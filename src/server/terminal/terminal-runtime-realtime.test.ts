@@ -53,6 +53,12 @@ describe('terminal realtime handlers', () => {
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
     buffered.pause()
+    const sessionsChanged = JSON.stringify({
+      type: 'sessions-changed',
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      revision: 5,
+    })
     const output = JSON.stringify({
       type: 'output',
       event: {
@@ -67,15 +73,17 @@ describe('terminal realtime handlers', () => {
     })
     const host = {
       attach: async () => {
+        buffered.send(sessionsChanged)
         buffered.send(output)
         return {
           ok: true as const,
           frame: 'stream' as const,
+          terminalProjectionEffect: { kind: 'delta' as const, revision: 5 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
-          phase: 'opening' as const,
+          phase: 'open' as const,
           message: null,
           controller: { clientId: 'client-test', status: 'connected' as const },
           canonicalCols: 100,
@@ -101,9 +109,14 @@ describe('terminal realtime handlers', () => {
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
       action: 'attach',
-      payload: { ok: true, frame: 'stream' },
+      payload: {
+        ok: true,
+        frame: 'stream',
+        terminalProjectionEffect: { kind: 'delta', revision: 5 },
+      },
     })
-    expect(sent[1]).toBe(output)
+    expect(sent[1]).toBe(sessionsChanged)
+    expect(sent[2]).toBe(output)
   })
 
   test('drops buffered output represented by an existing-session snapshot', async () => {
@@ -130,6 +143,7 @@ describe('terminal realtime handlers', () => {
         return {
           ok: true as const,
           frame: 'snapshot' as const,
+          terminalProjectionEffect: { kind: 'none' as const },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
           processName: 'zsh',
@@ -162,5 +176,61 @@ describe('terminal realtime handlers', () => {
 
     expect(sent).toHaveLength(1)
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({ payload: { ok: true, frame: 'snapshot' } })
+  })
+
+  test('orders a restart delta response before its buffered sessions event', async () => {
+    const sent: string[] = []
+    const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
+    const buffered = new BufferedAppRealtimeSocket(socket)
+    buffered.pause()
+    const sessionsChanged = JSON.stringify({
+      type: 'sessions-changed',
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      revision: 6,
+    })
+    const host = {
+      restart: async () => {
+        buffered.send(sessionsChanged)
+        return {
+          ok: true as const,
+          frame: 'snapshot' as const,
+          terminalProjectionEffect: { kind: 'delta' as const, revision: 6 },
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 2,
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          snapshot: 'prompt',
+          snapshotSeq: 1,
+          outputEra: 1,
+          controller: { clientId: 'client-test', status: 'connected' as const },
+          canonicalCols: 100,
+          canonicalRows: 30,
+        }
+      },
+    } as unknown as ServerTerminalActionHost
+
+    await handleTerminalRealtimeRequestMessage(
+      createTerminalRealtimeHandlers(host),
+      'client-test',
+      'user-test',
+      socket,
+      buffered,
+      {
+        type: 'request',
+        requestId: 'request-restart',
+        action: 'restart',
+        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
+      },
+    )
+
+    expect(JSON.parse(sent[0] ?? '')).toMatchObject({
+      type: 'response',
+      action: 'restart',
+      payload: { terminalProjectionEffect: { kind: 'delta', revision: 6 } },
+    })
+    expect(sent[1]).toBe(sessionsChanged)
   })
 })

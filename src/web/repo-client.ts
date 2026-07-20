@@ -3,19 +3,16 @@ import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-f
 import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
-  RepoRuntimeProjection,
+  GitWorkspaceRuntimeProjection,
   RepoWorktreeStatusSnapshot,
-  RepoRuntimesSnapshot,
-  RepoRuntimeOpenResult,
-  RepoRuntimeMembershipReconcileResult,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
@@ -27,6 +24,9 @@ const REPO_REQUEST_TIMEOUT_MS = {
   patch: 15 * 60_000,
 } as const
 
+const BACKGROUND_SYNC_REVISION_STORAGE_KEY = 'goblin:background-sync-registration-revision'
+let fallbackBackgroundSyncRevision = 0
+
 async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   try {
     return await read()
@@ -35,10 +35,6 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
-}
-
-export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
-  return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
 
 export async function cloneRepository(
@@ -63,14 +59,20 @@ export async function cloneRepository(
 }
 
 export async function getRepoLog(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   branch: string,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
 ): Promise<LogEntry[]> {
   const result = await postServerJson(
     '/api/repo/log',
-    { cwd, repoRuntimeId, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
+    {
+      cwd,
+      workspaceRuntimeId,
+      branch,
+      count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT,
+      skip: options?.skip ?? 0,
+    },
     { signal: options?.signal },
   )
   const log = result as RepoLogResponse
@@ -79,62 +81,58 @@ export async function getRepoLog(
 }
 
 export async function getRepoRemoteBranches(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  return await postServerJson('/api/repo/remote-branches', { cwd, repoRuntimeId }, { signal })
+  return await postServerJson('/api/repo/remote-branches', { cwd, workspaceRuntimeId }, { signal })
 }
 
 export async function getRepoProjection(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   branch?: string | null,
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
-): Promise<RepoRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   return await postServerJson(
     '/api/repo/projection',
-    { cwd, repoRuntimeId, branch: branch || undefined, mode: options?.mode },
+    { cwd, workspaceRuntimeId, branch: branch || undefined, mode: options?.mode },
     { signal },
   )
 }
 
 export async function getRepoWorktreeStatus(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoWorktreeStatusSnapshot> {
   return await runRepoReadWithStableErrorKey(
-    async () => await postServerJson('/api/repo/worktree-status', { cwd, repoRuntimeId }, { signal }),
+    async () => await postServerJson('/api/repo/worktree-status', { cwd, workspaceRuntimeId }, { signal }),
     signal,
   )
 }
 
 export async function getRepoOperations(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   options?: { includeSettled?: boolean; signal?: AbortSignal },
 ): Promise<RepoOperationsSnapshot> {
   return await postServerJson(
     '/api/repo/operations',
-    { cwd, repoRuntimeId, includeSettled: options?.includeSettled },
+    { cwd, workspaceRuntimeId, includeSettled: options?.includeSettled },
     { signal: options?.signal },
   )
 }
 
-export async function abortRepoOperation(cwd: string): Promise<boolean> {
-  return await postServerJson('/api/repo/abort', { cwd })
-}
-
 export async function fetchRepo(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
   return await postServerJson(
     '/api/repo/fetch',
-    { cwd, repoRuntimeId },
+    { cwd, workspaceRuntimeId },
     {
       signal,
       timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
@@ -143,28 +141,28 @@ export async function fetchRepo(
 }
 
 export async function pullRepoBranch(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/pull',
-    { cwd, repoRuntimeId, branch, worktreePath },
+    { cwd, workspaceRuntimeId, branch, worktreePath },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
   )
 }
 
 export async function pushRepoBranch(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/push',
-    { cwd, repoRuntimeId, branch },
+    { cwd, workspaceRuntimeId, branch },
     {
       signal,
       timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
@@ -173,44 +171,44 @@ export async function pushRepoBranch(
 }
 
 export async function createRepoWorktree(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
-    { cwd, repoRuntimeId, ...input, worktreeBootstrap },
+    { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
 
 export async function getRepoWorktreeBootstrapPreview(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
-  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd, repoRuntimeId }, { signal })
+  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd, workspaceRuntimeId }, { signal })
 }
 
 export async function deleteRepoBranch(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   branch: string,
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, repoRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
+    { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }
 
 export async function removeRepoWorktree(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   options: {
     branch: string
     worktreePath: string
@@ -222,7 +220,7 @@ export async function removeRepoWorktree(
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/remove-worktree',
-    { cwd, repoRuntimeId, ...options },
+    { cwd, workspaceRuntimeId, ...options },
     {
       signal,
       timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
@@ -231,97 +229,58 @@ export async function removeRepoWorktree(
 }
 
 export async function getRepoPatch(
-  cwd: string,
-  repoRuntimeId: string,
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
   worktreePath: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/patch',
-    { cwd, repoRuntimeId, worktreePath },
+    { cwd, workspaceRuntimeId, worktreePath },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.patch },
   )
 }
 
-export async function openRepoUrl(cwd: string, repoRuntimeId: string, target: RepoUrlTarget): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; repoRuntimeId: string; target: RepoUrlTarget }, ExecResult>(
-    '/api/repo/open-url',
-    {
-      cwd,
-      repoRuntimeId,
-      target,
-    },
-  )
+export async function openRepoUrl(
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
+  target: RepoUrlTarget,
+): Promise<ExecResult> {
+  const result = await postServerJson<
+    { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget },
+    ExecResult
+  >('/api/repo/open-url', {
+    cwd,
+    workspaceRuntimeId,
+    target,
+  })
   if (!result.ok || !result.message) return result
   const opened = await openExternalUrl(result.message)
   return opened.ok ? { ok: true, message: '' } : opened
 }
 
-export async function openRepoTerminal(
-  repoId: string,
-  repoRuntimeId: string,
-  worktreePath: string,
-  app: TerminalApp,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { repoId, repoRuntimeId, worktreePath, app })
-}
-
-export async function openRepoEditor(
-  repoId: string,
-  repoRuntimeId: string,
-  worktreePath: string,
-  app: EditorApp,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { repoId, repoRuntimeId, worktreePath, app })
-}
-
-export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-in-finder', { repoId, worktreePath })
-}
-
-export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
-  await postServerJson('/api/repo/background-sync-repos', { repoIds })
-}
-
-export async function openRepoRuntime(repoRoot: string): Promise<string> {
-  const result = await postServerJson<{ repoRoot: string; clientId: string }, { repoRuntimeId: string }>(
-    '/api/repo/runtime-open',
-    { repoRoot, clientId: readOrCreateWebTerminalClientId() },
-  )
-  return result.repoRuntimeId
-}
-
-export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRuntimeOpenResult> {
-  return await postServerJson<{ repoInput: string; clientId: string }, RepoRuntimeOpenResult>(
-    '/api/repo/runtime-open',
+export async function setBackgroundSyncRepos(targets: GitBackgroundSyncTarget[], signal?: AbortSignal): Promise<void> {
+  await postServerJson(
+    '/api/repo/background-sync-repos',
     {
-      repoInput,
       clientId: readOrCreateWebTerminalClientId(),
+      revision: nextBackgroundSyncRegistrationRevision(),
+      targets,
     },
+    { signal },
   )
 }
 
-export async function reconcileRepoRuntimeMemberships(
-  repoRoots: string[],
-): Promise<RepoRuntimeMembershipReconcileResult> {
-  return await postServerJson('/api/repo/runtime-reconcile', {
-    clientId: readOrCreateWebTerminalClientId(),
-    repoRoots,
-  })
-}
-
-export async function closeRepoRuntime(repoRoot: string, repoRuntimeId: string): Promise<boolean> {
-  const result = await postServerJson<
-    { repoRoot: string; repoRuntimeId: string; clientId: string },
-    { ok: boolean; released: boolean; runtimeClosed: boolean }
-  >('/api/repo/runtime-close', {
-    repoRoot,
-    repoRuntimeId,
-    clientId: readOrCreateWebTerminalClientId(),
-  })
-  return result.released
-}
-
-export async function listRepoRuntimes(signal?: AbortSignal): Promise<RepoRuntimesSnapshot> {
-  return await postServerJson<{}, RepoRuntimesSnapshot>('/api/repo/runtime-list', {}, { signal })
+function nextBackgroundSyncRegistrationRevision(): number {
+  const clockRevision = Date.now() * 1000
+  try {
+    const stored = Number(window.sessionStorage.getItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY))
+    const canIncrementStored = Number.isSafeInteger(stored) && stored > 0 && stored < Number.MAX_SAFE_INTEGER
+    const next = Math.max(canIncrementStored ? stored + 1 : 1, clockRevision)
+    window.sessionStorage.setItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY, String(next))
+    return next
+  } catch {
+    fallbackBackgroundSyncRevision = Math.max(fallbackBackgroundSyncRevision + 1, clockRevision)
+    return fallbackBackgroundSyncRevision
+  }
 }

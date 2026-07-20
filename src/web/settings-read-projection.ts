@@ -58,7 +58,7 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
   }
 }
 
-export function useRuntimeRecentRepos() {
+export function useRuntimeRecentWorkspaces() {
   const { data } = useSettingsSnapshotQuery()
-  return data?.recentRepos ?? []
+  return data?.recentWorkspaces ?? []
 }

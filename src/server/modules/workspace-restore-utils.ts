@@ -13,7 +13,7 @@ export async function abortableWorkspaceRestore<T>(promise: Promise<T>, signal?:
   }
 }
 
-export function workspaceRepoDisplayName(value: string): string {
+export function workspaceDisplayName(value: string): string {
   const trimmed = value.replace(/[\\/]+$/, '')
   return trimmed.split(/[\\/]/).pop() || value
 }

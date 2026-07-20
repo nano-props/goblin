@@ -3,15 +3,16 @@
 Use these docs for app-level product and architecture decisions:
 
 - `ui-conventions.md`: UI and copy rules
+- `workspaces.md`: canonical workspace identity, capabilities, refresh, and pane targets
 - `arch.md`: app shell and process control
-- `ssh-remote.md`: SSH remote repository backend design
+- `ssh-remote.md`: SSH remote workspace backend design
 - `layering.md`: feature layering rules
 - `state-sync.md`: state control and sync model
 - `startup.md`: primary window startup, restore, routing, and persistence gates
 - `client-model.md`: client model
 - `testing.md`: testing strategy
 - `realtime.md`: realtime rules
-- `repo-runtime-membership.md`: durable workspace membership, runtime identity, and client lease ownership
+- `workspace-runtime-membership.md`: durable workspace membership, runtime identity, and client lease ownership
 - `g-command.md`: `g` shell command architecture (registry, control vs. data plane, error envelope)
 - `terminology.md`: canonical naming reference for subsystems, components, and state classes
 - `transient-surfaces.md`: transient hover/proximity surfaces and descendant floating-surface pinning

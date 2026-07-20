@@ -20,27 +20,24 @@ import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
 import type { PasteResolution } from '#/web/clipboard/resolver.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
-  useTerminalWorktreeSelectedDescriptor,
-  useTerminalWorktreeSessionDescriptor,
-  useTerminalWorktreeCount,
-  useTerminalWorktreeCreatePending,
+  useTerminalFilesystemTargetSelectedDescriptor,
+  useTerminalFilesystemTargetSessionDescriptor,
+  useTerminalFilesystemTargetCount,
+  useTerminalFilesystemTargetCreatePending,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
 interface TerminalSessionViewProps {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
+  base: TerminalSessionBase
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
@@ -48,10 +45,7 @@ interface TerminalSessionViewProps {
 }
 
 export function TerminalSessionView({
-  repoRoot,
-  repoRuntimeId,
-  branch,
-  worktreePath,
+  base,
   selectedTerminalSessionId,
   projectionPhase = 'ready',
   projectionErrorMessage,
@@ -79,30 +73,28 @@ export function TerminalSessionView({
     restart,
     focusTerminal,
   } = context
-  const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreePath)
+  const { workspaceId, executionRootId } = terminalSessionCoordinates(base)
+  const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(workspaceId, executionRootId)
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return
-    registerHost(terminalWorktreeKey, host)
-    return () => unregisterHost(terminalWorktreeKey, host)
-  }, [registerHost, terminalWorktreeKey, unregisterHost])
+    registerHost(terminalFilesystemTargetKey, host)
+    return () => unregisterHost(terminalFilesystemTargetKey, host)
+  }, [registerHost, terminalFilesystemTargetKey, unregisterHost])
 
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host || typeof ResizeObserver !== 'function') return
-    const observer = new ResizeObserver(() => registerHost(terminalWorktreeKey, host))
+    const observer = new ResizeObserver(() => registerHost(terminalFilesystemTargetKey, host))
     observer.observe(host)
     return () => observer.disconnect()
-  }, [registerHost, terminalWorktreeKey])
+  }, [registerHost, terminalFilesystemTargetKey])
 
-  const selectedDescriptor = useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey)
-  const explicitDescriptor = useTerminalWorktreeSessionDescriptor({
-    terminalWorktreeKey,
+  const selectedDescriptor = useTerminalFilesystemTargetSelectedDescriptor(terminalFilesystemTargetKey)
+  const explicitDescriptor = useTerminalFilesystemTargetSessionDescriptor({
+    terminalFilesystemTargetKey,
     terminalSessionId: selectedTerminalSessionId ?? null,
-    repoRoot,
-    repoRuntimeId,
-    branch,
-    worktreePath,
+    base,
   })
   const descriptor = selectedTerminalSessionId === undefined ? selectedDescriptor : explicitDescriptor
   const terminalSessionId =
@@ -117,8 +109,8 @@ export function TerminalSessionView({
     descriptorRef.current = descriptor
   }, [descriptor])
   const snapshot = useTerminalSnapshot(terminalSessionId)
-  const hasSessions = useTerminalWorktreeCount(terminalWorktreeKey) > 0
-  const createPending = useTerminalWorktreeCreatePending(terminalWorktreeKey)
+  const hasSessions = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey) > 0
+  const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -533,7 +525,7 @@ export function TerminalSessionView({
         // loading state is still the right user signal).
         <EmptyTerminalCta
           onCreate={async () => {
-            await createTerminalForSlot({ repoRoot, repoRuntimeId, branch, worktreePath })
+            await createTerminalForSlot(base)
           }}
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}
@@ -579,16 +571,16 @@ interface EmptyTerminalCtaProps {
   newTerminalLabel: string
 }
 
-// Empty-state CTA. Rendered when the worktree has no terminal
+// Empty-state CTA. Rendered when the filesystem target has no terminal
 // sessions yet. The button is the only way for the user to
-// materialize a session on a fresh worktree without reaching for
-// the per-worktree "+" affordance in the tab strip — the session's
+// materialize a session on a fresh target without reaching for
+// the per-target "+" affordance in the tab strip — the session's
 // bare host <div> would otherwise be a featureless black box, which
 // is the "blank screen" symptom the user reported on first click.
 //
 // `creating` is local to the button so double-clicks don't enqueue
 // a second create while the first one is in flight. The registry's
-// pending-create queue would dedupe the second call by worktree
+// pending-create queue would dedupe the second call by filesystem-target
 // key, but a visible loading state is still the right user signal.
 function EmptyTerminalCta({ onCreate, emptyLabel, newTerminalLabel }: EmptyTerminalCtaProps) {
   const [creating, setCreating] = useState(false)

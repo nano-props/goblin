@@ -4,21 +4,22 @@
 // in one data path.
 
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
+import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
-import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
   onSelectBranch?: (branch: string) => void
   currentBranchName?: string | null
   /** Run after the user picks a row. Kept optional for embedded
@@ -31,8 +32,8 @@ interface Props {
 export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const repoRuntimeId = useReposStore((state) => state.repos[repoId]?.repoRuntimeId ?? null)
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repoRuntimeId ?? '', repoRuntimeId !== null)
+  const workspaceRuntimeId = useWorkspacesStore((state) => state.workspaces[repoId]?.workspaceRuntimeId ?? null)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
@@ -54,7 +55,7 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   const handleOpenBranchStatus = (branchName: string) => {
     void dispatchShowWorkspacePaneStaticTabAction({
-      repoId,
+      workspaceId: repoId,
       branchName,
       type: 'status',
       workspacePaneRoute: undefined,
@@ -73,11 +74,11 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const retryStatus = () => {
-    if (!repoRuntimeId) return
-    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
+    if (!workspaceRuntimeId) return
+    void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoId, workspaceRuntimeId)
   }
 
-  if (!repo && !statusReadModel.data && statusReadModel.isError && repoRuntimeId) {
+  if (!repo && !statusReadModel.data && statusReadModel.isError && workspaceRuntimeId) {
     return (
       <RepoStatusFailureView
         messageKey={statusErrorKey ?? 'error.failed-read-repo'}

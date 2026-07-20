@@ -11,12 +11,12 @@ export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'
   | 'file-create-worktree'
-  | 'file-open-local-repo'
-  | 'file-open-local-repo-path'
+  | 'file-open-local-workspace'
+  | 'file-open-local-workspace-path'
   | 'file-clone-repo'
-  | 'file-open-remote-repo'
+  | 'file-open-remote-workspace'
   | 'file-close-workspace-tab-or-window'
-  | 'file-close-tab'
+  | 'file-close-workspace'
   | 'file-settings'
   | 'view-status'
   | 'view-history'
@@ -24,8 +24,8 @@ export type ClientMenuCommandId =
   | 'view-terminal'
   | 'view-toggle-zen-mode'
   | 'view-refresh'
-  | 'window-next-repo'
-  | 'window-prev-repo'
+  | 'window-next-workspace'
+  | 'window-prev-workspace'
   | 'window-reset-layout'
   | 'help-shortcuts'
 
@@ -95,7 +95,7 @@ export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
 export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+T'
 export const CREATE_WORKTREE_SHORTCUT = 'CmdOrCtrl+N'
 export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
-export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
+export const CLOSE_WORKSPACE_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
 export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
@@ -126,16 +126,16 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-open-local-repo',
-    'menu.file.open-local-repo',
-    { type: 'open-repo-requested' },
+    'file-open-local-workspace',
+    'menu.file.open-local-workspace',
+    { type: 'open-workspace-requested' },
     {
-      helpLabelKey: 'help.row.open-local-repo',
+      helpLabelKey: 'help.row.open-local-workspace',
       accelerator: 'CmdOrCtrl+O',
     },
   ),
-  clientMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', {
-    type: 'open-repo-path-requested',
+  clientMenuCommand('file-open-local-workspace-path', 'menu.file.open-local-workspace-path', {
+    type: 'open-workspace-path-requested',
   }),
   clientMenuCommand(
     'file-clone-repo',
@@ -147,9 +147,9 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-open-remote-repo',
-    'menu.file.open-remote-repo',
-    { type: 'open-remote-repo-requested' },
+    'file-open-remote-workspace',
+    'menu.file.open-remote-workspace',
+    { type: 'open-remote-workspace-requested' },
     {
       accelerator: 'CmdOrCtrl+Shift+R',
     },
@@ -164,12 +164,12 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-close-tab',
-    'menu.file.close-tab',
-    { type: 'close-repo-requested' },
+    'file-close-workspace',
+    'menu.file.close-workspace',
+    { type: 'close-workspace-requested' },
     {
-      helpLabelKey: 'help.row.close-repo',
-      accelerator: CLOSE_REPO_SHORTCUT,
+      helpLabelKey: 'help.row.close-workspace',
+      accelerator: CLOSE_WORKSPACE_SHORTCUT,
     },
   ),
   clientMenuCommand(
@@ -225,27 +225,27 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'view-refresh',
     'menu.view.refresh',
-    { type: 'repo-refresh-requested' },
+    { type: 'workspace-refresh-requested' },
     {
       helpLabelKey: 'help.row.refresh',
       accelerator: 'CmdOrCtrl+U',
     },
   ),
   clientMenuCommand(
-    'window-next-repo',
-    'menu.window.next-repo',
-    { type: 'cycle-repo-requested', direction: 1 },
+    'window-next-workspace',
+    'menu.window.next-workspace',
+    { type: 'cycle-workspace-requested', direction: 1 },
     {
-      helpLabelKey: 'help.row.next-repo',
+      helpLabelKey: 'help.row.next-workspace',
       accelerator: 'CmdOrCtrl+Shift+]',
     },
   ),
   clientMenuCommand(
-    'window-prev-repo',
-    'menu.window.prev-repo',
-    { type: 'cycle-repo-requested', direction: -1 },
+    'window-prev-workspace',
+    'menu.window.prev-workspace',
+    { type: 'cycle-workspace-requested', direction: -1 },
     {
-      helpLabelKey: 'help.row.prev-repo',
+      helpLabelKey: 'help.row.prev-workspace',
       accelerator: 'CmdOrCtrl+Shift+[',
     },
   ),
@@ -256,14 +256,14 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
 export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'file-new-terminal-tab',
   'file-create-worktree',
-  'file-open-local-repo',
+  'file-open-local-workspace',
   'file-clone-repo',
   'view-refresh',
 ]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])
 
 export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
-  'window-next-repo',
-  'window-prev-repo',
+  'window-next-workspace',
+  'window-prev-workspace',
 ])
 
 export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts(['view-toggle-zen-mode'])

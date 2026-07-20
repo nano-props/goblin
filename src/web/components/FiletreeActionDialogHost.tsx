@@ -1,16 +1,18 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
-import { trashRepositoryFile } from '#/web/filetree-client.ts'
+import { trashWorkspaceFile } from '#/web/workspace-filesystem-client.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
+import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
-  readonly currentRepoId: string | null
+  readonly currentWorkspaceId: WorkspaceId | null
+  readonly currentWorkspaceRuntimeId: string | null
 }
 
-export function FiletreeActionDialogHost({ currentRepoId }: Props) {
+export function FiletreeActionDialogHost({ currentWorkspaceId, currentWorkspaceRuntimeId }: Props) {
   const t = useT()
   const trashFileConfirm = useFiletreeActionDialogsStore((s) => s.trashFileConfirm)
   const closeTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.closeTrashFileConfirm)
@@ -18,8 +20,12 @@ export function FiletreeActionDialogHost({ currentRepoId }: Props) {
   const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
 
   useEffect(() => {
-    closeStaleDialogs(currentRepoId ?? '')
-  }, [currentRepoId, closeStaleDialogs])
+    closeStaleDialogs(
+      currentWorkspaceId && currentWorkspaceRuntimeId
+        ? { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
+        : null,
+    )
+  }, [currentWorkspaceId, currentWorkspaceRuntimeId, closeStaleDialogs])
 
   return (
     <ConfirmDialog
@@ -37,12 +43,7 @@ export function FiletreeActionDialogHost({ currentRepoId }: Props) {
       onCancel={closeTrashFileConfirm}
       onConfirm={async () => {
         if (!trashFileConfirm) return
-        const result = await trashRepositoryFile(
-          trashFileConfirm.repoId,
-          trashFileConfirm.repoRuntimeId,
-          trashFileConfirm.worktreePath,
-          trashFileConfirm.path,
-        )
+        const result = await trashWorkspaceFile(trashFileConfirm.target, trashFileConfirm.path)
         if (result.ok) {
           closeTrashFileConfirm()
           return

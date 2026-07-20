@@ -213,7 +213,7 @@ describe('architecture boundary rules', () => {
           source: 'repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)\n',
         },
         {
-          relativeFilePath: '/src/web/stores/repos/refresh.ts',
+          relativeFilePath: '/src/web/stores/workspaces/refresh.ts',
           source: 'repo.dataLoads.visibleStatus.error = message\n',
         },
       ]),
@@ -236,7 +236,7 @@ describe('architecture boundary rules', () => {
         },
         {
           relativeFilePath: '/src/web/hooks/useRepoStoreInvalidationRefresh.ts',
-          source: "if (event.query === 'repo-snapshot') invalidateRepoDataQueries(event.repoId)\n",
+          source: "if (event.query === 'repo-snapshot') invalidateRepoSnapshotQueries(event.repoId)\n",
         },
       ]),
     ).toEqual([])

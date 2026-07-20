@@ -3,14 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CLIPBOARD_SAVE_FILES_CHANNEL } from '#/shared/ipc-channels.ts'
-import {
-  CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
-  PASTE_FILE_MAX_BYTES,
-} from '#/shared/clipboard-paste.ts'
-import {
-  createClipboardTimestampedFileName,
-  listDirEntries,
-} from '#/shared/clipboard-paste-node.ts'
+import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { createClipboardTimestampedFileName, listDirEntries } from '#/shared/clipboard-paste-node.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 /**

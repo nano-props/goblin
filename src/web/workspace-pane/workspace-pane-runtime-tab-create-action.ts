@@ -1,25 +1,40 @@
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionCoordinates,
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionBase,
+  type TerminalPresentation,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import {
   runCreateTerminalTabCommand,
   type TerminalCreateCommandAdmission,
   type TerminalCreateCommandResult,
   type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
-import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import {
   commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { goblinLog } from '#/web/logger.ts'
-import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromFilesystemTarget,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  beginPrimaryWindowPresentation,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -29,13 +44,12 @@ export interface WorkspacePaneRuntimeTabCreateAction {
 }
 
 export interface WorkspacePaneRuntimeTabCreateActionContext {
-  repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
-  initialRuntimeProjectionHydrating: boolean
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
-    canonicalBranch: string,
+    presentation: TerminalPresentation,
+    presentationToken: PrimaryWindowPresentationToken,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
@@ -48,7 +62,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+    placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   captureOpenerIdentity: () => string | null
 }
@@ -58,10 +72,10 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+    placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, presentation: TerminalPresentation) => boolean | Promise<boolean>
   insertAfterIdentity?: string | null
   options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
@@ -70,9 +84,9 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
 
 export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
-  admission: TerminalCreateLeaderAdmissionResult
+  admission: TerminalCreateAdmissionResult
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, presentation: TerminalPresentation) => boolean | Promise<boolean>
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -98,11 +112,7 @@ export function workspacePaneRuntimeTabCreateAction(
 export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
 ): Promise<TerminalCreateCommandResult> {
-  const base = terminalSessionBaseWithRuntime(options.base)
-  if (!base) {
-    const error = new Error('terminal runtime target is unavailable')
-    return { ok: false, error, messageKey: 'terminal.createFailed' }
-  }
+  const base = options.base
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   return await runWorkspacePaneAction(
     target,
@@ -129,27 +139,57 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   base: TerminalSessionBase,
   terminalSessionId: string,
   navigation: WorkspacePaneTabControllerCommitNavigation,
+  presentationToken: PrimaryWindowPresentationToken,
 ): boolean | Promise<boolean> {
-  const resolvedBase = terminalSessionBaseWithRuntime(base)
-  if (!resolvedBase) return false
-  const target = terminalWorkspacePaneCoordinatorTarget(resolvedBase)
-  return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId }, navigation)
+  const coordinates = terminalExecutionCoordinates(base.target)
+  const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
+  if (!paneTarget) return false
+  const workspaceRoot = base.target.kind === 'workspace-root'
+  if (workspaceRoot) {
+    if (base.presentation.kind !== 'workspace-root') return false
+    return (
+      navigation.showWorkspaceRootPaneTab?.(
+        coordinates.workspaceId,
+        { kind: 'terminal', terminalSessionId },
+        { presentationToken },
+      ) ?? false
+    )
+  }
+  if (base.presentation.kind === 'git-worktree' && base.presentation.head.kind === 'detached') {
+    return (
+      navigation.showRepoWorktreeTerminalSession?.(
+        coordinates.workspaceId,
+        terminalExecutionPath(base.target),
+        terminalSessionId,
+        { presentationToken },
+      ) ?? false
+    )
+  }
+  return commitWorkspacePaneCurrentTargetRoute(
+    {
+      workspaceId: coordinates.workspaceId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
+      branchName: terminalPresentationBranch(base.presentation),
+      worktreePath: terminalExecutionPath(base.target),
+      paneTarget,
+    },
+    { kind: 'terminal', terminalSessionId },
+    navigation,
+    undefined,
+    presentationToken,
+  )
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<TerminalCreatedTabCommitResult> {
-  const canonicalOptions = {
-    ...options,
-    base: { ...options.base, branch: options.admission.branch },
-  }
-  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(canonicalOptions)
-  if (projectionStatus !== 'accepted') return { status: projectionStatus }
+  const canonicalBase = terminalSessionBase(options.base.target, options.admission.presentation)
+  const canonicalOptions = { ...options, base: canonicalBase }
   if (!terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) return { status: 'superseded' }
   recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
   const navigationCommitted = await options.showCreatedTerminalTab(
     options.admission.terminalSessionId,
-    options.admission.branch,
+    options.admission.presentation,
   )
   return navigationCommitted ? { status: 'committed' } : { status: 'navigation-rejected' }
 }
@@ -157,58 +197,28 @@ export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
 function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): void {
-  if (!options.openerIdentity || options.admission.resourceDisposition !== 'created') return
-  const repoRuntimeId = options.base.repoRuntimeId
-  if (!repoRuntimeId) return
+  const ownsCreatedResource =
+    options.admission.requestRole === 'leader' && options.admission.resourceDisposition === 'created'
+  if (!options.openerIdentity || !ownsCreatedResource) return
+  const coordinates = terminalExecutionCoordinates(options.base.target)
+  const paneTarget = workspacePaneTabsTargetFromRuntime(options.base.target)
+  if (!paneTarget) return
   recordWorkspacePaneTabOpener(
-    options.base.repoRoot,
-    repoRuntimeId,
-    options.base.branch,
+    paneTarget,
+    coordinates.workspaceRuntimeId,
     terminalWorkspacePaneTabProvider.identity(options.admission.terminalSessionId),
     options.openerIdentity,
   )
 }
 
-function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase & { repoRuntimeId: string }) {
-  return {
-    repoId: base.repoRoot,
-    repoRuntimeId: base.repoRuntimeId,
-    branchName: base.branch,
-    worktreePath: base.worktreePath,
-  }
-}
-
-function terminalSessionBaseWithRuntime(
-  base: TerminalSessionBase,
-): (TerminalSessionBase & { repoRuntimeId: string }) | null {
-  const repoRuntimeId = base.repoRuntimeId
-  return repoRuntimeId ? { ...base, repoRuntimeId } : null
-}
-
-async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
-  options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
-): Promise<'accepted' | 'superseded' | 'projection-failed'> {
-  const repoRuntimeId = options.base.repoRuntimeId
-  if (!repoRuntimeId) return 'superseded'
-  try {
-    await refreshWorkspacePaneTabsQueryData(options.base.repoRoot, repoRuntimeId)
-    return terminalCreateTargetRuntimeIsCurrent(options.base) ? 'accepted' : 'superseded'
-  } catch (err) {
-    goblinLog.warn('failed to refresh workspace pane tabs after runtime creation', {
-      repoRoot: options.base.repoRoot,
-      repoRuntimeId,
-      branchName: options.base.branch,
-      worktreePath: options.base.worktreePath,
-      err,
-    })
-    return 'projection-failed'
-  }
+function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase) {
+  return workspacePaneActionTargetFromFilesystemTarget(base.target)
 }
 
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
-  const repoRuntimeId = base.repoRuntimeId
+  const coordinates = terminalExecutionCoordinates(base.target)
   return (
-    typeof repoRuntimeId === 'string' && currentRepoRuntimeId(useReposStore.getState(), base.repoRoot) === repoRuntimeId
+    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.workspaceId) === coordinates.workspaceRuntimeId
   )
 }
 
@@ -216,22 +226,23 @@ function terminalRuntimeTabCreateAction(
   context: WorkspacePaneRuntimeTabCreateActionContext,
 ): WorkspacePaneRuntimeTabCreateAction | null {
   const terminal = context.terminal
-  const base = terminal?.base ? terminalSessionBaseWithRuntime(terminal.base) : null
+  const base = terminal?.base ?? null
   if (!terminal || !base) return null
   return {
     label: context.t('terminal.new'),
-    busy: context.initialRuntimeProjectionHydrating || context.runtimeTabStateByType.terminal.createPending,
+    busy: context.runtimeTabStateByType.terminal.createPending,
     blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       if (context.runtimeTabStateByType.terminal.createPending) return
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = terminal.captureOpenerIdentity()
+      const presentationToken = beginPrimaryWindowPresentation()
       void dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal: terminal.createTerminal,
         openerIdentity,
-        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-          context.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch),
+        showCreatedTerminalTab: (terminalSessionId, presentation) =>
+          context.showCreatedRuntimeTab('terminal', terminalSessionId, presentation, presentationToken),
         t: context.t,
       })
     },

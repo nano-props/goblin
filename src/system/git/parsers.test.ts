@@ -11,6 +11,7 @@ import {
   parseBranches,
   parseLog,
   parseStatus,
+  parseUsableWorktrees,
   parseWorktreeStatusBatch,
   parseWorktrees,
   splitWorktreeStatusBatch,
@@ -236,6 +237,37 @@ describe('parseWorktrees', () => {
 
     const bare = ['worktree /repo/wt2', 'HEAD a', 'branch refs/heads/x', 'locked'].join('\n')
     expect(parseWorktrees(bare)[0]?.isLocked).toBe(true)
+  })
+
+  test('models prunable metadata while excluding it from the usable projection', () => {
+    const out = [
+      'worktree /repo',
+      'HEAD a',
+      'branch refs/heads/main',
+      '',
+      'worktree /repo/missing',
+      'HEAD b',
+      'branch refs/heads/stale',
+      'prunable gitdir file points to non-existent location',
+      '',
+      'worktree /repo/live',
+      'HEAD c',
+      'branch refs/heads/live',
+    ].join('\n')
+
+    expect(parseWorktrees(out)).toEqual([
+      { path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
+      {
+        path: '/repo/missing',
+        branch: 'stale',
+        isBare: false,
+        isPrimary: false,
+        isLocked: false,
+        isPrunable: true,
+      },
+      { path: '/repo/live', branch: 'live', isBare: false, isPrimary: false, isLocked: false },
+    ])
+    expect(parseUsableWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
   })
 
   test('detached HEAD has no branch line — branch left undefined', () => {

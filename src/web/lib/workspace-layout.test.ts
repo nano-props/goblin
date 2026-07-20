@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 
-describe('repoWorkspaceBehavior', () => {
+describe('workspaceLayoutBehavior', () => {
   test('renders split behavior when neither compact nor Zen Mode is active', () => {
-    expect(repoWorkspaceBehavior({ compact: false, zenMode: false })).toMatchObject({
+    expect(workspaceLayoutBehavior({ compact: false, zenMode: false })).toMatchObject({
       mode: 'split',
       singlePane: false,
       zenMode: false,
@@ -11,8 +11,8 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('uses the sidebar as the single pane when large-screen Zen Mode has no current repo workspace', () => {
-    expect(repoWorkspaceBehavior({ compact: false, zenMode: true })).toMatchObject({
+  test('uses the sidebar as the single pane when large-screen Zen Mode has no active workspace pane', () => {
+    expect(workspaceLayoutBehavior({ compact: false, zenMode: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       zenMode: true,
@@ -20,12 +20,12 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('collapses the sidebar inside split layout when large-screen Zen Mode has a current repo workspace', () => {
+  test('collapses the sidebar inside split layout when large-screen Zen Mode has an active workspace pane', () => {
     expect(
-      repoWorkspaceBehavior({
+      workspaceLayoutBehavior({
         compact: false,
         zenMode: true,
-        repoWorkspaceActive: true,
+        workspacePaneActive: true,
       }),
     ).toMatchObject({
       mode: 'split',
@@ -36,7 +36,7 @@ describe('repoWorkspaceBehavior', () => {
   })
 
   test('uses single-pane behavior in compact mode even when Zen Mode is off', () => {
-    expect(repoWorkspaceBehavior({ compact: true, zenMode: false })).toMatchObject({
+    expect(workspaceLayoutBehavior({ compact: true, zenMode: false })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       compact: true,
@@ -45,12 +45,12 @@ describe('repoWorkspaceBehavior', () => {
     })
   })
 
-  test('hides the sidebar in compact mode once a repo workspace is active', () => {
+  test('hides the sidebar in compact mode once a workspace pane is active', () => {
     expect(
-      repoWorkspaceBehavior({
+      workspaceLayoutBehavior({
         compact: true,
         zenMode: false,
-        repoWorkspaceActive: true,
+        workspacePaneActive: true,
       }),
     ).toMatchObject({
       mode: 'single-pane',

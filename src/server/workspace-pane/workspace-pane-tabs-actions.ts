@@ -1,21 +1,41 @@
-import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
+import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface WorkspacePaneTabsActionService {
-  listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsSnapshot>
-  replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot>
-  updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot>
+  listWorkspaceTabs(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
+  replaceTabs(
+    userId: string,
+    input: WorkspacePaneTabsReplaceInput,
+    assertCurrentMembership: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
+  updateTabs(
+    userId: string,
+    input: WorkspacePaneTabsUpdateInput,
+    assertCurrentMembership: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
 }
 
 export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
-  isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
+  isCurrentWorkspaceRuntimeMembership(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    clientId: string,
+  ): boolean
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -28,10 +48,10 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsReplaceInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.replaceTabs(userId, input)
+      if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.replaceTabs(userId, input, assertCurrentMembership)
     },
 
     async updateTabs(
@@ -40,10 +60,10 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsUpdateInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.updateTabs(userId, input)
+      if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.updateTabs(userId, input, assertCurrentMembership)
     },
 
     async listWorkspaceTabs(
@@ -52,17 +72,39 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsListInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
+      if (!isValidWorkspaceLocatorInput(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.listWorkspaceTabs(
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
   }
 
-  function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
-    if (!deps.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
-      throw new Error('error.repo-runtime-stale')
+  function membershipAssertion(
+    clientId: string,
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): () => void {
+    return () => {
+      if (!deps.isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)) {
+        throw new Error('error.workspace-runtime-stale')
+      }
     }
   }
+}
+
+function validInputTarget(input: WorkspacePaneTabsReplaceInput | WorkspacePaneTabsUpdateInput): boolean {
+  return Boolean(
+    isValidWorkspaceLocatorInput(input?.workspaceId) &&
+    input.target.workspaceId === input.workspaceId &&
+    input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
+    restorableWorkspacePaneTargetFromRuntime(input.target),
+  )
 }
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {

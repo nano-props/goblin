@@ -1,24 +1,24 @@
 // @vitest-environment jsdom
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
-  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+  EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   TerminalSessionContext,
   TerminalSessionReadContext,
   useTerminalSessionContext,
   useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 function ReadSnapshot() {
   const ctx = useTerminalSessionReadContext()
   return (
     <>
-      <span data-testid="count">{ctx.terminalWorktreeSnapshot('any').count}</span>
-      <span data-testid="bell">{ctx.repoBellCount('any')}</span>
+      <span data-testid="count">{ctx.terminalFilesystemTargetSnapshot('any').count}</span>
+      <span data-testid="bell">{ctx.workspaceBellCount(WORKSPACE_ID)}</span>
     </>
   )
 }
@@ -28,14 +28,12 @@ function CommandProbe() {
   return <span data-testid="has-create-terminal">{String(typeof ctx.createTerminal)}</span>
 }
 
-function makeCommandContext(
-  overrides: Partial<TerminalSessionContextValue> = {},
-): TerminalSessionContextValue {
+function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: 'term-111111111111111111111',
-      branch: 'main',
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       resourceDisposition: 'created',
       runtimeProjectionApplied: false,
       requestRole: 'leader',
@@ -84,10 +82,10 @@ describe('useTerminalSessionReadContext', () => {
 
   test('returns the provider value when present', () => {
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => ({ ...EMPTY_TERMINAL_WORKTREE_SNAPSHOT, count: 7 }),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 3,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => ({ ...EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT, count: 7 }),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 3,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
       subscribeSnapshot: () => () => {},
     }

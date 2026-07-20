@@ -3,9 +3,10 @@
 
 import { BranchView } from '#/web/components/branch-navigator/BranchView.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
   onSelectBranch?: (branch: string) => void
   currentBranchName?: string | null
 }

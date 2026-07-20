@@ -69,7 +69,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
         sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true })]}
@@ -81,7 +81,9 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       />,
     )
 
-    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
+    const tabChrome = document.body.querySelector(
+      '[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]',
+    )
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal tab')
     expect(tabChrome.className).toContain('bg-selected')
     expect(tabChrome.className).toContain('cursor-grabbing')
@@ -94,7 +96,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
           session({ terminalSessionId: 'term-111111111111111111111', selected: true }),
@@ -116,7 +118,9 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
-    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
+    const tabChrome = document.body.querySelector(
+      '[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]',
+    )
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 
     expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
@@ -149,18 +153,18 @@ function makeWorkspacePaneTabStrip(
 ) {
   const { WorkspacePaneTabStrip } = workspacePaneTabStripModule
   return function TestWorkspacePaneTabStrip(props: {
-    terminalWorktreeKey: string
+    terminalFilesystemTargetKey: string
     sessions: TerminalSessionSummary[]
     workspacePaneId: string
     panelActive?: boolean
     onNew: () => void
-    onSelect: (terminalWorktreeKey: string, tab: TerminalSessionSummary) => void
+    onSelect: (terminalFilesystemTargetKey: string, tab: TerminalSessionSummary) => void
     onScrollToBottom: (key: string) => void
     onClose: (tab: TerminalSessionSummary) => void
     onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-    const { sessions, terminalWorktreeKey, onNew, onScrollToBottom, ...workspacePaneProps } = props
+    const { sessions, terminalFilesystemTargetKey, onNew, onScrollToBottom, ...workspacePaneProps } = props
     const items = sessions.map((tab) =>
       createRuntimeWorkspacePaneTabItem({
         view: tab,
@@ -178,7 +182,7 @@ function makeWorkspacePaneTabStrip(
         activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
         onSelect={(item) => {
           if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onSelect(terminalWorktreeKey, item.view)
+            props.onSelect(terminalFilesystemTargetKey, item.view)
           }
         }}
         onReselect={(item) => {
@@ -202,7 +206,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
   return {
     type: 'terminal',
     terminalSessionId,
-    terminalWorktreeKey: overrides.terminalWorktreeKey ?? '/repo\0/repo/worktree',
+    terminalFilesystemTargetKey: overrides.terminalFilesystemTargetKey ?? '/repo\0/repo/worktree',
     index: overrides.index ?? 1,
     title,
     fullTitle: overrides.fullTitle ?? title,

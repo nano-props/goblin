@@ -1,17 +1,16 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 
 import '#/web/components/terminal/terminal-session.css'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
-import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { useTerminalRepoIndex } from '#/web/components/terminal/terminal-repo-index.ts'
+import { useTerminalRuntimeMembershipIndex } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
@@ -19,9 +18,9 @@ interface TerminalSessionProviderProps {
 }
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
-  const repoIndex = useTerminalRepoIndex()
-  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
-    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
+  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
+    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
 
   // T1.1: prewarm the terminal font at app startup. The provider lives at
@@ -38,9 +37,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   // Projection state sync
   useEffect(() => {
-    projection.setRepoIndex(repoIndex)
-    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
-  }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
+    projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
+    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)
+  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalFilesystemTarget])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
   // The projection is client-level; we only subscribe / unsubscribe client
@@ -71,12 +70,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // keeps its projection visible until that close command settles.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const repoRuntimeId = useReposStore.getState().repos[event.repoRoot]?.repoRuntimeId
-      if (typeof repoRuntimeId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoRuntimeId)
     })
 
     const disposeCommandBridge = setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
@@ -121,10 +118,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
   const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
-      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
-      subscribeTerminalWorktree: projection.subscribeTerminalWorktree,
-      repoBellCount: projection.repoBellCount,
-      subscribeRepoBellCount: projection.subscribeRepoBellCount,
+      terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
+      subscribeTerminalFilesystemTarget: projection.subscribeTerminalFilesystemTarget,
+      workspaceBellCount: projection.workspaceBellCount,
+      subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
     }),

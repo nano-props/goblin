@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
@@ -8,12 +9,18 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneRuntimeTabProjectionProviders } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+
+const REPO_ID = workspaceIdForTest('goblin+file:///repo')
+const WORKTREE_PATH = '/repo-worktree'
+const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
-  useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: {} })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
+  useWorkspacesStore.setState({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
 })
 
 describe('workspace pane runtime tab target projection', () => {
@@ -28,7 +35,7 @@ describe('workspace pane runtime tab target projection', () => {
       providers: [
         {
           type: 'terminal',
-          targetKey: '/repo\0/repo-worktree',
+          targetKey: WORKTREE_KEY,
           views: [terminalView('term-111111111111111111111')],
           selectedSessionId: 'term-111111111111111111111',
           state: {
@@ -70,9 +77,9 @@ describe('workspace pane runtime tab target projection', () => {
   })
 
   test('reads terminal runtime projection from command bridge and hydration state', () => {
-    const terminalWorktreeKey = '/repo\0/repo-worktree'
-    const terminalWorktreeSnapshot = vi.fn(() => ({
-      terminalWorktreeKey,
+    const terminalFilesystemTargetKey = WORKTREE_KEY
+    const terminalFilesystemTargetSnapshot = vi.fn(() => ({
+      terminalFilesystemTargetKey,
       selectedDescriptor: null,
       sessions: [terminalView('term-111111111111111111111')],
       count: 1,
@@ -80,25 +87,25 @@ describe('workspace pane runtime tab target projection', () => {
       outputActiveCount: 0,
       createPending: true,
     }))
-    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-runtime-1')
-    useReposStore.setState({
-      selectedTerminalSessionIdByTerminalWorktree: {
-        [terminalWorktreeKey]: 'term-111111111111111111111',
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-runtime-1')
+    useWorkspacesStore.setState({
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
+        [terminalFilesystemTargetKey]: 'term-111111111111111111111',
       },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot,
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
     })
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      worktreePath: '/repo-worktree',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: 'repo-runtime-1',
+      filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
     })
 
-    expect(terminalWorktreeSnapshot).toHaveBeenCalledWith(terminalWorktreeKey)
+    expect(terminalFilesystemTargetSnapshot).toHaveBeenCalledWith(terminalFilesystemTargetKey)
     expect(projection.runtimeTabViews).toEqual([terminalView('term-111111111111111111111')])
     expect(projection.runtimeTabStateByType.terminal).toMatchObject({
       createPending: true,
@@ -108,10 +115,10 @@ describe('workspace pane runtime tab target projection', () => {
   })
 
   test('reads terminal selected session through the projection provider', () => {
-    const terminalWorktreeKey = '/repo\0/repo-worktree'
+    const terminalFilesystemTargetKey = WORKTREE_KEY
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: vi.fn(() => ({
-        terminalWorktreeKey,
+      terminalFilesystemTargetSnapshot: vi.fn(() => ({
+        terminalFilesystemTargetKey,
         selectedDescriptor: null,
         sessions: [terminalView('term-111111111111111111111'), terminalView('term-222222222222222222222')],
         count: 2,
@@ -122,26 +129,57 @@ describe('workspace pane runtime tab target projection', () => {
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
       selectTerminal: vi.fn(),
     })
-    useReposStore.setState({
-      selectedTerminalSessionIdByTerminalWorktree: {
-        [terminalWorktreeKey]: 'term-222222222222222222222',
+    useWorkspacesStore.setState({
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
+        [terminalFilesystemTargetKey]: 'term-222222222222222222222',
       },
     })
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      worktreePath: '/repo-worktree',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: 'repo-runtime-1',
+      filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
     })
 
     expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('term-222222222222222222222')
   })
 
   test('formats the current runtime target key', () => {
-    expect(workspacePaneRuntimeTabTargetKey({ repoRoot: '/repo', worktreePath: '/repo-worktree' })).toBe(
-      '/repo\0/repo-worktree',
-    )
-    expect(workspacePaneRuntimeTabTargetKey({ repoRoot: '/repo', worktreePath: null })).toBeNull()
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
+      }),
+    ).toBe(WORKTREE_KEY)
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: { kind: 'workspace-root', workspaceId: REPO_ID, workspaceRuntimeId: 'repo-runtime-1' },
+      }),
+    ).toBe(formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID))
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: null,
+      }),
+    ).toBeNull()
+  })
+
+  test('rejects a filesystem target owned by a different runtime', () => {
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-current',
+        filesystemTarget: {
+          kind: 'workspace-root',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: 'repo-runtime-stale',
+        },
+      }),
+    ).toBeNull()
   })
 })
 
@@ -149,7 +187,7 @@ function terminalView(terminalSessionId: string) {
   return {
     type: 'terminal' as const,
     terminalSessionId,
-    terminalWorktreeKey: '/repo\0/repo-worktree',
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     index: 1,
     title: terminalSessionId,
     fullTitle: terminalSessionId,

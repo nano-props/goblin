@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -13,10 +15,10 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 
 const USER_ID = 'user_terminal_pruner'
 const SCOPE = 'repo-runtime-terminal-pruner'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///repo')
 const LIVE_WORKTREE_PATH = '/repo/live-worktree'
 const STALE_WORKTREE_PATH = '/repo/stale-worktree'
-const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 describe('terminal session pruner', () => {
   beforeEach(() => {
@@ -29,7 +31,10 @@ describe('terminal session pruner', () => {
     const sessions = [
       terminalSession('term-livelivelivelivelive1', { repoRoot: REPO_ROOT, worktreePath: LIVE_WORKTREE_PATH }),
       terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
-      terminalSession('term-otherrepootherrepo001', { repoRoot: '/other-repo', worktreePath: '/other-repo/worktree' }),
+      terminalSession('term-otherrepootherrepo001', {
+        repoRoot: 'goblin+file:///other-repo',
+        worktreePath: '/other-repo/worktree',
+      }),
     ]
     const closeSession = vi.fn(async (terminalRuntimeSessionId: string) => {
       const index = sessions.findIndex((session) => session.terminalRuntimeSessionId === terminalRuntimeSessionId)
@@ -46,12 +51,12 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         scope: SCOPE,
         assertCurrent: vi.fn(),
       }),
     ).resolves.toEqual({ pruned: 1, remaining: 2 })
-    expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
+    expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
     expect(closeSession).toHaveBeenCalledTimes(1)
     expect(closeSession).toHaveBeenCalledWith('pty_term-stalestalestalestale1')
   })
@@ -73,20 +78,20 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REMOTE_REPO_ROOT,
+        workspaceId: REMOTE_REPO_ROOT,
         scope: SCOPE,
         assertCurrent,
       }),
     ).resolves.toEqual({ pruned: 0, remaining: 2 })
     expect(getWorktrees).not.toHaveBeenCalled()
-    expect(assertCurrent).not.toHaveBeenCalled()
+    expect(assertCurrent).toHaveBeenCalledOnce()
     expect(closeSession).not.toHaveBeenCalled()
   })
 
-  test('checks repo runtime freshness after reading local worktrees and before closing sessions', async () => {
+  test('checks workspace runtime freshness after reading sessions before Git or close work', async () => {
     const closeSession = vi.fn()
     const assertCurrent = vi.fn(() => {
-      throw new Error('error.repo-runtime-stale')
+      throw new Error('error.workspace-runtime-stale')
     })
     const pruner = createTerminalSessionPruner({
       manager: {
@@ -100,30 +105,57 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         scope: SCOPE,
         assertCurrent,
       }),
-    ).rejects.toThrow('error.repo-runtime-stale')
-    expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
+    ).rejects.toThrow('error.workspace-runtime-stale')
+    expect(getWorktrees).not.toHaveBeenCalled()
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()
+  })
+
+  test('stops pruning when membership becomes stale between session retirements', async () => {
+    const sessions = [
+      terminalSession('term-staleonestaleone001', { repoRoot: REPO_ROOT, worktreePath: '/repo/stale-one' }),
+      terminalSession('term-staletwostaletwo002', { repoRoot: REPO_ROOT, worktreePath: '/repo/stale-two' }),
+    ]
+    const closeSession = vi.fn(async () => true)
+    const assertCurrent = vi.fn(() => {
+      if (assertCurrent.mock.calls.length === 4) throw new Error('error.workspace-runtime-stale')
+    })
+    const pruner = createTerminalSessionPruner({
+      manager: {
+        listSessionsForUser: vi.fn(async () => sessions),
+        requestSessionRetirement: closeSession,
+      },
+    })
+
+    await expect(
+      pruner.prune({ userId: USER_ID, workspaceId: REPO_ROOT, scope: SCOPE, assertCurrent }),
+    ).rejects.toThrow('error.workspace-runtime-stale')
+    expect(closeSession).toHaveBeenCalledOnce()
   })
 })
 
 function terminalSession(
   terminalSessionId: string,
-  overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>> = {},
+  overrides: { repoRoot?: string; worktreePath?: string } = {},
 ): TerminalSessionSummary {
+  const repoRoot = overrides.repoRoot ?? REPO_ROOT
+  const worktreePath = overrides.worktreePath ?? LIVE_WORKTREE_PATH
+  const workspaceId = requiredWorkspaceLocator(repoRoot)
+  const root = requiredWorkspaceLocator(
+    repoRoot.startsWith('goblin+ssh://')
+      ? `${repoRoot.slice(0, repoRoot.indexOf('/', 'goblin+ssh://'.length))}${worktreePath}`
+      : `goblin+file://${worktreePath}`,
+  )
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
-    repoRuntimeId: 'repo-runtime-test',
-    repoRoot: overrides.repoRoot ?? REPO_ROOT,
-    branch: 'feature/worktree',
-    worktreePath: overrides.worktreePath ?? LIVE_WORKTREE_PATH,
-    cwd: overrides.worktreePath ?? LIVE_WORKTREE_PATH,
+    target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'repo-runtime-test', root },
+    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,
@@ -132,4 +164,10 @@ function terminalSession(
     cols: 80,
     rows: 24,
   }
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
 }

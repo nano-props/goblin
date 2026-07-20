@@ -3,7 +3,7 @@ import { createHealthRoutes } from '#/server/routes/health.ts'
 import type { ServerAppRealtimeDiagnostics } from '#/server/realtime/app-realtime-host.ts'
 
 const mocks = vi.hoisted(() => ({
-  getBackgroundSyncDiagnostics: vi.fn(),
+  getBackgroundSyncHealth: vi.fn(),
   appRealtimeHost: {
     isValidClientId(value: unknown): value is string {
       return typeof value === 'string'
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
-  getBackgroundSyncDiagnostics: mocks.getBackgroundSyncDiagnostics,
+  getBackgroundSyncHealth: mocks.getBackgroundSyncHealth,
 }))
 
 describe('health routes', () => {
@@ -77,21 +77,13 @@ describe('health routes', () => {
   })
 
   test('returns background sync diagnostics under the health namespace', async () => {
-    mocks.getBackgroundSyncDiagnostics.mockReturnValue({
+    mocks.getBackgroundSyncHealth.mockReturnValue({
       running: true,
       intervalSec: 120,
-      repoIds: ['/tmp/repo'],
-      nextRepoIndex: 0,
+      registeredTargetCount: 1,
       tickRunning: false,
-      repos: [
-        {
-          repoId: '/tmp/repo',
-          lastFetchAt: 1_000,
-          failureCount: 2,
-          backoffUntil: 5_000,
-          nextEligibleAt: 5_000,
-        },
-      ],
+      queuePending: 0,
+      queueSize: 0,
     })
 
     const app = createHealthRoutes({ version: '0.1.0', startedAt: 123, appRealtimeHost: mocks.appRealtimeHost })
@@ -107,8 +99,10 @@ describe('health routes', () => {
       backgroundSync: {
         running: true,
         intervalSec: 120,
-        repoIds: ['/tmp/repo'],
+        registeredTargetCount: 1,
       },
     })
+    expect(json.backgroundSync).not.toHaveProperty('repoIds')
+    expect(json.backgroundSync).not.toHaveProperty('repos')
   })
 })

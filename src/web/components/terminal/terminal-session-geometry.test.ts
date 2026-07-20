@@ -8,6 +8,7 @@ import {
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 
 const geometryMocks = vi.hoisted(() => ({
   estimateTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
@@ -37,15 +38,14 @@ class MockResizeObserver {
 }
 
 function descriptor(): TerminalDescriptor {
-  return {
+  return terminalDescriptorForTest({
     terminalSessionId: 'term-111111111111111111111',
-    terminalWorktreeKey: '/repo\0/repo',
     index: 1,
     repoRoot: '/repo',
-    repoRuntimeId: 'repo-runtime-test',
+    workspaceRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
-  }
+  })
 }
 
 function makeHost(): HTMLDivElement {
@@ -62,23 +62,23 @@ describe('terminal session geometry helpers', () => {
 
   test('captures geometry from a connected host and caches it', async () => {
     const host = makeHost()
-    const startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
+    const startupGeometryHintByFilesystemTarget = new Map<string, { cols: number; rows: number }>()
 
     const geometry = captureTerminalHostGeometry({
-      terminalWorktreeKey: '/repo\0/repo',
-      hostByWorktree: new Map([['/repo\0/repo', host]]),
-      startupGeometryHintByWorktree,
+      terminalFilesystemTargetKey: '/repo\0/repo',
+      hostByFilesystemTarget: new Map([['/repo\0/repo', host]]),
+      startupGeometryHintByFilesystemTarget,
     })
 
     expect(geometry).toEqual({ cols: 120, rows: 40 })
-    expect(startupGeometryHintByWorktree.get('/repo\0/repo')).toEqual({ cols: 120, rows: 40 })
+    expect(startupGeometryHintByFilesystemTarget.get('/repo\0/repo')).toEqual({ cols: 120, rows: 40 })
   })
 
   test('falls back to selected attachment canonical size or cached geometry', async () => {
     const geometry = resolveTerminalStartupGeometryHint({
-      terminalWorktreeKey: '/repo\0/repo',
-      hostByWorktree: new Map(),
-      startupGeometryHintByWorktree: new Map(),
+      terminalFilesystemTargetKey: '/repo\0/repo',
+      hostByFilesystemTarget: new Map(),
+      startupGeometryHintByFilesystemTarget: new Map(),
       selectedDescriptor: descriptor(),
       getAttachmentSnapshot: () => ({
         role: 'controller',
@@ -93,9 +93,9 @@ describe('terminal session geometry helpers', () => {
     expect(geometry).toEqual({ cols: 90, rows: 30 })
 
     const cached = resolveTerminalStartupGeometryHint({
-      terminalWorktreeKey: '/repo\0/repo',
-      hostByWorktree: new Map(),
-      startupGeometryHintByWorktree: new Map([['/repo\0/repo', { cols: 70, rows: 20 }]]),
+      terminalFilesystemTargetKey: '/repo\0/repo',
+      hostByFilesystemTarget: new Map(),
+      startupGeometryHintByFilesystemTarget: new Map([['/repo\0/repo', { cols: 70, rows: 20 }]]),
       selectedDescriptor: null,
       getAttachmentSnapshot: () => null,
     })

@@ -5,32 +5,38 @@
 // runtime if the client ever invoked it.
 
 import path from 'node:path'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 /**
- * Normalize a repoRoot into the scope string the manager stores on
- * each session. For local repos this is the path-resolved form (so
- * `/repo` and `./repo` collapse to the same scope on every platform,
- * including Windows where `path.resolve('/repo')` becomes `C:\repo`).
- * For remote (SSH) repos the input is opaque and stays as-is.
+ * Runtime scopes are keyed by canonical workspace identity. Native paths are
+ * execution metadata and must never be allowed to rewrite this identity.
  *
  * This is the **single source of truth** for session scope. Any
- * caller that needs to ask the manager about a repoRoot (create,
+ * caller that needs to ask the manager about a workspace (create,
  * list, reorder, prune) must normalize through here first, otherwise
  * string-equality lookups will silently miss.
  */
-export function terminalSessionScope(repoRoot: string): string {
-  return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
+export function terminalSessionScope(workspaceId: WorkspaceId): string {
+  if (!parseCanonicalWorkspaceLocator(workspaceId)) throw new Error('error.workspace-locator-malformed')
+  return workspaceId
 }
 
-export function terminalSessionRuntimeScope(repoRoot: string, repoRuntimeId: string): string {
-  return `${terminalSessionScope(repoRoot)}\0${repoRuntimeId}`
+export function terminalSessionRuntimeScope(workspaceId: WorkspaceId, workspaceRuntimeId: string): string {
+  return `${terminalSessionScope(workspaceId)}\0${workspaceRuntimeId}`
 }
 
-export function terminalSessionScopeBelongsToRepo(scope: string, repoRoot: string): boolean {
-  return scope.startsWith(`${terminalSessionScope(repoRoot)}\0`)
+export function terminalSessionExecutionPath(workspaceId: WorkspaceId, executionPath: string): string {
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!workspace) throw new Error('error.workspace-locator-malformed')
+  if (executionPath === workspaceId) return workspace.path
+  return workspace.transport === 'ssh' ? executionPath : path.resolve(executionPath)
 }
 
-export function terminalSessionWorktreePath(repoRoot: string, worktreePath: string): string {
-  return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+export function terminalSessionTargetExecutionPath(target: RuntimeWorkspacePaneTarget): string | null {
+  if (target.kind === 'git-branch') return null
+  const expected = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
+  if (!expected) return null
+  return expected.path
 }

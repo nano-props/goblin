@@ -3,24 +3,37 @@
 import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
+import type { ServerTerminalCreateInput } from '#/server/terminal/terminal-session-creator.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalSessionAdmissionCommitResult,
+  TerminalSessionEnsureResult,
+} from '#/server/terminal/terminal-session-ensurer.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
 const TERMINAL_CLIENT_ID = 'client_terminal_controller'
-const REPO_ROOT = '/repo'
-const REPO_RUNTIME_ID = 'repo-runtime-terminal-creator'
+const REPO_ROOT = 'goblin+file:///repo'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-terminal-creator'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+const WORKTREE_ROOT = requiredWorkspaceLocator('goblin+file:///repo/worktree')
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 describe('terminal session creator', () => {
   test('keeps the manager metadata revision when takeover advances current revision during stale validation', async () => {
     const sessions: TerminalSessionSummary[] = []
     const manager = {
-      listSessionsForUser: vi.fn(async () => sessions),
+      primaryTerminalSessionIdForFilesystemTarget: vi.fn(() => sessions[0]?.terminalSessionId ?? null),
     }
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
@@ -32,7 +45,7 @@ describe('terminal session creator', () => {
         createSessionId: () => 'term-createdcreatedcreated',
       }),
       ensureOrRestore,
-      isCurrentRepoRuntime: vi.fn(() => true),
+      isCurrentWorkspaceRuntime: vi.fn(() => true),
     })
 
     const result = await creator.create({
@@ -64,9 +77,9 @@ describe('terminal session creator', () => {
     expect(result).not.toHaveProperty('sessions')
   })
 
-  test('rejects before ensuring when the repo runtime is already stale', async () => {
+  test('rejects before ensuring when the workspace runtime is already stale', async () => {
     const manager = {
-      listSessionsForUser: vi.fn(async () => []),
+      primaryTerminalSessionIdForFilesystemTarget: vi.fn(() => null),
     }
     const ensureOrRestore = vi.fn(async () => ensureResult('term-createdcreatedcreated'))
     const creator = createTerminalSessionCreator({
@@ -75,7 +88,7 @@ describe('terminal session creator', () => {
         createSessionId: () => 'term-createdcreatedcreated',
       }),
       ensureOrRestore,
-      isCurrentRepoRuntime: vi.fn(() => false),
+      isCurrentWorkspaceRuntime: vi.fn(() => false),
     })
 
     await expect(
@@ -87,14 +100,14 @@ describe('terminal session creator', () => {
         physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
         signal: new AbortController().signal,
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
     expect(ensureOrRestore).not.toHaveBeenCalled()
   })
 
   test('stops the create when the service rejects a stale runtime', async () => {
     const sessions: TerminalSessionSummary[] = []
     const manager = {
-      listSessionsForUser: vi.fn(async () => sessions),
+      primaryTerminalSessionIdForFilesystemTarget: vi.fn(() => sessions[0]?.terminalSessionId ?? null),
     }
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
@@ -106,7 +119,7 @@ describe('terminal session creator', () => {
         createSessionId: () => 'term-createdcreatedcreated',
       }),
       ensureOrRestore,
-      isCurrentRepoRuntime: vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false),
+      isCurrentWorkspaceRuntime: vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false),
     })
 
     await expect(
@@ -118,20 +131,22 @@ describe('terminal session creator', () => {
         physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
         signal: new AbortController().signal,
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
   })
 })
 
-function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCreateInput {
+function createRequest(overrides: Partial<ServerTerminalCreateInput> = {}): ServerTerminalCreateInput {
   return {
-    repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    branch: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-    kind: 'additional',
-    cols: 80,
-    rows: 24,
     ...overrides,
+    target: overrides.target ?? {
+      kind: 'git-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      root: WORKTREE_ROOT,
+    },
+    kind: overrides.kind ?? 'additional',
+    cols: overrides.cols ?? 80,
+    rows: overrides.rows ?? 24,
   }
 }
 
@@ -140,11 +155,13 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    repoRoot: path.resolve(REPO_ROOT),
-    branch: BRANCH_NAME,
-    worktreePath: path.resolve(WORKTREE_PATH),
-    cwd: path.resolve(WORKTREE_PATH),
+    target: {
+      kind: 'git-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      root: WORKTREE_ROOT,
+    },
+    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,
@@ -169,11 +186,11 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
   }
 }
 
-function committedResult(terminalRuntimeSessionId: string) {
+function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmissionCommitResult {
   return {
     action: 'created' as const,
-    branch: BRANCH_NAME,
-    terminalSessionsRevision: 7,
+    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    terminalProjectionEffect: { kind: 'delta', revision: 7 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',

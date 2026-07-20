@@ -5,13 +5,15 @@ import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-re
 import {
   physicalWorktreeExecutionBinding,
   type PhysicalWorktreeExecutionCapability,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REMOTE_REPO = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 const REMOTE_PATH = '/srv/worktrees/feature'
 
 describe('physical worktree capability boundaries', () => {
@@ -38,16 +40,17 @@ describe('physical worktree capability boundaries', () => {
     await ensurer.ensure(
       'user-a',
       {
-        repoRoot: REMOTE_REPO,
-        repoRuntimeId: 'runtime-a',
-        branch: 'feature',
-        worktreePath: REMOTE_PATH,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: canonicalWorkspaceLocator(REMOTE_REPO)!,
+          workspaceRuntimeId: 'runtime-a',
+          root: canonicalWorkspaceLocator('goblin+ssh://prod/srv/worktrees/feature')!,
+        },
       },
       {
         terminalSessionId: 'term-capabilitycapability01',
         cols: 80,
         rows: 24,
-        scopedWorktreePath: REMOTE_PATH,
         physicalWorktreeCapability: capability,
         signal: new AbortController().signal,
       },
@@ -86,8 +89,8 @@ function remoteCapability(target: ReturnType<typeof remoteTarget>): PhysicalWork
       endpoint: REMOTE_PATH,
     },
     userId: 'user-a',
-    repoRoot: REMOTE_REPO,
-    repoRuntimeId: 'runtime-a',
+    workspaceId: REMOTE_REPO,
+    workspaceRuntimeId: 'runtime-a',
     worktreePath: REMOTE_PATH,
     execution: {
       kind: 'remote',

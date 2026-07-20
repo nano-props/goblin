@@ -15,13 +15,13 @@ function monotonicNow(): number {
 // the indicator is for terminals actively producing visible output.
 export interface TerminalOutputActivityState {
   hasRecentOutput: (terminalSessionId: string) => boolean
-  markOutput: (terminalSessionId: string, terminalWorktreeKey: string) => void
+  markOutput: (terminalSessionId: string, terminalFilesystemTargetKey: string) => void
   remove: (terminalSessionId: string) => void
   reset: () => void
 }
 
 interface ActivityRecord {
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   lastActivityAt: number
   pendingSince: number | null
   activeSince: number | null
@@ -30,7 +30,7 @@ interface ActivityRecord {
 }
 
 export function createTerminalOutputActivityState(
-  notifyWorktree: (terminalWorktreeKey: string) => void,
+  notifyFilesystemTarget: (terminalFilesystemTargetKey: string) => void,
   now: () => number = monotonicNow,
   setTimer: (handler: () => void, timeout: number) => ActivityTimer = (handler, timeout) =>
     setTimeout(handler, timeout),
@@ -56,7 +56,7 @@ export function createTerminalOutputActivityState(
     record.pendingSince = null
     record.activeSince = now()
     scheduleIdleExpiry(terminalSessionId)
-    notifyWorktree(record.terminalWorktreeKey)
+    notifyFilesystemTarget(record.terminalFilesystemTargetKey)
   }
 
   function activityExpiresAt(record: ActivityRecord): number {
@@ -89,7 +89,7 @@ export function createTerminalOutputActivityState(
     }
     const wasActive = record.activeSince !== null
     deleteRecord(terminalSessionId, record)
-    if (wasActive) notifyWorktree(record.terminalWorktreeKey)
+    if (wasActive) notifyFilesystemTarget(record.terminalFilesystemTargetKey)
   }
 
   function scheduleConfirmation(terminalSessionId: string): void {
@@ -113,15 +113,15 @@ export function createTerminalOutputActivityState(
 
   return {
     hasRecentOutput,
-    markOutput(terminalSessionId, terminalWorktreeKey) {
+    markOutput(terminalSessionId, terminalFilesystemTargetKey) {
       const current = now()
       const record = records.get(terminalSessionId)
       if (record) {
         record.lastActivityAt = current
-        record.terminalWorktreeKey = terminalWorktreeKey
+        record.terminalFilesystemTargetKey = terminalFilesystemTargetKey
       } else {
         records.set(terminalSessionId, {
-          terminalWorktreeKey,
+          terminalFilesystemTargetKey,
           lastActivityAt: current,
           pendingSince: current,
           activeSince: null,

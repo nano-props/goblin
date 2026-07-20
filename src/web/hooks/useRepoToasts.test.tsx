@@ -18,9 +18,11 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { createGitWorkspaceProbeForTest, resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -44,18 +46,21 @@ vi.mock('sonner', () => ({
   toast: toastMocks,
 }))
 
-const REPO_ID = '/tmp/repo-toasts-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-toasts-test')
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
 })
 
 describe('useRepoToasts', () => {
   test('shows worktree bootstrap details on create-worktree success toasts', async () => {
-    const repoRuntimeId = seedRepoShellForTest({ id: REPO_ID }).repoRuntimeId
-    useReposStore.getState().setLastResult(
+    const workspaceRuntimeId = seedRepoShellForTest({
+      id: REPO_ID,
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    }).workspaceRuntimeId
+    useWorkspacesStore.getState().setLastResult(
       REPO_ID,
       {
         ok: true,
@@ -68,7 +73,7 @@ describe('useRepoToasts', () => {
           setup: { command: 'bun install' },
         },
       },
-      repoRuntimeId,
+      workspaceRuntimeId,
       { action: { kind: 'createWorktree', branch: 'feature/a', worktreePath: '/tmp/worktrees/feature-a' } },
     )
 
@@ -82,7 +87,7 @@ describe('useRepoToasts', () => {
   })
 })
 
-function Harness({ repoId }: { repoId: string }) {
+function Harness({ repoId }: { repoId: WorkspaceId }) {
   useRepoToasts(repoId)
   return null
 }

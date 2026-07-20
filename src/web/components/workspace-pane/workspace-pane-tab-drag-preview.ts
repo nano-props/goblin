@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspacePaneTabDragPreviewSnapshot {
   targetKey: string
@@ -10,11 +14,11 @@ interface WorkspacePaneTabDragPreviewSnapshot {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneTabDragPreviewInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
+type WorkspacePaneTabDragPreviewTarget =
+  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
+
+export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
+  workspaceRuntimeId: string
   canonicalTabs: readonly WorkspacePaneTabEntry[]
 }
 
@@ -31,18 +35,7 @@ export function useWorkspacePaneTabDragPreview(
   // Visual-only drag state. Runtime tab truth lives on the server and
   // React Query only caches that server projection; this hook must not
   // write either one.
-  const targetKey = useMemo(
-    () =>
-      input.branchName
-        ? workspacePaneTabDragPreviewTargetKey({
-            repoRoot: input.repoRoot,
-            repoRuntimeId: input.repoRuntimeId,
-            branchName: input.branchName,
-            worktreePath: input.worktreePath,
-          })
-        : null,
-    [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath],
-  )
+  const targetKey = workspacePaneTabDragPreviewTargetKey(input)
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
@@ -91,11 +84,9 @@ export function useWorkspacePaneTabDragPreview(
   }
 }
 
-function workspacePaneTabDragPreviewTargetKey(input: {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
-}): string {
-  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoRuntimeId}`
+function workspacePaneTabDragPreviewTargetKey(
+  input: WorkspacePaneTabDragPreviewTarget & { workspaceRuntimeId: string },
+): string | null {
+  if (input.kind === 'inactive') return null
+  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.workspaceRuntimeId}`
 }

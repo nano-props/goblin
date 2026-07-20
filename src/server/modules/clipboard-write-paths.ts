@@ -1,14 +1,8 @@
 import { mkdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { serverDataDir } from '#/shared/data-dir.ts'
-import {
-  CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
-  PASTE_FILE_MAX_BYTES,
-} from '#/shared/clipboard-paste.ts'
-import {
-  createClipboardTimestampedFileName,
-  listDirEntries,
-} from '#/shared/clipboard-paste-node.ts'
+import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { createClipboardTimestampedFileName, listDirEntries } from '#/shared/clipboard-paste-node.ts'
 
 /**
  * Web counterpart to `src/main/clipboard-ipc.ts`. Web clients reach

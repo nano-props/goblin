@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RefreshCw } from 'lucide-react'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoEvent, RepoState } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
-import type {
-  RepoActivity,
-  RepoActivityProjectionRepo,
-  RepoCompletion,
-} from '#/web/components/repo-activity/model.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
   getRepoActivityControlView,
@@ -20,26 +17,27 @@ import {
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
+import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
-import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
 }
 
 const COMPLETION_VISIBLE_MS = 1500
-const EMPTY_EVENTS: RepoEvent[] = []
 
-type RepoActivityControlRepo = Pick<
-  RepoState,
-  'id' | 'repoRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
-> &
+type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
+  Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
   RepoActivityProjectionRepo
 
-function useRepoActivityControlPresentation(repo: RepoActivityProjectionRepo, serverOperations?: RepoOperationsSnapshot) {
+function useRepoActivityControlPresentation(
+  repo: RepoActivityProjectionRepo,
+  serverOperations?: RepoOperationsSnapshot,
+) {
   const rawActivity = getRepoActivity(repo, serverOperations)
   const rawActivityKey = rawActivity
     ? `${rawActivity.kind}:${rawActivity.labelKey}:${JSON.stringify(rawActivity.labelParams ?? {})}`
@@ -57,10 +55,9 @@ function repoActivityControlRepoEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.repoRuntimeId === b.repoRuntimeId &&
+      a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.dataLoads === b.dataLoads &&
       a.branchAction === b.branchAction &&
-      a.availability === b.availability &&
       a.projection === b.projection &&
       a.remote === b.remote)
   )
@@ -68,18 +65,17 @@ function repoActivityControlRepoEqual(
 
 export function RepoActivityControl({ repoId }: Props) {
   const repo = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s): RepoActivityControlRepo | undefined => {
-      const repo = s.repos[repoId]
-      return repo
+      const repo = s.workspaces[repoId]
+      return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
-            dataLoads: repo.dataLoads,
-            branchAction: repo.operations.branchAction,
-            availability: repo.availability,
-            projection: repo.projection,
-            remote: repo.remote,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            dataLoads: repo.capability.git.dataLoads,
+            branchAction: repo.capability.git.operations.branchAction,
+            projection: repo.capability.git.projection,
+            remote: repo.capability.git.remote,
           }
         : undefined
     },
@@ -90,7 +86,7 @@ export function RepoActivityControl({ repoId }: Props) {
 }
 
 function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
-  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.repoRuntimeId)
+  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.workspaceRuntimeId)
   const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
@@ -115,8 +111,11 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
   }
 }
 
-function useRepoCompletion(repoId: string): RepoCompletion | null {
-  const events = useReposStore((s) => s.repos[repoId]?.events ?? EMPTY_EVENTS)
+function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
+  const events = useWorkspacesStore((s) => {
+    const workspace = s.workspaces[repoId]
+    return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null
+  })
   const [completion, setCompletion] = useState<RepoCompletion | null>(null)
   const latestEventIdRef = useRef(0)
 
@@ -126,6 +125,7 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   }, [repoId])
 
   useEffect(() => {
+    if (!events) return
     const latestSeen = latestEventIdRef.current
     let nextLatestSeen = latestSeen
     let nextCompletion: RepoCompletion | null = null
@@ -156,12 +156,14 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
 
-  function handleSync() {
-    const repoRuntimeId = repo.repoRuntimeId
-    // Fire-and-forget so AsyncButton's internal pending state does not fight
-    // the external manualSyncBusy prop. The visual loading state is owned by
-    // the operation, not the click promise.
-    void runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, repo.id, { repoRuntimeId })
+  async function handleSync(): Promise<void> {
+    const workspaceRuntimeId = repo.workspaceRuntimeId
+    const outcome = await runManualWorkspaceRefresh(
+      { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+      repo.id,
+      { workspaceRuntimeId },
+    )
+    presentWorkspaceRefreshOutcome(outcome, t)
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
@@ -176,7 +178,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   // sync has happened. Single-line label so the font matches the
   // rest of the repo chrome tooltips.
   const tooltipLabel = lastSyncedLabel
-    ? `${t('repo-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
+    ? `${t('workspace-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
     : t(fetchTooltipKey)
 
   return (
@@ -186,7 +188,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
         size="icon-lg"
         disabled={manualSyncBusy}
         loading={manualSyncBusy}
-        onClick={handleSync}
+        onClick={() => void handleSync()}
         aria-label={label}
       >
         {({ busy }) => (

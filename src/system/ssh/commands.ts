@@ -7,7 +7,7 @@ import { execa, ExecaError } from 'execa'
 import { FIELD_SEP, WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
@@ -28,7 +28,7 @@ export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
 const SSH_CONTROL_DIR = path.join(os.homedir(), '.goblin', 'ssh')
 const SSH_CONTROL_PERSIST_SEC = 600
 
-function controlPathFor(target: RemoteRepoTarget): string {
+function controlPathFor(target: RemoteWorkspaceTarget): string {
   const key = target.sshConnection
     ? JSON.stringify([target.sshConnection.destination, ...target.sshConnection.options])
     : JSON.stringify([target.alias, target.host, target.port, target.user])
@@ -53,6 +53,7 @@ function ensureControlDir(): Promise<void> {
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
+export const REMOTE_PANE_WORKTREES_MARKER = '__GOBLIN_REMOTE_PANE_WORKTREES__'
 
 export type RemoteCommandKind =
   | { type: 'printHome' }
@@ -60,10 +61,13 @@ export type RemoteCommandKind =
   | { type: 'checkGit' }
   | { type: 'testDirectory'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
-  | { type: 'gitTreeWalk'; path: string; prefix?: string }
+  | { type: 'directoryOverview'; path: string }
+  | { type: 'directoryChildren'; path: string; prefix?: string }
+  | { type: 'gitDirectoryChildren'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
+  | { type: 'gitWorkspacePaneIdentities'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
   | { type: 'gitWorktreeListAndStatus'; path: string }
@@ -133,9 +137,9 @@ const REMOTE_COMMAND_STDERR_END_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_END__'
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
-  target: Pick<RemoteRepoTarget, 'alias' | 'host' | 'user' | 'port'>,
+  target: Pick<RemoteWorkspaceTarget, 'alias' | 'host' | 'user' | 'port'>,
   effectiveConfig: string,
-): NonNullable<RemoteRepoTarget['sshConnection']> {
+): NonNullable<RemoteWorkspaceTarget['sshConnection']> {
   const options = effectiveConfig
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -155,7 +159,7 @@ export function buildCanonicalSshConnectionSnapshot(
   })
 }
 
-function capturedConnectionArgs(target: RemoteRepoTarget): string[] {
+function capturedConnectionArgs(target: RemoteWorkspaceTarget): string[] {
   if (!target.sshConnection) return []
   const nullConfig = process.platform === 'win32' ? 'NUL' : '/dev/null'
   return ['-F', nullConfig, ...target.sshConnection.options.flatMap((option) => ['-o', option])]
@@ -163,12 +167,12 @@ function capturedConnectionArgs(target: RemoteRepoTarget): string[] {
 
 export type RemoteCommandRunner = (
   command: RemoteCommandKind,
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
 export function buildRemoteCommandInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   command: RemoteCommandKind,
 ): RemoteCommandInvocation {
   const script = scriptForCommand(command)
@@ -176,7 +180,7 @@ export function buildRemoteCommandInvocation(
 }
 
 export function buildRemoteTerminalInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   remotePath: string,
   _size: { cols: number; rows: number },
   options: { startupShellCommand?: string } = {},
@@ -191,7 +195,7 @@ export function buildRemoteTerminalInvocation(
 }
 
 function buildCanonicalSshInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   script: string,
   ttyArgs: readonly string[],
 ): RemoteCommandInvocation {
@@ -220,7 +224,7 @@ function normalizeTerminalStartupShellCommand(command: string | undefined): stri
 }
 
 export async function runRemoteCommand(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   command: RemoteCommandKind,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
@@ -369,18 +373,47 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'checkGit':
       return 'command -v git'
     case 'testDirectory':
-      return `test -d ${shellQuote(command.path)}`
+      return `cd ${shellQuote(command.path)} && test -r . && pwd -P`
     case 'listDirectories': {
       const limit = Math.max(1, Math.min(50, Math.floor(command.limit ?? 20)))
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
     }
-    case 'gitTreeWalk': {
-      return remoteTreeChildrenScript(command.path, command.prefix)
+    case 'directoryOverview': {
+      const root = shellQuote(command.path)
+      return [
+        `cd ${root} || exit $?`,
+        `files=0; directories=0`,
+        `for entry in ./* ./.[!.]* ./..?*; do`,
+        `  if [ ! -e "$entry" ] || [ -L "$entry" ]; then continue; fi`,
+        `  if [ -f "$entry" ]; then files=$((files + 1)); elif [ -d "$entry" ]; then directories=$((directories + 1)); fi`,
+        `done`,
+        `bytes=-`,
+        `if stat -c '%s' . >/dev/null 2>&1; then`,
+        `  if file_sizes=$(find . -type f -exec stat -c '%s' {} + 2>/dev/null); then`,
+        `    bytes=$(printf '%s\\n' "$file_sizes" | awk '{sum += $1} END {printf "%.0f", sum}')`,
+        `  fi`,
+        `elif stat -f '%z' . >/dev/null 2>&1; then`,
+        `  if file_sizes=$(find . -type f -exec stat -f '%z' {} + 2>/dev/null); then`,
+        `    bytes=$(printf '%s\\n' "$file_sizes" | awk '{sum += $1} END {printf "%.0f", sum}')`,
+        `  fi`,
+        `else`,
+        `  bytes=-`,
+        `fi`,
+        `printf '%s\\t%s\\t%s\\n' "$files" "$directories" "$bytes"`,
+      ].join('\n')
     }
+    case 'directoryChildren': {
+      return remoteDirectoryChildrenScript(command.path, command.prefix)
+    }
+    case 'gitDirectoryChildren':
+      return remoteGitDirectoryChildrenScript(command.path, command.prefix)
     case 'revParseTopLevel':
-      return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
+      return [
+        `root=$(git -C ${shellQuote(command.path)} rev-parse --show-toplevel) || exit $?`,
+        `cd "$root" && pwd -P`,
+      ].join('\n')
     case 'resolvePhysicalWorktreeIdentity':
       return remotePhysicalWorktreeIdentityScript(command.path)
     case 'gitSnapshot': {
@@ -402,6 +435,15 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `git -C ${repo} symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##'`,
         `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_BRANCHES_MARKER)}`,
         `git -C ${repo} for-each-ref --format=${shellQuote(branchFormat)} refs/heads/`,
+      ].join('\n')
+    }
+    case 'gitWorkspacePaneIdentities': {
+      const repo = shellQuote(command.path)
+      return [
+        'set -e',
+        `git -C ${repo} for-each-ref --format=${shellQuote('%(refname:short)')} refs/heads/`,
+        `printf '\\n%s\\n' ${shellQuote(REMOTE_PANE_WORKTREES_MARKER)}`,
+        `git -C ${repo} worktree list --porcelain`,
       ].join('\n')
     }
     case 'gitPatch':
@@ -490,7 +532,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         //
         // The awk splits the porcelain output on blank-line blocks
         // (RS="") so we can inspect each worktree block as a single
-        // record and skip blocks containing a bare marker. Paths
+        // record and skip blocks containing a bare or prunable marker. Paths
         // registered with relative arguments are passed through
         // verbatim; the worker resolves them via
         // `git rev-parse --show-toplevel`.
@@ -504,6 +546,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         // system treats them as opaque strings.
         `awk -v RS= 'BEGIN { idx = 0 }`,
         `  /(^|\\n)bare(\\n|$)/ { next }`,
+        `  /(^|\\n)prunable([ \\t]|\\n|$)/ { next }`,
         `  match($0, /^worktree[ \\t]+/) {`,
         `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
         `    if (p != "") { idx++; printf "%05d\\t%s\\n", idx, p }`,
@@ -734,17 +777,33 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
   ].join('\n')
 }
 
-function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined): string {
-  const root = shellQuote(rootPath)
-  const normalizedPrefix = (prefix ?? '')
-    .replace(/^\.\/+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/u, '')
-  const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
+function remoteDirectoryChildrenScript(rootPath: string, prefix: string | undefined): string {
+  const { root, dir } = remoteDirectoryPaths(rootPath, prefix)
   return [
     `root=${root}`,
     `dir=${dir}`,
-    'test -d "$dir" || exit 0',
+    'if [ ! -e "$dir" ]; then printf "%s\\n" "error.workspace-path-not-found" >&2; exit 66; fi',
+    'if [ ! -d "$dir" ]; then printf "%s\\n" "error.workspace-path-not-directory" >&2; exit 67; fi',
+    'if [ ! -r "$dir" ]; then printf "%s\\n" "error.workspace-permission-denied" >&2; exit 68; fi',
+    'find "$dir" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c \'',
+    'root=$1',
+    'shift',
+    'for entry do',
+    '  rel=${entry#"$root"/}',
+    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    'done',
+    '\' sh "$root" {} +',
+  ].join('\n')
+}
+
+function remoteGitDirectoryChildrenScript(rootPath: string, prefix: string | undefined): string {
+  const { root, dir } = remoteDirectoryPaths(rootPath, prefix)
+  return [
+    `root=${root}`,
+    `dir=${dir}`,
+    'if [ ! -e "$dir" ]; then printf "%s\\n" "error.workspace-path-not-found" >&2; exit 66; fi',
+    'if [ ! -d "$dir" ]; then printf "%s\\n" "error.workspace-path-not-directory" >&2; exit 67; fi',
+    'if [ ! -r "$dir" ]; then printf "%s\\n" "error.workspace-permission-denied" >&2; exit 68; fi',
     'find "$dir" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c \'',
     'root=$1',
     'shift',
@@ -753,14 +812,20 @@ function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined):
     '  if git -C "$root" check-ignore -q -- "$rel"; then',
     '    git -C "$root" ls-files -- "$rel" | IFS= read -r _tracked || continue',
     '  fi',
-    '  if [ -d "$entry" ]; then',
-    '    printf "%s/\\0" "$rel"',
-    '  else',
-    '    printf "%s\\0" "$rel"',
-    '  fi',
+    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')
+}
+
+function remoteDirectoryPaths(rootPath: string, prefix: string | undefined): { root: string; dir: string } {
+  const root = shellQuote(rootPath)
+  const normalizedPrefix = (prefix ?? '')
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/u, '')
+  const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
+  return { root, dir }
 }
 
 const REMOTE_COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/

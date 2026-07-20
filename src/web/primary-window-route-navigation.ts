@@ -1,13 +1,15 @@
 import { useRouter } from '@tanstack/react-router'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useMemo } from 'react'
-import { branchSlugFromName, repoSlugFromId } from '#/web/repo-route-slugs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowNavigationState,
+  primaryWindowPresentationIsCurrent,
   registerPrimaryWindowNavigation,
   releasePrimaryWindowNavigation,
   type PrimaryWindowPresentationToken,
@@ -17,66 +19,94 @@ export interface PrimaryWindowRouteNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: RepoBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+  routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowRouteNavigation {
-  repoSlugForId: (repoId: string) => string | null
-  currentRepoBranchWorkspacePaneRoute: (
-    repoId: string,
-    branchName: string,
-  ) => RepoBranchWorkspacePaneRouteTarget | undefined
+  workspaceSlugForId: (workspaceId: WorkspaceId) => string | null
+  currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoRoot: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoDashboard: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoBranch: (repoId: string, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openWorkspaceNavigator: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openWorkspaceRootPane: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openWorkspaceRootTab: (
+    workspaceId: WorkspaceId,
+    tab: WorkspacePaneStaticTabType,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
+  openWorkspaceRootTerminal: (
+    workspaceId: WorkspaceId,
+    terminalSessionId: string,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
+  openWorkspaceDashboard: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openRepoBranch: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
   openRepoBranchTab: (
-    repoId: string,
+    workspaceId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   openRepoBranchTerminal: (
-    repoId: string,
+    workspaceId: WorkspaceId,
     branchName: string,
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
+  openRepoWorktree: (
+    workspaceId: WorkspaceId,
+    worktreePath: string,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
+  openRepoWorktreeTerminal?: (
+    workspaceId: WorkspaceId,
+    worktreePath: string,
+    terminalSessionId: string,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
+  openRepoWorktreeTab?: (
+    workspaceId: WorkspaceId,
+    worktreePath: string,
+    tab: WorkspacePaneStaticTabType,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
   /** Operation-owned navigation that settles only after the requested route is the router's current location. */
-  commitRepoBranchWorkspacePaneRoute?: (
-    repoId: string,
+  commitWorkspacePaneRoute?: (
+    workspaceId: WorkspaceId,
     branchName: string,
-    route: RepoBranchWorkspacePaneRouteTarget,
+    route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => Promise<boolean>
   openRepoNewWorktree: (
-    repoId: string,
+    workspaceId: WorkspaceId,
     options?: {
       returnTo?: string | null
       presentationToken?: PrimaryWindowPresentationToken
       onCommit?: () => void
     },
   ) => void
-  cancelRepoNewWorktree: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
+  cancelRepoNewWorktree: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
 }
 
 export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation {
   const router = useRouter({ warn: false })
   return useMemo(() => {
     return {
-      repoSlugForId(repoId) {
-        const repo = useReposStore.getState().repos[repoId]
-        return repo ? repoSlugFromId(repo.id) : null
+      workspaceSlugForId(workspaceId) {
+        const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+        return workspace ? workspaceSlugFromId(workspace.id) : null
       },
-      currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug) return undefined
+      currentWorkspacePaneRoute(workspaceId, branchName) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug) return undefined
         const branchRootHref = router.buildLocation({
-          to: '/repo/$repoSlug/branch/$branchSlug',
-          params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+          to: '/workspace/$workspaceSlug/branch/$branchSlug',
+          params: { workspaceSlug, branchSlug: branchSlugFromName(branchName) },
         }).href
         return workspacePaneRouteFromBranchHref(router.state.location.href, branchRootHref)
       },
@@ -87,6 +117,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          currentHref: () => router.state.location.href,
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/',
@@ -133,52 +164,71 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           this.openHome(options)
         }
       },
-      openRepoRoot(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return
-        const target = router.buildLocation({ to: '/repo/$repoSlug', params: { repoSlug } })
+      openWorkspaceNavigator(workspaceId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug', params: { workspaceSlug } })
         void runOwnedPrimaryWindowNavigation({
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
           navigate: async (navigationId) => {
             await router.navigate({
-              to: '/repo/$repoSlug',
-              params: { repoSlug },
+              to: '/workspace/$workspaceSlug',
+              params: { workspaceSlug },
               state: (state) => primaryWindowNavigationState(state, navigationId),
             })
           },
         })
       },
-      openRepoDashboard(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return
-        const target = router.buildLocation({ to: '/repo/$repoSlug/dashboard', params: { repoSlug } })
+      openWorkspaceDashboard(workspaceId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/dashboard', params: { workspaceSlug } })
         void runOwnedPrimaryWindowNavigation({
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
           navigate: async (navigationId) => {
             await router.navigate({
-              to: '/repo/$repoSlug/dashboard',
-              params: { repoSlug },
+              to: '/workspace/$workspaceSlug/dashboard',
+              params: { workspaceSlug },
               state: (state) => primaryWindowNavigationState(state, navigationId),
             })
           },
         })
       },
-      openRepoBranch(repoId, branchName, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return false
-        const params = { repoSlug, branchSlug: branchSlugFromName(branchName) }
-        const target = router.buildLocation({ to: '/repo/$repoSlug/branch/$branchSlug', params })
+      openWorkspaceRootPane(workspaceId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/root', params: { workspaceSlug } })
         return runOwnedPrimaryWindowNavigation({
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          currentHref: () => router.state.location.href,
           navigate: async (navigationId) => {
             await router.navigate({
-              to: '/repo/$repoSlug/branch/$branchSlug',
+              to: '/workspace/$workspaceSlug/root',
+              params: { workspaceSlug },
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openWorkspaceRootTab(workspaceId, tab, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, tabKey: tab }
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/root/tab/$tabKey', params })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          currentHref: () => router.state.location.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/root/tab/$tabKey',
               params,
               replace: options?.replace,
               state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -186,31 +236,73 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoBranchTab(repoId, branchName, tab, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return false
-        const params = { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab }
-        const target = router.buildLocation({ to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey', params })
-        return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
-          commitEffect: options?.onCommit,
-          targetHref: target.href,
-          navigate: async (navigationId) => {
-            await router.navigate({
-              to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-              params,
-              replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
-            })
-          },
-        })
-      },
-      openRepoBranchTerminal(repoId, branchName, terminalSessionId, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return false
-        const params = { repoSlug, branchSlug: branchSlugFromName(branchName), terminalSessionId }
+      openWorkspaceRootTerminal(workspaceId, terminalSessionId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, terminalSessionId }
         const target = router.buildLocation({
-          to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+          to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
+          params,
+        })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          currentHref: () => router.state.location.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoBranch(workspaceId, branchName, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, branchSlug: branchSlugFromName(branchName) }
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/branch/$branchSlug', params })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/branch/$branchSlug',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoBranchTab(workspaceId, branchName, tab, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab }
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey', params })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoBranchTerminal(workspaceId, branchName, terminalSessionId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, branchSlug: branchSlugFromName(branchName), terminalSessionId }
+        const target = router.buildLocation({
+          to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
           params,
         })
         return runOwnedPrimaryWindowNavigation({
@@ -219,7 +311,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           targetHref: target.href,
           navigate: async (navigationId) => {
             await router.navigate({
-              to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+              to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
               params,
               replace: options?.replace,
               state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -227,15 +319,78 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      async commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options) {
-        const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug) return false
+      openRepoWorktree(workspaceId, worktreePath, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(worktreePath) }
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/worktree/$worktreeSlug', params })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/worktree/$worktreeSlug',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(worktreePath), terminalSessionId }
+        const target = router.buildLocation({
+          to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/terminal/$terminalSessionId',
+          params,
+        })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/terminal/$terminalSessionId',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoWorktreeTab(workspaceId, worktreePath, tab, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(worktreePath), tabKey: tab }
+        const target = router.buildLocation({
+          to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/tab/$tabKey',
+          params,
+        })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/tab/$tabKey',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      async commitWorkspacePaneRoute(workspaceId, branchName, route, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug) return false
         const branchSlug = branchSlugFromName(branchName)
         const routePrecondition = options?.routePrecondition
         const currentHref = router.state.location.href
         const branchRootHref = router.buildLocation({
-          to: '/repo/$repoSlug/branch/$branchSlug',
-          params: { repoSlug, branchSlug },
+          to: '/workspace/$workspaceSlug/branch/$branchSlug',
+          params: { workspaceSlug, branchSlug },
         }).href
         const expectedCurrentHref =
           routePrecondition?.kind === 'current-workspace-target'
@@ -246,25 +401,29 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
               ? undefined
               : (routePrecondition.route === null
                   ? router.buildLocation({
-                      to: '/repo/$repoSlug/branch/$branchSlug',
-                      params: { repoSlug, branchSlug },
+                      to: '/workspace/$workspaceSlug/branch/$branchSlug',
+                      params: { workspaceSlug, branchSlug },
                     })
                   : routePrecondition.route.kind === 'static'
                     ? router.buildLocation({
-                        to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-                        params: { repoSlug, branchSlug, tabKey: routePrecondition.route.tab },
+                        to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
+                        params: { workspaceSlug, branchSlug, tabKey: routePrecondition.route.tab },
                       })
                     : router.buildLocation({
-                        to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
-                        params: { repoSlug, branchSlug, terminalSessionId: routePrecondition.route.terminalSessionId },
+                        to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
+                        params: {
+                          workspaceSlug,
+                          branchSlug,
+                          terminalSessionId: routePrecondition.route.terminalSessionId,
+                        },
                       })
                 ).href
         if (expectedCurrentHref === null) return false
         const replace = options?.replace
         if (route === null) {
           const target = router.buildLocation({
-            to: '/repo/$repoSlug/branch/$branchSlug',
-            params: { repoSlug, branchSlug },
+            to: '/workspace/$workspaceSlug/branch/$branchSlug',
+            params: { workspaceSlug, branchSlug },
           })
           if (
             router.state.location.href === target.href &&
@@ -280,8 +439,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
-                to: '/repo/$repoSlug/branch/$branchSlug',
-                params: { repoSlug, branchSlug },
+                to: '/workspace/$workspaceSlug/branch/$branchSlug',
+                params: { workspaceSlug, branchSlug },
                 replace,
                 ignoreBlocker: true,
                 state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -292,8 +451,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         }
         if (route.kind === 'static') {
           const target = router.buildLocation({
-            to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-            params: { repoSlug, branchSlug, tabKey: route.tab },
+            to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
+            params: { workspaceSlug, branchSlug, tabKey: route.tab },
           })
           if (
             router.state.location.href === target.href &&
@@ -309,8 +468,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
-                to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-                params: { repoSlug, branchSlug, tabKey: route.tab },
+                to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
+                params: { workspaceSlug, branchSlug, tabKey: route.tab },
                 replace,
                 ignoreBlocker: true,
                 state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -320,9 +479,9 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           })
         }
         const target = router.buildLocation({
-          to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+          to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
           params: {
-            repoSlug,
+            workspaceSlug,
             branchSlug,
             terminalSessionId: route.terminalSessionId,
           },
@@ -341,9 +500,9 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           expectedCurrentHref,
           navigate: async (navigationId) => {
             await router.navigate({
-              to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+              to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
               params: {
-                repoSlug,
+                workspaceSlug,
                 branchSlug,
                 terminalSessionId: route.terminalSessionId,
               },
@@ -355,26 +514,30 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           currentHref: () => router.state.location.href,
         })
       },
-      openRepoNewWorktree(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoNewWorktree(workspaceId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
         const href = router?.state.location.href ?? null
-        if (repoSlug && router) {
-          const targetPath = `/repo/${repoSlug}/worktree/new`
+        if (workspaceSlug && router) {
+          const targetPath = `/workspace/${workspaceSlug}/worktree/new`
           const search =
             options?.returnTo === undefined
               ? routeReturnSearch(href, targetPath)
               : options.returnTo
                 ? { returnTo: options.returnTo }
                 : {}
-          const target = router.buildLocation({ to: '/repo/$repoSlug/worktree/new', params: { repoSlug }, search })
+          const target = router.buildLocation({
+            to: '/workspace/$workspaceSlug/worktree/new',
+            params: { workspaceSlug },
+            search,
+          })
           void runOwnedPrimaryWindowNavigation({
             token: options?.presentationToken,
             commitEffect: options?.onCommit,
             targetHref: target.href,
             navigate: async (navigationId) => {
               await router.navigate({
-                to: '/repo/$repoSlug/worktree/new',
-                params: { repoSlug },
+                to: '/workspace/$workspaceSlug/worktree/new',
+                params: { workspaceSlug },
                 search,
                 state: (state) => primaryWindowNavigationState(state, navigationId),
               })
@@ -382,7 +545,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           })
         }
       },
-      cancelRepoNewWorktree(repoId, options) {
+      cancelRepoNewWorktree(workspaceId, options) {
         const href = returnToFromHref(router?.state.location.href ?? null)
         if (href && router) {
           void runOwnedPrimaryWindowNavigation({
@@ -394,8 +557,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             },
           })
         } else {
-          const repoSlug = repoSlugForId(repoId)
-          if (repoSlug) this.openRepoRoot(repoId, options)
+          const workspaceSlug = workspaceSlugForId(workspaceId)
+          if (workspaceSlug) this.openWorkspaceNavigator(workspaceId, options)
         }
       },
     }
@@ -410,10 +573,16 @@ export function usePrimaryWindowRouteActions(): PrimaryWindowRouteNavigation {
 export function runOwnedPrimaryWindowNavigation(input: {
   token?: PrimaryWindowPresentationToken
   targetHref: string
+  currentHref?: () => string
   commitEffect?: () => void
   navigate(navigationId: string): Promise<unknown>
 }): boolean {
   const token = input.token ?? beginPrimaryWindowPresentation()
+  if (input.currentHref?.() === input.targetHref) {
+    if (!primaryWindowPresentationIsCurrent(token)) return false
+    input.commitEffect?.()
+    return true
+  }
   const navigationId = registerPrimaryWindowNavigation(token, input.targetHref, input.commitEffect)
   if (!navigationId) return false
   void input
@@ -482,7 +651,7 @@ export function workspacePaneHrefBelongsToBranch(currentHref: string, branchRoot
 export function workspacePaneRouteFromBranchHref(
   currentHref: string,
   branchRootHref: string,
-): RepoBranchWorkspacePaneRouteTarget | undefined {
+): WorkspacePaneRouteTarget | undefined {
   const currentPath = pathFromHref(currentHref)
   const branchRootPath = pathFromHref(branchRootHref)
   if (!currentPath || !branchRootPath) return undefined
@@ -502,9 +671,9 @@ export function workspacePaneRouteFromBranchHref(
   return undefined
 }
 
-function repoSlugForId(repoId: string): string | null {
-  const repo = useReposStore.getState().repos[repoId]
-  return repo ? repoSlugFromId(repo.id) : null
+function workspaceSlugForId(workspaceId: WorkspaceId): string | null {
+  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  return workspace ? workspaceSlugFromId(workspace.id) : null
 }
 
 export function routeReturnSearch(

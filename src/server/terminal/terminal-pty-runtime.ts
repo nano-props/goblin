@@ -1,5 +1,4 @@
 import * as pty from 'node-pty'
-import { ensureNodePtyDarwinSpawnHelperExecutable } from '#/server/terminal/node-pty-spawn-helper.ts'
 import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
 
 export interface TerminalPtyRuntime {
@@ -31,11 +30,7 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
     const shell = input.startupShellCommand
       ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
       : resolveLocalShell(input)
-    const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
-    // Bun/npm installs can leave node-pty's macOS spawn-helper without
-    // executable bits. Repair it at the runtime boundary so dev and packaged
-    // terminal creation do not depend on the current node_modules mode.
-    ensureNodePtyDarwinSpawnHelperExecutable()
+    const env = userShellEnvironment(input.env)
     const term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',
       cols: input.cols,
@@ -47,6 +42,13 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
   }
+}
+
+function userShellEnvironment(overrides: Record<string, string> | undefined): NodeJS.ProcessEnv {
+  const environment = { ...process.env, ...overrides, TERM: 'xterm-256color' }
+  return Object.fromEntries(
+    Object.entries(environment).filter(([name]) => name !== 'ELECTRON_RUN_AS_NODE' && name !== 'ELECTRON_NO_ASAR'),
+  )
 }
 
 class NodePtyTerminalRuntime implements TerminalPtyRuntime {

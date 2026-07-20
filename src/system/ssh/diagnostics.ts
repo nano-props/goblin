@@ -4,23 +4,23 @@ import type {
   RemoteDiagnosticStage,
   RemoteDiagnosticStageName,
   RemoteDiagnosticsResult,
-  RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+  RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
 
 type DiagnosticsRunner = (
   command: RemoteCommandKind,
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
-export async function testRemoteRepo(
-  target: RemoteRepoTarget,
+export async function testRemoteWorkspace(
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: DiagnosticsRunner; timeoutMs?: number } = {},
 ): Promise<RemoteDiagnosticsResult> {
   const run: DiagnosticsRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const stages = createStages()
   // No default timeout: the boot-probe caller passes SSH_BOOT_PROBE_TIMEOUT_MS,
-  // the manual diagnostic in OpenRemoteRepositoryDialog leaves it unset so
+  // the manual diagnostic in OpenRemoteWorkspaceDialog leaves it unset so
   // runRemoteCommand falls back to the full SSH_COMMAND_TIMEOUT_MS.
   const runOptions = { signal: options.signal, timeoutMs: options.timeoutMs }
 
@@ -82,7 +82,16 @@ export async function testRemoteRepo(
       stages,
     }
 
-  return { target, ok: true, stages }
+  return {
+    target,
+    ok: true,
+    stages,
+    gitAtWorkspaceRoot: physicalPath(pathResult.stdout) === physicalPath(repoResult.stdout),
+  }
+}
+
+function physicalPath(stdout: string): string {
+  return stdout.trim().split(/\r?\n/u).at(-1)?.trim() ?? ''
 }
 
 export function classifySshFailure(result: RemoteCommandResult): RemoteDiagnosticCategory {
@@ -142,7 +151,7 @@ function hasOkMarker(stdout: string): boolean {
  *  shape that records the actual outcome of every stage that ran —
  *  see the Promise.all block above. */
 function failDiagnosticAt(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   stages: RemoteDiagnosticStage[],
   failedIndex: number,
   category: RemoteDiagnosticCategory,
@@ -166,7 +175,7 @@ function failDiagnosticAt(
  *  every subsequent stage as skipped, so the rendered failure matches
  *  the canonical stage ordering without callers having to mirror it. */
 export function makeUnresolvedTargetDiagnostic(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   category: RemoteDiagnosticCategory,
   message: string,
 ): RemoteDiagnosticsResult {

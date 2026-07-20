@@ -11,7 +11,7 @@ import type {
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
-export const MAX_RECENT_REPOS = 10
+export const MAX_RECENT_WORKSPACES = 10
 export const DEFAULT_LANG_PREF: LangPref = 'auto'
 export const DEFAULT_THEME_PREF: ThemePref = 'auto'
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
@@ -20,17 +20,17 @@ export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
 
 export function defaultServerWorkspaceState(): ServerWorkspaceState {
-  return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+  return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
 }
 
 export function defaultClientWorkspaceState(): ClientWorkspaceState {
   return {
-    restoredRepoId: null,
+    restoredWorkspaceId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalSessionIdByTerminalWorktree: {},
-    preferredWorkspacePaneTabByTargetByRepo: {},
-    filetreeViewStateByWorktreeByRepo: {},
+    selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+    preferredWorkspacePaneTabByTargetByWorkspace: {},
+    filetreeViewStateByFilesystemTargetByWorkspace: {},
   }
 }
 
@@ -53,8 +53,8 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
   return {
     ...prefs,
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
-    recentRepos: overrides.recentRepos ?? [],
-    repoSettings: overrides.repoSettings ?? [],
+    recentWorkspaces: overrides.recentWorkspaces ?? [],
+    workspaceSettings: overrides.workspaceSettings ?? [],
   }
 }
 

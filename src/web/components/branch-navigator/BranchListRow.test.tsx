@@ -3,9 +3,10 @@
 import { createRef } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
@@ -23,8 +24,8 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useTerminalWorktreeOutputActive: () => terminalStoreMocks.outputActive,
-  useTerminalWorktreeBellCount: () => 0,
+  useTerminalFilesystemTargetOutputActive: () => terminalStoreMocks.outputActive,
+  useTerminalFilesystemTargetBellCount: () => 0,
 }))
 
 const branchRowPropsSpy = vi.fn()
@@ -89,17 +90,21 @@ function baseProps(
 }
 
 function branchListRowRepo(): BranchActionRepo {
-  const repo = repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
-    branches: [],
-    currentBranch: '',
-    status: [],
-    worktreesByPath: {},
-  })
+  const repo = createGitRepoPresentationForTest(
+    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo', 'repo-runtime-test'),
+    {
+      branches: [],
+      currentBranch: '',
+      status: [],
+      worktreesByPath: {},
+    },
+  )
   return {
     id: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchModel: repo.branchModel,
     branchAction: repo.operations.branchAction,
     remote: repo.remote,
+    remoteLifecycle: repo.remoteLifecycle,
   }
 }

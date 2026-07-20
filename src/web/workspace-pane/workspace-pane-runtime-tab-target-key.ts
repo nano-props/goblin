@@ -1,10 +1,6 @@
 import { workspacePaneRuntimeTabTargetKeyForType } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
+import type { WorkspacePaneRuntimeTabTargetInput } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
-export interface WorkspacePaneRuntimeTabTargetKeyInput {
-  repoRoot: string
-  worktreePath: string | null
-}
-
-export function workspacePaneRuntimeTabTargetKey(input: WorkspacePaneRuntimeTabTargetKeyInput): string | null {
+export function workspacePaneRuntimeTabTargetKey(input: WorkspacePaneRuntimeTabTargetInput): string | null {
   return workspacePaneRuntimeTabTargetKeyForType('terminal', input)
 }

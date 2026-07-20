@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
@@ -10,24 +10,31 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
-vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
-  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
-  return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+const failRemoteWorkspaceRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async (importActual) => {
+  const actual = await importActual<typeof RemoteWorkspaceFailureSettlement>()
+  return { ...actual, failRemoteWorkspaceRuntimeIfNeeded: failRemoteWorkspaceRuntimeIfNeededMock }
 })
 
+const workspaceId = workspaceIdForTest('goblin+file:///repo')
+const worktreeRoot = workspaceIdForTest('goblin+file:///repo/worktree')
+const linkedWorkspaceId = workspaceIdForTest('goblin+file:///linked-repo')
+const linkedWorktreeRoot = workspaceIdForTest('goblin+file:///linked/worktree')
 const target = {
-  repoRoot: '/repo',
-  repoRuntimeId: 'repo-runtime-test',
+  repoRoot: workspaceId,
+  workspaceRuntimeId: 'repo-runtime-test',
   worktreePath: '/repo/worktree',
   branchName: 'feature/worktree',
   deleteBranch: false,
 }
 
 describe('WorktreeRemovalApplication', () => {
-  test('gates one physical worktree across users and repo runtime ids until removal settles', async () => {
+  test('gates one physical worktree across users and workspace runtime ids until removal settles', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const physicalIdentity = testPhysicalWorktreeIdentity(target.worktreePath)
     const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
@@ -64,10 +71,10 @@ describe('WorktreeRemovalApplication', () => {
       operations,
       physicalWorktrees: { capture: async () => physicalCapability },
     })
-    const primaryRepo = normalizeRemoteRepoId({ alias: 'build-host', remotePath: '/srv/repo' })
+    const primaryRepo = normalizeRemoteWorkspaceId({ alias: 'build-host', remotePath: '/srv/repo' })
     const removal = application.removeWorktree('user-a', {
       repoRoot: primaryRepo,
-      repoRuntimeId: target.repoRuntimeId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
       worktreePath: '/srv/repo-linked',
       branchName: target.branchName,
       deleteBranch: false,
@@ -94,8 +101,20 @@ describe('WorktreeRemovalApplication', () => {
 
   test('reconciles every affected user scope after Git removal fails', async () => {
     const affectedScopes = [
-      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', worktreePath: '/repo/worktree' },
-      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b', worktreePath: '/repo/worktree' },
+      {
+        userId: 'user-a',
+        workspaceId,
+        workspaceRuntimeId: 'runtime-a',
+        scope: 'goblin+file:///repo\0runtime-a',
+        worktreePath: '/repo/worktree',
+      },
+      {
+        userId: 'user-b',
+        workspaceId,
+        workspaceRuntimeId: 'runtime-b',
+        scope: 'goblin+file:///repo\0runtime-b',
+        worktreePath: '/repo/worktree',
+      },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => {})
@@ -121,13 +140,18 @@ describe('WorktreeRemovalApplication', () => {
 
     expect(retireTarget).not.toHaveBeenCalled()
     expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledWith({
-      repoRoot: target.repoRoot,
+      workspaceId: target.repoRoot,
       worktreePath: target.worktreePath,
       physicalWorktreeCapability: expect.objectContaining({
         identity: testPhysicalWorktreeIdentity(target.worktreePath),
       }),
       permit: expect.objectContaining({ operationId: expect.any(Number) }),
-      scopes: affectedScopes,
+      scopes: affectedScopes.map(({ userId, scope, worktreePath }) => ({
+        userId,
+        scope,
+        workspaceId: target.repoRoot,
+        worktreePath,
+      })),
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', target.repoRoot)
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-b', target.repoRoot)
@@ -186,12 +210,12 @@ describe('WorktreeRemovalApplication', () => {
         if (!prepared.ok) return prepared
         entered.resolve()
         await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
-        return { ok: false, message: 'error.repo-runtime-stale' }
+        return { ok: false, message: 'error.workspace-runtime-stale' }
       },
     })
     await entered.promise
-    runtime.abort(new Error('error.repo-runtime-stale'))
-    await expect(removal).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+    runtime.abort(new Error('error.workspace-runtime-stale'))
+    await expect(removal).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
   })
 
   test('runtime close cancels a queued removal before its task starts', async () => {
@@ -206,21 +230,21 @@ describe('WorktreeRemovalApplication', () => {
     const remove = vi.fn(async () => ({ ok: true as const, message: 'removed' }))
     const application = createApplication({ operations, physicalWorktrees: { capture: async () => capability } })
     const queued = application.removeWorktree('user-a', { ...target, remove })
-    runtime.abort(new Error('error.repo-runtime-stale'))
-    await expect(queued).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+    runtime.abort(new Error('error.workspace-runtime-stale'))
+    await expect(queued).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
     expect(remove).not.toHaveBeenCalled()
     gate.resolve()
     await active.catch(() => undefined)
   })
 
   test('fails remote lifecycle when capture hits a remote runtime failure', async () => {
-    const failure = new RemoteRepoRuntimeFailureError({
-      repoRoot: target.repoRoot,
-      repoRuntimeId: target.repoRuntimeId,
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: target.repoRoot,
+      workspaceRuntimeId: target.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',
     })
-    failRemoteRuntimeIfNeededMock.mockClear()
+    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
     const application = createApplication({
       physicalWorktrees: {
         capture: async () => {
@@ -232,13 +256,13 @@ describe('WorktreeRemovalApplication', () => {
     await expect(
       application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
     ).resolves.toEqual({ ok: false, message: 'connection refused' })
-    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
+    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
   test('fails remote lifecycle when queued validation hits a remote runtime failure', async () => {
-    const failure = new RemoteRepoRuntimeFailureError({
-      repoRoot: target.repoRoot,
-      repoRuntimeId: target.repoRuntimeId,
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: target.repoRoot,
+      workspaceRuntimeId: target.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',
     })
@@ -248,7 +272,7 @@ describe('WorktreeRemovalApplication', () => {
         throw failure
       },
     })
-    failRemoteRuntimeIfNeededMock.mockClear()
+    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
     const application = createApplication({
       physicalWorktrees: { capture: async () => capability },
     })
@@ -256,7 +280,7 @@ describe('WorktreeRemovalApplication', () => {
     await expect(
       application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
     ).resolves.toEqual({ ok: false, message: 'connection refused' })
-    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
+    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
   test('does not retire pane layout after worktree and branch removal', async () => {
@@ -307,14 +331,19 @@ describe('WorktreeRemovalApplication', () => {
       {
         userId: 'user-a',
         scope: '/repo\0runtime-a',
-        repoRuntimeId: 'runtime-a',
-        target: { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' },
+        workspaceRuntimeId: 'runtime-a',
+        target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'runtime-a', root: worktreeRoot },
       },
       {
         userId: 'user-a',
         scope: '/linked-repo\0runtime-b',
-        repoRuntimeId: 'runtime-b',
-        target: { kind: 'worktree' as const, repoRoot: '/linked-repo', worktreePath: '/linked/worktree' },
+        workspaceRuntimeId: 'runtime-b',
+        target: {
+          kind: 'git-worktree' as const,
+          workspaceId: linkedWorkspaceId,
+          workspaceRuntimeId: 'runtime-b',
+          root: linkedWorktreeRoot,
+        },
       },
     ]
     const broadcastSessionsChanged = vi.fn()
@@ -338,36 +367,45 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: '' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/repo')
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo', 'runtime-a')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo', 'runtime-b')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
   })
 })
+
+interface TestTerminalScope {
+  userId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  scope: string
+}
 
 function createApplication(
   options: {
     operations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     physicalWorktrees?: typeof testPhysicalWorktrees
-    terminalScopes?: Array<{ userId: string; repoRoot: string; scope: string }>
+    terminalScopes?: TestTerminalScope[]
     terminalQuiescence?:
-      | { ok: true; scopes: Array<{ userId: string; repoRoot: string; scope: string }> }
-      | { ok: false; scopes: Array<{ userId: string; repoRoot: string; scope: string }>; message: string }
-    closeSessionsForPhysicalWorktree?: (
-      identity: PhysicalWorktreeIdentity,
-    ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
+      | { ok: true; scopes: TestTerminalScope[] }
+      | {
+          ok: false
+          scopes: TestTerminalScope[]
+          message: string
+        }
+    closeSessionsForPhysicalWorktree?: (identity: PhysicalWorktreeIdentity) => Promise<TestTerminalScope[]>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
-    broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
-    broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
+    broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: WorkspaceId) => void
+    broadcastSessionsChanged?: (userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string) => void
   } = {},
 ) {
   return createWorktreeRemovalApplication({
     worktreeOperations: options.operations ?? createPhysicalWorktreeOperationCoordinator(),
     physicalWorktrees: options.physicalWorktrees ?? testPhysicalWorktrees,
-    terminalWorktree: {
+    terminalSessions: {
       closeSessionsForPhysicalWorktree: async (capability) => ({
         ...(options.terminalQuiescence ?? {
           ok: true as const,
@@ -383,7 +421,7 @@ function createApplication(
       reconcilePhysicalWorktreeAfterRemovalFailure:
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
-    isCurrentRepoRuntime: () => true,
+    isCurrentWorkspaceRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),
     broadcastWorkspaceTabsChanged: options.broadcastWorkspaceTabsChanged ?? (() => {}),
   })

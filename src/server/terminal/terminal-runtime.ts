@@ -10,6 +10,8 @@
 // to the route layer.
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -19,41 +21,47 @@ import {
   createWorkspacePaneTabsCoordinator,
   type WorkspacePaneTargetProjectionProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import { workspacePaneDurableLayoutsEqual } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
-import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
+import {
+  broadcastWorkspacePaneTabsChanged,
+  broadcastWorkspacePaneTabsRevision,
+} from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {
   serverWorkspacePaneLayoutRepository,
   serverWorkspacePaneLayoutRestoreTransaction,
 } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import {
-  TerminalSessionManager,
-  type TerminalSessionCloseReason,
-} from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSessionManager, type TerminalSessionCloseReason } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
+import {
+  isCurrentWorkspaceRuntime,
+  isCurrentWorkspaceRuntimeMembership,
+  onWorkspaceRuntimeClosed,
+} from '#/server/modules/workspace-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
-import { getRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -65,23 +73,12 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // A window's repo membership survives the same long disconnect window as its
 // terminals, but remains a separate policy input so the two lifecycles are not
 // structurally coupled if product retention changes later.
-const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
+const WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
+const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
+const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
-const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider = {
-  async captureTargets(_userId, repoRoot, scope) {
-    const separator = scope.lastIndexOf('\0')
-    if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
-    const snapshot = await getRepoSnapshot(repoRoot, {
-      repoRuntimeId: scope.slice(separator + 1),
-    })
-    return (snapshot?.branches ?? []).map((branch) => ({
-      repoRoot,
-      branchName: branch.name,
-      worktreePath: branch.worktree?.path ?? null,
-    }))
-  },
-}
+const serverWorkspacePaneTargetProjection = new WorkspacePaneTargetCatalog()
 
 export interface ServerTerminalRuntimeOptions {
   ptySupervisor: PtySupervisor
@@ -97,13 +94,15 @@ export interface ServerTerminalRuntime {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   shutdown(): void
 }
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
+  const workspacePaneLayoutRepository = options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository
   const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
-    repository: options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository,
+    repository: workspacePaneLayoutRepository,
     restoreTransaction: options.workspacePaneLayoutRestoreTransaction ?? serverWorkspacePaneLayoutRestoreTransaction,
   })
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
@@ -140,8 +139,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onLifecycle(userId, event) {
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
-      onSessionsProjectionChanged(userId, repoRoot) {
-        broadcastRepoSessionsChanged(userId, repoRoot)
+      onSessionsProjectionChanged(userId, event) {
+        broadcastTerminalSessionsChanged(userId, event)
       },
     },
     (userId, clientId) => broker.isClientOnline(userId, clientId),
@@ -157,7 +156,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
-    repoMembershipTtlMs: REPO_RUNTIME_MEMBERSHIP_TTL_MS,
+    repoMembershipTtlMs: WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS,
   })
   broker = coordinator.broker
   sessionService = createTerminalSessionService({
@@ -165,33 +164,135 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidTerminalSessionId,
     manager,
     workspaceTabsCoordinator,
-    isCurrentRepoRuntime: isCurrentRepoRuntime,
-    broadcastSessionsChanged(userId, repoRoot) {
-      broadcastRepoSessionsChanged(userId, repoRoot)
-    },
-    broadcastWorkspaceTabsChanged(userId, repoRoot) {
-      broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
+    isCurrentWorkspaceRuntime: isCurrentWorkspaceRuntime,
+    broadcastWorkspaceTabsChanged(userId, workspaceId) {
+      publishWorkspaceTabsChanged(userId, workspaceId)
     },
     gCommand: options.gCommand,
   })
-  const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
-    const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
-    void manager
-      .closeSessionsForRepo(event.userId, scope)
-      .then(async (retirement) => {
-        if (retirement.failures.length > 0) throw new Error('terminal session close failed')
-        manager.releaseProjectionRevisionForScope(event.userId, scope)
-        await workspaceTabsCoordinator.closeInvalidatedScope({ userId: event.userId, scope })
-        broadcastRepoSessionsChanged(event.userId, event.repoRoot)
-        broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
-      })
-      .catch((err) => {
-        terminalRuntimeLogger.warn(
-          { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err },
-          'failed to close workspace tabs after repo runtime close',
-        )
-      })
+  const invalidatedScopeRetirements = new Map<
+    string,
+    {
+      userId: string
+      workspaceId: WorkspaceId
+      workspaceRuntimeId: string
+      scope: string
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    }
+  >()
+  const unsubscribeWorkspaceRuntimeClosed = onWorkspaceRuntimeClosed((event) => {
+    const scope = terminalSessionRuntimeScope(event.workspaceId, event.workspaceRuntimeId)
+    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(event.userId, scope)
+    const sessionsChangedEvent = manager.terminalSessionsChangedEventForScope(
+      event.userId,
+      event.workspaceId,
+      event.workspaceRuntimeId,
+    )
+    manager.releaseProjectionRevisionForScope(event.userId, scope)
+    scheduleInvalidatedScopeRetirement({
+      userId: event.userId,
+      workspaceId: event.workspaceId,
+      workspaceRuntimeId: event.workspaceRuntimeId,
+      scope,
+    })
+    invalidation.publishEffects()
+    try {
+      broadcastTerminalSessionsChanged(event.userId, sessionsChangedEvent)
+    } catch (error) {
+      terminalRuntimeLogger.warn(
+        {
+          userId: event.userId,
+          workspaceId: event.workspaceId,
+          workspaceRuntimeId: event.workspaceRuntimeId,
+          err: error,
+        },
+        'failed to publish invalidated workspace runtime sessions',
+      )
+    }
   })
+
+  function scheduleInvalidatedScopeRetirement(input: {
+    userId: string
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    scope: string
+  }): void {
+    if (shuttingDown) return
+    const key = JSON.stringify([input.userId, input.scope])
+    if (invalidatedScopeRetirements.has(key)) return
+    const retirement = { ...input, attempts: 0, running: false, timer: null }
+    invalidatedScopeRetirements.set(key, retirement)
+    queueMicrotask(() => void runInvalidatedScopeRetirement(key, retirement))
+  }
+
+  async function runInvalidatedScopeRetirement(
+    key: string,
+    retirement: {
+      userId: string
+      workspaceId: WorkspaceId
+      workspaceRuntimeId: string
+      scope: string
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    },
+  ): Promise<void> {
+    if (shuttingDown) {
+      invalidatedScopeRetirements.delete(key)
+      return
+    }
+    if (invalidatedScopeRetirements.get(key) !== retirement || retirement.running) return
+    retirement.running = true
+    retirement.timer = null
+    try {
+      await workspaceTabsCoordinator.closeInvalidatedScope({ userId: retirement.userId, scope: retirement.scope })
+      if (invalidatedScopeRetirements.get(key) !== retirement) return
+      invalidatedScopeRetirements.delete(key)
+      try {
+        publishWorkspaceTabsChanged(retirement.userId, retirement.workspaceId)
+      } catch (error) {
+        terminalRuntimeLogger.warn(
+          {
+            userId: retirement.userId,
+            workspaceId: retirement.workspaceId,
+            workspaceRuntimeId: retirement.workspaceRuntimeId,
+            err: error,
+          },
+          'failed to publish retired workspace runtime workspace tabs',
+        )
+      }
+    } catch (error) {
+      retirement.attempts += 1
+      terminalRuntimeLogger.warn(
+        {
+          userId: retirement.userId,
+          workspaceId: retirement.workspaceId,
+          workspaceRuntimeId: retirement.workspaceRuntimeId,
+          attempt: retirement.attempts,
+          err: error,
+        },
+        'failed to retire invalidated workspace runtime workspace tabs; retrying',
+      )
+      if (invalidatedScopeRetirements.get(key) !== retirement) return
+      if (shuttingDown) {
+        invalidatedScopeRetirements.delete(key)
+        return
+      }
+      const delay = Math.min(
+        INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS * 2 ** Math.min(retirement.attempts - 1, 6),
+        INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS,
+      )
+      retirement.timer = setTimeout(() => {
+        retirement.timer = null
+        void runInvalidatedScopeRetirement(key, retirement)
+      }, delay)
+      retirement.timer.unref?.()
+    } finally {
+      retirement.running = false
+    }
+  }
 
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
@@ -199,6 +300,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     sessionService,
     isValidTerminalClientId,
+    isCurrentWorkspaceRuntimeMembership,
     worktreeOperations,
   })
   const terminalCreateProvider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
@@ -206,19 +308,24 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     workspaceTabsCoordinator,
     worktreeOperations,
     physicalWorktrees,
-    terminal: { ...terminalCreateProvider, close: actions.close },
-    terminalWorktree: manager,
-    isCurrentRepoRuntime,
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    terminal: { ...terminalCreateProvider, close: actions.closeForWorkspacePane },
+    terminalSessions: manager,
+    isCurrentWorkspaceRuntimeMembership,
+    broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
-    terminalWorktree: manager,
+    terminalSessions: manager,
     workspaceTabs: workspaceTabsCoordinator,
-    isCurrentRepoRuntime,
-    broadcastSessionsChanged: broadcastRepoSessionsChanged,
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    isCurrentWorkspaceRuntime,
+    broadcastSessionsChanged(userId, workspaceId, workspaceRuntimeId) {
+      broadcastTerminalSessionsChanged(
+        userId,
+        manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+      )
+    },
+    broadcastWorkspaceTabsChanged: publishWorkspaceTabsChanged,
   })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
@@ -231,7 +338,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
-    isCurrentRepoRuntime: isCurrentRepoRuntime,
+    isCurrentWorkspaceRuntimeMembership,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
     async restoreTabs(userId, input) {
@@ -308,7 +415,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     onShutdown() {
       if (shuttingDown) return
       shuttingDown = true
-      unsubscribeRepoRuntimeClosed()
+      unsubscribeWorkspaceRuntimeClosed()
+      for (const retirement of invalidatedScopeRetirements.values()) {
+        if (retirement.timer) clearTimeout(retirement.timer)
+      }
+      invalidatedScopeRetirements.clear()
       physicalWorktrees.dispose()
       coordinator.shutdown()
       manager.forceShutdown()
@@ -326,23 +437,72 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
+  const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
+    async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
+      const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
+      let durableLayoutChanged: boolean
+      try {
+        assertCurrent()
+        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+      } catch (error) {
+        return { kind: 'failed-before-commit', error }
+      }
+
+      // The accepted durable CAS is the capability-removal commit point.
+      // Register overlay retirement before detaching terminal authority; the
+      // queued effect cannot run until this synchronous commit returns.
+      scheduleInvalidatedScopeRetirement({
+        userId,
+        workspaceId,
+        workspaceRuntimeId: workspaceRuntimeId,
+        scope,
+      })
+      const terminalInvalidation = manager.commitGitSessionInvalidation(userId, scope)
+      terminalInvalidation.publishEffects()
+      if (durableLayoutChanged || terminalInvalidation.removedCount > 0) {
+        try {
+          broadcastTerminalSessionsChanged(
+            userId,
+            manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+          )
+        } catch (error) {
+          terminalRuntimeLogger.warn(
+            { userId, workspaceId, workspaceRuntimeId, err: error },
+            'failed to publish committed terminal invalidation',
+          )
+        }
+      }
+      return { kind: 'committed' }
+    },
+  }
+
   return {
     host,
     workspacePaneRuntimeHost,
     workspacePaneTabsHost,
     workspacePaneRuntimeApplication,
     worktreeRemovalApplication,
+    workspaceCapabilityTransitionHost,
     shutdown() {
       host.shutdown()
     },
   }
 
-  function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
+  function broadcastTerminalSessionsChanged(userId: string, event: TerminalSessionsChangedEvent): void {
+    broker.broadcastToUser(userId, { type: 'sessions-changed', ...event })
   }
 
-  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
+  function publishWorkspaceTabsChanged(userId: string, workspaceId: WorkspaceId): void {
+    broadcastWorkspacePaneTabsChanged(broker, userId, workspaceId)
+  }
+
+  function publishWorkspaceTabsRevision(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    revision: number,
+  ): void {
+    broadcastWorkspacePaneTabsRevision(broker, userId, workspaceId, workspaceRuntimeId, revision)
   }
 
   function handleSessionClosed(
@@ -351,17 +511,47 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     reason: TerminalSessionCloseReason,
   ): void {
     if (reason !== 'session') return
-    broadcastRepoSessionsChanged(userId, session.repoRoot)
+    const coordinates = terminalSessionCoordinates(session)
+    broadcastTerminalSessionsChanged(
+      userId,
+      manager.terminalSessionsChangedEventForScope(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId),
+    )
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {
-        broadcastRepoWorkspaceTabsChanged(userId, session.repoRoot)
+        publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, repoRoot: session.repoRoot, err },
+          {
+            userId,
+            terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+            workspaceId: coordinates.workspaceId,
+            err,
+          },
           'failed to reconcile workspace tabs after terminal session close',
         )
       })
   }
+}
+
+async function clearWorkspacePaneDurableLayout(
+  repository: WorkspacePaneLayoutRepository,
+  workspaceId: WorkspaceId,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = await repository.load(workspaceId)
+    const replacement = {
+      entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
+    }
+    if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return false
+    const outcome = await repository.compareAndSwap({
+      workspaceId,
+      expected: current.layout,
+      replacement,
+    })
+    if (outcome.kind === 'accepted') return outcome.changed
+    if (outcome.kind === 'write-failure') throw outcome.error
+  }
+  throw new Error('workspace pane layout cleanup was superseded')
 }

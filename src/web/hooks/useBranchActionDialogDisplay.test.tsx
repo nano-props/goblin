@@ -21,11 +21,11 @@ import {
   useBranchActionDialogsStore,
   type BranchActionDialogEntry,
   type RemoveWorktreeDialogPayload,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+} from '#/web/stores/workspaces/branch-action-dialogs.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -33,13 +33,14 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = '/tmp/goblin-dialog-display-test'
-const OTHER_REPO_ID = '/tmp/goblin-dialog-display-test-other'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-test')
+const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-test-other')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   resetBranchActionDialogsStore()
 })
 
@@ -58,7 +59,7 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     // production `BranchActionDialogHost` pattern. The helper takes
     // `repos` as a parameter precisely so multiple display hooks in
     // one host share a single subscription.
-    const repos = useReposStore((s) => s.repos)
+    const repos = useWorkspacesStore((s) => s.workspaces)
     handle.current = useBranchActionDialogDisplay(slot, repos)
     return null
   }
@@ -94,7 +95,7 @@ function setupRepo(): void {
 }
 
 function dropBranch(repoId: string, branchName: string): void {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   const readModel = repo ? readRepoBranchQueryProjection(repo) : null
   const nextBranches = readModel?.branches.filter((b) => b.name !== branchName) ?? []
   act(() => {
@@ -172,9 +173,15 @@ describe('useBranchActionDialogDisplay', () => {
       branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
       currentBranchName: 'feature/query',
     })
-    setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, {
+    setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
       loadedAt: 123,
-      operations: [serverOperation({ repoRuntimeId: repo.repoRuntimeId, kind: 'delete-branch', branch: 'feature/query' })],
+      operations: [
+        serverOperation({
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          kind: 'delete-branch',
+          branch: 'feature/query',
+        }),
+      ],
     })
     const entry: BranchActionDialogEntry<string> = {
       repoId: REPO_ID,
@@ -412,12 +419,12 @@ describe('useBranchActionDialogDisplay', () => {
 })
 
 function serverOperation(
-  overrides: Pick<RepoServerOperationState, 'kind'> & { branch: string; repoRuntimeId: string },
+  overrides: Pick<RepoServerOperationState, 'kind'> & { branch: string; workspaceRuntimeId: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}`,
     repoId: REPO_ID,
-    repoRuntimeId: overrides.repoRuntimeId,
+    workspaceRuntimeId: overrides.workspaceRuntimeId,
     kind: overrides.kind,
     phase: 'running',
     source: 'user',

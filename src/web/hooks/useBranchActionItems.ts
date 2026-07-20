@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Diff, FolderTree, GitBranch, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { type BranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -11,7 +11,7 @@ import {
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -46,7 +46,7 @@ export function useBranchActionItems(
   repo: BranchActionRepo,
   branch: RepoBranchState,
   branchActions: BranchActions,
-  options: { workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined },
+  options: { workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined },
 ): BranchActionSurface {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
@@ -66,7 +66,7 @@ export function useBranchActionItems(
   }
   const openStaticWorkspacePaneTab = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
     void dispatchShowWorkspacePaneStaticTabAction({
-      repoId: repo.id,
+      workspaceId: repo.id,
       branchName: branch.name,
       type,
       workspacePaneRoute: options.workspacePaneRoute,

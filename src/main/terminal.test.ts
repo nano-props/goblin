@@ -11,8 +11,9 @@ import {
 // hoisted to the top of the file by vitest's transformer. Hoist the
 // storage too so the factory can write to it before the surrounding
 // module body has run.
-const { ipcHandlers, mockNotificationEmitting } = vi.hoisted(() => {
+const { ipcHandlers, mockNotificationEmitting, broadcastClientEffectIntent } = vi.hoisted(() => {
   const ipcHandlers = new Map<string, (_event: unknown, input: unknown) => unknown>()
+  const broadcastClientEffectIntent = vi.fn()
   const mockNotificationEmitting = (emitEvent: 'show' | 'failed') =>
     function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
       const listeners = new Map<string, () => void>()
@@ -23,8 +24,10 @@ const { ipcHandlers, mockNotificationEmitting } = vi.hoisted(() => {
         listeners.get(emitEvent)?.()
       })
     }
-  return { ipcHandlers, mockNotificationEmitting }
+  return { ipcHandlers, mockNotificationEmitting, broadcastClientEffectIntent }
 })
+
+vi.mock('#/main/client-surface-events.ts', () => ({ broadcastClientEffectIntent }))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -72,7 +75,7 @@ describe('terminal IPC', () => {
       {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: '/tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       },
       {
         sender: { id: 99, once: vi.fn() },
@@ -84,9 +87,12 @@ describe('terminal IPC', () => {
   })
 
   test('rejects malformed bell payloads', async () => {
-    await expect(invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 1, body: 'bad', repoRoot: '/tmp/repo' })).resolves.toBe(
-      false,
-    )
+    await expect(
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 1, body: 'bad', workspaceId: 'goblin+file:///tmp/repo' }),
+    ).resolves.toBe(false)
+    await expect(
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 'Terminal bell', body: 'bad', workspaceId: '/tmp/repo' }),
+    ).resolves.toBe(false)
   })
 
   test('rejects malformed test notification payloads', async () => {
@@ -106,7 +112,15 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention in feature',
-        repoRoot: '/tmp/repo',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
@@ -130,9 +144,52 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: '/tmp/repo',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).resolves.toBe(false)
+  })
+
+  test('forwards terminal presentation when a native notification is clicked', async () => {
+    const { Notification } = await import('electron')
+    vi.mocked(Notification).mockImplementationOnce(
+      function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
+        const listeners = new Map<string, () => void>()
+        this.once = vi.fn((event: string, callback: () => void) => listeners.set(event, callback))
+        this.show = vi.fn(() => {
+          listeners.get('show')?.()
+          listeners.get('click')?.()
+        })
+      } as any,
+    )
+    const input = {
+      title: 'Terminal bell',
+      body: 'task completed',
+      terminalSessionId: 'term-111111111111111111111',
+      session: {
+        target: {
+          kind: 'git-worktree' as const,
+          workspaceId: 'goblin+file:///tmp/repo',
+          workspaceRuntimeId: 'workspace-runtime-test',
+          root: 'goblin+file:///tmp/repo',
+        },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      },
+    }
+
+    await expect(invoke(TERMINAL_NOTIFY_BELL_CHANNEL, input)).resolves.toBe(true)
+    expect(broadcastClientEffectIntent).toHaveBeenCalledWith({
+      type: 'terminal-bell-click',
+      terminalSessionId: input.terminalSessionId,
+      session: input.session,
+    })
   })
 
   test('returns true when Notification.isSupported() is false (flashFrame/bounce already fired)', async () => {
@@ -149,7 +206,15 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: '/tmp/repo',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)

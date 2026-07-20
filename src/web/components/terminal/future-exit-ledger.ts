@@ -1,9 +1,11 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface FutureExitBinding {
   terminalSessionId: string
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
 interface FutureExitLedgerOptions {
@@ -67,10 +69,7 @@ export class FutureExitLedger {
     }
   }
 
-  confirmAuthoritativeSnapshot(
-    snapshotScopeKey: string,
-    presentBindings: readonly FutureExitBinding[],
-  ): void {
+  confirmAuthoritativeSnapshot(snapshotScopeKey: string, presentBindings: readonly FutureExitBinding[]): void {
     this.pruneExpired(this.now())
     const authoritativeBindingKeyByTerminalSessionId = new Map(
       presentBindings
@@ -148,6 +147,6 @@ function bindingKey(binding: FutureExitBinding): string {
   return `${scopeKey(binding)}:${binding.terminalSessionId}:${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
 }
 
-function scopeKey(binding: Pick<FutureExitBinding, 'repoRoot' | 'repoRuntimeId'>): string {
-  return JSON.stringify([binding.repoRoot, binding.repoRuntimeId])
+function scopeKey(binding: Pick<FutureExitBinding, 'workspaceId' | 'workspaceRuntimeId'>): string {
+  return JSON.stringify([binding.workspaceId, binding.workspaceRuntimeId])
 }

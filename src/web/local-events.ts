@@ -1,10 +1,7 @@
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+
 export interface ClientLocalEventMap {
-  'terminal-bell-click': {
-    type: 'terminal-bell-click'
-    repoRoot: string
-    terminalSessionId?: string
-    terminalWorktreeKey?: string
-  }
+  'terminal-bell-click': Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>
 }
 
 type ClientLocalEvent = ClientLocalEventMap[keyof ClientLocalEventMap]

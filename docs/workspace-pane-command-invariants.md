@@ -32,29 +32,29 @@ Durable commands obey this lock order:
 
 ```text
 physical worktree permit
--> repoRoot layout queue
+-> workspaceId layout queue
 -> settings mutation queue inside the repository adapter
 -> synchronous epoch overlay commit
 ```
 
-The aggregate owns the `repoRoot` queue and canonical epoch projection clock. The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Invalid persisted targets are filtered by the authoritative repo projection even when repair persistence fails. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
+The aggregate owns the per-`workspaceId` queue and canonical epoch projection clock. The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Invalid persisted targets are filtered by the authoritative Workspace/Git target projection even when repair persistence fails. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
 
 Target repair and branch retirement use the same aggregate boundary. Repair validates membership and filters invalid target keys from the settings transaction's current layout in one atomic write, preserving valid siblings without partial commits. The epoch physical index retains only a lightweight admission lease for each target: identity-queue admission plus the runtime-epoch signal. Current operations and removal require a separate execution capability and validate the physical object; stale-index cleanup uses the lease so a deleted path can still be reconciled safely. Physical removal clears the removed generation from every affected live index but does not let that old generation authorize durable retirement. The authoritative repo projection suppresses the now-invalid row, and the next membership-aware repair removes it atomically. Git success followed by finalize failure reports `repositoryStateChanged: true`; physical deletion is never described as rolled back.
 
 ## Commands
 
-| Class | Capture | Execute/commit |
-| --- | --- | --- |
-| Absolute current-target: identity/index/open | intent and presentation token before queue | resolve from current projection; latest absolute intent wins; router must remain on the target |
-| Relative current-target: next/previous | `direction` before queue | resolve route, projection, adjacent tab, and token at execution; every queued step runs |
-| Exact transition: active close-back | source, destination, opener, and token before write | never rebase; commit only while router still equals the source |
-| Absolute destination | destination and target lease before queue | independent of source route; destination lease must remain current |
-| Resource command: create/close/open membership | write input and operation facts | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
-| Recovery/reconciliation | canonical server/runtime snapshot | converge after server state; never repair or reclassify a user command |
+| Class                                          | Capture                                             | Execute/commit                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Absolute current-target: identity/index/open   | intent and presentation token before queue          | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
+| Relative current-target: next/previous         | `direction` before queue                            | resolve route, projection, adjacent tab, and token at execution; every queued step runs                           |
+| Exact transition: active close-back            | source, destination, opener, and token before write | never rebase; commit only while router still equals the source                                                    |
+| Absolute destination                           | destination and target lease before queue           | independent of source route; destination lease must remain current                                                |
+| Resource command: create/close/open membership | write input and operation facts                     | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
+| Recovery/reconciliation                        | canonical server/runtime snapshot                   | converge after server state; never repair or reclassify a user command                                            |
 
 ## Invariants
 
-1. Every queued command keeps its admission lease: `repoRuntimeId`, branch, and worktree. It cannot cross an epoch or worktree replacement.
+1. Every queued command keeps its admission lease: `workspaceRuntimeId`, branch, and worktree. It cannot cross an epoch or worktree replacement.
 2. Relative intent remains relative until execution and runs once in queue order. Absolute intent remains absolute and may rebase only within its current target.
 3. Router currentness comes from the router capability, never store supplements. Only an accepted router commit writes route supplements.
 4. Server write, projection acceptance, and route commit are separate outcomes; later failure cannot undo or report failure as success for an earlier fact.
@@ -66,15 +66,15 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 
 ## Required concurrency tests
 
-| Sequence | Result |
-| --- | --- |
-| Absolute A→B, then A→C before B settles | C rebases within the target and finishes final; B may be superseded |
-| Relative next, next across `[A,B,C]` | A→B→C; neither step is superseded |
-| Relative move queued behind open/active-close | resolve from the post-operation route and projection |
-| Router leaves the repo/branch while a command waits | reject with no navigation |
-| Runtime/worktree is replaced while a command waits | reject with no effect on the replacement |
-| Close write commits, then source CAS fails | resource stays closed; reconciliation may fix the URL |
-| One of two windows releases a shared runtime | sibling remains current |
-| Recovery resets projection scopes | cancel old work; keep effect-owned listeners installed |
+| Sequence                                            | Result                                                              |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| Absolute A→B, then A→C before B settles             | C rebases within the target and finishes final; B may be superseded |
+| Relative next, next across `[A,B,C]`                | A→B→C; neither step is superseded                                   |
+| Relative move queued behind open/active-close       | resolve from the post-operation route and projection                |
+| Router leaves the repo/branch while a command waits | reject with no navigation                                           |
+| Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                            |
+| Close write commits, then source CAS fails          | resource stays closed; reconciliation may fix the URL               |
+| One of two windows releases a shared runtime        | sibling remains current                                             |
+| Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed              |
 
 Queue tests must block between capture and execution. Router substitutes must track the observed route and enforce production preconditions. Assert command outcomes, final route, and zero effects on rejected targets; never encode a partial side effect as success.

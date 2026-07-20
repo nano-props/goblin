@@ -1,14 +1,14 @@
 import type { LangPref } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 
 export interface MenuRuntimeState {
-  recentRepos: RepoSessionEntry[]
+  recentWorkspaces: WorkspaceSessionEntry[]
   shortcutsDisabled: boolean
   langPref: LangPref
 }
 
 const DEFAULT_MENU_RUNTIME_STATE: MenuRuntimeState = {
-  recentRepos: [],
+  recentWorkspaces: [],
   shortcutsDisabled: false,
   langPref: 'auto',
 }
@@ -17,7 +17,7 @@ let state: MenuRuntimeState = { ...DEFAULT_MENU_RUNTIME_STATE }
 
 function nextMenuRuntimeState(base: MenuRuntimeState, next: Partial<MenuRuntimeState>): MenuRuntimeState {
   return {
-    recentRepos: next.recentRepos ? [...next.recentRepos] : [...base.recentRepos],
+    recentWorkspaces: next.recentWorkspaces ? [...next.recentWorkspaces] : [...base.recentWorkspaces],
     shortcutsDisabled: next.shortcutsDisabled ?? base.shortcutsDisabled,
     langPref: next.langPref ?? base.langPref,
   }
@@ -29,7 +29,7 @@ export function initializeMenuRuntimeState(next: Partial<MenuRuntimeState>): voi
 
 export function readMenuRuntimeState(): MenuRuntimeState {
   return {
-    recentRepos: [...state.recentRepos],
+    recentWorkspaces: [...state.recentWorkspaces],
     shortcutsDisabled: state.shortcutsDisabled,
     langPref: state.langPref,
   }

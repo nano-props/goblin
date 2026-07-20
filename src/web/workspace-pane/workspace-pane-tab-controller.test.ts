@@ -5,30 +5,38 @@ import {
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
+  selectWorkspacePaneControllerTabEntry,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabId,
+  type WorkspacePaneStaticTabType,
+} from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneStaticTab, WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
-    resetReposStore()
+    resetWorkspacesStore()
     seedRepoWithReadModelForTest({
-      id: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
+      id: WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-1',
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-a' } })],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
@@ -36,23 +44,23 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('commits an exact target route without feature observation', async () => {
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, committingNavigation()),
     ).resolves.toBe(true)
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith(WORKSPACE_ID, 'feature/a', 'status')
   })
 
   test('passes the observed route as a compare-and-set precondition', async () => {
-    const commitRepoBranchWorkspacePaneRoute = vi.fn(() => false)
+    const commitWorkspacePaneRoute = vi.fn(() => false)
 
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
-        commitRepoBranchWorkspacePaneRoute,
+        commitWorkspacePaneRoute,
       }),
     ).resolves.toBe(false)
-    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/repo',
+    expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
+      WORKSPACE_ID,
       'feature/a',
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'exact-route', route: SOURCE_ROUTE } }),
@@ -60,22 +68,90 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('rebases an absolute selection to the current workspace target at execution time', async () => {
-    const commitRepoBranchWorkspacePaneRoute = vi.fn((_repoId, _branchName, _route, options) => {
+    const commitWorkspacePaneRoute = vi.fn((_repoId, _branchName, _route, options) => {
       options?.onCommit?.()
       return true
     })
 
     await expect(
       selectWorkspacePaneControllerTab(workspacePaneTarget(), staticTab('status'), {
-        commitRepoBranchWorkspacePaneRoute,
+        commitWorkspacePaneRoute,
       }),
     ).resolves.toBe(true)
-    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/repo',
+    expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
+      WORKSPACE_ID,
       'feature/a',
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'current-workspace-target' } }),
     )
+  })
+
+  test('presents a workspace-scoped tab through the workspace route', async () => {
+    const showWorkspaceRootPaneTab = vi.fn((_repoId, presentation, options) => {
+      useWorkspacesStore
+        .getState()
+        .setWorkspacePaneTabForTarget(
+          { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+          presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+        )
+      options?.onCommit?.()
+      return true
+    })
+    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false), showWorkspaceRootPaneTab }
+
+    await expect(
+      selectWorkspacePaneControllerTab(
+        {
+          ...workspacePaneTarget(),
+          branchName: null,
+          worktreePath: '/repo',
+          paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        },
+        staticTab('files'),
+        navigation,
+      ),
+    ).resolves.toBe(true)
+
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      { kind: 'static', tab: 'files' },
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'workspace-root',
+      workspaceId: WORKSPACE_ID,
+    })
+    expect(
+      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+    ).toBe('files')
+  })
+
+  test('does not create a replacement worktree presentation after the queued token is superseded', async () => {
+    const tokenA = beginPrimaryWindowPresentation()
+    beginPrimaryWindowPresentation()
+    const showRepoWorktreeTerminalSession = vi.fn(() => true)
+    const target = {
+      ...workspacePaneTarget(),
+      branchName: null,
+      paneTarget: {
+        kind: 'git-worktree' as const,
+        workspaceId: WORKSPACE_ID,
+        worktreePath: '/worktree-a',
+      },
+      tabEntries: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
+      tabs: [],
+    }
+
+    await expect(
+      selectWorkspacePaneControllerTabEntry(
+        target,
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        { commitWorkspacePaneRoute: vi.fn(() => false), showRepoWorktreeTerminalSession },
+        tokenA,
+      ),
+    ).resolves.toBe(false)
+    expect(showRepoWorktreeTerminalSession).not.toHaveBeenCalled()
   })
 
   test('commits a server-created runtime route while the local branch label is stale', async () => {
@@ -84,34 +160,41 @@ describe('workspace pane tab controller transactions', () => {
     await expect(
       commitWorkspacePaneCommittedRuntimeTargetRoute(
         {
-          repoId: '/repo',
-          repoRuntimeId: 'repo-runtime-1',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: 'repo-runtime-1',
           branchName: 'feature/renamed',
           worktreePath: '/worktree-a',
+          paneTarget: {
+            kind: 'git-worktree',
+            workspaceId: WORKSPACE_ID,
+            worktreePath: '/worktree-a',
+          },
         },
         { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         navigation,
       ),
     ).resolves.toBe(true)
 
-    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/repo',
+    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
+      WORKSPACE_ID,
       'feature/renamed',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/repo',
-      branchName: 'feature/renamed',
+      kind: 'git-worktree' as const,
+      workspaceId: WORKSPACE_ID,
       worktreePath: '/worktree-a',
     })
-    expect(useReposStore.getState().repos['/repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
+    expect(
+      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+    ).toBe('terminal')
   })
 
   test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneTabControllerCommitNavigation = {
-      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
       }),
@@ -122,8 +205,11 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    useReposStore.setState((state) => ({
-      repos: { ...state.repos, '/repo': { ...state.repos['/repo']!, repoRuntimeId: 'repo-runtime-2' } },
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [WORKSPACE_ID]: { ...state.workspaces[WORKSPACE_ID]!, workspaceRuntimeId: 'repo-runtime-2' },
+      },
     }))
     commit.resolve(true)
     await expect(completion).resolves.toBe(false)
@@ -132,7 +218,7 @@ describe('workspace pane tab controller transactions', () => {
   test('normalizes a navigation rejection to false', async () => {
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
-        commitRepoBranchWorkspacePaneRoute: vi.fn(async () => {
+        commitWorkspacePaneRoute: vi.fn(async () => {
           throw new Error('router failed')
         }),
       }),
@@ -142,7 +228,7 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects completion when the target worktree changes while navigation settles', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneTabControllerCommitNavigation = {
-      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
       }),
@@ -153,7 +239,7 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    const repo = useReposStore.getState().repos['/repo']!
+    const repo = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]!
     seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-b' } })],
       currentBranch: 'feature/a',
@@ -176,24 +262,25 @@ describe('workspace pane tab controller transactions', () => {
   })
 })
 
-function workspacePaneTarget(): RepoWorkspaceTabModel {
+function workspacePaneTarget(): WorkspacePaneTabModel {
   return {
-    repoId: '/repo',
-    repoRuntimeId: 'repo-runtime-1',
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
-  } as RepoWorkspaceTabModel
+    paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
+  } as WorkspacePaneTabModel
 }
 
 function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
   return {
-    commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+    commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
       options?.onCommit?.()
       return true
     }),
   }
 }
 
-function staticTab(type: WorkspacePaneStaticTabType): RepoWorkspaceStaticTab {
+function staticTab(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTab {
   return { identity: workspacePaneStaticTabId(type), type, kind: 'static', view: null }
 }

@@ -8,9 +8,9 @@ import type {
   I18nSnapshot,
   LangPref,
   LanInfo,
-  RepoSettingsState,
-  RepoWorkspaceTabsRestoreResult,
-  RuntimeRecentReposState,
+  WorkspaceSettingsState,
+  WorkspaceTabsRestoreResult,
+  RuntimeRecentWorkspacesState,
   WorkspaceRestoreResult,
   UserSettings,
   UserSettingsUpdateResponse,
@@ -19,14 +19,19 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceExternalAppRecentKey, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
 } from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
-type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
+type RecentWorkspacesUpdateResponse = {
+  ok: boolean
+  addedWorkspace?: WorkspaceSessionEntry | null
+} & RuntimeRecentWorkspacesState
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
@@ -113,74 +118,78 @@ export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapsho
   return await postServerJson('/api/settings/external-apps/refresh', {})
 }
 
-export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentReposUpdateResponse> {
-  const result = await postServerJson<{ repo: RepoSessionEntry }, RecentReposUpdateResponse>(
-    '/api/settings/recent-repos/add',
-    { repo },
+export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<RecentWorkspacesUpdateResponse> {
+  const result = await postServerJson<{ workspace: WorkspaceSessionEntry }, RecentWorkspacesUpdateResponse>(
+    '/api/settings/recent-workspaces/add',
+    { workspace },
   )
   if (!canUseNativeIpcBridge()) return result
   await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentRepos: { recentRepos: result.recentRepos },
+    recentWorkspaces: { recentWorkspaces: result.recentWorkspaces },
   })
   return result
 }
 
-export async function clearRecentRepos(): Promise<void> {
-  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
+export async function clearRecentWorkspaces(): Promise<void> {
+  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-workspaces/clear', {})
   if (!canUseNativeIpcBridge()) return
   await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentRepos: { recentRepos: [] },
+    recentWorkspaces: { recentWorkspaces: [] },
   })
 }
 
 /**
  * Record the most recently chosen workspace external app id for a
- * (repo, worktree) scope. Callers may update optimistic UI before
+ * workspace and filesystem-target scope. Callers may update optimistic UI before
  * awaiting this write, but should surface failures and reconcile from
  * the server-driven `settings-snapshot` invalidation on success.
  */
 export async function setRecentWorkspaceExternalApp(input: {
-  repoId: string
-  worktreePath: string | null
+  workspaceId: WorkspaceId
+  target: WorkspaceExternalAppTarget
   itemId: string
-}): Promise<RepoSettingsState> {
+}): Promise<WorkspaceSettingsState> {
   return await postServerJson<
-    { repoId: string; worktreePath: string | null; itemId: string },
-    { ok: true } & RepoSettingsState
-  >('/api/settings/repo-external-app-recent', input)
+    { workspaceId: WorkspaceId; targetKey: string; itemId: string },
+    { ok: true } & WorkspaceSettingsState
+  >('/api/settings/workspace-external-app-recent', {
+    workspaceId: input.workspaceId,
+    targetKey: workspaceExternalAppRecentKey(input.target),
+    itemId: input.itemId,
+  })
 }
 
 export async function restoreServerWorkspace(
   clientId: string,
-  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
+  options?: { activeWorkspaceId?: WorkspaceId | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
   return await postServerJson(
     '/api/settings/workspace/restore',
     {
       clientId,
-      ...(options && 'activeRepoRoot' in options ? { activeRepoRoot: options.activeRepoRoot } : {}),
+      ...(options && 'activeWorkspaceId' in options ? { activeWorkspaceId: options.activeWorkspaceId } : {}),
     },
     { signal: options?.signal },
   )
 }
 
-export async function addWorkspaceRepo(entry: RepoSessionEntry): Promise<void> {
-  await postServerJson('/api/settings/workspace/repos/add', { entry })
+export async function addWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<void> {
+  await postServerJson('/api/settings/workspace/entries/add', { entry })
 }
 
-export async function removeWorkspaceRepo(repoRoot: string): Promise<void> {
-  await postServerJson('/api/settings/workspace/repos/remove', { repoRoot })
+export async function removeWorkspaceEntry(workspaceId: WorkspaceId): Promise<void> {
+  await postServerJson('/api/settings/workspace/entries/remove', { workspaceId })
 }
 
-export async function restoreRepoWorkspaceTabs(
+export async function restoreWorkspaceTabs(
   clientId: string,
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
-): Promise<RepoWorkspaceTabsRestoreResult> {
+): Promise<WorkspaceTabsRestoreResult> {
   return await postServerJson(
-    '/api/settings/workspace/restore-repo-tabs',
-    { clientId, repoRoot, repoRuntimeId },
+    '/api/settings/workspace/tabs/restore',
+    { clientId, workspaceId, workspaceRuntimeId },
     { signal: options?.signal },
   )
 }

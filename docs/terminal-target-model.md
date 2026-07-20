@@ -30,8 +30,8 @@ A session is the long-lived terminal business object.
 It owns:
 
 - session identity
-- stable target identity (`repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity)
-- the current canonical branch label for that target
+- atomic `TerminalSessionBase`: a runtime-bound filesystem execution target plus its presentation
+- the current canonical Git head label when the target is a Git worktree
 - canonical geometry
 - PTY lifecycle association
 - attachment set
@@ -46,13 +46,19 @@ canonical PTY geometry, and the headless render state used to produce replay
 snapshots. It should not try to predict browser font metrics or local xterm
 layout details before a real view exists.
 
-The server-owned session is also authoritative for the terminal's workspace
-target projection. Worktree identity does not include `branch`: a branch can be
+The server-owned session is also authoritative for the terminal's Workspace
+target projection. Git worktree identity does not include `branch`: a branch can be
 renamed while the physical worktree and terminal session remain the same. A
 new or reused admission therefore resolves the current canonical branch at the
 Workspace target-capture boundary and stores that label on the session. Tab
 recovery uses the stored canonical label and does not depend on a client-side
 repo snapshot or an ad hoc local `git worktree` lookup.
+
+`TerminalExecutionTarget` is the runtime-scoped execution authority. It carries
+`workspaceId`, `workspaceRuntimeId`, and either the Workspace root or a canonical
+Git worktree root. `TerminalFilesystemTargetKey` is the separate runtime-neutral
+UI/persistence grouping key (`workspaceId` + `executionRootId`). Native paths are
+decoded only at the execution boundary and are never terminal identity.
 
 Server-owned runtime ids should also drive terminal writes. If a mutation
 targets a live session by `terminalRuntimeSessionId`, close/restart/takeover should be
@@ -115,8 +121,9 @@ with its Workspace target or epoch.
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope
-- stable target identity: `repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity
-- mutable canonical target label: `branch`
+- atomic `TerminalSessionBase` (`TerminalExecutionTarget` + matching `TerminalPresentation`)
+- runtime-neutral `TerminalFilesystemTargetKey` for UI/persistence grouping
+- mutable canonical Git head presentation for Git worktree targets
 - lifecycle phase
 - canonical geometry
 - PTY binding information

@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
+const LINKED_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-linked')
+const WORKTREE_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-worktree')
 
 const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
@@ -19,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   fsStat: vi.fn(),
   isGitRepo: vi.fn(),
   getBranches: vi.fn(),
+  getBranchWorktreeIdentities: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
@@ -26,16 +33,15 @@ const mocks = vi.hoisted(() => ({
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
+  getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
   getWorktrees: vi.fn(),
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
   cloneGitRepo: vi.fn(),
-  getBackgroundSyncRepos: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
   removeWorktree: vi.fn(),
-  setBackgroundSyncRepos: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
   publishSettingsInvalidation: vi.fn(),
   bootstrapWorktreeAfterCreate: vi.fn(),
@@ -45,20 +51,22 @@ const mocks = vi.hoisted(() => ({
   fetchRemoteRepo: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
+  getRemoteWorkspacePaneTargetIdentities: vi.fn(),
   getRemoteRepoWriteGroupPath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
-  getServerRepoSettings: vi.fn(),
-  pruneServerRepoSettingsForRemovedWorktree: vi.fn(),
+  getServerWorkspaceSettings: vi.fn(),
+  pruneServerWorkspaceSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
-  trustServerRepoWorktreeBootstrapConfig: vi.fn(),
-  untrustServerRepoWorktreeBootstrapConfig: vi.fn(),
+  trustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
+  untrustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
   deleteBranch: mocks.deleteBranch,
   deleteUpstreamBranch: mocks.deleteUpstreamBranch,
   getBranches: mocks.getBranches,
+  getBranchWorktreeIdentities: mocks.getBranchWorktreeIdentities,
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
   getRepoCommonDir: mocks.getRepoCommonDir,
@@ -101,7 +109,7 @@ vi.mock('#/system/git/remote-refs.ts', () => ({
 }))
 
 vi.mock('#/system/git/status.ts', () => ({
-  getWorkingStatus: vi.fn(),
+  getWorkingStatus: mocks.getWorkingStatus,
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
@@ -117,15 +125,15 @@ vi.mock('#/system/git/worktree-bootstrap.ts', () => ({
 
 vi.mock('#/shared/input-validation.ts', () => ({
   isValidCwd: () => true,
-  isValidRepoLocator: () => true,
-  toSafeRepoLocator: (value: unknown) => (typeof value === 'string' ? value : null),
+  isValidWorkspaceLocatorInput: () => true,
+  toSafeWorkspaceLocator: (value: unknown) => (typeof value === 'string' ? value : null),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerRepoSettings: mocks.getServerRepoSettings,
-  pruneServerRepoSettingsForRemovedWorktree: mocks.pruneServerRepoSettingsForRemovedWorktree,
-  trustServerRepoWorktreeBootstrapConfig: mocks.trustServerRepoWorktreeBootstrapConfig,
-  untrustServerRepoWorktreeBootstrapConfig: mocks.untrustServerRepoWorktreeBootstrapConfig,
+  getServerWorkspaceSettings: mocks.getServerWorkspaceSettings,
+  pruneServerWorkspaceSettingsForRemovedWorktree: mocks.pruneServerWorkspaceSettingsForRemovedWorktree,
+  trustServerWorkspaceWorktreeBootstrapConfig: mocks.trustServerWorkspaceWorktreeBootstrapConfig,
+  untrustServerWorkspaceWorktreeBootstrapConfig: mocks.untrustServerWorkspaceWorktreeBootstrapConfig,
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -133,7 +141,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/diagnostics.ts', () => ({
-  testRemoteRepo: vi.fn(),
+  testRemoteWorkspace: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
@@ -145,6 +153,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
+  getRemoteWorkspacePaneTargetIdentities: mocks.getRemoteWorkspacePaneTargetIdentities,
   getRemoteRepoWriteGroupPath: mocks.getRemoteRepoWriteGroupPath,
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
@@ -162,11 +171,6 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
   publishSettingsInvalidation: mocks.publishSettingsInvalidation,
-}))
-
-vi.mock('#/server/modules/background-sync.ts', () => ({
-  getBackgroundSyncRepos: mocks.getBackgroundSyncRepos,
-  setBackgroundSyncRepos: mocks.setBackgroundSyncRepos,
 }))
 
 beforeEach(async () => {
@@ -212,11 +216,11 @@ beforeEach(async () => {
       excludeCount: 0,
     },
   })
-  mocks.getServerRepoSettings.mockResolvedValue([])
-  mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValue(false)
+  mocks.getServerWorkspaceSettings.mockResolvedValue([])
+  mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValue(false)
   mocks.resolveRemoteTarget.mockResolvedValue({
     target: {
-      id: normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' }),
+      id: normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' }),
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -225,8 +229,8 @@ beforeEach(async () => {
       displayName: 'prod:repo',
     },
   })
-  mocks.trustServerRepoWorktreeBootstrapConfig.mockResolvedValue([])
-  mocks.untrustServerRepoWorktreeBootstrapConfig.mockResolvedValue(true)
+  mocks.trustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue([])
+  mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue(true)
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
@@ -243,6 +247,18 @@ beforeEach(async () => {
   mocks.getDefaultBranch.mockResolvedValue('main')
   mocks.getUpstream.mockResolvedValue(null)
   mocks.isAncestor.mockResolvedValue(true)
+})
+
+describe('resolveRemoteWorkspaceTarget', () => {
+  test('threads cancellation into SSH config resolution', async () => {
+    const signal = new AbortController().signal
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const { resolveRemoteWorkspaceTarget } = await import('#/server/modules/repo-source.ts')
+
+    await resolveRemoteWorkspaceTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
+
+    expect(mocks.resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' }, signal)
+  })
 })
 
 afterEach(() => {
@@ -321,10 +337,33 @@ describe('getRepoSnapshot', () => {
     mocks.getRemoteInfo.mockResolvedValueOnce(snapshot.remote)
 
     const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoSnapshot('/tmp/repo')
+    const result = await getRepoSnapshot(REPO_ID)
 
     expect(result).toEqual(snapshot)
     expectNoRepoSnapshotInvalidations()
+  })
+})
+
+describe('getWorkspacePaneTargetIdentities', () => {
+  test('reads only worktree and branch identity without status or remote display data', async () => {
+    const worktrees = [{ path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true }]
+    mocks.getWorktrees.mockResolvedValueOnce(worktrees)
+    mocks.getBranchWorktreeIdentities.mockResolvedValueOnce([
+      { branch: 'main', worktreePath: '/tmp/repo' },
+      { branch: 'feature/no-worktree', worktreePath: null },
+    ])
+
+    const { getWorkspacePaneTargetIdentities } = await import('#/server/modules/repo-read-paths.ts')
+    await expect(getWorkspacePaneTargetIdentities(REPO_ID)).resolves.toEqual([
+      { branch: 'main', worktreePath: '/tmp/repo' },
+      { branch: 'feature/no-worktree', worktreePath: null },
+    ])
+
+    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktrees, { signal: undefined })
+    expect(mocks.getBranches).not.toHaveBeenCalled()
+    expect(mocks.getWorkingStatus).not.toHaveBeenCalled()
+    expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
   })
 })
 
@@ -333,7 +372,7 @@ describe('getRepoPullRequests', () => {
     const fresh: PullRequestEntry[] = [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
     mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(1)]]))
     const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoPullRequests('/tmp/repo', ['feature/a'], { mode: 'full' })
+    const result = await getRepoPullRequests(REPO_ID, ['feature/a'], { mode: 'full' })
 
     expect(result).toEqual(fresh)
     expectNoRepoSnapshotInvalidations()
@@ -343,7 +382,7 @@ describe('getRepoPullRequests', () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(2)]]))
 
     const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoPullRequests('/tmp/repo', ['feature/a'], { mode: 'summary' })
+    const result = await getRepoPullRequests(REPO_ID, ['feature/a'], { mode: 'summary' })
 
     expect(result).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(2) }])
     expectNoRepoSnapshotInvalidations()
@@ -358,7 +397,7 @@ describe('getRepoPullRequests', () => {
     )
 
     const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoPullRequests('/tmp/repo', ['feature/a', 'feature/b'], { mode: 'full' })
+    const result = await getRepoPullRequests(REPO_ID, ['feature/a', 'feature/b'], { mode: 'full' })
 
     expect(result).toEqual([
       { branch: 'feature/a', pullRequest: pullRequest(3) },
@@ -376,7 +415,7 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', kind as 'user' | 'background')
+    const result = await fetchRepo(REPO_ID, kind as 'user' | 'background')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
@@ -392,7 +431,7 @@ describe('fetchRepo invalidation publishing', () => {
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', 'user', caller.signal)
+    const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
     expectNoRepoSnapshotInvalidations()
@@ -402,11 +441,11 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', 'user')
+    const result = await fetchRepo(REPO_ID, 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expectRepoSnapshotInvalidations({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
   })
@@ -419,16 +458,16 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', 'user')
+    const result = await fetchRepo(REPO_ID, 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -440,11 +479,11 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const background = fetchRepo('/tmp/repo', 'background')
+    const background = fetchRepo(REPO_ID, 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     })
-    const user = fetchRepo('/tmp/repo', 'user')
+    const user = fetchRepo(REPO_ID, 'user')
 
     backgroundFetch.resolve({ ok: true, message: 'fetched in background' })
     const [backgroundResult, userResult] = await Promise.all([background, user])
@@ -454,11 +493,11 @@ describe('fetchRepo invalidation publishing', () => {
     expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -477,11 +516,11 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const background = fetchRepo('/tmp/repo', 'background')
+    const background = fetchRepo(REPO_ID, 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     })
-    const user = fetchRepo('/tmp/repo-linked', 'user')
+    const user = fetchRepo(LINKED_REPO_ID, 'user')
 
     fetch.resolve({ ok: true, message: 'fetched in background' })
     const [backgroundResult, userResult] = await Promise.all([background, user])
@@ -491,27 +530,27 @@ describe('fetchRepo invalidation publishing', () => {
     expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
     )
   })
 
   test('user sync waits for an active remote background sync with the same alias', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
@@ -551,8 +590,8 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('user sync waits for an active linked remote background sync with the same alias', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
@@ -592,11 +631,11 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-a' })
-    const otherRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-b' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-a' })
+    const otherRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-b' })
     mocks.resolveRemoteTarget.mockImplementation(async (ref: { alias: string; remotePath: string }) => ({
       target: {
-        id: normalizeRemoteRepoId(ref),
+        id: normalizeRemoteWorkspaceId(ref),
         alias: ref.alias,
         host: 'example.test',
         user: 'deploy',
@@ -639,13 +678,13 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const background = fetchRepo('/tmp/repo', 'background')
+    const background = fetchRepo(REPO_ID, 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     })
 
     const caller = new AbortController()
-    const user = fetchRepo('/tmp/repo', 'user', caller.signal)
+    const user = fetchRepo(REPO_ID, 'user', caller.signal)
     caller.abort('client disconnected')
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
@@ -655,7 +694,7 @@ describe('fetchRepo invalidation publishing', () => {
     fetch.resolve({ ok: true, message: 'fetched in background' })
     await expect(background).resolves.toEqual({ ok: true, message: 'fetched in background' })
     expectRepoSnapshotInvalidations({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
   })
@@ -668,22 +707,22 @@ describe('fetchRepo invalidation publishing', () => {
     const { deleteRepoBranch, fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const write = deleteRepoBranch('/tmp/repo', 'feature/a')
+    const write = deleteRepoBranch(REPO_ID, 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
 
-    const background = fetchRepo('/tmp/repo', 'background')
+    const background = fetchRepo(REPO_ID, 'background')
     await vi.waitFor(async () => {
-      expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual(
+      expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual(
         expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued' })]),
       )
     })
 
     const caller = new AbortController()
-    const user = fetchRepo('/tmp/repo', 'user', caller.signal)
+    const user = fetchRepo(REPO_ID, 'user', caller.signal)
     await vi.waitFor(async () => {
-      expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual(
+      expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual(
         expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued', source: 'user' })]),
       )
     })
@@ -691,7 +730,7 @@ describe('fetchRepo invalidation publishing', () => {
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.fetchAll).not.toHaveBeenCalled()
-    await expect(readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).resolves.toMatchObject({
+    await expect(readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).resolves.toMatchObject({
       operations: expect.arrayContaining([
         expect.objectContaining({
           kind: 'fetch',
@@ -718,7 +757,7 @@ describe('fetchRepo invalidation publishing', () => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', 'background')
+    const result = await fetchRepo(REPO_ID, 'background')
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
     expectNoRepoSnapshotInvalidations()
@@ -800,48 +839,14 @@ describe('cloneRepo cancellation', () => {
   })
 })
 
-describe('probeRepo path errors', () => {
-  test('reports missing paths specifically', async () => {
-    mocks.fsStat.mockRejectedValueOnce({ code: 'ENOENT' })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('/tmp/missing')).resolves.toEqual({ ok: false, message: 'error.path-not-found' })
-  })
-
-  test('reports non-directory paths specifically', async () => {
-    mocks.fsStat.mockResolvedValueOnce({ isDirectory: () => false })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('/tmp/file')).resolves.toEqual({ ok: false, message: 'error.path-not-directory' })
-  })
-
-  test('reports permission-denied paths specifically', async () => {
-    mocks.fsAccess.mockRejectedValueOnce({ code: 'EACCES' })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('/tmp/private')).resolves.toEqual({
-      ok: false,
-      message: 'error.path-permission-denied',
-    })
-  })
-})
-
 describe('repo mutation invalidation publishing', () => {
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pullRepoBranch('/tmp/repo', 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pushRepoBranch('/tmp/repo', 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
     [
       'createRepoWorktree',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.createRepoWorktree('/tmp/repo', {
+      async (repo: typeof RepoWritePaths) =>
+        repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
         }),
@@ -853,7 +858,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(repoSnapshotInvalidations()).toContainEqual({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
   })
@@ -865,7 +870,7 @@ describe('repo mutation invalidation publishing', () => {
     ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree('/tmp/repo', {
+    const result = await createRepoWorktree(REPO_ID, {
       worktreePath: '/tmp/repo-worktree',
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     })
@@ -873,15 +878,15 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: true, message: 'ok' })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-worktree',
+        repoId: WORKTREE_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -890,7 +895,7 @@ describe('repo mutation invalidation publishing', () => {
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree('/tmp/repo', {
+    const result = await createRepoWorktree(REPO_ID, {
       worktreePath: '/tmp/repo-worktree',
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     })
@@ -921,7 +926,7 @@ describe('repo mutation invalidation publishing', () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -942,16 +947,16 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.getServerRepoSettings).toHaveBeenCalledTimes(1)
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.getServerWorkspaceSettings).toHaveBeenCalledTimes(1)
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree clears existing bootstrap trust when the create request leaves trust unchecked', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
-        repoId: '/tmp/repo',
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
@@ -961,7 +966,7 @@ describe('repo mutation invalidation publishing', () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -981,27 +986,30 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
   test('createRepoWorktree reports settings failure when clearing bootstrap trust fails after bootstrap succeeds', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
-        repoId: '/tmp/repo',
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
         },
       },
     ])
-    mocks.untrustServerRepoWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1017,7 +1025,10 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -1026,7 +1037,7 @@ describe('repo mutation invalidation publishing', () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1047,10 +1058,10 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
     expect(mocks.bootstrapWorktreeAfterCreate.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.trustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
     )
   })
 
@@ -1061,9 +1072,9 @@ describe('repo mutation invalidation publishing', () => {
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
-    mocks.getServerRepoSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
       {
-        repoId: '/tmp/repo',
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
@@ -1074,7 +1085,7 @@ describe('repo mutation invalidation publishing', () => {
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const first = createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree-a',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1092,7 +1103,7 @@ describe('repo mutation invalidation publishing', () => {
       expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
     })
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
+      (await readRepoOperationsSnapshot(REPO_ID)).operations.find(
         (operation) => operation.target?.branch === 'feature/a',
       ),
     ).toMatchObject({
@@ -1102,7 +1113,7 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     const second = createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree-b',
         mode: { kind: 'newBranch', newBranch: 'feature/b', baseRef: 'main' },
@@ -1118,14 +1129,14 @@ describe('repo mutation invalidation publishing', () => {
     )
     await vi.waitFor(async () => {
       expect(
-        (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
+        (await readRepoOperationsSnapshot(REPO_ID)).operations.find(
           (operation) => operation.target?.branch === 'feature/b',
         ),
       ).toMatchObject({ phase: 'queued' })
     })
     expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
+      (await readRepoOperationsSnapshot(REPO_ID)).operations.find(
         (operation) => operation.target?.branch === 'feature/b',
       ),
     ).toMatchObject({
@@ -1142,22 +1153,25 @@ describe('repo mutation invalidation publishing', () => {
 
     secondCreate.resolve({ ok: true, message: 'second created' })
     await expect(second).resolves.toEqual({ ok: true, message: 'second created' })
-    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations.filter(
+      (await readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).operations.filter(
         (operation) => operation.kind === 'create-worktree',
       ),
     ).toHaveLength(2)
 
     expect(mocks.createWorktree.mock.calls[0]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-a' })
     expect(mocks.createWorktree.mock.calls[1]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-b' })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createWorktree.mock.invocationCallOrder[1],
     )
     expect(mocks.createWorktree.mock.invocationCallOrder[1]).toBeLessThan(
-      mocks.untrustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
     )
   })
 
@@ -1180,14 +1194,12 @@ describe('repo mutation invalidation publishing', () => {
     const { deleteRepoBranch, removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const first = deleteRepoBranch('/tmp/repo', 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
-        (operation) => operation.kind === 'delete-branch',
-      ),
+      (await readRepoOperationsSnapshot(REPO_ID)).operations.find((operation) => operation.kind === 'delete-branch'),
     ).toMatchObject({
       kind: 'delete-branch',
       phase: 'running',
@@ -1195,7 +1207,7 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     const second = removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/b',
         worktreePath: '/tmp/repo-worktree',
@@ -1208,9 +1220,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
-        (operation) => operation.kind === 'remove-worktree',
-      ),
+      (await readRepoOperationsSnapshot(REPO_ID)).operations.find((operation) => operation.kind === 'remove-worktree'),
     ).toMatchObject({
       kind: 'remove-worktree',
       phase: 'queued',
@@ -1225,7 +1235,7 @@ describe('repo mutation invalidation publishing', () => {
 
     secondRemove.resolve({ ok: true, message: 'removed' })
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
-    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
   })
 
   test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
@@ -1250,14 +1260,14 @@ describe('repo mutation invalidation publishing', () => {
     const { deleteRepoBranch, removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const first = deleteRepoBranch('/tmp/repo', 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
-    await expect(readRepoOperationsSnapshot('/tmp/repo-linked')).resolves.toMatchObject({
+    await expect(readRepoOperationsSnapshot(LINKED_REPO_ID)).resolves.toMatchObject({
       operations: [
         expect.objectContaining({
-          repoId: '/tmp/repo',
+          repoId: REPO_ID,
           kind: 'delete-branch',
           phase: 'running',
           target: { branch: 'feature/a' },
@@ -1266,7 +1276,7 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     const second = removeRepoWorktree(
-      '/tmp/repo-linked',
+      LINKED_REPO_ID,
       {
         branch: 'feature/b',
         worktreePath: '/tmp/repo-linked',
@@ -1279,7 +1289,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(
-      (await readRepoOperationsSnapshot('/tmp/repo-linked')).operations.find(
+      (await readRepoOperationsSnapshot(LINKED_REPO_ID)).operations.find(
         (operation) => operation.kind === 'remove-worktree',
       ),
     ).toMatchObject({
@@ -1309,12 +1319,12 @@ describe('repo mutation invalidation publishing', () => {
     mocks.pullBranch.mockImplementationOnce(async () => await secondPull.promise)
     const { deleteRepoBranch, pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const first = deleteRepoBranch('/tmp/repo', 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
 
-    const second = pullRepoBranch('/tmp/repo-linked', 'feature/b')
+    const second = pullRepoBranch(LINKED_REPO_ID, 'feature/b')
     await Promise.resolve()
     await Promise.resolve()
 
@@ -1332,11 +1342,11 @@ describe('repo mutation invalidation publishing', () => {
 
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.trustServerRepoWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.trustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1359,27 +1369,19 @@ describe('repo mutation invalidation publishing', () => {
     })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-worktree',
+      repoId: WORKTREE_REPO_ID,
       query: 'repo-snapshot',
     })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pullRepoBranch('/tmp/repo', 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pushRepoBranch('/tmp/repo', 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
   ])('%s records the network mutation in the repo write coordinator', async (name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
     const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
@@ -1388,7 +1390,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(name === 'pullRepoBranch' ? mocks.pullBranch : mocks.pushBranch).toHaveBeenCalled()
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toEqual(
+    await expect(listRepoWriteOperationsForRepo(REPO_ID, { includeSettled: true })).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: expect.stringMatching(/^repo-write-op-/),
@@ -1401,24 +1403,39 @@ describe('repo mutation invalidation publishing', () => {
     )
   })
 
+  test('pullRepoBranch preserves the authoritative changed worktree paths for route projection', async () => {
+    mocks.pullBranch.mockResolvedValueOnce({
+      ok: true,
+      message: 'ok',
+      affectedWorktreePaths: ['/tmp/repo-worktree'],
+    })
+    const { pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await pullRepoBranch(REPO_ID, 'feature/a', '/tmp/repo-worktree')
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'ok',
+      affectedWorktreePaths: ['/tmp/repo-worktree'],
+    })
+  })
+
   test.each([
     [
       'pullRepoBranch',
       () => mocks.pullBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: pull failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pullRepoBranch('/tmp/repo', 'feature/a'),
+      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'pushRepoBranch',
       () => mocks.pushBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: push failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pushRepoBranch('/tmp/repo', 'feature/a'),
+      async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'createRepoWorktree',
       () => mocks.createWorktree.mockResolvedValueOnce({ ok: false, message: 'fatal: worktree failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.createRepoWorktree('/tmp/repo', {
+      async (repo: typeof RepoWritePaths) =>
+        repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
         }),
@@ -1433,9 +1450,9 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           trustedAt: '2026-06-26T00:00:00.000Z',
@@ -1449,7 +1466,7 @@ describe('repo mutation invalidation publishing', () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1474,19 +1491,19 @@ describe('repo mutation invalidation publishing', () => {
       expectedConfigHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-worktree',
+      repoId: WORKTREE_REPO_ID,
       query: 'repo-snapshot',
     })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const worktreeRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
     mocks.createRemoteWorktree.mockResolvedValueOnce({
       ok: true,
       message: 'created',
@@ -1538,7 +1555,7 @@ describe('repo mutation invalidation publishing', () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1558,15 +1575,15 @@ describe('repo mutation invalidation publishing', () => {
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       repositoryStateChanged: true,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree rejects non-absolute paths before calling git', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree('/tmp/repo', {
+    const result = await createRepoWorktree(REPO_ID, {
       worktreePath: 'relative/path',
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     })
@@ -1576,41 +1593,28 @@ describe('repo mutation invalidation publishing', () => {
     expectNoRepoSnapshotInvalidations()
   })
 
-  test('createRepoWorktree rejects malformed mode input', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-
-    const result = await createRepoWorktree('/tmp/repo', {
-      worktreePath: '/tmp/repo-worktree',
-      // @ts-expect-error — exercise the runtime normalization path
-      mode: { kind: 'unknown' },
-    })
-
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
-    expect(mocks.createWorktree).not.toHaveBeenCalled()
-  })
-
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await deleteRepoBranch('/tmp/repo', 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
-    expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
+    expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'delete-branch',
       phase: 'done',
       target: { branch: 'feature/a' },
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+      repoId: REPO_ID,
       query: 'repo-snapshot',
     })
   })
 
   test('remote deleteRepoBranch forwards upstream deletion and refreshes affected remote worktrees after partial failure', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-linked'])
     mocks.deleteRemoteBranch.mockResolvedValueOnce({
       ok: false,
@@ -1641,21 +1645,9 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pullRepoBranch('/tmp/repo', 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.pushRepoBranch('/tmp/repo', 'feature/a'),
-    ],
-    [
-      'deleteRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.deleteRepoBranch('/tmp/repo', 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
+    ['deleteRepoBranch', async (repo: typeof RepoWritePaths) => repo.deleteRepoBranch(REPO_ID, 'feature/a')],
   ])('%s publishes sibling worktree snapshot invalidations after success', async (_name, run) => {
     mocks.getWorktrees.mockResolvedValue([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
@@ -1668,11 +1660,11 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: true, message: 'ok' })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -1682,7 +1674,7 @@ describe('repo mutation invalidation publishing', () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('feature/current')
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch('/tmp/repo', 'main')
+    const result = await deleteRepoBranch(REPO_ID, 'main')
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
@@ -1696,7 +1688,7 @@ describe('repo mutation invalidation publishing', () => {
     mocks.getUpstream.mockResolvedValueOnce(null)
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch('/tmp/repo', 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'release/1.0', undefined)
@@ -1707,7 +1699,7 @@ describe('repo mutation invalidation publishing', () => {
     mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    await deleteRepoBranch('/tmp/repo', 'feature/a')
+    await deleteRepoBranch(REPO_ID, 'feature/a')
 
     expectNoRepoSnapshotInvalidations()
   })
@@ -1734,7 +1726,7 @@ describe('repo mutation invalidation publishing', () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -1750,19 +1742,19 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.removeWorktree.mock.invocationCallOrder[0]).toBeLessThan(
       afterWorktreeRemoved.mock.invocationCallOrder[0]!,
     )
-    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
-    expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
+    expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'remove-worktree',
       phase: 'done',
       target: { branch: 'feature/a', worktreePath: '/tmp/repo-worktree' },
     })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-worktree',
+        repoId: WORKTREE_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -1787,7 +1779,7 @@ describe('repo mutation invalidation publishing', () => {
 
     await expect(
       removeRepoWorktree(
-        '/tmp/repo',
+        REPO_ID,
         {
           branch: 'feature/a',
           worktreePath: '/tmp/repo-worktree',
@@ -1799,7 +1791,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(afterRemoveFailed).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).not.toHaveBeenCalled()
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
@@ -1817,7 +1809,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -1830,8 +1822,8 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repositoryStateChanged: true })
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
   })
@@ -1851,7 +1843,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -1863,11 +1855,11 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: true, message: 'ok' })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-worktree',
+        repoId: WORKTREE_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -1890,7 +1882,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -1901,17 +1893,17 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo-worktree',
+        repoId: WORKTREE_REPO_ID,
         query: 'repo-snapshot',
       },
     )
@@ -1933,7 +1925,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo-linked',
+      LINKED_REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-linked',
@@ -1948,16 +1940,16 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
     expectRepoSnapshotInvalidations(
       {
-        repoId: '/tmp/repo-linked',
+        repoId: LINKED_REPO_ID,
         query: 'repo-snapshot',
       },
       {
-        repoId: '/tmp/repo',
+        repoId: REPO_ID,
         query: 'repo-snapshot',
       },
     )
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-linked',
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: LINKED_REPO_ID,
       worktreePath: '/tmp/repo-linked',
     })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
@@ -1976,11 +1968,11 @@ describe('repo mutation invalidation publishing', () => {
       },
     ]
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
-    mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValueOnce(true)
+    mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValueOnce(true)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -1990,8 +1982,8 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
@@ -2009,11 +2001,11 @@ describe('repo mutation invalidation publishing', () => {
         changeCount: 0,
       },
     ])
-    mocks.pruneServerRepoSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -2045,7 +2037,7 @@ describe('repo mutation invalidation publishing', () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -2076,7 +2068,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
@@ -2097,7 +2089,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
-      '/tmp/repo',
+      REPO_ID,
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',

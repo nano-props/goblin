@@ -22,8 +22,11 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
   TerminalSessionsSnapshot,
+  TerminalSessionsChangedEvent,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
+  WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
@@ -43,7 +46,7 @@ export interface ClientTerminal {
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
+  pruneTerminals: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsSnapshot>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
@@ -54,7 +57,7 @@ export interface ClientTerminal {
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
-  onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  onSessionsChanged: (cb: (event: TerminalSessionsChangedEvent) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
@@ -69,8 +72,7 @@ export interface ClientTerminal {
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
-      worktreePath: string
+      workspaceId: WorkspaceId
     }) => void,
   ) => () => void
 }
@@ -79,7 +81,7 @@ export interface ClientWorkspacePaneTabs {
   list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsSnapshot>
   replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabsSnapshot>
   update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabsSnapshot>
-  onChanged: (cb: (repoRoot: string) => void) => () => void
+  onChanged: (cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => () => void
 }
 
 export interface ClientWorkspacePaneRuntime {

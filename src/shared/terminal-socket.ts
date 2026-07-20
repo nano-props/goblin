@@ -12,6 +12,7 @@ import type {
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionsSnapshot,
+  TerminalSessionsChangedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -19,6 +20,7 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -32,21 +34,19 @@ export type TerminalRealtimeMessage =
   // like a role change to the client.
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
-  | { type: 'sessions-changed'; repoRoot: string }
+  | ({ type: 'sessions-changed' } & TerminalSessionsChangedEvent)
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
   // this to drop the local session immediately, without waiting for
-  // a full list-rescan. The `repoRoot` is included so the client
-  // can route the event to the right worktree without a manager
-  // lookup.
+  // a full list-rescan. The workspace identity lets the client route
+  // the event without a manager lookup.
   | {
       type: 'session-closed'
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
-      worktreePath: string
+      workspaceId: WorkspaceId
     }
 
 export interface TerminalSocketRequestInputs {

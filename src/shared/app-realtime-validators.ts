@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   AppRealtimeClientMessage,
   AppRealtimeRequestAction,
@@ -11,6 +12,7 @@ import {
   type WorkspacePaneTabsSocketAction,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
+  WorkspaceRuntimeIdSchema,
   WorkspacePaneTabsListInputSchema,
   WorkspacePaneTabsReplaceInputSchema,
   WorkspacePaneTabsSnapshotSchema,
@@ -83,7 +85,18 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
 ])
 
 const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
-  v.object({ type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed), repoRoot: v.string() }),
+  v.strictObject({
+    type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    change: v.literal('invalidation'),
+    workspaceId: WorkspaceIdSchema,
+  }),
+  v.strictObject({
+    type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    change: v.literal('revision'),
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+    revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  }),
   v.object({
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
@@ -178,9 +191,7 @@ export function isAppRealtimeWorkspacePaneTabsAction(
 export function isAppRealtimeWorkspacePaneRuntimeAction(
   action: AppRealtimeRequestAction,
 ): action is WorkspacePaneRuntimeSocketAction {
-  return (
-    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open || action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close
-  )
+  return action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open || action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close
 }
 
 export function isAppRealtimeWsMessageWithinLimit(value: string): boolean {

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { omit } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -9,6 +10,7 @@ import {
   type LogEntry,
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
+import { gitHead, type GitHead } from '#/shared/git-head.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -56,6 +58,7 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   }
 }
 
+/** Read only the current worktree's HEAD presentation identity. */
 export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   if (options?.signal?.aborted) return ''
   try {
@@ -86,8 +89,7 @@ export function markDefaultBranch(branches: BranchSnapshotInfo[], defaultBranch:
   return branches.map((branch) => {
     if (branch.name === defaultBranch) return branch.isDefault ? branch : { ...branch, isDefault: true }
     if (!branch.isDefault) return branch
-    const { isDefault: _isDefault, ...rest } = branch
-    return rest
+    return omit(branch, ['isDefault'])
   })
 }
 
@@ -155,6 +157,37 @@ export async function getBranches(
   } catch {
     return []
   }
+}
+
+export type BranchWorktreeIdentity =
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+
+/** Strict, display-free branch membership read for admission/catalog paths. */
+export async function getBranchWorktreeIdentities(
+  cwd: string,
+  worktrees: readonly WorktreeInfo[],
+  options?: { signal?: AbortSignal },
+): Promise<BranchWorktreeIdentity[]> {
+  const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
+    signal: options?.signal,
+  })
+  options?.signal?.throwIfAborted()
+  const branches = output
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
+  const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare && !worktree.isPrunable)
+  const checkedOutBranches = new Set(usableWorktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  return [
+    ...usableWorktrees.map((worktree): BranchWorktreeIdentity => ({
+      kind: 'git-worktree',
+      worktreePath: worktree.path,
+      head: gitHead(worktree.branch ?? null),
+    })),
+    ...branches
+      .filter((branch) => !checkedOutBranches.has(branch))
+      .map((branch): BranchWorktreeIdentity => ({ kind: 'git-branch', branchName: branch })),
+  ]
 }
 
 export async function getLog(

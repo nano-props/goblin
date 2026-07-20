@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { act } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -10,8 +11,8 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
@@ -40,7 +41,7 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   fetchMock.mockClear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
@@ -75,13 +76,16 @@ afterEach(() => {
 
 describe('RepoCloneDialog', () => {
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: '/tmp/cloned-repo' }))
-    useReposStore.setState({ ensureWorkspaceOpen })
-    const activateRepo = vi.fn()
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+    }))
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
         <RepoCloneDialog open onOpenChange={onOpenChange} />
       </PrimaryWindowNavigationProvider>,
     )
@@ -92,17 +96,17 @@ describe('RepoCloneDialog', () => {
     await flush()
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
-    expect(activateRepo).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
-      id: '/tmp/cloned-repo',
-      postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+      postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
 
     renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -115,7 +119,7 @@ describe('RepoCloneDialog', () => {
     click('button[type="submit"]')
     await flush()
 
-    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
       description: '/tmp/cloned-repo\nrecent write failed',
     })
   })
@@ -123,20 +127,20 @@ describe('RepoCloneDialog', () => {
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: () => true,
+    commitWorkspacePaneRoute: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
+    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
   }
 }
 

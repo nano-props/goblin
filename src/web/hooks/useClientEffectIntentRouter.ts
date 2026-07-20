@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { onClientLocalEventType } from '#/web/local-events.ts'
 import { subscribeClientEffectIntent } from '#/web/client-ingress.ts'
 import { subscribeServerClientIntentIngress } from '#/web/server-client-intent-ingress.ts'
@@ -13,20 +14,19 @@ import {
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
-  currentRepoId: string | null
-  currentBranchName?: string | null
-  currentWorkspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspaceId: WorkspaceId | null
+  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   closeAllOverlays: () => void
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
@@ -34,13 +34,12 @@ interface ClientEffectIntentRouterOptions {
 
 export function useClientEffectIntentRouter({
   navigation,
-  currentRepoId,
-  currentBranchName = null,
-  currentWorkspacePaneRoute,
+  currentWorkspaceId,
+  currentWorkspacePaneCommandTarget,
   closeAllOverlays,
-  openRepoPathDialog,
+  openWorkspacePathDialog,
   openCloneRepo,
-  openRemoteRepo,
+  openRemoteWorkspace,
   openCreateWorktree,
   isOverlayOpen,
   isWorkspaceShortcutSuppressed,
@@ -48,22 +47,20 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, resetLayout, toggleZenMode } = useReposStore(
+  const { ensureWorkspaceOpen, resetLayout, toggleZenMode } = useWorkspacesStore(
     useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
   const navigationRef = useRef(navigation)
-  const currentRepoIdRef = useRef(currentRepoId)
-  const currentBranchNameRef = useRef(currentBranchName)
-  const currentWorkspacePaneRouteRef = useRef(currentWorkspacePaneRoute)
+  const currentWorkspaceIdRef = useRef(currentWorkspaceId)
+  const currentWorkspacePaneCommandTargetRef = useRef(currentWorkspacePaneCommandTarget)
   const isOverlayOpenRef = useRef(isOverlayOpen)
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const tRef = useRef(t)
   const ensureWorkspaceOpenRef = useRef(ensureWorkspaceOpen)
   navigationRef.current = navigation
-  currentRepoIdRef.current = currentRepoId
-  currentBranchNameRef.current = currentBranchName
-  currentWorkspacePaneRouteRef.current = currentWorkspacePaneRoute
+  currentWorkspaceIdRef.current = currentWorkspaceId
+  currentWorkspacePaneCommandTargetRef.current = currentWorkspacePaneCommandTarget
   isOverlayOpenRef.current = isOverlayOpen
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   tRef.current = t
@@ -72,7 +69,7 @@ export function useClientEffectIntentRouter({
   useEffect(() => {
     const externalOpenDrainer = createExternalOpenIntentDrainer({
       ensureWorkspaceOpen: async (path) => await ensureWorkspaceOpenRef.current(path),
-      activateRepo: (repoId) => navigationRef.current.activateRepo(repoId),
+      activateWorkspace: (workspaceId) => navigationRef.current.activateWorkspace(workspaceId),
       t: (key) => tRef.current(key),
     })
     let disposed = false
@@ -80,17 +77,16 @@ export function useClientEffectIntentRouter({
 
     const sharedDeps = () => ({
       navigation: navigationRef.current,
-      currentRepoId: currentRepoIdRef.current,
-      currentBranchName: currentBranchNameRef.current,
-      currentWorkspacePaneRoute: currentWorkspacePaneRouteRef.current,
+      currentWorkspaceId: currentWorkspaceIdRef.current,
+      currentWorkspacePaneCommandTarget: currentWorkspacePaneCommandTargetRef.current,
       closeAllOverlays,
-      openRepoPathDialog,
+      openWorkspacePathDialog,
       openCloneRepo,
-      openRemoteRepo,
+      openRemoteWorkspace,
       openCreateWorktree,
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
-      ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
+      ensureWorkspaceOpen: async (input: string | WorkspaceSessionEntry) => await ensureWorkspaceOpenRef.current(input),
       resetLayout,
       toggleZenMode,
       t: (key: string) => tRef.current(key),
@@ -140,14 +136,14 @@ export function useClientEffectIntentRouter({
   }, [
     closeAllOverlays,
     navigation,
-    currentRepoId,
+    currentWorkspaceId,
     isOverlayOpen,
     isWorkspaceShortcutSuppressed,
     ensureWorkspaceOpen,
     openCloneRepo,
-    openRemoteRepo,
+    openRemoteWorkspace,
     openCreateWorktree,
-    openRepoPathDialog,
+    openWorkspacePathDialog,
     resetLayout,
     toggleZenMode,
     t,

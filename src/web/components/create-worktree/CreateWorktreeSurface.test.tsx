@@ -6,13 +6,16 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch, repoPresentationForTest, seedRepoReadModelQueryData } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoPresentationForTest, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/bridge.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo')
+const WORKTREE_PATH = '/tmp/goblin-repo'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -90,11 +93,14 @@ describe('CreateWorktreePageBody', () => {
     render(<CreateWorktreePageBody repo={createRepo()} onCancel={onCancel} onCreate={onCreate} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
+    const pathInput = screen.getByRole('textbox', { name: /action.create-worktree-path-label/i })
+    await user.clear(pathInput)
+    await user.type(pathInput, `${WORKTREE_PATH}-feature-new`)
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
 
     expect(onCreate).toHaveBeenCalledWith({
       input: {
-        worktreePath: '/tmp/goblin-repo-feature-new',
+        worktreePath: `${WORKTREE_PATH}-feature-new`,
         mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
       },
     })
@@ -152,10 +158,13 @@ describe('CreateWorktreePageBody', () => {
         (screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement).disabled,
       ).toBe(false)
     })
+    const pathInput = screen.getByRole('textbox', { name: /action.create-worktree-path-label/i })
+    await user.clear(pathInput)
+    await user.type(pathInput, `${WORKTREE_PATH}-main`)
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
 
     expect(onCreate).toHaveBeenCalledWith({
-      input: { worktreePath: '/tmp/goblin-repo-main', mode: { kind: 'existingBranch', branch: 'main' } },
+      input: { worktreePath: `${WORKTREE_PATH}-main`, mode: { kind: 'existingBranch', branch: 'main' } },
     })
   })
 
@@ -178,7 +187,7 @@ describe('CreateWorktreePageBody', () => {
 
     expect(onCreate).toHaveBeenCalledWith({
       input: {
-        worktreePath: '/tmp/goblin-repo-feature',
+        worktreePath: '/srv/repo-feature',
         mode: { kind: 'trackRemoteBranch', remoteRef: 'origin/feature', localBranch: 'feature' },
       },
     })
@@ -249,20 +258,30 @@ describe('CreateWorktreePageBody', () => {
 })
 
 function createRepo(): RepoPresentationForTest {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
-  seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
+  const repo = seedRepoWithReadModelForTest({
+    id: WORKSPACE_ID,
+    name: 'goblin-repo',
+    workspaceRuntimeId: 'repo-runtime-test',
+    branches,
+    currentBranch: 'main',
+  })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }
 
 function createRepoWithCreatedWorktree(): RepoPresentationForTest {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [
     createRepoBranch('main'),
     createRepoBranch('feature/base'),
-    createRepoBranch('feature/new', { worktree: { path: '/tmp/goblin-repo-feature-new' } }),
+    createRepoBranch('feature/new', { worktree: { path: `${WORKTREE_PATH}-feature-new` } }),
   ]
-  seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
+  const repo = seedRepoWithReadModelForTest({
+    id: WORKSPACE_ID,
+    name: 'goblin-repo',
+    workspaceRuntimeId: 'repo-runtime-test',
+    branches,
+    currentBranch: 'main',
+  })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }
 
@@ -275,6 +294,14 @@ function createRemoteRepo(): RepoPresentationForTest {
     port: 22,
   })
   if (!target) throw new Error('invalid target')
-  const repo = createRepo()
-  return { ...repo, remote: { ...repo.remote, lifecycle: { kind: 'ready', target } } }
+  const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
+  const repo = seedRepoWithReadModelForTest({
+    id: target.id,
+    name: 'remote-workspace',
+    workspaceRuntimeId: 'repo-runtime-test',
+    branches,
+    currentBranch: 'main',
+    remoteLifecycle: { kind: 'ready', target },
+  })
+  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }

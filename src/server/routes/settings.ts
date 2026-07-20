@@ -1,17 +1,22 @@
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
-import { addServerWorkspaceRepo, getUserSettings, removeServerWorkspaceRepo } from '#/server/modules/settings-source.ts'
+import {
+  addServerWorkspaceEntry,
+  getUserSettings,
+  removeServerWorkspaceEntry,
+} from '#/server/modules/settings-source.ts'
 import { restoreServerWorkspace } from '#/server/modules/session-restore.ts'
-import { restoreRepoTabsForRepo } from '#/server/modules/repo-workspace-tabs-restore.ts'
+import { restoreWorkspaceTabs } from '#/server/modules/workspace-tabs-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import {
   handleSetFetchInterval,
   handleSetGlobalShortcutRegistered,
-  handleAddRecentRepo,
-  handleClearRecentRepos,
-  handleSetRepoWorkspaceExternalAppRecent,
+  handleAddRecentWorkspace,
+  handleClearRecentWorkspaces,
+  handleSetWorkspaceExternalAppRecent,
   handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
@@ -27,8 +32,9 @@ import {
 export function createSettingsRoutes(options: {
   settingsState: NativeShortcutRegistrationState
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
-  const { settingsState, workspacePaneTabsHost } = options
+  const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.post('/github-cli', async (c) => {
@@ -71,52 +77,60 @@ export function createSettingsRoutes(options: {
   app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, activeRepoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRestore, c)
+    const { clientId, activeWorkspaceId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRestore, c)
     return c.json(
       await restoreServerWorkspace({
         userId,
         clientId,
-        activeRepoRoot: activeRepoRoot ?? null,
+        activeWorkspaceId: activeWorkspaceId ?? null,
         workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )
   })
-  app.post('/workspace/repos/add', async (c) => {
+  app.post('/workspace/entries/add', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { entry } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoAdd, c)
-    return c.json(await addServerWorkspaceRepo(entry))
+    const { entry } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceEntryAdd, c)
+    return c.json(await addServerWorkspaceEntry(entry))
   })
-  app.post('/workspace/repos/remove', async (c) => {
+  app.post('/workspace/entries/remove', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoRemove, c)
-    return c.json(await removeServerWorkspaceRepo(repoRoot))
+    const { workspaceId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceEntryRemove, c)
+    return c.json(await removeServerWorkspaceEntry(workspaceId))
   })
-  app.post('/workspace/restore-repo-tabs', async (c) => {
+  app.post('/workspace/tabs/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, repoRoot, repoRuntimeId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.restoreRepoTabs, c)
+    const { clientId, workspaceId, workspaceRuntimeId } = await parseHttpBody(
+      SETTINGS_PROCEDURE_SCHEMAS.restoreWorkspaceTabs,
+      c,
+    )
     return c.json(
-      await restoreRepoTabsForRepo({
+      await restoreWorkspaceTabs({
         userId,
         clientId,
-        repoRoot,
-        repoRuntimeId,
+        workspaceId,
+        workspaceRuntimeId,
         workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )
   })
-  app.post('/recent-repos/add', async (c) => {
-    const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)
-    return c.json(await handleAddRecentRepo({ repo }))
+  app.post('/recent-workspaces/add', async (c) => {
+    const { workspace } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentWorkspacesAdd, c)
+    return c.json(await handleAddRecentWorkspace({ workspace }))
   })
-  app.post('/recent-repos/clear', async (c) => c.json(await handleClearRecentRepos()))
-  app.post('/repo-external-app-recent', async (c) => {
-    const { repoId, worktreePath, itemId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.repoExternalAppRecentSet, c)
-    return c.json(await handleSetRepoWorkspaceExternalAppRecent({ repoId, worktreePath, itemId }))
+  app.post('/recent-workspaces/clear', async (c) => c.json(await handleClearRecentWorkspaces()))
+  app.post('/workspace-external-app-recent', async (c) => {
+    const { workspaceId, targetKey, itemId } = await parseHttpBody(
+      SETTINGS_PROCEDURE_SCHEMAS.workspaceExternalAppRecentSet,
+      c,
+    )
+    return c.json(await handleSetWorkspaceExternalAppRecent({ workspaceId, targetKey, itemId }))
   })
   return app
 }

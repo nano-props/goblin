@@ -7,16 +7,20 @@ import type {
   TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export interface TerminalDescriptor {
-  terminalWorktreeKey: string
+type TerminalDescriptorIdentity = {
   terminalSessionId: string
   index: number
-  repoRuntimeId: string
-  repoRoot: string
-  branch: string
-  worktreePath: string
 }
+
+type TerminalDescriptorFor<Session extends TerminalSessionBase> = Session extends TerminalSessionBase
+  ? Session & TerminalDescriptorIdentity
+  : never
+
+export type TerminalDescriptor = TerminalDescriptorFor<TerminalSessionBase>
 
 export interface TerminalProgressState {
   /** 1 = normal, 2 = error, 3 = indeterminate, 4 = paused/warning. State 0 clears the progress (not stored). */
@@ -139,16 +143,15 @@ export interface TerminalCreateOptions {
   resolveStartupShellCommand?: () => Promise<string>
 }
 
-export interface TerminalRepoSnapshot {
-  repoRuntimeId: string
-  branchByWorktreePath: Record<string, string>
+export interface TerminalRuntimeMembership {
+  workspaceRuntimeId: string
 }
 
-export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
+export type TerminalRuntimeMembershipIndex = ReadonlyMap<WorkspaceId, TerminalRuntimeMembership>
 
 export interface TerminalSessionSummary {
   type: 'terminal'
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   terminalSessionId: string
   index: number
   title: string
@@ -161,8 +164,8 @@ export interface TerminalSessionSummary {
   hasRecentOutput: boolean
 }
 
-export interface TerminalWorktreeSnapshot {
-  terminalWorktreeKey: string
+export interface TerminalFilesystemTargetSnapshot {
+  terminalFilesystemTargetKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
   count: number
@@ -176,11 +179,11 @@ export interface TerminalSessionContextValue {
   createTerminalWithAdmission: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
-  ) => Promise<import('#/web/components/terminal/terminal-create-admission.ts').TerminalCreateAdmissionResult>
-  registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
-  unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
-  selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
+    placement?: WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<TerminalCreateAdmissionResult>
+  registerHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
+  unregisterHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
+  selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
   scrollToBottom: (terminalSessionId: string) => void
   scrollLines: (terminalSessionId: string, amount: number) => void
   clearBell: (terminalSessionId: string) => boolean
@@ -198,10 +201,10 @@ export interface TerminalSessionContextValue {
 }
 
 export interface TerminalSessionReadContextValue {
-  terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
-  subscribeTerminalWorktree: (terminalWorktreeKey: string, listener: () => void) => () => void
-  repoBellCount: (repoRoot: string) => number
-  subscribeRepoBellCount: (repoRoot: string, listener: () => void) => () => void
+  terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey: string) => TerminalFilesystemTargetSnapshot
+  subscribeTerminalFilesystemTarget: (terminalFilesystemTargetKey: string, listener: () => void) => () => void
+  workspaceBellCount: (workspaceId: WorkspaceId) => number
+  subscribeWorkspaceBellCount: (workspaceId: WorkspaceId, listener: () => void) => () => void
   snapshot: (terminalSessionId: string) => TerminalSnapshot
   subscribeSnapshot: (terminalSessionId: string, listener: () => void) => () => void
 }

@@ -10,7 +10,7 @@ import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pan
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   terminalSessionId: 'term-111111111111111111111',
-  terminalWorktreeKey: 'repo\0worktree',
+  terminalFilesystemTargetKey: 'repo\0worktree',
   index: 1,
   title: 'terminal 1',
   phase: 'open',

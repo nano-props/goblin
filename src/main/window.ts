@@ -1,4 +1,4 @@
-// Single BrowserWindow. Multi-repo lives inside the repository switcher; we don't
+// Single BrowserWindow. Multiple workspaces live inside the workspace switcher; we don't
 // need multiple windows.
 //
 // Bounds are persisted: on second run the window comes back where the

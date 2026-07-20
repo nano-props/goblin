@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import {
   type WorkspacePaneRuntimeTabTargetProjection,
   type WorkspacePaneRuntimeTabTargetSelectionByType,
@@ -12,9 +14,9 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
-  repoRoot: string
-  repoRuntimeId: string
-  worktreePath: string | null
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
 }
 
 export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends WorkspacePaneRuntimeTabTargetProjection {
@@ -24,20 +26,17 @@ export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends Works
 }
 
 export function useWorkspacePaneRuntimeTabTargetProjection({
-  repoRoot,
-  repoRuntimeId,
-  worktreePath,
+  workspaceId,
+  workspaceRuntimeId,
+  filesystemTarget,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
-  const runtimeTabTargetKeyByType = useMemo(
-    () => workspacePaneRuntimeTabTargetKeyByType({ repoRoot, worktreePath }),
-    [repoRoot, worktreePath],
+  const input = useMemo(
+    () => ({ workspaceId, workspaceRuntimeId, filesystemTarget }),
+    [filesystemTarget, workspaceId, workspaceRuntimeId],
   )
-  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({
-    repoRoot,
-    repoRuntimeId,
-    worktreePath,
-  })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey(input)
+  const runtimeTabTargetKeyByType = useMemo(() => workspacePaneRuntimeTabTargetKeyByType(input), [input])
+  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections(input)
 
   const selectedSessionIdByRuntimeType = useMemo<WorkspacePaneRuntimeTabTargetSelectionByType>(
     () =>

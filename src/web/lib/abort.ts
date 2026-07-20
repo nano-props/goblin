@@ -15,3 +15,18 @@ export function createTimeoutAbortController(ms: number, message: string): Timeo
     dispose: () => window.clearTimeout(timeout),
   }
 }
+
+/** Stop one caller from waiting without transferring its cancellation authority to shared work. */
+export async function waitForPromiseWithSignal<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError')
+  let onAbort: (() => void) | null = null
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    return await Promise.race([promise, aborted])
+  } finally {
+    if (onAbort) signal.removeEventListener('abort', onAbort)
+  }
+}

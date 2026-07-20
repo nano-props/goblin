@@ -81,6 +81,9 @@ export interface WorktreeInfo {
   isDirty?: boolean
   changeCount?: number
   isLocked?: boolean
+  /** Git still has administrative metadata for this worktree, but its
+   * physical worktree is no longer usable and may be pruned. */
+  isPrunable?: boolean
 }
 
 export interface StatusEntry {

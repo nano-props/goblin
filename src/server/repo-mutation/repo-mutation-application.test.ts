@@ -1,5 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('repo mutation application', () => {
   test('does not retire pane layout after branch deletion', async () => {
@@ -8,8 +11,8 @@ describe('repo mutation application', () => {
 
     await expect(
       application.deleteBranch('user-a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        repoRoot: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/retired',
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),
@@ -18,8 +21,8 @@ describe('repo mutation application', () => {
 
     await expect(
       application.deleteBranch('user-a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        repoRoot: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/kept',
         deleteBranch: async () => ({ ok: false, message: 'failed' }),
       }),
@@ -35,8 +38,8 @@ describe('repo mutation application', () => {
 
     await expect(
       application.deleteBranch('user-a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        repoRoot: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/deleted',
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),

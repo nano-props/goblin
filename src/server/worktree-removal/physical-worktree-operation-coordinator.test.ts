@@ -4,7 +4,7 @@ import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 describe('physical worktree operation coordinator', () => {
   test('admits one queue for multiple generations of the same identity', async () => {
@@ -12,28 +12,37 @@ describe('physical worktree operation coordinator', () => {
     const oldCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
       execution: {
-        kind: 'local', canonicalWorktreePath: identity.endpoint,
+        kind: 'local',
+        canonicalWorktreePath: identity.endpoint,
         endpointMarker: { deviceId: '1', inode: '1' },
       },
     })
     const currentCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
       execution: {
-        kind: 'local', canonicalWorktreePath: identity.endpoint,
+        kind: 'local',
+        canonicalWorktreePath: identity.endpoint,
         endpointMarker: { deviceId: '1', inode: '2' },
       },
     })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     let executions = 0
 
-    await expect(coordinator.runAdmissionBatch([{
-      identity,
-      currentCapability,
-      indexedLeases: [physicalWorktreeAdmissionLease(oldCapability)],
-    }], async () => {
-      executions += 1
-      return 'ok'
-    })).resolves.toEqual({ admitted: true, value: 'ok' })
+    await expect(
+      coordinator.runAdmissionBatch(
+        [
+          {
+            identity,
+            currentCapability,
+            indexedLeases: [physicalWorktreeAdmissionLease(oldCapability)],
+          },
+        ],
+        async () => {
+          executions += 1
+          return 'ok'
+        },
+      ),
+    ).resolves.toEqual({ admitted: true, value: 'ok' })
     expect(executions).toBe(1)
   })
 
@@ -44,10 +53,13 @@ describe('physical worktree operation coordinator', () => {
     const gate = deferred<void>()
     const active = coordinator.runOperation(held, async () => await gate.promise)
     await Promise.resolve()
-    const batch = coordinator.runAdmissionBatch([
-      { identity: held.identity, currentCapability: held, indexedLeases: [] },
-      { identity: second.identity, currentCapability: second, indexedLeases: [] },
-    ], async () => 'batch')
+    const batch = coordinator.runAdmissionBatch(
+      [
+        { identity: held.identity, currentCapability: held, indexedLeases: [] },
+        { identity: second.identity, currentCapability: second, indexedLeases: [] },
+      ],
+      async () => 'batch',
+    )
 
     await expect(coordinator.runRemoval(second, async () => 'removed')).resolves.toEqual({ admitted: false })
     gate.resolve()
@@ -61,16 +73,26 @@ describe('physical worktree operation coordinator', () => {
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     const record = { identity, currentCapability: capability, indexedLeases: [] }
 
-    await expect(coordinator.runAdmissionBatch([record, record], async () => undefined))
-      .rejects.toThrow('error.duplicate-worktree-admission-record')
+    await expect(coordinator.runAdmissionBatch([record, record], async () => undefined)).rejects.toThrow(
+      'error.duplicate-worktree-admission-record',
+    )
   })
 
   test('rejects an empty record before reserving its identity', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const coordinator = createPhysicalWorktreeOperationCoordinator()
-    await expect(coordinator.runAdmissionBatch([{
-      identity, currentCapability: null, indexedLeases: [],
-    }], async () => undefined)).rejects.toThrow('error.invalid-worktree-admission-record')
+    await expect(
+      coordinator.runAdmissionBatch(
+        [
+          {
+            identity,
+            currentCapability: null,
+            indexedLeases: [],
+          },
+        ],
+        async () => undefined,
+      ),
+    ).rejects.toThrow('error.invalid-worktree-admission-record')
     const capability = issueTestPhysicalWorktreeExecutionCapability({ identity })
     await expect(coordinator.runRemoval(capability, async () => 'removed')).resolves.toMatchObject({ admitted: true })
   })
@@ -83,17 +105,25 @@ describe('physical worktree operation coordinator', () => {
     const live = issueTestPhysicalWorktreeExecutionCapability({ identity })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
 
-    await expect(coordinator.runAdmissionBatch([{
-      identity,
-      currentCapability: null,
-      indexedLeases: [physicalWorktreeAdmissionLease(old), physicalWorktreeAdmissionLease(live)],
-    }], async () => 'ok')).resolves.toEqual({ admitted: true, value: 'ok' })
+    await expect(
+      coordinator.runAdmissionBatch(
+        [
+          {
+            identity,
+            currentCapability: null,
+            indexedLeases: [physicalWorktreeAdmissionLease(old), physicalWorktreeAdmissionLease(live)],
+          },
+        ],
+        async () => 'ok',
+      ),
+    ).resolves.toEqual({ admitted: true, value: 'ok' })
   })
 
   test('does not execute the batch task after an outer lease aborts while waiting', async () => {
     const signalA = new AbortController()
     const a = issueTestPhysicalWorktreeExecutionCapability({
-      identity: testPhysicalWorktreeIdentity('/repo/a'), runtimeSignal: signalA.signal,
+      identity: testPhysicalWorktreeIdentity('/repo/a'),
+      runtimeSignal: signalA.signal,
     })
     const b = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
@@ -101,10 +131,15 @@ describe('physical worktree operation coordinator', () => {
     const held = coordinator.runOperation(b, async () => await gate.promise)
     await Promise.resolve()
     let ran = false
-    const batch = coordinator.runAdmissionBatch([
-      { identity: a.identity, currentCapability: a, indexedLeases: [] },
-      { identity: b.identity, currentCapability: b, indexedLeases: [] },
-    ], async () => { ran = true })
+    const batch = coordinator.runAdmissionBatch(
+      [
+        { identity: a.identity, currentCapability: a, indexedLeases: [] },
+        { identity: b.identity, currentCapability: b, indexedLeases: [] },
+      ],
+      async () => {
+        ran = true
+      },
+    )
     await Promise.resolve()
     signalA.abort()
     gate.resolve()
@@ -118,6 +153,8 @@ describe('physical worktree operation coordinator', () => {
 
 function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
   return { promise, resolve }
 }

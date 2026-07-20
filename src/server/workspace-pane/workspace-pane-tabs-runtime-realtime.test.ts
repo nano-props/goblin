@@ -5,6 +5,16 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const TARGET = {
+  kind: 'git-worktree' as const,
+  workspaceId: WORKSPACE_ID,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+  root: WORKSPACE_ID,
+}
 
 describe('createWorkspacePaneTabsRealtimeHandlers', () => {
   test('routes canonical workspace pane tab actions to workspace pane host methods', async () => {
@@ -18,45 +28,41 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
 
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list]('client_a', 'user_a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       }),
     ).resolves.toEqual(emptySnapshot)
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace]('client_a', 'user_a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-test',
-        branchName: 'main',
-        worktreePath: '/repo',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        target: TARGET,
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
       }),
     ).resolves.toEqual(emptySnapshot)
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update]('client_a', 'user_a', {
-        repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-test',
-        branchName: 'main',
-        worktreePath: '/repo',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        target: TARGET,
         operation: { type: 'open-static', tabType: 'history' },
       }),
     ).resolves.toEqual(emptySnapshot)
 
     expect(host.listWorkspaceTabs).toHaveBeenCalledWith('client_a', 'user_a', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(host.replaceTabs).toHaveBeenCalledWith('client_a', 'user_a', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      branchName: 'main',
-      worktreePath: '/repo',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      target: TARGET,
       tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
     })
     expect(host.updateTabs).toHaveBeenCalledWith('client_a', 'user_a', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      branchName: 'main',
-      worktreePath: '/repo',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      target: TARGET,
       operation: { type: 'open-static', tabType: 'history' },
     })
   })
@@ -85,7 +91,7 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
         type: 'request',
         requestId: 'request_1',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        input: { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' },
+        input: { workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       },
       onSendFailed,
     )

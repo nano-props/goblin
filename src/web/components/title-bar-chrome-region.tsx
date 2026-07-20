@@ -2,7 +2,7 @@ import { Slot } from 'radix-ui'
 import type { ComponentProps } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 
-// Electron folds app-region rectangles in DOM order: drag rectangles are
+// Electron folds app-region rectangles in DOM workspaceOrder: drag rectangles are
 // unioned, then later no-drag rectangles are subtracted. Render broad drag
 // surfaces before interactive controls that must cut through them.
 

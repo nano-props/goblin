@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { describe, expect, test } from 'vitest'
 import { act } from '@testing-library/react'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
@@ -15,26 +16,28 @@ import {
 import {
   useTerminalSessionSummaries,
   useTerminalSnapshot,
-  useRepoTerminalBellCounts,
-  useTerminalWorktreeBellCount,
-  useTerminalWorktreeCount,
-  useTerminalWorktreeCreatePending,
-  useTerminalWorktreeField,
-  useTerminalWorktreeOutputActive,
-  useTerminalWorktreeSelectedDescriptor,
+  useWorkspaceTerminalBellCounts,
+  useTerminalFilesystemTargetBellCount,
+  useTerminalFilesystemTargetCount,
+  useTerminalFilesystemTargetCreatePending,
+  useTerminalFilesystemTargetField,
+  useTerminalFilesystemTargetOutputActive,
+  useTerminalFilesystemTargetSelectedDescriptor,
 } from '#/web/components/terminal/terminal-session-store.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import type {
   TerminalSessionReadContextValue,
   TerminalSnapshot,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 
 const WORKTREE_KEY = 'wt:1'
 const SESSION_ID = 'session:1'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
-function makeReadContext(overrides: Partial<TerminalWorktreeSnapshot> = {}): TerminalSessionReadContextValue {
-  const snapshot: TerminalWorktreeSnapshot = {
-    terminalWorktreeKey: WORKTREE_KEY,
+function makeReadContext(overrides: Partial<TerminalFilesystemTargetSnapshot> = {}): TerminalSessionReadContextValue {
+  const snapshot: TerminalFilesystemTargetSnapshot = {
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 3,
@@ -44,11 +47,11 @@ function makeReadContext(overrides: Partial<TerminalWorktreeSnapshot> = {}): Ter
     ...overrides,
   }
   return {
-    terminalWorktreeSnapshot: (key) =>
-      key === WORKTREE_KEY ? snapshot : { ...snapshot, terminalWorktreeKey: key },
-    subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 0,
-    subscribeRepoBellCount: () => () => {},
+    terminalFilesystemTargetSnapshot: (key) =>
+      key === WORKTREE_KEY ? snapshot : { ...snapshot, terminalFilesystemTargetKey: key },
+    subscribeTerminalFilesystemTarget: () => () => {},
+    workspaceBellCount: () => 0,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
     subscribeSnapshot: () => () => {},
   }
@@ -59,58 +62,55 @@ function withRead(value: TerminalSessionReadContextValue, children: React.ReactN
 }
 
 describe('simplified worktree hooks read the right field', () => {
-  test('useTerminalWorktreeCount returns snapshot.count', () => {
+  test('useTerminalFilesystemTargetCount returns snapshot.count', () => {
     function Probe() {
-      const count = useTerminalWorktreeCount(WORKTREE_KEY)
+      const count = useTerminalFilesystemTargetCount(WORKTREE_KEY)
       return <span data-testid="v">{count}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 7 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('7')
   })
 
-  test('useTerminalWorktreeCreatePending returns snapshot.createPending', () => {
+  test('useTerminalFilesystemTargetCreatePending returns snapshot.createPending', () => {
     function Probe() {
-      const v = useTerminalWorktreeCreatePending(WORKTREE_KEY)
+      const v = useTerminalFilesystemTargetCreatePending(WORKTREE_KEY)
       return <span data-testid="v">{String(v)}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ createPending: true }), <Probe />))
     expect(getByTestId('v').textContent).toBe('true')
   })
 
-  test('useTerminalWorktreeBellCount returns snapshot.bellCount', () => {
+  test('useTerminalFilesystemTargetBellCount returns snapshot.bellCount', () => {
     function Probe() {
-      const v = useTerminalWorktreeBellCount(WORKTREE_KEY)
+      const v = useTerminalFilesystemTargetBellCount(WORKTREE_KEY)
       return <span data-testid="v">{v}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ bellCount: 5 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('5')
   })
 
-  test('useTerminalWorktreeOutputActive derives from outputActiveCount', () => {
+  test('useTerminalFilesystemTargetOutputActive derives from outputActiveCount', () => {
     function Probe() {
-      const v = useTerminalWorktreeOutputActive(WORKTREE_KEY)
+      const v = useTerminalFilesystemTargetOutputActive(WORKTREE_KEY)
       return <span data-testid="v">{String(v)}</span>
     }
-    const { rerender, getByTestId } = renderInJsdom(
-      withRead(makeReadContext({ outputActiveCount: 2 }), <Probe />),
-    )
+    const { rerender, getByTestId } = renderInJsdom(withRead(makeReadContext({ outputActiveCount: 2 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('true')
     rerender(withRead(makeReadContext({ outputActiveCount: 0 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('false')
   })
 
-  test('useTerminalWorktreeSelectedDescriptor returns snapshot.selectedDescriptor', () => {
-    const descriptor = {
-      terminalWorktreeKey: WORKTREE_KEY,
+  test('useTerminalFilesystemTargetSelectedDescriptor returns snapshot.selectedDescriptor', () => {
+    const descriptor = terminalDescriptorForTest({
       terminalSessionId: SESSION_ID,
       index: 0,
-      repoRuntimeId: 'rt:1',
+      workspaceRuntimeId: 'rt:1',
       repoRoot: '/r',
       branch: 'main',
       worktreePath: '/r',
-    }
+    })
     function Probe() {
-      const d = useTerminalWorktreeSelectedDescriptor(WORKTREE_KEY)
+      const d = useTerminalFilesystemTargetSelectedDescriptor(WORKTREE_KEY)
       return <span data-testid="v">{d?.terminalSessionId ?? 'none'}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ selectedDescriptor: descriptor }), <Probe />))
@@ -121,7 +121,7 @@ describe('simplified worktree hooks read the right field', () => {
     const sessions = [
       {
         type: 'terminal' as const,
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         terminalSessionId: 's1',
         index: 0,
         title: 't1',
@@ -141,36 +141,36 @@ describe('simplified worktree hooks read the right field', () => {
 })
 
 describe('null key returns empty-derived values', () => {
-  test('useTerminalWorktreeCount(null) returns 0', () => {
+  test('useTerminalFilesystemTargetCount(null) returns 0', () => {
     function Probe() {
-      const v = useTerminalWorktreeCount(null)
+      const v = useTerminalFilesystemTargetCount(null)
       return <span data-testid="v">{v}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
     expect(getByTestId('v').textContent).toBe('0')
   })
 
-  test('useTerminalWorktreeCreatePending(null) returns false', () => {
+  test('useTerminalFilesystemTargetCreatePending(null) returns false', () => {
     function Probe() {
-      const v = useTerminalWorktreeCreatePending(null)
+      const v = useTerminalFilesystemTargetCreatePending(null)
       return <span data-testid="v">{String(v)}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
     expect(getByTestId('v').textContent).toBe('false')
   })
 
-  test('useTerminalWorktreeOutputActive(null) returns false', () => {
+  test('useTerminalFilesystemTargetOutputActive(null) returns false', () => {
     function Probe() {
-      const v = useTerminalWorktreeOutputActive(null)
+      const v = useTerminalFilesystemTargetOutputActive(null)
       return <span data-testid="v">{String(v)}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
     expect(getByTestId('v').textContent).toBe('false')
   })
 
-  test('useTerminalWorktreeBellCount(null) returns 0', () => {
+  test('useTerminalFilesystemTargetBellCount(null) returns 0', () => {
     function Probe() {
-      const v = useTerminalWorktreeBellCount(null)
+      const v = useTerminalFilesystemTargetBellCount(null)
       return <span data-testid="v">{v}</span>
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
@@ -188,7 +188,7 @@ describe('null key returns empty-derived values', () => {
 
   test('null worktree key still requires the read provider', () => {
     function Probe() {
-      useTerminalWorktreeCount(null)
+      useTerminalFilesystemTargetCount(null)
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
@@ -204,7 +204,7 @@ describe('null key returns empty-derived values', () => {
 
   test('empty repo bell count query still requires the read provider', () => {
     function Probe() {
-      useRepoTerminalBellCounts([])
+      useWorkspaceTerminalBellCounts([])
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
@@ -212,7 +212,7 @@ describe('null key returns empty-derived values', () => {
 
   test('real worktree key still requires the read provider', () => {
     function Probe() {
-      useTerminalWorktreeCount(WORKTREE_KEY)
+      useTerminalFilesystemTargetCount(WORKTREE_KEY)
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
@@ -228,22 +228,19 @@ describe('null key returns empty-derived values', () => {
 
   test('non-empty repo bell count query still requires the read provider', () => {
     function Probe() {
-      useRepoTerminalBellCounts(['/repo'])
+      useWorkspaceTerminalBellCounts([WORKSPACE_ID])
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
   })
 })
 
-describe('useTerminalWorktreeField uses the latest selector closure', () => {
+describe('useTerminalFilesystemTargetField uses the latest selector closure', () => {
   test('a selector that depends on a captured variable reflects updates to that variable', () => {
     function Probe({ multiplier }: { multiplier: number }) {
       // Closure captures `multiplier`; when the prop changes, the new
       // selector closure must take effect on the very next render.
-      const value = useTerminalWorktreeField(
-        WORKTREE_KEY,
-        (s) => s.count * multiplier,
-      )
+      const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (s) => s.count * multiplier)
       return <span data-testid="v">{value}</span>
     }
 
@@ -276,9 +273,9 @@ describe('useTerminalWorktreeField uses the latest selector closure', () => {
   test('a selector that ignores its captured variable stays consistent across re-renders', () => {
     function Probe({ tick }: { tick: number }) {
       // Selector always projects to `s.count` regardless of `tick`. This
-      // mirrors the real `useTerminalWorktreeCount` etc., where the
+      // mirrors the real `useTerminalFilesystemTargetCount` etc., where the
       // selector ignores everything except the store snapshot.
-      const value = useTerminalWorktreeField(WORKTREE_KEY, (s) => s.count + (tick - tick))
+      const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (s) => s.count + (tick - tick))
       return <span data-testid="v">{value}</span>
     }
 

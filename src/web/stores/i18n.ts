@@ -58,6 +58,8 @@ interface I18nState {
     subscribe?: boolean
     signal?: AbortSignal
   }) => Promise<void>
+  /** Install the authenticated invalidation stream without fetching the snapshot again. */
+  subscribeInvalidation: () => void
   setPref: (pref: LangPref) => Promise<void>
 }
 
@@ -67,9 +69,14 @@ let unsubscribe: (() => void) | null = null
 let hydrateVersion = 0
 let snapshotQueue = Promise.resolve()
 
-function clearI18nSubscription() {
-  unsubscribe?.()
-  unsubscribe = null
+function ensureI18nSubscription(set: I18nSet): void {
+  if (unsubscribe) return
+  unsubscribe = subscribeSettingsInvalidationRefetch({
+    scope: 'i18n',
+    fetch: getI18nSnapshot,
+    label: 'i18n',
+    apply: (next) => commitSnapshot(set, next),
+  })
 }
 
 export const useI18nStore = create<I18nState>((set) => ({
@@ -85,18 +92,11 @@ export const useI18nStore = create<I18nState>((set) => ({
     await commitSnapshot(set, snapshot)
     if (version !== hydrateVersion) return
     if (options?.subscribe === false) return
-    const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
-      scope: 'i18n',
-      fetch: getI18nSnapshot,
-      label: 'i18n',
-      apply: (next) => commitSnapshot(set, next),
-    })
-    if (version !== hydrateVersion) {
-      nextUnsubscribe()
-      return
-    }
-    clearI18nSubscription()
-    unsubscribe = nextUnsubscribe
+    ensureI18nSubscription(set)
+  },
+
+  subscribeInvalidation() {
+    ensureI18nSubscription(set)
   },
 
   async setPref(pref) {

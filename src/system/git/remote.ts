@@ -27,6 +27,10 @@ export interface BrowserRemote {
   provider: BrowserRemoteProvider
 }
 
+export interface GitPullResult extends ExecResult {
+  affectedWorktreePaths?: readonly string[]
+}
+
 export async function getBrowserRepoUrl(
   cwd: string,
   target: RepoUrlTarget,
@@ -288,15 +292,22 @@ export async function pullBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<GitPullResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (worktreePath) {
-    return gitResultWithOptions(worktreePath, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
+    const result = await gitResultWithOptions(
+      worktreePath,
+      { timeoutMs: NETWORK_TIMEOUT_MS, signal },
+      'pull',
+      '--ff-only',
+    )
+    return result.ok || result.repositoryStateChanged ? { ...result, affectedWorktreePaths: [worktreePath] } : result
   }
   const current = await getCurrentBranch(cwd, { signal })
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (branch === current) {
-    return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
+    const result = await gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
+    return result.ok || result.repositoryStateChanged ? { ...result, affectedWorktreePaths: [cwd] } : result
   }
   const target = await getUpstreamParts(cwd, branch, signal)
   if (signal?.aborted) return { ok: false, message: 'cancelled' }

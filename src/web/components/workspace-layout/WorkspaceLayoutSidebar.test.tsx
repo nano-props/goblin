@@ -1,0 +1,234 @@
+// @vitest-environment jsdom
+
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
+import { fireEvent } from '@testing-library/react'
+import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
+import { renderInJsdom } from '#/test-utils/render.tsx'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
+  WorkspacePickerHost: () => (
+    <button type="button" data-testid="workspace-picker-host" className="h-10 w-full shrink-0" />
+  ),
+}))
+
+const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+const workspaceCommandMocks = vi.hoisted(() => ({
+  showTab: vi.fn(async () => true),
+  terminal: vi.fn(async () => true),
+}))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
+vi.mock('#/web/commands/workspace-commands.ts', () => ({
+  runShowWorkspacePaneTabCommand: workspaceCommandMocks.showTab,
+  runTerminalPrimaryActionCommand: workspaceCommandMocks.terminal,
+}))
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-shell-sidebar-test')
+
+function gitProjection() {
+  const capability = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.capability
+  if (capability?.kind !== 'git') throw new Error('Expected Git workspace fixture')
+  return capability.git
+}
+
+beforeEach(() => {
+  responsiveMocks.compact = false
+  workspaceCommandMocks.showTab.mockClear()
+  workspaceCommandMocks.terminal.mockClear()
+  primaryWindowQueryClient.clear()
+  resetWorkspacesStore()
+  seedRepoWithReadModelForTest({
+    id: WORKSPACE_ID,
+    branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+  })
+})
+
+afterEach(() => {
+  primaryWindowQueryClient.clear()
+  resetWorkspacesStore()
+  vi.restoreAllMocks()
+})
+
+describe('WorkspaceLayoutSidebar', () => {
+  test('renders sidebar actions before the branch content without growing action rows', () => {
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        git={gitProjection()}
+        compact={false}
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+
+    const workspacePicker = container.querySelector('[data-testid="workspace-picker-host"]')
+    expect(workspacePicker).not.toBeNull()
+
+    const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
+    if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
+    expect(createWorktree.className).toContain('shrink-0')
+    expect(createWorktree.className).not.toContain('flex-1')
+
+    const branchTitle = [...container.querySelectorAll('div')].find(
+      (element) => element.children.length === 0 && element.textContent?.trim() === 'tab.branches',
+    )
+    expect(branchTitle).not.toBeNull()
+    expect(container.querySelector('[data-testid="branch-content"]')).not.toBeNull()
+
+    const settings = container.querySelector('button[aria-label="app-chrome.settings"]')
+    expect(settings).not.toBeNull()
+  })
+
+  test('renders placeholder state when no repo is open', () => {
+    const { container } = renderSidebar(<WorkspaceLayoutSidebar git={null} compact={false} />)
+
+    expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
+
+    const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
+    expect(createWorktree).toBeNull()
+
+    const branchTitle = [...container.querySelectorAll('div')].find(
+      (element) => element.children.length === 0 && element.textContent?.trim() === 'tab.branches',
+    )
+    expect(branchTitle).toBeUndefined()
+
+    const settings = container.querySelector('button[aria-label="app-chrome.settings"]')
+    expect(settings).not.toBeNull()
+  })
+
+  test('keeps the shared dashboard and navigator layout without Git-only controls when Git is unavailable', () => {
+    const onOpenDashboard = vi.fn()
+    const onSelectWorkspaceRoot = vi.fn()
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        compact={false}
+        git={null}
+        onOpenDashboard={onOpenDashboard}
+        onSelectWorkspaceRoot={onSelectWorkspaceRoot}
+      />,
+    )
+
+    expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
+    expect(container.textContent).toContain('workspace.navigation-title')
+    expect(container.textContent).not.toContain('tab.branches')
+    expect(container.textContent).toContain('workspace.dashboard')
+    expect(container.querySelector('button[aria-label="menu.view.refresh"]')).not.toBeNull()
+    expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
+
+    const workspaceRow = container.querySelector('[data-testid="workspace-root-row"]')
+    if (!(workspaceRow instanceof HTMLElement)) throw new Error('missing workspace root row')
+    fireEvent.click(workspaceRow)
+    expect(onSelectWorkspaceRoot).toHaveBeenCalledOnce()
+
+    const menuTrigger = workspaceRow.querySelector('button[aria-label="action.menu"]')
+    if (!(menuTrigger instanceof HTMLButtonElement)) throw new Error('missing workspace root action menu')
+    fireEvent.click(menuTrigger)
+    const statusAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.status')
+    const filesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
+    const terminalAction = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent === 'tab.terminal',
+    )
+    if (
+      !(statusAction instanceof HTMLButtonElement) ||
+      !(filesAction instanceof HTMLButtonElement) ||
+      !(terminalAction instanceof HTMLButtonElement)
+    ) {
+      throw new Error('missing workspace root actions')
+    }
+    fireEvent.click(statusAction)
+    expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'status' }),
+    )
+
+    fireEvent.click(menuTrigger)
+    const reopenedFilesAction = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent === 'tab.files',
+    )
+    if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
+    fireEvent.click(reopenedFilesAction)
+    expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'files' }),
+    )
+  })
+
+  test('keeps the workspace row action menu visible in compact UI', () => {
+    responsiveMocks.compact = true
+    const { container } = renderSidebar(<WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={null} />)
+
+    const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
+    expect(menuTrigger?.parentElement?.className).toContain('opacity-100')
+    expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
+  })
+
+  test('opens create-worktree from the row action', () => {
+    const onCreateWorktree = vi.fn()
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        git={gitProjection()}
+        compact={false}
+        branchContent={<div />}
+        onCreateWorktree={onCreateWorktree}
+      />,
+    )
+
+    const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
+    if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
+
+    fireEvent.click(createWorktree)
+
+    expect(onCreateWorktree).toHaveBeenCalledTimes(1)
+  })
+
+  test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        git={gitProjection()}
+        compact={false}
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(sidebarTop?.className).toContain('title-bar-chrome')
+    expect(sidebarTop?.className).not.toContain('relative')
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+  })
+
+  test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        git={gitProjection()}
+        compact={false}
+        chromeRegion="none"
+        branchContent={<div data-testid="branch-content" />}
+      />,
+    )
+
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
+    expect(sidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+  })
+})
+
+function renderSidebar(element: ReactElement) {
+  return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+}

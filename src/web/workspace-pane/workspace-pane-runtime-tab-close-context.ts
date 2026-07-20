@@ -74,7 +74,10 @@ function canCloseTerminalRuntimeTab(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): boolean {
   if (input.type !== 'terminal') return false
-  return !!terminalBaseForRuntimeTabCloseTarget(input.target) && !!terminalRuntimeTabCloseContext(context)?.closeTerminalByDescriptor
+  return (
+    !!terminalBaseForRuntimeTabCloseTarget(input.target) &&
+    !!terminalRuntimeTabCloseContext(context)?.closeTerminalByDescriptor
+  )
 }
 
 function canConfirmTerminalRuntimeTabClose(

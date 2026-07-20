@@ -3,16 +3,21 @@ import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import { createTerminalOutputActivityState } from '#/web/components/terminal/terminal-output-activity-state.ts'
-import { formatTerminalWorktreeKey, parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import {
+  formatTerminalFilesystemTargetKey,
+  parseTerminalFilesystemTargetKey,
+} from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalProjectionEffect,
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalSessionsSnapshot,
   TerminalTitleEvent,
+  WorkspaceRuntimeScope,
 } from '#/shared/terminal-types.ts'
 import {
   projectCreateResultForClient,
@@ -31,17 +36,21 @@ import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/t
 import { resolveAdjacentTerminalSelectionAfterRemoval } from '#/web/components/terminal/terminal-session-eviction.ts'
 import { syncTerminalRuntimeSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
-import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
   TerminalIdentityRealtimeEvent,
   TerminalLifecycleRealtimeEvent,
-  TerminalRepoIndex,
-  TerminalWorktreeSnapshot,
+  TerminalRuntimeMembershipIndex,
+  TerminalFilesystemTargetSnapshot,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
 import type {
   TerminalWorkspacePaneRuntimeCloseEffect,
@@ -50,9 +59,11 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
+import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -93,16 +104,16 @@ interface ResolvedTerminalCreateOptions {
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
- * (per-worktree session lists, bell controller, startup geometry hints,
+ * (per-filesystem-target session lists, bell controller, startup geometry hints,
  * selector snapshot caches, pending create/close queues) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
  */
 interface TerminalRuntimeBindingIdentity {
-  repoRoot: string
-  repoRuntimeId: string
-  worktreePath: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  executionRootId: WorkspaceId
   terminalSessionId: string
   terminalRuntimeSessionId: string | null
   terminalRuntimeGeneration: number | null
@@ -115,9 +126,9 @@ interface TerminalCloseOperation {
 
 function terminalRuntimeBindingKey(binding: TerminalRuntimeBindingIdentity): string {
   return JSON.stringify([
-    binding.repoRoot,
-    binding.repoRuntimeId,
-    binding.worktreePath,
+    binding.workspaceId,
+    binding.workspaceRuntimeId,
+    binding.executionRootId,
     binding.terminalSessionId,
     binding.terminalRuntimeSessionId,
     binding.terminalRuntimeGeneration,
@@ -132,36 +143,44 @@ function terminalRealtimeEventBindingKey(event: {
   return JSON.stringify([event.terminalSessionId, event.terminalRuntimeSessionId, event.terminalRuntimeGeneration])
 }
 
-function terminalRepoEpochKey(repoRoot: string, repoRuntimeId: string): string {
-  return JSON.stringify([repoRoot, repoRuntimeId])
+function terminalRuntimeMembershipKey(workspaceId: WorkspaceId, workspaceRuntimeId: string): string {
+  return JSON.stringify([workspaceId, workspaceRuntimeId])
 }
 
-function retiredTerminalRepoEpochKeys(previous: TerminalRepoIndex, next: TerminalRepoIndex): string[] {
-  return Object.entries(previous).flatMap(([repoRoot, repo]) =>
-    next[repoRoot]?.repoRuntimeId === repo.repoRuntimeId ? [] : [terminalRepoEpochKey(repoRoot, repo.repoRuntimeId)],
+function retiredTerminalRuntimeMembershipKeys(
+  previous: TerminalRuntimeMembershipIndex,
+  next: TerminalRuntimeMembershipIndex,
+): string[] {
+  return Array.from(previous).flatMap(([workspaceId, membership]) =>
+    next.get(workspaceId)?.workspaceRuntimeId === membership.workspaceRuntimeId
+      ? []
+      : [terminalRuntimeMembershipKey(workspaceId, membership.workspaceRuntimeId)],
   )
 }
 
 export class TerminalSessionProjection {
   private readonly writeFailureReporter = createTerminalWriteFailureReporter()
-  private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  private repoIndex: TerminalRepoIndex = {}
+  private readonly onSelectedFilesystemTargetChange: (
+    terminalFilesystemTargetKey: string,
+    terminalSessionId: string | null,
+  ) => void
+  private runtimeMembershipIndex: TerminalRuntimeMembershipIndex = new Map()
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, Map<number, string>>()
   private readonly terminalRuntimeBindingByTerminalSessionId = new Map<
     string,
     { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }
   >()
-  private readonly terminalSessionsProjectionRevisionByRepoRoot = new Map<
-    string,
-    { repoRuntimeId: string; revision: number }
+  private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
+    WorkspaceId,
+    { workspaceRuntimeId: string; revision: number }
   >()
   // Client preference only: server owns session existence/control, while
-  // each client chooses which terminal to present for a worktree.
-  private readonly selectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
-  private readonly preferredSelectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
-  private readonly hostByWorktree = new Map<string, HTMLElement>()
-  private readonly startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
+  // each client chooses which terminal to present for a filesystem target.
+  private readonly selectedTerminalSessionIdByTerminalFilesystemTarget = new Map<string, string>()
+  private readonly preferredSelectedTerminalSessionIdByTerminalFilesystemTarget = new Map<string, string>()
+  private readonly hostByFilesystemTarget = new Map<string, HTMLElement>()
+  private readonly startupGeometryHintByFilesystemTarget = new Map<string, { cols: number; rows: number }>()
   // Owns pending create promises; server-owned composed commands own close.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<
     TerminalSessionBase,
@@ -179,57 +198,53 @@ export class TerminalSessionProjection {
   // Selector publication caches only. They memoize lightweight UI snapshots
   // for React subscribers and do not contain terminal render buffers.
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
-  private readonly worktreeSnapshotCache = new Map<string, TerminalWorktreeSnapshot>()
-  private readonly worktreeListeners = new Map<string, Set<() => void>>()
-  private readonly repoBellCountListeners = new Map<string, Set<() => void>>()
+  private readonly filesystemTargetSnapshotCache = new Map<string, TerminalFilesystemTargetSnapshot>()
+  private readonly filesystemTargetListeners = new Map<string, Set<() => void>>()
+  private readonly workspaceBellCountListeners = new Map<WorkspaceId, Set<() => void>>()
   // Selector publication cache only. The unread bell source of truth
   // stays in `bellState`; this stores the last count delivered to
-  // repo-level subscribers so unrelated worktree events do not wake
-  // the repo picker.
-  private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
+  // workspace-level subscribers so unrelated filesystem-target events do not
+  // wake the workspace picker.
+  private readonly lastPublishedWorkspaceBellCount = new Map<WorkspaceId, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
-  private readonly terminalSessionIdsByTerminalWorktree = new Map<string, string[]>()
+  private readonly terminalSessionIdsByTerminalFilesystemTarget = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
   private readonly futureExitOrphans = new FutureExitLedger()
   private readonly bellState = createTerminalBellState(
     (terminalSessionId) => {
       if (terminalSessionId) {
-        const terminalWorktreeKey = this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey
-        if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
+        const descriptor = this.sessions.get(terminalSessionId)?.descriptor
+        const terminalFilesystemTargetKey = descriptor ? terminalDescriptorFilesystemTargetKey(descriptor) : null
+        if (terminalFilesystemTargetKey) this.notifyFilesystemTarget(terminalFilesystemTargetKey)
         return
       }
-      this.notifyAllWorktrees()
-      this.notifyAllRepoBellCounts()
+      this.notifyAllFilesystemTargets()
+      this.notifyAllWorkspaceBellCounts()
     },
     (count) => terminalClient.setBadge(count),
   )
-  private readonly outputActivityState = createTerminalOutputActivityState((terminalWorktreeKey) =>
-    this.notifyWorktree(terminalWorktreeKey),
+  private readonly outputActivityState = createTerminalOutputActivityState((terminalFilesystemTargetKey) =>
+    this.notifyFilesystemTarget(terminalFilesystemTargetKey),
   )
 
   constructor(
-    onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void = () => {},
+    onSelectedFilesystemTargetChange: (
+      terminalFilesystemTargetKey: string,
+      terminalSessionId: string | null,
+    ) => void = () => {},
   ) {
-    this.onSelectedWorktreeChange = onSelectedWorktreeChange
+    this.onSelectedFilesystemTargetChange = onSelectedFilesystemTargetChange
   }
 
-  setRepoIndex(repoIndex: TerminalRepoIndex): void {
-    for (const retiredScopeKey of retiredTerminalRepoEpochKeys(this.repoIndex, repoIndex)) {
+  setRuntimeMembershipIndex(runtimeMembershipIndex: TerminalRuntimeMembershipIndex): void {
+    for (const retiredScopeKey of retiredTerminalRuntimeMembershipKeys(
+      this.runtimeMembershipIndex,
+      runtimeMembershipIndex,
+    )) {
       this.futureExitOrphans.retireSnapshotScope(retiredScopeKey)
     }
-    this.repoIndex = repoIndex
-    this.syncDescriptorsFromRepoIndex()
-    this.pruneSessionsMissingFromRepoIndex()
-  }
-
-  private syncDescriptorsFromRepoIndex(): void {
-    for (const session of this.sessions.values()) {
-      const repo = this.repoIndex[session.descriptor.repoRoot]
-      const branch = repo?.branchByWorktreePath[session.descriptor.worktreePath]
-      if (!branch || branch === session.descriptor.branch) continue
-      session.updateDescriptor({ ...session.descriptor, branch })
-      this.notifySession(session.descriptor.terminalSessionId)
-    }
+    this.runtimeMembershipIndex = runtimeMembershipIndex
+    this.pruneSessionsMissingFromRuntimeMembership()
   }
 
   /**
@@ -258,19 +273,19 @@ export class TerminalSessionProjection {
     this.sessions.clear()
     this.terminalSessionIdByTerminalRuntimeSessionId.clear()
     this.terminalRuntimeBindingByTerminalSessionId.clear()
-    this.terminalSessionsProjectionRevisionByRepoRoot.clear()
-    this.selectedTerminalSessionIdByTerminalWorktree.clear()
-    this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
-    this.hostByWorktree.clear()
-    this.startupGeometryHintByWorktree.clear()
+    this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
+    this.selectedTerminalSessionIdByTerminalFilesystemTarget.clear()
+    this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.clear()
+    this.hostByFilesystemTarget.clear()
+    this.startupGeometryHintByFilesystemTarget.clear()
     this.closeOperationByRuntimeBindingKey.clear()
     this.snapshotCache.clear()
-    this.worktreeSnapshotCache.clear()
-    this.worktreeListeners.clear()
-    this.repoBellCountListeners.clear()
-    this.lastPublishedRepoBellCountByRepo.clear()
+    this.filesystemTargetSnapshotCache.clear()
+    this.filesystemTargetListeners.clear()
+    this.workspaceBellCountListeners.clear()
+    this.lastPublishedWorkspaceBellCount.clear()
     this.snapshotListeners.clear()
-    this.terminalSessionIdsByTerminalWorktree.clear()
+    this.terminalSessionIdsByTerminalFilesystemTarget.clear()
     this.pendingServerBellByRuntimeBindingKey.clear()
     this.futureExitOrphans.clear()
     this.bellState.reset()
@@ -324,7 +339,10 @@ export class TerminalSessionProjection {
     const { session } = classified
     session.handleOutput(event)
     if (event.data.length > 0)
-      this.outputActivityState.markOutput(session.descriptor.terminalSessionId, session.descriptor.terminalWorktreeKey)
+      this.outputActivityState.markOutput(
+        session.descriptor.terminalSessionId,
+        terminalDescriptorFilesystemTargetKey(session.descriptor),
+      )
   }
 
   handleServerBell(event: TerminalBellRealtimeEvent): void {
@@ -370,8 +388,8 @@ export class TerminalSessionProjection {
       return
     }
     if (
-      classified.session.descriptor.repoRoot !== event.repoRoot ||
-      classified.session.descriptor.repoRuntimeId !== event.repoRuntimeId
+      terminalSessionCoordinates(classified.session.descriptor).workspaceId !== event.workspaceId ||
+      terminalSessionCoordinates(classified.session.descriptor).workspaceRuntimeId !== event.workspaceRuntimeId
     ) {
       return
     }
@@ -409,7 +427,7 @@ export class TerminalSessionProjection {
   // for the broader `sessions-changed` list-rescan. We route through
   // `discardLocalSessionAndDismissDetailIfLast` (rather than
   // `closeTerminal`) because the server has already killed the PTY
-  // — calling `close` again would no-op the `closeSessionForUser` check
+  // — calling `close` again would no-op the server close-authority check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(event: {
     terminalRuntimeSessionId: string
@@ -442,82 +460,116 @@ export class TerminalSessionProjection {
   }
 
   reconcileServerSessions(
-    scope: { repoRoot: string; repoRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
   ): boolean {
-    if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId)
+      return false
 
-    const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
+    const { controllerTerminalSessionIdByFilesystemTarget, touchedFilesystemTargets, tabsChangedFilesystemTargets } =
       this.materializeServerSessions(scope, serverSessions, clientId)
 
-    const authoritativeServerSessions = serverSessions.filter(
-      (session) => session.repoRoot === scope.repoRoot && session.repoRuntimeId === scope.repoRuntimeId,
-    )
+    const authoritativeServerSessions = serverSessions.filter((session) => {
+      const coordinates = terminalSessionCoordinates(session)
+      return (
+        coordinates.workspaceId === scope.workspaceId && coordinates.workspaceRuntimeId === scope.workspaceRuntimeId
+      )
+    })
     const serverTerminalSessionIds = new Set(authoritativeServerSessions.map((session) => session.terminalSessionId))
     this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
     this.futureExitOrphans.confirmAuthoritativeSnapshot(
-      terminalRepoEpochKey(scope.repoRoot, scope.repoRuntimeId),
+      terminalRuntimeMembershipKey(scope.workspaceId, scope.workspaceRuntimeId),
       authoritativeServerSessions.map((session) => ({
         terminalSessionId: session.terminalSessionId,
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-        repoRoot: scope.repoRoot,
-        repoRuntimeId: scope.repoRuntimeId,
+        workspaceId: scope.workspaceId,
+        workspaceRuntimeId: scope.workspaceRuntimeId,
       })),
     )
 
-    this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
-    for (const terminalWorktreeKey of tabsChangedWorktrees) {
-      this.notifyWorktree(terminalWorktreeKey)
+    this.resolveSelectedTerminalSessionIdsForTouchedFilesystemTargets(
+      touchedFilesystemTargets,
+      controllerTerminalSessionIdByFilesystemTarget,
+    )
+    for (const terminalFilesystemTargetKey of tabsChangedFilesystemTargets) {
+      this.notifyFilesystemTarget(terminalFilesystemTargetKey)
     }
     return true
   }
 
   reconcileServerSessionsSnapshot(
-    scope: { repoRoot: string; repoRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     snapshot: TerminalSessionsSnapshot,
     clientId: string,
   ): boolean {
-    const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
-    if (current?.repoRuntimeId === scope.repoRuntimeId && snapshot.revision < current.revision) return false
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
+    if (current?.workspaceRuntimeId === scope.workspaceRuntimeId && snapshot.revision < current.revision) return false
     if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId)) return false
-    this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
-      repoRuntimeId: scope.repoRuntimeId,
+    this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
+      workspaceRuntimeId: scope.workspaceRuntimeId,
       revision: snapshot.revision,
     })
     return true
   }
 
-  private applyServerSessionEffect(
-    scope: { repoRoot: string; repoRuntimeId: string },
-    revision: number,
-    serverSession: ServerTerminalSessionSummary,
-    clientId: string,
-  ): boolean {
-    if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
-    const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
-    if (current?.repoRuntimeId === scope.repoRuntimeId && revision < current.revision) return false
-    const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
-      this.materializeServerSessions(scope, [serverSession], clientId, {
-        mergeIntoExisting: true,
-        hydrationSource: 'partial-effect',
-      })
-    this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
-    for (const terminalWorktreeKey of tabsChangedWorktrees) this.notifyWorktree(terminalWorktreeKey)
-    this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
-      repoRuntimeId: scope.repoRuntimeId,
+  terminalSessionsCatalogCoverageRevision(scope: WorkspaceRuntimeScope): number | null {
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
+    return current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : null
+  }
+
+  applyTerminalSessionsDeltaRevision(scope: WorkspaceRuntimeScope, revision: number): boolean {
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId)
+      return false
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
+    const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
+    if (revision <= coverageRevision) return true
+    if (revision !== coverageRevision + 1) return true
+    this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
+      workspaceRuntimeId: scope.workspaceRuntimeId,
       revision,
     })
     return true
   }
 
+  private applyServerSessionEffect(
+    scope: WorkspaceRuntimeScope,
+    effect: TerminalProjectionEffect,
+    serverSession: ServerTerminalSessionSummary,
+    clientId: string,
+  ): boolean {
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId)
+      return false
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
+    const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
+    if (effect.kind === 'delta' && effect.revision <= coverageRevision) return false
+    const { controllerTerminalSessionIdByFilesystemTarget, touchedFilesystemTargets, tabsChangedFilesystemTargets } =
+      this.materializeServerSessions(scope, [serverSession], clientId, {
+        mergeIntoExisting: true,
+        hydrationSource: 'partial-effect',
+      })
+    this.resolveSelectedTerminalSessionIdsForTouchedFilesystemTargets(
+      touchedFilesystemTargets,
+      controllerTerminalSessionIdByFilesystemTarget,
+    )
+    for (const terminalFilesystemTargetKey of tabsChangedFilesystemTargets)
+      this.notifyFilesystemTarget(terminalFilesystemTargetKey)
+    if (effect.kind === 'delta' && effect.revision === coverageRevision + 1) {
+      this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
+        workspaceRuntimeId: scope.workspaceRuntimeId,
+        revision: effect.revision,
+      })
+    }
+    return true
+  }
+
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
-  // which worktrees saw any change. Side effects: ensureSession,
-  // session.hydrate, terminalSessionIdsByTerminalWorktree, syncTerminalRuntimeSessionIdIndex.
+  // which filesystem targets saw any change. Side effects: ensureSession,
+  // session.hydrate, terminalSessionIdsByTerminalFilesystemTarget, syncTerminalRuntimeSessionIdIndex.
   private materializeServerSessions(
-    scope: { repoRoot: string; repoRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     options: {
@@ -525,74 +577,80 @@ export class TerminalSessionProjection {
       hydrationSource?: 'snapshot' | 'partial-effect'
     } = {},
   ): {
-    controllerTerminalSessionIdByWorktree: Map<string, string>
-    touchedWorktrees: Set<string>
-    tabsChangedWorktrees: Set<string>
+    controllerTerminalSessionIdByFilesystemTarget: Map<string, string>
+    touchedFilesystemTargets: Set<string>
+    tabsChangedFilesystemTargets: Set<string>
   } {
-    const controllerTerminalSessionIdByWorktree = new Map<string, string>()
-    const touchedWorktrees = new Set<string>()
-    const terminalSessionIdsByTouchedWorktree = new Map<string, string[]>()
-    const nextIndexByWorktree = new Map<string, number>()
+    const controllerTerminalSessionIdByFilesystemTarget = new Map<string, string>()
+    const touchedFilesystemTargets = new Set<string>()
+    const terminalSessionIdsByTouchedFilesystemTarget = new Map<string, string[]>()
+    const nextIndexByFilesystemTarget = new Map<string, number>()
 
     for (const serverSession of serverSessions) {
-      const terminalWorktreeKey = formatTerminalWorktreeKey(serverSession.repoRoot, serverSession.worktreePath)
+      const coordinates = terminalSessionCoordinates(serverSession)
+      const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
+        coordinates.workspaceId,
+        coordinates.executionRootId,
+      )
       const existingSessionIds = options.mergeIntoExisting
-        ? (this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? [])
+        ? (this.terminalSessionIdsByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? [])
         : []
       const existingIndex = existingSessionIds.indexOf(serverSession.terminalSessionId)
       const index =
         existingIndex >= 0
           ? existingIndex + 1
-          : (nextIndexByWorktree.get(terminalWorktreeKey) ?? existingSessionIds.length) + 1
+          : (nextIndexByFilesystemTarget.get(terminalFilesystemTargetKey) ?? existingSessionIds.length) + 1
       const projected = projectServerTerminalSession({
-        repoIndex: this.repoIndex,
-        repoRoot: scope.repoRoot,
-        repoRuntimeId: scope.repoRuntimeId,
+        workspaceId: scope.workspaceId,
+        workspaceRuntimeId: scope.workspaceRuntimeId,
         serverSession,
         clientId,
         index,
       })
       if (!projected) continue
-      touchedWorktrees.add(projected.terminalWorktreeKey)
-      nextIndexByWorktree.set(projected.terminalWorktreeKey, index)
+      touchedFilesystemTargets.add(projected.terminalFilesystemTargetKey)
+      nextIndexByFilesystemTarget.set(projected.terminalFilesystemTargetKey, index)
       const descriptor = projected.descriptor
       const session = this.ensureSession(descriptor)
       session.hydrate(projected.hydrateInput, options.hydrationSource ?? 'snapshot')
       if (!this.sessions.has(descriptor.terminalSessionId)) continue
       if (projected.controlsTerminal)
-        controllerTerminalSessionIdByWorktree.set(projected.terminalWorktreeKey, descriptor.terminalSessionId)
+        controllerTerminalSessionIdByFilesystemTarget.set(
+          projected.terminalFilesystemTargetKey,
+          descriptor.terminalSessionId,
+        )
       pushUniqueMapList(
-        terminalSessionIdsByTouchedWorktree,
-        projected.terminalWorktreeKey,
+        terminalSessionIdsByTouchedFilesystemTarget,
+        projected.terminalFilesystemTargetKey,
         descriptor.terminalSessionId,
       )
     }
 
-    const nextSessionIdsByWorktree = new Map(terminalSessionIdsByTouchedWorktree)
+    const nextSessionIdsByFilesystemTarget = new Map(terminalSessionIdsByTouchedFilesystemTarget)
     if (options.mergeIntoExisting) {
-      for (const [terminalWorktreeKey, incomingSessionIds] of terminalSessionIdsByTouchedWorktree) {
-        const existingSessionIds = this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? []
-        nextSessionIdsByWorktree.set(terminalWorktreeKey, [
+      for (const [terminalFilesystemTargetKey, incomingSessionIds] of terminalSessionIdsByTouchedFilesystemTarget) {
+        const existingSessionIds =
+          this.terminalSessionIdsByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? []
+        nextSessionIdsByFilesystemTarget.set(terminalFilesystemTargetKey, [
           ...existingSessionIds,
           ...incomingSessionIds.filter((sessionId) => !existingSessionIds.includes(sessionId)),
         ])
       }
     }
-    const tabsChangedWorktrees = this.replaceTerminalSessionIdListForTouchedWorktrees(nextSessionIdsByWorktree)
-    return { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees }
+    const tabsChangedFilesystemTargets = this.replaceTerminalSessionIdListForTouchedFilesystemTargets(
+      nextSessionIdsByFilesystemTarget,
+    )
+    return { controllerTerminalSessionIdByFilesystemTarget, touchedFilesystemTargets, tabsChangedFilesystemTargets }
   }
 
   // Phase 2: the accepted catalog is the complete membership authority for
-  // this repo runtime. Pending creates live in lifecycle queues, not sessions.
-  private evictOrphanedLocalSessions(
-    scope: { repoRoot: string; repoRuntimeId: string },
-    serverTerminalSessionIds: Set<string>,
-  ): number {
+  // this workspace runtime. Pending creates live in lifecycle queues, not sessions.
+  private evictOrphanedLocalSessions(scope: WorkspaceRuntimeScope, serverTerminalSessionIds: Set<string>): number {
     const orphanedTerminalSessionIds = Array.from(this.sessions.values())
       .filter(
         (session) =>
-          session.descriptor.repoRoot === scope.repoRoot &&
-          session.descriptor.repoRuntimeId === scope.repoRuntimeId &&
+          terminalSessionCoordinates(session.descriptor).workspaceId === scope.workspaceId &&
+          terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === scope.workspaceRuntimeId &&
           !serverTerminalSessionIds.has(session.descriptor.terminalSessionId),
       )
       .map((session) => session.descriptor.terminalSessionId)
@@ -604,37 +662,43 @@ export class TerminalSessionProjection {
     return orphanedTerminalSessionIds.length
   }
 
-  // Phase 3: for every worktree that saw a server-side change, decide
+  // Phase 3: for every filesystem target that saw a server-side change, decide
   // which local terminal should be selected. The selection prefers the
-  // controller of the worktree, then the user's last selection, then
+  // controller of the target, then the user's last selection, then
   // the first available terminal.
-  private resolveSelectedTerminalSessionIdsForTouchedWorktrees(
-    touchedWorktrees: Set<string>,
-    controllerTerminalSessionIdByWorktree: Map<string, string>,
+  private resolveSelectedTerminalSessionIdsForTouchedFilesystemTargets(
+    touchedFilesystemTargets: Set<string>,
+    controllerTerminalSessionIdByFilesystemTarget: Map<string, string>,
   ): void {
-    for (const terminalWorktreeKey of touchedWorktrees) {
-      const current = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
-      const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
+    for (const terminalFilesystemTargetKey of touchedFilesystemTargets) {
+      const current = this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null
+      const preferred =
+        this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null
       const next = resolveSelectedTerminalSessionId({
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         preferredSessionId: preferred,
         currentSessionId: current,
-        controllerSessionId: controllerTerminalSessionIdByWorktree.get(terminalWorktreeKey) ?? null,
-        sortedDescriptors: this.visibleSessionsForWorktree(terminalWorktreeKey).map((session) => session.descriptor),
-        isSelectedTerminalSessionIdValid: (candidateTerminalWorktreeKey, terminalSessionId) =>
-          this.isSelectedTerminalSessionIdValid(candidateTerminalWorktreeKey, terminalSessionId),
+        controllerSessionId: controllerTerminalSessionIdByFilesystemTarget.get(terminalFilesystemTargetKey) ?? null,
+        sortedDescriptors: this.visibleSessionsForFilesystemTarget(terminalFilesystemTargetKey).map(
+          (session) => session.descriptor,
+        ),
+        isSelectedTerminalSessionIdValid: (candidateTerminalFilesystemTargetKey, terminalSessionId) =>
+          this.isSelectedTerminalSessionIdValid(candidateTerminalFilesystemTargetKey, terminalSessionId),
       })
-      this.selectTerminalSessionId(terminalWorktreeKey, next)
+      this.selectTerminalSessionId(terminalFilesystemTargetKey, next)
     }
   }
 
   createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> => {
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).executionRootId,
+    )
+    const admission = this.enqueueCreateRequest(base, terminalFilesystemTargetKey, {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
       placement: {},
-      geometry: this.startupGeometryHint(terminalWorktreeKey),
+      geometry: this.startupGeometryHint(terminalFilesystemTargetKey),
     })
     const existing = this.terminalSessionIdPromiseByCreatePromise.get(admission.promise)
     if (existing) return existing
@@ -648,12 +712,15 @@ export class TerminalSessionProjection {
     options: TerminalCreateOptions = {},
     placement: WorkspacePaneRuntimeTabPlacement = {},
   ): Promise<TerminalCreateAdmissionResult> => {
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).executionRootId,
+    )
+    const admission = this.enqueueCreateRequest(base, terminalFilesystemTargetKey, {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
       placement,
-      geometry: this.startupGeometryHint(terminalWorktreeKey),
+      geometry: this.startupGeometryHint(terminalFilesystemTargetKey),
     })
     const result = await admission.promise
     return {
@@ -662,103 +729,108 @@ export class TerminalSessionProjection {
     }
   }
 
-  registerHost = (terminalWorktreeKey: string, host: HTMLElement): void => {
-    this.hostByWorktree.set(terminalWorktreeKey, host)
+  registerHost = (terminalFilesystemTargetKey: string, host: HTMLElement): void => {
+    this.hostByFilesystemTarget.set(terminalFilesystemTargetKey, host)
     captureTerminalHostGeometry({
-      terminalWorktreeKey,
-      hostByWorktree: this.hostByWorktree,
-      startupGeometryHintByWorktree: this.startupGeometryHintByWorktree,
+      terminalFilesystemTargetKey,
+      hostByFilesystemTarget: this.hostByFilesystemTarget,
+      startupGeometryHintByFilesystemTarget: this.startupGeometryHintByFilesystemTarget,
     })
   }
 
-  unregisterHost = (terminalWorktreeKey: string, host: HTMLElement): void => {
-    if (this.hostByWorktree.get(terminalWorktreeKey) !== host) return
-    this.hostByWorktree.delete(terminalWorktreeKey)
+  unregisterHost = (terminalFilesystemTargetKey: string, host: HTMLElement): void => {
+    if (this.hostByFilesystemTarget.get(terminalFilesystemTargetKey) !== host) return
+    this.hostByFilesystemTarget.delete(terminalFilesystemTargetKey)
   }
 
   private async performCreateTerminal(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
     createOptions: ResolvedTerminalCreateOptions,
   ): Promise<TerminalCreateQueueResult> {
-    return await this.performCreateTerminalNow(base, geometry, terminalWorktreeKey, pending, createOptions)
+    return await this.performCreateTerminalNow(base, geometry, terminalFilesystemTargetKey, pending, createOptions)
   }
 
   private async performCreateTerminalNow(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
     createOptions: ResolvedTerminalCreateOptions,
   ): Promise<TerminalCreateQueueResult> {
-    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     const request = pending.options
     const clientId = readOrCreateWebTerminalClientId()
     const createKind = createOptions.startupShellCommand
       ? 'additional'
-      : this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0
+      : this.visibleSessionsForFilesystemTarget(terminalFilesystemTargetKey).length === 0
         ? 'primary'
         : 'additional'
     pending.creating = true
     const openResult = await workspacePaneRuntimeClient.open({
       runtimeType: 'terminal',
       request: {
-        repoRoot: base.repoRoot,
-        repoRuntimeId: requireRepoRuntimeId(base),
-        branch: base.branch,
-        worktreePath: base.worktreePath,
         kind: createKind,
         ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
         cols: geometry.cols,
         rows: geometry.rows,
         clientId,
+        target: base.target,
       },
       ...request.placement,
     })
     if (!openResult.ok) throw new Error(openResult.message)
+    writeCanonicalWorkspacePaneTabsSnapshot(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).workspaceRuntimeId,
+      openResult.paneTabsSnapshot,
+    )
     const result = openResult.runtime
     if (!result.terminalRuntimeSessionId) throw new Error('error.terminal-create-failed')
     let runtimeProjectionApplied = false
-    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
+    if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) === pending) {
       const projectedCreate = projectCreateResultForClient(base, result)
-      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
+      if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) === pending) {
         runtimeProjectionApplied = this.applyServerSessionEffect(
-          { repoRoot: base.repoRoot, repoRuntimeId: requireRepoRuntimeId(base) },
-          result.terminalSessionsRevision,
+          {
+            workspaceId: terminalSessionCoordinates(base).workspaceId,
+            workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
+          },
+          result.terminalProjectionEffect,
           projectedCreate.serverSession,
           clientId,
         )
         if (runtimeProjectionApplied) {
-          this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
+          this.setPreferredSelectedTerminalSessionId(terminalFilesystemTargetKey, result.terminalSessionId)
         }
       }
     }
     return {
       terminalSessionId: result.terminalSessionId,
-      branch: result.branch,
+      presentation: result.presentation,
       resourceDisposition: result.action,
       runtimeProjectionApplied,
     }
   }
 
   private requireCurrentCreateRequest(
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
   ): void {
-    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+    if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) !== pending) {
       throw new Error('terminal create request canceled')
     }
   }
 
-  private startupGeometryHint(terminalWorktreeKey: string): { cols: number; rows: number } {
+  private startupGeometryHint(terminalFilesystemTargetKey: string): { cols: number; rows: number } {
     return (
       resolveTerminalStartupGeometryHint({
-        terminalWorktreeKey,
-        hostByWorktree: this.hostByWorktree,
-        startupGeometryHintByWorktree: this.startupGeometryHintByWorktree,
-        selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
+        terminalFilesystemTargetKey,
+        hostByFilesystemTarget: this.hostByFilesystemTarget,
+        startupGeometryHintByFilesystemTarget: this.startupGeometryHintByFilesystemTarget,
+        selectedDescriptor: this.selectedDescriptor(terminalFilesystemTargetKey),
         getAttachmentSnapshot: (terminalSessionId) => this.snapshot(terminalSessionId).attachment,
       }) ?? { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }
     )
@@ -766,11 +838,11 @@ export class TerminalSessionProjection {
 
   private enqueueCreateRequest(
     base: TerminalSessionBase,
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     request: TerminalCreateQueueRequest,
   ): { promise: Promise<TerminalCreateQueueResult>; ownsAdmission: boolean } {
     const admission = this.lifecycleQueues.enqueueCreate({
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       base,
       options: request,
       isSameRequest: (existing, next) => existing.dedupeKey !== null && existing.dedupeKey === next.dedupeKey,
@@ -778,12 +850,12 @@ export class TerminalSessionProjection {
         void this.flushCreateRequest(key)
       },
     })
-    this.notifyWorktree(terminalWorktreeKey)
+    this.notifyFilesystemTarget(terminalFilesystemTargetKey)
     return admission
   }
 
-  private async flushCreateRequest(terminalWorktreeKey: string): Promise<void> {
-    const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
+  private async flushCreateRequest(terminalFilesystemTargetKey: string): Promise<void> {
+    const pending = this.lifecycleQueues.getCreate(terminalFilesystemTargetKey)
     if (!pending || pending.flushing) return
     // Synchronous claim: enqueueCreateRequest, registerHost, and a
     // StrictMode double-invoke can all arrive here while a prior flush
@@ -791,119 +863,129 @@ export class TerminalSessionProjection {
     // bail and observe the same pending promise.
     pending.flushing = true
     try {
-      pending.resolve(await this.flushCreateRequestNow(terminalWorktreeKey, pending))
+      pending.resolve(await this.flushCreateRequestNow(terminalFilesystemTargetKey, pending))
     } catch (error) {
       pending.reject(error)
     } finally {
       pending.creating = false
-      if (this.lifecycleQueues.deleteCreate(terminalWorktreeKey, pending)) {
-        this.notifyWorktree(terminalWorktreeKey)
-        if (this.lifecycleQueues.hasCreate(terminalWorktreeKey)) {
-          void this.flushCreateRequest(terminalWorktreeKey)
+      if (this.lifecycleQueues.deleteCreate(terminalFilesystemTargetKey, pending)) {
+        this.notifyFilesystemTarget(terminalFilesystemTargetKey)
+        if (this.lifecycleQueues.hasCreate(terminalFilesystemTargetKey)) {
+          void this.flushCreateRequest(terminalFilesystemTargetKey)
         }
       }
     }
   }
 
   private async flushCreateRequestNow(
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
   ): Promise<TerminalCreateQueueResult> {
-    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+    if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) !== pending) {
       throw new Error('terminal create request canceled')
     }
-    const createOptions = await this.resolveCurrentCreateOptions(terminalWorktreeKey, pending)
-    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    const createOptions = await this.resolveCurrentCreateOptions(terminalFilesystemTargetKey, pending)
+    this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     return await this.performCreateTerminal(
       pending.base,
       pending.options.geometry,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       pending,
       createOptions,
     )
   }
 
   private async resolveCurrentCreateOptions(
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
   ): Promise<ResolvedTerminalCreateOptions> {
-    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     const request = pending.options
     const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(request.createOptions, pending.promise)
-    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     return createOptions
   }
 
-  private selectedDescriptor(terminalWorktreeKey: string): TerminalDescriptor | null {
-    const selectedKey = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey)
+  private selectedDescriptor(terminalFilesystemTargetKey: string): TerminalDescriptor | null {
+    const selectedKey = this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey)
     return selectedKey ? (this.sessions.get(selectedKey)?.descriptor ?? null) : null
   }
 
-  setPreferredSelectedTerminalSessionIds(selectedKeysByWorktree: Record<string, string>): void {
-    const nextPreferred = new Map(Object.entries(selectedKeysByWorktree))
-    const worktrees = new Set<string>([
-      ...Array.from(this.preferredSelectedTerminalSessionIdByTerminalWorktree.keys()),
+  setPreferredSelectedTerminalSessionIds(selectedKeysByFilesystemTarget: Record<string, string>): void {
+    const nextPreferred = new Map(Object.entries(selectedKeysByFilesystemTarget))
+    const filesystemTargets = new Set<string>([
+      ...Array.from(this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.keys()),
       ...Array.from(nextPreferred.keys()),
-      ...Array.from(this.selectedTerminalSessionIdByTerminalWorktree.keys()),
+      ...Array.from(this.selectedTerminalSessionIdByTerminalFilesystemTarget.keys()),
     ])
-    this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
-    for (const [terminalWorktreeKey, terminalSessionId] of nextPreferred)
-      this.preferredSelectedTerminalSessionIdByTerminalWorktree.set(terminalWorktreeKey, terminalSessionId)
-    for (const terminalWorktreeKey of worktrees) {
-      const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
-      if (!preferred || !this.isSelectedTerminalSessionIdValid(terminalWorktreeKey, preferred)) continue
-      this.selectTerminalSessionId(terminalWorktreeKey, preferred)
+    this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.clear()
+    for (const [terminalFilesystemTargetKey, terminalSessionId] of nextPreferred)
+      this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.set(
+        terminalFilesystemTargetKey,
+        terminalSessionId,
+      )
+    for (const terminalFilesystemTargetKey of filesystemTargets) {
+      const preferred =
+        this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null
+      if (!preferred || !this.isSelectedTerminalSessionIdValid(terminalFilesystemTargetKey, preferred)) continue
+      this.selectTerminalSessionId(terminalFilesystemTargetKey, preferred)
     }
   }
 
-  terminalWorktreeSnapshot = (terminalWorktreeKey: string): TerminalWorktreeSnapshot => {
-    const cached = this.worktreeSnapshotCache.get(terminalWorktreeKey)
+  terminalFilesystemTargetSnapshot = (terminalFilesystemTargetKey: string): TerminalFilesystemTargetSnapshot => {
+    const cached = this.filesystemTargetSnapshotCache.get(terminalFilesystemTargetKey)
     if (cached) return cached
-    const snapshot = buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey,
-      selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
-      createPending: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
-      sessions: this.visibleSessionsForWorktree(terminalWorktreeKey),
-      selectedTerminalSessionId: this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null,
+    const snapshot = buildTerminalFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey,
+      selectedDescriptor: this.selectedDescriptor(terminalFilesystemTargetKey),
+      createPending: this.lifecycleQueues.hasCreate(terminalFilesystemTargetKey),
+      sessions: this.visibleSessionsForFilesystemTarget(terminalFilesystemTargetKey),
+      selectedTerminalSessionId:
+        this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null,
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
       cacheSnapshot: (terminalSessionId, nextSnapshot) => this.snapshotCache.set(terminalSessionId, nextSnapshot),
       hasBell: (terminalSessionId) => this.bellState.hasBell(terminalSessionId),
       hasRecentOutput: (terminalSessionId) => this.outputActivityState.hasRecentOutput(terminalSessionId),
     })
-    this.worktreeSnapshotCache.set(terminalWorktreeKey, snapshot)
+    this.filesystemTargetSnapshotCache.set(terminalFilesystemTargetKey, snapshot)
     return snapshot
   }
 
-  subscribeTerminalWorktree = (terminalWorktreeKey: string, listener: () => void): (() => void) => {
-    return this.subscribeToKeyedListeners(this.worktreeListeners, terminalWorktreeKey, listener)
+  subscribeTerminalFilesystemTarget = (terminalFilesystemTargetKey: string, listener: () => void): (() => void) => {
+    return this.subscribeToKeyedListeners(this.filesystemTargetListeners, terminalFilesystemTargetKey, listener)
   }
 
-  repoBellCount = (repoRoot: string): number => {
+  workspaceBellCount = (workspaceId: WorkspaceId): number => {
     let count = 0
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
-      if (session.descriptor.repoRoot === repoRoot && this.bellState.hasBell(terminalSessionId)) count++
+      if (
+        terminalSessionCoordinates(session.descriptor).workspaceId === workspaceId &&
+        this.bellState.hasBell(terminalSessionId)
+      )
+        count++
     }
     return count
   }
 
-  subscribeRepoBellCount = (repoRoot: string, listener: () => void): (() => void) => {
-    if (!this.repoBellCountListeners.has(repoRoot))
-      this.lastPublishedRepoBellCountByRepo.set(repoRoot, this.repoBellCount(repoRoot))
-    const unsubscribe = this.subscribeToKeyedListeners(this.repoBellCountListeners, repoRoot, listener)
+  subscribeWorkspaceBellCount = (workspaceId: WorkspaceId, listener: () => void): (() => void) => {
+    if (!this.workspaceBellCountListeners.has(workspaceId))
+      this.lastPublishedWorkspaceBellCount.set(workspaceId, this.workspaceBellCount(workspaceId))
+    const unsubscribe = this.subscribeToKeyedListeners(this.workspaceBellCountListeners, workspaceId, listener)
     return () => {
       unsubscribe()
-      if (!this.repoBellCountListeners.has(repoRoot)) this.lastPublishedRepoBellCountByRepo.delete(repoRoot)
+      if (!this.workspaceBellCountListeners.has(workspaceId)) this.lastPublishedWorkspaceBellCount.delete(workspaceId)
     }
   }
 
-  selectTerminal = (terminalWorktreeKey: string, terminalSessionId: string): void => {
+  selectTerminal = (terminalFilesystemTargetKey: string, terminalSessionId: string): void => {
     const session = this.sessions.get(terminalSessionId)
-    if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
-    const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
+    if (!session || terminalDescriptorFilesystemTargetKey(session.descriptor) !== terminalFilesystemTargetKey) return
+    const wasSelected =
+      this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) === terminalSessionId
     const hadBell = this.bellState.hasBell(terminalSessionId)
     if (wasSelected && !hadBell) return
-    this.selectTerminalSessionId(terminalWorktreeKey, terminalSessionId, { notify: !hadBell })
+    this.selectTerminalSessionId(terminalFilesystemTargetKey, terminalSessionId, { notify: !hadBell })
     this.bellState.clear(terminalSessionId)
   }
 
@@ -920,7 +1002,6 @@ export class TerminalSessionProjection {
   }
 
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
-    if (!base.repoRuntimeId) return false
     return await this.closeTerminalRuntimeTab(terminalSessionId, base)
   }
 
@@ -937,9 +1018,13 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.restart()
   }
 
-  resynchronizeConnectedViews = (repoRoot: string, repoRuntimeId: string): void => {
+  resynchronizeConnectedViews = (workspaceId: WorkspaceId, workspaceRuntimeId: string): void => {
     for (const session of this.sessions.values()) {
-      if (session.descriptor.repoRoot !== repoRoot || session.descriptor.repoRuntimeId !== repoRuntimeId) continue
+      if (
+        terminalSessionCoordinates(session.descriptor).workspaceId !== workspaceId ||
+        terminalSessionCoordinates(session.descriptor).workspaceRuntimeId !== workspaceRuntimeId
+      )
+        continue
       session.resynchronizeConnectedView()
     }
   }
@@ -994,20 +1079,20 @@ export class TerminalSessionProjection {
     return session.takeover()
   }
 
-  private notifyWorktree(terminalWorktreeKey: string): void {
-    this.worktreeSnapshotCache.delete(terminalWorktreeKey)
-    const listeners = this.worktreeListeners.get(terminalWorktreeKey)
+  private notifyFilesystemTarget(terminalFilesystemTargetKey: string): void {
+    this.filesystemTargetSnapshotCache.delete(terminalFilesystemTargetKey)
+    const listeners = this.filesystemTargetListeners.get(terminalFilesystemTargetKey)
     if (listeners) {
       for (const listener of Array.from(listeners)) {
         try {
           listener()
         } catch (err) {
-          terminalSessionProviderLog.warn('worktree listener threw', { terminalWorktreeKey, err })
+          terminalSessionProviderLog.warn('filesystem target listener threw', { terminalFilesystemTargetKey, err })
         }
       }
     }
-    const repoRoot = parseTerminalWorktreeKey(terminalWorktreeKey)?.repoRoot
-    if (repoRoot) this.notifyRepoBellCountIfChanged(repoRoot)
+    const workspaceId = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)?.workspaceId
+    if (workspaceId) this.notifyWorkspaceBellCountIfChanged(workspaceId)
   }
 
   private notifySnapshot(terminalSessionId: string): void {
@@ -1022,34 +1107,36 @@ export class TerminalSessionProjection {
     }
   }
 
-  private notifyAllWorktrees(): void {
-    for (const terminalWorktreeKey of Array.from(this.worktreeListeners.keys()))
-      this.notifyWorktree(terminalWorktreeKey)
+  private notifyAllFilesystemTargets(): void {
+    for (const terminalFilesystemTargetKey of Array.from(this.filesystemTargetListeners.keys()))
+      this.notifyFilesystemTarget(terminalFilesystemTargetKey)
   }
 
-  private notifyRepoBellCountIfChanged(repoRoot: string): void {
-    if (!this.repoBellCountListeners.has(repoRoot)) return
-    const previous = this.lastPublishedRepoBellCountByRepo.get(repoRoot) ?? 0
-    const next = this.repoBellCount(repoRoot)
+  private notifyWorkspaceBellCountIfChanged(workspaceId: WorkspaceId): void {
+    if (!this.workspaceBellCountListeners.has(workspaceId)) return
+    const previous = this.lastPublishedWorkspaceBellCount.get(workspaceId) ?? 0
+    const next = this.workspaceBellCount(workspaceId)
     if (previous === next) return
-    this.lastPublishedRepoBellCountByRepo.set(repoRoot, next)
-    this.notifyRepoBellCount(repoRoot)
+    this.lastPublishedWorkspaceBellCount.set(workspaceId, next)
+    this.notifyWorkspaceBellCount(workspaceId)
   }
 
-  private notifyRepoBellCount(repoRoot: string): void {
-    const listeners = this.repoBellCountListeners.get(repoRoot)
+  private notifyWorkspaceBellCount(workspaceId: WorkspaceId): void {
+    const listeners = this.workspaceBellCountListeners.get(workspaceId)
     if (!listeners) return
     for (const listener of Array.from(listeners)) {
       try {
         listener()
       } catch (err) {
-        terminalSessionProviderLog.warn('repo bell count listener threw', { repoRoot, err })
+        terminalSessionProviderLog.warn('workspace bell count listener threw', { workspaceId, err })
       }
     }
   }
 
-  private notifyAllRepoBellCounts(): void {
-    for (const repoRoot of Array.from(this.repoBellCountListeners.keys())) this.notifyRepoBellCountIfChanged(repoRoot)
+  private notifyAllWorkspaceBellCounts(): void {
+    for (const workspaceId of Array.from(this.workspaceBellCountListeners.keys())) {
+      this.notifyWorkspaceBellCountIfChanged(workspaceId)
+    }
   }
 
   private subscribeToKeyedListeners(
@@ -1093,8 +1180,8 @@ export class TerminalSessionProjection {
       this.snapshotCache.delete(terminalSessionId)
     }
     this.notifySnapshot(terminalSessionId)
-    const terminalWorktreeKey = session?.descriptor.terminalWorktreeKey
-    if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
+    const terminalFilesystemTargetKey = session ? terminalDescriptorFilesystemTargetKey(session.descriptor) : null
+    if (terminalFilesystemTargetKey) this.notifyFilesystemTarget(terminalFilesystemTargetKey)
   }
 
   /**
@@ -1107,8 +1194,8 @@ export class TerminalSessionProjection {
     if (pendingBinding) {
       const pendingEventBinding = {
         terminalSessionId: session.descriptor.terminalSessionId,
-        repoRoot: session.descriptor.repoRoot,
-        repoRuntimeId: session.descriptor.repoRuntimeId,
+        workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
+        workspaceRuntimeId: terminalSessionCoordinates(session.descriptor).workspaceRuntimeId,
         ...pendingBinding,
       }
       const pendingBindingKey = terminalRealtimeEventBindingKey(pendingEventBinding)
@@ -1127,8 +1214,8 @@ export class TerminalSessionProjection {
     if (!binding) return true
     const eventBinding = {
       terminalSessionId: session.descriptor.terminalSessionId,
-      repoRoot: session.descriptor.repoRoot,
-      repoRuntimeId: session.descriptor.repoRuntimeId,
+      workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
+      workspaceRuntimeId: terminalSessionCoordinates(session.descriptor).workspaceRuntimeId,
       ...binding,
     }
     const bindingKey = terminalRealtimeEventBindingKey(eventBinding)
@@ -1153,11 +1240,12 @@ export class TerminalSessionProjection {
   ): boolean {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
-    const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
-    const visibleTerminalSessionIdsBeforeRemoval = this.visibleSessionsForWorktree(terminalWorktreeKey).map(
-      (item) => item.descriptor.terminalSessionId,
-    )
-    const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
+    const terminalFilesystemTargetKey = terminalDescriptorFilesystemTargetKey(session.descriptor)
+    const visibleTerminalSessionIdsBeforeRemoval = this.visibleSessionsForFilesystemTarget(
+      terminalFilesystemTargetKey,
+    ).map((item) => item.descriptor.terminalSessionId)
+    const wasSelected =
+      this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) === terminalSessionId
     const runtimeBinding = session.currentRuntimeBinding() ?? session.addressableRuntimeBinding()
     if (runtimeBinding) {
       this.pendingServerBellByRuntimeBindingKey.delete(
@@ -1168,7 +1256,7 @@ export class TerminalSessionProjection {
     this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
-    this.removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey, terminalSessionId)
+    this.removeTerminalSessionIdFromFilesystemTargetList(terminalFilesystemTargetKey, terminalSessionId)
     this.outputActivityState.remove(terminalSessionId)
     this.notifySnapshot(terminalSessionId)
     this.bellState.remove(terminalSessionId)
@@ -1178,9 +1266,9 @@ export class TerminalSessionProjection {
         visibleTerminalSessionIdsBeforeRemoval,
         terminalSessionId,
       )
-      this.selectTerminalSessionId(terminalWorktreeKey, nextSessionId, { notify: false })
+      this.selectTerminalSessionId(terminalFilesystemTargetKey, nextSessionId, { notify: false })
     }
-    this.notifyWorktree(terminalWorktreeKey)
+    this.notifyFilesystemTarget(terminalFilesystemTargetKey)
     return true
   }
 
@@ -1212,17 +1300,13 @@ export class TerminalSessionProjection {
     base: TerminalSessionBase,
     requestedBinding: TerminalRuntimeBindingIdentity,
   ): Promise<boolean> {
-    const repoRuntimeId = requireRepoRuntimeId(base)
     let result: WorkspacePaneRuntimeCloseResult
     try {
       result = await workspacePaneRuntimeClient.close({
         runtimeType: 'terminal',
         sessionId: terminalSessionId,
         target: {
-          repoRoot: base.repoRoot,
-          repoRuntimeId,
-          branchName: base.branch,
-          worktreePath: base.worktreePath,
+          target: base.target,
         },
       })
     } catch (err) {
@@ -1231,14 +1315,6 @@ export class TerminalSessionProjection {
     }
     if (!result.ok) return false
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    void refreshWorkspacePaneTabsQueryData(base.repoRoot, repoRuntimeId).catch((err) => {
-      terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
-        terminalSessionId,
-        repoRoot: base.repoRoot,
-        repoRuntimeId,
-        err,
-      })
-    })
     return true
   }
 
@@ -1250,9 +1326,9 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(effect.terminalSessionId)
     if (!session) return
     const effectBinding: TerminalRuntimeBindingIdentity = {
-      repoRoot: base.repoRoot,
-      repoRuntimeId: requireRepoRuntimeId(base),
-      worktreePath: base.worktreePath,
+      workspaceId: terminalSessionCoordinates(base).workspaceId,
+      workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
+      executionRootId: terminalSessionCoordinates(base).executionRootId,
       terminalSessionId: effect.terminalSessionId,
       terminalRuntimeSessionId:
         effect.terminalRuntimeSessionId ??
@@ -1289,18 +1365,19 @@ export class TerminalSessionProjection {
 
   private runtimeBindingForClose(terminalSessionId: string, base: TerminalSessionBase): TerminalRuntimeBindingIdentity {
     const session = this.sessions.get(terminalSessionId)
-    const repoRuntimeId = requireRepoRuntimeId(base)
+    const workspaceRuntimeId = terminalSessionCoordinates(base).workspaceRuntimeId
     const addressableBinding =
       session &&
-      session.descriptor.repoRoot === base.repoRoot &&
-      session.descriptor.repoRuntimeId === repoRuntimeId &&
-      session.descriptor.worktreePath === base.worktreePath
+      terminalSessionCoordinates(session.descriptor).workspaceId === terminalSessionCoordinates(base).workspaceId &&
+      terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === workspaceRuntimeId &&
+      terminalSessionCoordinates(session.descriptor).executionRootId ===
+        terminalSessionCoordinates(base).executionRootId
         ? session.addressableRuntimeBinding()
         : null
     return {
-      repoRoot: base.repoRoot,
-      repoRuntimeId,
-      worktreePath: base.worktreePath,
+      workspaceId: terminalSessionCoordinates(base).workspaceId,
+      workspaceRuntimeId,
+      executionRootId: terminalSessionCoordinates(base).executionRootId,
       terminalSessionId,
       terminalRuntimeSessionId: addressableBinding?.terminalRuntimeSessionId ?? null,
       terminalRuntimeGeneration: addressableBinding?.terminalRuntimeGeneration ?? null,
@@ -1312,12 +1389,12 @@ export class TerminalSessionProjection {
     terminalRuntimeSessionId: string,
     terminalRuntimeGeneration: number | null = session.currentRuntimeBinding()?.terminalRuntimeGeneration ?? null,
   ): TerminalRuntimeBindingIdentity | null {
-    const repoRuntimeId = session.descriptor.repoRuntimeId
-    if (!repoRuntimeId) return null
+    const workspaceRuntimeId = terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
+    if (!workspaceRuntimeId) return null
     return {
-      repoRoot: session.descriptor.repoRoot,
-      repoRuntimeId,
-      worktreePath: session.descriptor.worktreePath,
+      workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
+      workspaceRuntimeId,
+      executionRootId: terminalSessionCoordinates(session.descriptor).executionRootId,
       terminalSessionId: session.descriptor.terminalSessionId,
       terminalRuntimeSessionId,
       terminalRuntimeGeneration,
@@ -1326,9 +1403,9 @@ export class TerminalSessionProjection {
 
   private sessionMatchesRuntimeBinding(session: TerminalSession, binding: TerminalRuntimeBindingIdentity): boolean {
     return (
-      session.descriptor.repoRoot === binding.repoRoot &&
-      session.descriptor.repoRuntimeId === binding.repoRuntimeId &&
-      session.descriptor.worktreePath === binding.worktreePath &&
+      terminalSessionCoordinates(session.descriptor).workspaceId === binding.workspaceId &&
+      terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === binding.workspaceRuntimeId &&
+      terminalSessionCoordinates(session.descriptor).executionRootId === binding.executionRootId &&
       session.descriptor.terminalSessionId === binding.terminalSessionId &&
       session.currentRuntimeBinding()?.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
       session.currentRuntimeBinding()?.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
@@ -1340,9 +1417,9 @@ export class TerminalSessionProjection {
     for (const operation of this.closeOperationByRuntimeBindingKey.values()) {
       const binding = operation.binding
       if (
-        binding.repoRoot !== session.descriptor.repoRoot ||
-        binding.repoRuntimeId !== session.descriptor.repoRuntimeId ||
-        binding.worktreePath !== session.descriptor.worktreePath ||
+        binding.workspaceId !== terminalSessionCoordinates(session.descriptor).workspaceId ||
+        binding.workspaceRuntimeId !== terminalSessionCoordinates(session.descriptor).workspaceRuntimeId ||
+        binding.executionRootId !== terminalSessionCoordinates(session.descriptor).executionRootId ||
         binding.terminalSessionId !== session.descriptor.terminalSessionId
       ) {
         continue
@@ -1367,28 +1444,33 @@ export class TerminalSessionProjection {
     const candidateSession = this.sessions.get(terminalSessionId)
     if (candidateSession && this.hasPendingCloseForSession(candidateSession)) return
     const session = this.sessions.get(terminalSessionId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).executionRootId,
+    )
+    if (!session || terminalDescriptorFilesystemTargetKey(session.descriptor) !== terminalFilesystemTargetKey) return
     this.removeSession(terminalSessionId, { dispose: true, preserveFutureExits })
   }
 
-  private pruneSessionsMissingFromRepoIndex(): void {
+  private pruneSessionsMissingFromRuntimeMembership(): void {
     const sessionIdsToRemove = Array.from(this.sessions.entries())
-      .filter(([, session]) => !this.sessionBelongsToCurrentRepoIndex(session))
+      .filter(([, session]) => !this.sessionBelongsToCurrentRuntimeMembership(session))
       .map(([terminalSessionId]) => terminalSessionId)
-    for (const terminalSessionId of sessionIdsToRemove)
-      this.removeSession(terminalSessionId, { dispose: true })
+    for (const terminalSessionId of sessionIdsToRemove) this.removeSession(terminalSessionId, { dispose: true })
   }
 
-  private sessionBelongsToCurrentRepoIndex(session: TerminalSession): boolean {
-    const current = this.repoIndex[session.descriptor.repoRoot]
+  private sessionBelongsToCurrentRuntimeMembership(session: TerminalSession): boolean {
+    const current = this.runtimeMembershipIndex.get(terminalSessionCoordinates(session.descriptor).workspaceId)
     if (!current) return false
-    return current.repoRuntimeId === session.descriptor.repoRuntimeId
+    return current.workspaceRuntimeId === terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
   }
 
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {
     const current = this.sessions.get(descriptor.terminalSessionId)
-    this.appendTerminalSessionIdToWorktreeList(descriptor.terminalWorktreeKey, descriptor.terminalSessionId)
+    this.appendTerminalSessionIdToFilesystemTargetList(
+      terminalDescriptorFilesystemTargetKey(descriptor),
+      descriptor.terminalSessionId,
+    )
     if (current) {
       current.updateDescriptor(descriptor)
       this.syncTerminalRuntimeSessionIdIndex(
@@ -1397,76 +1479,100 @@ export class TerminalSessionProjection {
           this.terminalRuntimeBindingByTerminalSessionId.get(descriptor.terminalSessionId) ??
           null,
       )
-      this.notifyWorktree(descriptor.terminalWorktreeKey)
+      this.notifyFilesystemTarget(terminalDescriptorFilesystemTargetKey(descriptor))
       return current
     }
     const session = new TerminalSession(
       descriptor,
-      () => this.notifySession(descriptor.terminalSessionId),
+      (...notification) => {
+        const [reason, projectionDeltaRevision] = notification
+        if (reason === 'projection-delta-revision') {
+          if (projectionDeltaRevision === undefined) throw new Error('terminal projection delta revision missing')
+          this.applyTerminalSessionsDeltaRevision(terminalSessionCoordinates(descriptor), projectionDeltaRevision)
+          return
+        }
+        this.notifySession(descriptor.terminalSessionId)
+      },
       this.writeFailureReporter,
     )
     this.sessions.set(descriptor.terminalSessionId, session)
     this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, session.currentRuntimeBinding())
     this.snapshotCache.set(descriptor.terminalSessionId, session.snapshot())
-    if (!this.selectedTerminalSessionIdByTerminalWorktree.has(descriptor.terminalWorktreeKey)) {
-      const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(descriptor.terminalWorktreeKey)
+    if (
+      !this.selectedTerminalSessionIdByTerminalFilesystemTarget.has(terminalDescriptorFilesystemTargetKey(descriptor))
+    ) {
+      const preferred = this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.get(
+        terminalDescriptorFilesystemTargetKey(descriptor),
+      )
       if (!preferred || preferred === descriptor.terminalSessionId)
-        this.selectTerminalSessionId(descriptor.terminalWorktreeKey, descriptor.terminalSessionId, { notify: false })
+        this.selectTerminalSessionId(terminalDescriptorFilesystemTargetKey(descriptor), descriptor.terminalSessionId, {
+          notify: false,
+        })
     }
-    this.notifyWorktree(descriptor.terminalWorktreeKey)
+    this.notifyFilesystemTarget(terminalDescriptorFilesystemTargetKey(descriptor))
     return session
   }
 
   private selectTerminalSessionId(
-    terminalWorktreeKey: string,
+    terminalFilesystemTargetKey: string,
     terminalSessionId: string | null,
     options: { notify?: boolean } = {},
   ): void {
     const next =
-      terminalSessionId && this.isSelectedTerminalSessionIdValid(terminalWorktreeKey, terminalSessionId)
+      terminalSessionId && this.isSelectedTerminalSessionIdValid(terminalFilesystemTargetKey, terminalSessionId)
         ? terminalSessionId
         : null
-    const current = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
+    const current = this.selectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null
     if (current === next) {
-      this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, next)
+      this.setPreferredSelectedTerminalSessionId(terminalFilesystemTargetKey, next)
       return
     }
     if (next) {
-      this.selectedTerminalSessionIdByTerminalWorktree.set(terminalWorktreeKey, next)
+      this.selectedTerminalSessionIdByTerminalFilesystemTarget.set(terminalFilesystemTargetKey, next)
     } else {
-      this.selectedTerminalSessionIdByTerminalWorktree.delete(terminalWorktreeKey)
+      this.selectedTerminalSessionIdByTerminalFilesystemTarget.delete(terminalFilesystemTargetKey)
     }
-    this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, next)
-    if (options.notify !== false) this.notifyWorktree(terminalWorktreeKey)
+    this.setPreferredSelectedTerminalSessionId(terminalFilesystemTargetKey, next)
+    if (options.notify !== false) this.notifyFilesystemTarget(terminalFilesystemTargetKey)
   }
 
-  private setPreferredSelectedTerminalSessionId(terminalWorktreeKey: string, terminalSessionId: string | null): void {
-    const current = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null
+  private setPreferredSelectedTerminalSessionId(
+    terminalFilesystemTargetKey: string,
+    terminalSessionId: string | null,
+  ): void {
+    const current =
+      this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? null
     if (current === terminalSessionId) return
     if (terminalSessionId)
-      this.preferredSelectedTerminalSessionIdByTerminalWorktree.set(terminalWorktreeKey, terminalSessionId)
-    else this.preferredSelectedTerminalSessionIdByTerminalWorktree.delete(terminalWorktreeKey)
-    this.onSelectedWorktreeChange(terminalWorktreeKey, terminalSessionId)
+      this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.set(
+        terminalFilesystemTargetKey,
+        terminalSessionId,
+      )
+    else this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.delete(terminalFilesystemTargetKey)
+    this.onSelectedFilesystemTargetChange(terminalFilesystemTargetKey, terminalSessionId)
   }
 
-  private isSelectedTerminalSessionIdValid(terminalWorktreeKey: string, terminalSessionId: string): boolean {
-    return this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey === terminalWorktreeKey
+  private isSelectedTerminalSessionIdValid(terminalFilesystemTargetKey: string, terminalSessionId: string): boolean {
+    const descriptor = this.sessions.get(terminalSessionId)?.descriptor
+    return !!descriptor && terminalDescriptorFilesystemTargetKey(descriptor) === terminalFilesystemTargetKey
   }
 
-  private visibleSessionsForWorktree(terminalWorktreeKey: string): TerminalSession[] {
-    return this.sessionsForWorktreeList(terminalWorktreeKey)
+  private visibleSessionsForFilesystemTarget(terminalFilesystemTargetKey: string): TerminalSession[] {
+    return this.sessionsForFilesystemTargetList(terminalFilesystemTargetKey)
   }
 
-  private sessionsForWorktreeList(terminalWorktreeKey: string): TerminalSession[] {
+  private sessionsForFilesystemTargetList(terminalFilesystemTargetKey: string): TerminalSession[] {
     const sessions = Array.from(this.sessions.values()).filter(
-      (session) => session.descriptor.terminalWorktreeKey === terminalWorktreeKey,
+      (session) => terminalDescriptorFilesystemTargetKey(session.descriptor) === terminalFilesystemTargetKey,
     )
     const terminalSessionByTerminalSessionId = new Map(
       sessions.map((session) => [session.descriptor.terminalSessionId, session]),
     )
     const seen = new Set<string>()
     const listedSessions: TerminalSession[] = []
-    for (const terminalSessionId of this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? []) {
+    for (const terminalSessionId of this.terminalSessionIdsByTerminalFilesystemTarget.get(
+      terminalFilesystemTargetKey,
+    ) ?? []) {
       const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
       if (!session || seen.has(terminalSessionId)) continue
       seen.add(terminalSessionId)
@@ -1481,40 +1587,44 @@ export class TerminalSessionProjection {
     return listedSessions
   }
 
-  private appendTerminalSessionIdToWorktreeList(terminalWorktreeKey: string, terminalSessionId: string): void {
-    const current = this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey)
+  private appendTerminalSessionIdToFilesystemTargetList(
+    terminalFilesystemTargetKey: string,
+    terminalSessionId: string,
+  ): void {
+    const current = this.terminalSessionIdsByTerminalFilesystemTarget.get(terminalFilesystemTargetKey)
     if (current?.includes(terminalSessionId)) return
-    this.terminalSessionIdsByTerminalWorktree.set(terminalWorktreeKey, [...(current ?? []), terminalSessionId])
+    this.terminalSessionIdsByTerminalFilesystemTarget.set(terminalFilesystemTargetKey, [
+      ...(current ?? []),
+      terminalSessionId,
+    ])
   }
 
-  private removeTerminalSessionIdFromWorktreeList(terminalWorktreeKey: string, terminalSessionId: string): void {
-    const current = this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey)
+  private removeTerminalSessionIdFromFilesystemTargetList(
+    terminalFilesystemTargetKey: string,
+    terminalSessionId: string,
+  ): void {
+    const current = this.terminalSessionIdsByTerminalFilesystemTarget.get(terminalFilesystemTargetKey)
     if (!current) return
     const next = current.filter((candidate) => candidate !== terminalSessionId)
     if (next.length === current.length) return
-    if (next.length === 0) this.terminalSessionIdsByTerminalWorktree.delete(terminalWorktreeKey)
-    else this.terminalSessionIdsByTerminalWorktree.set(terminalWorktreeKey, next)
+    if (next.length === 0) this.terminalSessionIdsByTerminalFilesystemTarget.delete(terminalFilesystemTargetKey)
+    else this.terminalSessionIdsByTerminalFilesystemTarget.set(terminalFilesystemTargetKey, next)
   }
 
-  private replaceTerminalSessionIdListForTouchedWorktrees(
-    nextByWorktree: ReadonlyMap<string, readonly string[]>,
+  private replaceTerminalSessionIdListForTouchedFilesystemTargets(
+    nextByFilesystemTarget: ReadonlyMap<string, readonly string[]>,
   ): Set<string> {
-    const changedWorktrees = new Set<string>()
-    for (const [terminalWorktreeKey, terminalSessionIds] of nextByWorktree) {
+    const changedFilesystemTargets = new Set<string>()
+    for (const [terminalFilesystemTargetKey, terminalSessionIds] of nextByFilesystemTarget) {
       const next = uniqueNonEmptyStrings(terminalSessionIds)
-      const current = this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? []
+      const current = this.terminalSessionIdsByTerminalFilesystemTarget.get(terminalFilesystemTargetKey) ?? []
       if (stringArraysEqual(current, next)) continue
-      if (next.length === 0) this.terminalSessionIdsByTerminalWorktree.delete(terminalWorktreeKey)
-      else this.terminalSessionIdsByTerminalWorktree.set(terminalWorktreeKey, next)
-      changedWorktrees.add(terminalWorktreeKey)
+      if (next.length === 0) this.terminalSessionIdsByTerminalFilesystemTarget.delete(terminalFilesystemTargetKey)
+      else this.terminalSessionIdsByTerminalFilesystemTarget.set(terminalFilesystemTargetKey, next)
+      changedFilesystemTargets.add(terminalFilesystemTargetKey)
     }
-    return changedWorktrees
+    return changedFilesystemTargets
   }
-}
-
-function requireRepoRuntimeId(base: TerminalSessionBase): string {
-  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
-  throw new Error('error.repo-runtime-stale')
 }
 
 async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Promise<ResolvedTerminalCreateOptions> {
@@ -1569,7 +1679,7 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
 }
 
 export interface TerminalSessionProjectionDeps {
-  onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
+  onSelectedFilesystemTargetChange: (terminalFilesystemTargetKey: string, terminalSessionId: string | null) => void
 }
 
 let projectionInstance: TerminalSessionProjection | null = null
@@ -1588,7 +1698,7 @@ let projectionInstance: TerminalSessionProjection | null = null
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
   if (!projectionInstance) {
-    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange)
+    projectionInstance = new TerminalSessionProjection(deps.onSelectedFilesystemTargetChange)
   }
   return projectionInstance
 }

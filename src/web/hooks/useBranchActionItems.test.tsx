@@ -5,8 +5,9 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
-import { idleOperation } from '#/web/stores/repos/operations.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import { idleOperation } from '#/web/stores/workspaces/operations.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   setDetailCollapsed: vi.fn(),
@@ -35,8 +36,8 @@ vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
   }),
 }))
 
-vi.mock('#/web/stores/repos/store.ts', () => ({
-  useReposStore: (selector: (state: { setDetailCollapsed: typeof mocks.setDetailCollapsed }) => unknown) =>
+vi.mock('#/web/stores/workspaces/store.ts', () => ({
+  useWorkspacesStore: (selector: (state: { setDetailCollapsed: typeof mocks.setDetailCollapsed }) => unknown) =>
     selector({ setDetailCollapsed: mocks.setDetailCollapsed }),
 }))
 
@@ -122,7 +123,7 @@ describe('useBranchActionItems', () => {
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoId: '/tmp/goblin-action-items',
+        workspaceId: 'goblin+file:///tmp/goblin-action-items',
         branchName: 'feature/action-order',
         type: 'history',
       }),
@@ -166,8 +167,8 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 
 function repo(): BranchActionRepo {
   return {
-    id: '/tmp/goblin-action-items',
-    repoRuntimeId: 'repo-runtime-test',
+    id: workspaceIdForTest('goblin+file:///tmp/goblin-action-items'),
+    workspaceRuntimeId: 'repo-runtime-test',
     branchModel: {
       currentBranch: 'main',
       status: [],
@@ -175,13 +176,13 @@ function repo(): BranchActionRepo {
     },
     branchAction: idleOperation(),
     remote: {
-      lifecycle: null,
       hasRemotes: true,
       hasBrowserRemote: true,
       hasGitHubRemote: true,
       browserRemoteProvider: 'github',
       remoteProviders: { origin: 'github' },
     },
+    remoteLifecycle: null,
   }
 }
 

@@ -1,0 +1,45 @@
+import { describe, expect, test, vi } from 'vitest'
+import { getBranchWorktreeIdentities } from '#/system/git/branches.ts'
+import { git } from '#/system/git/git-exec.ts'
+
+vi.mock('#/system/git/git-exec.ts', () => ({
+  git: vi.fn(),
+  gitResultWithOptions: vi.fn(),
+  NETWORK_TIMEOUT_MS: 30_000,
+}))
+
+describe('getBranchWorktreeIdentities', () => {
+  test('reads strict branch identity and maps known worktree paths', async () => {
+    vi.mocked(git).mockResolvedValueOnce('main\nfeature/linked\nfeature/free\n')
+
+    await expect(
+      getBranchWorktreeIdentities('/repo', [
+        { path: '/repo', branch: 'main', isBare: false, isPrimary: true },
+        { path: '/worktrees/linked', branch: 'feature/linked', isBare: false, isPrimary: false },
+      ]),
+    ).resolves.toEqual([
+      { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'branch', branchName: 'main' } },
+      {
+        kind: 'git-worktree',
+        worktreePath: '/worktrees/linked',
+        head: { kind: 'branch', branchName: 'feature/linked' },
+      },
+      { kind: 'git-branch', branchName: 'feature/free' },
+    ])
+    expect(git).toHaveBeenCalledWith('/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
+      signal: undefined,
+    })
+  })
+
+  test('does not turn a failed authority read into an empty catalog', async () => {
+    vi.mocked(git).mockRejectedValueOnce(new Error('git unavailable'))
+    await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('git unavailable')
+  })
+
+  test('keeps a detached local worktree without a branch ref', async () => {
+    vi.mocked(git).mockResolvedValueOnce('')
+    await expect(
+      getBranchWorktreeIdentities('/repo', [{ path: '/repo', isBare: false, isPrimary: true }]),
+    ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }])
+  })
+})

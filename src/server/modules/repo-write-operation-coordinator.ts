@@ -1,7 +1,7 @@
 import PQueue from 'p-queue'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
+import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
   RepoOperationFailureReason,
@@ -11,6 +11,7 @@ import type {
   RepoServerOperationTarget,
 } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type RepoWriteOperationQueue = PQueue
 
@@ -28,8 +29,8 @@ export interface RepoWriteOperationContext {
 
 interface BeginRepoWriteOperationInput {
   id?: string
-  repoId?: string | null
-  repoRuntimeId?: string | null
+  repoId?: WorkspaceId | null
+  workspaceRuntimeId?: string | null
   kind: RepoServerOperationKind
   source: RepoServerOperationSource
   target?: RepoServerOperationTarget | null
@@ -39,7 +40,7 @@ interface BeginRepoWriteOperationInput {
 
 interface RepoWriteOperationQueueRuntime {
   boundaryKey: string
-  repoIds: Set<string>
+  repoIds: Set<WorkspaceId>
   queue: RepoWriteOperationQueue
   operations: Map<string, RepoServerOperationState>
   activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
@@ -54,9 +55,9 @@ const MAX_SETTLED_OPERATIONS = 100
 
 let nextWriteOperationId = 1
 const repoWriteOperationRuntimesByBoundary = new Map<string, RepoWriteOperationQueueRuntime>()
-const repoWriteOperationRepoIdsByBoundary = new Map<string, Set<string>>()
-const repoWriteOperationBoundaryByRepoId = new Map<string, string>()
-let repoRuntimeCloseSubscription: (() => void) | null = null
+const repoWriteOperationRepoIdsByBoundary = new Map<string, Set<WorkspaceId>>()
+const repoWriteOperationBoundaryByRepoId = new Map<WorkspaceId, string>()
+let workspaceRuntimeCloseSubscription: (() => void) | null = null
 
 function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
@@ -130,7 +131,7 @@ function beginRepoWriteOperation(
   const operation: RepoServerOperationState = {
     id: input.id ?? freshWriteOperationId(),
     repoId: input.repoId ?? null,
-    repoRuntimeId: input.repoRuntimeId ?? null,
+    workspaceRuntimeId: input.workspaceRuntimeId ?? null,
     kind: input.kind,
     phase: 'queued',
     source: input.source,
@@ -202,7 +203,10 @@ function publishRepoRuntimeInvalidation(
   }
 }
 
-function registerRepoWriteOperationBoundaryRepoId(boundaryKey: string, repoId: string | null | undefined): Set<string> {
+function registerRepoWriteOperationBoundaryRepoId(
+  boundaryKey: string,
+  repoId: WorkspaceId | null | undefined,
+): Set<WorkspaceId> {
   ensureRepoRuntimeCloseSubscription()
   let repoIds = repoWriteOperationRepoIdsByBoundary.get(boundaryKey)
   if (!repoIds) {
@@ -221,7 +225,7 @@ function registerRepoWriteOperationBoundaryRepoId(boundaryKey: string, repoId: s
   return repoIds
 }
 
-function unregisterRepoWriteOperationBoundaryRepoId(repoId: string): void {
+function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId): void {
   const boundaryKey = repoWriteOperationBoundaryByRepoId.get(repoId)
   if (!boundaryKey) return
   repoWriteOperationBoundaryByRepoId.delete(repoId)
@@ -237,15 +241,15 @@ function deleteRepoWriteOperationBoundaryIfEmpty(boundaryKey: string): void {
 }
 
 function ensureRepoRuntimeCloseSubscription(): void {
-  if (repoRuntimeCloseSubscription) return
-  repoRuntimeCloseSubscription = onRepoRuntimeClosed((event) => {
-    unregisterRepoWriteOperationBoundaryRepoId(event.repoRoot)
+  if (workspaceRuntimeCloseSubscription) return
+  workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
+    unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId)
   })
 }
 
 function repoWriteOperationRuntimeForBoundary(
   boundaryKey: string,
-  repoId?: string | null,
+  repoId?: WorkspaceId | null,
 ): RepoWriteOperationQueueRuntime {
   const repoIds = registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
   let runtime = repoWriteOperationRuntimesByBoundary.get(boundaryKey)
@@ -368,7 +372,7 @@ function createRepoWriteOperationContext(
 }
 
 export async function enqueueRepoWriteOperation<T extends ExecResult>(
-  repoId: string,
+  repoId: WorkspaceId,
   signal: AbortSignal | undefined,
   operationInput: BeginRepoWriteOperationInput,
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
@@ -396,32 +400,25 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
     operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
     throw err
   }
-  return await runResolvedRepoWriteOperation(boundaryKey, runtime, operation, async () => {
-    try {
-      return await task()
-    } catch (err) {
-      operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
-      throw err
-    }
-  }, signal)
-}
-
-export async function abortRepoWriteNetworkOperation(
-  repoId: string,
-  options: { signal?: AbortSignal } = {},
-): Promise<boolean> {
-  const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
-  registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
-  const active = repoWriteOperationRuntimesByBoundary.get(boundaryKey)?.activeNetworkOperation
-  if (!active) return false
-  active.operation.requestCancel('user-cancel')
-  active.ctrl.abort()
-  return true
+  return await runResolvedRepoWriteOperation(
+    boundaryKey,
+    runtime,
+    operation,
+    async () => {
+      try {
+        return await task()
+      } catch (err) {
+        operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
+        throw err
+      }
+    },
+    signal,
+  )
 }
 
 export async function listRepoWriteOperationsForRepo(
-  repoId: string | undefined,
-  options: { includeSettled?: boolean; repoRuntimeId?: string; signal?: AbortSignal } = {},
+  repoId: WorkspaceId | undefined,
+  options: { includeSettled?: boolean; workspaceRuntimeId?: string; signal?: AbortSignal } = {},
 ): Promise<RepoServerOperationState[]> {
   const includeSettled = options.includeSettled === true
   let runtimes: RepoWriteOperationQueueRuntime[]
@@ -437,7 +434,11 @@ export async function listRepoWriteOperationsForRepo(
   return sortedOperations(
     runtimes.flatMap((runtime) =>
       [...runtime.operations.values()].filter((operation) => {
-        if (options.repoRuntimeId && operation.repoRuntimeId && operation.repoRuntimeId !== options.repoRuntimeId) {
+        if (
+          options.workspaceRuntimeId &&
+          operation.workspaceRuntimeId &&
+          operation.workspaceRuntimeId !== options.workspaceRuntimeId
+        ) {
           return false
         }
         if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false
@@ -451,8 +452,8 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   repoWriteOperationRuntimesByBoundary.clear()
   repoWriteOperationRepoIdsByBoundary.clear()
   repoWriteOperationBoundaryByRepoId.clear()
-  repoRuntimeCloseSubscription?.()
-  repoRuntimeCloseSubscription = null
+  workspaceRuntimeCloseSubscription?.()
+  workspaceRuntimeCloseSubscription = null
   nextWriteOperationId = 1
 }
 

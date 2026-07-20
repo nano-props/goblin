@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -16,12 +19,12 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
-vi.mock('#/web/components/EmptyRepoView.tsx', () => ({
-  EmptyRepoView: () => <div data-testid="empty-repo-view" />,
+vi.mock('#/web/components/EmptyWorkspaceView.tsx', () => ({
+  EmptyWorkspaceView: () => <div data-testid="empty-workspace-view" />,
 }))
 
-vi.mock('#/web/components/RepoView.tsx', () => ({
-  RepoView: () => <div data-testid="repo-view" />,
+vi.mock('#/web/components/WorkspaceView.tsx', () => ({
+  WorkspaceView: () => <div data-testid="workspace-view" />,
 }))
 
 vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
@@ -34,26 +37,26 @@ vi.mock('#/web/components/ErrorBoundary.tsx', () => ({
 
 beforeEach(() => {
   responsiveMocks.mode = 'default'
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('App workspace membership skeleton', () => {
   test('renders the empty repo shell while no repository is open', () => {
-    useReposStore.setState({ workspaceMembershipReady: true })
+    useWorkspacesStore.setState({ workspaceMembershipReady: true })
 
     const { container } = render(<App />)
 
-    expect(container.querySelector('[data-testid="empty-repo-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-view"]')).toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-view"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-view"]')).toBeNull()
   })
 
   test('renders the current repository shell when a repository is open', () => {
-    seedRepoShellForTest({ id: '/tmp/repo' })
+    seedRepoShellForTest({ id: WORKSPACE_ID })
 
-    const { container } = render(<App routeRepoView={{ kind: 'dashboard', repoId: '/tmp/repo' }} />)
+    const { container } = render(<App routeWorkspaceView={{ kind: 'dashboard', workspaceId: WORKSPACE_ID }} />)
 
-    expect(container.querySelector('[data-testid="repo-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-view"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-view"]')).toBeNull()
   })
 
   test('uses a single-pane navigator skeleton in compact mode before workspace membership is ready', () => {
@@ -70,8 +73,8 @@ function render(element: React.ReactNode) {
   return renderInJsdom(
     <LayoutOverlayActions
       value={{
-        openRepoPathDialog: vi.fn(),
-        openRemoteRepo: vi.fn(),
+        openWorkspacePathDialog: vi.fn(),
+        openRemoteWorkspace: vi.fn(),
         openCloneRepo: vi.fn(),
         openCreateWorktree: vi.fn(),
       }}

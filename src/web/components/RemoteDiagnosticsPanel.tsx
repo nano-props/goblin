@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { failedDiagnosticsCategory } from '#/web/lib/remote-diagnostics.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RemoteDiagnosticCategory, RemoteDiagnosticsResult } from '#/shared/remote-repo.ts'
+import type { RemoteDiagnosticCategory, RemoteDiagnosticsResult } from '#/shared/remote-workspace.ts'
 
 interface Props {
   diagnostics: RemoteDiagnosticsResult | null
@@ -27,10 +27,10 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
   }
 
   const statusText = loading
-    ? t('repo-picker.open-remote-diagnostics-testing')
+    ? t('workspace-picker.open-remote-diagnostics-testing')
     : diagnostics
       ? diagnostics.ok
-        ? t('repo-picker.open-remote-diagnostics-ok')
+        ? t('workspace-picker.open-remote-diagnostics-ok')
         : diagnosticCategoryLabel(t, failedCategory ?? diagnostics.category ?? diagnostics.message ?? 'unknown')
       : error
         ? error
@@ -42,7 +42,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
       <DialogStatusRow
         message={statusText}
         tone={error || (diagnostics && !diagnostics.ok) ? 'danger' : diagnostics?.ok ? 'success' : 'default'}
-        actionLabel={copyDetailsValue ? t('repo-picker.open-remote-diagnostics-copy-details') : undefined}
+        actionLabel={copyDetailsValue ? t('workspace-picker.open-remote-diagnostics-copy-details') : undefined}
         onAction={copyDetailsValue ? () => void copyText(copyDetailsValue) : undefined}
       />
     </div>
@@ -51,7 +51,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
 
 function diagnosticCategoryLabel(t: (key: string) => string, category: string): string {
   const known = category as RemoteDiagnosticCategory
-  const key = `repo-picker.open-remote-diagnostics-category-${known}`
+  const key = `workspace-picker.open-remote-diagnostics-category-${known}`
   const translated = t(key)
   return translated === key ? category : translated
 }

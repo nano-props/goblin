@@ -1,69 +1,49 @@
-import {
-  isRemoteRepoId,
-  remoteRepoConnectionTarget,
-  remoteRepoRefFromTarget,
-  remoteRepoSessionEntry,
-  type RemoteRepoConnectionLifecycle,
-  type RepoSessionEntry,
-} from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-/** Minimal shape this helper needs from a `RepoState`. Defined
+/** Minimal shape this helper needs from a `WorkspaceState`. Defined
  *  locally so the persistence / session layer doesn't have to
  *  depend on the full store types. */
-interface OpenWorkspaceRepoLike {
-  id: string
+interface OpenWorkspaceLike {
+  id: WorkspaceId
   session?: {
-    entry: RepoSessionEntry | null
-  }
-  remote: {
-    lifecycle: RemoteRepoConnectionLifecycle | null
+    entry: WorkspaceSessionEntry | null
   }
 }
 
 export function persistedOpenWorkspaceEntries(
-  order: string[],
-  repos: Record<string, OpenWorkspaceRepoLike | undefined>,
-): RepoSessionEntry[] {
-  return order.flatMap<RepoSessionEntry>((id) => {
-    const repo = repos[id]
-    if (!repo) return []
-    if (repo.session?.entry) return [repo.session.entry]
-    if (!isRemoteRepoId(repo.id)) return [{ kind: 'local', id: repo.id }]
-    // For remote repos, reconstruct the session entry from the
-    // last-known target (lifecycle.target). A failed lifecycle
-    // may or may not have a retained target; without one we
-    // can't reconstruct a session entry, so the repo is dropped
-    // from the recent-workspace list. This is the same
-    // intentional trade-off: a placeholder with no target is just a
-    // connecting spinner, not a repo the user explicitly opened.
-    const target = remoteRepoConnectionTarget(repo.remote.lifecycle)
-    if (!target) return []
-    return [remoteRepoSessionEntry(remoteRepoRefFromTarget(target))]
+  workspaceOrder: WorkspaceId[],
+  workspaces: Record<string, OpenWorkspaceLike | undefined>,
+): WorkspaceSessionEntry[] {
+  return workspaceOrder.flatMap<WorkspaceSessionEntry>((id) => {
+    const workspace = workspaces[id]
+    if (!workspace) return []
+    return [workspace.session?.entry ?? { id: workspace.id }]
   })
 }
 
-export function nextRestoredRepoIdAfterWorkspaceClose(
-  order: string[],
-  restoredRepoId: string | null,
-  closedId: string,
-): string | null {
-  if (restoredRepoId !== closedId) return restoredRepoId
-  const idx = order.indexOf(closedId)
+export function nextRestoredWorkspaceIdAfterWorkspaceClose(
+  workspaceOrder: WorkspaceId[],
+  restoredWorkspaceId: WorkspaceId | null,
+  closedId: WorkspaceId,
+): WorkspaceId | null {
+  if (restoredWorkspaceId !== closedId) return restoredWorkspaceId
+  const idx = workspaceOrder.indexOf(closedId)
   if (idx === -1) return null
-  return order[idx + 1] ?? order[idx - 1] ?? null
+  return workspaceOrder[idx + 1] ?? workspaceOrder[idx - 1] ?? null
 }
 
-export function restoredRepoIdAfterWorkspaceHydration(
-  currentRestoredRepoId: string | null,
-  repos: Record<string, unknown>,
-  order: string[],
-  preferredActiveRepoId: string | null,
-  managedRestoredRepoId: string | null,
-): string | null {
-  if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && repos[currentRestoredRepoId]) {
-    return currentRestoredRepoId
+export function restoredWorkspaceIdAfterWorkspaceHydration(
+  currentRestoredWorkspaceId: WorkspaceId | null,
+  workspaces: Record<string, unknown>,
+  workspaceOrder: WorkspaceId[],
+  preferredActiveWorkspaceId: WorkspaceId | null,
+  managedRestoredWorkspaceId: WorkspaceId | null,
+): WorkspaceId | null {
+  if (currentRestoredWorkspaceId && currentRestoredWorkspaceId !== managedRestoredWorkspaceId && workspaces[currentRestoredWorkspaceId]) {
+    return currentRestoredWorkspaceId
   }
-  if (preferredActiveRepoId && repos[preferredActiveRepoId]) return preferredActiveRepoId
-  if (preferredActiveRepoId) return null
-  return order[0] ?? null
+  if (preferredActiveWorkspaceId && workspaces[preferredActiveWorkspaceId]) return preferredActiveWorkspaceId
+  if (preferredActiveWorkspaceId) return null
+  return workspaceOrder[0] ?? null
 }

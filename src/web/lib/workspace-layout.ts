@@ -1,24 +1,24 @@
-export type RepoWorkspaceMode = 'split' | 'single-pane'
+export type WorkspaceLayoutMode = 'split' | 'single-pane'
 
-export interface RepoWorkspaceBehavior {
-  mode: RepoWorkspaceMode
+export interface WorkspaceLayoutBehavior {
+  mode: WorkspaceLayoutMode
   singlePane: boolean
   compact: boolean
   zenMode: boolean
   sidebarCollapsed: boolean
 }
 
-export function repoWorkspaceBehavior({
+export function workspaceLayoutBehavior({
   compact = false,
   zenMode = false,
-  repoWorkspaceActive = false,
+  workspacePaneActive = false,
 }: {
   compact?: boolean
   zenMode?: boolean
-  repoWorkspaceActive?: boolean
-}): RepoWorkspaceBehavior {
-  const sidebarCollapsed = !compact && zenMode && repoWorkspaceActive
-  const singlePane = compact || (zenMode && !repoWorkspaceActive)
+  workspacePaneActive?: boolean
+}): WorkspaceLayoutBehavior {
+  const sidebarCollapsed = !compact && zenMode && workspacePaneActive
+  const singlePane = compact || (zenMode && !workspacePaneActive)
   return {
     mode: singlePane ? 'single-pane' : 'split',
     singlePane,

@@ -69,7 +69,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getDefaultBranch: vi.fn(),
   getLog: vi.fn(),
   getRepoName: vi.fn(),
-  getRepoRoot: vi.fn(() => '/repo'),
+  getRepoRoot: vi.fn(() => 'goblin+file:///repo'),
   getUpstream: vi.fn(),
   isAncestor: vi.fn(),
   isGitRepo: vi.fn(),
@@ -263,7 +263,7 @@ describe('main repo ipc cancellation', () => {
     resolveRemoteTargetMock.mockImplementation(
       async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
         target: {
-          id: `ssh-config://${alias}${remotePath}`,
+          id: `goblin+ssh://${alias}${remotePath}`,
           alias,
           host: 'example.com',
           user: 'alice',
@@ -279,12 +279,11 @@ describe('main repo ipc cancellation', () => {
     writeNativeClientWorkspaceStateMock.mockResolvedValue(undefined)
     vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
-    vi.mocked(getWorktrees).mockResolvedValue([{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
+    vi.mocked(getWorktrees).mockResolvedValue([
+      { path: 'goblin+file:///repo', branch: 'main', isBare: false, isPrimary: true },
+    ])
     vi.mocked(getUpstream).mockResolvedValue(null)
-    vi.mocked(isAncestor).mockImplementation(async () => {
-      await invokeIpc('repo.abort', { cwd: '/repo' })
-      return false
-    })
+    vi.mocked(isAncestor).mockResolvedValue(false)
     vi.mocked(resolveRemovableWorktree).mockReturnValue({
       ok: true,
       target: { path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false },
@@ -314,12 +313,12 @@ describe('main repo ipc cancellation', () => {
 
   test('routes native client workspace reads and writes', async () => {
     const workspace = {
-      restoredRepoId: '/repo',
+      restoredWorkspaceId: 'goblin+file:///repo',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     }
     readNativeClientWorkspaceStateMock.mockResolvedValue({ kind: 'loaded', state: workspace })
 
@@ -329,6 +328,23 @@ describe('main repo ipc cancellation', () => {
     })
     await expect(invokeIpc('clientWorkspace.write', workspace)).resolves.toEqual({ ok: true, data: undefined })
     expect(writeNativeClientWorkspaceStateMock).toHaveBeenCalledWith(workspace)
+  })
+
+  test('rejects a non-canonical workspace identity at the native persistence boundary', async () => {
+    const result = await invokeIpc('clientWorkspace.write', {
+      restoredWorkspaceId: '/repo',
+      zenMode: false,
+      workspacePaneSize: 50,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'BAD_REQUEST' },
+    })
+    expect(writeNativeClientWorkspaceStateMock).not.toHaveBeenCalled()
   })
 
   test('rejects IPC calls without a sender frame', async () => {
@@ -356,7 +372,7 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       json: async () => [{ path: 'file.txt', staged: false, status: 'M' }],
     }))
-    const result = await invokeIpc('repo.status', { cwd: '/repo' })
+    const result = await invokeIpc('repo.status', { cwd: 'goblin+file:///repo' })
 
     expect(result).toEqual({
       ok: false,
@@ -375,17 +391,17 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       json: async () => ({
         target: {
-          id: 'ssh-config://prod/repo',
+          id: 'goblin+ssh://prod/repo',
           alias: 'prod',
           host: 'example.com',
           user: 'tester',
           port: 22,
-          remotePath: '/repo',
+          remotePath: 'goblin+file:///repo',
           displayName: 'prod:repo',
         },
       }),
     }))
-    const result = await invokeIpc('remote.resolveTarget', { alias: 'prod', remotePath: '/repo' })
+    const result = await invokeIpc('remote.resolveTarget', { alias: 'prod', remotePath: 'goblin+file:///repo' })
 
     expect(result).toEqual({
       ok: false,
@@ -396,7 +412,7 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('returns NOT_FOUND for removed business ipc procedures regardless of embedded server runtime', async () => {
-    const result = await invokeIpc('repo.deleteBranch', { cwd: '/repo', branch: 'feature/cancel' })
+    const result = await invokeIpc('repo.deleteBranch', { cwd: 'goblin+file:///repo', branch: 'feature/cancel' })
 
     expect(result).toEqual({
       ok: false,
@@ -433,9 +449,11 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
-    const repo = { kind: 'local' as const, id: '/repo' }
+    const repo = { id: 'goblin+file:///repo' }
 
-    const result = await invokeIpc('settings.applyNativeHostProjection', { recentRepos: { recentRepos: [repo] } })
+    const result = await invokeIpc('settings.applyNativeHostProjection', {
+      recentWorkspaces: { recentWorkspaces: [repo] },
+    })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
@@ -443,15 +461,11 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('skips remote repos when syncing Dock recent documents', async () => {
-    const localRepo = { kind: 'local' as const, id: '/repo' }
-    const remoteRepo = {
-      kind: 'remote' as const,
-      id: 'gh:owner/repo',
-      ref: { id: 'gh:owner/repo', alias: 'gh', remotePath: '/owner/repo', displayName: 'gh:repo' },
-    }
+    const localRepo = { id: 'goblin+file:///repo' }
+    const remoteRepo = { id: 'goblin+ssh://gh/owner/repo' }
 
     const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentRepos: { recentRepos: [localRepo, remoteRepo] },
+      recentWorkspaces: { recentWorkspaces: [localRepo, remoteRepo] },
     })
 
     expect(result).toEqual({ ok: true, data: undefined })
@@ -505,20 +519,11 @@ describe('main repo ipc cancellation', () => {
     })
   })
 
-  test('rejects recent repo projections with invalid remote paths', async () => {
+  test('rejects recent workspace projections with invalid canonical IDs', async () => {
     const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentRepos: {
-        recentRepos: [
-          {
-            kind: 'remote',
-            id: 'ssh-config://prodrepo',
-            ref: {
-              id: 'ssh-config://prodrepo',
-              alias: 'prod',
-              remotePath: 'repo',
-              displayName: 'prod:repo',
-            },
-          },
+      recentWorkspaces: {
+        recentWorkspaces: [
+          { id: 'goblin+ssh://prodrepo' },
         ],
       },
     })

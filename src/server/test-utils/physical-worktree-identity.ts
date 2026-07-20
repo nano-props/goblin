@@ -1,11 +1,17 @@
 import path from 'node:path'
 import {
   PhysicalWorktreeIdentityResolver,
-  type PhysicalWorktreeExecutionCapability,
-  type PhysicalWorktreeExecutionBinding,
   type ResolvePhysicalWorktreeIdentityInput,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type {
+  PhysicalWorktreeExecutionBinding,
+  PhysicalWorktreeExecutionCapability,
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const DEFAULT_WORKSPACE_ID = workspaceIdForTest('goblin+file:///test-workspace')
 
 export function testPhysicalWorktreeIdentity(endpoint: string): PhysicalWorktreeIdentity {
   return { kind: 'local', executionNamespaceId: 'local', endpoint: path.resolve(endpoint) }
@@ -13,14 +19,14 @@ export function testPhysicalWorktreeIdentity(endpoint: string): PhysicalWorktree
 
 class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResolver {
   constructor() {
-    super({ onRepoRuntimeClosed: () => () => undefined })
+    super({ onWorkspaceRuntimeClosed: () => () => undefined })
   }
 
   issue(input: {
     identity: PhysicalWorktreeIdentity
     userId?: string
-    repoRoot?: string
-    repoRuntimeId?: string
+    workspaceId?: WorkspaceId
+    workspaceRuntimeId?: string
     worktreePath?: string
     execution?: PhysicalWorktreeExecutionBinding
     runtimeSignal?: AbortSignal
@@ -30,8 +36,8 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
     return this.issueCapability({
       identity: input.identity,
       userId: input.userId ?? 'test-user',
-      repoRoot: input.repoRoot ?? '/repo',
-      repoRuntimeId: input.repoRuntimeId ?? 'test-runtime',
+      workspaceId: input.workspaceId ?? DEFAULT_WORKSPACE_ID,
+      workspaceRuntimeId: input.workspaceRuntimeId ?? 'test-runtime',
       worktreePath: endpoint,
       execution: input.execution ?? {
         kind: 'local',
@@ -55,15 +61,15 @@ export function issueTestPhysicalWorktreeExecutionCapability(
 export function testPhysicalWorktreeExecutionCapability(
   endpoint: string,
   input: Partial<
-    Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>
+    Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'workspaceId' | 'workspaceRuntimeId' | 'worktreePath'>
   > = {},
 ): PhysicalWorktreeExecutionCapability {
   const worktreePath = input.worktreePath ?? endpoint
   return issueTestPhysicalWorktreeExecutionCapability({
     identity: testPhysicalWorktreeIdentity(endpoint),
     userId: input.userId,
-    repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     worktreePath,
   })
 }

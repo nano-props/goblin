@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef, KeyboardEvent } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { omit } from 'es-toolkit'
 
 interface UseSortableTabResult {
   attributes: Record<string, unknown>
@@ -21,7 +22,7 @@ export function useSortableTab(
     disabled: options?.disabled,
   })
   const sortableOnKeyDown = listeners?.onKeyDown as ((event: KeyboardEvent) => void) | undefined
-  const { onKeyDown: _sortableOnKeyDown, ...sortableListeners } = (listeners ?? {}) as ComponentPropsWithoutRef<'div'>
+  const sortableListeners = omit((listeners ?? {}) as ComponentPropsWithoutRef<'div'>, ['onKeyDown'])
   const chromeLikeTransform = transform ? { ...transform, y: 0, scaleX: 1, scaleY: 1 } : null
   const style = {
     transform: CSS.Transform.toString(chromeLikeTransform) ?? undefined,

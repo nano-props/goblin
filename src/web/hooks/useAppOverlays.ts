@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
-export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo'] as const
+export const APP_OVERLAY_KEYS = ['clone', 'openWorkspace', 'openRemoteWorkspace'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
 interface AppOverlayRouteOptions {
@@ -37,40 +37,42 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
-  const openRepoPathDialog = useCallback(() => {
+  const openWorkspacePathDialog = useCallback(() => {
     if (routeDriven) {
-      onRouteOverlayChange?.('openRepo')
+      onRouteOverlayChange?.('openWorkspace')
       return
     }
-    open('openRepo')
+    open('openWorkspace')
   }, [onRouteOverlayChange, open, routeDriven])
 
-  const setOpenRepoOpen = useCallback(
+  const setOpenWorkspaceOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'openRepo' : routeOverlay === 'openRepo' ? null : routeOverlay)
+        onRouteOverlayChange?.(open ? 'openWorkspace' : routeOverlay === 'openWorkspace' ? null : routeOverlay)
         return
       }
-      setOpen('openRepo', open)
+      setOpen('openWorkspace', open)
     },
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
-  const openRemoteRepo = useCallback(() => {
+  const openRemoteWorkspace = useCallback(() => {
     if (routeDriven) {
-      onRouteOverlayChange?.('openRemoteRepo')
+      onRouteOverlayChange?.('openRemoteWorkspace')
       return
     }
-    open('openRemoteRepo')
+    open('openRemoteWorkspace')
   }, [onRouteOverlayChange, open, routeDriven])
 
-  const setOpenRemoteRepoOpen = useCallback(
+  const setOpenRemoteWorkspaceOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'openRemoteRepo' : routeOverlay === 'openRemoteRepo' ? null : routeOverlay)
+        onRouteOverlayChange?.(
+          open ? 'openRemoteWorkspace' : routeOverlay === 'openRemoteWorkspace' ? null : routeOverlay,
+        )
         return
       }
-      setOpen('openRemoteRepo', open)
+      setOpen('openRemoteWorkspace', open)
     },
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
@@ -86,24 +88,24 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   const state = useMemo(
     () => ({
       clone: { open: routeDriven ? routeOverlay === 'clone' : openByKey.clone },
-      openRepo: { open: routeDriven ? routeOverlay === 'openRepo' : openByKey.openRepo },
-      openRemoteRepo: {
-        open: routeDriven ? routeOverlay === 'openRemoteRepo' : openByKey.openRemoteRepo,
+      openWorkspace: { open: routeDriven ? routeOverlay === 'openWorkspace' : openByKey.openWorkspace },
+      openRemoteWorkspace: {
+        open: routeDriven ? routeOverlay === 'openRemoteWorkspace' : openByKey.openRemoteWorkspace,
       },
     }),
-    [openByKey.clone, openByKey.openRepo, openByKey.openRemoteRepo, routeDriven, routeOverlay],
+    [openByKey.clone, openByKey.openWorkspace, openByKey.openRemoteWorkspace, routeDriven, routeOverlay],
   )
-  const anyOverlayOpen = state.clone.open || state.openRepo.open || state.openRemoteRepo.open
+  const anyOverlayOpen = state.clone.open || state.openWorkspace.open || state.openRemoteWorkspace.open
 
   return {
     state,
     anyOpen: anyOverlayOpen,
     openCloneRepo,
     setCloneOpen,
-    openRepoPathDialog,
-    setOpenRepoOpen,
-    openRemoteRepo,
-    setOpenRemoteRepoOpen,
+    openWorkspacePathDialog,
+    setOpenWorkspaceOpen,
+    openRemoteWorkspace,
+    setOpenRemoteWorkspaceOpen,
     closeAllOverlays,
   }
 }

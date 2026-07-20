@@ -3,14 +3,14 @@ import { createNativeShortcutRegistrationState } from '#/server/modules/native-s
 
 const mocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
-  getServerRecentRepos: vi.fn(),
-  getServerRepoSettings: vi.fn(),
+  getServerRecentWorkspaces: vi.fn(),
+  getServerWorkspaceSettings: vi.fn(),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
-  getServerRecentRepos: mocks.getServerRecentRepos,
-  getServerRepoSettings: mocks.getServerRepoSettings,
+  getServerRecentWorkspaces: mocks.getServerRecentWorkspaces,
+  getServerWorkspaceSettings: mocks.getServerWorkspaceSettings,
 }))
 
 describe('server settings snapshot runtime state', () => {
@@ -31,8 +31,8 @@ describe('server settings snapshot runtime state', () => {
       globalShortcut: 'Alt+G',
       lanEnabled: false,
     })
-    mocks.getServerRecentRepos.mockResolvedValue([])
-    mocks.getServerRepoSettings.mockResolvedValue([])
+    mocks.getServerRecentWorkspaces.mockResolvedValue([])
+    mocks.getServerWorkspaceSettings.mockResolvedValue([])
 
     const state = createNativeShortcutRegistrationState()
     state.globalShortcutRegistered = true

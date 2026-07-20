@@ -1,7 +1,13 @@
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { type TerminalCreateAction, type TerminalRuntimeMetadata } from '#/shared/terminal-types.ts'
-import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import {
+  type TerminalCreateAction,
+  terminalExecutionCoordinates,
+  type TerminalExecutionTarget,
+  type TerminalPresentation,
+  type TerminalProjectionEffect,
+  type TerminalRuntimeMetadata,
+} from '#/shared/terminal-types.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
@@ -9,18 +15,15 @@ import {
 import {
   physicalWorktreeExecutionBinding,
   type PhysicalWorktreeExecutionCapability,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 export interface TerminalSessionEnsureInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
   terminalSessionId?: string
   startupShellCommand?: string
   cols?: number
   rows?: number
   clientId?: string
+  target: TerminalExecutionTarget
 }
 
 export type TerminalSessionEnsureResult =
@@ -33,30 +36,24 @@ export type TerminalSessionEnsureResult =
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
-  | { ok: false; message: string }
+  { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission } | { ok: false; message: string }
 
 export type TerminalSessionAdmissionCommitResult = {
   action: TerminalCreateAction
-  branch: string
-  terminalSessionsRevision: number
+  presentation: TerminalPresentation
+  terminalProjectionEffect: TerminalProjectionEffect
 } & TerminalRuntimeMetadata
 
 export interface TerminalSessionAdmission {
   kind: 'existing' | 'prepared'
-  commit(input: { canonicalBranch: string }): TerminalSessionAdmissionCommitResult
+  commit(input: { presentation: TerminalPresentation }): TerminalSessionAdmissionCommitResult
   publishCommittedEffects(): void
   abort(): void
 }
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string
-  scope: string
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
   terminalSessionId: string
-  worktreePath: string
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   cwd: string
   cols: number
@@ -67,6 +64,7 @@ export interface TerminalSessionEnsureManagerInput {
   startupShellCommand?: string
   env?: Record<string, string>
   signal?: AbortSignal
+  target: TerminalExecutionTarget
 }
 
 export interface TerminalSessionEnsureManager {
@@ -84,7 +82,6 @@ export interface TerminalSessionEnsureContext {
   terminalSessionId: string
   cols: number
   rows: number
-  scopedWorktreePath: string
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   signal: AbortSignal
 }
@@ -101,7 +98,9 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    if (isRemoteRepoId(input.repoRoot)) return await this.ensureRemote(userId, input, context)
+    if (isRemoteWorkspaceId(terminalExecutionCoordinates(input.target).workspaceId)) {
+      return await this.ensureRemote(userId, input, context)
+    }
     return await this.ensureLocal(userId, input, context)
   }
 
@@ -121,14 +120,10 @@ class TerminalSessionEnsurer {
       },
       { startupShellCommand: input.startupShellCommand },
     )
+    const coordinates = terminalExecutionCoordinates(input.target)
     const result = await this.options.manager.prepareSession({
       userId,
-      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
-      repoRoot: input.repoRoot,
-      repoRuntimeId: input.repoRuntimeId,
-      branch: input.branch,
       terminalSessionId: context.terminalSessionId,
-      worktreePath: context.scopedWorktreePath,
       physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: process.cwd(),
       cols: context.cols,
@@ -137,6 +132,7 @@ class TerminalSessionEnsurer {
       command: invocation.command,
       args: invocation.args,
       signal: context.signal,
+      target: input.target,
     })
     if (!result.ok) return { ok: false, message: result.message }
     return toEnsureResult(context.terminalSessionId, result)
@@ -149,23 +145,15 @@ class TerminalSessionEnsurer {
   ): Promise<TerminalSessionEnsureResult> {
     const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'local') return { ok: false, message: 'error.invalid-worktree-capability' }
-    const repoRoot = input.repoRoot
     const worktreePath = execution.canonicalWorktreePath
     const env = this.options.gCommand
       ? (buildGoblinTerminalCommandEnvironment({
           ...this.options.gCommand,
-          repoRoot,
-          worktreePath,
         }) ?? undefined)
       : undefined
     const result = await this.options.manager.prepareSession({
       userId,
-      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
-      repoRoot,
-      repoRuntimeId: input.repoRuntimeId,
-      branch: input.branch,
       terminalSessionId: context.terminalSessionId,
-      worktreePath: worktreePath,
       physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: worktreePath,
       cols: context.cols,
@@ -174,6 +162,7 @@ class TerminalSessionEnsurer {
       startupShellCommand: input.startupShellCommand,
       env,
       signal: context.signal,
+      target: input.target,
     })
     if (!result.ok) return { ok: false, message: result.message }
     return toEnsureResult(context.terminalSessionId, result)

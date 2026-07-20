@@ -6,6 +6,9 @@ import {
   settleRepoServerOperation,
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
   resetRepoServerOperationRegistryForTests()
@@ -20,11 +23,11 @@ afterEach(() => {
 describe('repo operation registry', () => {
   test('orders settled operations by settledAt', () => {
     vi.setSystemTime(100)
-    const first = beginRepoServerOperation({ repoId: '/tmp/repo', kind: 'delete-branch', source: 'user' })
+    const first = beginRepoServerOperation({ repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' })
     startRepoServerOperation(first.id)
 
     vi.setSystemTime(200)
-    const second = beginRepoServerOperation({ repoId: '/tmp/repo', kind: 'remove-worktree', source: 'user' })
+    const second = beginRepoServerOperation({ repoId: WORKSPACE_ID, kind: 'remove-worktree', source: 'user' })
     startRepoServerOperation(second.id)
 
     vi.setSystemTime(250)
@@ -34,27 +37,27 @@ describe('repo operation registry', () => {
     settleRepoServerOperation(first.id, { ok: true, message: 'first done' })
 
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true }).map((operation) => operation.id),
+      listRepoServerOperations({ repoId: WORKSPACE_ID, includeSettled: true }).map((operation) => operation.id),
     ).toEqual([first.id, second.id])
   })
 
   test('filters runtime-scoped operations while retaining repo-scoped operations', () => {
-    const repoScoped = beginRepoServerOperation({ repoId: '/tmp/repo', kind: 'fetch', source: 'background' })
+    const repoScoped = beginRepoServerOperation({ repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' })
     const current = beginRepoServerOperation({
-      repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-current',
+      repoId: WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-current',
       kind: 'delete-branch',
       source: 'user',
     })
     beginRepoServerOperation({
-      repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-stale',
+      repoId: WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-stale',
       kind: 'remove-worktree',
       source: 'user',
     })
 
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-current' }).map(
+      listRepoServerOperations({ repoId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-current' }).map(
         (operation) => operation.id,
       ),
     ).toEqual([repoScoped.id, current.id])

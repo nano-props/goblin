@@ -48,7 +48,7 @@ function renderability(input: {
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
   terminalSessionId: 'term-111111111111111111111',
-  terminalWorktreeKey: 'repo\0worktree',
+  terminalFilesystemTargetKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1 full',
@@ -60,21 +60,11 @@ const terminalView: WorkspacePaneTabSummary = {
 }
 
 describe('workspace pane tab providers', () => {
-  test('centralizes static tab scope and refresh behavior', () => {
+  test('centralizes static tab scope', () => {
     expect(statusWorkspacePaneTabProvider.scope).toBe('branch')
-    expect(statusWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
-    expect(statusWorkspacePaneTabProvider.refreshOnVisible).toBe(true)
     expect(changesWorkspacePaneTabProvider.scope).toBe('worktree')
-    expect(changesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
-    expect(changesWorkspacePaneTabProvider.refreshOnVisible).toBe(true)
     expect(historyWorkspacePaneTabProvider.scope).toBe('branch')
-    expect(historyWorkspacePaneTabProvider.refreshOnOpen).toBe(false)
-    expect(historyWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
     expect(filesWorkspacePaneTabProvider.scope).toBe('worktree')
-    expect(filesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
-    expect(filesWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
-    expect(terminalWorkspacePaneTabProvider.refreshOnOpen).toBe(false)
-    expect(terminalWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
   })
 
   test('derives provider scope from the shared workspace pane scope definitions', () => {
@@ -163,10 +153,14 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
     expect(workspacePaneStaticTabProvider('changes').tabEntry()).toEqual(workspacePaneStaticTabEntry('changes'))
-    expect(terminalWorkspacePaneTabProvider.identity('term-111111111111111111111')).toBe('terminal:term-111111111111111111111')
+    expect(terminalWorkspacePaneTabProvider.identity('term-111111111111111111111')).toBe(
+      'terminal:term-111111111111111111111',
+    )
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.tabEntry('term-111111111111111111111')).toEqual(workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'))
+    expect(terminalWorkspacePaneTabProvider.tabEntry('term-111111111111111111111')).toEqual(
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+    )
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )
@@ -179,7 +173,7 @@ describe('workspace pane tab providers', () => {
     expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.status-tooltip:{"branch":"main"}',
     )
-    expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.status')
+    expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: null, statusCount: 0 })).toBe('tab.status')
     expect(historyWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.history-tooltip:{"branch":"main"}',
     )
@@ -187,7 +181,7 @@ describe('workspace pane tab providers', () => {
     expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.files-tooltip:{"branch":"main"}',
     )
-    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.files')
+    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: null, statusCount: 0 })).toBe('tab.files')
     expect(
       terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView }),
     ).toBe('Terminal 1 full')
@@ -214,34 +208,28 @@ describe('workspace pane tab providers', () => {
 
     await expect(
       statusWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: 'main',
         closeStaticTab,
       }),
     ).resolves.toBe(true)
 
-    expect(closeStaticTab).toHaveBeenCalledWith('/repo', 'status', 'main')
+    expect(closeStaticTab).toHaveBeenCalledWith('status')
   })
 
-  test('rejects static tab close without a branch owner', async () => {
+  test('closes static tabs without requiring a branch owner', async () => {
     const closeStaticTab = vi.fn()
 
     await expect(
       statusWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: null,
         closeStaticTab,
       }),
-    ).resolves.toBe(false)
+    ).resolves.toBe(true)
 
-    expect(closeStaticTab).not.toHaveBeenCalled()
+    expect(closeStaticTab).toHaveBeenCalledWith('status')
   })
 
   test('runtime provider close is delegated to runtime close actions', async () => {
     await expect(
       terminalWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: 'main',
         runtimeSessionId: 'term-111111111111111111111',
       }),
     ).resolves.toBe(false)

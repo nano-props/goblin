@@ -1,5 +1,7 @@
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneRuntimeTabStateInput } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   readWorkspacePaneRuntimeTabProviderProjections,
@@ -10,7 +12,7 @@ export type { WorkspacePaneRuntimeTabTargetSelectionByType } from '#/web/workspa
 
 export interface WorkspacePaneRuntimeTabTargetProjection {
   runtimeTabViews: WorkspacePaneTabSummary[]
-  runtimeTabStateByType: Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabStateInput>
+  runtimeTabStateByType: Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabStateInput>
 }
 
 export interface WorkspacePaneRuntimeTabTargetProjectionInput {
@@ -18,9 +20,9 @@ export interface WorkspacePaneRuntimeTabTargetProjectionInput {
 }
 
 export function readWorkspacePaneRuntimeTabTargetProjection(input: {
-  repoRoot: string
-  repoRuntimeId: string
-  worktreePath: string | null
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
 }): WorkspacePaneRuntimeTabTargetProjection {
   return workspacePaneRuntimeTabTargetProjection({
     providers: readWorkspacePaneRuntimeTabProviderProjections(input),
@@ -30,7 +32,7 @@ export function readWorkspacePaneRuntimeTabTargetProjection(input: {
 export function workspacePaneRuntimeTabTargetProjection(
   input: WorkspacePaneRuntimeTabTargetProjectionInput,
 ): WorkspacePaneRuntimeTabTargetProjection {
-  const stateByType: Partial<Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabStateInput>> = {}
+  const stateByType: Partial<Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabStateInput>> = {}
   const runtimeTabViews: WorkspacePaneTabSummary[] = []
   for (const provider of input.providers) {
     runtimeTabViews.push(...provider.views)
@@ -38,6 +40,6 @@ export function workspacePaneRuntimeTabTargetProjection(
   }
   return {
     runtimeTabViews,
-    runtimeTabStateByType: stateByType as Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabStateInput>,
+    runtimeTabStateByType: stateByType as Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabStateInput>,
   }
 }

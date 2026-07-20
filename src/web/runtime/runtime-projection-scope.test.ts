@@ -1,33 +1,39 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import {
-  createRuntimeProjectionScopeRegistry,
-  RuntimeProjectionScope,
-} from '#/web/runtime/runtime-projection-scope.ts'
+import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const TARGET = { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-1' }
+const WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace')
+const SECOND_WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace-2')
+if (!WORKSPACE_ID || !SECOND_WORKSPACE_ID) throw new Error('invalid workspace locator fixture')
+const TARGET = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-1' }
 
 describe('RuntimeProjectionScope', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  test('only lets the latest operation in a lane publish', async () => {
+  test('coalesces overlapping lane invalidations into one follow-up operation', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    scope.runLatest('recovery', async () => await first.promise, publish, reject)
-    scope.runLatest('recovery', async () => await second.promise, publish, reject)
+    const runFirst = vi.fn(async () => await first.promise)
+    const runSecond = vi.fn(async () => await second.promise)
+    scope.runLatest('recovery', runFirst, publish, reject)
+    scope.runLatest('recovery', runSecond, publish, reject)
     second.resolve('new')
     await Promise.resolve()
     await Promise.resolve()
-    first.resolve('old')
-    await Promise.resolve()
-    await Promise.resolve()
+    expect(runFirst).toHaveBeenCalledOnce()
+    expect(runSecond).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
 
-    expect(publish).toHaveBeenCalledOnce()
+    first.resolve('old')
+    await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce())
+
+    expect(runSecond).toHaveBeenCalledOnce()
     expect(publish).toHaveBeenCalledWith('new')
     expect(reject).not.toHaveBeenCalled()
   })
@@ -83,8 +89,8 @@ describe('RuntimeProjectionScope', () => {
 
 describe('RuntimeProjectionScopeRegistry', () => {
   test('runtime replacement disposes the old target and suppresses late success and failure', async () => {
-    let currentRuntimeId = TARGET.repoRuntimeId
-    const registry = createRuntimeProjectionScopeRegistry((target) => target.repoRuntimeId === currentRuntimeId)
+    let currentRuntimeId = TARGET.workspaceRuntimeId
+    const registry = createRuntimeProjectionScopeRegistry((target) => target.workspaceRuntimeId === currentRuntimeId)
     const oldScope = registry.scopeFor(TARGET)
     const lateSuccess = Promise.withResolvers<string>()
     const lateFailure = Promise.withResolvers<string>()
@@ -94,7 +100,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     oldScope.runLatest('failure', async () => await lateFailure.promise, publish, reject)
 
     currentRuntimeId = 'repo-runtime-2'
-    const replacement = registry.scopeFor({ repoRoot: TARGET.repoRoot, repoRuntimeId: currentRuntimeId })
+    const replacement = registry.scopeFor({ workspaceId: TARGET.workspaceId, workspaceRuntimeId: currentRuntimeId })
     lateSuccess.resolve('stale')
     lateFailure.reject(new Error('stale failure'))
     await Promise.resolve()
@@ -111,7 +117,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     const unsubscribe = vi.fn()
     const registry = createRuntimeProjectionScopeRegistry(() => true)
     const first = registry.scopeFor(TARGET)
-    const second = registry.scopeFor({ repoRoot: '/repo-2', repoRuntimeId: 'repo-runtime-2' })
+    const second = registry.scopeFor({ workspaceId: SECOND_WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-2' })
     registry.track(unsubscribe)
 
     registry.dispose()

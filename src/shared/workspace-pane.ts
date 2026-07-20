@@ -1,4 +1,5 @@
 export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history', 'files'] as const
+export type WorkspacePaneDefaultTargetKind = 'git' | 'workspace-root'
 export const WORKSPACE_PANE_RUNTIME_TAB_TYPES = ['terminal'] as const
 export const WORKSPACE_PANE_TAB_TYPES = [
   ...WORKSPACE_PANE_STATIC_TAB_TYPES,
@@ -122,6 +123,12 @@ export function workspacePaneTabEntryFromUnknown(value: unknown): WorkspacePaneT
 
 export function workspacePaneStaticTabEntry(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabEntry {
   return { type, tabId: workspacePaneStaticTabId(type) }
+}
+
+export function defaultWorkspacePaneTabEntries(kind: WorkspacePaneDefaultTargetKind): WorkspacePaneTabEntry[] {
+  return kind === 'workspace-root'
+    ? [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')]
+    : [workspacePaneStaticTabEntry('status')]
 }
 
 export function workspacePaneRuntimeTabEntry(

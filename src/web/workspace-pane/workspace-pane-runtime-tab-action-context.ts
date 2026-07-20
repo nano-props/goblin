@@ -7,10 +7,7 @@ export interface WorkspacePaneRuntimeTabActionContextInput {
 }
 
 interface WorkspacePaneRuntimeTabActionContextResolver {
-  assign: (
-    context: WorkspacePaneRuntimeTabActionContext,
-    input: WorkspacePaneRuntimeTabActionContextInput,
-  ) => void
+  assign: (context: WorkspacePaneRuntimeTabActionContext, input: WorkspacePaneRuntimeTabActionContextInput) => void
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_ACTION_CONTEXT_RESOLVERS_BY_TYPE: Record<

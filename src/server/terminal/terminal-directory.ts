@@ -1,25 +1,28 @@
+import { terminalSessionUserFilesystemTargetKey } from '#/shared/terminal-session-keys.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface TerminalDirectoryEntry<TUser extends string | number> {
-  id: string
-  userId: TUser
-  scope: string
-  terminalSessionId: string
+  readonly id: string
+  readonly userId: TUser
+  readonly scope: string
+  readonly terminalSessionId: string
+  readonly executionRootId: WorkspaceId
 }
 
 export interface TerminalDirectoryReservation<TUser extends string | number> {
-  id: string
-  userId: TUser
-  scope: string
-  terminalSessionId: string
+  readonly id: string
+  readonly userId: TUser
+  readonly scope: string
+  readonly terminalSessionId: string
+  readonly executionRootId: WorkspaceId
 }
 
-export class TerminalDirectory<
-  TUser extends string | number,
-  TEntry extends TerminalDirectoryEntry<TUser>,
-> {
+export class TerminalDirectory<TUser extends string | number, TEntry extends TerminalDirectoryEntry<TUser>> {
   private readonly entriesByRuntimeId = new Map<string, TEntry>()
   private readonly runtimeIdByUserSession = new Map<string, string>()
   private readonly reservationsByRuntimeId = new Map<string, TerminalDirectoryReservation<TUser>>()
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
+  private readonly runtimeIdsByUserFilesystemTarget = new Map<string, Set<string>>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
   private publish(entry: TEntry): void {
@@ -28,6 +31,13 @@ export class TerminalDirectory<
     if (this.runtimeIdByUserSession.has(durableKey)) throw new Error('terminal directory durable identity conflict')
     this.entriesByRuntimeId.set(entry.id, entry)
     this.runtimeIdByUserSession.set(durableKey, entry.id)
+    const filesystemTargetKey = terminalSessionUserFilesystemTargetKey(entry)
+    let runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(filesystemTargetKey)
+    if (!runtimeIds) {
+      runtimeIds = new Set()
+      this.runtimeIdsByUserFilesystemTarget.set(filesystemTargetKey, runtimeIds)
+    }
+    runtimeIds.add(entry.id)
     this.advanceCatalogRevision(entry.userId, entry.scope)
   }
 
@@ -45,7 +55,8 @@ export class TerminalDirectory<
         if (settled) throw new Error('terminal directory reservation already settled')
         if (this.reservationsByRuntimeId.get(identity.id) !== identity)
           throw new Error('terminal directory reservation ownership lost')
-        if (!reservationMatchesEntry(identity, entry)) throw new Error('terminal directory reservation identity mismatch')
+        if (!reservationMatchesEntry(identity, entry))
+          throw new Error('terminal directory reservation identity mismatch')
         this.publish(entry)
         settled = true
         this.reservationsByRuntimeId.delete(identity.id)
@@ -79,13 +90,37 @@ export class TerminalDirectory<
     return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
   }
 
+  primaryForFilesystemTarget(userId: TUser, scope: string, executionRootId: WorkspaceId): TEntry | undefined {
+    const runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(
+      terminalSessionUserFilesystemTargetKey({ userId, scope, executionRootId }),
+    )
+    const runtimeId = runtimeIds?.values().next().value
+    return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
+  }
+
   remove(entry: TEntry): boolean {
     if (this.entriesByRuntimeId.get(entry.id) !== entry) return false
     this.entriesByRuntimeId.delete(entry.id)
     const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
     if (this.runtimeIdByUserSession.get(durableKey) === entry.id) this.runtimeIdByUserSession.delete(durableKey)
+    const filesystemTargetKey = terminalSessionUserFilesystemTargetKey(entry)
+    const runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(filesystemTargetKey)
+    runtimeIds?.delete(entry.id)
+    if (runtimeIds?.size === 0) this.runtimeIdsByUserFilesystemTarget.delete(filesystemTargetKey)
     this.advanceCatalogRevision(entry.userId, entry.scope)
     return true
+  }
+
+  change(entry: TEntry, mutate: () => void): number {
+    if (this.entriesByRuntimeId.get(entry.id) !== entry) throw new Error('terminal directory entry unavailable')
+    mutate()
+    return this.touch(entry)
+  }
+
+  touch(entry: TEntry): number {
+    if (this.entriesByRuntimeId.get(entry.id) !== entry) throw new Error('terminal directory entry unavailable')
+    this.advanceCatalogRevision(entry.userId, entry.scope)
+    return this.catalogRevision(entry.userId, entry.scope)
   }
 
   entries(): IterableIterator<TEntry> {
@@ -131,6 +166,7 @@ function reservationMatchesEntry<TUser extends string | number>(
     entry.id === identity.id &&
     entry.userId === identity.userId &&
     entry.scope === identity.scope &&
-    entry.terminalSessionId === identity.terminalSessionId
+    entry.terminalSessionId === identity.terminalSessionId &&
+    entry.executionRootId === identity.executionRootId
   )
 }

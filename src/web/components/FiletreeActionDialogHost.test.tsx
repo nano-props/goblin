@@ -2,12 +2,15 @@
 
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import {
   resetFiletreeActionDialogsStore,
   useFiletreeActionDialogsStore,
-} from '#/web/stores/repos/filetree-action-dialogs.ts'
+} from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 const dialogProps = vi.hoisted(() => ({
   latest: { open: false, title: '', message: null as unknown },
@@ -40,13 +43,20 @@ afterEach(() => {
 
 describe('FiletreeActionDialogHost', () => {
   test('retains the file path message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<FiletreeActionDialogHost currentRepoId="/repo" />)
+    renderInJsdom(
+      <FiletreeActionDialogHost
+        currentWorkspaceId={WORKSPACE_ID}
+        currentWorkspaceRuntimeId="workspace-runtime-filetree-action-test"
+      />,
+    )
 
     act(() => {
       useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
-        repoId: '/repo',
-        repoRuntimeId: 'repo-runtime-filetree-action-test',
-        worktreePath: '/repo-worktree',
+        target: {
+          kind: 'workspace-root',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: 'workspace-runtime-filetree-action-test',
+        },
         path: 'src/example.ts',
         name: 'example.ts',
       })
@@ -67,6 +77,28 @@ describe('FiletreeActionDialogHost', () => {
     })
     expect(renderMessageText(dialogProps.latest.message)).toContain('Move to trash:')
     expect(renderMessageText(dialogProps.latest.message)).toContain('src/example.ts')
+  })
+
+  test('closes a confirmation bound to an earlier runtime of the same workspace', () => {
+    useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
+      target: {
+        kind: 'workspace-root',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'workspace-runtime-previous',
+      },
+      path: 'src/example.ts',
+      name: 'example.ts',
+    })
+
+    renderInJsdom(
+      <FiletreeActionDialogHost
+        currentWorkspaceId={WORKSPACE_ID}
+        currentWorkspaceRuntimeId="workspace-runtime-current"
+      />,
+    )
+
+    expect(useFiletreeActionDialogsStore.getState().trashFileConfirm).toBeNull()
+    expect(dialogProps.latest.open).toBe(false)
   })
 })
 

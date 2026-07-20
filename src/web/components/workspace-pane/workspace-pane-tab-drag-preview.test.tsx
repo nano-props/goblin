@@ -3,7 +3,9 @@
 import { act } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test } from 'vitest'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -14,9 +16,9 @@ import {
   useWorkspacePaneTabDragPreview,
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
-const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-drag-preview-repo')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
@@ -47,9 +49,9 @@ describe('useWorkspacePaneTabDragPreview', () => {
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     setWorkspacePaneTabsForTargetQueryData(
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
+        kind: 'git-worktree' as const,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
       },
@@ -96,8 +98,22 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(<HookHost input={previewInput({ branchName: null, canonicalTabs: sourceTabs })} />)
     })
     act(() => {
-      expect(currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')])).toBe(false)
+      expect(
+        currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')]),
+      ).toBe(false)
     })
+    expect(currentControls().visualTabs).toEqual(sourceTabs)
+  })
+
+  test('stages and clears a workspace-root preview without a branch sentinel', () => {
+    const sourceTabs = [staticEntry('status'), staticEntry('files')]
+    const reorderedTabs = [...sourceTabs].reverse()
+    renderPreviewHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
+
+    act(() => expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true))
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+
+    act(() => currentControls().clearDragPreview())
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
@@ -144,7 +160,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
-  test('clears a staged preview when the repo runtime changes', () => {
+  test('clears a staged preview when the workspace runtime changes', () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
@@ -158,7 +174,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(
         <HookHost
           input={previewInput({
-            repoRuntimeId: NEXT_REPO_RUNTIME_ID,
+            workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
             canonicalTabs: sourceTabs,
           })}
         />,
@@ -169,18 +185,48 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 })
 
-function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}) {
+interface PreviewInputOverrides {
+  kind?: 'workspace-root' | 'inactive'
+  workspaceId?: WorkspaceId
+  workspaceRuntimeId?: string
+  branchName?: string | null
+  worktreePath?: string | null
+  canonicalTabs?: readonly WorkspacePaneTabEntry[]
+}
+
+function renderPreviewHook(input: PreviewInputOverrides = {}) {
   return renderInJsdom(<HookHost input={previewInput(input)} />)
 }
 
-function previewInput(input: Partial<WorkspacePaneTabDragPreviewInput> = {}): WorkspacePaneTabDragPreviewInput {
+function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPreviewInput {
+  const workspaceId = input.workspaceId ?? REPO_ROOT
+  const workspaceRuntimeId = input.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
+  const canonicalTabs = input.canonicalTabs ?? []
+  if (input.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId,
+
+      canonicalTabs,
+    }
+  }
+  if (input.kind === 'inactive' || input.branchName === null) {
+    return {
+      kind: 'inactive',
+      workspaceId,
+      workspaceRuntimeId,
+      branchName: null,
+      worktreePath: null,
+      canonicalTabs,
+    }
+  }
   return {
-    repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    branchName: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-    canonicalTabs: [],
-    ...input,
+    kind: 'git-worktree',
+    workspaceId,
+    workspaceRuntimeId,
+    worktreePath: input.worktreePath ?? WORKTREE_PATH,
+    canonicalTabs,
   }
 }
 
@@ -197,9 +243,9 @@ function currentControls(): WorkspacePaneTabDragPreviewState {
 function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget(
     {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
+      kind: 'git-worktree' as const,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       worktreePath: WORKTREE_PATH,
     },
     queryClient,

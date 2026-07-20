@@ -4,22 +4,16 @@ import { runConfirmCloseTerminalWorkspacePaneTabCommand } from '#/web/commands/w
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
-  currentRepoId: string | null
-  currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspaceId: string | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }
 
-export function TerminalActionDialogHost({
-  currentRepoId,
-  currentBranchName,
-  currentWorkspacePaneRoute,
-  navigation,
-}: Props) {
+export function TerminalActionDialogHost({ currentWorkspaceId, currentWorkspacePaneRoute, navigation }: Props) {
   const t = useT()
   const closeConfirm = useTerminalActionDialogsStore((s) => s.closeConfirm)
   const closeCloseConfirm = useTerminalActionDialogsStore((s) => s.closeCloseConfirm)
@@ -27,9 +21,9 @@ export function TerminalActionDialogHost({
   const displayCloseConfirm = useLastNonNull(closeConfirm)
 
   useEffect(() => {
-    if (currentRepoId) closeStaleDialogs(currentRepoId)
+    if (currentWorkspaceId) closeStaleDialogs(currentWorkspaceId)
     else closeCloseConfirm()
-  }, [currentRepoId, closeCloseConfirm, closeStaleDialogs])
+  }, [currentWorkspaceId, closeCloseConfirm, closeStaleDialogs])
 
   return (
     <ConfirmDialog
@@ -53,14 +47,12 @@ export function TerminalActionDialogHost({
         const payload = closeConfirm
         closeCloseConfirm()
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
-          repoId: payload.repoId,
-          branchName: payload.terminalBase.branch,
+          workspaceId: payload.workspaceId,
           workspacePaneRoute: payload.workspacePaneRoute,
-          currentRepoId,
-          currentBranchName,
           currentWorkspacePaneRoute,
           navigation,
           targetIdentity: payload.targetIdentity,
+          selectedIdentity: payload.selectedIdentity,
           confirmedTerminal: {
             terminalSessionId: payload.terminalSessionId,
             base: payload.terminalBase,

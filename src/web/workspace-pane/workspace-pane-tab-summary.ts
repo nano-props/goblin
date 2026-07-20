@@ -15,8 +15,7 @@ export type WorkspacePaneRuntimeTabSummary = WorkspacePaneTerminalTabSummary | W
 export type WorkspacePaneTabSummary = WorkspacePaneRuntimeTabSummary
 
 type WorkspacePaneRuntimeTabSummaryWithGenericId =
-  | WorkspacePaneRuntimeTabSummary
-  | WorkspacePaneGenericRuntimeTabSummary<WorkspacePaneRuntimeTabType>
+  WorkspacePaneRuntimeTabSummary | WorkspacePaneGenericRuntimeTabSummary<WorkspacePaneRuntimeTabType>
 
 export function workspacePanePendingRuntimeTabIdentity(type: WorkspacePaneRuntimeTabType): string {
   return `${type}:pending`

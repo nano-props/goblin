@@ -6,14 +6,9 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import {
-  workspacePaneRuntimeTabProvider,
-  workspacePaneStaticTabProvider,
-} from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneRuntimeTabAttention } from '#/web/workspace-pane/tab-providers.ts'
-import type {
-  WorkspacePaneRuntimeTabSummary,
-} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   workspacePanePendingRuntimeTabIdentity,
   workspacePaneRuntimeTabSummaryIdentity,
@@ -30,6 +25,7 @@ interface WorkspacePaneTabItemBase {
   tooltip: string
   icon: LucideIcon
   panelId?: string
+  closable?: boolean
 }
 
 interface WorkspacePaneSortableTabItemBase extends WorkspacePaneTabItemBase {
@@ -70,6 +66,7 @@ export function createStaticWorkspacePaneTabItem(input: {
   tooltip: string
   closeLabel: string
   panelId?: string
+  closable?: boolean
 }): WorkspacePaneStaticTabItem {
   const provider = workspacePaneStaticTabProvider(input.type)
   return {
@@ -82,6 +79,7 @@ export function createStaticWorkspacePaneTabItem(input: {
     closeLabel: input.closeLabel,
     icon: provider.icon,
     panelId: input.panelId,
+    closable: input.closable,
     sortableId: provider.identity(),
     tabEntry: provider.tabEntry(),
   }

@@ -40,13 +40,7 @@ type RealtimePongMessage = { type: 'pong'; requestId: string }
 type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
 
 export type ClientRealtimeRequestFailureKind =
-  | 'unavailable'
-  | 'open-timeout'
-  | 'open-failed'
-  | 'send-failed'
-  | 'disconnected'
-  | 'timeout'
-  | 'app-quitting'
+  'unavailable' | 'open-timeout' | 'open-failed' | 'send-failed' | 'disconnected' | 'timeout' | 'app-quitting'
 
 export class ClientRealtimeRequestError extends Error {
   readonly kind: ClientRealtimeRequestFailureKind

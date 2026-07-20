@@ -38,7 +38,8 @@ function deleteReverseBinding(
   const byGeneration = input.terminalSessionIdByTerminalRuntimeSessionId.get(binding.terminalRuntimeSessionId)
   if (byGeneration?.get(binding.terminalRuntimeGeneration) !== input.terminalSessionId) return
   byGeneration.delete(binding.terminalRuntimeGeneration)
-  if (byGeneration.size === 0) input.terminalSessionIdByTerminalRuntimeSessionId.delete(binding.terminalRuntimeSessionId)
+  if (byGeneration.size === 0)
+    input.terminalSessionIdByTerminalRuntimeSessionId.delete(binding.terminalRuntimeSessionId)
 }
 
 function sameBinding(a: IndexedTerminalRuntimeBinding, b: IndexedTerminalRuntimeBinding | null): boolean {

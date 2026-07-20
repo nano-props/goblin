@@ -38,7 +38,7 @@ export interface WorkspacePaneTabAvailabilityContext {
 
 export interface WorkspacePaneStaticTabMetadataInput {
   t: T
-  branchName: string
+  branchName: string | null
   statusCount: number
 }
 
@@ -46,7 +46,7 @@ export interface WorkspacePaneRuntimeTabMetadataInput<
   TType extends WorkspacePaneRuntimeTabType = WorkspacePaneRuntimeTabType,
 > {
   t: T
-  branchName: string
+  branchName: string | null
   statusCount: number
   view: Extract<WorkspacePaneTabSummary, { type: TType }>
 }
@@ -74,22 +74,14 @@ export interface WorkspacePanePanelLabel {
 }
 
 export interface WorkspacePaneTabCloseInput {
-  repoId: string
-  branchName: string | null
   runtimeSessionId?: string
-  closeStaticTab?: (
-    repoId: string,
-    type: WorkspacePaneStaticTabType,
-    branchName: string,
-  ) => boolean | void | Promise<boolean | void>
+  closeStaticTab?: (type: WorkspacePaneStaticTabType) => boolean | void | Promise<boolean | void>
 }
 
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
   readonly type: TType
   readonly icon: LucideIcon
   abstract readonly kind: WorkspacePaneTabProviderKind
-  abstract readonly refreshOnOpen: boolean
-  abstract readonly refreshOnVisible: boolean
 
   constructor(input: { type: TType; icon: LucideIcon }) {
     this.type = input.type
@@ -121,7 +113,6 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabTyp
   }
 
   abstract close(input: WorkspacePaneTabCloseInput): Promise<boolean>
-
 }
 
 export abstract class WorkspacePaneStaticTabProvider<
@@ -149,10 +140,8 @@ export abstract class WorkspacePaneStaticTabProvider<
   }
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.branchName || !input.closeStaticTab) return Promise.resolve(false)
-    return Promise.resolve(input.closeStaticTab(input.repoId, this.type, input.branchName)).then(
-      (result) => result !== false,
-    )
+    if (!input.closeStaticTab) return Promise.resolve(false)
+    return Promise.resolve(input.closeStaticTab(this.type)).then((result) => result !== false)
   }
 }
 
@@ -184,9 +173,6 @@ export abstract class WorkspacePaneRuntimeTabProvider<
 }
 
 class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'status'> {
-  readonly refreshOnOpen = true
-  readonly refreshOnVisible = true
-
   constructor() {
     super({ type: 'status', icon: GitBranch })
   }
@@ -201,9 +187,6 @@ class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'sta
 }
 
 class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'changes'> {
-  readonly refreshOnOpen = true
-  readonly refreshOnVisible = true
-
   constructor() {
     super({ type: 'changes', icon: Diff })
   }
@@ -221,9 +204,6 @@ class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'ch
 }
 
 class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'history'> {
-  readonly refreshOnOpen = false
-  readonly refreshOnVisible = false
-
   constructor() {
     super({ type: 'history', icon: History })
   }
@@ -238,9 +218,6 @@ class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'hi
 }
 
 class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'files'> {
-  readonly refreshOnOpen = true
-  readonly refreshOnVisible = false
-
   constructor() {
     super({ type: 'files', icon: FolderTree })
   }
@@ -256,9 +233,6 @@ class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'file
 }
 
 export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabProvider<'terminal'> {
-  readonly refreshOnOpen = false
-  readonly refreshOnVisible = false
-
   constructor() {
     super({ type: 'terminal', icon: Terminal })
   }
@@ -351,10 +325,12 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabT
 
 const RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS = [terminalWorkspacePaneTabProvider] as const
 
-const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabProvider> =
-  {
-    terminal: terminalWorkspacePaneTabProvider,
-  }
+const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<
+  WorkspacePaneRuntimeTabType,
+  WorkspacePaneRuntimeTabProvider
+> = {
+  terminal: terminalWorkspacePaneTabProvider,
+}
 
 export const workspacePaneTabProviders = [
   ...STATIC_WORKSPACE_PANE_TAB_PROVIDERS,

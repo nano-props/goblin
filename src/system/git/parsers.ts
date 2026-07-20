@@ -243,12 +243,13 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
   const worktrees: WorktreeInfo[] = []
   const blocks = output.split('\n\n').filter(Boolean)
 
-  for (const block of blocks) {
+  for (const [blockIndex, block] of blocks.entries()) {
     const lines = block.split('\n').filter(Boolean)
     let path = ''
     let branch: string | undefined
     let isBare = false
     let isLocked = false
+    let isPrunable = false
 
     for (const line of lines) {
       if (line.startsWith('worktree ')) {
@@ -260,11 +261,29 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
         isBare = true
       } else if (line === 'locked' || line.startsWith('locked ')) {
         isLocked = true
+      } else if (line === 'prunable' || line.startsWith('prunable ')) {
+        isPrunable = true
       }
     }
 
-    if (path) worktrees.push({ path, branch, isBare, isPrimary: worktrees.length === 0, isLocked })
+    if (path) {
+      worktrees.push({
+        path,
+        branch,
+        isBare,
+        isPrimary: blockIndex === 0,
+        isLocked,
+        ...(isPrunable ? { isPrunable: true } : {}),
+      })
+    }
   }
 
   return worktrees
+}
+
+/** Physical worktree projection used by every execution consumer. The raw
+ * parser deliberately retains prunable Git metadata for diagnostics and
+ * future cleanup, while this single boundary defines usable membership. */
+export function parseUsableWorktrees(output: string): WorktreeInfo[] {
+  return parseWorktrees(output).filter((worktree) => worktree.isPrunable !== true)
 }

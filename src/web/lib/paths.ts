@@ -1,7 +1,11 @@
 import { homeDirectory } from '#/web/app-shell-client.ts'
-import { formatRemoteWorktreeLocator, formatRepoLocator as formatSharedRepoLocator } from '#/shared/repo-locator.ts'
+import {
+  formatRemoteWorktreeLocator,
+  formatWorkspaceDisplayLocation as formatSharedWorkspaceDisplayLocation,
+} from '#/shared/workspace-display-location.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 
 /** Last segment of a path. Tolerant of either separator so worktree
@@ -36,11 +40,11 @@ export function joinPath(parent: string, child: string): string {
   return `${parent}${sep}${child}`
 }
 
-export function defaultWorktreePath(repoId: string, branch: string): string {
+export function defaultWorktreePath(workspacePath: string, branch: string): string {
   const slug = branch.trim().replaceAll('/', '-')
   if (!slug) return ''
-  const parent = parentDir(repoId)
-  const name = lastPathSegment(repoId) || 'worktree'
+  const parent = parentDir(workspacePath)
+  const name = lastPathSegment(workspacePath) || 'worktree'
   return parent ? joinPath(parent, `${name}-${slug}`) : `${name}-${slug}`
 }
 
@@ -52,10 +56,13 @@ export function untildify(path: string): string {
   return untildifyPath(path, homeDirectory())
 }
 
-export function formatRepoLocator(path: string, target?: RemoteRepoTarget | null): string {
-  return formatSharedRepoLocator(path, homeDirectory(), target)
+export function formatWorkspaceDisplayLocation(
+  workspaceId: WorkspaceId,
+  target?: RemoteWorkspaceTarget | null,
+): string {
+  return formatSharedWorkspaceDisplayLocation(workspaceId, homeDirectory(), target)
 }
 
-export function formatWorktreePath(path: string, target?: RemoteRepoTarget | null): string {
+export function formatWorktreePath(path: string, target?: RemoteWorkspaceTarget | null): string {
   return target ? formatRemoteWorktreeLocator(target, path) : tildify(path)
 }

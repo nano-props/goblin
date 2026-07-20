@@ -5,21 +5,27 @@ import os from 'node:os'
 import path from 'node:path'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { restorableWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
+const REPO_B = workspaceIdForTest('goblin+file:///repo-b')
+const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
-  repoRoot: string,
+  workspaceId: WorkspaceId,
   replacement: WorkspacePaneDurableLayout,
 ): Promise<void> {
-  const current = await source.serverWorkspacePaneLayoutRepository.load(repoRoot)
+  const current = await source.serverWorkspacePaneLayoutRepository.load(workspaceId)
   const outcome = await source.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot,
+    workspaceId,
     expected: current.layout,
     replacement,
   })
@@ -56,8 +62,8 @@ test('initializes user-settings.json with defaults when no persisted settings ex
     lanEnabled: false,
   })
   expect(await mod.getServerWorkspaceState()).toEqual(defaultServerWorkspaceState())
-  expect(await mod.getServerRecentRepos()).toEqual([])
-  expect(await mod.getServerRepoSettings()).toEqual([])
+  expect(await mod.getServerRecentWorkspaces()).toEqual([])
+  expect(await mod.getServerWorkspaceSettings()).toEqual([])
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
@@ -84,12 +90,12 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'CommandOrControl+Alt+G',
     lanEnabled: false,
   })
-  await writeWorkspacePaneLayout(mod, '/repo-b', {
-    entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: [] }],
+  await writeWorkspacePaneLayout(mod, REPO_B, {
+    entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
   })
-  await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-b',
+  await mod.addServerRecentWorkspace({ id: REPO_B })
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_B,
     configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   })
   unsubscribe()
@@ -112,16 +118,16 @@ test('persists updates and notifies subscribers from the server settings store',
     lanEnabled: false,
   })
   expect(await reloaded.getServerWorkspaceState()).toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
-      '/repo-b': {
-        [branchTargetKey('/repo-b', 'main')]: [],
+    workspacePaneTabsByTargetByWorkspace: {
+      [REPO_B]: {
+        [branchTargetKey(REPO_B, 'main')]: [],
       },
     },
   })
-  expect(await reloaded.getServerRecentRepos()).toEqual([{ kind: 'local', id: '/repo-b' }])
-  expect(await reloaded.getServerRepoSettings()).toEqual([
+  expect(await reloaded.getServerRecentWorkspaces()).toEqual([{ id: REPO_B }])
+  expect(await reloaded.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-b',
+      workspaceId: REPO_B,
       worktreeBootstrapTrust: {
         configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         trustedAt: expect.any(String),
@@ -165,30 +171,32 @@ test('serializes concurrent settings mutations without dropping updates', async 
   const mod = await import('#/server/modules/settings-source.ts')
 
   await Promise.all([
-    mod.addServerRecentRepo({ kind: 'local', id: '/repo-a' }),
-    mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' }),
-    mod.addServerRecentRepo({ kind: 'local', id: '/repo-c' }),
+    mod.addServerRecentWorkspace({ id: REPO_A }),
+    mod.addServerRecentWorkspace({ id: REPO_B }),
+    mod.addServerRecentWorkspace({ id: REPO_C }),
   ])
 
-  expect(await mod.getServerRecentRepos()).toEqual([
-    { kind: 'local', id: '/repo-c' },
-    { kind: 'local', id: '/repo-b' },
-    { kind: 'local', id: '/repo-a' },
+  expect(await mod.getServerRecentWorkspaces()).toEqual([
+    { id: REPO_C },
+    { id: REPO_B },
+    { id: REPO_A },
   ])
   expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
 
-test('stores the shared open repo order without applying the recent-repo limit', async () => {
+test('stores the shared open repo order without applying the recent-workspace limit', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const entries = Array.from({ length: 12 }, (_, index) => ({ kind: 'local' as const, id: `/repo-${index}` }))
+  const entries = Array.from({ length: 12 }, (_, index) => ({
+    id: workspaceIdForTest(`goblin+file:///repo-${index}`),
+  }))
 
-  for (const entry of entries) await mod.addServerWorkspaceRepo(entry)
-  await mod.addServerWorkspaceRepo(entries[3]!)
+  for (const entry of entries) await mod.addServerWorkspaceEntry(entry)
+  await mod.addServerWorkspaceEntry(entries[3]!)
 
-  expect((await mod.getServerWorkspaceState()).openRepoEntries).toEqual(entries)
+  expect((await mod.getServerWorkspaceState()).openWorkspaceEntries).toEqual(entries)
 })
 
 test('repairs open repos only when the source membership is unchanged', async () => {
@@ -196,20 +204,20 @@ test('repairs open repos only when the source membership is unchanged', async ()
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoA = { kind: 'local' as const, id: '/repo-a' }
-  const repoB = { kind: 'local' as const, id: '/repo-b' }
-  const repoC = { kind: 'local' as const, id: '/repo-c' }
-  await mod.addServerWorkspaceRepo(repoA)
-  await mod.addServerWorkspaceRepo(repoB)
+  const repoA = { id: REPO_A }
+  const repoB = { id: REPO_B }
+  const repoC = { id: REPO_C }
+  await mod.addServerWorkspaceEntry(repoA)
+  await mod.addServerWorkspaceEntry(repoB)
 
-  await expect(mod.compareAndReplaceServerWorkspaceRepos([repoA, repoB], [repoA])).resolves.toMatchObject({
+  await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA, repoB], [repoA])).resolves.toMatchObject({
     matched: true,
-    workspace: { openRepoEntries: [repoA] },
+    workspace: { openWorkspaceEntries: [repoA] },
   })
-  await mod.addServerWorkspaceRepo(repoC)
-  await expect(mod.compareAndReplaceServerWorkspaceRepos([repoA], [])).resolves.toMatchObject({
+  await mod.addServerWorkspaceEntry(repoC)
+  await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA], [])).resolves.toMatchObject({
     matched: false,
-    latestWorkspace: { openRepoEntries: [repoA, repoC] },
+    latestWorkspace: { openWorkspaceEntries: [repoA, repoC] },
   })
 })
 
@@ -218,14 +226,14 @@ test('confirms one canonical workspace repo entry without writing settings', asy
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const entry = { kind: 'local' as const, id: '/repo-a' }
-  await mod.addServerWorkspaceRepo(entry)
+  const entry = { id: REPO_A }
+  await mod.addServerWorkspaceEntry(entry)
 
-  await expect(mod.confirmServerWorkspaceRepoEntry(entry)).resolves.toMatchObject({ matched: true })
-  await mod.removeServerWorkspaceRepo(entry.id)
-  await expect(mod.confirmServerWorkspaceRepoEntry(entry)).resolves.toMatchObject({
+  await expect(mod.confirmServerWorkspaceEntry(entry)).resolves.toMatchObject({ matched: true })
+  await mod.removeServerWorkspaceEntry(entry.id)
+  await expect(mod.confirmServerWorkspaceEntry(entry)).resolves.toMatchObject({
     matched: false,
-    latestWorkspace: { openRepoEntries: [] },
+    latestWorkspace: { openWorkspaceEntries: [] },
   })
 })
 
@@ -234,28 +242,26 @@ test('persists durable tabs independently of runtime membership', async () => {
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  await writeWorkspacePaneLayout(mod, '/repo-a', {
+  await writeWorkspacePaneLayout(mod, REPO_A, {
     entries: [
       {
-        repoRoot: '/repo-a',
-        branchName: 'main',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'main' },
         tabs: [workspacePaneStaticTabEntry('history')],
       },
     ],
   })
 
   await expect(mod.getServerWorkspaceState()).resolves.toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
-      '/repo-a': { [branchTargetKey('/repo-a', 'main')]: [workspacePaneStaticTabEntry('history')] },
+    workspacePaneTabsByTargetByWorkspace: {
+      [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [workspacePaneStaticTabEntry('history')] },
     },
   })
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
   await expect(reloaded.getServerWorkspaceState()).resolves.toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
-      '/repo-a': { [branchTargetKey('/repo-a', 'main')]: [workspacePaneStaticTabEntry('history')] },
+    workspacePaneTabsByTargetByWorkspace: {
+      [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [workspacePaneStaticTabEntry('history')] },
     },
   })
 })
@@ -265,46 +271,54 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoEntry = { kind: 'local' as const, id: '/repo-a' }
+  const repoEntry = { id: REPO_A }
   const empty = { entries: [] }
-  const history = {
-    entries: [{
-      repoRoot: '/repo-a',
-      branchName: 'main',
-      worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('history')],
-    }],
+  const history: WorkspacePaneDurableLayout = {
+    entries: [
+      {
+        target: { kind: 'git-branch', branch: 'main' },
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ],
   }
   const historyTarget = history.entries[0]
   if (!historyTarget) throw new Error('test layout target missing')
-  await mod.addServerWorkspaceRepo(repoEntry)
+  await mod.addServerWorkspaceEntry(repoEntry)
 
-  await expect(mod.serverWorkspacePaneLayoutRepository.load('/repo-a')).resolves.toEqual({ layout: empty })
+  await expect(mod.serverWorkspacePaneLayoutRepository.load(REPO_A)).resolves.toEqual({ layout: empty })
   await mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: '/repo-a',
+    workspaceId: REPO_A,
     expected: empty,
     replacement: history,
   })
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-    repoRoot: '/repo-a',
-    expectedRepoEntry: repoEntry,
-  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: history } })
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: '/repo-a',
-    expected: history,
-    replacement: history,
-  })).resolves.toMatchObject({ kind: 'accepted', changed: false })
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: '/repo-a',
-    expected: empty,
-    replacement: empty,
-  })).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
+  await expect(
+    mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
+    }),
+  ).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: history } })
+  await expect(
+    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+      workspaceId: REPO_A,
+      expected: history,
+      replacement: history,
+    }),
+  ).resolves.toMatchObject({ kind: 'accepted', changed: false })
+  await expect(
+    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+      workspaceId: REPO_A,
+      expected: empty,
+      replacement: empty,
+    }),
+  ).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
 
-  await mod.removeServerWorkspaceRepo('/repo-a')
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-    repoRoot: '/repo-a',
-    expectedRepoEntry: repoEntry,
-  })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
+  await mod.removeServerWorkspaceEntry(REPO_A)
+  await expect(
+    mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
+    }),
+  ).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
 })
 
 test('workspace pane layout repository does not disguise programming errors as persistence failures', async () => {
@@ -319,11 +333,13 @@ test('workspace pane layout repository does not disguise programming errors as p
     },
   }) as WorkspacePaneDurableLayout
 
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: '/repo-a',
-    expected: { entries: [] },
-    replacement,
-  })).rejects.toBe(programmingError)
+  await expect(
+    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+      workspaceId: REPO_A,
+      expected: { entries: [] },
+      replacement,
+    }),
+  ).rejects.toBe(programmingError)
 })
 
 test('workspace pane layout repository classifies settings write failures at the persistence boundary', async () => {
@@ -331,21 +347,25 @@ test('workspace pane layout repository classifies settings write failures at the
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  await mod.serverWorkspacePaneLayoutRepository.load('/repo-a')
+  await mod.serverWorkspacePaneLayoutRepository.load(REPO_A)
   const settingsFile = path.join(tmp, 'user-settings.json')
   rmSync(settingsFile)
   await mkdir(settingsFile)
 
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: '/repo-a',
-    expected: { entries: [] },
-    replacement: { entries: [{
-      repoRoot: '/repo-a',
-      branchName: 'main',
-      worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('history')],
-    }] },
-  })).resolves.toMatchObject({ kind: 'write-failure', error: { name: 'SettingsPersistenceWriteError' } })
+  await expect(
+    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+      workspaceId: REPO_A,
+      expected: { entries: [] },
+      replacement: {
+        entries: [
+          {
+            target: { kind: 'git-branch', branch: 'main' },
+            tabs: [workspacePaneStaticTabEntry('history')],
+          },
+        ],
+      },
+    }),
+  ).resolves.toMatchObject({ kind: 'write-failure', error: { name: 'SettingsPersistenceWriteError' } })
 })
 
 test('workspace pane restore does not write or classify persistence failures', async () => {
@@ -353,42 +373,49 @@ test('workspace pane restore does not write or classify persistence failures', a
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoEntry = { kind: 'local' as const, id: '/repo-a' }
-  const staleLayout = { entries: [{
-    repoRoot: '/repo-a', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
-  }] }
-  await mod.addServerWorkspaceRepo(repoEntry)
-  await writeWorkspacePaneLayout(mod, '/repo-a', staleLayout)
+  const repoEntry = { id: REPO_A }
+  const staleLayout: WorkspacePaneDurableLayout = {
+    entries: [
+      {
+        target: { kind: 'git-branch', branch: 'deleted' },
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ],
+  }
+  await mod.addServerWorkspaceEntry(repoEntry)
+  await writeWorkspacePaneLayout(mod, REPO_A, staleLayout)
   const settingsFile = path.join(tmp, 'user-settings.json')
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-    repoRoot: '/repo-a',
-    expectedRepoEntry: repoEntry,
-  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout } })
+  await expect(
+    mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
+    }),
+  ).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout } })
 })
 
-test('updates repo-level worktree bootstrap trust by repo id', async () => {
+test('updates workspace-level worktree bootstrap trust by repo id', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-a',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_A,
     configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   })
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-a',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_A,
     configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
   })
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-b',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_B,
     configHash: 'not-a-hash',
   })
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       worktreeBootstrapTrust: {
         configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         trustedAt: expect.any(String),
@@ -397,7 +424,7 @@ test('updates repo-level worktree bootstrap trust by repo id', async () => {
   ])
 })
 
-test('clears repo-level worktree bootstrap trust without dropping other repo settings', async () => {
+test('clears workspace-level worktree bootstrap trust without dropping other workspace settings', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -405,33 +432,35 @@ test('clears repo-level worktree bootstrap trust without dropping other repo set
   const mod = await import('#/server/modules/settings-source.ts')
   const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-a',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_A,
     configHash,
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a-worktree',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a-worktree'),
     itemId: 'editor:vscode',
   })
 
   await expect(
-    mod.untrustServerRepoWorktreeBootstrapConfig({
-      repoId: '/repo-a',
+    mod.untrustServerWorkspaceWorktreeBootstrapConfig({
+      workspaceId: REPO_A,
       configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     }),
   ).resolves.toBe(false)
-  await expect(mod.untrustServerRepoWorktreeBootstrapConfig({ repoId: '/repo-a', configHash })).resolves.toBe(true)
+  await expect(mod.untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: REPO_A, configHash })).resolves.toBe(
+    true,
+  )
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
-      workspaceExternalAppRecent: { byWorktree: { '/repo-a-worktree': 'editor:vscode' } },
+      workspaceId: REPO_A,
+      workspaceExternalAppRecent: { byTarget: { [externalAppTargetKey('/repo-a-worktree')]: 'editor:vscode' } },
     },
   ])
 })
 
-test('clears empty repo settings entry when removing only worktree bootstrap trust', async () => {
+test('clears empty workspace settings entry when removing only worktree bootstrap trust', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -439,13 +468,15 @@ test('clears empty repo settings entry when removing only worktree bootstrap tru
   const mod = await import('#/server/modules/settings-source.ts')
   const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-a',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_A,
     configHash,
   })
 
-  await expect(mod.untrustServerRepoWorktreeBootstrapConfig({ repoId: '/repo-a', configHash })).resolves.toBe(true)
-  expect(await mod.getServerRepoSettings()).toEqual([])
+  await expect(mod.untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: REPO_A, configHash })).resolves.toBe(
+    true,
+  )
+  expect(await mod.getServerWorkspaceSettings()).toEqual([])
 })
 
 test('normalizes workspace pane tab list in server sessions', async () => {
@@ -454,16 +485,14 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
-  const mainTargetKey = branchTargetKey('/repo-b', 'main')
-  const worktreeTargetKeyValue = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
-  const emptyTargetKey = branchTargetKey('/repo-b', 'empty')
-  const invalidTargetKey = branchTargetKey('/repo-b', 'invalid')
-  await writeWorkspacePaneLayout(mod, '/repo-b', {
+  const mainTargetKey = branchTargetKey(REPO_B, 'main')
+  const worktreeTargetKeyValue = worktreeTargetKey('/tmp/repo-b-worktree')
+  const emptyTargetKey = branchTargetKey(REPO_B, 'empty')
+  const invalidTargetKey = branchTargetKey(REPO_B, 'invalid')
+  await writeWorkspacePaneLayout(mod, REPO_B, {
     entries: [
       {
-        repoRoot: '/repo-b',
-        branchName: 'main',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'main' },
         tabs: [
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
@@ -472,24 +501,20 @@ test('normalizes workspace pane tab list in server sessions', async () => {
         ],
       },
       {
-        repoRoot: '/repo-b',
-        branchName: 'feature/worktree',
-        worktreePath: '/tmp/repo-b-worktree',
+        target: { kind: 'git-worktree', root: requiredFileWorkspaceLocator('/tmp/repo-b-worktree') },
         tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
       },
-      { repoRoot: '/repo-b', branchName: 'empty', worktreePath: null, tabs: [] },
+      { target: { kind: 'git-branch', branch: 'empty' }, tabs: [] },
       {
-        repoRoot: '/repo-b',
-        branchName: 'invalid',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'invalid' },
         tabs: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
       },
     ] as never,
   })
 
   expect(await mod.getServerWorkspaceState()).toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
-      '/repo-b': {
+    workspacePaneTabsByTargetByWorkspace: {
+      [REPO_B]: {
         [mainTargetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         [worktreeTargetKeyValue]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
         [emptyTargetKey]: [],
@@ -499,37 +524,37 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   })
 })
 
-test('records the most recent workspace external app per (repo, worktree)', async () => {
+test('records the most recent workspace external app per canonical filesystem target', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-y',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'terminal:ghostty',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: null,
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: 'workspace-root',
     itemId: 'finder',
   })
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '/repo-a/worktree-y': 'terminal:ghostty',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
+          'workspace-root': 'finder',
         },
       },
     },
@@ -538,14 +563,14 @@ test('records the most recent workspace external app per (repo, worktree)', asyn
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
-  expect(await reloaded.getServerRepoSettings()).toEqual([
+  expect(await reloaded.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '/repo-a/worktree-y': 'terminal:ghostty',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
+          'workspace-root': 'finder',
         },
       },
     },
@@ -559,23 +584,23 @@ test('overwrites an existing workspace external app recent on the same worktree 
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
         },
       },
     },
@@ -591,9 +616,9 @@ test('skips the file rewrite when the workspace external app recent is already c
   const fs = await import('node:fs/promises')
   const dataFile = `${tmp}/user-settings.json`
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
   const mtimeBefore = (await fs.stat(dataFile)).mtimeMs
@@ -601,9 +626,9 @@ test('skips the file rewrite when the workspace external app recent is already c
   // Sleep so the mtime can change if the file is rewritten.
   await new Promise((resolve) => setTimeout(resolve, 5))
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
@@ -611,43 +636,49 @@ test('skips the file rewrite when the workspace external app recent is already c
   expect(mtimeAfter).toBe(mtimeBefore)
 })
 
-test('rejects invalid workspace external app recent input without touching disk', async () => {
+test('rejects invalid workspace external app target and item without touching disk', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '',
-    worktreePath: '/repo-a',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: 'git-worktree\0relative/path',
     itemId: 'editor:vscode',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: 'relative/path',
-    itemId: 'editor:vscode',
-  })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a'),
     itemId: '',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a'),
     itemId: 'editor:vscode\0with-nul',
   })
 
-  expect(await mod.getServerRepoSettings()).toEqual([])
+  expect(await mod.getServerWorkspaceSettings()).toEqual([])
 })
 
-function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+function branchTargetKey(_workspaceId: string, branchName: string): string {
+  return restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: branchName })
 }
 
-function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
+function worktreeTargetKey(worktreePath: string): string {
+  const root = requiredFileWorkspaceLocator(worktreePath)
+  return restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root })
+}
+
+function externalAppTargetKey(worktreePath: string): string {
+  return worktreeTargetKey(worktreePath)
+}
+
+function requiredFileWorkspaceLocator(worktreePath: string) {
+  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: worktreePath }, 'posix')
+  if (!root) throw new Error('invalid workspace locator fixture')
+  return root
 }
 
 test('normalizer drops malformed workspace external app recent entries on load', async () => {
@@ -659,20 +690,21 @@ test('normalizer drops malformed workspace external app recent entries on load',
   await fs.writeFile(
     `${tmp}/user-settings.json`,
     JSON.stringify({
-      repoSettings: [
+      workspaceSettings: [
         {
-          repoId: '/repo-a',
+          workspaceId: REPO_A,
           workspaceExternalAppRecent: {
-            byWorktree: {
-              '/repo-a/worktree-x': 'editor:vscode',
+            byFilesystemTarget: { '/legacy/native/path': 'terminal:ghostty' },
+            byTarget: {
+              [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
               // Unknown item id (not in WORKSPACE_EXTERNAL_APP_IDS) —
               // the normalizer must drop the entry.
-              '/repo-a/worktree-y': 'editor:webstorm',
-              // Path-invalid entries (relative path, NUL byte) must
+              [externalAppTargetKey('/repo-a/worktree-y')]: 'editor:webstorm',
+              // Target-invalid entries (relative locator, NUL byte) must
               // also be dropped.
               'relative/path': 'editor:vscode',
               '/repo-a/nul\0key': 'editor:vscode',
-              '': 'finder',
+              'workspace-root': 'finder',
             },
           },
         },
@@ -683,20 +715,20 @@ test('normalizer drops malformed workspace external app recent entries on load',
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          'workspace-root': 'finder',
         },
       },
     },
   ])
 })
 
-test('setServerRepoWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
+test('setServerWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -704,25 +736,25 @@ test('setServerRepoWorkspaceExternalAppRecent silently drops unknown item ids wi
   const mod = await import('#/server/modules/settings-source.ts')
   // Seed a known-good entry so we can confirm the unknown-id write
   // is dropped (not persisted) without losing the existing one.
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-y',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'editor:webstorm',
   })
 
-  const persisted = await mod.getServerRepoSettings()
+  const persisted = await mod.getServerWorkspaceSettings()
   expect(persisted).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
         },
       },
     },
@@ -737,63 +769,63 @@ test('prunes removed-worktree settings without dropping repo-level trust', async
   const mod = await import('#/server/modules/settings-source.ts')
   const configHash = `sha256:${'a'.repeat(64)}`
 
-  await mod.trustServerRepoWorktreeBootstrapConfig({
-    repoId: '/repo-a',
+  await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    workspaceId: REPO_A,
     configHash,
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-y',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'terminal:ghostty',
   })
 
   await expect(
-    mod.pruneServerRepoSettingsForRemovedWorktree({
-      repoId: '/repo-a',
+    mod.pruneServerWorkspaceSettingsForRemovedWorktree({
+      workspaceId: REPO_A,
       worktreePath: '/repo-a/worktree-x',
     }),
   ).resolves.toBe(true)
 
-  expect(await mod.getServerRepoSettings()).toEqual([
+  expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
-      repoId: '/repo-a',
+      workspaceId: REPO_A,
       worktreeBootstrapTrust: {
         configHash,
         trustedAt: expect.any(String),
       },
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-y': 'terminal:ghostty',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
         },
       },
     },
   ])
 })
 
-test('prunes empty repo settings entries after removed-worktree cleanup', async () => {
+test('prunes empty workspace settings entries after removed-worktree cleanup', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.setServerRepoWorkspaceExternalAppRecent({
-    repoId: '/repo-a',
-    worktreePath: '/repo-a/worktree-x',
+  await mod.setServerWorkspaceExternalAppRecent({
+    workspaceId: REPO_A,
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
   await expect(
-    mod.pruneServerRepoSettingsForRemovedWorktree({
-      repoId: '/repo-a',
+    mod.pruneServerWorkspaceSettingsForRemovedWorktree({
+      workspaceId: REPO_A,
       worktreePath: '/repo-a/worktree-x',
     }),
   ).resolves.toBe(true)
 
-  expect(await mod.getServerRepoSettings()).toEqual([])
+  expect(await mod.getServerWorkspaceSettings()).toEqual([])
 })

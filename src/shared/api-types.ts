@@ -4,6 +4,9 @@
 // this file aggregates what crosses process/transport boundaries.
 
 import * as v from 'valibot'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import type {
   BranchSnapshotInfo,
   ExecResult,
@@ -32,18 +35,24 @@ import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
-  RepoSessionEntry,
-  RemoteRepoTarget,
-  RemoteRepoRuntimeLifecycle,
-  ResolvedRemoteTarget,
+  WorkspaceSessionEntry,
+  RemoteWorkspaceTarget,
+  RemoteWorkspaceRuntimeLifecycle,
+  ResolvedRemoteWorkspaceTarget,
   SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import { type NativeHostProjection } from '#/shared/native-host-projection.ts'
-import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
+import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
+import type {
+  WorkspaceCapabilities,
+  WorkspaceGitReadyProbeState,
+  WorkspacePaneFilesystemExecutionTarget,
+  WorkspaceProbeState,
+} from '#/shared/workspace-runtime.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
@@ -58,12 +67,16 @@ export type {
   ThemePref,
 } from '#/shared/settings.ts'
 export type {
-  NativeRecentReposProjection,
+  NativeRecentWorkspacesProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
   NativeHostProjection,
 } from '#/shared/native-host-projection.ts'
-export type { RepoSettingsEntry, WorktreeBootstrapTrust, WorkspaceExternalAppRecent } from '#/shared/repo-settings.ts'
+export type {
+  WorkspaceSettingsEntry,
+  WorktreeBootstrapTrust,
+  WorkspaceExternalAppRecent,
+} from '#/shared/workspace-settings.ts'
 
 export interface LanInfo {
   host: string
@@ -80,22 +93,22 @@ export interface ThemeState {
 }
 
 export interface ServerWorkspaceState {
-  /** User-level repository membership, in picker order. */
-  openRepoEntries: RepoSessionEntry[]
-  /** Per-repo, per-target workspace pane layout that survives a server restart. */
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
+  /** User-level workspace membership, in picker order. */
+  openWorkspaceEntries: WorkspaceSessionEntry[]
+  /** Per-workspace, per-target pane layout that survives a server restart. */
+  workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
 }
 
 export interface ClientWorkspaceState {
-  /** Repo id restored when opening `/` — null when no repos were open. */
-  restoredRepoId: string | null
+  /** Workspace restored when opening `/`; null when none were open. */
+  restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
-  /** Per-repo, per-target workspace pane tab preference that session restore can make renderable. */
-  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
-  /** Per-repo, per-worktree file tree view state. */
-  filetreeViewStateByWorktreeByRepo: Record<string, Record<string, FiletreeSessionViewState>>
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
+  /** Per-workspace, per-target pane tab preference that session restore can make renderable. */
+  preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
+  /** Per-workspace, per-filesystem-target file tree view state. */
+  filetreeViewStateByFilesystemTargetByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
 export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
@@ -112,72 +125,93 @@ export interface RuntimeSettingsSnapshot extends UserSettings {
 
 export type RepoLogResponse = LogEntry[] | { ok: false; message: string }
 
-export interface RuntimeRecentReposState {
-  recentRepos: RepoSessionEntry[]
+export interface RuntimeRecentWorkspacesState {
+  recentWorkspaces: WorkspaceSessionEntry[]
 }
 
-export interface RepoRuntimeEntry {
-  repoRoot: string
-  repoRuntimeId: string
-  remoteLifecycle?: RemoteRepoRuntimeLifecycle | null
+export interface WorkspaceRuntimeEntry {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  remoteLifecycle?: RemoteWorkspaceRuntimeLifecycle | null
+  workspaceProbe: WorkspaceProbeState
 }
 
-export interface RepoRuntimesSnapshot {
-  runtimes: RepoRuntimeEntry[]
+export interface WorkspaceRuntimesSnapshot {
+  runtimes: WorkspaceRuntimeEntry[]
 }
 
-export interface RepoRuntimeMembershipReconcileResult {
-  runtimes: RepoRuntimeEntry[]
+export interface WorkspaceRuntimeMembershipReconcileResult {
+  runtimes: WorkspaceRuntimeEntry[]
 }
 
-interface RestoredWorkspaceRepoRuntimeBase {
-  entry: RepoSessionEntry
-  repoRoot: string
-  repoRuntimeId: string
+interface RestoredWorkspaceRuntimeBase {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
   name: string
-  target?: RemoteRepoTarget
+  workspaceProbe: WorkspaceProbeState
 }
 
-export interface ProjectedRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
-  projection: RepoRuntimeProjection
-}
+type RestoredWorkspaceTransport = {
+  entry: WorkspaceSessionEntry
+} & (
+  | { transport: { kind: 'file' } }
+  | {
+      transport: {
+        kind: 'ssh'
+        lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      }
+    }
+)
 
-export interface StubRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
-  // Stub leases have a validated runtime identity but no projection. They are
-  // projected lazily when the user navigates to the repo.
-  projection: null
-}
+export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
+  RestoredWorkspaceTransport & {
+    workspaceProbe: WorkspaceGitReadyProbeState
+    gitProjection: GitWorkspaceRuntimeProjection
+  }
 
-export type RestoredWorkspaceRepoRuntime = ProjectedRestoredWorkspaceRepoRuntime | StubRestoredWorkspaceRepoRuntime
+export type RestoredWorkspaceRuntimeWithoutGitProjection = RestoredWorkspaceRuntimeBase &
+  RestoredWorkspaceTransport & {
+    // Git may be conclusively unavailable or its projection may be deferred.
+    // Workspace session projection state is derived separately from the probe.
+    gitProjection: null
+  }
 
-export function isProjectedRestoredWorkspaceRepo(
-  repo: RestoredWorkspaceRepoRuntime,
-): repo is ProjectedRestoredWorkspaceRepoRuntime {
-  return repo.projection !== null
+export type RestoredWorkspaceRuntime =
+  GitProjectedRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutGitProjection
+
+export function hasRestoredWorkspaceGitProjection(
+  workspace: RestoredWorkspaceRuntime,
+): workspace is GitProjectedRestoredWorkspaceRuntime {
+  return workspace.gitProjection !== null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {
-  repos: RestoredWorkspaceRepoRuntime[]
-  workspacePaneTabs: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
-  restoredRepoId: string | null
+  workspaces: RestoredWorkspaceRuntime[]
+  workspacePaneTabs: Array<{
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    snapshot: WorkspacePaneTabsSnapshot
+  }>
+  restoredWorkspaceId: WorkspaceId | null
 }
 
 export interface WorkspaceRestoreResult {
   status: 'restored' | 'repaired'
-  openRepoEntries: RepoSessionEntry[]
+  openWorkspaceEntries: WorkspaceSessionEntry[]
   runtime: WorkspaceRuntimeRestoreSnapshot
 }
 
-export interface RepoWorkspaceTabsRestoreResult {
-  repo: ProjectedRestoredWorkspaceRepoRuntime
+export interface WorkspaceTabsRestoreResult {
+  workspace: RestoredWorkspaceRuntime
   snapshot: WorkspacePaneTabsSnapshot | null
 }
 
-export interface RepoSettingsState {
-  repoSettings: RepoSettingsEntry[]
+export interface WorkspaceSettingsState {
+  workspaceSettings: WorkspaceSettingsEntry[]
 }
 
-export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {}
+export interface SettingsSnapshot
+  extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, WorkspaceSettingsState {}
 
 export interface GlobalShortcutState {
   accelerator: string
@@ -237,50 +271,51 @@ export interface RepoSnapshot {
   remote?: RepoRemoteInfo
 }
 
-// Worktree-scoped file tree types — see docs/filetree.md. Wire and
+// Workspace-filesystem-scoped tree types — see docs/filetree.md. Wire and
 // domain shapes coincide in v1; if they diverge, move these into a
 // dedicated `src/shared/filetree.ts` and map at the hook boundary.
 
-export type RepoTreeNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
+export type WorkspaceFilesystemNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
 
-export interface RepoTreeNode {
-  /** Stable id: relative POSIX path inside the worktree. */
+export interface WorkspaceFilesystemNode {
+  /** Stable id: relative POSIX path inside the filesystem root. */
   readonly id: string
-  /** Relative POSIX path inside the worktree (matches id; named for readability). */
+  /** Relative POSIX path inside the filesystem root (matches id; named for readability). */
   readonly path: string
   /** Final path segment, used as the display name. */
   readonly name: string
   readonly parentId: string | null
   readonly kind: 'directory' | 'file'
-  readonly status: RepoTreeNodeStatus
+  readonly status: WorkspaceFilesystemNodeStatus
   /** Present for lazily-loaded directory rows when the server knows the directory has children. */
   readonly hasChildren?: boolean
 }
 
-export interface RepoTreeResult {
-  readonly nodes: ReadonlyArray<RepoTreeNode>
+export interface WorkspaceFilesystemTreeResult {
+  readonly nodes: ReadonlyArray<WorkspaceFilesystemNode>
   /** True if the direct-children result was truncated by the node-count cap. */
   readonly truncated: boolean
 }
 
-export type RepoFileViewer = 'bat' | 'batcat' | 'cat' | 'type'
-export type RepoFileViewerShell = 'posix' | 'cmd'
+export type WorkspaceFileViewer = 'bat' | 'batcat' | 'cat' | 'type'
+export type WorkspaceFileViewerShell = 'posix' | 'cmd'
 
-export interface RepoFileViewerResult {
-  readonly viewer: RepoFileViewer
-  readonly shell: RepoFileViewerShell
+export interface WorkspaceFileViewerResult {
+  readonly viewer: WorkspaceFileViewer
+  readonly shell: WorkspaceFileViewerShell
+  readonly executionRoot: string
 }
 
-export interface ProbeResult {
-  ok: boolean
-  root?: string
-  name?: string
-  message?: string
-}
-
-export type RepoRuntimeOpenResult =
-  { ok: true; repo: { id: string; name: string }; repoRuntimeId: string } | { ok: false; input: string; reason: string }
-export type RepoRuntimeOpenResponse = { ok: true; repoRuntimeId: string } | RepoRuntimeOpenResult
+export type WorkspaceRuntimeOpenResult =
+  | {
+      ok: true
+      workspace: { id: WorkspaceId; name: string }
+      workspaceRuntimeId: string
+      capabilities: WorkspaceCapabilities
+      diagnostics: Array<{ scope: 'git' | 'transport'; message: string }>
+    }
+  | { ok: false; input: string; reason: string }
+export type WorkspaceRuntimeOpenResponse = { ok: true; workspaceRuntimeId: string } | WorkspaceRuntimeOpenResult
 
 export interface CloneRepoResult extends ExecResult {
   path?: string
@@ -296,7 +331,7 @@ export type RepoServerOperationKind =
   'fetch' | 'clone' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
 export type RepoServerOperationSource = NetworkOpKind | 'system'
 export type RepoOperationCancellationReason =
-  'caller-abort' | 'user-cancel' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
+  'caller-abort' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
 export type RepoOperationFailureReason = RepoOperationCancellationReason
 
 export interface RepoServerOperationTarget {
@@ -322,8 +357,8 @@ export interface RepoServerOperationError {
 
 export interface RepoServerOperationState {
   id: string
-  repoId: string | null
-  repoRuntimeId: string | null
+  repoId: WorkspaceId | null
+  workspaceRuntimeId: string | null
   kind: RepoServerOperationKind
   phase: RepoServerOperationPhase
   source: RepoServerOperationSource
@@ -342,10 +377,9 @@ export interface RepoOperationsSnapshot {
   loadedAt: number
 }
 
-export interface RepoRuntimeProjection {
+export interface GitWorkspaceRuntimeProjection {
   snapshot: RepoSnapshot | null
   pullRequests: PullRequestEntry[] | null
-  operations: RepoOperationsSnapshot
   requested: {
     branch: string | null
     pullRequestMode: PullRequestFetchMode
@@ -354,13 +388,13 @@ export interface RepoRuntimeProjection {
 }
 
 export interface RepoWorktreeStatusSnapshot {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   status: WorktreeStatus[]
   loadedAt: number
 }
 
-export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-export { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
+export type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+export { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 /** Request envelope for the native Electron bridge IPC layer. */
 export interface IpcRequest {
@@ -387,50 +421,52 @@ export type IpcEvent =
   | RepoQueryInvalidationEvent
 
 export interface AppIpcHandlers {
-  repo: {
-    probe: (input: { cwd: string }) => Promise<ProbeResult>
+  workspace: {
     runtimeOpen: (
-      input: ({ repoRoot: string } | { repoInput: string }) & { clientId: string },
-    ) => Promise<RepoRuntimeOpenResponse>
+      input: ({ workspaceId: WorkspaceId } | { workspaceInput: string }) & { clientId: string },
+    ) => Promise<WorkspaceRuntimeOpenResponse>
     runtimeReconcile: (input: {
       clientId: string
-      repoRoots: string[]
-    }) => Promise<RepoRuntimeMembershipReconcileResult>
-    runtimeList: () => Promise<RepoRuntimesSnapshot>
-    runtimeClose: (input: { repoRoot: string; repoRuntimeId: string; clientId: string }) => Promise<{
+      workspaceIds: WorkspaceId[]
+    }) => Promise<WorkspaceRuntimeMembershipReconcileResult>
+    runtimeList: () => Promise<WorkspaceRuntimesSnapshot>
+    runtimeClose: (input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; clientId: string }) => Promise<{
       ok: boolean
       released: boolean
       runtimeClosed: boolean
     }>
+    tree: (input: {
+      target: WorkspacePaneFilesystemExecutionTarget
+      prefix?: string
+    }) => Promise<WorkspaceFilesystemTreeResult>
+    trashFile: (input: { target: WorkspacePaneFilesystemExecutionTarget; path: string }) => Promise<ExecResult>
+    fileViewer: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<WorkspaceFileViewerResult>
+    openTerminal: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: TerminalApp }) => Promise<ExecResult>
+    openEditor: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: EditorApp }) => Promise<ExecResult>
+    openInFinder: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<ExecResult>
+  }
+  repo: {
     clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
     projection: (input: {
-      cwd: string
-      repoRuntimeId: string
+      cwd: WorkspaceId
+      workspaceRuntimeId: string
       branch?: string
       mode?: PullRequestFetchMode
-    }) => Promise<RepoRuntimeProjection>
-    operations: (input: {
-      cwd?: string
-      repoRuntimeId?: string
-      includeSettled?: boolean
-    }) => Promise<RepoOperationsSnapshot>
-    patch: (input: { cwd: string; repoRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
-    trashFile: (input: {
-      cwd: string
-      repoRuntimeId: string
-      worktreePath: string
-      path: string
-    }) => Promise<ExecResult>
+    }) => Promise<GitWorkspaceRuntimeProjection>
+    operations: (
+      input: { includeSettled?: boolean } | { cwd: WorkspaceId; workspaceRuntimeId: string; includeSettled?: boolean },
+    ) => Promise<RepoOperationsSnapshot>
+    patch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
     deleteBranch: (input: {
-      cwd: string
-      repoRuntimeId: string
+      cwd: WorkspaceId
+      workspaceRuntimeId: string
       branch: string
       force?: boolean
       deleteUpstream?: boolean
     }) => Promise<ExecResult>
     removeWorktree: (input: {
-      cwd: string
-      repoRuntimeId: string
+      cwd: WorkspaceId
+      workspaceRuntimeId: string
       branch: string
       worktreePath: string
       deleteBranch: boolean
@@ -438,32 +474,35 @@ export interface AppIpcHandlers {
       deleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
-    worktreeBootstrapPreview: (input: { cwd: string; repoRuntimeId: string }) => Promise<WorktreeBootstrapPreviewResult>
-    remoteBranches: (input: { cwd: string; repoRuntimeId: string }) => Promise<string[]>
-    pull: (input: { cwd: string; repoRuntimeId: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
-    push: (input: { cwd: string; repoRuntimeId: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: string; repoRuntimeId: string }) => Promise<ExecResult>
-    abort: (input: { cwd: string }) => Promise<boolean>
-    openUrl: (input: { cwd: string; repoRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    openTerminal: (input: {
-      repoId: string
-      repoRuntimeId: string
-      worktreePath: string
-      app: TerminalApp
+    worktreeBootstrapPreview: (input: {
+      cwd: WorkspaceId
+      workspaceRuntimeId: string
+    }) => Promise<WorktreeBootstrapPreviewResult>
+    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<string[]>
+    pull: (input: {
+      cwd: WorkspaceId
+      workspaceRuntimeId: string
+      branch: string
+      worktreePath?: string
     }) => Promise<ExecResult>
-    openEditor: (input: {
-      repoId: string
-      repoRuntimeId: string
-      worktreePath: string
-      app: EditorApp
-    }) => Promise<ExecResult>
-    openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
+    push: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
+    fetch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<ExecResult>
+    openUrl: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
+    backgroundSyncRepos: (input: {
+      clientId: string
+      revision: number
+      targets: GitBackgroundSyncTarget[]
+    }) => Promise<{
+      ok: true
+      repoIds: WorkspaceId[]
+      intervalSec: number
+    }>
   }
   remote: {
     listSshHosts: () => Promise<SshConfigHostsResult>
-    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
+    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteWorkspaceTarget>
     listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
-    testRepo: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
+    testWorkspace: (input: { target: RemoteWorkspaceTarget }) => Promise<RemoteDiagnosticsResult>
   }
   theme: {
     get: () => ThemeState
@@ -478,8 +517,8 @@ export interface AppIpcHandlers {
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
-    addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
-    clearRecentRepos: () => Promise<void>
+    addRecentWorkspace: (input: { workspace: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
+    clearRecentWorkspaces: () => Promise<void>
   }
   externalApps: {
     get: () => Promise<ExternalAppsSnapshot>
@@ -513,14 +552,11 @@ export type NativeHostIpcPath = {
 const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 
-/** Primitive valibot schema for `{ cwd: string }`. */
-export const CwdInput = v.object({ cwd: v.string() })
+/** Canonical WorkspaceId envelope shared by Git procedures. */
+export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
 
-/** Primitive valibot schema for `{ cwd, branch }`. */
-export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
-
-export const RemoteTargetSchema = v.object({
-  id: v.string(),
+export const RemoteWorkspaceTargetSchema = v.object({
+  id: WorkspaceIdSchema,
   alias: v.string(),
   host: v.string(),
   user: v.string(),

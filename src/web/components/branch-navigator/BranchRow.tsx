@@ -1,5 +1,5 @@
 import { type RefObject } from 'react'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -7,12 +7,8 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
-import {
-  BRANCH_ROW_ACTION_BOX_CLASS,
-  BRANCH_ROW_ACTION_SLOT_CLASS,
-  BRANCH_ROW_CONTENT_CLASS,
-  BRANCH_ROW_GRID_CLASS,
-} from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import { BRANCH_ROW_ACTION_BOX_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 
 export interface BranchRowProps {
   repo: BranchActionRepo
@@ -70,18 +66,12 @@ export function BranchRow({
     (repo.branchAction.reason === 'branch:createWorktree' || repo.branchAction.reason === 'branch:removeWorktree')
 
   return (
-    <li
-      ref={isSelected ? selectedRef : undefined}
+    <NavigatorRow
+      rowRef={isSelected ? selectedRef : undefined}
+      selected={isSelected}
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
-      className={cn(
-        BRANCH_ROW_GRID_CLASS,
-        'group relative cursor-pointer',
-        'transition-colors duration-100',
-        isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
-      )}
-    >
-      <div className={cn(BRANCH_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10')}>
+      content={
         <BranchSummaryInline
           repo={repo}
           branch={branch}
@@ -90,17 +80,19 @@ export function BranchRow({
           leadingTerminalOutputActive={leadingTerminalOutputActive}
           worktreeIconDirty={worktreeOperationTargetsRow ? false : undefined}
         />
-      </div>
-      <BranchRowActionSlot
-        repo={repo}
-        branch={branch}
-        actionMenuOpen={actionMenuOpen}
-        onActionMenuOpenChange={onActionMenuOpenChange}
-        actionHidden={isActionsHidden}
-        terminalBellCount={actionTerminalBellCount}
-        terminalOutputActive={actionTerminalOutputActive}
-      />
-    </li>
+      }
+      actions={
+        <BranchRowActionSlot
+          repo={repo}
+          branch={branch}
+          actionMenuOpen={actionMenuOpen}
+          onActionMenuOpenChange={onActionMenuOpenChange}
+          actionHidden={isActionsHidden}
+          terminalBellCount={actionTerminalBellCount}
+          terminalOutputActive={actionTerminalOutputActive}
+        />
+      }
+    />
   )
 }
 
@@ -121,28 +113,26 @@ function BranchRowActionSlot({
   const showOutputActivity = terminalOutputActive && actionHidden && !showBellBadge
 
   return (
-    <div className={cn(BRANCH_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>
-      <div className={BRANCH_ROW_ACTION_BOX_CLASS}>
-        {showBellBadge && (
-          <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
-            <TerminalBellBadge count={terminalBellCount} />
-          </div>
-        )}
-        {showOutputActivity && (
-          <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
-            <TerminalOutputActivityIndicator />
-          </div>
-        )}
-        <div
-          className={cn(
-            'relative',
-            !actionHidden && 'pointer-events-auto',
-            actionHidden &&
-              'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-          )}
-        >
-          <BranchActionsMenu repo={repo} branch={branch} open={actionMenuOpen} onOpenChange={onActionMenuOpenChange} />
+    <div className={BRANCH_ROW_ACTION_BOX_CLASS}>
+      {showBellBadge && (
+        <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+          <TerminalBellBadge count={terminalBellCount} />
         </div>
+      )}
+      {showOutputActivity && (
+        <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+          <TerminalOutputActivityIndicator />
+        </div>
+      )}
+      <div
+        className={cn(
+          'relative',
+          !actionHidden && 'pointer-events-auto',
+          actionHidden &&
+            'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+        )}
+      >
+        <BranchActionsMenu repo={repo} branch={branch} open={actionMenuOpen} onOpenChange={onActionMenuOpenChange} />
       </div>
     </div>
   )

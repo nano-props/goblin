@@ -1,26 +1,32 @@
 import { useMutation } from '@tanstack/react-query'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import { getRepoPatch, openRepoEditor, openRepoInFinder, openRepoTerminal } from '#/web/repo-client.ts'
-import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
+import { getRepoPatch } from '#/web/repo-client.ts'
 import {
-  dispatchRepoBranchAction,
-  dispatchRepoUiAction,
-  isPushProtected,
-} from '#/web/stores/repos/branch-action-write-paths.ts'
-import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
+  openWorkspaceEditor,
+  openWorkspaceInFinder,
+  openWorkspaceTerminal,
+} from '#/web/workspace-external-app-client.ts'
+import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+import { getBranchWorktreeState } from '#/web/stores/workspaces/worktree-state.ts'
+import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
+import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
+import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
   isBranchActionBlocked,
   type BranchActionItemId,
 } from '#/web/hooks/branch-action-state.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  requiredGitWorkspacePaneTabsTarget,
+  workspacePaneTabsTargetIdentityKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
 
@@ -62,7 +68,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
   const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
   const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
   const hasWorktree = !!branch.worktree?.path
-  const isRemoteRepo = isRemoteRepoId(repo.id)
+  const isRemoteRepo = isRemoteWorkspaceId(repo.id)
   return {
     canRemoveWorktree,
     isRegularBranch,
@@ -84,19 +90,17 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
  * dispatch functions the dialog uses to commit a confirmed action.
  */
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState): BranchActions {
-  const setLastResult = useReposStore((s) => s.setLastResult)
-  const runBranchAction = useReposStore((s) => s.runBranchAction)
+  const setLastResult = useWorkspacesStore((s) => s.setLastResult)
+  const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({
-    mutationKey: ['repo-data', repo.id, repo.repoRuntimeId, 'patch'],
-    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.repoRuntimeId, worktreePath),
+    mutationKey: ['repo-data', repo.id, repo.workspaceRuntimeId, 'patch'],
+    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.workspaceRuntimeId, worktreePath),
   })
   const branchActionBusy = isBranchActionBlocked(repo)
   const branchBusyAction = branchActionBusyItemId(repo, branch.name)
-  const localActionScopeKey = workspacePaneTabsTargetIdentityKey({
-    repoRoot: repo.id,
-    branchName: branch.name,
-    worktreePath: branch.worktree?.path ?? null,
-  })
+  const localActionScopeKey = workspacePaneTabsTargetIdentityKey(
+    requiredGitWorkspacePaneTabsTarget(repo.id, branch.name, branch.worktree?.path ?? null),
+  )
   const {
     pending: pendingLocalAction,
     hasPending: hasPendingLocalAction,
@@ -112,7 +116,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ): void {
     if (guardBusy()) return
-    void dispatchRepoBranchAction(repo.id, repo.repoRuntimeId, action, runBranchAction, {
+    void dispatchRepoBranchAction(repo.id, repo.workspaceRuntimeId, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
       handleResult: options?.handleResult,
     })
@@ -125,9 +129,10 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchRepoUiAction(repo.id, repo.repoRuntimeId, op, fn, setLastResult, {
+      const result = await dispatchWorkspaceUiAction(repo.id, repo.workspaceRuntimeId, op, fn, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
+        reportResult: setLastResult,
       })
       return result
     })
@@ -177,21 +182,24 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
 
   function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
-    return runUiAction('terminal', () => openRepoTerminal(repo.id, repo.repoRuntimeId, worktreePath, app))
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('terminal', () => openWorkspaceTerminal(target, app))
   }
 
   function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
-    return runUiAction('editor', () => openRepoEditor(repo.id, repo.repoRuntimeId, worktreePath, app))
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('editor', () => openWorkspaceEditor(target, app))
   }
 
   function openFinder() {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
-    if (isRemoteRepoId(repo.id)) return
-    return runUiAction('finder', () => openRepoInFinder(repo.id, worktreePath))
+    if (isRemoteWorkspaceId(repo.id)) return
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('finder', () => openWorkspaceInFinder(target))
   }
 
   function requestDeleteBranch() {

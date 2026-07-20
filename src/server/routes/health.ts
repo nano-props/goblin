@@ -1,4 +1,4 @@
-import { getBackgroundSyncDiagnostics } from '#/server/modules/background-sync.ts'
+import { getBackgroundSyncHealth } from '#/server/modules/background-sync.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { createRouteApp } from '#/server/common/http-validate.ts'
 
@@ -19,7 +19,7 @@ export function createHealthRoutes(options: {
   app.get('/health/background-sync', (c) =>
     c.json({
       ...payload,
-      backgroundSync: getBackgroundSyncDiagnostics(),
+      backgroundSync: getBackgroundSyncHealth(),
     }),
   )
   app.get('/health/terminal', async (c) =>

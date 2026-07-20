@@ -204,11 +204,11 @@ It also shows a feature where a separate source layer makes sense.
 ### Repos
 
 - boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
-- read: `src/web/stores/repos/refresh.ts` (read-side refresh orchestration)
-- write: `src/web/stores/repos/repo-session-write-paths.ts`, `src/web/stores/repos/branch-actions.ts`
+- read: `src/web/stores/workspaces/refresh.ts` (read-side refresh orchestration)
+- write: `src/web/stores/workspaces/workspace-session-write-paths.ts`, `src/web/stores/workspaces/branch-actions.ts`
 - server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
 - source: `src/server/modules/repo-source.ts`
-- runtime projection/facade: `src/web/stores/repos/store.ts`, related repo store slices
+- runtime projection/facade: `src/web/stores/workspaces/store.ts`, related repo store slices
 - restorable/runtime distinction: repo store types and lifecycle modules
 
 This is a good example of a feature that should stay feature-first, even when its runtime projection is store-heavy instead of query-heavy.
@@ -220,7 +220,7 @@ It also shows that not every complex feature needs a separate runtime facade lay
 - read: `src/web/runtime/AppRuntimeProjectionProvider.tsx` (server recovery orchestration), `src/web/components/terminal/TerminalSessionProjection.ts` (read projection)
 - write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/session service/broker/dispatch), `src/web/components/terminal/TerminalSessionProjection.ts` (client-side write paths for `attach`/`select`/`create`)
 - source: `src/server/terminal/terminal-session-manager.ts` (in-process state for sessions, target metadata, control, render), `src/server/terminal/terminal-session-service.ts` (public session-service facade), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
-- protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/terminal-worktree-key.ts` (client↔server wire types, validation, controller helpers, and repo/worktree grouping), `src/server/terminal/terminal-session-ids.ts` (server-side terminalSessionId allocation), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
+- protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/terminal-filesystem-target-key.ts` (client↔server wire types, validation, controller helpers, and runtime-neutral filesystem grouping), `src/server/terminal/terminal-session-ids.ts` (server-side terminalSessionId allocation), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
 
 The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and contributes terminal handlers to the shared app realtime host. The realtime route receives that app realtime host via dependency injection from the server factory. The TerminalSessionProvider on the client side keeps `TerminalSessionProjection` as the single source of truth for live session state and uses the terminal client only for fetches and mutations.
 

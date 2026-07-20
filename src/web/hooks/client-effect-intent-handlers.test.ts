@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
@@ -16,25 +17,25 @@ vi.mock('sonner', () => ({
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-client-intent-handlers-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-client-intent-handlers-repo')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 afterEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('client effect intent handlers', () => {
@@ -53,9 +54,16 @@ describe('client effect intent handlers', () => {
     handleTerminalBellClickIntent(
       {
         type: 'terminal-bell-click',
-        repoRoot: REPO_ID,
         terminalSessionId: 'term-queryqueryqueryquery1',
-        terminalWorktreeKey: `${REPO_ID}\0/tmp/bell-worktree`,
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            root: workspaceIdForTest('goblin+file:///tmp/bell-worktree'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/query' } },
+        },
       },
       d,
     )
@@ -104,23 +112,22 @@ describe('client effect intent handlers', () => {
 
   test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
+    useWorkspacesStore.setState((state) => {
+      const repo = state.workspaces[REPO_ID]
+      if (repo?.capability.kind !== 'git') return state
+      const branchAction = {
+        ...repo.capability.git.operations.branchAction,
+        phase: 'running' as const,
+        reason: 'branch:pull' as const,
+        target: 'main',
+      }
+      const operations = { ...repo.capability.git.operations, branchAction }
       return {
-        repos: {
-          ...state.repos,
+        workspaces: {
+          ...state.workspaces,
           [REPO_ID]: {
             ...repo,
-            operations: {
-              ...repo.operations,
-              branchAction: {
-                ...repo.operations.branchAction,
-                phase: 'running',
-                reason: 'branch:pull',
-                target: 'main',
-              },
-            },
+            capability: { ...repo.capability, git: { ...repo.capability.git, operations } },
           },
         },
       }
@@ -134,8 +141,8 @@ describe('client effect intent handlers', () => {
 
   test('create-worktree-requested reads busy state from server operations projection', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
       loadedAt: 123,
     })
     const d = deps(REPO_ID)
@@ -146,21 +153,23 @@ describe('client effect intent handlers', () => {
   })
 })
 
-function deps(currentRepoId: string | null, currentBranchName = 'feature/worktree') {
+function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/worktree') {
   return {
     navigation: navigationWithStoreActions(),
-    currentRepoId,
-    currentBranchName,
+    currentWorkspaceId,
+    currentWorkspacePaneCommandTarget: currentWorkspaceId
+      ? { kind: 'git-branch' as const, branchName: currentBranchName, workspacePaneRoute: null }
+      : null,
     closeAllOverlays: vi.fn(),
-    openRepoPathDialog: vi.fn(),
+    openWorkspacePathDialog: vi.fn(),
     openCloneRepo: vi.fn(),
-    openRemoteRepo: vi.fn(),
+    openRemoteWorkspace: vi.fn(),
     openCreateWorktree: vi.fn(),
     isOverlayOpen: () => false,
     isWorkspaceShortcutSuppressed: () => false,
     ensureWorkspaceOpen: vi.fn(async (input: string | { id: string }) => ({
       ok: true as const,
-      id: typeof input === 'string' ? input : input.id,
+      workspaceId: workspaceIdForTest(typeof input === 'string' ? input : input.id),
     })),
     resetLayout: vi.fn(),
     toggleZenMode: vi.fn(),
@@ -170,36 +179,36 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
-    activateRepo: vi.fn(),
-    closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
-    cycleRepo: vi.fn(),
+    currentWorkspacePaneRoute: () => undefined,
+    activateWorkspace: vi.fn(),
+    closeWorkspace: (workspaceId) => useWorkspacesStore.getState().closeWorkspace(workspaceId),
+    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   return navigation
 }
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

@@ -1,4 +1,10 @@
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import {
+  workspacePaneFilesystemExecutionPath,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -23,17 +29,66 @@ export interface TerminalController {
   status: Exclude<TerminalControllerStatus, 'none'>
 }
 
-export interface TerminalSessionBase {
-  repoRoot: string
-  branch: string
-  worktreePath: string
-  repoRuntimeId?: string
+export type TerminalExecutionTarget = WorkspacePaneFilesystemExecutionTarget
+
+export type TerminalSessionBase =
+  | {
+      target: Extract<TerminalExecutionTarget, { kind: 'workspace-root' }>
+      presentation: Extract<TerminalPresentation, { kind: 'workspace-root' }>
+    }
+  | {
+      target: Extract<TerminalExecutionTarget, { kind: 'git-worktree' }>
+      presentation: Extract<TerminalPresentation, { kind: 'git-worktree' }>
+    }
+
+/** Constructs a transport-safe session base and enforces target/presentation agreement. */
+export function terminalSessionBase(
+  target: TerminalExecutionTarget,
+  presentation: TerminalPresentation,
+): TerminalSessionBase {
+  if (target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
+    return { target, presentation }
+  }
+  if (target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
+    return { target, presentation }
+  }
+  throw new Error('terminal target and presentation disagree')
 }
 
-export interface RepoRuntimeInput {
-  repoRoot: string
-  repoRuntimeId: string
+export interface TerminalExecutionCoordinates {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  executionRootId: WorkspaceId
 }
+
+export interface WorkspaceRuntimeScope {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+}
+
+/** Canonical execution coordinates. Callers must not cache a second copy beside the target. */
+export function terminalExecutionCoordinates(target: TerminalExecutionTarget): TerminalExecutionCoordinates {
+  return {
+    workspaceId: target.workspaceId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
+    executionRootId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
+  }
+}
+
+/** Transport-native execution path. This is execution data, never terminal identity. */
+export function terminalExecutionPath(target: TerminalExecutionTarget): string {
+  return workspacePaneFilesystemExecutionPath(target)
+}
+
+export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 'target'>): TerminalExecutionCoordinates {
+  return terminalExecutionCoordinates(session.target)
+}
+
+export function terminalPresentationBranch(presentation: TerminalPresentation): string | null {
+  return presentation.kind === 'git-worktree' ? gitHeadBranch(presentation.head) : null
+}
+
+export type WorkspaceRuntimeInput = WorkspaceRuntimeScope
 
 export interface TerminalAttachInput {
   /**
@@ -50,10 +105,6 @@ export interface TerminalAttachInput {
 }
 
 export interface TerminalCreateInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
   kind: 'primary' | 'additional'
   /**
    * Shell text to run as the terminal starts, before returning to an interactive shell.
@@ -64,6 +115,7 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
+  target: TerminalExecutionTarget
 }
 
 export interface TerminalRestartInput {
@@ -146,6 +198,10 @@ export interface TerminalSnapshotFrame {
   outputEra: number
 }
 
+export type TerminalProjectionNoneEffect = { kind: 'none' }
+export type TerminalProjectionDeltaEffect = { kind: 'delta'; revision: number }
+export type TerminalProjectionEffect = TerminalProjectionNoneEffect | TerminalProjectionDeltaEffect
+
 /**
  * Attach chooses its frame protocol from server-owned PTY history:
  * a prepared session with no PTY starts as `stream`, while an already-bound
@@ -153,25 +209,40 @@ export interface TerminalSnapshotFrame {
  * startup from being represented as a recovery replay.
  */
 export type TerminalAttachResult =
-  | ({ ok: true } & TerminalRuntimeMetadata & TerminalStreamFrame)
-  | ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
+      TerminalStreamFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalRuntimeMetadata &
+      TerminalSnapshotFrame)
   | { ok: false; message: string }
 
 /** Restart always replaces an existing binding and commits a reset snapshot. */
 export type TerminalRestartResult =
-  ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame) | { ok: false; message: string }
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
+      TerminalSnapshotFrame)
+  | { ok: false; message: string }
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
+
+export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; head: GitHead }
+
+export function terminalGitWorktreePresentation(
+  branchName: string | null,
+): Extract<TerminalPresentation, { kind: 'git-worktree' }> {
+  return {
+    kind: 'git-worktree',
+    head: gitHead(branchName),
+  }
+}
 
 export type TerminalCreateResult =
   | ({
       ok: true
       action: TerminalCreateAction
-      /** Canonical branch label resolved at the admission commit boundary. */
-      branch: string
+      /** Canonical presentation resolved at the admission commit boundary. */
+      presentation: TerminalPresentation
       terminalSessionId: string
-      /** Exact terminal projection revision sampled with this metadata. */
-      terminalSessionsRevision: number
+      /** Catalog mutation committed by this admission operation. */
+      terminalProjectionEffect: TerminalProjectionEffect
     } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
@@ -194,38 +265,28 @@ export interface TerminalSessionInput {
   terminalRuntimeSessionId: string
 }
 
-export interface TerminalNotifyBellInput {
+type TerminalNotifyBellFields = {
   title: string
   body: string
-  terminalSessionId?: string
-  terminalWorktreeKey?: string
-  repoRoot: string
+  terminalSessionId: string
+  session: TerminalSessionBase
 }
+
+export type TerminalNotifyBellInput = TerminalNotifyBellFields
 
 export interface TerminalTestNotificationInput {
   title: string
   body: string
 }
 
-export interface TerminalListSessionsInput {
-  repoRoot: string
-  repoRuntimeId: string
-}
+export type TerminalListSessionsInput = WorkspaceRuntimeScope
 
-export interface TerminalPruneInput {
-  repoRoot: string
-  repoRuntimeId: string
-}
+export type TerminalPruneInput = WorkspaceRuntimeScope
 
-export interface TerminalSessionSummary {
+interface TerminalSessionSummaryFields {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRuntimeId: string
-  repoRoot: string
-  branch: string
-  worktreePath: string
-  cwd: string
   controller: TerminalController | null
   processName: string
   canonicalTitle: string | null
@@ -235,8 +296,14 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
+type TerminalSessionSummaryFor<Session extends TerminalSessionBase> = Session extends TerminalSessionBase
+  ? Session & TerminalSessionSummaryFields
+  : never
+
+export type TerminalSessionSummary = TerminalSessionSummaryFor<TerminalSessionBase>
+
 /**
- * Versioned full terminal projection for one user/repo-runtime scope.
+ * Versioned full terminal projection for one user/workspace-runtime scope.
  *
  * This revision belongs exclusively to the terminal projection. Workspace
  * pane tab revisions must never be used to decide whether this collection is
@@ -245,6 +312,12 @@ export interface TerminalSessionSummary {
 export interface TerminalSessionsSnapshot {
   revision: number
   sessions: TerminalSessionSummary[]
+}
+
+export interface TerminalSessionsChangedEvent {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  revision: number
 }
 
 export type TerminalMutationResult = boolean
@@ -285,8 +358,7 @@ export interface TerminalBellRealtimeEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
-  worktreePath: string
+  workspaceId: WorkspaceId
   processName: string
   canonicalTitle: string | null
 }
@@ -295,8 +367,7 @@ export interface TerminalTitleEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
-  worktreePath: string
+  workspaceId: WorkspaceId
   canonicalTitle: string | null
 }
 
@@ -304,8 +375,8 @@ export interface TerminalExitEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
 /**

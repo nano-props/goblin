@@ -1,19 +1,27 @@
-import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { terminalSessionScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionTargetExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-describe('terminalSessionScope', () => {
-  test('normalizes local repo roots into canonical session scope', () => {
-    expect(terminalSessionScope('/repo')).toBe(path.resolve('/repo'))
-    expect(terminalSessionScope('./repo')).toBe(path.resolve('./repo'))
+const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!
+
+describe('terminal session target execution path', () => {
+  test('derives a workspace-root execution path from its authoritative locator', () => {
+    expect(
+      terminalSessionTargetExecutionPath({
+        kind: 'workspace-root',
+        workspaceId,
+        workspaceRuntimeId: 'repo-runtime-current',
+      }),
+    ).toBe('/tmp/workspace')
   })
 
-  test('preserves remote repo roots as opaque session scopes', () => {
-    expect(terminalSessionScope('ssh-config://prod/%2Frepo')).toBe('ssh-config://prod/%2Frepo')
-  })
-
-  test('normalizes local worktrees and preserves remote worktree paths', () => {
-    expect(terminalSessionWorktreePath('/repo', './repo-worktree')).toBe(path.resolve('./repo-worktree'))
-    expect(terminalSessionWorktreePath('ssh-config://prod/%2Frepo', '/srv/repo')).toBe('/srv/repo')
+  test('derives a Git worktree execution path from its authoritative target root', () => {
+    const target = {
+      kind: 'git-worktree' as const,
+      workspaceId,
+      workspaceRuntimeId: 'repo-runtime-current',
+      root: canonicalWorkspaceLocator('goblin+file:///tmp/worktree')!,
+    }
+    expect(terminalSessionTargetExecutionPath(target)).toBe('/tmp/worktree')
   })
 })

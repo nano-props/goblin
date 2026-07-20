@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   beginWorkspacePaneDestinationPresentation,
   commitWorkspacePaneDestinationRoute,
@@ -9,10 +10,10 @@ import {
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -26,14 +27,14 @@ import {
   registerPrimaryWindowNavigation,
 } from '#/web/primary-window-presentation.ts'
 
-const REPO_ID = '/tmp/goblin-destination-navigation-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-destination-navigation-repo')
 const CURRENT_WORKTREE = '/tmp/goblin-destination-current-worktree'
 const DESTINATION_WORKTREE = '/tmp/goblin-destination-target-worktree'
 const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacePaneDestinationPresentationForTest()
 })
@@ -41,60 +42,62 @@ beforeEach(() => {
 describe('workspace pane destination navigation', () => {
   test('commits branch-scoped tabs for a destination without a worktree', async () => {
     seedNoWorktreeRepo()
-    const commitRepoBranchWorkspacePaneRoute = acceptedRouteCommit()
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const commitWorkspacePaneRoute = acceptedRouteCommit()
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         route: DESTINATION_ROUTE,
-        navigation: { commitRepoBranchWorkspacePaneRoute },
+        navigation: { commitWorkspacePaneRoute },
       }),
     ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
-    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce()
     expect(setWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
   })
 
   test('rejects worktree-scoped tabs for a destination without a worktree', async () => {
     seedNoWorktreeRepo()
-    const commitRepoBranchWorkspacePaneRoute = acceptedRouteCommit()
+    const commitWorkspacePaneRoute = acceptedRouteCommit()
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         route: { kind: 'static', tab: 'changes' },
-        navigation: { commitRepoBranchWorkspacePaneRoute },
+        navigation: { commitWorkspacePaneRoute },
       }),
     ).resolves.toEqual({ kind: 'unsupported', reason: 'worktree-required' })
-    expect(commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('rejects a stale runtime lease before route commit', async () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
+    useWorkspacesStore.setState((state) => {
+      const repo = state.workspaces[REPO_ID]
       if (!repo) return state
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo, repoRuntimeId: 'repo-runtime-reopened' } } }
+      return {
+        workspaces: { ...state.workspaces, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } },
+      }
     })
-    const commitRepoBranchWorkspacePaneRoute = acceptedRouteCommit()
+    const commitWorkspacePaneRoute = acceptedRouteCommit()
 
     await expect(
-      commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, { commitRepoBranchWorkspacePaneRoute }),
+      commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, { commitWorkspacePaneRoute }),
     ).resolves.toEqual({ kind: 'superseded' })
-    expect(commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('rejects a worktree replacement after router settlement without writing supplements', async () => {
     const repo = seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
-    const commitRepoBranchWorkspacePaneRoute = deferredRouteCommit(routeCommit.promise)
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const commitWorkspacePaneRoute = deferredRouteCommit(routeCommit.promise)
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute,
+      commitWorkspacePaneRoute,
     })
     await Promise.resolve()
     seedRepoReadModelQueryData(repo, {
@@ -116,14 +119,14 @@ describe('workspace pane destination navigation', () => {
     const firstCommit = Promise.withResolvers<boolean>()
     const firstNavigation = deferredRouteCommit(firstCommit.promise)
     const firstWork = commitWorkspacePaneDestinationRoute(first, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute: firstNavigation,
+      commitWorkspacePaneRoute: firstNavigation,
     })
     await Promise.resolve()
 
     const second = beginPresentation('feature/destination')
     await expect(
       commitWorkspacePaneDestinationRoute(second, DESTINATION_ROUTE, {
-        commitRepoBranchWorkspacePaneRoute: acceptedRouteCommit(),
+        commitWorkspacePaneRoute: acceptedRouteCommit(),
       }),
     ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
     firstCommit.resolve(true)
@@ -135,7 +138,7 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
     })
     await Promise.resolve()
 
@@ -150,7 +153,7 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
     })
     await Promise.resolve()
 
@@ -165,11 +168,11 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
     })
     await Promise.resolve()
 
-    primaryNavigationActions().actions.activateRepo('/tmp/another-repo')
+    primaryNavigationActions().actions.activateWorkspace(workspaceIdForTest('goblin+file:///tmp/another-repo'))
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
@@ -180,12 +183,12 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitRepoBranchWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
     })
     await Promise.resolve()
 
     observePrimaryWindowHistoryNavigation({
-      href: '/repo/current/tab/history',
+      href: '/workspace/current/tab/history',
       state: {},
       action: { type: 'PUSH' },
     })
@@ -197,19 +200,21 @@ describe('workspace pane destination navigation', () => {
   test('a destination commit consumes its own route observation without self-superseding', async () => {
     seedDestinationRepo()
     const { actions, routeNavigation } = primaryNavigationActions()
-    vi.mocked(routeNavigation.commitRepoBranchWorkspacePaneRoute).mockImplementation(async (_repoId, _branchName, _route, options) => {
-      const token = options?.presentationToken
-      if (!token) return false
-      const href = '/repo/destination/tab/status'
-      const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
-      if (!navigationId) return false
-      observePrimaryWindowHistoryNavigation({
-        href,
-        state: primaryWindowNavigationState({}, navigationId),
-        action: { type: 'PUSH' },
-      })
-      return true
-    })
+    vi.mocked(routeNavigation.commitWorkspacePaneRoute).mockImplementation(
+      async (_repoId, _branchName, _route, options) => {
+        const token = options?.presentationToken
+        if (!token) return false
+        const href = '/workspace/destination/tab/status'
+        const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
+        if (!navigationId) return false
+        observePrimaryWindowHistoryNavigation({
+          href,
+          state: primaryWindowNavigationState({}, navigationId),
+          action: { type: 'PUSH' },
+        })
+        return true
+      },
+    )
 
     await expect(
       commitWorkspacePaneDestinationRoute(beginPresentation('feature/destination'), DESTINATION_ROUTE, actions),
@@ -218,23 +223,24 @@ describe('workspace pane destination navigation', () => {
 })
 
 function primaryNavigationActions() {
-  const store = useReposStore.getState()
+  const store = useWorkspacesStore.getState()
   const routeNavigation = {
     openHome: vi.fn(),
-    openRepoDashboard: vi.fn(),
+    openWorkspaceDashboard: vi.fn(),
+    openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn(() => true),
     openRepoBranchTab: vi.fn(() => true),
     openRepoBranchTerminal: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: acceptedRouteCommit(),
+    commitWorkspacePaneRoute: acceptedRouteCommit(),
     openRepoNewWorktree: vi.fn(),
     openSettings: vi.fn(),
   }
   return {
     routeNavigation,
     actions: createPrimaryWindowNavigationActions({
-      currentRepoId: REPO_ID,
-      order: [REPO_ID],
-      closeRepo: vi.fn(),
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,
       commitWorkspaceNavigation: store.commitWorkspaceNavigation,
       routeNavigation: routeNavigation as unknown as PrimaryWindowRouteNavigation,
@@ -249,7 +255,7 @@ function beginPresentation(branchName: string) {
 }
 
 function acceptedRouteCommit() {
-  return vi.fn<WorkspacePaneDestinationNavigation['commitRepoBranchWorkspacePaneRoute']>(
+  return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       if (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken)) {
         options?.onCommit?.()
@@ -260,13 +266,10 @@ function acceptedRouteCommit() {
 }
 
 function deferredRouteCommit(completion: Promise<boolean>) {
-  return vi.fn<WorkspacePaneDestinationNavigation['commitRepoBranchWorkspacePaneRoute']>(
+  return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       const accepted = await completion
-      if (
-        accepted &&
-        (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken))
-      ) {
+      if (accepted && (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken))) {
         options?.onCommit?.()
       }
       return accepted

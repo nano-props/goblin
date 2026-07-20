@@ -1,11 +1,12 @@
 import { useContext } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { GitBranchPlus, LayoutDashboard } from 'lucide-react'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { GitBranchPlus } from 'lucide-react'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
-import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
@@ -17,17 +18,12 @@ import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
 }
 
 interface CreateWorktreeRowActionProps extends Props {
   selected?: boolean
   onCreateWorktree?: () => void
-}
-
-interface DashboardRowActionProps extends Props {
-  selected?: boolean
-  onOpenDashboard?: () => void
 }
 
 export function RepoSyncAction({ repoId }: Props) {
@@ -38,35 +34,20 @@ export function BranchFilterAction({ repoId }: Props) {
   return <WorktreeFilterToggle repoId={repoId} />
 }
 
-export function DashboardRowAction({ selected = false, onOpenDashboard }: DashboardRowActionProps) {
-  const t = useT()
-  return (
-    <SidebarRowButton
-      onClick={() => onOpenDashboard?.()}
-      aria-label={t('repo.dashboard')}
-      size="dense"
-      selected={selected}
-      leading={<LayoutDashboard size={16} />}
-    >
-      {t('repo.dashboard')}
-    </SidebarRowButton>
-  )
-}
-
 function WorktreeFilterToggle({ repoId }: Props) {
-  const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const repoView = useReposStore(
+  const setBranchViewMode = useWorkspacesStore((s) => s.setBranchViewMode)
+  const repoView = useWorkspacesStore(
     useShallow((s) => {
-      const repo = s.repos[repoId]
+      const repo = s.workspaces[repoId]
       return {
         id: repo?.id ?? '',
-        repoRuntimeId: repo?.repoRuntimeId ?? '',
-        branchViewMode: repo?.ui.branchViewMode ?? 'all',
-        exists: !!repo,
+        workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
+        branchViewMode: repo?.capability.kind === 'git' ? repo.capability.git.ui.branchViewMode : 'all',
+        exists: repo?.capability.kind === 'git',
       }
     }),
   )
-  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.repoRuntimeId, repoView.exists)
+  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.workspaceRuntimeId, repoView.exists)
   return (
     <BranchViewModeControl
       value={repoView.branchViewMode}
@@ -107,18 +88,18 @@ export function CreateWorktreeRowAction({
   )
 }
 
-function useCreateWorktreeTrigger(repoId: string) {
+function useCreateWorktreeTrigger(repoId: WorkspaceId) {
   const overlayActions = useContext(LayoutOverlayActions)
   const repoShell = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) => {
-      const repo = s.repos[repoId]
-      return repo
+      const repo = s.workspaces[repoId]
+      return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             operations: {
-              branchAction: repo.operations.branchAction,
+              branchAction: repo.capability.git.operations.branchAction,
             },
           }
         : null
@@ -128,12 +109,12 @@ function useCreateWorktreeTrigger(repoId: string) {
       (!!a &&
         !!b &&
         a.id === b.id &&
-        a.repoRuntimeId === b.repoRuntimeId &&
+        a.workspaceRuntimeId === b.workspaceRuntimeId &&
         a.operations.branchAction.phase === b.operations.branchAction.phase &&
         a.operations.branchAction.reason === b.operations.branchAction.reason &&
         a.operations.branchAction.target === b.operations.branchAction.target),
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
   const branchAction = repoShell

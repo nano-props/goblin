@@ -1,4 +1,4 @@
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   useBranchActionItems,
@@ -25,7 +25,7 @@ export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
 
   // Dialogs are no longer rendered here. The shared
   // `BranchActionDialogHost` is mounted once at the workspace level
-  // (`RepoWorkspace`), and its open/close state is held by
+  // (`WorkspacePane`), and its open/close state is held by
   // `useBranchActionDialogsStore` so that triggering a confirm from a
   // temporary surface (e.g. the zen-mode HoverCard popover) does
   // not get its dialog torn down when the surface unmounts.

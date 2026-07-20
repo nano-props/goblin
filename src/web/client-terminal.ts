@@ -7,6 +7,7 @@ import type {
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalTestNotificationInput,
+  TerminalSessionsChangedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
@@ -27,14 +28,13 @@ export function createServerTerminalClient(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
-  const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const sessionsChangedSubscribers = new Set<(event: TerminalSessionsChangedEvent) => void>()
   const sessionClosedSubscribers = new Set<
     (event: {
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
-      worktreePath: string
+      workspaceId: TerminalExitEvent['workspaceId']
     }) => void
   >()
 
@@ -56,8 +56,8 @@ export function createServerTerminalClient(options: {
     takeover(input) {
       return options.realtime.request('takeover', input)
     },
-    pruneTerminals(repoRoot, repoRuntimeId) {
-      return options.realtime.request('prune', { repoRoot, repoRuntimeId })
+    pruneTerminals(workspaceId, workspaceRuntimeId) {
+      return options.realtime.request('prune', { workspaceId, workspaceRuntimeId })
     },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {
@@ -182,7 +182,7 @@ export function createServerTerminalClient(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
         return
       case 'sessions-changed':
-        for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+        for (const subscriber of sessionsChangedSubscribers) subscriber(message)
         return
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)
@@ -190,8 +190,7 @@ export function createServerTerminalClient(options: {
             terminalRuntimeSessionId: message.terminalRuntimeSessionId,
             terminalRuntimeGeneration: message.terminalRuntimeGeneration,
             terminalSessionId: message.terminalSessionId,
-            repoRoot: message.repoRoot,
-            worktreePath: message.worktreePath,
+            workspaceId: message.workspaceId,
           })
         return
       case 'identity': {

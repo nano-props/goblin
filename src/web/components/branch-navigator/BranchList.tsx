@@ -17,7 +17,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 
 interface Props {

@@ -5,24 +5,24 @@ import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
-const REPO_ID = '/tmp/goblin-branch-action-dispatch-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/goblin-branch-action-dispatch-worktree'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 afterEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('branch action dispatch', () => {
@@ -40,7 +40,7 @@ describe('branch action dispatch', () => {
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    useReposStore.setState({ runBranchAction })
+    useWorkspacesStore.setState({ runBranchAction })
 
     await expect(
       dispatchRemoveWorktree({
@@ -63,7 +63,7 @@ describe('branch action dispatch', () => {
         deleteUpstream: false,
       },
       {
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         deferResultMessages: [],
       },
     )
@@ -78,7 +78,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {},
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    useReposStore.setState({ runBranchAction })
+    useWorkspacesStore.setState({ runBranchAction })
 
     await expect(
       dispatchRemoveWorktree({

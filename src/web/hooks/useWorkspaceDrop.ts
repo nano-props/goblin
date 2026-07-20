@@ -1,0 +1,95 @@
+import { type DragEvent, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { pathForDroppedFile } from '#/web/app-shell-client.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { useT } from '#/web/stores/i18n.ts'
+import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
+import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+interface Options {
+  /** True when an overlay (Settings/Help) is up. While blocked, the
+   *  drop overlay stays hidden and drops are ignored — otherwise the
+   *  dashed border would stack on top of the modal at the same
+   *  z-index, and a drop would silently swap repos under a still-open
+   *  Settings panel. */
+  blocked: boolean
+}
+
+function hasFiles(event: DragEvent<HTMLDivElement>): boolean {
+  return event.dataTransfer.types.includes('Files')
+}
+
+function isDropBlocked(blocked: boolean): boolean {
+  return blocked || isShortcutBlockingLayerOpen()
+}
+
+export function useWorkspaceDrop({ blocked }: Options) {
+  const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
+  const navigation = usePrimaryWindowNavigation()
+  const t = useT()
+  const tRef = useRef(t)
+  tRef.current = t
+  const blockedRef = useRef(blocked)
+  blockedRef.current = blocked
+  const [active, setDropActive] = useState(false)
+
+  // If a modal opens mid-drag, the gate stops reacting to enter/over/
+  // drop but `setDropActive(false)` would never fire on its own. Force-clear
+  // when blocked flips on so the dashed border doesn't stay painted
+  // over the modal.
+  useEffect(() => {
+    if (blocked) setDropActive(false)
+  }, [blocked])
+
+  const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
+    event.preventDefault()
+    if (isDropBlocked(blockedRef.current)) return
+    setDropActive(!handledByChild)
+  }
+
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
+    event.preventDefault()
+    if (isDropBlocked(blockedRef.current)) return
+    setDropActive(!handledByChild)
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFiles(event)) return
+    // Depth counters (enter++/leave--) are unreliable across child
+    // boundaries — the dashed border ends up stuck "on" after a few
+    // hovers. `relatedTarget === null` fires once when the cursor
+    // exits the BrowserWindow, which is the signal we actually want.
+    if (event.relatedTarget === null) setDropActive(false)
+  }
+
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
+    event.preventDefault()
+    setDropActive(false)
+    if (handledByChild) return
+    if (isDropBlocked(blockedRef.current)) return
+    const paths = Array.from(event.dataTransfer.files)
+      .map((file) => pathForDroppedFile(file))
+      .filter((path) => path.length > 0)
+    if (paths.length === 0) return
+    void (async () => {
+      await openWorkspacePaths(paths, {
+        ensureWorkspaceOpen,
+        activateWorkspace: navigation.activateWorkspace,
+        onOpenFailed: (_path, message) => {
+          toast.error(tRef.current('drop.open-failed'), {
+            description: tRef.current(message),
+          })
+        },
+      })
+    })()
+  }
+
+  return { active, onDragEnter, onDragOver, onDragLeave, onDrop }
+}

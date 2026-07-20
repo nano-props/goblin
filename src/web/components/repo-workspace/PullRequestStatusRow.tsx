@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { Check, Circle, GitPullRequest, X } from 'lucide-react'
 import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
@@ -19,7 +20,7 @@ import {
   StatusChip,
   StatusRow,
   type Tone,
-} from '#/web/components/repo-workspace/status-ui.tsx'
+} from '#/web/components/workspace-pane/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { Lang } from '#/shared/api-types.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string
@@ -179,13 +180,13 @@ function PullRequestValue({
 
 export function PullRequestStatusRow({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   branchName,
   pullRequest,
   tooltipSide = 'right',
 }: {
-  repoId: string
-  repoRuntimeId: string
+  repoId: WorkspaceId
+  workspaceRuntimeId: string
   branchName: string
   pullRequest: PullRequestInfo | undefined
   tooltipSide?: TooltipSide
@@ -202,12 +203,12 @@ export function PullRequestStatusRow({
     () =>
       throttle(
         () => {
-          void openBranchExternalTarget(repoId, repoRuntimeId, { name: branchName, pullRequest }).catch(() => {})
+          void openBranchExternalTarget(repoId, workspaceRuntimeId, { name: branchName, pullRequest }).catch(() => {})
         },
         500,
         { edges: ['leading'] },
       ),
-    [repoId, repoRuntimeId, branchName, pullRequest],
+    [repoId, workspaceRuntimeId, branchName, pullRequest],
   )
   if (!pullRequest) return null
 

@@ -1,11 +1,11 @@
 import {
   REMOTE_DIAGNOSTIC_CATEGORIES,
   type RemoteDiagnosticsResult,
-  type RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+  type RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
 const SSH_SETTINGS_REASONS = new Set([
   'error.ssh-config-changed',
-  'repo-picker.open-remote-home-unavailable',
+  'workspace-picker.open-remote-home-unavailable',
   'auth-failed',
   'host-key',
   'config-changed',
@@ -14,7 +14,7 @@ const SSH_SETTINGS_REASONS = new Set([
 const REMOTE_DIAGNOSTIC_REASONS = new Set<string>(REMOTE_DIAGNOSTIC_CATEGORIES)
 
 function reasonTranslationKey(reason: string): string {
-  return REMOTE_DIAGNOSTIC_REASONS.has(reason) ? `repo-picker.open-remote-diagnostics-category-${reason}` : reason
+  return REMOTE_DIAGNOSTIC_REASONS.has(reason) ? `workspace-picker.open-remote-diagnostics-category-${reason}` : reason
 }
 
 export function formatTranslatableReason(t: (key: string) => string, reason: string): string {
@@ -24,13 +24,12 @@ export function formatTranslatableReason(t: (key: string) => string, reason: str
 }
 
 export function unavailableBodyKey(isRemote: boolean, reason: string): string {
-  if (!isRemote) return 'repo-unavailable.body'
-  if (reason === 'error.ssh-config-changed') return 'repo-unavailable.remote-config-changed'
-  if (reason === 'repo-picker.open-remote-home-unavailable') return 'repo-unavailable.remote-home-unavailable'
-  if (reason === 'path-missing') return 'repo-unavailable.remote-path-missing'
-  if (reason === 'not-a-repo') return 'repo-unavailable.remote-not-a-repo'
-  if (REMOTE_DIAGNOSTIC_REASONS.has(reason)) return 'repo-unavailable.remote-connect-failed'
-  return 'repo-unavailable.remote-body'
+  if (!isRemote) return 'workspace-unavailable.body'
+  if (reason === 'error.ssh-config-changed') return 'workspace-unavailable.remote-config-changed'
+  if (reason === 'workspace-picker.open-remote-home-unavailable') return 'workspace-unavailable.remote-home-unavailable'
+  if (reason === 'path-missing') return 'workspace-unavailable.remote-path-missing'
+  if (REMOTE_DIAGNOSTIC_REASONS.has(reason)) return 'workspace-unavailable.remote-connect-failed'
+  return 'workspace-unavailable.remote-body'
 }
 
 export function shouldOfferSshSettings(reasonOrCategory: string | null | undefined): boolean {
@@ -47,6 +46,6 @@ export function failedDiagnosticsCategory(diagnostics: RemoteDiagnosticsResult |
   )
 }
 
-export function remoteSshCommand(target: Pick<RemoteRepoTarget, 'alias'>): string {
+export function remoteSshCommand(target: Pick<RemoteWorkspaceTarget, 'alias'>): string {
   return `ssh ${target.alias}`
 }

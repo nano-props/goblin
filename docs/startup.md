@@ -30,7 +30,7 @@ The primary window boot path has two separate concerns: public shell hydration a
    - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
 
 5. Lazy repo promotion
-   - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
+   - Owner: `useRestoreWorkspaceTabsOnView` and server `restoreWorkspaceTabs`.
    - When navigation reaches a stub, the server projects that repo and asks the pane aggregate for a canonical snapshot.
    - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
    - Promotion validates both the requesting client's runtime lease and durable membership, atomically filters invalid durable targets from the settings transaction's current layout, and then performs a pure projection. It never initializes or copies layout into epoch state.
@@ -51,14 +51,14 @@ The repos store keeps low-level fields because different UI surfaces need differ
 - `sessionPersistenceReady`: server workspace restore and client-local workspace hydrate have both converged.
 - `sessionRestoreError`: restore failed in a way that must block persistence.
 
-Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/repos/selector-state.ts` instead of recombining booleans at call sites.
+Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/workspaces/selector-state.ts` instead of recombining booleans at call sites.
 
 ## Routing Rules
 
 - Repo routes derive `RepoRouteView` directly from the URL before store hydration.
 - A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
 - After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
-- Client workspace persistence should prefer the routed repo id over `restoredRepoId`.
+- Client workspace persistence should prefer the routed repo id over `restoredWorkspaceId`.
 
 ## Persistence Rules
 

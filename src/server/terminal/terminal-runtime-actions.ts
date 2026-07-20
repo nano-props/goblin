@@ -1,4 +1,5 @@
-import { isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -16,22 +17,29 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
+import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import type { TerminalCloseOutcome, TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 interface TerminalSessionServiceLike {
   prune(
     clientId: string,
     userId: string,
-    repoRoot: string,
-    repoRuntimeId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
   ): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
+  listSessions(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
+  ): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -39,6 +47,12 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
+  isCurrentWorkspaceRuntimeMembership(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    clientId: string,
+  ): boolean
   worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'runOperation'>
 }
 
@@ -78,7 +92,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
       const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(
         userId,
         terminalRuntimeSessionId,
@@ -88,7 +101,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const operation = await worktreeOperations.runOperation(
         physicalWorktreeCapability,
         async (_permit, context) =>
-          await manager.restartSession(
+          await manager.restartSessionWithProjectionOutcome(
             userId,
             terminalRuntimeSessionId,
             input.cols,
@@ -98,8 +111,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           ),
       )
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
-      const result = operation.value
-      if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
+      const { result, projectionChanged } = operation.value
+      if (projectionChanged) {
+        broker.broadcastToUser(userId, {
+          type: 'sessions-changed',
+          ...projectionChanged,
+        })
+      }
       return result
     },
 
@@ -109,9 +127,16 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalPruneInput,
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
-      if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.prune(clientId, userId, input.repoRoot, input.repoRuntimeId)
+      if (!isValidWorkspaceLocatorInput(input.workspaceId)) return { pruned: 0, remaining: 0 }
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input)
+      assertCurrentMembership()
+      return await sessionService.prune(
+        clientId,
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
@@ -136,33 +161,16 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {
-      if (!isValidTerminalClientId(clientId)) return false
-      // Look up the session BEFORE closing so we know its scope
-      // (for the per-session broadcast). The session is gone after
-      // `closeSessionForUser` returns, so a post-close lookup would
-      // always miss. The lookup is also gated on validity so a
-      // malformed input never throws inside the action.
-      const session = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? manager.getSessionSummaryForUser(userId, input.terminalRuntimeSessionId)
-        : null
-      const closed = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? await manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
-        : false
-      if (closed && session) {
-        // General repo/session-list invalidation is emitted by the
-        // manager close lifecycle. This action owns only the targeted
-        // sibling-window event; other users must not hear about this
-        // session id.
-        broker.broadcastToUser(userId, {
-          type: 'session-closed',
-          terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-          terminalSessionId: session.terminalSessionId,
-          repoRoot: session.repoRoot,
-          worktreePath: session.worktreePath,
-        })
-      }
-      return closed
+      return (await closeOutcome(clientId, userId, input)).kind === 'closed'
+    },
+
+    async closeForWorkspacePane(
+      clientId: string,
+      userId: string,
+      input: TerminalSessionInput,
+    ): Promise<TerminalCloseOutcome> {
+      const outcome = await closeOutcome(clientId, userId, input)
+      return { kind: outcome.kind }
     },
 
     takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
@@ -182,11 +190,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionsSnapshot> {
-      if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
+      if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.workspaceId)) {
         return { revision: 0, sessions: [] }
       }
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+      membershipAssertion(clientId, userId, input)()
+      const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
       return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
@@ -196,19 +204,48 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(input.repoRoot)) return []
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.listSessions(userId, input.repoRoot, input.repoRuntimeId)
+      if (!isValidWorkspaceLocatorInput(input.workspaceId)) return []
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input)
+      assertCurrentMembership()
+      return await sessionService.listSessions(
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
   }
 
-  function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
+  async function closeOutcome(
+    clientId: string,
+    userId: string,
+    input: TerminalSessionInput,
+  ): Promise<TerminalSessionCloseOutcome> {
+    if (!isValidTerminalClientId(clientId)) return { kind: 'failed' }
+    if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)) return { kind: 'failed' }
+    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId)
+    if (outcome.kind === 'closed') {
+      const session = outcome.session
+      // General repo/session-list invalidation is emitted by the
+      // manager close lifecycle. This action owns only the targeted
+      // sibling-window event; other users must not hear about this
+      // session id.
+      broker.broadcastToUser(userId, {
+        type: 'session-closed',
+        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+        terminalSessionId: session.terminalSessionId,
+        workspaceId: terminalSessionCoordinates(session).workspaceId,
+      })
+    }
+    return outcome
   }
 
-  function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
-    if (!isCurrentRepoRuntimeOpen(userId, repoRoot, repoRuntimeId)) {
-      throw new Error('error.repo-runtime-stale')
+  function membershipAssertion(clientId: string, userId: string, input: TerminalListSessionsInput): () => void {
+    return () => {
+      if (!deps.isCurrentWorkspaceRuntimeMembership(userId, input.workspaceId, input.workspaceRuntimeId, clientId)) {
+        throw new Error('error.workspace-runtime-stale')
+      }
     }
   }
 }

@@ -1,31 +1,65 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { hasClientServerConfig } from '#/web/lib/server-config.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { goblinLog } from '#/web/logger.ts'
 
-function isBackgroundSyncEligible(repo: RepoState | null | undefined): repo is RepoState {
-  return !!repo && !isRepoUnavailable(repo) && repo.remote.hasRemotes === true
+function isBackgroundSyncEligible(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
+  return (
+    !!repo &&
+    workspaceCanExecute(repo) &&
+    repo.capability.kind === 'git' &&
+    repo.capability.git.remote.hasRemotes === true
+  )
 }
 
-export function backgroundSyncRepoIdsFromStore(
-  state: Pick<ReposStore, 'repos'>,
-  hydratedRouteRepoId: string | null,
-): string[] {
-  const currentRepo = hydratedRouteRepoId ? state.repos[hydratedRouteRepoId] : null
-  return isBackgroundSyncEligible(currentRepo) ? [currentRepo.id] : []
+export function backgroundSyncTargetsFromStore(
+  state: Pick<WorkspacesStore, 'workspaces'>,
+  currentWorkspaceId: WorkspaceId | null,
+): GitBackgroundSyncTarget[] {
+  const currentWorkspace = currentWorkspaceId ? state.workspaces[currentWorkspaceId] : null
+  return isBackgroundSyncEligible(currentWorkspace)
+    ? [{ workspaceId: currentWorkspace.id, workspaceRuntimeId: currentWorkspace.workspaceRuntimeId }]
+    : []
 }
 
-export function useBackgroundFetch({ hydratedRouteRepoId }: { hydratedRouteRepoId: string | null }) {
-  const eligibleRepoIdsKey = useReposStore((s) => backgroundSyncRepoIdsFromStore(s, hydratedRouteRepoId).join('\0'))
+export function useBackgroundFetch({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId | null }) {
+  const hasDeclaredGitTarget = useRef(false)
+  const currentWorkspace = useWorkspacesStore((state) =>
+    currentWorkspaceId ? state.workspaces[currentWorkspaceId] : undefined,
+  )
+  const eligible = isBackgroundSyncEligible(currentWorkspace)
+  const eligibleWorkspaceId = eligible ? currentWorkspace.id : null
+  const eligibleWorkspaceRuntimeId = eligible ? currentWorkspace.workspaceRuntimeId : null
+  const eligibleTarget = useMemo(
+    () =>
+      eligibleWorkspaceId && eligibleWorkspaceRuntimeId
+        ? { workspaceId: eligibleWorkspaceId, workspaceRuntimeId: eligibleWorkspaceRuntimeId }
+        : null,
+    [eligibleWorkspaceId, eligibleWorkspaceRuntimeId],
+  )
   const { fetchIntervalSec } = useFetchSettings()
+  const fetchEnabled = fetchIntervalSec > 0
   const hasServer = hasClientServerConfig()
 
   useEffect(() => {
     if (!hasServer) return
-    const repoIds = fetchIntervalSec > 0 ? eligibleRepoIdsKey.split('\0').filter(Boolean) : []
-    void setBackgroundSyncRepos(repoIds)
-  }, [eligibleRepoIdsKey, fetchIntervalSec, hasServer])
+    const targets = fetchEnabled && eligibleTarget ? [eligibleTarget] : []
+    if (targets.length === 0 && !hasDeclaredGitTarget.current) return
+    const controller = new AbortController()
+    if (targets.length > 0) hasDeclaredGitTarget.current = true
+    void setBackgroundSyncRepos(targets, controller.signal)
+      .then(() => {
+        if (targets.length === 0) hasDeclaredGitTarget.current = false
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) goblinLog.warn('background sync registration failed', { err })
+      })
+    return () => controller.abort('background-sync-target-changed')
+  }, [eligibleTarget, fetchEnabled, hasServer])
 }

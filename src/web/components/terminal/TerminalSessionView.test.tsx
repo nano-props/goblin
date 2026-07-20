@@ -15,8 +15,11 @@ import type {
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalSnapshot,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
+import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -46,30 +49,91 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 
 type TestTerminalSessionViewProps = Omit<
   ComponentProps<typeof TerminalSessionViewComponent>,
-  'createTerminalForSlot'
+  'createTerminalForSlot' | 'base'
 > & {
   createTerminalForSlot?: ComponentProps<typeof TerminalSessionViewComponent>['createTerminalForSlot']
+  repoRoot?: string
+  workspaceRuntimeId?: string
+  branch?: string | null
+  worktreePath?: string
 }
 
 const defaultCreateTerminalForSlot = vi.fn(async () => {})
 
 function TerminalSessionView({
   createTerminalForSlot = defaultCreateTerminalForSlot,
+  repoRoot = '/repo',
+  workspaceRuntimeId = 'repo-runtime-test',
+  branch = 'feature',
+  worktreePath = '/worktree',
   ...props
 }: TestTerminalSessionViewProps) {
-  return <TerminalSessionViewComponent {...props} createTerminalForSlot={createTerminalForSlot} />
+  return (
+    <TerminalSessionViewComponent
+      {...props}
+      base={terminalBaseForTest(repoRoot, workspaceRuntimeId, branch, worktreePath)}
+      createTerminalForSlot={createTerminalForSlot}
+    />
+  )
+}
+
+function terminalBaseForTest(
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  branch: string | null,
+  worktreePath: string,
+): TerminalSessionBase {
+  const workspaceId = requiredWorkspaceLocator(repoRoot)
+  if (branch === null) {
+    return {
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspaceRuntimeId },
+      presentation: { kind: 'workspace-root' },
+    }
+  }
+  return {
+    target: {
+      kind: 'git-worktree' as const,
+      workspaceId,
+      workspaceRuntimeId: workspaceRuntimeId,
+      root: requiredWorkspaceLocator(worktreePath),
+    },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branch } },
+  }
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator =
+    canonicalWorkspaceLocator(input) ??
+    formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input }, 'posix')
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
+
+function terminalDescriptorTargetForTest() {
+  return {
+    target: {
+      kind: 'git-worktree' as const,
+      workspaceId: requiredWorkspaceLocator('/repo'),
+      workspaceRuntimeId: 'repo-runtime-test',
+      root: requiredWorkspaceLocator('/worktree'),
+    },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature' } },
+  }
 }
 
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'hasRecentOutput'> &
   Partial<Pick<TerminalSessionSummary, 'type' | 'hasRecentOutput'>>
 
-type TestWorktreeSnapshot = Omit<TerminalWorktreeSnapshot, 'sessions' | 'bellCount' | 'outputActiveCount'> & {
+type TestFilesystemTargetSnapshot = Omit<
+  TerminalFilesystemTargetSnapshot,
+  'sessions' | 'bellCount' | 'outputActiveCount'
+> & {
   sessions: TestTerminalSummary[]
   bellCount?: number
   outputActiveCount?: number
 }
 
-function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): TerminalWorktreeSnapshot {
+function completeFilesystemTargetSnapshot(snapshot: TestFilesystemTargetSnapshot): TerminalFilesystemTargetSnapshot {
   const sessions = snapshot.sessions.map((session) => ({
     ...session,
     type: 'terminal' as const,
@@ -87,24 +151,17 @@ async function renderTerminalSession() {
   const writeInput = vi.fn()
   const descriptor = {
     terminalSessionId: 'term-111111111111111111111',
-    terminalWorktreeKey: '/repo\0/worktree',
+    terminalFilesystemTargetKey: '/repo\0/worktree',
     index: 1,
-
-    repoRoot: '/repo',
-
-    repoRuntimeId: 'repo-runtime-test',
-
-    branch: 'feature',
-
-    worktreePath: '/worktree',
+    ...terminalDescriptorTargetForTest(),
   }
-  const terminalWorktreeSnapshot = {
-    terminalWorktreeKey: '/repo\0/worktree',
+  const terminalFilesystemTargetSnapshot = {
+    terminalFilesystemTargetKey: '/repo\0/worktree',
     selectedDescriptor: descriptor,
     sessions: [
       {
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey: '/repo\0/worktree',
+        terminalFilesystemTargetKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -151,10 +208,10 @@ async function renderTerminalSession() {
     focusTerminal: vi.fn(),
   })
   const readContext: TerminalSessionReadContextValue = {
-    terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-    subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 0,
-    subscribeRepoBellCount: () => () => {},
+    terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+    subscribeTerminalFilesystemTarget: () => () => {},
+    workspaceBellCount: () => 0,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => snapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -164,7 +221,7 @@ async function renderTerminalSession() {
       <TerminalSessionReadContext value={readContext}>
         <TerminalSessionView
           repoRoot="/repo"
-          repoRuntimeId={'repo-runtime-test'}
+          workspaceRuntimeId={'repo-runtime-test'}
           branch="feature"
           worktreePath="/worktree"
         />
@@ -239,24 +296,17 @@ describe('TerminalSessionView', () => {
   test('attaches the explicit terminal session before projection selection catches up', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = completeWorktreeSnapshot({
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -265,7 +315,7 @@ describe('TerminalSessionView', () => {
         },
         {
           terminalSessionId: 'term-222222222222222222222',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 2,
           title: 'zsh',
           phase: 'open' as const,
@@ -311,10 +361,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -324,7 +374,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
             selectedTerminalSessionId="term-222222222222222222222"
@@ -338,14 +388,7 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({
           terminalSessionId: 'term-222222222222222222222',
           index: 2,
-
-          repoRoot: '/repo',
-
-          repoRuntimeId: 'repo-runtime-test',
-
-          branch: 'feature',
-
-          worktreePath: '/worktree',
+          ...terminalDescriptorTargetForTest(),
         }),
         expect.any(HTMLDivElement),
       )
@@ -361,24 +404,17 @@ describe('TerminalSessionView', () => {
   test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    let terminalWorktreeSnapshot = completeWorktreeSnapshot({
-      terminalWorktreeKey: '/repo\0/worktree',
+    let terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -404,7 +440,7 @@ describe('TerminalSessionView', () => {
     }
     const attach = vi.fn()
     const detach = vi.fn()
-    const worktreeListeners = new Set<() => void>()
+    const filesystemTargetListeners = new Set<() => void>()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
@@ -426,13 +462,13 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
-      subscribeTerminalWorktree: (_terminalWorktreeKey, listener) => {
-        worktreeListeners.add(listener)
-        return () => worktreeListeners.delete(listener)
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
+      subscribeTerminalFilesystemTarget: (_terminalFilesystemTargetKey, listener) => {
+        filesystemTargetListeners.add(listener)
+        return () => filesystemTargetListeners.delete(listener)
       },
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -442,7 +478,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -453,13 +489,13 @@ describe('TerminalSessionView', () => {
     try {
       expect(attach).toHaveBeenCalledTimes(1)
 
-      terminalWorktreeSnapshot = completeWorktreeSnapshot({
-        terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
+        terminalFilesystemTargetKey: '/repo\0/worktree',
         selectedDescriptor: { ...descriptor, index: 2 },
         sessions: [
           {
             terminalSessionId: 'term-111111111111111111111',
-            terminalWorktreeKey: '/repo\0/worktree',
+            terminalFilesystemTargetKey: '/repo\0/worktree',
             index: 2,
             title: 'zsh',
             phase: 'open' as const,
@@ -471,7 +507,7 @@ describe('TerminalSessionView', () => {
         createPending: false,
       })
       await act(async () => {
-        for (const listener of worktreeListeners) listener()
+        for (const listener of filesystemTargetListeners) listener()
       })
 
       expect(attach).toHaveBeenCalledTimes(1)
@@ -486,7 +522,7 @@ describe('TerminalSessionView', () => {
     const summaries = [
       {
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey: '/repo\0/worktree',
+        terminalFilesystemTargetKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -497,19 +533,12 @@ describe('TerminalSessionView', () => {
     ]
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: summaries,
       count: 1,
@@ -550,10 +579,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -563,7 +592,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -592,8 +621,8 @@ describe('TerminalSessionView', () => {
   })
 
   test('does not automatically create a default terminal from render lifecycle', async () => {
-    const emptyWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const emptyFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -621,10 +650,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(emptyFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -634,7 +663,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -655,24 +684,17 @@ describe('TerminalSessionView', () => {
   test('hides the xterm host while an existing session is still attaching locally', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -706,10 +728,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -719,7 +741,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -739,8 +761,8 @@ describe('TerminalSessionView', () => {
   })
 
   test('shows terminal projection failure reason while opening without sessions', () => {
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -767,10 +789,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
       subscribeSnapshot: () => () => {},
     }
@@ -780,11 +802,11 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId="repo-runtime-test"
+            workspaceRuntimeId="repo-runtime-test"
             branch="feature"
             worktreePath="/worktree"
             projectionPhase="failed"
-            projectionErrorMessage="error.repo-runtime-stale"
+            projectionErrorMessage="error.workspace-runtime-stale"
           />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
@@ -792,7 +814,7 @@ describe('TerminalSessionView', () => {
 
     try {
       expect(container.textContent).toContain('terminal.load-failed')
-      expect(container.textContent).toContain('error.repo-runtime-stale')
+      expect(container.textContent).toContain('error.workspace-runtime-stale')
     } finally {
       unmount()
     }
@@ -801,24 +823,17 @@ describe('TerminalSessionView', () => {
   test('focuses the controller terminal after the ready render shows the host', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -868,10 +883,10 @@ describe('TerminalSessionView', () => {
     })
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -880,7 +895,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -915,24 +930,17 @@ describe('TerminalSessionView', () => {
   test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -982,10 +990,10 @@ describe('TerminalSessionView', () => {
     })
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -994,7 +1002,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1037,24 +1045,17 @@ describe('TerminalSessionView', () => {
     const restart = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -1101,10 +1102,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1114,7 +1115,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1157,24 +1158,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1223,10 +1217,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1236,7 +1230,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1282,24 +1276,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1348,10 +1335,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1370,7 +1357,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1426,24 +1413,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1490,10 +1470,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1503,7 +1483,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1542,24 +1522,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1606,10 +1579,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1623,7 +1596,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1674,24 +1647,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1738,10 +1704,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1758,7 +1724,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1962,24 +1928,17 @@ describe('TerminalSessionView', () => {
     const writeInput = vi.fn()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const terminalWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const terminalFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptor,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -2026,10 +1985,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -2049,7 +2008,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -2090,46 +2049,35 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('drop writes to the terminal session captured by the drop event after a worktree switch', async () => {
+  test('drop writes to the terminal session captured by the drop event after a filesystem target switch', async () => {
     // The blob-save tier is a real roundtrip (HTTP POST in web, IPC in
-    // Electron), so the user can switch worktrees before the resolver returns.
+    // Electron), so the user can switch filesystem targets before the resolver returns.
     // The operation target is still the session that received the original
     // drop event; projection/server lifecycle decides whether that session is
     // still writable.
     const writeInput = vi.fn()
     const descriptorA = {
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: '/repo\0/worktree',
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+      ...terminalDescriptorTargetForTest(),
     }
-    const descriptorB = {
+    const descriptorB = terminalDescriptorForTest({
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
 
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
+      workspaceRuntimeId: 'repo-runtime-test',
       branch: 'feature',
-
       worktreePath: '/worktree-other',
-    }
-    const worktreeSnapshotA = {
-      terminalWorktreeKey: '/repo\0/worktree',
+      repoRoot: '/repo',
+    })
+    const filesystemTargetSnapshotA = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
       sessions: [
         {
           terminalSessionId: 'term-111111111111111111111',
-          terminalWorktreeKey: '/repo\0/worktree',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -2141,13 +2089,13 @@ describe('TerminalSessionView', () => {
       count: 1,
       createPending: false,
     }
-    const worktreeSnapshotB = {
-      terminalWorktreeKey: '/repo\0/worktree-other',
+    const filesystemTargetSnapshotB = {
+      terminalFilesystemTargetKey: '/repo\0/worktree-other',
       selectedDescriptor: descriptorB,
       sessions: [
         {
           terminalSessionId: 'term-222222222222222222222',
-          terminalWorktreeKey: '/repo\0/worktree-other',
+          terminalFilesystemTargetKey: '/repo\0/worktree-other',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -2193,12 +2141,12 @@ describe('TerminalSessionView', () => {
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
-    let activeWorktreeSnapshot = worktreeSnapshotA
+    let activeFilesystemTargetSnapshot: TestFilesystemTargetSnapshot = filesystemTargetSnapshotA
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(activeFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshotOpen,
       subscribeSnapshot: () => () => {},
     }
@@ -2222,7 +2170,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -2248,16 +2196,16 @@ describe('TerminalSessionView', () => {
         await Promise.resolve()
       })
 
-      // User switches worktrees mid-resolve. The session re-renders with
+      // User switches filesystem targets mid-resolve. The session re-renders with
       // the new descriptor, but the in-flight drop keeps the target captured
       // at the event boundary.
-      activeWorktreeSnapshot = worktreeSnapshotB
+      activeFilesystemTargetSnapshot = filesystemTargetSnapshotB
       rerender(
         <TerminalSessionContext value={context}>
           <TerminalSessionReadContext value={readContext}>
             <TerminalSessionView
               repoRoot="/repo"
-              repoRuntimeId={'repo-runtime-test'}
+              workspaceRuntimeId={'repo-runtime-test'}
               branch="feature"
               worktreePath="/worktree-other"
             />
@@ -2281,15 +2229,15 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('empty worktree shows a New terminal CTA that calls the supplied create operation', async () => {
+  test('empty filesystem target shows a New terminal CTA that calls the supplied create operation', async () => {
     // Regression for the "blank screen on first click" symptom: when
-    // a worktree has no sessions yet, the session renders a CTA so the
+    // a filesystem target has no sessions yet, the session renders a CTA so the
     // user doesn't see a featureless black box and can discover the
-    // affordance without reaching for the per-worktree "+" tab.
+    // affordance without reaching for the per-target "+" tab.
     const createTerminal = vi.fn(async () => 'raw-session')
     const createTerminalForSlot = vi.fn(async () => 'term-111111111111111111111')
-    const emptyWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
+    const emptyFilesystemTargetSnapshot = {
+      terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -2317,10 +2265,10 @@ describe('TerminalSessionView', () => {
       focusTerminal: vi.fn(),
     })
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(emptyFilesystemTargetSnapshot),
+      subscribeTerminalFilesystemTarget: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -2330,7 +2278,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
             createTerminalForSlot={createTerminalForSlot}
@@ -2359,10 +2307,7 @@ describe('TerminalSessionView', () => {
       expect(createTerminal).not.toHaveBeenCalled()
       expect(createTerminalForSlot).toHaveBeenCalledTimes(1)
       expect(createTerminalForSlot).toHaveBeenCalledWith({
-        repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-test',
-        branch: 'feature',
-        worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
       })
     } finally {
       unmount()

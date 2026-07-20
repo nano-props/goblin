@@ -1,16 +1,16 @@
-import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
+import type { TerminalCreateAction, TerminalPresentation } from '#/shared/terminal-types.ts'
 
 /**
  * Client admission result for a server-committed terminal runtime open.
  *
  * `runtimeProjectionApplied` is intentionally independent from the server
- * commit: a client that has already moved to another repo runtime may skip
+ * commit: a client that has already moved to another workspace runtime may skip
  * local terminal hydration without acquiring rollback ownership over the
  * committed server resource.
  */
 export interface TerminalCreateAdmissionBase {
   terminalSessionId: string
-  branch: string
+  presentation: TerminalPresentation
   resourceDisposition: TerminalCreateAction
   runtimeProjectionApplied: boolean
 }

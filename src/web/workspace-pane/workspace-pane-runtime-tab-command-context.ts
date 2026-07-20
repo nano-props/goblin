@@ -1,25 +1,38 @@
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionCoordinates,
+  terminalExecutionPath,
+  type TerminalPresentation,
+} from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 
-type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
+type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
-  repoId: string
-  branchName: string
+  workspaceId: WorkspaceId
+  branchName: string | null
+  filesystemTarget: WorkspacePaneFilesystemTarget | null
   workspacePaneRoute: WorkspacePaneCommandRoute
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    presentationToken: PrimaryWindowPresentationToken,
+  ) => boolean | Promise<boolean>
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
-    canonicalBranch: string,
+    presentation: TerminalPresentation,
     worktreePath: string,
+    presentationToken: PrimaryWindowPresentationToken,
   ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
@@ -51,50 +64,29 @@ function assignTerminalRuntimeTabCommandContext(
   context: WorkspacePaneRuntimeTabCommandContext,
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
-  const base = selectedWorkspacePaneTerminalBase(input.repoId, input.branchName, input.workspacePaneRoute)
+  const base = input.filesystemTarget ? workspacePaneFilesystemTerminalBase(input.filesystemTarget) : null
+  const paneTarget = base ? workspacePaneTabsTargetFromRuntime(base.target) : null
   context.terminal = {
     base,
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity: captureWorkspacePaneActiveTabIdentity(
-      input.repoId,
-      useReposStore.getState().repos[input.repoId]?.repoRuntimeId ?? '',
-      input.branchName,
-      {
-        workspacePaneRoute: input.workspacePaneRoute,
-      },
-    ),
-    showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
-    showCreatedTerminalSession: (terminalSessionId, canonicalBranch) =>
+    openerIdentity:
+      base && paneTarget
+        ? captureWorkspacePaneActiveTabIdentity(paneTarget, base.target.workspaceRuntimeId, {
+            workspacePaneRoute: input.workspacePaneRoute,
+          })
+        : null,
+    showTerminalSession: (terminalSessionId, presentationToken) =>
+      input.showRuntimeTab('terminal', terminalSessionId, presentationToken),
+    showCreatedTerminalSession: (terminalSessionId, presentation, presentationToken) =>
       base
-        ? input.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch, base.worktreePath)
+        ? input.showCreatedRuntimeTab(
+            'terminal',
+            terminalSessionId,
+            presentation,
+            terminalExecutionPath(base.target),
+            presentationToken,
+          )
         : false,
     t: input.terminalCreateTranslator,
   }
-}
-
-export function selectedWorkspacePaneTerminalBase(
-  repoId: string,
-  branchName: string,
-  workspacePaneRoute: WorkspacePaneCommandRoute,
-): TerminalSessionBase | null {
-  const repo = useReposStore.getState().repos[repoId]
-  const target = selectedRepoWorkspaceTargetForRuntimeCommand(repoId, branchName, workspacePaneRoute)
-  if (!repo || !target?.worktreePath) return null
-  return {
-    repoRoot: repoId,
-    repoRuntimeId: repo.repoRuntimeId,
-    branch: target.branchName,
-    worktreePath: target.worktreePath,
-  }
-}
-
-function selectedRepoWorkspaceTargetForRuntimeCommand(
-  repoId: string,
-  branchName: string,
-  workspacePaneRoute: WorkspacePaneCommandRoute,
-): { branchName: string; worktreePath: string | null } | null {
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
-  if (resolution.kind !== 'ready') return null
-  if (!resolution.target.branchName) return null
-  return { branchName: resolution.target.branchName, worktreePath: resolution.target.worktreePath }
 }

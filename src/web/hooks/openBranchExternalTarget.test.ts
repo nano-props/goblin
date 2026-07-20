@@ -2,7 +2,8 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { openBranchExternalTarget, openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
@@ -17,11 +18,11 @@ vi.mock('#/web/repo-client.ts', () => ({
   openRepoUrl: mocks.openRepoUrl,
 }))
 
-const REPO_ID = '/tmp/goblin-open-upstream-test'
-const REPO_RUNTIME_ID = 'repo-runtime-open-upstream-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-open-upstream-test'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   mocks.openExternalUrl.mockReset()
   mocks.openRepoUrl.mockReset()
 })
@@ -30,7 +31,7 @@ describe('openBranchExternalTarget', () => {
   test('prefers the existing pull request URL', async () => {
     mocks.openExternalUrl.mockResolvedValue({ ok: true, message: '' })
 
-    await openBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, {
+    await openBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, {
       name: 'feature/pr',
       pullRequest: { url: 'https://github.com/acme/repo/pull/1', number: 1 } as never,
     })
@@ -42,9 +43,12 @@ describe('openBranchExternalTarget', () => {
   test('falls back to the branch remote target when no pull request exists', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
 
-    await openBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, { name: 'feature/no-pr', pullRequest: undefined })
+    await openBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, { name: 'feature/no-pr', pullRequest: undefined })
 
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, { type: 'branch', branch: 'feature/no-pr' })
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, {
+      type: 'branch',
+      branch: 'feature/no-pr',
+    })
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 })
@@ -52,11 +56,11 @@ describe('openBranchExternalTarget', () => {
 describe('openUpstreamBranchExternalTarget', () => {
   test('parses `remote/branch` and opens the named remote', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
-    await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, 'origin/main')
+    await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/main')
 
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, {
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, {
       type: 'branch',
       branch: 'main',
       remote: 'origin',
@@ -65,11 +69,11 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('preserves slashes in the branch name', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
-    await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, 'origin/feature/foo')
+    await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/feature/foo')
 
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, {
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, {
       type: 'branch',
       branch: 'feature/foo',
       remote: 'origin',
@@ -78,7 +82,7 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('uses the longest matching remote name when remote names contain slashes', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       remote: {
         remotes: ['origin', 'origin/team'],
@@ -86,9 +90,9 @@ describe('openUpstreamBranchExternalTarget', () => {
       },
     })
 
-    await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, 'origin/team/main')
+    await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/team/main')
 
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, {
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, {
       type: 'branch',
       branch: 'main',
       remote: 'origin/team',
@@ -96,14 +100,14 @@ describe('openUpstreamBranchExternalTarget', () => {
   })
 
   test('rejects malformed tracking refs without calling openRepoUrl', async () => {
-    const result = await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, 'no-slash')
+    const result = await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'no-slash')
     expect(result.ok).toBe(false)
     expect(mocks.openRepoUrl).not.toHaveBeenCalled()
   })
 
   test('rejects empty branch segments', async () => {
-    const trailingSlash = await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, 'origin/')
-    const leadingSlash = await openUpstreamBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, '/main')
+    const trailingSlash = await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/')
+    const leadingSlash = await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, '/main')
     expect(trailingSlash.ok).toBe(false)
     expect(leadingSlash.ok).toBe(false)
     expect(mocks.openRepoUrl).not.toHaveBeenCalled()

@@ -6,6 +6,7 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemoteSnapshot,
+  getRemoteWorkspacePaneTargetIdentities,
   getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
@@ -13,6 +14,7 @@ import {
   pullRemoteBranch,
   fetchRemoteRepo,
   remoteCommandExists,
+  remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
@@ -21,7 +23,7 @@ import {
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 
 const TARGET = normalizeRemoteTarget({
@@ -113,6 +115,50 @@ describe('remote git helpers', () => {
       browserRemoteProvider: 'gitlab',
       hasGitHubRemote: false,
     })
+  })
+
+  test('reads remote workspace-pane identity without status or remote display commands', async () => {
+    const run = vi.fn(async (command: { type: string }) =>
+      command.type === 'gitWorkspacePaneIdentities'
+        ? okRemoteResult(
+            'main\nfeature/no-worktree\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n',
+          )
+        : (() => {
+            throw new Error(`unexpected command: ${command.type}`)
+          })(),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
+      { kind: 'git-branch', branchName: 'feature/no-worktree' },
+    ])
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith({ type: 'gitWorkspacePaneIdentities', path: '/srv/repo' }, TARGET, {
+      signal: undefined,
+    })
+  })
+
+  test('does not turn a failed remote worktree membership read into branch-only targets', async () => {
+    const run = vi.fn(async (command: { type: string }) =>
+      command.type === 'gitWorkspacePaneIdentities'
+        ? ({ ok: false, stdout: '', stderr: '', message: 'worktree list failed' } as RemoteCommandResult)
+        : okRemoteResult(''),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).rejects.toThrow(
+      'worktree list failed',
+    )
+  })
+
+  test('returns detached worktree identity for an unborn repository', async () => {
+    const run = vi.fn(async () =>
+      okRemoteResult('\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n'),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
+    ])
+    expect(run).toHaveBeenCalledOnce()
   })
 
   test('prefers stderr when converting remote exec failures', () => {
@@ -1064,7 +1110,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     const run = vi.fn(async (command: { type: string }) => {
       const NUL = String.fromCharCode(0)
       switch (command.type) {
-        case 'gitTreeWalk':
+        case 'gitDirectoryChildren':
           return okRemoteResult(`/srv/repo-feature/README.md${NUL}/srv/repo-feature/src/foo.ts`)
         default:
           return failRemoteResult('should not be called')
@@ -1077,7 +1123,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     })
 
     expect(result).toMatchObject({ ok: true })
-    const treeWalkCall = run.mock.calls.find(([command]) => command.type === 'gitTreeWalk')
+    const treeWalkCall = run.mock.calls.find(([command]) => command.type === 'gitDirectoryChildren')
     expect(treeWalkCall).toBeDefined()
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitWorktreeList' }),
@@ -1091,7 +1137,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(['worktree /srv/repo-feature', 'HEAD a', 'branch refs/heads/feat'].join('\n'))
-        case 'gitTreeWalk':
+        case 'gitDirectoryChildren':
           return okRemoteResult('')
         default:
           return failRemoteResult('unexpected')
@@ -1148,6 +1194,19 @@ describe('resolveRemoteWorktree', () => {
 })
 
 describe('remoteCommandExists', () => {
+  test('checks an explicitly authorized workspace root without inventing a worktree', async () => {
+    const run = vi.fn(async () => okRemoteResult(''))
+
+    await expect(
+      remoteCommandExistsAtWorkspaceRoot(TARGET, '/srv/plain-workspace', 'bat', { run: run as any }),
+    ).resolves.toBe(true)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'commandExists', path: '/srv/plain-workspace', commandName: 'bat' },
+      TARGET,
+      { signal: undefined },
+    )
+  })
+
   test('validates the remote worktree before checking the command', async () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },

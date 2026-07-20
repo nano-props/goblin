@@ -1,32 +1,31 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
   terminalBaseForRuntimeTabCloseTarget,
   workspacePaneRuntimeTabCloseConfirmRequest,
-  workspacePaneRuntimeTabConfirmedCloseBranchName,
   workspacePaneRuntimeTabConfirmedCloseIdentity,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const REPO_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
 const terminalBase: TerminalSessionBase = {
-  repoRoot: '/repo',
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branch: 'main',
-  worktreePath: '/repo-worktree',
+  target: {
+    kind: 'git-worktree' as const,
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+  },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
-const closeTarget = {
-  repoRoot: terminalBase.repoRoot,
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branchName: terminalBase.branch,
-  worktreePath: terminalBase.worktreePath,
-}
+const closeTarget = terminalBase
 
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
   terminalSessionId: 'term-111111111111111111111',
-  terminalWorktreeKey: 'repo\0worktree',
+  terminalFilesystemTargetKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1',
@@ -81,19 +80,15 @@ describe('workspace pane runtime tab close actions', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
     expect(
-      workspacePaneRuntimeTabConfirmedCloseBranchName({
+      workspacePaneRuntimeTabConfirmedCloseIdentity({
         type: 'terminal',
         sessionId: 'term-111111111111111111111',
         target: closeTarget,
       }),
-    ).toBe('main')
-    expect(
-      workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget }),
     ).toBe('terminal:term-111111111111111111111')
   })
 
-  test('builds terminal bases from runtime close targets', () => {
+  test('uses the canonical terminal base as the runtime close target', () => {
     expect(terminalBaseForRuntimeTabCloseTarget(closeTarget)).toEqual(terminalBase)
-    expect(terminalBaseForRuntimeTabCloseTarget({ ...closeTarget, worktreePath: null })).toBeNull()
   })
 })

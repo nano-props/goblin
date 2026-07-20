@@ -7,6 +7,7 @@ import type {
   TerminalAttachInput,
   TerminalOutputEvent,
   TerminalRestartInput,
+  TerminalRestartResult,
 } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
@@ -21,8 +22,8 @@ import {
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
-  projectTerminalAttachResultForClient,
-  type TerminalAttachResultWithController,
+  projectTerminalStartResultForClient,
+  type TerminalStartResultWithController,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import {
   TerminalSessionRuntime,
@@ -61,7 +62,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
-export type TerminalNotifyReason = 'metadata'
+export type TerminalNotify = (...notification: ['metadata'] | ['projection-delta-revision', number]) => void
 
 interface PendingOutputWrite {
   data: string
@@ -70,7 +71,7 @@ interface PendingOutputWrite {
 
 export class TerminalSession {
   descriptor: TerminalDescriptor
-  private readonly notify: (reason: TerminalNotifyReason) => void
+  private readonly notify: TerminalNotify
   private readonly writeFailureReporter: TerminalWriteFailureReporter
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
@@ -107,7 +108,7 @@ export class TerminalSession {
 
   constructor(
     descriptor: TerminalDescriptor,
-    notify: (reason: TerminalNotifyReason) => void,
+    notify: TerminalNotify,
     writeFailureReporter: TerminalWriteFailureReporter = createTerminalWriteFailureReporter(),
   ) {
     this.descriptor = descriptor
@@ -674,6 +675,7 @@ export class TerminalSession {
         this.authority().setRole(result.role)
         this.destroyActiveView()
         if (committed.changed) this.notify('metadata')
+        this.notifyAttachProjectionRevision(result)
         return
       }
       if (result.frame === 'stream' && preloadReplayGeneration !== null) {
@@ -785,7 +787,7 @@ export class TerminalSession {
     epoch: number,
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-  ): Promise<TerminalAttachResultWithController> {
+  ): Promise<TerminalStartResultWithController> {
     const restart = attempt.operation === 'restart'
     const terminalRuntimeSessionId = restart
       ? this.runtime.restartingTerminalRuntimeSessionId()
@@ -819,7 +821,7 @@ export class TerminalSession {
     epoch: number,
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-    result: Extract<TerminalAttachResultWithController, { frame: 'snapshot' }>,
+    result: Extract<TerminalStartResultWithController, { frame: 'snapshot' }>,
   ): Promise<boolean> {
     const metadataChanged = this.commitAttachFrame(attempt, term, result)
     await this.replayActiveView(epoch, term, result.snapshot, {
@@ -828,6 +830,7 @@ export class TerminalSession {
       seq: result.snapshotSeq,
     })
     this.assertCurrentStart(epoch, term)
+    this.notifyAttachProjectionRevision(result)
     return metadataChanged
   }
 
@@ -835,17 +838,24 @@ export class TerminalSession {
     epoch: number,
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-    result: Extract<TerminalAttachResultWithController, { frame: 'stream' }>,
+    result: Extract<TerminalStartResultWithController, { frame: 'stream' }>,
   ): boolean {
     const metadataChanged = this.commitAttachFrame(attempt, term, result)
     this.assertCurrentStart(epoch, term)
+    this.notifyAttachProjectionRevision(result)
     return metadataChanged
+  }
+
+  private notifyAttachProjectionRevision(result: TerminalStartResultWithController): void {
+    if (result.terminalProjectionEffect.kind === 'delta') {
+      this.notify('projection-delta-revision', result.terminalProjectionEffect.revision)
+    }
   }
 
   private commitAttachFrame(
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-    result: TerminalAttachResultWithController,
+    result: TerminalStartResultWithController,
   ): boolean {
     const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
     if (!committed.accepted) throw new StartCancelledError()
@@ -902,9 +912,11 @@ export class TerminalSession {
     }
   }
 
-  private withLocalController(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithController {
+  private withLocalController(
+    result: Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>,
+  ): TerminalStartResultWithController {
     const clientId = readOrCreateWebTerminalClientId()
-    return projectTerminalAttachResultForClient(result, clientId)
+    return projectTerminalStartResultForClient(result, clientId)
   }
 
   private async replayActiveView(
@@ -1266,7 +1278,6 @@ export class TerminalSession {
   private clearTerminalFocusIfOwned(): void {
     if (this.isTerminalFocusTarget(document.activeElement)) setTerminalFocused(false)
   }
-
 }
 
 function waitForTerminalLayout(): Promise<void> {

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createWorktree, removeWorktree } from '#/system/git/worktrees.ts'
+import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
 
 const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
+const gitMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
   const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
   return {
     ...actual,
+    git: gitMock,
     gitResultWithOptions: vi.fn((cwd: string, opts: unknown, ...args: string[]) =>
       gitResultWithOptionsMock(cwd, opts, ...args),
     ),
@@ -17,6 +19,7 @@ describe('worktree git operations', () => {
   beforeEach(() => {
     gitResultWithOptionsMock.mockReset()
     gitResultWithOptionsMock.mockResolvedValue({ ok: false, message: 'cancelled' })
+    gitMock.mockReset()
   })
 
   test.each([
@@ -78,5 +81,11 @@ describe('worktree git operations', () => {
       '--',
       '/tmp/repo-feature',
     )
+  })
+
+  test('does not turn a failed authoritative worktree-list read into an empty repository', async () => {
+    gitMock.mockRejectedValue(new Error('git unavailable'))
+
+    await expect(getWorktrees('/tmp/repo', { includeStatus: false })).rejects.toThrow('git unavailable')
   })
 })

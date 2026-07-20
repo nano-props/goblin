@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
-import { classifySshFailure, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
+import { classifySshFailure, testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
 import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const okShell: RemoteCommandResult = { ok: true, stdout: 'ok', stderr: '', message: 'ok', timedOut: false }
 
@@ -32,9 +33,9 @@ describe('classifySshFailure', () => {
   })
 })
 
-describe('testRemoteRepo parallel stages', () => {
-  const target: RemoteRepoTarget = {
-    id: 'ssh-config://example/srv%2Frepo',
+describe('testRemoteWorkspace parallel stages', () => {
+  const target: RemoteWorkspaceTarget = {
+    id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
     alias: 'example',
     host: 'example.local',
     user: 'me',
@@ -63,7 +64,7 @@ describe('testRemoteRepo parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepo(target, { run })
+    const result = await testRemoteWorkspace(target, { run })
 
     expect(result.ok).toBe(false)
     expect(result.category).toBe('git-missing')
@@ -82,15 +83,32 @@ describe('testRemoteRepo parallel stages', () => {
         return { ok: true, stdout: 'profile notice\nok\nready', stderr: '', message: 'ok', timedOut: false }
       if (command.type === 'checkGit')
         return { ok: true, stdout: '/usr/bin/git', stderr: '', message: 'ok', timedOut: false }
-      if (command.type === 'testDirectory') return { ok: true, stdout: '', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory')
+        return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
       if (command.type === 'revParseTopLevel')
         return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepo(target, { run })
+    const result = await testRemoteWorkspace(target, { run })
 
     expect(result.ok).toBe(true)
+    expect(result.gitAtWorkspaceRoot).toBe(true)
     expect(result.stages.find((stage) => stage.name === 'shell')?.status).toBe('passed')
+  })
+
+  test('compares physical workspace and Git roots exactly', async () => {
+    const run = vi.fn<(command: RemoteCommandKind) => Promise<RemoteCommandResult>>(async (command) => {
+      if (command.type === 'checkShell') return okShell
+      if (command.type === 'checkGit')
+        return { ok: true, stdout: '/usr/bin/git', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory')
+        return { ok: true, stdout: '/physical/repo/child\n', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'revParseTopLevel')
+        return { ok: true, stdout: '/physical/repo\n', stderr: '', message: 'ok', timedOut: false }
+      return { ok: false, stdout: '', stderr: '', message: 'unexpected', timedOut: false }
+    })
+
+    await expect(testRemoteWorkspace(target, { run })).resolves.toMatchObject({ ok: true, gitAtWorkspaceRoot: false })
   })
 })

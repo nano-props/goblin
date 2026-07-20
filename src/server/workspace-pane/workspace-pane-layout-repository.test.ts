@@ -6,31 +6,47 @@ import {
   workspacePaneDurableLayoutsEqual,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('workspace pane layout repository normalization', () => {
   test('preserves explicit empty targets and removes duplicate and invalid static entries', () => {
-    expect(normalizeWorkspacePaneDurableLayout('/repo', { entries: [
-      { repoRoot: '/repo', branchName: 'empty', worktreePath: null, tabs: [] },
-      {
-        repoRoot: '/repo',
-        branchName: 'main',
-        worktreePath: null,
-        tabs: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('files'),
+    expect(
+      normalizeWorkspacePaneDurableLayout(WORKSPACE_ID, {
+        entries: [
+          { target: { kind: 'git-branch', branch: 'empty' }, tabs: [] },
+          {
+            target: { kind: 'git-branch', branch: 'main' },
+            tabs: [
+              workspacePaneStaticTabEntry('status'),
+              workspacePaneStaticTabEntry('status'),
+              workspacePaneStaticTabEntry('files'),
+            ],
+          },
         ],
-      },
-    ] })).toEqual({ entries: [
-      { repoRoot: '/repo', branchName: 'empty', worktreePath: null, tabs: [] },
-      { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] },
-    ] })
+      }),
+    ).toEqual({
+      entries: [
+        { target: { kind: 'git-branch', branch: 'empty' }, tabs: [] },
+        { target: { kind: 'git-branch', branch: 'main' }, tabs: [workspacePaneStaticTabEntry('status')] },
+      ],
+    })
   })
 
   test('compares normalized layouts rather than input ordering and duplicates', () => {
-    const entry = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
-    expect(workspacePaneDurableLayoutsEqual('/repo', { entries: [entry] }, {
-      entries: [{ ...entry, tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('status')] }],
-    })).toBe(true)
+    const entry = {
+      target: { kind: 'git-branch' as const, branch: 'main' },
+      tabs: [workspacePaneStaticTabEntry('status')],
+    }
+    expect(
+      workspacePaneDurableLayoutsEqual(
+        WORKSPACE_ID,
+        { entries: [entry] },
+        {
+          entries: [{ ...entry, tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('status')] }],
+        },
+      ),
+    ).toBe(true)
   })
 })

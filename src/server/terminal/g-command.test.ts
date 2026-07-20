@@ -30,8 +30,6 @@ describe('g terminal command', () => {
       entryPath,
       serverUrl: 'http://127.0.0.1:32100',
       accessToken: 'secret',
-      repoRoot: '/repo',
-      worktreePath: '/repo/worktree',
       currentPath: '/usr/bin',
       nodePath: '/node',
     })
@@ -41,8 +39,6 @@ describe('g terminal command', () => {
       GOBLIN_TERMINAL: '1',
       GOBLIN_SERVER_URL: 'http://127.0.0.1:32100',
       GOBLIN_SERVER_ACCESS_TOKEN: 'secret',
-      GOBLIN_REPO_ROOT: '/repo',
-      GOBLIN_WORKTREE_PATH: '/repo/worktree',
       GOBLIN_NODE: '/node',
       GOBLIN_CLI_ENTRY: entryPath,
     })
@@ -57,8 +53,6 @@ describe('g terminal command', () => {
       entryPath: path.join(binDir, 'missing.js'),
       serverUrl: 'http://127.0.0.1:32100',
       accessToken: 'secret',
-      repoRoot: '/repo',
-      worktreePath: '/repo/worktree',
     })
 
     expect(env).toBeNull()

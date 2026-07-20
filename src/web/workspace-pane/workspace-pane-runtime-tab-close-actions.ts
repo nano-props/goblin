@@ -3,13 +3,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneRuntimeTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-
-export interface WorkspacePaneRuntimeTabCloseTarget {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
-}
+export type WorkspacePaneRuntimeTabCloseTarget = TerminalSessionBase
 
 export interface WorkspacePaneRuntimeTabCloseConfirmInput {
   type: WorkspacePaneRuntimeTabType
@@ -49,7 +43,6 @@ interface WorkspacePaneRuntimeTabCloseActions {
     confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
     context: WorkspacePaneRuntimeTabCloseContext,
   ) => Promise<boolean>
-  confirmedBranchName: (confirmed: ConfirmedWorkspacePaneRuntimeTabClose) => string | null
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
@@ -59,7 +52,6 @@ const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
   terminal: {
     closeConfirmRequest: terminalCloseConfirmRequest,
     confirmClose: confirmTerminalClose,
-    confirmedBranchName: terminalConfirmedBranchName,
   },
 }
 
@@ -74,12 +66,6 @@ export async function confirmWorkspacePaneRuntimeTabClose(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): Promise<boolean> {
   return await WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmClose(confirmed, context)
-}
-
-export function workspacePaneRuntimeTabConfirmedCloseBranchName(
-  confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-): string | null {
-  return WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmedBranchName(confirmed)
 }
 
 export function workspacePaneRuntimeTabConfirmedCloseIdentity(
@@ -116,24 +102,12 @@ async function confirmTerminalClose(
   return await closeTerminalByDescriptor(confirmed.sessionId, terminalBase)
 }
 
-function terminalConfirmedBranchName(confirmed: ConfirmedWorkspacePaneRuntimeTabClose): string | null {
-  return confirmed.target.branchName
-}
-
 export function terminalRuntimeTabCloseContext(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): TerminalWorkspacePaneRuntimeTabCloseContext | undefined {
   return context.byType.terminal as TerminalWorkspacePaneRuntimeTabCloseContext | undefined
 }
 
-export function terminalBaseForRuntimeTabCloseTarget(
-  target: WorkspacePaneRuntimeTabCloseTarget,
-): TerminalSessionBase | null {
-  if (!target.branchName || !target.worktreePath) return null
-  return {
-    repoRoot: target.repoRoot,
-    repoRuntimeId: target.repoRuntimeId,
-    branch: target.branchName,
-    worktreePath: target.worktreePath,
-  }
+export function terminalBaseForRuntimeTabCloseTarget(target: WorkspacePaneRuntimeTabCloseTarget): TerminalSessionBase {
+  return target
 }

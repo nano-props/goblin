@@ -1,28 +1,33 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
-import type {
-  TerminalAttachResult,
-  TerminalCreateResult,
-  TerminalSessionBase,
-  TerminalSessionSummary as ServerTerminalSessionSummary,
+import {
+  terminalExecutionCoordinates,
+  terminalSessionBase,
+  terminalSessionCoordinates,
+  type TerminalAttachResult,
+  type TerminalCreateResult,
+  type TerminalRestartResult,
+  type TerminalSessionBase,
+  type TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type {
   TerminalDescriptor,
-  TerminalRepoIndex,
   TerminalSessionHydrationInput,
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export type TerminalAttachResultWithController = Extract<TerminalAttachResult, { ok: true }> & {
+type TerminalStartResult = Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>
+
+export type TerminalStartResultWithController = TerminalStartResult & {
   role: TerminalIdentityViewModel['role']
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
 
 export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   hydrateInput: TerminalSessionHydrationInput
   controlsTerminal: boolean
 }
@@ -31,10 +36,10 @@ export interface ProjectedCreateTerminalSession {
   serverSession: ServerTerminalSessionSummary
 }
 
-export function projectTerminalAttachResultForClient(
-  result: Extract<TerminalAttachResult, { ok: true }>,
+export function projectTerminalStartResultForClient(
+  result: TerminalStartResult,
   clientId: string,
-): TerminalAttachResultWithController {
+): TerminalStartResultWithController {
   return {
     ...result,
     ...resolveTerminalController(result.controller, clientId),
@@ -45,40 +50,38 @@ export function projectCreateResultForClient(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
 ): ProjectedCreateTerminalSession {
+  const target = base.target
+  if (target.kind !== result.presentation.kind) {
+    throw new Error('terminal create result does not match its execution target')
+  }
   return {
     serverSession: createSessionSummaryFromCreate(base, result),
   }
 }
 
 export function projectServerTerminalSession(input: {
-  repoIndex: TerminalRepoIndex
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
 }): ProjectedServerTerminalSession | null {
-  if (input.serverSession.repoRoot !== input.repoRoot) return null
-  if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
-  const branch =
-    branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath) ||
-    input.serverSession.branch
-  if (!branch) return null
+  const coordinates = terminalExecutionCoordinates(input.serverSession.target)
+  if (coordinates.workspaceId !== input.workspaceId) return null
+  if (coordinates.workspaceRuntimeId !== input.workspaceRuntimeId) return null
   const descriptor = terminalDescriptor(
-    {
-      repoRoot: input.serverSession.repoRoot,
-      repoRuntimeId: input.serverSession.repoRuntimeId,
-      branch,
-      worktreePath: input.serverSession.worktreePath,
-    },
+    terminalSessionBase(input.serverSession.target, input.serverSession.presentation),
     input.serverSession.terminalSessionId,
     input.index,
   )
-  const terminalWorktree = formatTerminalWorktreeKey(input.serverSession.repoRoot, input.serverSession.worktreePath)
+  const terminalFilesystemTarget = formatTerminalFilesystemTargetKey(
+    coordinates.workspaceId,
+    coordinates.executionRootId,
+  )
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   return {
     descriptor,
-    terminalWorktreeKey: terminalWorktree,
+    terminalFilesystemTargetKey: terminalFilesystemTarget,
     hydrateInput: {
       terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
       terminalRuntimeGeneration: input.serverSession.terminalRuntimeGeneration,
@@ -102,15 +105,11 @@ function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
 ): ServerTerminalSessionSummary {
-  return {
+  const coordinates = terminalSessionCoordinates(base)
+  const common = {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalRuntimeGeneration: result.terminalRuntimeGeneration,
     terminalSessionId: result.terminalSessionId,
-    repoRuntimeId: requireBaseRepoRuntimeId(base),
-    repoRoot: base.repoRoot,
-    branch: result.branch,
-    worktreePath: base.worktreePath,
-    cwd: base.worktreePath,
     controller: result.controller,
     processName: result.processName,
     canonicalTitle: result.canonicalTitle,
@@ -119,9 +118,12 @@ function createSessionSummaryFromCreate(
     cols: result.canonicalCols,
     rows: result.canonicalRows,
   }
-}
-
-function requireBaseRepoRuntimeId(base: TerminalSessionBase): string {
-  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
-  throw new Error('error.repo-runtime-stale')
+  const target = base.target
+  if (target.kind === 'workspace-root' && result.presentation.kind === 'workspace-root') {
+    return { ...common, target, presentation: result.presentation }
+  }
+  if (target.kind === 'git-worktree' && result.presentation.kind === 'git-worktree') {
+    return { ...common, target, presentation: result.presentation }
+  }
+  throw new Error('terminal create target and presentation disagree')
 }

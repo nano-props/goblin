@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from '@tanstack/react-query'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -8,7 +9,7 @@ import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/re
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   createBranchSnapshot,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
@@ -16,11 +17,11 @@ import {
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-repo-toolbar-actions-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   vi.clearAllMocks()
 })
 
@@ -63,8 +64,8 @@ describe('RepoToolbarActions', () => {
 
   test('disables create worktree entry from server branch operation projection', () => {
     const repo = seedRepoShellForTest({ id: REPO_ID })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
       loadedAt: 123,
     })
 
@@ -79,13 +80,13 @@ describe('RepoToolbarActions', () => {
 })
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

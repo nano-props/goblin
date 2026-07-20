@@ -1,19 +1,24 @@
 // @vitest-environment jsdom
 
 import type { ReactNode } from 'react'
+import type * as ReactModule from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
-import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
 import { Layout, authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type * as TerminalSessionContextModule from '#/web/components/terminal/terminal-session-context.ts'
+import type * as WorkspaceNavigationHistoryModule from '#/web/workspace-navigation-history.ts'
 
 const restoringWorkspaceState: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
 const failedState: AuthenticatedAppBootstrapState = { status: 'failed', message: 'restore failed' }
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const layoutRouterMock = vi.hoisted(() => ({
   pathname: '/settings/general',
   href: '/settings/general',
@@ -53,9 +58,7 @@ vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
 }))
 
 vi.mock('#/web/workspace-navigation-history.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/workspace-navigation-history.ts')>(
-    '#/web/workspace-navigation-history.ts',
-  )
+  const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>('#/web/workspace-navigation-history.ts')
   return {
     ...actual,
     usePrimaryWindowHistoryPresentationObserver: () => undefined,
@@ -63,13 +66,13 @@ vi.mock('#/web/workspace-navigation-history.ts', async () => {
 })
 
 vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
-  const React = await vi.importActual<typeof import('react')>('react')
-  const context = await vi.importActual<typeof import('#/web/components/terminal/terminal-session-context.ts')>(
+  const React = await vi.importActual<typeof ReactModule>('react')
+  const context = await vi.importActual<typeof TerminalSessionContextModule>(
     '#/web/components/terminal/terminal-session-context.ts',
   )
   const readContext: TerminalSessionReadContextValue = {
-    terminalWorktreeSnapshot: () => ({
-      terminalWorktreeKey: '',
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey: '',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -77,9 +80,9 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
       outputActiveCount: 0,
       createPending: false,
     }),
-    subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 4,
-    subscribeRepoBellCount: () => () => {},
+    subscribeTerminalFilesystemTarget: () => () => {},
+    workspaceBellCount: () => 4,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
     subscribeSnapshot: () => () => {},
   }
@@ -87,7 +90,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     createTerminal: vi.fn(async () => ''),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: '',
-      branch: 'main',
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       resourceDisposition: 'created',
       runtimeProjectionApplied: false,
       requestRole: 'leader',
@@ -137,8 +140,8 @@ beforeEach(() => {
 })
 
 function SettingsRetainedOutletTerminalConsumer() {
-  const bellCounts = useRepoTerminalBellCounts(['repo-a'])
-  return <span data-testid="settings-retained-terminal-consumer">{bellCounts['repo-a']}</span>
+  const bellCounts = useWorkspaceTerminalBellCounts([WORKSPACE_ID])
+  return <span data-testid="settings-retained-terminal-consumer">{bellCounts[WORKSPACE_ID]}</span>
 }
 
 describe('Layout shell providers', () => {
@@ -151,7 +154,7 @@ describe('Layout shell providers', () => {
   })
 })
 
-describe('CompactRepoWorkspace', () => {
+describe('CompactWorkspaceLayout', () => {
   test('marks the inactive pane inert while sharing workspace motion tokens', () => {
     const { container, rerender } = renderCompactWorkspace('navigator')
 
@@ -165,10 +168,10 @@ describe('CompactRepoWorkspace', () => {
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(true)
 
     rerender(
-      <CompactRepoWorkspace
+      <CompactWorkspaceLayout
         activePane="workspace"
         sidebarPane={<button type="button">navigator</button>}
-        repoWorkspacePane={<button type="button">workspace</button>}
+        workspacePane={<button type="button">workspace</button>}
       />,
     )
 
@@ -183,10 +186,10 @@ describe('CompactRepoWorkspace', () => {
     vi.useFakeTimers()
     try {
       const { container, rerender } = renderInJsdom(
-        <CompactRepoWorkspace
+        <CompactWorkspaceLayout
           activePane="workspace"
           sidebarPane={<button type="button">navigator</button>}
-          repoWorkspacePane={<div data-testid="workspace-a">workspace-a</div>}
+          workspacePane={<div data-testid="workspace-a">workspace-a</div>}
           transitionScopeKey="repo-a"
         />,
       )
@@ -194,10 +197,10 @@ describe('CompactRepoWorkspace', () => {
       expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
 
       rerender(
-        <CompactRepoWorkspace
+        <CompactWorkspaceLayout
           activePane="navigator"
           sidebarPane={<button type="button">navigator</button>}
-          repoWorkspacePane={<div data-testid="workspace-b">workspace-b</div>}
+          workspacePane={<div data-testid="workspace-b">workspace-b</div>}
           transitionScopeKey="repo-a"
         />,
       )
@@ -217,10 +220,10 @@ describe('CompactRepoWorkspace', () => {
   })
 })
 
-describe('RepoWorkspace', () => {
+describe('WorkspaceSplitLayout', () => {
   test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
     const { container } = renderInJsdom(
-      <RepoWorkspace sidebarPane={<div>navigator</div>} repoWorkspacePane={<div>workspace</div>} />,
+      <WorkspaceSplitLayout sidebarPane={<div>navigator</div>} workspacePane={<div>workspace</div>} />,
     )
 
     expect(splitPane(container)?.dataset.afterSize).toBe('70')
@@ -235,18 +238,18 @@ describe('authenticatedAppShellMode', () => {
 
   test('workspace routes wait for authenticated boot before mounting runtime', () => {
     expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', readyState)).toBe('workspace-ready')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', failedState)).toBe('workspace-failed')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', readyState)).toBe('workspace-ready')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', failedState)).toBe('workspace-failed')
   })
 })
 
 function renderCompactWorkspace(activePane: 'navigator' | 'workspace') {
   return renderInJsdom(
-    <CompactRepoWorkspace
+    <CompactWorkspaceLayout
       activePane={activePane}
       sidebarPane={<button type="button">navigator</button>}
-      repoWorkspacePane={<button type="button">workspace</button>}
+      workspacePane={<button type="button">workspace</button>}
     />,
   )
 }

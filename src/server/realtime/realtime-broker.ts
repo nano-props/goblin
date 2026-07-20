@@ -127,8 +127,12 @@ export class RealtimeBroker<TMessage> {
   broadcastToUser(userId: string, message: TMessage): void {
     const sockets = this.socketsByUserId.get(userId)
     if (!sockets || sockets.size === 0) return
-    const payload = JSON.stringify(message)
+    const payload = this.serializeMessage(message)
     for (const socket of Array.from(sockets)) this.sendOrUnregister(socket, payload)
+  }
+
+  protected serializeMessage(message: TMessage): string {
+    return JSON.stringify(message)
   }
 
   isClientOnline(userId: string, clientId: string): boolean {

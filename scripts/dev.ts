@@ -1,9 +1,12 @@
 #!/usr/bin/env bun
 import { watch } from 'node:fs'
 import path from 'node:path'
+import { omit } from 'es-toolkit'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
+import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
+prepareNodePtyDarwinRuntime({ packageRoot: path.join(repoRoot, 'node_modules/node-pty') })
 const webDevHost = process.env.GOBLIN_WEB_DEV_HOST?.trim() || '127.0.0.1'
 const webDevPort = parsePort(process.env.GOBLIN_WEB_DEV_PORT) ?? 5173
 const webDevUrl = `http://${webDevHost}:${webDevPort}/`
@@ -114,7 +117,7 @@ function launchElectron(): Bun.Subprocess {
   // here so the Electron process starts as a real native host; the
   // embedded server child process still re-applies it via
   // embedded-server-lifecycle.ts to spawn Node for the worker entry.
-  const { ELECTRON_RUN_AS_NODE: _ignored, ...electronEnv } = process.env
+  const electronEnv = omit(process.env, ['ELECTRON_RUN_AS_NODE'])
   const proc = Bun.spawn(electronArgs, {
     cwd: repoRoot,
     stdin: 'inherit',

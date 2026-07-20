@@ -11,12 +11,12 @@ import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessi
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
-import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
+import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogHost.tsx'
-import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
+import { WorkspaceDropOverlay } from '#/web/components/WorkspaceDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
@@ -25,8 +25,10 @@ import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
+import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
+import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
+import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
@@ -37,10 +39,10 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
+import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
+import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
 import {
   usePrimaryWindowHistoryPresentationObserver,
@@ -51,9 +53,17 @@ import type {
   AuthenticatedAppBootstrapResult,
   AuthenticatedAppBootstrapState,
 } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { gitHead } from '#/shared/git-head.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -95,10 +105,11 @@ export function Layout() {
 }
 
 function AuthenticatedAppShell() {
+  useWorkspaceFilesystemInvalidationSync()
   const routeMatches = useRouterState({ select: (s) => s.matches })
-  const activeRepoSlug = repoRouteContextFromMatches(routeMatches)?.repoSlug ?? null
-  const activeRepoRoot = activeRepoSlug ? repoIdFromSlug(activeRepoSlug) : null
-  const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
+  const activeWorkspaceSlug = workspaceRouteContextFromMatches(routeMatches)?.workspaceSlug ?? null
+  const activeWorkspaceId = activeWorkspaceSlug ? workspaceIdFromSlug(activeWorkspaceSlug) : null
+  const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId })
   const bootstrapState = bootstrap.state
   const location = useRouterState({ select: (s) => s.location })
   const shellMode = authenticatedAppShellMode(location.pathname, bootstrapState)
@@ -136,20 +147,78 @@ function AuthenticatedWorkspaceShell() {
   const overlays = useAppOverlays()
   const modalOpen = overlays.anyOpen
 
-  const routeContext = repoRouteContextFromMatches(routeMatches)
-  // `routedRepoId` is the canonical repo id encoded in the URL. It is the
-  // source of truth for session persistence even before repo hydration has
-  // populated `repos[routedRepoId]`.
-  const routedRepoId = routeContext ? repoIdFromSlug(routeContext.repoSlug) : null
-  // `hydratedRouteRepoId` means the routed repo is present in the hydrated repo store and
-  // can safely drive refreshes, dialogs, and commands that need repo data.
-  const hydratedRouteRepoId = useReposStore((s) => {
-    return routedRepoId && s.repos[routedRepoId] ? routedRepoId : null
+  const routeContext = workspaceRouteContextFromMatches(routeMatches)
+  // The routed workspace identity remains the persistence source of truth
+  // even before the workspace projection has hydrated into the store.
+  const routedWorkspaceId = routeContext ? workspaceIdFromSlug(routeContext.workspaceSlug) : null
+  // `hydratedRouteWorkspaceId` means the routed workspace is present in the hydrated workspace store and
+  // can safely drive refreshes, dialogs, and commands that need workspace runtime data.
+  const hydratedRouteWorkspaceId = useWorkspacesStore((s) => {
+    return routedWorkspaceId ? (s.workspaces[routedWorkspaceId]?.id ?? null) : null
   })
+  const commandWorkspace = useWorkspacesStore((s) =>
+    hydratedRouteWorkspaceId ? s.workspaces[hydratedRouteWorkspaceId] : undefined,
+  )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
-  const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
-  const order = useReposStore((s) => s.order)
-  const { closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
+  const currentWorkspacePaneRoute =
+    routeContext?.kind === 'branch' || routeContext?.kind === 'workspace-root'
+      ? (routeContext.workspacePaneRoute ?? null)
+      : null
+  const commandCapabilities =
+    commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
+      ? commandWorkspace.capability.probe.capabilities
+      : null
+  const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
+  const commandBranch =
+    commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
+      ? (readRepoBranchSnapshotQueryProjection(commandWorkspace)?.branches.find(
+          (branch) => branch.name === routeContext.branchName,
+        ) ?? null)
+      : null
+  const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
+    routeContext?.kind === 'branch' && routeContext.branchName
+      ? commandWorkspace?.capability.kind === 'git' && commandBranch?.worktree?.path
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
+              workspaceId: commandWorkspace.id,
+              workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
+              worktreePath: commandBranch.worktree.path,
+              head: gitHead(commandBranch.name),
+              capabilities: commandWorkspace.capability.probe.capabilities,
+            }),
+          }
+        : {
+            kind: 'git-branch',
+            branchName: routeContext.branchName,
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+          }
+      : routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git' && commandWorktreePath
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
+              workspaceId: commandWorkspace.id,
+              workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
+              worktreePath: commandWorktreePath,
+              head: { kind: 'detached' },
+              capabilities: commandWorkspace.capability.probe.capabilities,
+            }),
+          }
+        : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities
+          ? {
+              kind: 'workspace-root',
+              workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+              filesystemTarget: workspaceRootPaneFilesystemTarget({
+                workspaceId: commandWorkspace.id,
+                workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
+                capabilities: commandCapabilities,
+              }),
+            }
+          : null
+  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
+  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteActions()
@@ -157,31 +226,38 @@ function AuthenticatedWorkspaceShell() {
   const navigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
-        currentRepoId: hydratedRouteRepoId,
-        order,
-        closeRepo,
+        currentWorkspaceId: hydratedRouteWorkspaceId,
+        workspaceOrder,
+        closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation, order, routeNavigation, hydratedRouteRepoId],
+    [
+      closeWorkspace,
+      peekWorkspaceNavigation,
+      commitWorkspaceNavigation,
+      workspaceOrder,
+      routeNavigation,
+      hydratedRouteWorkspaceId,
+    ],
   )
 
-  const repoDrop = useRepoDrop({ blocked: modalOpen })
+  const workspaceDrop = useWorkspaceDrop({ blocked: modalOpen })
 
   return (
     <>
       <AuthenticatedWorkspaceSideEffects
-        routedRepoId={routedRepoId}
-        hydratedRouteRepoId={hydratedRouteRepoId}
+        routedWorkspaceId={routedWorkspaceId}
+        hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
         currentBranchName={currentBranchName}
-        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
+        currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
-        openRepoPathDialog={overlays.openRepoPathDialog}
+        openWorkspacePathDialog={overlays.openWorkspacePathDialog}
         openCloneRepo={overlays.openCloneRepo}
-        openRemoteRepo={overlays.openRemoteRepo}
+        openRemoteWorkspace={overlays.openRemoteWorkspace}
         modalOpen={modalOpen}
         isSettingsOpen={false}
         navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
@@ -190,26 +266,27 @@ function AuthenticatedWorkspaceShell() {
       <PrimaryWindowNavigationProvider value={navigation}>
         <LayoutOverlayActions
           value={{
-            openRepoPathDialog: overlays.openRepoPathDialog,
+            openWorkspacePathDialog: overlays.openWorkspacePathDialog,
             openCloneRepo: overlays.openCloneRepo,
-            openRemoteRepo: overlays.openRemoteRepo,
+            openRemoteWorkspace: overlays.openRemoteWorkspace,
             openCreateWorktree: navigation.openCreateWorktree,
           }}
         >
-          <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
+          <AppRuntimeProjectionProvider currentWorkspaceId={hydratedRouteWorkspaceId}>
             <div
               className="relative flex h-full flex-col"
-              onDragEnter={repoDrop.onDragEnter}
-              onDragOver={repoDrop.onDragOver}
-              onDragLeave={repoDrop.onDragLeave}
-              onDrop={repoDrop.onDrop}
+              onDragEnter={workspaceDrop.onDragEnter}
+              onDragOver={workspaceDrop.onDragOver}
+              onDragLeave={workspaceDrop.onDragLeave}
+              onDrop={workspaceDrop.onDrop}
             >
               <Outlet />
               <PrimaryWindowOverlays
                 overlays={overlays}
-                repoDrop={repoDrop}
+                workspaceDrop={workspaceDrop}
                 navigation={navigation}
-                hydratedRouteRepoId={hydratedRouteRepoId}
+                hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
+                currentWorkspaceRuntimeId={commandWorkspace?.workspaceRuntimeId ?? null}
                 currentBranchName={currentBranchName}
                 currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
@@ -262,43 +339,58 @@ function WorkspaceSessionRestoreError({
   )
 }
 
-interface RepoRouteContext {
-  kind: 'empty' | 'dashboard' | 'branch' | 'newWorktree'
-  repoSlug: string
-  branchName?: string
-  workspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
-}
+type WorkspaceRouteContext =
+  | { kind: 'empty' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
+  | { kind: 'workspace-root'; workspaceSlug: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | { kind: 'branch'; workspaceSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | {
+      kind: 'worktree'
+      workspaceSlug: string
+      worktreePath: string
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
+    }
 
-export function repoRouteContextFromMatches(
+export function workspaceRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): RepoRouteContext | null {
-  const repoMatch = [...matches].reverse().find((match) => typeof match.params.repoSlug === 'string')
-  if (!repoMatch) return null
+): WorkspaceRouteContext | null {
+  const workspaceMatch = [...matches].reverse().find((match) => typeof match.params.workspaceSlug === 'string')
+  if (!workspaceMatch) return null
 
-  const repoSlug = repoMatch.params.repoSlug
-  if (!repoSlug) return null
+  const workspaceSlug = workspaceMatch.params.workspaceSlug
+  if (!workspaceSlug) return null
 
-  const branchSlug = repoMatch.params.branchSlug
+  const branchSlug = workspaceMatch.params.branchSlug
   if (branchSlug) {
     const branchName = branchNameFromSlug(branchSlug)
     return branchName
       ? {
           kind: 'branch',
-          repoSlug,
+          workspaceSlug,
           branchName,
           workspacePaneRoute: workspacePaneRouteFromMatches(matches),
         }
-      : { kind: 'empty', repoSlug }
+      : { kind: 'empty', workspaceSlug }
   }
 
-  if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
-  if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
-  return { kind: 'empty', repoSlug }
+  const worktreeSlug = workspaceMatch.params.worktreeSlug
+  if (worktreeSlug) {
+    const worktreePath = worktreePathFromSlug(worktreeSlug)
+    return worktreePath
+      ? { kind: 'worktree', workspaceSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
+      : { kind: 'empty', workspaceSlug }
+  }
+
+  if (workspaceMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/root')) {
+    return { kind: 'workspace-root', workspaceSlug, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
+  }
+  return { kind: 'empty', workspaceSlug }
 }
 
 function workspacePaneRouteFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): ParsedRepoBranchWorkspacePaneRoute | null {
+): ParsedWorkspacePaneRoute | null {
   const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
   const terminalSessionId = terminalMatch?.params.terminalSessionId
   if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
@@ -311,38 +403,42 @@ function workspacePaneRouteFromMatches(
 
 interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
-  repoDrop: ReturnType<typeof useRepoDrop>
+  workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: PrimaryWindowNavigationActions
-  hydratedRouteRepoId: string | null
+  hydratedRouteWorkspaceId: WorkspaceId | null
+  currentWorkspaceRuntimeId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
   overlays,
-  repoDrop,
+  workspaceDrop,
   navigation,
-  hydratedRouteRepoId,
+  hydratedRouteWorkspaceId,
+  currentWorkspaceRuntimeId,
   currentBranchName,
   currentWorkspacePaneRoute,
 }: PrimaryWindowOverlaysProps) {
   return (
     <>
-      <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
+      <WorkspaceOpenDialog open={overlays.state.openWorkspace.open} onOpenChange={overlays.setOpenWorkspaceOpen} />
       <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
-      <OpenRemoteRepositoryDialog
-        open={overlays.state.openRemoteRepo.open}
-        onOpenChange={overlays.setOpenRemoteRepoOpen}
+      <OpenRemoteWorkspaceDialog
+        open={overlays.state.openRemoteWorkspace.open}
+        onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
       />
-      <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
-      <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
+      <BranchActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} currentBranchName={currentBranchName} />
+      <FiletreeActionDialogHost
+        currentWorkspaceId={hydratedRouteWorkspaceId}
+        currentWorkspaceRuntimeId={currentWorkspaceRuntimeId}
+      />
       <TerminalActionDialogHost
-        currentRepoId={hydratedRouteRepoId}
-        currentBranchName={currentBranchName}
+        currentWorkspaceId={hydratedRouteWorkspaceId}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         navigation={navigation}
       />
-      <RepoDropOverlay active={repoDrop.active} />
+      <WorkspaceDropOverlay active={workspaceDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
   )
@@ -367,31 +463,31 @@ function PrimaryWindowOverlays({
  * other subtree needs the same set of subscriptions.
  */
 function AuthenticatedWorkspaceSideEffects({
-  routedRepoId,
-  hydratedRouteRepoId,
+  routedWorkspaceId,
+  hydratedRouteWorkspaceId,
   currentBranchName,
-  currentWorkspacePaneRoute,
+  currentWorkspacePaneCommandTarget,
   routeContext,
   navigation,
   closeAllOverlays,
-  openRepoPathDialog,
+  openWorkspacePathDialog,
   openCloneRepo,
-  openRemoteRepo,
+  openRemoteWorkspace,
   modalOpen,
   isSettingsOpen,
   navigateToSettingsShortcuts,
   navigateToIndex,
 }: {
-  routedRepoId: string | null
-  hydratedRouteRepoId: string | null
+  routedWorkspaceId: WorkspaceId | null
+  hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   modalOpen: boolean
   isSettingsOpen: boolean
   navigateToSettingsShortcuts: () => void
@@ -400,13 +496,12 @@ function AuthenticatedWorkspaceSideEffects({
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useClientEffectIntentRouter({
     navigation,
-    currentRepoId: hydratedRouteRepoId,
-    currentBranchName,
-    currentWorkspacePaneRoute,
+    currentWorkspaceId: hydratedRouteWorkspaceId,
+    currentWorkspacePaneCommandTarget,
     closeAllOverlays,
-    openRepoPathDialog,
+    openWorkspacePathDialog,
     openCloneRepo,
-    openRemoteRepo,
+    openRemoteWorkspace,
     openCreateWorktree: navigation.openCreateWorktree,
     isOverlayOpen: () => modalOpen,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
@@ -414,9 +509,9 @@ function AuthenticatedWorkspaceSideEffects({
 
   useKeyboard({
     navigation,
-    currentRepoId: hydratedRouteRepoId,
+    currentWorkspaceId: hydratedRouteWorkspaceId,
     currentBranchName,
-    currentWorkspacePaneRoute,
+    currentWorkspacePaneCommandTarget,
     onShowHelp: navigateToSettingsShortcuts,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
     isSettingsOpen: () => isSettingsOpen,
@@ -424,28 +519,46 @@ function AuthenticatedWorkspaceSideEffects({
     openCreateWorktree: navigation.openCreateWorktree,
   })
 
-  useClientWorkspacePersistence({ routedRepoId })
+  useClientWorkspacePersistence({ routedWorkspaceId })
   useWorkspaceNavigationHistory({ routeContext })
-  useBackgroundFetch({ hydratedRouteRepoId })
+  useBackgroundFetch({ currentWorkspaceId: hydratedRouteWorkspaceId })
   useNetworkReconnect()
   useRepoProjectionQueryEffects()
   useRepoStoreInvalidationRefresh()
+  useWorkspaceRuntimeInvalidationRefresh()
   useSettingsQueryInvalidationSync()
   return null
 }
 
 function workspaceNavigationRouteContext(
-  routeContext: RepoRouteContext | null,
+  routeContext: WorkspaceRouteContext | null,
   routeHref: string | null,
 ): WorkspaceNavigationRouteContext | null {
   if (!routeContext) return null
-  const repoId = repoIdFromSlug(routeContext.repoSlug)
-  if (!repoId) return null
+  const workspaceId = workspaceIdFromSlug(routeContext.workspaceSlug)
+  if (!workspaceId) return null
   if (routeContext.kind === 'branch') {
     return null
   }
-  if (routeContext.kind === 'newWorktree') {
-    return { kind: 'newWorktree', repoId, returnTo: returnToFromHref(routeHref) }
+  if (routeContext.kind === 'worktree') {
+    return {
+      kind: 'worktree',
+      workspaceId,
+      worktreePath: routeContext.worktreePath,
+      workspacePaneRoute:
+        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
+    }
   }
-  return { kind: routeContext.kind, repoId }
+  if (routeContext.kind === 'newWorktree') {
+    return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
+  }
+  if (routeContext.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root',
+      workspaceId,
+      workspacePaneRoute:
+        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
+    }
+  }
+  return { kind: routeContext.kind, workspaceId }
 }

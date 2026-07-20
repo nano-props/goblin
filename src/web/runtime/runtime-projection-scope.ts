@@ -1,11 +1,14 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface RuntimeProjectionTarget {
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
 interface RuntimeProjectionOperation {
   generation: number
   controller: AbortController
+  rerun: (() => void) | null
 }
 
 interface RuntimeProjectionTimer {
@@ -50,10 +53,15 @@ export class RuntimeProjectionScope {
     reject: (error: unknown) => void,
   ): void {
     if (!this.isActive()) return
-    this.operationsByLane.get(lane)?.controller.abort()
+    const current = this.operationsByLane.get(lane)
+    if (current) {
+      current.rerun = () => this.runLatest(lane, task, publish, reject)
+      return
+    }
     const operation: RuntimeProjectionOperation = {
       generation: this.nextGeneration++,
       controller: new AbortController(),
+      rerun: null,
     }
     this.operationsByLane.set(lane, operation)
     void this.executeLatest(lane, operation, task, publish, reject)
@@ -118,11 +126,13 @@ export class RuntimeProjectionScope {
   ): Promise<void> {
     try {
       const value = await task(operation.controller.signal)
-      this.commitLatest(lane, operation, () => publish(value), reject)
+      if (!operation.rerun) this.commitLatest(lane, operation, () => publish(value), reject)
     } catch (error) {
-      this.commitLatest(lane, operation, () => reject(error))
+      if (!operation.rerun) this.commitLatest(lane, operation, () => reject(error))
     } finally {
-      if (this.operationsByLane.get(lane) === operation) this.operationsByLane.delete(lane)
+      if (this.operationsByLane.get(lane) !== operation) return
+      this.operationsByLane.delete(lane)
+      operation.rerun?.()
     }
   }
 
@@ -146,7 +156,7 @@ export class RuntimeProjectionScope {
 
 export class RuntimeProjectionScopeRegistry {
   private readonly isTargetCurrent: (target: RuntimeProjectionTarget) => boolean
-  private readonly scopesByRepoRoot = new Map<string, RuntimeProjectionScope>()
+  private readonly scopesByWorkspaceId = new Map<string, RuntimeProjectionScope>()
   private readonly disposers = new Set<RuntimeProjectionDisposer>()
   private active = true
 
@@ -156,11 +166,11 @@ export class RuntimeProjectionScopeRegistry {
 
   scopeFor(target: RuntimeProjectionTarget): RuntimeProjectionScope {
     if (!this.active) throw new Error('runtime projection scope registry disposed')
-    const current = this.scopesByRepoRoot.get(target.repoRoot)
-    if (current?.target.repoRuntimeId === target.repoRuntimeId && current.isActive()) return current
+    const current = this.scopesByWorkspaceId.get(target.workspaceId)
+    if (current?.target.workspaceRuntimeId === target.workspaceRuntimeId && current.isActive()) return current
     current?.dispose()
     const scope = new RuntimeProjectionScope(target, this.isTargetCurrent)
-    this.scopesByRepoRoot.set(target.repoRoot, scope)
+    this.scopesByWorkspaceId.set(target.workspaceId, scope)
     return scope
   }
 
@@ -183,8 +193,8 @@ export class RuntimeProjectionScopeRegistry {
   }
 
   disposeScopes(): void {
-    for (const scope of this.scopesByRepoRoot.values()) scope.dispose()
-    this.scopesByRepoRoot.clear()
+    for (const scope of this.scopesByWorkspaceId.values()) scope.dispose()
+    this.scopesByWorkspaceId.clear()
   }
 
   dispose(): void {

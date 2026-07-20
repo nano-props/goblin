@@ -4,8 +4,8 @@ import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -24,7 +24,10 @@ export type WorkspacePaneTabsRestoreResult = WorkspacePaneTabsRestored | Workspa
 export interface ServerWorkspacePaneTabsHost {
   restoreTabs(
     userId: string,
-    input: WorkspacePaneTabsListInput & { targets: WorkspacePaneTabsTarget[]; expectedRepoEntry: RepoSessionEntry },
+    input: WorkspacePaneTabsListInput & {
+      targets: RestorableWorkspacePaneTarget[]
+      expectedWorkspaceEntry: WorkspaceSessionEntry
+    },
   ): MaybePromise<WorkspacePaneTabsRestoreResult>
   listWorkspaceTabs(
     clientId: string,

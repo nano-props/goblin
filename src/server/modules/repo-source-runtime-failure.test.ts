@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const target: RemoteRepoTarget = {
-  id: 'ssh-config://prod/home/alice/service',
+const target: RemoteWorkspaceTarget = {
+  id: workspaceIdForTest('goblin+ssh://prod/home/alice/service'),
   alias: 'prod',
   remotePath: '/home/alice/service',
   displayName: 'prod:service',
@@ -45,14 +46,12 @@ describe('repo source runtime failure classification', () => {
     })
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(
-      getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' }),
-    ).rejects.toMatchObject({
-      name: 'RemoteRepoRuntimeFailureError',
-      repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+      name: 'RemoteWorkspaceRuntimeFailureError',
+      workspaceId: target.id,
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'unreachable',
-    } satisfies Partial<RemoteRepoRuntimeFailureError>)
+    } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
   })
 
   test('throws a typed remote runtime failure for classified remote write failures', async () => {
@@ -65,11 +64,11 @@ describe('repo source runtime failure classification', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
 
     await expect(fetchRepo(target.id, 'user', undefined, 'repo-runtime-test')).rejects.toMatchObject({
-      name: 'RemoteRepoRuntimeFailureError',
-      repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+      name: 'RemoteWorkspaceRuntimeFailureError',
+      workspaceId: target.id,
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'unreachable',
-    } satisfies Partial<RemoteRepoRuntimeFailureError>)
+    } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
   })
 
   test('preserves normal remote read failures when no runtime context is supplied', async () => {
@@ -88,13 +87,11 @@ describe('repo source runtime failure classification', () => {
     mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(
-      getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' }),
-    ).rejects.toMatchObject({
-      name: 'RemoteRepoRuntimeFailureError',
-      repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+      name: 'RemoteWorkspaceRuntimeFailureError',
+      workspaceId: target.id,
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'config-changed',
-    } satisfies Partial<RemoteRepoRuntimeFailureError>)
+    } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
   })
 })

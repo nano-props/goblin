@@ -9,6 +9,7 @@ import { isValidTerminalNotifyBellInput, isValidTerminalTestNotificationInput } 
 import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
+  TerminalSessionBase,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import {
@@ -35,7 +36,7 @@ export function wireTerminalIpc(): void {
     async (event, input: TerminalTestNotificationInput): Promise<boolean> => {
       if (!isTrustedIpcEvent(event) || !isValidTerminalTestNotificationInput(input)) return false
       if (!Notification.isSupported()) return false
-      return showNotificationWithResult(input.title, input.body, null)
+      return showNotificationWithResult(input.title, input.body)
     },
   )
   ipcMain.on(TERMINAL_SET_BADGE_CHANNEL, (event, count: unknown): void => {
@@ -74,13 +75,10 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
     if (!Notification.isSupported()) return true
     // showNotificationWithResult is async: it waits for the 'show' or 'failed'
     // event so the caller gets an accurate result instead of an optimistic true.
-    return await showNotificationWithResult(
-      input.title,
-      input.body,
-      input.repoRoot,
-      input.terminalSessionId,
-      input.terminalWorktreeKey,
-    )
+    return await showNotificationWithResult(input.title, input.body, {
+      terminalSessionId: input.terminalSessionId,
+      session: input.session,
+    })
   } catch (err) {
     terminalNodeLog.warn({ err }, 'failed to show bell notification')
     return false
@@ -103,9 +101,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
 function showNotificationWithResult(
   title: string,
   body: string,
-  repoRoot: string | null,
-  terminalSessionId?: string,
-  terminalWorktreeKey?: string,
+  clickTarget?: { terminalSessionId: string; session: TerminalSessionBase },
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const notif = new Notification({ title, body })
@@ -121,10 +117,13 @@ function showNotificationWithResult(
     notif.once('failed', () => settle(false))
     notif.once('click', () => {
       // Bring the window to the foreground, then tell the client to switch
-      // to the repo and open the terminal view (only when repoRoot is known).
+      // to the workspace and open the terminal view.
       void activatePrimaryWindow().catch(() => {})
-      if (repoRoot)
-        broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, terminalSessionId, terminalWorktreeKey })
+      if (clickTarget)
+        broadcastClientEffectIntent({
+          type: 'terminal-bell-click',
+          ...clickTarget,
+        })
     })
     notif.show()
   })

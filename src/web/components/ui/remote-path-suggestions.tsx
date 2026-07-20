@@ -1,5 +1,5 @@
 // Typeable path input with a styled suggestion dropdown. Replaces the
-// HTML5 <datalist> autocomplete used by OpenRemoteRepositoryDialog and
+// HTML5 <datalist> autocomplete used by OpenRemoteWorkspaceDialog and
 // Create Worktree surfaces — <datalist> renders with browser-native chrome
 // that ignores our design tokens and varies across Electron versions.
 //

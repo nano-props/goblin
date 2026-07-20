@@ -1,5 +1,5 @@
 import { useCallback, type ReactNode } from 'react'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
@@ -12,6 +12,8 @@ import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -19,10 +21,8 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
+  runtimeTarget: RuntimeWorkspacePaneTarget
+  presentation: TerminalPresentation
 }
 
 export interface WorkspacePaneRuntimeTabPanelRenderInput {
@@ -73,16 +73,30 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
+      const presentationToken = beginPrimaryWindowPresentation()
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-          showCreatedTerminalWorkspacePaneRuntimeTab(
-            { ...base, branch: canonicalBranch },
-            terminalSessionId,
-            navigation,
-          ),
+        showCreatedTerminalTab: (terminalSessionId, presentation) => {
+          if (base.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
+            return showCreatedTerminalWorkspacePaneRuntimeTab(
+              { target: base.target, presentation },
+              terminalSessionId,
+              navigation,
+              presentationToken,
+            )
+          }
+          if (base.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
+            return showCreatedTerminalWorkspacePaneRuntimeTab(
+              { target: base.target, presentation },
+              terminalSessionId,
+              navigation,
+              presentationToken,
+            )
+          }
+          return false
+        },
         t,
         logMessage: 'workspace pane terminal create failed',
       })
@@ -90,14 +104,19 @@ function TerminalWorkspacePaneRuntimeTabPanel({
     [createTerminalWithAdmission, navigation, t],
   )
 
-  if (!target.branchName || !target.worktreePath) return null
+  const { runtimeTarget, presentation } = target
+  if (runtimeTarget.kind !== presentation.kind) return null
+  const base: TerminalSessionBase | null =
+    runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root'
+      ? { target: runtimeTarget, presentation }
+      : runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree'
+        ? { target: runtimeTarget, presentation }
+        : null
+  if (!base) return null
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
-        repoRoot={target.repoRoot}
-        repoRuntimeId={target.repoRuntimeId}
-        branch={target.branchName}
-        worktreePath={target.worktreePath}
+        base={base}
         selectedTerminalSessionId={selectedSessionId}
         projectionPhase={runtimeState.projectionPhase}
         projectionErrorMessage={runtimeState.projectionErrorMessage}

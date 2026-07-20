@@ -21,7 +21,11 @@ function makeAppRealtimeHost(): ServerAppRealtimeHost {
 }
 
 const workspacePaneTabsHost = {
-  restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+  restoreTabs: vi.fn(async () => ({
+    kind: 'restored' as const,
+    snapshot: { revision: 0, entries: [] },
+    repaired: false,
+  })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
@@ -29,6 +33,10 @@ const workspacePaneTabsHost = {
 
 const worktreeRemovalApplication = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
+}
+
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
 describe('POST /api/repo/view', () => {
@@ -135,6 +143,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: makeAppRealtimeHost(),
       workspacePaneTabsHost,
       worktreeRemovalApplication,
@@ -159,6 +168,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: makeAppRealtimeHost(),
       workspacePaneTabsHost,
       worktreeRemovalApplication,

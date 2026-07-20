@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
@@ -18,15 +19,13 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 stubI18n()
 
 interface CapturedTerminalSessionViewProps {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
+  base: TerminalSessionBase
   selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
@@ -66,16 +65,16 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
+  resetWorkspacesStore()
   seedRepoWithReadModelForTest({
-    id: '/repo',
-    repoRuntimeId: 'repo-runtime-1',
+    id: 'goblin+file:///repo',
+    workspaceRuntimeId: 'repo-runtime-1',
     branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({
-    repoId: '/repo',
-    repoRuntimeId: 'repo-runtime-1',
+    workspaceId: workspaceIdForTest('goblin+file:///repo'),
+    workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'main',
     worktreePath: '/repo-worktree',
     route: null,
@@ -84,7 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
+  resetWorkspacesStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
   workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockClear()
@@ -99,10 +98,15 @@ describe('workspace pane runtime tab panel', () => {
     expect(panel?.getAttribute('aria-label')).toBe('Terminal')
     expect(container.querySelector('[data-testid="terminal-session-view"]')).not.toBeNull()
     expect(terminalSessionViewMocks.props[0]).toMatchObject({
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      branch: 'main',
-      worktreePath: '/repo-worktree',
+      base: {
+        target: {
+          kind: 'git-worktree' as const,
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-1',
+          root: 'goblin+file:///repo-worktree',
+        },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      },
       selectedTerminalSessionId: 'term-111111111111111111111',
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
@@ -117,10 +121,13 @@ describe('workspace pane runtime tab panel', () => {
     })
 
     const base: TerminalSessionBase = {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      branch: 'stale-branch',
-      worktreePath: '/repo-worktree',
+      target: {
+        kind: 'git-worktree' as const,
+        workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+        workspaceRuntimeId: 'repo-runtime-1',
+        root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+      },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'stale-branch' } },
     }
 
     await act(async () => {
@@ -140,7 +147,7 @@ describe('workspace pane runtime tab panel', () => {
         {
           commitCreatedTerminalTab: (admission: {
             terminalSessionId: string
-            branch: string
+            presentation: { kind: 'git-worktree'; head: { kind: 'branch'; branchName: string } }
             requestRole: 'leader'
             resourceDisposition: 'created'
             runtimeProjectionApplied: boolean
@@ -150,14 +157,14 @@ describe('workspace pane runtime tab panel', () => {
     >
     await commandCalls[0]?.[0].commitCreatedTerminalTab({
       terminalSessionId: 'term-111111111111111111111',
-      branch: 'main',
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith('/repo', 'repo-runtime-1')
-    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/repo',
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).not.toHaveBeenCalled()
+    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
+      'goblin+file:///repo',
       'main',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
@@ -175,10 +182,13 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           workspacePaneId: 'workspace',
           panelLabel: { label: 'Terminal' },
           target: {
-            repoRoot: '/repo',
-            repoRuntimeId: 'repo-runtime-1',
-            branchName: 'main',
-            worktreePath: '/repo-worktree',
+            runtimeTarget: {
+              kind: 'git-worktree' as const,
+              workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+              workspaceRuntimeId: 'repo-runtime-1',
+              root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+            },
+            presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
           },
           selectedSessionId: 'term-111111111111111111111',
           runtimeState: {
@@ -194,21 +204,21 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 
 function navigationWith(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
-    activateRepo: vi.fn(),
-    closeRepo: vi.fn(),
-    cycleRepo: vi.fn(),
+    currentWorkspacePaneRoute: () => undefined,
+    activateWorkspace: vi.fn(),
+    closeWorkspace: vi.fn(),
+    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
+  navigation.commitWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
   return navigation
 }
 

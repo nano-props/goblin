@@ -11,7 +11,7 @@ export function createTerminalWithAdmissionForContextTest(
     const terminalSessionId = await createTerminal(base, options)
     return {
       terminalSessionId,
-      branch: base.branch,
+      presentation: base.presentation,
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
       runtimeProjectionApplied: true,

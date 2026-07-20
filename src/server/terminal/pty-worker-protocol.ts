@@ -5,7 +5,7 @@
 // native host owns the business runtime and talks to the worker over
 // IPC for the few low-level operations that have to live close to the
 // OS process boundary (spawn / write / resize / kill). Every other
-// concern (terminal session lifecycle, worktree grouping, controllers, sockets, session service) is handled
+// concern (terminal session lifecycle, filesystem-target grouping, controllers, sockets, session service) is handled
 // in-process by the main runtime.
 //
 // Protocol surface:

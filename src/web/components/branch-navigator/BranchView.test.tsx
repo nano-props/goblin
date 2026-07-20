@@ -4,6 +4,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchView } from '#/web/components/branch-navigator/BranchView.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -14,7 +15,7 @@ import {
   createBranchSnapshot,
   createRepoBranch,
   installGoblinTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -30,19 +31,19 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-const REPO_ID = '/tmp/goblin-branch-view-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
 const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {
-  currentRepoBranchWorkspacePaneRoute: () => undefined,
-  activateRepo: vi.fn(),
-  closeRepo: vi.fn(),
-  cycleRepo: vi.fn(),
+  currentWorkspacePaneRoute: () => undefined,
+  activateWorkspace: vi.fn(),
+  closeWorkspace: vi.fn(),
+  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
-  commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
+  commitWorkspacePaneRoute: vi.fn(() => true),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -50,8 +51,8 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {
-  terminalWorktreeSnapshot: () => ({
-    terminalWorktreeKey: '',
+  terminalFilesystemTargetSnapshot: () => ({
+    terminalFilesystemTargetKey: '',
     selectedDescriptor: null,
     sessions: [],
     count: 0,
@@ -59,16 +60,16 @@ const terminalReadContext: TerminalSessionReadContextValue = {
     outputActiveCount: 0,
     createPending: false,
   }),
-  subscribeTerminalWorktree: () => () => {},
-  repoBellCount: () => 0,
-  subscribeRepoBellCount: () => () => {},
+  subscribeTerminalFilesystemTarget: () => () => {},
+  workspaceBellCount: () => 0,
+  subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   vi.clearAllMocks()
 })
 
@@ -106,7 +107,7 @@ describe('BranchView', () => {
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/destination',
         type: 'status',
       }),
@@ -178,7 +179,7 @@ describe('BranchView', () => {
       currentBranch: 'main',
     })
     primaryWindowQueryClient.removeQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
     })
     const readStatus = vi.fn(async () => {
       throw new Error('status failed')
@@ -208,12 +209,12 @@ describe('BranchView', () => {
     const readStatus = vi
       .fn()
       .mockRejectedValueOnce(new Error('status failed'))
-      .mockResolvedValueOnce({ repoRuntimeId: repo.repoRuntimeId, status: [], loadedAt: 2 })
+      .mockResolvedValueOnce({ workspaceRuntimeId: repo.workspaceRuntimeId, status: [], loadedAt: 2 })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderBranchView()
 
     await primaryWindowQueryClient.invalidateQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
       refetchType: 'active',
     })

@@ -1,13 +1,23 @@
 import { describe, expect, test } from 'vitest'
 import { FutureExitLedger, type FutureExitBinding } from '#/web/components/terminal/future-exit-ledger.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+function workspaceIdFixture(input: string) {
+  const workspaceId = canonicalWorkspaceLocator(input)
+  if (!workspaceId) throw new Error('invalid workspace locator fixture')
+  return workspaceId
+}
+
+const WORKSPACE_A = workspaceIdFixture('goblin+file:///workspace-a')
+const WORKSPACE_B = workspaceIdFixture('goblin+file:///workspace-b')
 
 function binding(index: number): FutureExitBinding {
   return {
     terminalSessionId: `term-${index}`,
     terminalRuntimeSessionId: `pty-${index}`,
     terminalRuntimeGeneration: 1,
-    repoRoot: '/repo-a',
-    repoRuntimeId: 'repo-runtime-a-1',
+    workspaceId: WORKSPACE_A,
+    workspaceRuntimeId: 'repo-runtime-a-1',
   }
 }
 
@@ -50,10 +60,7 @@ describe('FutureExitLedger', () => {
     let now = 0
     const ledger = new FutureExitLedger({ ttlMs: 50, now: () => now })
     ledger.record(binding(1))
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [binding(1)],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [binding(1)])
     now = 5_000
     expect(ledger.blocksActivation(binding(1))).toBe(true)
   })
@@ -73,10 +80,7 @@ describe('FutureExitLedger', () => {
   test('clears a durable tombstone after authoritative absence', () => {
     const ledger = new FutureExitLedger()
     ledger.record(binding(1), 'durable')
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [])
     expect(ledger.blocksActivation(binding(1))).toBe(false)
   })
 
@@ -85,13 +89,13 @@ describe('FutureExitLedger', () => {
     const repoA = binding(1)
     const repoB = {
       ...binding(2),
-      repoRoot: '/repo-b',
-      repoRuntimeId: 'repo-runtime-b-1',
+      workspaceId: WORKSPACE_B,
+      workspaceRuntimeId: 'repo-runtime-b-1',
     }
     ledger.record(repoA)
     ledger.record(repoB)
 
-    ledger.retireSnapshotScope(JSON.stringify(['/repo-a', 'repo-runtime-a-1']))
+    ledger.retireSnapshotScope(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']))
     expect(ledger.size()).toBe(1)
     expect(ledger.blocksActivation(repoA)).toBe(false)
     expect(ledger.blocksActivation(repoB)).toBe(true)
@@ -100,10 +104,7 @@ describe('FutureExitLedger', () => {
   test('keeps a present exit as an exact activation tombstone', () => {
     const ledger = new FutureExitLedger()
     ledger.record(binding(1))
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [binding(1)],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [binding(1)])
     expect(ledger.blocksActivation(binding(1))).toBe(true)
     expect(ledger.blocksActivation(binding(1))).toBe(true)
   })
@@ -124,16 +125,13 @@ describe('FutureExitLedger', () => {
     const repoA = binding(1)
     const repoB = {
       ...binding(2),
-      repoRoot: '/repo-b',
-      repoRuntimeId: 'repo-runtime-b-1',
+      workspaceId: WORKSPACE_B,
+      workspaceRuntimeId: 'repo-runtime-b-1',
     }
     ledger.record(repoA)
     ledger.record(repoB)
 
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [])
     expect(ledger.blocksActivation(repoA)).toBe(false)
     expect(ledger.blocksActivation(repoB)).toBe(true)
   })
@@ -146,7 +144,7 @@ describe('FutureExitLedger', () => {
     ledger.record(generation1)
     ledger.record(generation2)
 
-    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [generation1])
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [generation1])
     now = 50
 
     expect(ledger.blocksActivation(generation1)).toBe(true)
@@ -159,7 +157,7 @@ describe('FutureExitLedger', () => {
     const generation2 = { ...binding(1), terminalRuntimeGeneration: 2 }
     ledger.record(generation1, 'durable')
 
-    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [generation2])
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1']), [generation2])
 
     expect(ledger.blocksActivation(generation1)).toBe(false)
     expect(ledger.blocksActivation(generation2)).toBe(false)
@@ -167,7 +165,7 @@ describe('FutureExitLedger', () => {
 
   test('stays bounded across repeated future lineages for one authoritative session', () => {
     const ledger = new FutureExitLedger({ capacity: 2 })
-    const scope = JSON.stringify(['/repo-a', 'repo-runtime-a-1'])
+    const scope = JSON.stringify([WORKSPACE_A, 'repo-runtime-a-1'])
     for (let generation = 1; generation <= 20; generation += 1) {
       const authoritative = { ...binding(1), terminalRuntimeGeneration: generation }
       ledger.record(authoritative)

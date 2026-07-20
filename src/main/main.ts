@@ -6,7 +6,7 @@ import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
-import { syncRecentRepos } from '#/main/recent-repos.ts'
+import { syncRecentWorkspaces } from '#/main/recent-workspaces.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { wireShellIpc } from '#/main/shell-ipc.ts'
@@ -169,7 +169,7 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
     langPref: settingsSnapshot.lang,
   })
   setCurrentLang(resolveLang(settingsSnapshot.lang))
-  syncRecentRepos(settingsSnapshot.recentRepos)
+  syncRecentWorkspaces(settingsSnapshot.recentWorkspaces)
   buildAppMenu()
 }
 

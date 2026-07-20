@@ -1,11 +1,12 @@
-import { EmptyRepoView } from '#/web/components/EmptyRepoView.tsx'
+import { EmptyWorkspaceView } from '#/web/components/EmptyWorkspaceView.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
-import { RepoView } from '#/web/components/RepoView.tsx'
-import { RepoWorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
+import { WorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
@@ -16,54 +17,60 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 interface AppProps {
   routeSettingsPage?: SettingsPage | null
-  routeRepoView?: RepoRouteView | null
+  routeWorkspaceView?: WorkspaceRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
-  onOpenRepoRoot?: (repoId: string) => void
-  onOpenRepoDashboard?: (repoId: string) => void
-  onOpenRepoBranch?: (repoId: string, branchName: string) => void
-  onOpenRepoNewWorktree?: (repoId: string) => void
-  onCancelRepoNewWorktree?: (repoId: string) => void
-  onReplaceRepoBranch?: (repoId: string, branchName: string) => void
+  onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
+  onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
+  onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
 }
 
-export type RepoRouteView =
-  | { kind: 'empty'; repoId: string }
-  | { kind: 'dashboard'; repoId: string }
+export type WorkspaceRouteView =
+  | { kind: 'empty'; workspaceId: WorkspaceId }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | {
+      kind: 'worktree'
+      workspaceId: WorkspaceId
+      worktreePath: string
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
+    }
+  | { kind: 'dashboard'; workspaceId: WorkspaceId }
   | {
       kind: 'branch'
-      repoId: string
+      workspaceId: WorkspaceId
       branchName: string
-      workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
-  | { kind: 'newWorktree'; repoId: string }
+  | { kind: 'newWorktree'; workspaceId: WorkspaceId }
 
-export type RepoBranchWorkspacePaneRoute =
-  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
-  | { kind: 'terminal'; terminalSessionId: string }
+export type WorkspacePaneRoute =
+  { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
 
-export type RepoBranchWorkspacePaneRouteTarget = RepoBranchWorkspacePaneRoute | null
+export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
 
-export type ParsedRepoBranchWorkspacePaneRoute =
-  | RepoBranchWorkspacePaneRoute
-  | { kind: 'invalid-static'; tabKey: string }
+export type ParsedWorkspacePaneRoute = WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
 
-export type ParsedRepoBranchWorkspacePaneRouteTarget = ParsedRepoBranchWorkspacePaneRoute | null
+export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
 
 export function App({
   routeSettingsPage = null,
-  routeRepoView = null,
+  routeWorkspaceView = null,
   onRouteSettingsPageChange,
-  onOpenRepoRoot,
-  onOpenRepoDashboard,
+  onOpenWorkspaceNavigator,
+  onOpenWorkspaceRootPane,
+  onOpenWorkspaceDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
   onCancelRepoNewWorktree,
   onReplaceRepoBranch,
 }: AppProps) {
-  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
-  const zenMode = useReposStore((s) => s.zenMode)
+  const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
+  const zenMode = useWorkspacesStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
-  const bootWorkspaceBehavior = repoWorkspaceBehavior({
+  const bootWorkspaceBehavior = workspaceLayoutBehavior({
     compact: uiMode === 'compact',
     zenMode,
   })
@@ -80,27 +87,28 @@ export function App({
 
   return (
     <main className="flex flex-1 min-h-0 min-w-0">
-      <ErrorBoundary resetKey={routeRepoView?.repoId ?? 'empty'}>
-        {routeRepoView ? (
-          <RepoView
-            repoId={routeRepoView.repoId}
-            routeView={routeRepoView}
+      <ErrorBoundary resetKey={routeWorkspaceView?.workspaceId ?? 'empty'}>
+        {routeWorkspaceView ? (
+          <WorkspaceView
+            workspaceId={routeWorkspaceView.workspaceId}
+            routeView={routeWorkspaceView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
-            onOpenRepoRoot={onOpenRepoRoot}
-            onOpenRepoDashboard={onOpenRepoDashboard}
+            onOpenWorkspaceNavigator={onOpenWorkspaceNavigator}
+            onOpenWorkspaceRootPane={onOpenWorkspaceRootPane}
+            onOpenWorkspaceDashboard={onOpenWorkspaceDashboard}
             onOpenRepoBranch={onOpenRepoBranch}
             onOpenRepoNewWorktree={onOpenRepoNewWorktree}
             onCancelRepoNewWorktree={onCancelRepoNewWorktree}
             onReplaceRepoBranch={onReplaceRepoBranch}
           />
         ) : !workspaceMembershipReady ? (
-          <RepoWorkspaceLayoutSkeleton
+          <WorkspaceLayoutSkeleton
             singlePane={bootWorkspaceBehavior.singlePane}
             singlePaneView="navigator"
-            repoWorkspaceState="empty"
+            workspacePaneState="empty"
           />
         ) : (
-          <EmptyRepoView onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
+          <EmptyWorkspaceView onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
         )}
       </ErrorBoundary>
     </main>

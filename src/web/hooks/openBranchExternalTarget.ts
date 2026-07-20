@@ -1,34 +1,37 @@
 import { openRepoUrl } from '#/web/repo-client.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export async function openBranchExternalTarget(
-  repoId: string,
-  repoRuntimeId: string,
+  repoId: WorkspaceId,
+  workspaceRuntimeId: string,
   branch: Pick<RepoBranchState, 'name' | 'pullRequest'>,
 ): Promise<ExecResult> {
   if (branch.pullRequest?.url) return await openExternalUrl(branch.pullRequest.url)
-  return await openRepoUrl(repoId, repoRuntimeId, { type: 'branch', branch: branch.name })
+  return await openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch: branch.name })
 }
 
 export async function openUpstreamBranchExternalTarget(
-  repoId: string,
-  repoRuntimeId: string,
+  repoId: WorkspaceId,
+  workspaceRuntimeId: string,
   tracking: string,
 ): Promise<ExecResult> {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
+  if (repo?.capability.kind !== 'git') return { ok: false, message: 'error.invalid-upstream-ref' }
+  const gitRemote = repo.capability.git.remote
   const remoteName = resolveTrackingRemoteName(
     tracking,
-    repo?.remote.remotes ?? Object.keys(repo?.remote.remoteProviders ?? {}),
+    gitRemote.remotes ?? Object.keys(gitRemote.remoteProviders ?? {}),
   )
   if (!remoteName) {
     return { ok: false, message: 'error.invalid-upstream-ref' }
   }
   const branch = tracking.slice(remoteName.length + 1)
   if (!branch) return { ok: false, message: 'error.invalid-upstream-ref' }
-  return await openRepoUrl(repoId, repoRuntimeId, { type: 'branch', branch, remote: remoteName })
+  return await openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch, remote: remoteName })
 }
 
 function resolveTrackingRemoteName(tracking: string, remotes: readonly string[]): string | null {

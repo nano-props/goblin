@@ -1,11 +1,16 @@
-import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
-import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import {
+  terminalExecutionCoordinates,
+  type TerminalCreateInput,
+  type TerminalCreateResult,
+} from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
@@ -18,6 +23,8 @@ export type ServerTerminalCreateResult =
     }
   | TerminalCreateFailure
 
+export type ServerTerminalCreateInput = TerminalCreateInput
+
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
   ensureOrRestore(
@@ -27,7 +34,7 @@ interface TerminalSessionCreatorOptions {
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult>
-  isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
 }
 
 class TerminalSessionCreator {
@@ -41,22 +48,25 @@ class TerminalSessionCreator {
     clientId: string
     terminalClientId: string
     userId: string
-    request: TerminalCreateInput
+    request: ServerTerminalCreateInput
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     signal: AbortSignal
   }): Promise<ServerTerminalCreateResult> {
     const signal = input.signal
-    const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
-    const scopedWorktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
-    return await this.options.createCoordinator.runInWorktreeQueue(
-      { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
+    const coordinates = terminalExecutionCoordinates(input.request.target)
+    const sessionScope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
+    const executionRootId = coordinates.executionRootId
+    return await this.options.createCoordinator.runInFilesystemTargetQueue(
+      { userId: input.userId, scope: sessionScope, executionRootId },
       async () => {
-        if (signal.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
-        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
-          return { ok: false, message: 'error.repo-runtime-stale' }
+        if (signal.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
+        if (
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.workspaceId, coordinates.workspaceRuntimeId)
+        ) {
+          return { ok: false, message: 'error.workspace-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
-          { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath, kind: input.request.kind },
+          { userId: input.userId, scope: sessionScope, executionRootId, kind: input.request.kind },
           async ({ terminalSessionId }) =>
             await this.options.ensureOrRestore(
               input.clientId,
@@ -71,9 +81,11 @@ class TerminalSessionCreator {
             ),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
+        if (
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.workspaceId, coordinates.workspaceRuntimeId)
+        ) {
           createResult.admission.abort()
-          return { ok: false, message: 'error.repo-runtime-stale' }
+          return { ok: false, message: 'error.workspace-runtime-stale' }
         }
         return {
           ok: true,

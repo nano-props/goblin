@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsTarget,
-  workspacePaneTabsEntryMatchesTarget,
+  workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -20,17 +21,20 @@ export interface WorkspacePaneTabsTargetProjection {
   tabs: WorkspacePaneTabEntry[]
 }
 
+type WorkspacePaneTabsReadTarget =
+  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
+
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 
-export function workspacePaneTabsQueryKey(repoRoot: string, repoRuntimeId: string) {
-  return ['workspace-pane-tabs', repoRoot, repoRuntimeId] as const
+export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  return ['workspace-pane-tabs', workspaceId, workspaceRuntimeId] as const
 }
 
-export function workspacePaneTabsQueryOptions(repoRoot: string, repoRuntimeId: string) {
+export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
-    queryKey: workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
-    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId),
+    queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
+    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId),
     structuralSharing: (oldData, newData) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
@@ -42,12 +46,12 @@ export function workspacePaneTabsQueryOptions(repoRoot: string, repoRuntimeId: s
 }
 
 export function useWorkspacePaneTabsQuery(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
   const query = useQuery({
-    ...workspacePaneTabsQueryOptions(repoRoot, repoRuntimeId),
+    ...workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId),
     enabled: options.enabled !== false,
   })
   useEffect(() => {
@@ -57,31 +61,21 @@ export function useWorkspacePaneTabsQuery(
 }
 
 export function readWorkspacePaneTabsForTarget(
-  target: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string | null | undefined
-    worktreePath: string | null
-  },
+  target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabEntry[] {
   const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId),
+    workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
   return workspacePaneTabsForTargetFromQueryData(snapshot ?? emptyWorkspacePaneTabsSnapshot(), target)
 }
 
 export function readWorkspacePaneTabsProjectionForTarget(
-  target: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string | null | undefined
-    worktreePath: string | null
-  },
+  target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabsTargetProjection {
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId),
+    workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
   if (state?.status === 'error') return { phase: 'failed', tabs: [] }
   if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
@@ -93,19 +87,14 @@ export function readWorkspacePaneTabsProjectionForTarget(
 
 export function workspacePaneTabsForTargetFromQueryData(
   data: WorkspacePaneTabsSnapshot,
-  target: {
-    repoRoot: string
-    branchName: string | null | undefined
-    worktreePath: string | null
-  },
+  target: WorkspacePaneTabsReadTarget,
 ): WorkspacePaneTabEntry[] {
-  if (!target.branchName) return []
-  const entry = workspacePaneTabsEntryForTarget(data.entries, {
-    repoRoot: target.repoRoot,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
-  })
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
+  const resolvedTarget = target.kind === 'inactive' ? null : target
+  if (!resolvedTarget) return []
+  const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
+  return [
+    ...(entry?.tabs ?? defaultWorkspacePaneTabs(resolvedTarget.kind === 'workspace-root' ? 'workspace-root' : 'git')),
+  ]
 }
 
 /**
@@ -113,15 +102,15 @@ export function workspacePaneTabsForTargetFromQueryData(
  * revision. Returns whether the snapshot was accepted.
  */
 export function writeWorkspacePaneTabsSnapshotQueryData(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): boolean {
   if (!snapshot) return false
   let accepted = false
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
+    workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     (current) => {
       const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
       accepted = next !== current
@@ -133,26 +122,29 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
 }
 
 export function refreshWorkspacePaneTabs(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void refreshWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, queryClient).catch((err) => {
-    goblinLog.warn('workspace pane tabs refresh failed', { repoRoot, repoRuntimeId, err })
+  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, queryClient).catch((err) => {
+    goblinLog.warn('workspace pane tabs refresh failed', { workspaceId, workspaceRuntimeId, err })
   })
 }
 
 export async function refreshWorkspacePaneTabsQueryData(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  const snapshot = await fetchWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId)
-  writeWorkspacePaneTabsSnapshotQueryData(repoRoot, repoRuntimeId, snapshot, queryClient)
+  const snapshot = await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
+  writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
 }
 
-export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoRuntimeId: string): void {
-  primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, repoRuntimeId), exact: true })
+export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
+  primaryWindowQueryClient.removeQueries({
+    queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
+    exact: true,
+  })
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -160,9 +152,11 @@ export function workspacePaneTabsByTargetFromQueryData(
 ): Record<string, WorkspacePaneTabEntry[]> {
   const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
   for (const entry of data.entries) {
-    byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(
+    const target = workspacePaneTabsTargetFromRuntime(entry.target)
+    if (!target) continue
+    byTarget[workspacePaneTabsTargetIdentityKey(target)] = normalizeWorkspacePaneTabs(
       entry.tabs.filter((tab) => !isWorkspacePaneRuntimeTabEntry(tab)),
-      { hasWorktree: entry.worktreePath !== null },
+      { hasWorktree: workspacePaneTargetHasExecutionRoot(target) },
     )
   }
   return byTarget
@@ -179,16 +173,26 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
   return workspacePaneTabsPersistenceVersion
 }
 
+export function workspacePaneTabsProjectionRevision(workspaceId: WorkspaceId, workspaceRuntimeId: string): number | null {
+  return (
+    primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
+      workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
+    )?.revision ?? null
+  )
+}
+
 function notifyWorkspacePaneTabsPersistenceChanged(): void {
   workspacePaneTabsPersistenceVersion += 1
   for (const listener of workspacePaneTabsPersistenceListeners) listener()
 }
 
 async function fetchWorkspacePaneTabsSnapshot(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
 ): Promise<WorkspacePaneTabsSnapshot> {
-  return normalizeWorkspacePaneTabsSnapshot(await workspacePaneTabsClient.list({ repoRoot, repoRuntimeId }))
+  return normalizeWorkspacePaneTabsSnapshot(
+    await workspacePaneTabsClient.list({ workspaceId: workspaceId, workspaceRuntimeId: workspaceRuntimeId }),
+  )
 }
 
 /** The single revision acceptance rule for every server-snapshot cache entry. */
@@ -210,15 +214,20 @@ function normalizeWorkspacePaneTabsSnapshot(snapshot: WorkspacePaneTabsSnapshot)
 function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneTabsEntry[]): WorkspacePaneTabsEntry[] {
   const byTarget = new Map<string, WorkspacePaneTabsEntry>()
   for (const entry of entries) {
-    if (!entry.branchName || entry.branchName.includes('\0')) continue
-    byTarget.set(workspacePaneTabsTargetIdentityKey(entry), {
-      repoRoot: entry.repoRoot,
-      branchName: entry.branchName,
-      worktreePath: entry.worktreePath,
-      tabs: normalizeWorkspacePaneTabs(entry.tabs, { hasWorktree: entry.worktreePath !== null }),
+    const target = workspacePaneTabsTargetFromRuntime(entry.target)
+    if (!target || (target.kind === 'git-branch' && target.branchName.includes('\0'))) continue
+    byTarget.set(workspacePaneTabsTargetIdentityKey(target), {
+      target: entry.target,
+      tabs: normalizeWorkspacePaneTabs(entry.tabs, {
+        hasWorktree: workspacePaneTargetHasExecutionRoot(target),
+      }),
     })
   }
   return Array.from(byTarget.values())
+}
+
+function workspacePaneTargetHasExecutionRoot(target: WorkspacePaneTabsTarget): boolean {
+  return target.kind !== 'git-branch'
 }
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
@@ -231,7 +240,13 @@ function workspacePaneTabsEntryForTarget(
 ): WorkspacePaneTabsEntry | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
-    if (entry && workspacePaneTabsEntryMatchesTarget(entry, target)) return entry
+    const runtimeEntryTarget = entry ? workspacePaneTabsTargetFromRuntime(entry.target) : null
+    if (
+      entry &&
+      runtimeEntryTarget &&
+      workspacePaneTabsTargetIdentityKey(runtimeEntryTarget) === workspacePaneTabsTargetIdentityKey(target)
+    )
+      return entry
   }
   return undefined
 }

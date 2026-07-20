@@ -10,8 +10,6 @@ export interface GoblinTerminalCommandRuntime {
 }
 
 export interface GoblinTerminalCommandEnvironmentInput extends GoblinTerminalCommandRuntime {
-  repoRoot: string
-  worktreePath: string
   currentPath?: string
   fileExists?: typeof existsSync
 }
@@ -28,8 +26,6 @@ export function buildGoblinTerminalCommandEnvironment(
     GOBLIN_TERMINAL: '1',
     GOBLIN_SERVER_URL: input.serverUrl,
     GOBLIN_SERVER_ACCESS_TOKEN: input.accessToken,
-    GOBLIN_REPO_ROOT: input.repoRoot,
-    GOBLIN_WORKTREE_PATH: input.worktreePath,
     GOBLIN_NODE: input.nodePath ?? process.execPath,
     GOBLIN_CLI_ENTRY: input.entryPath,
   }

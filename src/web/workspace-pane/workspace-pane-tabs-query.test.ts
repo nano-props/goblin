@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -12,7 +13,10 @@ import {
   writeWorkspacePaneTabsSnapshotQueryData,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
@@ -24,26 +28,66 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
   },
 }))
 
-const REPO_ROOT = '/tmp/workspace-pane-tabs-query-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-query-repo')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 beforeEach(() => {
   vi.mocked(workspacePaneTabsClient.list).mockReset()
 })
 
+test('test workspace identity construction rejects legacy raw workspace ids', () => {
+  expect(() => workspaceIdForTest('/tmp/legacy-workspace-id')).toThrow(
+    'invalid test workspace id: /tmp/legacy-workspace-id',
+  )
+})
+
 describe('workspace pane tabs revisioned query cache', () => {
+  test('reads workspace-root runtime tabs by their explicit target identity', () => {
+    const queryClient = new QueryClient()
+    const tabs = [
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-rootrootrootrootroot1'),
+    ]
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      WORKSPACE_RUNTIME_ID,
+      snapshot(1, [
+        {
+          target: runtimeWorkspacePaneTargetForTest({
+            kind: 'workspace-root',
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          }),
+          tabs,
+        },
+      ]),
+      queryClient,
+    )
+
+    expect(
+      readWorkspacePaneTabsForTarget(
+        {
+          kind: 'workspace-root',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        },
+        queryClient,
+      ),
+    ).toEqual(tabs)
+  })
+
   test('accepts an identical same-revision snapshot as current', () => {
     const queryClient = new QueryClient()
     const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
-    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
-    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
   })
 
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
     const accepted = writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(4, [
         entry('feature/no-worktree', null, [
           workspacePaneStaticTabEntry('status'),
@@ -57,7 +101,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(accepted).toBe(true)
     expect(readTabs(queryClient, 'feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID)),
     ).toEqual(snapshot(4, [entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])]))
   })
 
@@ -65,7 +109,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(8, [
         entry('feature/a', null, [workspacePaneStaticTabEntry('history')]),
         entry('feature/b', null, [workspacePaneStaticTabEntry('status')]),
@@ -76,7 +120,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(
       writeWorkspacePaneTabsSnapshotQueryData(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(7, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
         queryClient,
       ),
@@ -90,7 +134,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
       queryClient,
     )
@@ -98,7 +142,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(
       writeWorkspacePaneTabsSnapshotQueryData(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
         queryClient,
       ),
@@ -115,9 +159,9 @@ describe('workspace pane tabs revisioned query cache', () => {
       return await request.promise
     })
 
-    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
     await vi.waitFor(() => expect(requests).toHaveLength(1))
-    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
     await vi.waitFor(() => expect(requests).toHaveLength(2))
 
     requests[1]!.resolve(snapshot(12, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]))
@@ -132,7 +176,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(20, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
       queryClient,
     )
@@ -140,45 +184,45 @@ describe('workspace pane tabs revisioned query cache', () => {
       snapshot(19, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
     )
     await queryClient.invalidateQueries({
-      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID),
+      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
       exact: true,
     })
 
-    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
+    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, WORKSPACE_RUNTIME_ID))
 
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
   test('test target seeds preserve the cached server revision', () => {
     const queryClient = new QueryClient()
-    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, snapshot(5, []), queryClient)
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(5, []), queryClient)
 
     setWorkspacePaneTabsForTargetQueryData(
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        kind: 'git-branch' as const,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         branchName: 'feature/a',
-        worktreePath: null,
         tabs: [workspacePaneStaticTabEntry('status')],
       },
       queryClient,
     )
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID)),
     ).toEqual(snapshot(5, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]))
   })
 
   test('persists worktree and branch-only entries under separate target identities', () => {
     const worktreeTargetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: REPO_ROOT,
-      branchName: 'feature/current',
+      kind: 'git-worktree' as const,
+      workspaceId: REPO_ROOT,
       worktreePath: '/tmp/worktree',
     })
     const branchTargetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: REPO_ROOT,
+      kind: 'git-branch' as const,
+      workspaceId: REPO_ROOT,
       branchName: 'feature/current',
-      worktreePath: null,
     })
 
     expect(
@@ -199,10 +243,15 @@ describe('workspace pane tabs revisioned query cache', () => {
 })
 
 function readTabs(queryClient: QueryClient, branchName: string, worktreePath: string | null) {
-  return readWorkspacePaneTabsForTarget(
-    { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branchName, worktreePath },
-    queryClient,
-  )
+  const target =
+    worktreePath === null
+      ? { kind: 'git-branch' as const, workspaceId: REPO_ROOT, branchName }
+      : {
+          kind: 'git-worktree' as const,
+          workspaceId: REPO_ROOT,
+          worktreePath,
+        }
+  return readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }, queryClient)
 }
 
 function snapshot(revision: number, entries: WorkspacePaneTabsEntry[]): WorkspacePaneTabsSnapshot {
@@ -214,5 +263,17 @@ function entry(
   worktreePath: string | null,
   tabs: WorkspacePaneTabsEntry['tabs'],
 ): WorkspacePaneTabsEntry {
-  return { repoRoot: REPO_ROOT, branchName, worktreePath, tabs }
+  return {
+    target: runtimeWorkspacePaneTargetForTest({
+      ...(worktreePath === null
+        ? { kind: 'git-branch' as const, workspaceId: REPO_ROOT, branchName }
+        : {
+            kind: 'git-worktree' as const,
+            workspaceId: REPO_ROOT,
+            worktreePath,
+          }),
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    }),
+    tabs,
+  }
 }

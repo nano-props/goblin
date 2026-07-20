@@ -13,9 +13,12 @@ beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
-  test('accepts canonical repo locators without Node path APIs', () => {
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'C:\\repo' }).restoredRepoId).toBe('C:\\repo')
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'relative/repo' }).restoredRepoId).toBeNull()
+  test('accepts canonical workspace IDs without Node path APIs', () => {
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'goblin+file:///repo' }).restoredWorkspaceId).toBe(
+      'goblin+file:///repo',
+    )
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'C:\\repo' }).restoredWorkspaceId).toBeNull()
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'relative/repo' }).restoredWorkspaceId).toBeNull()
   })
 
   test('fails fast when native workspace state cannot be read', async () => {
@@ -35,47 +38,139 @@ describe('client workspace persistence', () => {
 
   test('round-trips client-owned presentation without server workspace fields', async () => {
     const presentation = normalizeClientWorkspaceState({
-      restoredRepoId: '/repo-a',
+      restoredWorkspaceId: 'goblin+file:///repo-a',
       zenMode: true,
       workspacePaneSize: 52,
-      selectedTerminalSessionIdByTerminalWorktree: { '/repo-a\0/worktree': 'term-111' },
-      preferredWorkspacePaneTabByTargetByRepo: { '/repo-a': { target: 'history' } },
-      filetreeViewStateByWorktreeByRepo: {
-        '/repo-a': {
-          '/worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
+        'goblin+file:///repo-a\0goblin+file:///worktree': 'term-111',
+      },
+      preferredWorkspacePaneTabByTargetByWorkspace: {
+        'goblin+file:///repo-a': { 'goblin+file:///repo-a\0workspace-root': 'history' },
+      },
+      filetreeViewStateByFilesystemTargetByWorkspace: {
+        'goblin+file:///repo-a': {
+          'goblin+file:///worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
-      workspacePaneTabsByTargetByRepo: { '/must-not-persist': {} },
+      workspacePaneTabsByTargetByWorkspace: { '/must-not-persist': {} },
     })
 
     await writeClientWorkspaceState(presentation)
 
     expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
-    expect(raw).not.toHaveProperty('openRepoEntries')
-    expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
+    expect(raw).not.toHaveProperty('openWorkspaceEntries')
+    expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
+  })
+
+  test('preserves Windows workspace identities throughout nested presentation state on a non-Windows host', () => {
+    const workspaceId = 'goblin+file:///C:/workspace'
+    const worktreeId = 'goblin+file:///C:/workspace-feature'
+    const terminalKey = `${workspaceId}\0${worktreeId}`
+    const rootTargetKey = `${workspaceId}\0workspace-root`
+
+    expect(
+      normalizeClientWorkspaceState({
+        restoredWorkspaceId: workspaceId,
+        selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
+        preferredWorkspacePaneTabByTargetByWorkspace: {
+          [workspaceId]: { [rootTargetKey]: 'files' },
+        },
+        filetreeViewStateByFilesystemTargetByWorkspace: {
+          [workspaceId]: {
+            [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
+          },
+        },
+      }),
+    ).toMatchObject({
+      restoredWorkspaceId: workspaceId,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
+      preferredWorkspacePaneTabByTargetByWorkspace: { [workspaceId]: { [rootTargetKey]: 'files' } },
+      filetreeViewStateByFilesystemTargetByWorkspace: {
+        [workspaceId]: {
+          [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
+        },
+      },
+    })
   })
 
   test('normalizes malformed local presentation to safe defaults', async () => {
     localStorage.setItem(
       'goblin.workspace',
       JSON.stringify({
-        restoredRepoId: '',
+        restoredWorkspaceId: '',
         zenMode: 'yes',
         workspacePaneSize: Number.NaN,
-        selectedTerminalSessionIdByTerminalWorktree: { broken: 12 },
-        preferredWorkspacePaneTabByTargetByRepo: { '/repo-a': { target: 'unknown' } },
-        filetreeViewStateByWorktreeByRepo: [],
+        selectedTerminalSessionIdByTerminalFilesystemTarget: { broken: 12 },
+        preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
+        filetreeViewStateByFilesystemTargetByWorkspace: [],
       }),
     )
 
     expect(await readClientWorkspaceState()).toEqual({
-      restoredRepoId: null,
+      restoredWorkspaceId: null,
       zenMode: false,
       workspacePaneSize: 70,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
+  })
+
+  test('drops legacy raw-path and cross-transport persisted identities', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
+          'goblin+file:///repo-a\0/worktree': 'term-legacy',
+          'goblin+file:///repo-a\0goblin+ssh://dev/worktree': 'term-cross-transport',
+        },
+        preferredWorkspacePaneTabByTargetByWorkspace: {
+          'goblin+file:///repo-a': {
+            target: 'history',
+            'goblin+file:///repo-a\0worktree\0/worktree': 'files',
+          },
+        },
+        filetreeViewStateByFilesystemTargetByWorkspace: {
+          'goblin+file:///repo-a': {
+            '/worktree': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
+            'goblin+ssh://dev/worktree': {
+              selectedKeys: ['README.md'],
+              expandedKeys: [],
+              topVisibleRowIndex: 0,
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
+    })
+  })
+
+  test('does not restore the retired worktree-only terminal selection field', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///workspace\0goblin+file:///workspace': 'term-legacy',
+        },
+      }),
+    ).toMatchObject({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
+  })
+
+  test('does not restore the retired worktree-only file tree state field', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        filetreeViewStateByWorktreeByWorkspace: {
+          'goblin+file:///workspace': {
+            'goblin+file:///workspace': {
+              selectedKeys: ['README.md'],
+              expandedKeys: [],
+              topVisibleRowIndex: 0,
+            },
+          },
+        },
+      }),
+    ).toMatchObject({ filetreeViewStateByFilesystemTargetByWorkspace: {} })
   })
 })

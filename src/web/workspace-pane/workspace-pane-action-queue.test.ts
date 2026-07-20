@@ -4,14 +4,22 @@ import {
   finishWorkspacePaneRouteIntent,
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
+  workspacePaneActionTargetKey,
+  workspacePaneActionTargetFromFilesystemTarget,
+  workspacePaneActionTargetFromCoordinates,
   workspacePaneActionQueueStatsForTest,
   workspacePaneRouteIntentPending,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const TARGET = {
-  repoId: '/repo',
-  repoRuntimeId: 'repo-runtime-1',
-  branchName: 'feature/a',
+  kind: 'git-worktree' as const,
+  workspaceId: WORKSPACE_ID,
+  workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktree-a',
 } as const
 
@@ -19,27 +27,67 @@ describe('workspace pane action queue', () => {
   beforeEach(() => resetWorkspacePaneActionQueueForTest())
 
   test('serializes the same complete resource target and cleans up on idle', async () => {
-    const order: string[] = []
+    const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(TARGET, async () => {
-      order.push('first-start')
+      workspaceOrder.push('first-start')
       await release.promise
-      order.push('first-end')
+      workspaceOrder.push('first-end')
     })
-    const second = runWorkspacePaneAction(TARGET, () => order.push('second'))
+    const second = runWorkspacePaneAction(TARGET, () => workspaceOrder.push('second'))
 
     await Promise.resolve()
-    expect(order).toEqual(['first-start'])
+    expect(workspaceOrder).toEqual(['first-start'])
     release.resolve()
     await Promise.all([first, second])
-    expect(order).toEqual(['first-start', 'first-end', 'second'])
+    expect(workspaceOrder).toEqual(['first-start', 'first-end', 'second'])
     await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
   })
 
+  test('serializes workspace-scoped actions without inventing a branch', async () => {
+    const workspaceTarget = {
+      kind: 'workspace-root' as const,
+      workspaceId: OTHER_WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-1',
+    }
+    const workspaceOrder: string[] = []
+    const release = Promise.withResolvers<void>()
+    const first = runWorkspacePaneAction(workspaceTarget, async () => {
+      workspaceOrder.push('first')
+      await release.promise
+    })
+    const second = runWorkspacePaneAction(workspaceTarget, () => workspaceOrder.push('second'))
+
+    await Promise.resolve()
+    expect(workspaceOrder).toEqual(['first'])
+    release.resolve()
+    await Promise.all([first, second])
+    expect(workspaceOrder).toEqual(['first', 'second'])
+  })
+
+  test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
+    expect(
+      workspacePaneActionTargetFromCoordinates({
+        workspaceId: TARGET.workspaceId,
+        workspaceRuntimeId: TARGET.workspaceRuntimeId,
+        branchName: null,
+        worktreePath: TARGET.worktreePath,
+      }),
+    ).toEqual(TARGET)
+  })
+
   test.each([
-    ['runtime', { ...TARGET, repoRuntimeId: 'repo-runtime-2' }],
+    ['runtime', { ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }],
     ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
-    ['branch', { ...TARGET, branchName: 'feature/b' }],
+    [
+      'branch',
+      {
+        kind: 'git-branch' as const,
+        workspaceId: TARGET.workspaceId,
+        workspaceRuntimeId: TARGET.workspaceRuntimeId,
+        branchName: 'feature/b',
+      },
+    ],
   ] as const)('allows a different %s target to progress independently', async (_resource, otherTarget) => {
     const release = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(TARGET, async () => await release.promise)
@@ -53,11 +101,67 @@ describe('workspace pane action queue', () => {
     await first
   })
 
+  test('keys every target kind from only its authoritative identity', () => {
+    expect(
+      workspacePaneActionTargetKey({
+        kind: 'workspace-root',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime',
+      }),
+    ).toBe('goblin+file:///repo\0runtime\0workspace-root')
+    expect(
+      workspacePaneActionTargetKey({
+        kind: 'git-branch',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime',
+        branchName: 'main',
+      }),
+    ).toBe('goblin+file:///repo\0runtime\0git-branch\0main')
+    expect(
+      workspacePaneActionTargetKey({
+        kind: 'git-worktree' as const,
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime',
+        worktreePath: '/repo-worktree',
+      }),
+    ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
+  })
+
+  test('keeps a detached Git worktree in its worktree queue', () => {
+    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
+    const root = canonicalWorkspaceLocator('goblin+file:///repo-detached')
+    if (!workspaceId || !root) throw new Error('invalid mock filesystem target')
+
+    expect(
+      workspacePaneActionTargetFromFilesystemTarget({
+        kind: 'git-worktree',
+        workspaceId,
+        workspaceRuntimeId: 'runtime',
+        root,
+      }),
+    ).toEqual({
+      kind: 'git-worktree',
+      workspaceId: workspaceId,
+      workspaceRuntimeId: 'runtime',
+      worktreePath: '/repo-detached',
+    })
+    expect(
+      workspacePaneActionTargetFromCoordinates({
+        workspaceId: workspaceId,
+        workspaceRuntimeId: 'runtime',
+        branchName: null,
+        worktreePath: '/repo-detached',
+      }),
+    ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })
+  })
+
   test('bounds a pending route intent to its target and explicit lifetime', () => {
     const intentId = beginWorkspacePaneRouteIntent(TARGET, 'static:files')
 
     expect(workspacePaneRouteIntentPending(TARGET, 'static:files')).toBe(true)
-    expect(workspacePaneRouteIntentPending({ ...TARGET, repoRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(false)
+    expect(workspacePaneRouteIntentPending({ ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(
+      false,
+    )
     expect(workspacePaneActionQueueStatsForTest().pendingRouteIntents).toBe(1)
 
     finishWorkspacePaneRouteIntent(intentId)

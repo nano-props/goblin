@@ -2,71 +2,96 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import {
-  acquireRepoRuntimeLease,
-  clearRepoRuntimesForUser,
-  isCurrentRepoRuntime,
-  isCurrentRepoRuntimeMembership,
-  releaseRepoRuntimeMembershipLease,
-} from '#/server/modules/repo-runtimes.ts'
+  acquireWorkspaceRuntimeLease,
+  clearWorkspaceRuntimesForUser,
+  commitWorkspaceProbeState,
+  isCurrentWorkspaceRuntime,
+  isCurrentWorkspaceRuntimeMembership,
+  releaseWorkspaceRuntimeMembershipLease,
+} from '#/server/modules/workspace-runtimes.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
-  probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
-  runRemoteLifecycleWrite: vi.fn(),
+  runRemoteWorkspaceLifecycleWrite: vi.fn(),
 }))
+
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  compareAndReplaceServerWorkspaceRepos: vi.fn(),
-  confirmServerWorkspaceRepoEntry: vi.fn(async (entry) => ({
+  compareAndReplaceServerWorkspaceEntries: vi.fn(),
+  confirmServerWorkspaceEntry: vi.fn(async (entry) => ({
     matched: true,
-    workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
+    workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
   })),
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  probeRepo: mocks.probeRepo,
   readRepoProjection: mocks.readRepoProjection,
 }))
 
-vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
-  runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
+vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+  runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 
 const USER_ID = 'user_restore_runtime'
 const CLIENT_ID = 'client_restore_runtime'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///repo')
 
 describe('session restore runtime ownership', () => {
   beforeEach(() => {
-    clearRepoRuntimesForUser(USER_ID)
+    clearWorkspaceRuntimesForUser(USER_ID)
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
+      openWorkspaceEntries: [{ id: REPO_ROOT }],
     })
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: REPO_ROOT, name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
   })
 
-  test('preserves the existing stub membership when lazy projection fails', async () => {
-    const lease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, lease.repoRuntimeId, CLIENT_ID)).toBe(true)
+  test('preserves membership and restores workspace-root layout while the Git projection is deferred', async () => {
+    const lease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
+    commitWorkspaceProbeState({
+      userId: USER_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      probe: {
+        status: 'ready',
+        name: 'workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
+    expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, lease.workspaceRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    await expect(
-      restoreRepoTabsForRepo({
-        userId: USER_ID,
-        clientId: CLIENT_ID,
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: lease.repoRuntimeId,
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      userId: USER_ID,
+      clientId: CLIENT_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      workspacePaneTabsHost,
+    })
 
-    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, lease.repoRuntimeId)).toBe(true)
-    expect(releaseRepoRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
+    expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, gitProjection: null })
+    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      expectedWorkspaceEntry: { id: REPO_ROOT },
+      targets: [{ kind: 'workspace-root' }],
+    })
+    expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)
+    expect(releaseWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
       released: true,
       runtimeClosed: true,
     })

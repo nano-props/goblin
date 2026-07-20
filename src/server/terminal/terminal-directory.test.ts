@@ -2,12 +2,17 @@
 
 import { describe, expect, test } from 'vitest'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+
+const WORKTREE_A = requiredWorkspaceId('goblin+file:///workspace-a')
+const WORKTREE_B = requiredWorkspaceId('goblin+file:///workspace-b')
 
 interface Entry {
   id: string
   userId: string
   scope: string
   terminalSessionId: string
+  executionRootId: WorkspaceId
   mutableTitle: string | null
 }
 
@@ -25,7 +30,7 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_b')).toBe(0)
   })
 
-  test('orders only membership changes and ignores mutable entry metadata', () => {
+  test('orders explicit projection changes and ignores uncommitted mutable metadata', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
     expect(commit(directory, member)).toBe(true)
@@ -33,9 +38,11 @@ describe('TerminalDirectory', () => {
     member.mutableTitle = 'new title'
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
 
+    expect(directory.touch(member)).toBe(2)
+
     expect(directory.remove(member)).toBe(true)
     expect(directory.remove(member)).toBe(false)
-    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(2)
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(3)
   })
 
   test('releases a scope clock only after membership is empty', () => {
@@ -91,10 +98,74 @@ describe('TerminalDirectory', () => {
     admission?.abort()
     expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
   })
+
+  test('indexes only committed sessions and promotes the next committed session after removal', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const first = entry('pty_first', 'term_first', 'scope_a')
+    const second = entry('pty_second', 'term_second', 'scope_a')
+    const prepared = entry('pty_prepared', 'term_prepared', 'scope_a')
+    const reservation = directory.reserve(prepared)
+
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBeUndefined()
+    expect(commit(directory, first)).toBe(true)
+    expect(commit(directory, second)).toBe(true)
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(first)
+
+    directory.change(first, () => {
+      first.mutableTitle = 'changed'
+    })
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(first)
+    expect(directory.remove(first)).toBe(true)
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(second)
+    expect(directory.remove(second)).toBe(true)
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBeUndefined()
+
+    reservation?.commit(prepared)
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(prepared)
+  })
+
+  test('isolates the primary index by owner, scope, and canonical worktree identity', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const expected = entry('pty_expected', 'term_expected', 'scope_a', WORKTREE_A)
+    expect(commit(directory, expected)).toBe(true)
+    expect(commit(directory, entry('pty_other_scope', 'term_other_scope', 'scope_b', WORKTREE_A))).toBe(true)
+    expect(commit(directory, entry('pty_other_worktree', 'term_other_worktree', 'scope_a', WORKTREE_B))).toBe(true)
+    expect(commit(directory, entry('pty_other_user', 'term_other_user', 'scope_a', WORKTREE_A, 'user_b'))).toBe(true)
+
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(expected)
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_b', WORKTREE_A)?.id).toBe('pty_other_scope')
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_B)?.id).toBe('pty_other_worktree')
+    expect(directory.primaryForFilesystemTarget('user_b', 'scope_a', WORKTREE_A)?.id).toBe('pty_other_user')
+  })
+
+  test('rejects only a mismatched worktree identity without consuming the reservation', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const reserved = entry('pty_reserved', 'term_reserved', 'scope_a', WORKTREE_A)
+    const admission = directory.reserve(reserved)
+
+    expect(() => admission?.commit(entry('pty_reserved', 'term_reserved', 'scope_a', WORKTREE_B))).toThrow(
+      'terminal directory reservation identity mismatch',
+    )
+    expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBeUndefined()
+    admission?.abort()
+    expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a', WORKTREE_A))).not.toBeNull()
+  })
 })
 
-function entry(id: string, terminalSessionId: string, scope: string): Entry {
-  return { id, userId: 'user_a', scope, terminalSessionId, mutableTitle: null }
+function entry(
+  id: string,
+  terminalSessionId: string,
+  scope: string,
+  executionRootId = WORKTREE_A,
+  userId = 'user_a',
+): Entry {
+  return { id, userId, scope, terminalSessionId, executionRootId, mutableTitle: null }
+}
+
+function requiredWorkspaceId(input: string): WorkspaceId {
+  const workspaceId = canonicalWorkspaceLocator(input)
+  if (!workspaceId) throw new Error('invalid workspace id fixture')
+  return workspaceId
 }
 
 function commit(directory: TerminalDirectory<string, Entry>, value: Entry): boolean {

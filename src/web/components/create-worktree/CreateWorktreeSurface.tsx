@@ -21,9 +21,9 @@ import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.t
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import type { RepoOperationState } from '#/web/stores/repos/operations.ts'
+import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -42,11 +42,11 @@ const MODE_OPTIONS = [
 ] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
 interface CreateWorktreeRepo {
-  id: RepoState['id']
-  repoRuntimeId: RepoState['repoRuntimeId']
+  id: WorkspaceState['id']
+  workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
   branchModel: RepoBranchReadModelData
   branchAction: RepoOperationState
-  remote: Pick<RepoState['remote'], 'lifecycle'>
+  remoteLifecycle: Extract<WorkspaceAdmissionState, { kind: 'remote' }>['lifecycle']
 }
 
 export interface WorktreeBootstrapPromptState {
@@ -94,13 +94,13 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const [worktreePath, setWorktreePath] = useState('')
   const [formPhase, setFormPhase] = useState<CreateWorktreeFormPhase>('editing')
   const creating = formPhase === 'creating'
-  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.repoRuntimeId, {
+  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.workspaceRuntimeId, {
     enabled: mode === 'trackRemoteBranch' && !creating,
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
-  const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
+  const remoteTarget = remoteWorkspaceTarget(repo.id, repo.remoteLifecycle)
   const derived = deriveCreateWorktreeForm(
     { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
     repo,
@@ -320,7 +320,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
               suggestions={remotePathSuggestions.suggestions}
               isLoading={remotePathSuggestions.isLoading}
               hasFetched={remotePathSuggestions.hasFetched}
-              emptyLabel={t('repo-picker.open-remote-path-no-matches')}
+              emptyLabel={t('workspace-picker.open-remote-path-no-matches')}
               placeholder={derived.displayDefaultPath}
               aria-describedby="cwt-path-hint"
             />

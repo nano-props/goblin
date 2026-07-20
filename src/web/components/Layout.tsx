@@ -3,28 +3,31 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
-import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
+import type { WorkspaceLayoutMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
-import { REPO_SIDEBAR_MIN_WIDTH, REPO_WORKSPACE_MIN_WIDTH } from '#/web/components/repo-layout/sidebar-sizing.ts'
+import {
+  WORKSPACE_SIDEBAR_MIN_WIDTH,
+  WORKSPACE_PANE_MIN_WIDTH,
+} from '#/web/components/workspace-layout/sidebar-sizing.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 
 interface ShellProps {
   children: ReactNode
 }
 
-interface RepoWorkspaceProps {
+interface WorkspaceSplitLayoutProps {
   sidebarPane: ReactNode
-  repoWorkspacePane: ReactNode
-  mode?: RepoWorkspaceMode
+  workspacePane: ReactNode
+  mode?: WorkspaceLayoutMode
   sidebarCollapsed?: boolean
   workspacePaneSize?: number
   onWorkspacePaneSizeChange?: (size: number) => void
 }
 
-interface CompactRepoWorkspaceProps {
+interface CompactWorkspaceLayoutProps {
   activePane: 'navigator' | 'workspace'
   sidebarPane: ReactNode
-  repoWorkspacePane: ReactNode
+  workspacePane: ReactNode
   transitionScopeKey?: unknown
 }
 
@@ -39,43 +42,43 @@ interface EmptyStateProps {
   tone?: 'neutral' | 'success'
 }
 
-export function RepoWorkspace({
+export function WorkspaceSplitLayout({
   sidebarPane,
-  repoWorkspacePane,
+  workspacePane,
   mode = 'split',
   sidebarCollapsed = false,
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZE,
   onWorkspacePaneSizeChange,
-}: RepoWorkspaceProps) {
-  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{repoWorkspacePane}</div>
+}: WorkspaceSplitLayoutProps) {
+  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
 
   return (
     <SplitPane
       before={sidebarPane}
-      after={repoWorkspacePane}
+      after={workspacePane}
       afterSize={workspacePaneSize}
       onAfterSizeChange={onWorkspacePaneSizeChange}
       beforeCollapsed={sidebarCollapsed}
       animateBeforeCollapse
-      beforeMinSize={REPO_SIDEBAR_MIN_WIDTH}
-      beforeContentMinSize={REPO_SIDEBAR_MIN_WIDTH}
-      afterMinSize={REPO_WORKSPACE_MIN_WIDTH}
+      beforeMinSize={WORKSPACE_SIDEBAR_MIN_WIDTH}
+      beforeContentMinSize={WORKSPACE_SIDEBAR_MIN_WIDTH}
+      afterMinSize={WORKSPACE_PANE_MIN_WIDTH}
       afterMaxSize={sidebarCollapsed ? undefined : '90%'}
       className="flex-1"
     />
   )
 }
 
-export function RepoWorkspacePane({ children }: PaneProps) {
+export function WorkspaceLayoutPane({ children }: PaneProps) {
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
 }
 
-export function CompactRepoWorkspace({
+export function CompactWorkspaceLayout({
   activePane,
   sidebarPane,
-  repoWorkspacePane,
+  workspacePane,
   transitionScopeKey,
-}: CompactRepoWorkspaceProps) {
+}: CompactWorkspaceLayoutProps) {
   const workspaceActive = activePane === 'workspace'
   const retainedSidebarPane = useRetainedValueDuringExit({
     value: { content: sidebarPane },
@@ -84,7 +87,7 @@ export function CompactRepoWorkspace({
     resetKey: transitionScopeKey,
   })
   const retainedWorkspacePane = useRetainedValueDuringExit({
-    value: { content: repoWorkspacePane },
+    value: { content: workspacePane },
     active: workspaceActive,
     retainMs: WORKSPACE_PANE_TRANSITION_MS,
     resetKey: transitionScopeKey,
@@ -111,7 +114,7 @@ export function CompactRepoWorkspace({
         inert={!workspaceActive || undefined}
         className="goblin-compact-workspace__pane goblin-compact-workspace__pane--workspace absolute inset-0 flex min-h-0 min-w-0 bg-background"
       >
-        {workspaceActive ? repoWorkspacePane : (retainedWorkspacePane?.content ?? repoWorkspacePane)}
+        {workspaceActive ? workspacePane : (retainedWorkspacePane?.content ?? workspacePane)}
       </div>
     </div>
   )

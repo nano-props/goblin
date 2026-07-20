@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -17,7 +18,8 @@ import {
   buildRemoteCommandInvocation,
   buildRemoteTerminalInvocation,
 } from '#/system/ssh/commands.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
@@ -32,6 +34,49 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  testPosix('reads a directory overview with spaces and hidden entries', async () => {
+    const root = path.join(os.tmpdir(), `goblin-directory-overview-${process.pid}-${Date.now()}`)
+    tempDirs.push(root)
+    mkdirSync(path.join(root, 'nested folder'), { recursive: true })
+    writeFileSync(path.join(root, 'visible file'), 'abc')
+    writeFileSync(path.join(root, '.hidden'), '12345')
+    writeFileSync(path.join(root, 'nested folder', 'child'), '1234567')
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'directoryOverview',
+      path: root,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script])
+
+    expect(result.stdout.trim().split('\n').at(-1)).toBe('2\t1\t15')
+  })
+
+  testPosix('keeps directory facts when recursive size collection fails', async () => {
+    const root = path.join(os.tmpdir(), `goblin-directory-overview-partial-${process.pid}-${Date.now()}`)
+    const bin = path.join(root, 'bin')
+    tempDirs.push(root)
+    mkdirSync(path.join(root, 'blocked'), { recursive: true })
+    mkdirSync(bin)
+    writeFileSync(path.join(root, 'visible'), 'abc')
+    writeFileSync(path.join(root, 'blocked', 'nested'), 'not measurable')
+    const statShim = path.join(bin, 'stat')
+    writeFileSync(
+      statShim,
+      '#!/bin/sh\ncase "$*" in *blocked*) exit 1;; esac\nPATH=/usr/bin:/bin\nexport PATH\nexec stat "$@"\n',
+    )
+    chmodSync(statShim, 0o755)
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'directoryOverview',
+      path: root,
+    })
+
+    const result = await execa('sh', ['-c', invocation.script], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` },
+    })
+
+    expect(result.stdout.trim().split('\n').at(-1)).toBe('1\t2\t-')
+  })
+
   test('uses an ssh executable discovered on PATH', () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)
@@ -76,11 +121,11 @@ describe('remote ssh command builders', () => {
   })
 
   test('binds ControlPath to the complete captured SSH connection snapshot', () => {
-    const withConnection = (effectiveConfig: string): RemoteRepoTarget => {
+    const withConnection = (effectiveConfig: string): RemoteWorkspaceTarget => {
       const remote = target()
       return { ...remote, sshConnection: buildCanonicalSshConnectionSnapshot(remote, effectiveConfig) }
     }
-    const controlPath = (remote: RemoteRepoTarget): string | undefined =>
+    const controlPath = (remote: RemoteWorkspaceTarget): string | undefined =>
       buildRemoteCommandInvocation(remote, { type: 'printHome' }).args.find((arg) => arg.startsWith('ControlPath='))
     const base = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-a %n %h'].join('\n')
     const changedProxy = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-b %n %h'].join('\n')
@@ -104,7 +149,9 @@ describe('remote ssh command builders', () => {
     const terminal = buildRemoteTerminalInvocation(captured, '/srv/repo', { cols: 80, rows: 24 })
 
     for (const invocation of [command, terminal]) {
-      expect(invocation.args).toEqual(expect.arrayContaining(['-F', expect.any(String), '-o', 'hostname=edge.example.test']))
+      expect(invocation.args).toEqual(
+        expect.arrayContaining(['-F', expect.any(String), '-o', 'hostname=edge.example.test']),
+      )
       expect(invocation.args).toContain('proxycommand=route --alias %n --host %h')
       expect(invocation.args.at(-2)).toBe('prod')
     }
@@ -124,14 +171,26 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toContain('exec "${SHELL:-/bin/sh}" -l')
   })
 
-  test('remote tree walk uses directory listing for direct children', () => {
+  test('remote filesystem walk lists direct children without Git filtering', () => {
     const invocation = buildRemoteCommandInvocation(target(), {
-      type: 'gitTreeWalk',
+      type: 'directoryChildren',
       path: '/srv/repo worktree',
       prefix: 'src/app',
     })
 
     expect(invocation.script).toContain('find "$dir" -mindepth 1 -maxdepth 1')
+    expect(invocation.script).not.toContain('check-ignore')
+    expect(invocation.script).not.toContain('ls-files -- "$rel"')
+    expect(invocation.script).toContain('error.workspace-path-not-found')
+  })
+
+  test('remote Git worktree walk decorates direct children with ignore state', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'gitDirectoryChildren',
+      path: '/srv/repo worktree',
+      prefix: 'src/app',
+    })
+
     expect(invocation.script).toContain('check-ignore')
     expect(invocation.script).toContain('ls-files -- "$rel"')
     expect(invocation.script).not.toContain('ls-files -co --exclude-standard -z')
@@ -446,15 +505,42 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     })
 
     const result = await execa('sh', ['-lc', invocation.script])
-    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } = await import(
-      '#/system/git/parsers.ts'
-    )
+    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+      await import('#/system/git/parsers.ts')
     const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
 
     expect(parseWorktrees(worktreeListOutput)).toEqual([
       expect.objectContaining({ path: realpathSync(repoDir), isBare: true }),
     ])
     expect(parseWorktreeStatusBatch(statusStream).size).toBe(0)
+  })
+
+  testPosix('skips prunable worktrees before running remote status jobs', async () => {
+    const repoDir = await initRepoWithWorktrees([
+      { branch: 'main', files: [['README.md', 'root\n']] },
+      { branch: 'stale', files: [] },
+    ])
+    const stalePath = path.join(repoDir, '.worktrees', 'stale')
+    renameSync(stalePath, path.join(repoDir, 'removed-stale-worktree'))
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script])
+    const { parseUsableWorktrees, parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+      await import('#/system/git/parsers.ts')
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
+
+    expect(worktreeListOutput).toContain('prunable ')
+    expect(parseWorktrees(worktreeListOutput)).toEqual([
+      expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
+      expect.objectContaining({ isPrunable: true }),
+    ])
+    expect(parseUsableWorktrees(worktreeListOutput)).toEqual([
+      expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
+    ])
+    expect([...parseWorktreeStatusBatch(statusStream).keys()]).toEqual([realpathSync(repoDir)])
   })
 
   testPosix('runs per-worktree status work in parallel via POSIX background jobs (F5 regression check)', async () => {
@@ -610,9 +696,9 @@ async function initRepoWithWorktrees(
   return dir
 }
 
-function targetWithPath(repoPath: string): RemoteRepoTarget {
+function targetWithPath(repoPath: string): RemoteWorkspaceTarget {
   return {
-    id: `ssh-config://prod${repoPath}`,
+    id: workspaceIdForTest(`goblin+ssh://prod${repoPath}`),
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',
@@ -622,9 +708,9 @@ function targetWithPath(repoPath: string): RemoteRepoTarget {
   }
 }
 
-function target(): RemoteRepoTarget {
+function target(): RemoteWorkspaceTarget {
   return {
-    id: 'ssh-config://prod/srv/repo',
+    id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',

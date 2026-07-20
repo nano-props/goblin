@@ -10,7 +10,7 @@ import {
   parseLog,
   parseStatus,
   parseWorktreeStatusBatch,
-  parseWorktrees,
+  parseUsableWorktrees,
   splitWorktreeStatusBatch,
 } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
@@ -26,6 +26,7 @@ import {
   REMOTE_SNAPSHOT_BRANCHES_MARKER,
   REMOTE_SNAPSHOT_CURRENT_MARKER,
   REMOTE_SNAPSHOT_DEFAULT_MARKER,
+  REMOTE_PANE_WORKTREES_MARKER,
   runRemoteCommand,
   type RemoteCommandKind,
   type RemoteCommandResult,
@@ -41,8 +42,10 @@ import {
   type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
+import { gitHead, type GitHead } from '#/shared/git-head.ts'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { getRemoteGitDirectoryWalk } from '#/system/ssh/filesystem.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   normalizeCreateWorktreeInput,
@@ -60,7 +63,7 @@ import {
 
 export type RemoteGitRunner = (
   command: RemoteCommandKind,
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
@@ -80,6 +83,9 @@ export interface RemoteWorktreeMutationResult extends ExecResult {
   affectedWorktreePaths?: readonly string[]
 }
 
+export type RemoteWorkspacePaneTargetIdentity =
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+
 interface SnapshotSections {
   current: string[]
   defaultBranch: string[]
@@ -87,7 +93,7 @@ interface SnapshotSections {
 }
 
 export async function getRemoteSnapshot(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<RemoteRepoSnapshot | null> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -102,8 +108,44 @@ export async function getRemoteSnapshot(
   return { ...snapshot, remote }
 }
 
+/** Narrow identity read for workspace-pane membership. It intentionally skips
+ * worktree status and remote display data: neither participates in target
+ * identity or terminal admission. */
+export async function getRemoteWorkspacePaneTargetIdentities(
+  target: RemoteWorkspaceTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<RemoteWorkspacePaneTargetIdentity[]> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'gitWorkspacePaneIdentities', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
+  const separator = `\n${REMOTE_PANE_WORKTREES_MARKER}\n`
+  const index = result.stdout.lastIndexOf(separator)
+  if (index < 0) throw new Error('error.failed-read-repo')
+  const branches = result.stdout
+    .slice(0, index)
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
+  const worktrees = parseUsableWorktrees(result.stdout.slice(index + separator.length))
+  const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  return [
+    ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
+      kind: 'git-worktree',
+      worktreePath: worktree.path,
+      head: gitHead(worktree.branch ?? null),
+    })),
+    ...branches
+      .filter((branch) => !checkedOutBranches.has(branch))
+      .map((branch): RemoteWorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
+  ]
+}
+
+/** Read only the selected worktree's HEAD identity in one SSH round trip. */
 export async function getRemoteStatus(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<WorktreeStatus[]> {
   // Thin wrapper over the batched path. The single SSH call behind
@@ -133,7 +175,7 @@ export async function getRemoteStatus(
  * read so callers cannot accept a partial collection as authoritative clean.
  */
 export async function getRemoteStatusAndWorktrees(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<{ statuses: WorktreeStatus[]; worktrees: WorktreeInfo[] }> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -144,7 +186,7 @@ export async function getRemoteStatusAndWorktrees(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
 
   const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
-  const worktrees = parseWorktrees(worktreeListOutput)
+  const worktrees = parseUsableWorktrees(worktreeListOutput)
   options.signal?.throwIfAborted()
   const statusByPath = parseWorktreeStatusBatch(statusStream)
 
@@ -164,7 +206,7 @@ export async function getRemoteStatusAndWorktrees(
 }
 
 export async function getRemoteLog(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   count?: number,
   skip?: number,
@@ -181,7 +223,7 @@ export async function getRemoteLog(
 }
 
 export async function getRemoteTreeWalk(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: {
     signal?: AbortSignal
@@ -202,16 +244,11 @@ export async function getRemoteTreeWalk(
     knownWorktrees: options.knownWorktrees,
   })
   if ('ok' in known) return known
-  const result = await run({ type: 'gitTreeWalk', path: known.path, prefix: options.prefix }, target, {
-    signal: options.signal,
-  })
-  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (!result.ok) return remoteExecResult(result)
-  return { ok: true, message: result.stdout }
+  return await getRemoteGitDirectoryWalk(target, known.path, options)
 }
 
 export async function trashRemoteFile(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   filePath: string,
   options: {
@@ -234,7 +271,7 @@ export async function trashRemoteFile(
 }
 
 export async function remoteCommandExists(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   commandName: string,
   options: {
@@ -260,12 +297,27 @@ export async function remoteCommandExists(
   return !options.signal?.aborted && result.ok
 }
 
+/** Probe a command at a path already authorized by the workspace locator boundary. */
+export async function remoteCommandExistsAtWorkspaceRoot(
+  target: RemoteWorkspaceTarget,
+  workspacePath: string,
+  commandName: string,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<boolean> {
+  if (!REMOTE_COMMAND_NAME_RE.test(commandName) || !workspacePath.startsWith('/')) return false
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'commandExists', path: workspacePath, commandName }, target, {
+    signal: options.signal,
+  })
+  return !options.signal?.aborted && result.ok
+}
+
 /** Resolve a remote worktree path against the remote repo's worktree
  *  list. This membership authority distinguishes remote list failures
  *  from a successful list that lacks the target path, which throws
  *  `error.worktree-not-found`. */
 export async function resolveRemoteWorktree(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: {
     signal?: AbortSignal
@@ -284,7 +336,7 @@ export async function resolveRemoteWorktree(
 }
 
 export async function getRemotePatch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: {
     signal?: AbortSignal
@@ -338,7 +390,7 @@ export async function getRemotePatch(
 }
 
 export async function fetchRemoteRepo(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -362,11 +414,11 @@ export async function fetchRemoteRepo(
 }
 
 export async function pullRemoteBranch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   worktreePath?: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<ExecResult> {
+): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (worktreePath && !isValidRemotePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -375,7 +427,8 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    return remoteExecResult(result)
+    const pulled = remoteExecResult(result)
+    return pulled.ok || pulled.repositoryStateChanged ? { ...pulled, affectedWorktreePaths: [worktreePath] } : pulled
   }
 
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run })
@@ -385,7 +438,10 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    return remoteExecResult(result)
+    const pulled = remoteExecResult(result)
+    return pulled.ok || pulled.repositoryStateChanged
+      ? { ...pulled, affectedWorktreePaths: [target.remotePath] }
+      : pulled
   }
 
   const upstream = await getRemoteUpstream(target, branch, { signal: options.signal, run })
@@ -413,7 +469,7 @@ export async function pullRemoteBranch(
 }
 
 export async function pushRemoteBranch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<ExecResult> {
@@ -438,7 +494,7 @@ export async function pushRemoteBranch(
 }
 
 export async function createRemoteWorktree(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   input: CreateWorktreeInput & { signal?: AbortSignal; run?: RemoteGitRunner },
 ): Promise<RemoteWorktreeMutationResult> {
   const normalized = normalizeCreateWorktreeInput(input)
@@ -467,7 +523,7 @@ interface RemoteBootstrapConfigLoad {
 }
 
 async function loadRemoteBootstrapConfig(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<{ ok: true; value: RemoteBootstrapConfigLoad } | { ok: false; message: string }> {
   const rootResult = await options.run({ type: 'revParseTopLevel', path: target.remotePath }, target, {
@@ -498,7 +554,7 @@ async function loadRemoteBootstrapConfig(
 }
 
 export async function getRemoteWorktreeBootstrapPreview(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<WorktreeBootstrapPreviewResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -508,7 +564,7 @@ export async function getRemoteWorktreeBootstrapPreview(
 }
 
 export async function bootstrapRemoteWorktreeAfterCreate(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner; expectedConfigHash?: string } = {},
 ): Promise<ExecResult> {
@@ -587,7 +643,7 @@ function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootstrapSumm
 }
 
 export async function getRemoteTrackingBranches(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -596,18 +652,18 @@ export async function getRemoteTrackingBranches(
 }
 
 async function readRemoteWorktreeList(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<WorktreeInfo[]> {
   const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
     signal: options.signal,
   })
   if (options.signal?.aborted || !result.ok) return []
-  return parseWorktrees(result.stdout)
+  return parseUsableWorktrees(result.stdout)
 }
 
 export async function getRemoteRepoWorktreePaths(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -616,7 +672,7 @@ export async function getRemoteRepoWorktreePaths(
 }
 
 export async function getRemoteRepoWriteGroupPath(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -625,7 +681,7 @@ export async function getRemoteRepoWriteGroupPath(
 }
 
 export async function removeRemoteWorktree(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   input: {
     branch: string
     worktreePath: string
@@ -646,7 +702,7 @@ export async function removeRemoteWorktree(
   const listResult = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: input.signal })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!listResult.ok) return remoteExecResult(listResult)
-  const worktrees = parseWorktrees(listResult.stdout)
+  const worktrees = parseUsableWorktrees(listResult.stdout)
   const affectedWorktreePaths = worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 
   const mainWorktreePath = worktrees.find((worktree) => worktree.isPrimary)?.path ?? worktrees[0]?.path ?? ''
@@ -746,7 +802,7 @@ function withAffectedWorktreePaths(
 }
 
 export async function deleteRemoteBranch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   input: { branch: string; force?: boolean; deleteUpstream?: boolean; signal?: AbortSignal; run?: RemoteGitRunner },
 ): Promise<ExecResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -791,7 +847,7 @@ export async function deleteRemoteBranch(
 }
 
 export async function getRemoteBrowserUrl(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   urlTarget: RepoUrlTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
@@ -823,14 +879,22 @@ export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = 
 }
 
 async function getRemoteWorktrees(
-  target: RemoteRepoTarget,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
+  target: RemoteWorkspaceTarget,
+  options: { signal?: AbortSignal; run: RemoteGitRunner; includeStatus?: boolean; requireSuccess?: boolean },
 ): Promise<WorktreeInfo[]> {
   const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
     signal: options.signal,
   })
-  if (!result.ok || options.signal?.aborted) return []
-  const worktrees = parseWorktrees(result.stdout)
+  if (options.signal?.aborted) {
+    if (options.requireSuccess) options.signal.throwIfAborted()
+    return []
+  }
+  if (!result.ok) {
+    if (options.requireSuccess) throw new Error(result.message || 'error.failed-read-repo')
+    return []
+  }
+  const worktrees = parseUsableWorktrees(result.stdout)
+  if (options.includeStatus === false) return worktrees
   await mapWithConcurrency(
     worktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
@@ -878,7 +942,7 @@ function firstLine(lines: string[]): string {
 }
 
 async function resolveKnownRemoteWorktree(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: {
     signal?: AbortSignal
@@ -897,7 +961,7 @@ async function resolveKnownRemoteWorktree(
     })
     if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
     if (!result.ok) return remoteExecResult(result)
-    worktrees = parseWorktrees(result.stdout)
+    worktrees = parseUsableWorktrees(result.stdout)
   }
   const resolvedPath = path.posix.resolve(worktreePath)
   const worktree = worktrees.find((item) => path.posix.resolve(item.path) === resolvedPath && !item.isBare)
@@ -926,7 +990,7 @@ function resolveRemoteRemovableWorktree(
 }
 
 async function getRemoteUpstream(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner; path?: string },
 ): Promise<string | null> {
@@ -938,7 +1002,7 @@ async function getRemoteUpstream(
 }
 
 async function getRemoteRemotes(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<GitRemoteInfo[]> {
   const result = await options.run({ type: 'gitRemoteVerbose', path: target.remotePath }, target, {
@@ -949,7 +1013,7 @@ async function getRemoteRemotes(
 }
 
 async function getRemoteCurrentBranch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner; path?: string },
 ): Promise<string> {
   const result = await options.run({ type: 'gitSnapshot', path: options.path ?? target.remotePath }, target, {
@@ -961,7 +1025,7 @@ async function getRemoteCurrentBranch(
 }
 
 async function getRemoteUpstreamParts(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner; path?: string },
 ): Promise<UpstreamParts | null> {
@@ -970,7 +1034,7 @@ async function getRemoteUpstreamParts(
 }
 
 async function deleteRemoteUpstreamBranch(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   gitPath: string,
   upstream: UpstreamParts | null,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
@@ -989,14 +1053,14 @@ async function deleteRemoteUpstreamBranch(
 }
 
 async function getRemoteRepoInfo(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<RepoRemoteInfo> {
   return repoRemoteInfoForRemotes(await getRemoteRemotes(target, options))
 }
 
 async function getRemoteBranchMergeFacts(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner; currentBranch?: string; path?: string },
 ): Promise<{ mergedToCurrent: boolean; mergedToUpstream: boolean }> {
@@ -1024,7 +1088,7 @@ async function getRemoteBranchMergeFacts(
 }
 
 async function resolveRemotePushTarget(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   branch: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<{ remote: string; branch: string; setUpstream: boolean } | ExecResult> {

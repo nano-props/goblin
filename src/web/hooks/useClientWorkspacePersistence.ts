@@ -4,16 +4,17 @@ import { writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { clientWorkspaceStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
-import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
+import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import {
   restorableWorkspaceStateFromStore,
   workspaceSessionPersistenceOpenFromStore,
-} from '#/web/stores/repos/selector-state.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+} from '#/web/stores/workspaces/selector-state.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   subscribeWorkspacePaneTabsPersistenceChanges,
   workspacePaneTabsPersistenceSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS = 200
 
@@ -21,35 +22,35 @@ interface ClientWorkspacePersistenceInput {
   workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
   sessionRestoreError: string | null
-  restoredClientWorkspaceBaseline: ReturnType<typeof useReposStore.getState>['restoredClientWorkspaceBaseline']
-  repos: ReturnType<typeof useReposStore.getState>['repos']
-  order: string[]
-  restoredRepoId: string | null
+  restoredClientWorkspaceBaseline: ReturnType<typeof useWorkspacesStore.getState>['restoredClientWorkspaceBaseline']
+  workspaces: ReturnType<typeof useWorkspacesStore.getState>['workspaces']
+  workspaceOrder: WorkspaceId[]
+  restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
   filetreeInteractionByScope: Parameters<
     typeof clientWorkspaceStateFromRestorableWorkspaceState
   >[0]['filetreeInteractionByScope']
 }
 
-export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: string | null }) {
-  const restoredRepoId = useReposStore((s) => s.restoredRepoId)
-  const order = useReposStore((s) => s.order)
-  const zenMode = useReposStore((s) => s.zenMode)
-  const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
-    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWorkspaceId: WorkspaceId | null }) {
+  const restoredWorkspaceId = useWorkspacesStore((s) => s.restoredWorkspaceId)
+  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
+  const zenMode = useWorkspacesStore((s) => s.zenMode)
+  const workspacePaneSize = useWorkspacesStore((s) => s.workspacePaneSize)
+  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
+    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
-  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
-  const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
-  const sessionRestoreError = useReposStore((s) => s.sessionRestoreError)
-  const restoredClientWorkspaceBaseline = useReposStore((s) => s.restoredClientWorkspaceBaseline)
-  const repos = useReposStore((s) => s.repos)
+  const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
+  const sessionPersistenceReady = useWorkspacesStore((s) => s.sessionPersistenceReady)
+  const sessionRestoreError = useWorkspacesStore((s) => s.sessionRestoreError)
+  const restoredClientWorkspaceBaseline = useWorkspacesStore((s) => s.restoredClientWorkspaceBaseline)
+  const workspaces = useWorkspacesStore((s) => s.workspaces)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastImmediateKeyRef = useRef<string | null>(null)
-  const lastRoutedRepoIdRef = useRef<string | null>(null)
+  const lastRoutedWorkspaceIdRef = useRef<WorkspaceId | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
 
   const latestClientWorkspace = useEffectEvent(() =>
@@ -59,15 +60,15 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
         sessionPersistenceReady,
         sessionRestoreError,
         restoredClientWorkspaceBaseline,
-        repos,
-        order,
-        restoredRepoId,
+        workspaces,
+        workspaceOrder,
+        restoredWorkspaceId,
         zenMode,
         workspacePaneSize,
-        selectedTerminalSessionIdByTerminalWorktree,
+        selectedTerminalSessionIdByTerminalFilesystemTarget,
         filetreeInteractionByScope,
       },
-      routedRepoId ?? lastRoutedRepoIdRef.current,
+      routedWorkspaceId ?? lastRoutedWorkspaceIdRef.current,
     ),
   )
 
@@ -86,8 +87,8 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
   })
 
   useLayoutEffect(() => {
-    if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
-  }, [routedRepoId])
+    if (routedWorkspaceId) lastRoutedWorkspaceIdRef.current = routedWorkspaceId
+  }, [routedWorkspaceId])
 
   useEffect(() => subscribeAppQuitting(flushLatestClientWorkspace), [])
 
@@ -101,7 +102,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     }
     if (!workspace) return
     const immediateKey = JSON.stringify({
-      restoredRepoId: workspace.restoredRepoId,
+      restoredWorkspaceId: workspace.restoredWorkspaceId,
       zenMode: workspace.zenMode,
       workspacePaneSize: workspace.workspacePaneSize,
     })
@@ -123,14 +124,14 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     workspaceMembershipReady,
     sessionPersistenceReady,
     sessionRestoreError,
-    order,
-    restoredRepoId,
+    workspaceOrder,
+    restoredWorkspaceId,
     restoredClientWorkspaceBaseline,
-    routedRepoId,
+    routedWorkspaceId,
     workspacePaneSize,
     zenMode,
-    selectedTerminalSessionIdByTerminalWorktree,
-    repos,
+    selectedTerminalSessionIdByTerminalFilesystemTarget,
+    workspaces,
     workspacePaneTabsVersion,
     filetreeInteractionByScope,
   ])
@@ -152,17 +153,17 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
 
 function clientWorkspaceFromPersistenceInput(
   input: ClientWorkspacePersistenceInput,
-  lastRoutedRepoId: string | null,
+  lastRoutedWorkspaceId: WorkspaceId | null,
 ): ClientWorkspaceState | null {
   if (!workspaceSessionPersistenceOpenFromStore(input)) return null
   return clientWorkspaceStateFromRestorableWorkspaceState({
-    repos: input.repos,
+    workspaces: input.workspaces,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({
-      order: input.order,
-      restoredRepoId: lastRoutedRepoId ?? input.restoredRepoId,
+      workspaceOrder: input.workspaceOrder,
+      restoredWorkspaceId: lastRoutedWorkspaceId ?? input.restoredWorkspaceId,
       zenMode: input.zenMode,
       workspacePaneSize: input.workspacePaneSize,
-      selectedTerminalSessionIdByTerminalWorktree: input.selectedTerminalSessionIdByTerminalWorktree,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: input.selectedTerminalSessionIdByTerminalFilesystemTarget,
     }),
     filetreeInteractionByScope: input.filetreeInteractionByScope,
     restoredClientWorkspaceBaseline: input.restoredClientWorkspaceBaseline,

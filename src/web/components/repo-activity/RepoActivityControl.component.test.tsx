@@ -1,22 +1,36 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = '/tmp/repo-activity-control-component'
+const refreshMocks = vi.hoisted(() => ({
+  run: vi.fn<() => Promise<{ ok: true } | { ok: false; message: string }>>(async () => ({ ok: true })),
+}))
+const toastMocks = vi.hoisted(() => ({ error: vi.fn() }))
+
+vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
+  runManualWorkspaceRefresh: refreshMocks.run,
+}))
+vi.mock('sonner', () => ({ toast: toastMocks }))
+
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo-activity-control-component')
 
 beforeEach(() => {
-  resetReposStore()
+  refreshMocks.run.mockReset()
+  refreshMocks.run.mockResolvedValue({ ok: true })
+  toastMocks.error.mockClear()
+  resetWorkspacesStore()
   // Empty dict so `t('key')` returns the key itself — lets the test
   // assert the exact key the tooltip wires up, independent of the
   // dictionary snapshot (which is hydrated over IPC in production).
@@ -32,8 +46,8 @@ beforeEach(() => {
 describe('RepoActivityControl component', () => {
   test('disables the primary refresh button while server projection reports a user fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
       loadedAt: 123,
     })
 
@@ -45,8 +59,8 @@ describe('RepoActivityControl component', () => {
 
   test('keeps the primary refresh button idle while server projection reports a background fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
       loadedAt: 123,
     })
 
@@ -58,9 +72,9 @@ describe('RepoActivityControl component', () => {
 
   test('renders branch action activity from server operation projection', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [
-        serverOperation(repo.repoRuntimeId, {
+        serverOperation(repo.workspaceRuntimeId, {
           kind: 'push',
           phase: 'queued',
           source: 'user',
@@ -104,21 +118,38 @@ describe('RepoActivityControl component', () => {
     expect(container.textContent).not.toContain('tab.local-only')
   })
 
+  test('presents capability refresh failures from the Git refresh button', async () => {
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
+    refreshMocks.run.mockResolvedValueOnce({ ok: false, message: 'error.workspace-operation-failed' })
+    const { container } = renderControl()
+
+    fireEvent.click(button(container))
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed'))
+  })
+
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
+    if (repo.capability.kind !== 'git') throw new Error('Expected Git repo fixture')
+    const capability = repo.capability
+    const dataLoads = {
+      ...capability.git.dataLoads,
+      fetch: { ...capability.git.dataLoads.fetch, loadedAt },
+    }
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
         [REPO_ID]: {
           ...repo,
           // Use the fetch data load since `latestRepoSyncTime` reads
           // `dataLoads.fetch.loadedAt` directly; setting the read model
           // requires `projection.source === 'fresh'` which would also
           // work but couples this test to a second code path.
-          dataLoads: {
-            ...repo.dataLoads,
-            fetch: { ...repo.dataLoads.fetch, loadedAt },
+          dataLoads,
+          capability: {
+            ...capability,
+            git: { ...capability.git, dataLoads },
           },
         },
       },
@@ -130,7 +161,7 @@ describe('RepoActivityControl component', () => {
     // The tooltip should be a single line (no separator), starting
     // with the "Last synced" label, and the relative time should be
     // present (date-fns renders "5 seconds ago" in en).
-    expect(tooltip.textContent).toContain('repo-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-label')
     expect(tooltip.textContent).toMatch(/5\s+seconds?/)
   })
 
@@ -143,7 +174,7 @@ describe('RepoActivityControl component', () => {
     // No sync time has been recorded, so the tooltip shows the
     // generic fetch title — not the "Last synced" line.
     expect(tooltip.textContent).toContain('action.fetch-title')
-    expect(tooltip.textContent).not.toContain('repo-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).not.toContain('workspace-picker.tooltip.last-sync-label')
   })
 })
 
@@ -155,20 +186,20 @@ function renderControl() {
   )
 }
 
-function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
-  const repo = seedRepoShellForTest(input)
-  setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, { operations: [], loadedAt: 0 })
+function seedRepoForControl(input: Parameters<typeof seedRepoWithReadModelForTest>[0]) {
+  const repo = seedRepoWithReadModelForTest(input)
+  setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, { operations: [], loadedAt: 0 })
   return repo
 }
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase' | 'source'> & { branch?: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: overrides.source,

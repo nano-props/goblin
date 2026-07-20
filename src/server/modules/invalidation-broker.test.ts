@@ -4,12 +4,17 @@ import {
   InvalidationSocketLimitError,
   MAX_INVALIDATION_SOCKETS,
   publishRepoQueryInvalidation,
+  publishUserWorkspaceFilesystemInvalidation,
   publishUserRepoQueryInvalidation,
+  publishUserWorkspaceRuntimeInvalidation,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('invalidation broker', () => {
+  const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+
   beforeEach(() => {
     disconnectAllInvalidationSockets()
   })
@@ -21,7 +26,7 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(second)
 
     disconnectAllInvalidationSockets()
-    publishRepoQueryInvalidation({ repoId: 'repo_1', query: 'repo-snapshot' })
+    publishRepoQueryInvalidation({ repoId: workspaceId, query: 'repo-snapshot' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
@@ -51,9 +56,33 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(first, 'user_a')
     registerInvalidationSocket(second, 'user_b')
 
-    publishUserRepoQueryInvalidation('user_a', { repoId: 'repo_1', query: 'repo-runtime' })
+    publishUserRepoQueryInvalidation('user_a', { repoId: workspaceId, query: 'repo-runtime' })
 
     expect(first.send).toHaveBeenCalledOnce()
     expect(second.send).not.toHaveBeenCalled()
+  })
+
+  test('publishes workspace runtime invalidations with canonical workspace identity', () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerInvalidationSocket(socket, 'user_a')
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
+
+    publishUserWorkspaceRuntimeInvalidation('user_a', { workspaceId })
+
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-runtime-invalidated', workspaceId }))
+  })
+
+  test('publishes filesystem invalidations only to the owning user', () => {
+    const owner = { send: vi.fn(), close: vi.fn() }
+    const other = { send: vi.fn(), close: vi.fn() }
+    registerInvalidationSocket(owner, 'user_a')
+    registerInvalidationSocket(other, 'user_b')
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }
+
+    publishUserWorkspaceFilesystemInvalidation('user_a', { target })
+
+    expect(owner.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-filesystem-invalidated', target }))
+    expect(other.send).not.toHaveBeenCalled()
   })
 })

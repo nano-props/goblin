@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 let tmpHome: string
@@ -31,6 +32,15 @@ describe('ssh config resolution', () => {
   afterEach(() => {
     rmSync(tmpHome, { recursive: true, force: true })
   })
+
+  test.each(['-F', '.', '..', 'bad alias', '服务器', ' prod '])(
+    'rejects invalid profile %j before starting ssh',
+    async (alias) => {
+      const mod = await import('#/system/ssh/config.ts')
+      await expect(mod.resolveRemoteTarget({ alias, remotePath: '/' })).rejects.toThrow('Invalid SSH config host alias')
+      expect(execaMock).not.toHaveBeenCalled()
+    },
+  )
 
   test('lists concrete hosts and computes inherited values without surfacing wildcard aliases', async () => {
     const mod = await import('#/system/ssh/config.ts')
@@ -114,14 +124,14 @@ describe('ssh config resolution', () => {
 
     await expect(
       mod.resolveTrackedRemoteTarget({
-        id: 'ssh-config://prod/srv/repo',
+        id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/srv/repo',
       }),
     ).resolves.toMatchObject({
       target: {
-        id: 'ssh-config://prod/srv/repo',
+        id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
         alias: 'prod',
         host: 'changed.example.com',
         user: 'ubuntu',
@@ -137,7 +147,7 @@ describe('ssh config resolution', () => {
 
     await expect(
       mod.resolveTrackedRemoteTarget({
-        id: 'ssh-config://prod/srv/repo',
+        id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/srv/repo',

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -94,14 +97,14 @@ describe('repo query invalidation source', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
     FakeWebSocket.instances[0]?.emitMessage({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
+      repoId: WORKSPACE_ID,
+      query: 'repo-worktree-snapshot',
     })
 
     expect(listener).toHaveBeenCalledWith({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
+      repoId: WORKSPACE_ID,
+      query: 'repo-worktree-snapshot',
     })
     dispose()
   })
@@ -126,13 +129,13 @@ describe('repo query invalidation source', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
     FakeWebSocket.instances[0]?.emitMessage({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-snapshot',
     })
 
     expect(listener).toHaveBeenCalledWith({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-snapshot',
     })
     dispose()
@@ -160,13 +163,13 @@ describe('repo query invalidation source', () => {
     expect(FakeWebSocket.instances[0]?.url).toBe('ws://127.0.0.1:32100/ws/invalidation')
     FakeWebSocket.instances[0]?.emitMessage({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-snapshot',
     })
 
     expect(listener).toHaveBeenCalledWith({
       type: 'repo-query-invalidated',
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-snapshot',
     })
     dispose()

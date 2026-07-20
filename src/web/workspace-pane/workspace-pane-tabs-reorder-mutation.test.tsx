@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
@@ -8,7 +9,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -23,9 +24,9 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
-const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-repo')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
@@ -40,8 +41,8 @@ let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
-  seedWorkspacePaneTabsRepo(REPO_RUNTIME_ID)
+  resetWorkspacesStore()
+  seedWorkspacePaneTabsRepo(WORKSPACE_RUNTIME_ID)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   controls = null
 })
@@ -49,7 +50,7 @@ beforeEach(() => {
 afterEach(() => {
   resetWorkspacePaneActionQueueForTest()
   queryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   controls = null
 })
@@ -127,22 +128,22 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     expect(updateWorkspaceTabs).not.toHaveBeenCalled()
   })
 
-  test('uses the latest repo runtime after the hook target changes', async () => {
+  test('uses the latest workspace runtime after the hook target changes', async () => {
     const updateWorkspaceTabs = vi.fn(async () => [staticEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    seedWorkspacePaneTabs(sourceTabs, NEXT_REPO_RUNTIME_ID)
+    seedWorkspacePaneTabs(sourceTabs, NEXT_WORKSPACE_RUNTIME_ID)
     const renderResult = renderMutationHook({ canonicalTabs: sourceTabs })
-    seedWorkspacePaneTabsRepo(NEXT_REPO_RUNTIME_ID)
+    seedWorkspacePaneTabsRepo(NEXT_WORKSPACE_RUNTIME_ID)
 
     renderResult.rerender(
       <QueryClientProvider client={queryClient}>
         <HookHost
           input={{
-            repoRoot: REPO_ROOT,
-            repoRuntimeId: NEXT_REPO_RUNTIME_ID,
-            branchName: BRANCH_NAME,
+            kind: 'git-worktree' as const,
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
             worktreePath: WORKTREE_PATH,
             canonicalTabs: sourceTabs,
           }}
@@ -153,10 +154,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() =>
       expect(updateWorkspaceTabs).toHaveBeenCalledWith({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: NEXT_REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
+        target: {
+          kind: 'git-worktree' as const,
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
+          root: 'goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-worktree',
+        },
         operation: {
           type: 'reorder',
           tabIdentities: ['workspace-pane:status', 'terminal:term-111111111111111111111'],
@@ -164,19 +169,66 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       }),
     )
   })
+
+  test('preserves the workspace-root target through the reorder transaction', async () => {
+    const updateWorkspaceTabs = vi.fn(async () => [staticEntry('files'), staticEntry('status')])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const sourceTabs = [staticEntry('status'), staticEntry('files')]
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        kind: 'workspace-root',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+
+        tabs: sourceTabs,
+      },
+      queryClient,
+    )
+    renderMutationHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
+
+    act(() => currentControls().reorderTabs([...sourceTabs].reverse()))
+
+    await vi.waitFor(() =>
+      expect(updateWorkspaceTabs).toHaveBeenCalledWith({
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        target: {
+          kind: 'workspace-root',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        },
+        operation: {
+          type: 'reorder',
+          tabIdentities: ['workspace-pane:files', 'workspace-pane:status'],
+        },
+      }),
+    )
+  })
 })
 
-function renderMutationHook(input: Partial<WorkspacePaneTabsReorderMutationInput> = {}) {
+function renderMutationHook(
+  input: {
+    kind?: 'git-worktree' | 'workspace-root'
+    canonicalTabs?: WorkspacePaneTabEntry[]
+    onReorderRejected?: () => void
+  } = {},
+) {
+  const target =
+    input.kind === 'workspace-root'
+      ? { kind: 'workspace-root' as const, workspaceId: REPO_ROOT }
+      : {
+          kind: 'git-worktree' as const,
+          workspaceId: REPO_ROOT,
+          worktreePath: WORKTREE_PATH,
+        }
   return renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <HookHost
         input={{
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
-          canonicalTabs: [],
-          ...input,
+          ...target,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          canonicalTabs: input.canonicalTabs ?? [],
+          ...(input.onReorderRejected ? { onReorderRejected: input.onReorderRejected } : {}),
         }}
       />
     </QueryClientProvider>,
@@ -193,24 +245,29 @@ function currentControls(): WorkspacePaneTabsReorderMutationResult {
   return controls
 }
 
-function readWorkspacePaneTabs(repoRuntimeId: string = REPO_RUNTIME_ID): WorkspacePaneTabEntry[] {
+function readWorkspacePaneTabs(workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget(
-    { repoRoot: REPO_ROOT, repoRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    {
+      kind: 'git-worktree',
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId,
+      worktreePath: WORKTREE_PATH,
+    },
     queryClient,
   )
 }
 
-function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[], repoRuntimeId: string = REPO_RUNTIME_ID): void {
+function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[], workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID): void {
   setWorkspacePaneTabsForTargetQueryData(
-    { repoRoot: REPO_ROOT, repoRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs },
+    { workspaceId: REPO_ROOT, workspaceRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs },
     queryClient,
   )
 }
 
-function seedWorkspacePaneTabsRepo(repoRuntimeId: string): void {
+function seedWorkspacePaneTabsRepo(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: BRANCH_NAME,
   })

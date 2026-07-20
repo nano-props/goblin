@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
@@ -18,6 +19,7 @@ import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
+import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
@@ -25,6 +27,7 @@ import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -39,6 +42,7 @@ export interface ServerAppOptions {
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -95,7 +99,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.use(
     '/api/*',
     cors({
-      origin: (origin: string, _c) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
+      origin: (origin: string) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
       // `credentials: true` is required so the browser sends the
       // `goblin_access_token` cookie on cross-origin LAN requests.
       // Hono's `cors()` echoes the matched origin in
@@ -186,6 +190,14 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
+  app.use('/api/workspace/*', createAccessTokenMiddleware(options.accessToken))
+  app.use(
+    '/api/workspace/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))
   // MAX_PASTE_BATCH_BYTES (12 MiB) is the *success* ceiling. The
   // failure case is also bounded but the timing depends on the
@@ -209,7 +221,14 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.route('/api/settings', createSettingsRoutes({ settingsState, workspacePaneTabsHost: options.workspacePaneTabsHost }))
+  app.route(
+    '/api/settings',
+    createSettingsRoutes({
+      settingsState,
+      workspacePaneTabsHost: options.workspacePaneTabsHost,
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+    }),
+  )
   // i18n is mounted at a separate public path so the client can
   // fetch it before the user is authenticated. The token gate's
   // labels are translated by this endpoint; if it were under
@@ -223,15 +242,25 @@ export function createApp(options: ServerAppOptions): Hono {
   // before the user is authenticated. The payload is non-sensitive
   // (home directory path + platform identifier).
   app.route('/api/host', createHostRoutes())
-  app.route('/api/remote', createRemoteRoutes())
+  app.route(
+    '/api/remote',
+    createRemoteRoutes({
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+    }),
+  )
   app.route(
     '/api/repo',
     createRepoRoutes({
       worktreeRemovalApplication: options.worktreeRemovalApplication,
       repoMutationApplication: createRepoMutationApplication(),
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
     }),
   )
   app.route('/api/repo', createRepoViewRoutes())
+  app.route(
+    '/api/workspace',
+    createWorkspaceRoutes({ workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost }),
+  )
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))
 
@@ -278,7 +307,6 @@ export function createApp(options: ServerAppOptions): Hono {
         return errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`)
       }
       try {
-        const { readFile } = await import('node:fs/promises')
         return c.html(await readFile(webIndexHtmlPath, 'utf8'))
       } catch {
         return c.text('Not Found', 404)

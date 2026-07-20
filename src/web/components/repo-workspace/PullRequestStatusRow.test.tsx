@@ -6,6 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { createPullRequest } from '#/web/test-utils/bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Pass-through i18n with minimal translations for the keys this component
 // reads at render time. The stub interpolates `{name}` placeholders from
@@ -37,8 +38,8 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
-const REPO_ID = '/tmp/goblin-pr-row-test-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-pr-row-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 
 beforeEach(() => {
@@ -52,7 +53,12 @@ describe('PullRequestStatusRow', () => {
       url: 'https://github.com/acme/repo/pull/178',
     })
     renderInJsdom(
-      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={pullRequest}
+      />,
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')
@@ -72,14 +78,19 @@ describe('PullRequestStatusRow', () => {
       url: 'https://github.com/acme/repo/pull/105',
     })
     renderInJsdom(
-      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={pullRequest}
+      />,
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
     fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(1)
-    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
+    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
   })
 
   test('absorbs accidental double-clicks within the latch window', () => {
@@ -90,7 +101,12 @@ describe('PullRequestStatusRow', () => {
         url: 'https://github.com/acme/repo/pull/178',
       })
       renderInJsdom(
-        <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+        <PullRequestStatusRow
+          repoId={REPO_ID}
+          workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+          branchName={BRANCH_NAME}
+          pullRequest={pullRequest}
+        />,
       )
 
       const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!

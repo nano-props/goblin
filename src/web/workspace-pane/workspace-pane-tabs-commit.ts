@@ -1,26 +1,29 @@
 import type { QueryClient } from '@tanstack/react-query'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
-import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  runtimeWorkspacePaneTarget,
+  workspacePaneTabsBranchIdentity,
+  workspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsTargetWorktreePath,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
-export interface CommitWorkspacePaneTabsInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
+type WorkspacePaneTabsMutationTarget = WorkspacePaneTabsTarget & {
+  workspaceRuntimeId: string
+}
+
+export type CommitWorkspacePaneTabsInput = WorkspacePaneTabsMutationTarget & {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface UpdateWorkspacePaneTabsInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
+export type UpdateWorkspacePaneTabsInput = WorkspacePaneTabsMutationTarget & {
   operation: WorkspacePaneTabsUpdateOperation
 }
 
@@ -35,8 +38,8 @@ export interface WorkspacePaneTabsMutationSuccess {
 export interface WorkspacePaneTabsMutationFailure {
   ok: false
   operation: WorkspacePaneTabsMutationOperation
-  repoRoot: string
-  branchName: string
+  workspaceId: WorkspaceId
+  branchName: string | null
   worktreePath: string | null
   message: string
   error: unknown
@@ -45,11 +48,7 @@ export interface WorkspacePaneTabsMutationFailure {
 
 export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
 
-interface WorkspacePaneTabsInteractionTarget {
-  repoRoot: string
-  branchName: string
-  worktreePath: string | null
-}
+type WorkspacePaneTabsInteractionTarget = WorkspacePaneTabsTarget
 
 function createWorkspacePaneTabsInteractionBlocker() {
   const blockedCountsByTarget = new Map<string, number>()
@@ -68,18 +67,8 @@ function createWorkspacePaneTabsInteractionBlocker() {
   }
 
   return {
-    isBlocked(input: {
-      repoRoot: string
-      branchName: string | null | undefined
-      worktreePath: string | null
-    }): boolean {
-      const branchName = input.branchName
-      if (!branchName) return false
-      const key = workspacePaneTabsTargetIdentityKey({
-        repoRoot: input.repoRoot,
-        branchName,
-        worktreePath: input.worktreePath,
-      })
+    isBlocked(input: WorkspacePaneTabsInteractionTarget): boolean {
+      const key = workspacePaneTabsTargetIdentityKey(input)
       return (blockedCountsByTarget.get(key) ?? 0) > 0
     },
     async run<T>(
@@ -107,8 +96,8 @@ const workspacePaneTabsInteractionBlocker = createWorkspacePaneTabsInteractionBl
  */
 export function reportWorkspacePaneTabsFailure(input: {
   operation: WorkspacePaneTabsMutationOperation
-  repoRoot: string
-  branchName: string
+  workspaceId: WorkspaceId
+  branchName: string | null
   worktreePath: string | null
   error: unknown
 }): WorkspacePaneTabsMutationFailure {
@@ -119,7 +108,7 @@ export function reportWorkspacePaneTabsFailure(input: {
         ? input.error
         : 'workspace pane tabs operation failed'
   goblinLog.warn(`workspace pane tabs ${input.operation} failed`, {
-    repoRoot: input.repoRoot,
+    workspaceId: input.workspaceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     operation: input.operation,
@@ -129,7 +118,7 @@ export function reportWorkspacePaneTabsFailure(input: {
   return {
     ok: false,
     operation: input.operation,
-    repoRoot: input.repoRoot,
+    workspaceId: input.workspaceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     message,
@@ -153,11 +142,7 @@ export async function updateWorkspacePaneTabs(
   )
 }
 
-export function workspacePaneTabsInteractionBlockedForTarget(input: {
-  repoRoot: string
-  branchName: string | null | undefined
-  worktreePath: string | null
-}): boolean {
+export function workspacePaneTabsInteractionBlockedForTarget(input: WorkspacePaneTabsTarget): boolean {
   return workspacePaneTabsInteractionBlocker.isBlocked(input)
 }
 
@@ -170,14 +155,14 @@ async function commitWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await replaceWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.workspaceId, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
+      workspaceId: input.workspaceId,
+      branchName: workspacePaneTabsBranchIdentity(input),
+      worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
     })
   }
@@ -188,37 +173,38 @@ async function updateWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await updateWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.workspaceId, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
+      workspaceId: input.workspaceId,
+      branchName: workspacePaneTabsBranchIdentity(input),
+      worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
     })
   }
 }
 
 export function writeCanonicalWorkspacePaneTabsSnapshot(
-  repoRoot: string,
-  repoRuntimeId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot,
   queryClient?: QueryClient,
 ): boolean {
-  if (!workspacePaneTabsProjectionScopeAccepted({ repoRoot, repoRuntimeId })) return false
-  return writeWorkspacePaneTabsSnapshotQueryData(repoRoot, repoRuntimeId, snapshot, queryClient)
+  if (!workspacePaneTabsProjectionScopeAccepted({ workspaceId, workspaceRuntimeId })) return false
+  return writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
 }
 
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
+  const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
+  if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.replace({
-    repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+    target,
     tabs: input.tabs,
   })
 }
@@ -226,17 +212,18 @@ export async function replaceWorkspacePaneTabsOnServer(
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
+  const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
+  if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.update({
-    repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+    target,
     operation: input.operation,
   })
 }
 
 function workspacePaneTabsProjectionScopeAccepted(
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoRuntimeId'>,
+  input: Pick<CommitWorkspacePaneTabsInput, 'workspaceId' | 'workspaceRuntimeId'>,
 ): boolean {
-  return currentRepoRuntimeId(useReposStore.getState(), input.repoRoot) === input.repoRuntimeId
+  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.workspaceId) === input.workspaceRuntimeId
 }

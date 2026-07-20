@@ -3,7 +3,8 @@ import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
   list: 'workspace-pane-tabs.list',
@@ -25,23 +26,52 @@ export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
   changed: 'workspace-pane-tabs.changed',
 } as const
 
-export interface WorkspacePaneTabsChangedRealtimeMessage {
+export interface WorkspacePaneTabsInvalidatedRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
-  repoRoot: string
+  change: 'invalidation'
+  workspaceId: WorkspaceId
 }
+
+export interface WorkspacePaneTabsRevisionRealtimeMessage {
+  type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
+  change: 'revision'
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  revision: number
+}
+
+export type WorkspacePaneTabsChangedRealtimeMessage =
+  WorkspacePaneTabsInvalidatedRealtimeMessage | WorkspacePaneTabsRevisionRealtimeMessage
 
 export type WorkspacePaneTabsRealtimeMessage = WorkspacePaneTabsChangedRealtimeMessage
 
-export function workspacePaneTabsChangedRealtimeMessage(repoRoot: string): WorkspacePaneTabsChangedRealtimeMessage {
-  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, repoRoot }
+export function workspacePaneTabsInvalidatedRealtimeMessage(
+  workspaceId: WorkspaceId,
+): WorkspacePaneTabsInvalidatedRealtimeMessage {
+  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'invalidation', workspaceId }
+}
+
+export function workspacePaneTabsRevisionRealtimeMessage(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  revision: number,
+): WorkspacePaneTabsRevisionRealtimeMessage {
+  return {
+    type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+    change: 'revision',
+    workspaceId,
+    workspaceRuntimeId,
+    revision,
+  }
 }
 
 export interface WorkspacePaneTabsListInput {
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
-export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsTarget, WorkspacePaneTabsListInput {
+export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsListInput {
+  target: RuntimeWorkspacePaneTarget
   tabs: WorkspacePaneTabEntry[]
 }
 
@@ -54,15 +84,18 @@ export type WorkspacePaneTabsUpdateOperation =
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
   | { type: 'reorder'; tabIdentities: string[] }
 
-export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsTarget, WorkspacePaneTabsListInput {
+export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsListInput {
+  target: RuntimeWorkspacePaneTarget
   operation: WorkspacePaneTabsUpdateOperation
 }
 
-export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
+export interface WorkspacePaneTabsEntry {
+  target: RuntimeWorkspacePaneTarget
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneDurableLayoutEntry extends WorkspacePaneTabsTarget {
+export interface WorkspacePaneDurableLayoutEntry {
+  target: RestorableWorkspacePaneTarget
   tabs: WorkspacePaneStaticTabEntry[]
 }
 

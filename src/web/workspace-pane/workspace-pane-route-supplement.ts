@@ -1,53 +1,58 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRouteSupplementTarget {
-  repoId: string
-  repoRuntimeId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
 }
 
 export function commitWorkspacePaneRouteSupplement(
   target: WorkspacePaneRouteSupplementTarget,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
 ): boolean {
-  const state = useReposStore.getState()
-  const repo = state.repos[target.repoId]
-  if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
+  const state = useWorkspacesStore.getState()
+  const workspace = state.workspaces[target.workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git' || workspace.workspaceRuntimeId !== target.workspaceRuntimeId)
+    return false
+  const branchModel = readRepoBranchSnapshotQueryProjection(workspace)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
   if (!branch || (branch.worktree?.path ?? null) !== target.worktreePath) return false
   state.setWorkspacePaneTab(
-    target.repoId,
+    target.workspaceId,
     target.branchName,
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(
+      formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.worktreePath),
+      route.terminalSessionId,
+    )
   }
   return true
 }
 
 export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
   target: WorkspacePaneRouteSupplementTarget,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
 ): boolean {
   if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
-  const state = useReposStore.getState()
+  const state = useWorkspacesStore.getState()
   state.setWorkspacePaneTabForTarget(
-    {
-      repoRoot: target.repoId,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
-    },
+    requiredGitWorkspacePaneTabsTarget(target.workspaceId, target.branchName, target.worktreePath),
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(
+      formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.worktreePath),
+      route.terminalSessionId,
+    )
   }
   return true
 }

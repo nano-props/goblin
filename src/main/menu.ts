@@ -1,7 +1,7 @@
 // Application menu. Two purposes:
 //   1) Provide native macOS menu bar entries (File / View / Window / Help)
 //   2) Wire global keyboard shortcuts that should work regardless of
-//      which element has focus — e.g. ⌘O always opens a repo.
+//      which element has focus — e.g. ⌘O always opens a workspace.
 //
 // Client-driven actions (Open / Close Tab / Switch Tab / Refresh /
 // Toggle View) are dispatched as typed IPC events so the
@@ -21,9 +21,9 @@ import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
-import { formatRepoSessionEntryLocator } from '#/shared/repo-locator.ts'
+import { formatWorkspaceSessionEntryLocator } from '#/shared/workspace-display-location.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { readMenuRuntimeState } from '#/main/menu-state.ts'
@@ -42,7 +42,7 @@ import { platform } from '#/main/platform.ts'
 interface AppMenuState {
   isMac: boolean
   name: string
-  recentRepos: RepoSessionEntry[]
+  recentWorkspaces: WorkspaceSessionEntry[]
   shortcutsDisabled: boolean
   themePref: ThemePref
   langPref: LangPref
@@ -93,7 +93,7 @@ function readMenuState(): AppMenuState {
   return {
     isMac: platform.isMacOS(),
     name: app.name,
-    recentRepos: runtimeState.recentRepos,
+    recentWorkspaces: runtimeState.recentWorkspaces,
     shortcutsDisabled: runtimeState.shortcutsDisabled,
     themePref: getTheme().pref,
     langPref: runtimeState.langPref,
@@ -142,17 +142,17 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       createClientCommandMenuItem(state, 'file-new-terminal-tab'),
       createClientCommandMenuItem(state, 'file-create-worktree'),
       separator(),
-      createClientCommandMenuItem(state, 'file-open-local-repo'),
-      createClientCommandMenuItem(state, 'file-open-local-repo-path'),
+      createClientCommandMenuItem(state, 'file-open-local-workspace'),
+      createClientCommandMenuItem(state, 'file-open-local-workspace-path'),
       createClientCommandMenuItem(state, 'file-clone-repo'),
-      createClientCommandMenuItem(state, 'file-open-remote-repo'),
-      { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
+      createClientCommandMenuItem(state, 'file-open-remote-workspace'),
+      { label: t('menu.file.open-recent'), submenu: createRecentWorkspacesMenu(state.recentWorkspaces) },
       separator(),
       // Repeated close accelerators can arrive after the last window has
       // closed. Close commands are scoped to an existing surface and must
       // never recreate one just to deliver the intent.
       createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window', { missingWindow: 'ignore' }),
-      createClientCommandMenuItem(state, 'file-close-tab', { missingWindow: 'ignore' }),
+      createClientCommandMenuItem(state, 'file-close-workspace', { missingWindow: 'ignore' }),
       { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
@@ -172,30 +172,30 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
   }
 }
 
-function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstructorOptions[] {
-  if (recentRepos.length === 0) return [{ label: t('menu.file.no-recent'), enabled: false }]
+function createRecentWorkspacesMenu(recentWorkspaces: WorkspaceSessionEntry[]): MenuItemConstructorOptions[] {
+  if (recentWorkspaces.length === 0) return [{ label: t('menu.file.no-recent'), enabled: false }]
 
   const home = app.getPath('home')
-  const localRepoItems = recentRepos
-    .filter((entry) => entry.kind === 'local')
-    .map((entry) => createRecentRepoMenuItem(entry, home))
-  const remoteRepoItems = recentRepos
-    .filter((entry) => entry.kind === 'remote')
-    .map((entry) => createRecentRepoMenuItem(entry, home))
+  const localWorkspaceItems = recentWorkspaces
+    .filter((entry) => !isRemoteWorkspaceId(entry.id))
+    .map((entry) => createRecentWorkspaceMenuItem(entry, home))
+  const remoteWorkspaceItems = recentWorkspaces
+    .filter((entry) => isRemoteWorkspaceId(entry.id))
+    .map((entry) => createRecentWorkspaceMenuItem(entry, home))
 
   return [
-    ...localRepoItems,
-    ...(localRepoItems.length > 0 && remoteRepoItems.length > 0 ? [separator()] : []),
-    ...remoteRepoItems,
+    ...localWorkspaceItems,
+    ...(localWorkspaceItems.length > 0 && remoteWorkspaceItems.length > 0 ? [separator()] : []),
+    ...remoteWorkspaceItems,
     separator(),
-    { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-repos-requested' }) },
+    { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-workspaces-requested' }) },
   ]
 }
 
-function createRecentRepoMenuItem(entry: RepoSessionEntry, home: string): MenuItemConstructorOptions {
+function createRecentWorkspaceMenuItem(entry: WorkspaceSessionEntry, home: string): MenuItemConstructorOptions {
   return {
-    label: formatRepoSessionEntryLocator(entry, home),
-    click: () => send({ type: 'open-recent-repo-requested', entry }),
+    label: formatWorkspaceSessionEntryLocator(entry, home),
+    click: () => send({ type: 'open-recent-workspace-requested', entry }),
   }
 }
 
@@ -266,8 +266,8 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
       separator(),
-      createClientCommandMenuItem(state, 'window-next-repo'),
-      createClientCommandMenuItem(state, 'window-prev-repo'),
+      createClientCommandMenuItem(state, 'window-next-workspace'),
+      createClientCommandMenuItem(state, 'window-prev-workspace'),
       separator(),
       createClientCommandMenuItem(state, 'window-reset-layout', {
         // Reset Window also restores the main window itself to its default

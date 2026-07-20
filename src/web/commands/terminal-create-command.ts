@@ -2,17 +2,13 @@ import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
-import type {
-  TerminalCreateAdmissionResult,
-  TerminalCreateLeaderAdmissionResult,
-} from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
-export type TerminalCreatePresentationStatus =
-  TerminalCreatedTabCommitResult['status'] | 'observer' | 'presentation-failed'
+export type TerminalCreatePresentationStatus = TerminalCreatedTabCommitResult['status'] | 'presentation-failed'
 
 export type TerminalCreateCommandResult =
   | { ok: true; terminalSessionId: string; presentationStatus: TerminalCreatePresentationStatus }
@@ -21,10 +17,7 @@ export type TerminalCreateCommandResult =
 export type TerminalCreateCommandAdmission = TerminalCreateAdmissionResult
 
 export type TerminalCreatedTabCommitResult =
-  | { status: 'committed' }
-  | { status: 'superseded' }
-  | { status: 'projection-failed' }
-  | { status: 'navigation-rejected' }
+  { status: 'committed' } | { status: 'superseded' } | { status: 'navigation-rejected' }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 
@@ -36,12 +29,13 @@ export async function runCreateTerminalTabCommand(input: {
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   /**
-   * Applies the server projection and commits the exact route for the created
-   * session. This is required so every leader request has one explicit
-   * presentation boundary after server admission.
+   * Commits the exact route using the canonical presentation returned by the
+   * server. Resource admission ownership and presentation ownership are
+   * independent: a coalesced observer still represents a user request to show
+   * the admitted terminal.
    */
   commitCreatedTerminalTab: (
-    admission: TerminalCreateLeaderAdmissionResult,
+    admission: TerminalCreateAdmissionResult,
   ) => TerminalCreatedTabCommitResult | Promise<TerminalCreatedTabCommitResult>
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
@@ -54,9 +48,6 @@ export async function runCreateTerminalTabCommand(input: {
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
-  if (!input.base.repoRuntimeId) {
-    return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
-  }
   try {
     const admission =
       input.insertAfterIdentity === undefined
@@ -64,9 +55,6 @@ export async function runCreateTerminalTabCommand(input: {
         : await input.createTerminal(input.base, input.options, {
             insertAfterIdentity: input.insertAfterIdentity,
           })
-    if (admission.requestRole === 'observer') {
-      return { ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'observer' }
-    }
     return await finishCreateTerminalTabCommand(input, admission)
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
@@ -82,10 +70,10 @@ async function finishCreateTerminalTabCommand(
   input: {
     base: TerminalSessionBase
     commitCreatedTerminalTab: (
-      admission: TerminalCreateLeaderAdmissionResult,
+      admission: TerminalCreateAdmissionResult,
     ) => TerminalCreatedTabCommitResult | Promise<TerminalCreatedTabCommitResult>
   },
-  admission: TerminalCreateLeaderAdmissionResult,
+  admission: TerminalCreateAdmissionResult,
 ): Promise<TerminalCreateCommandResult> {
   const terminalSessionId = admission.terminalSessionId
   try {
@@ -103,6 +91,6 @@ async function finishCreateTerminalTabCommand(
 function isTerminalCreateCanceled(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.repo-runtime-stale')
+    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.workspace-runtime-stale')
   )
 }

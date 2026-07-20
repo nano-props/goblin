@@ -2,8 +2,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import type {
   ExternalAppsSnapshot,
   GitHubCliState,
-  RepoSettingsState,
-  RuntimeRecentReposState,
+  WorkspaceSettingsState,
+  RuntimeRecentWorkspacesState,
   RuntimeSettingsSnapshot,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
@@ -44,17 +44,20 @@ export function updateRuntimeSettingsSnapshotCache(
   }))
 }
 
-export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, next: RuntimeRecentReposState): void {
+export function updateRuntimeRecentWorkspacesStateCache(
+  queryClient: QueryClient,
+  next: RuntimeRecentWorkspacesState,
+): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
-    recentRepos: next.recentRepos,
+    recentWorkspaces: next.recentWorkspaces,
   }))
 }
 
-export function updateRepoSettingsStateCache(queryClient: QueryClient, next: RepoSettingsState): void {
+export function updateWorkspaceSettingsStateCache(queryClient: QueryClient, next: WorkspaceSettingsState): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
-    repoSettings: next.repoSettings,
+    workspaceSettings: next.workspaceSettings,
   }))
 }
 

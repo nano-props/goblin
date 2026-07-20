@@ -1,5 +1,6 @@
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
+  defaultWorkspacePaneTabEntries,
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryFromUnknown,
@@ -8,10 +9,8 @@ import {
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 
-const DEFAULT_WORKSPACE_PANE_TABS: readonly WorkspacePaneTabEntry[] = [workspacePaneStaticTabEntry('status')]
-
-export function defaultWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
-  return [...DEFAULT_WORKSPACE_PANE_TABS]
+export function defaultWorkspacePaneTabs(kind: 'git' | 'workspace-root' = 'git'): WorkspacePaneTabEntry[] {
+  return defaultWorkspacePaneTabEntries(kind)
 }
 
 export function workspacePaneStaticTabsFromEntries(

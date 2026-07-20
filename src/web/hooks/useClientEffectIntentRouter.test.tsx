@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -7,15 +8,16 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
@@ -25,80 +27,96 @@ import {
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
+} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import {
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  type WorkspacePaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 const appDataClientMocks = vi.hoisted(() => ({
-  clearRecentRepoHistory: vi.fn(async () => {}),
-  removeRepoFromWorkspace: vi.fn(async () => {}),
+  clearRecentWorkspaceHistory: vi.fn(async () => {}),
+  removeWorkspaceFromSession: vi.fn(async () => {}),
 }))
 
 vi.mock('#/web/settings-actions.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/settings-actions.ts')>('#/web/settings-actions.ts')
   return {
     ...actual,
-    clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
-    removeRepoFromWorkspace: appDataClientMocks.removeRepoFromWorkspace,
+    clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
+    removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
   }
 })
 
-const ipcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
+const ipcEventListeners = new Set<(event: { type: string; workspaceId?: string; key?: string }) => void>()
 const intentListeners = new Set<(event: any) => void>()
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
-let currentRepoId: string | null = null
+let currentWorkspaceId: WorkspaceId | null = null
 let currentBranchName: string | null = null
-let currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null = null
+let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
+let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null
 let navigation!: PrimaryWindowNavigationActions
-const activateRepoSpy = vi.fn()
+const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const showRepoBranchTerminalSessionSpy = vi.fn()
+const showWorkspaceRootPaneTabSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
-  activateRepoSpy.mockClear()
+  activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
-  appDataClientMocks.clearRecentRepoHistory.mockClear()
-  appDataClientMocks.removeRepoFromWorkspace.mockClear()
+  showWorkspaceRootPaneTabSpy.mockClear()
+  appDataClientMocks.clearRecentWorkspaceHistory.mockClear()
+  appDataClientMocks.removeWorkspaceFromSession.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
   workspaceShortcutSuppressed = false
-  currentRepoId = null
+  currentWorkspaceId = null
   currentBranchName = null
   currentWorkspacePaneRoute = null
+  currentFilesystemTarget = null
   setTerminalSessionCommandBridge(null)
   navigation = {
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
-    activateRepo: (repoId) => {
-      activateRepoSpy(repoId)
+    currentWorkspacePaneRoute: () => undefined,
+    activateWorkspace: (repoId) => {
+      activateWorkspaceSpy(repoId)
     },
-    closeRepo: async (repoId) => {
+    closeWorkspace: async (repoId) => {
       closeRepoSpy(repoId)
-      return await useReposStore.getState().closeRepo(repoId)
+      return await useWorkspacesStore.getState().closeWorkspace(repoId)
     },
-    cycleRepo: () => {},
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
@@ -106,19 +124,23 @@ beforeEach(() => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    showWorkspaceRootPaneTab: (workspaceId, presentation) => {
+      showWorkspaceRootPaneTabSpy(workspaceId, presentation)
+      return true
+    },
+    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
-      onEvent: vi.fn((cb: (event: { type: string; repoRoot?: string; key?: string }) => void) => {
+      onEvent: vi.fn((cb: (event: { type: string; workspaceId?: string; key?: string }) => void) => {
         ipcEventListeners.add(cb)
         return () => {
           ipcEventListeners.delete(cb)
@@ -162,31 +184,9 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
-  test('terminal bell clicks without a worktree target do not infer a branch route', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      currentBranch: 'main',
-      currentBranchName: 'main',
-      preferredWorkspacePaneTab: 'status',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
-    })
-    currentRepoId = repo.id
-
-    await renderHookHost()
-
-    expect(intentListeners.size).toBeGreaterThan(0)
-    await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id })
-      await Promise.resolve()
-    })
-
-    expect(closeAllOverlays).not.toHaveBeenCalled()
-    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
-  })
-
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -195,14 +195,13 @@ describe('useClientEffectIntentRouter', () => {
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
       ],
     })
-    currentRepoId = repo.id
+    currentWorkspaceId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-main',
       route: { kind: 'static', tab: 'status' },
@@ -210,7 +209,19 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
+        listener({
+          type: 'terminal-bell-click',
+          terminalSessionId,
+          session: {
+            target: {
+              kind: 'git-worktree',
+              workspaceId: repo.id,
+              workspaceRuntimeId: repo.workspaceRuntimeId,
+              root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
+            },
+            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+          },
+        })
     })
 
     await waitFor(() => {
@@ -219,9 +230,36 @@ describe('useClientEffectIntentRouter', () => {
     expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
+  test('terminal bell clicks restore a plain Workspace root terminal', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const workspace = emptyWorkspace(workspaceId, 'workspace', 'workspace-runtime-test')
+    useWorkspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
+    const terminalSessionId = 'term-111111111111111111111'
+
+    await renderHookHost()
+    await act(async () => {
+      for (const listener of intentListeners) {
+        listener({
+          type: 'terminal-bell-click',
+          terminalSessionId,
+          session: {
+            target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspace.workspaceRuntimeId },
+            presentation: { kind: 'workspace-root' },
+          },
+        })
+      }
+    })
+
+    expect(showWorkspaceRootPaneTabSpy).toHaveBeenCalledWith(workspaceId, {
+      kind: 'terminal',
+      terminalSessionId,
+    })
+    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
+  })
+
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -240,15 +278,14 @@ describe('useClientEffectIntentRouter', () => {
         return true
       },
     }
-    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
-    currentRepoId = repo.id
+    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+    currentWorkspaceId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-main',
       route: { kind: 'static', tab: 'status' },
@@ -256,7 +293,19 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
+        listener({
+          type: 'terminal-bell-click',
+          terminalSessionId,
+          session: {
+            target: {
+              kind: 'git-worktree',
+              workspaceId: repo.id,
+              workspaceRuntimeId: repo.workspaceRuntimeId,
+              root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
+            },
+            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+          },
+        })
     })
 
     await waitFor(() => {
@@ -266,67 +315,67 @@ describe('useClientEffectIntentRouter', () => {
 
   test('close-repo menu action delegates to navigation close', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
-    currentRepoId = repo.id
+    currentWorkspaceId = repo.id
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
       await Promise.resolve()
     })
 
     expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-    expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
   })
 
   test('close-repo menu action reports shared membership write failures', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
-    currentRepoId = repo.id
-    appDataClientMocks.removeRepoFromWorkspace.mockRejectedValueOnce(new Error('workspace write failed'))
+    currentWorkspaceId = repo.id
+    appDataClientMocks.removeWorkspaceFromSession.mockRejectedValueOnce(new Error('workspace write failed'))
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().repos[repo.id]).toBeDefined()
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.failed-read-repo'))
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.workspace-close-failed'))
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
-    currentRepoId = repo.id
+    currentWorkspaceId = repo.id
 
     await renderHookHost()
 
-    expect(useReposStore.getState().zenMode).toBe(false)
+    expect(useWorkspacesStore.getState().zenMode).toBe(false)
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'workspace-zen-mode-toggle-requested' })
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().zenMode).toBe(true)
+    expect(useWorkspacesStore.getState().zenMode).toBe(true)
   })
 
   test('current repo menu actions prefer the visible routed repo over restored repo id', async () => {
     const restoredRepo = seedRepoWithReadModelForTest({
-      id: '/tmp/restored-repo',
+      id: 'goblin+file:///tmp/restored-repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [
@@ -334,40 +383,43 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     const visibleRepo = seedRepoWithReadModelForTest({
-      id: '/tmp/visible-repo',
+      id: 'goblin+file:///tmp/visible-repo',
       currentBranch: 'feature',
       currentBranchName: 'feature',
       branchSnapshots: [
         createBranchSnapshot('feature', { isCurrent: true, worktree: { path: '/tmp/visible-repo-worktree' } }),
       ],
     })
-    useReposStore.setState((state) => ({
+    useWorkspacesStore.setState((state) => ({
       ...state,
-      repos: {
+      workspaces: {
         [restoredRepo.id]: restoredRepo,
         [visibleRepo.id]: visibleRepo,
       },
-      order: [restoredRepo.id, visibleRepo.id],
-      restoredRepoId: restoredRepo.id,
+      workspaceOrder: [restoredRepo.id, visibleRepo.id],
+      restoredWorkspaceId: restoredRepo.id,
       workspaceMembershipReady: true,
     }))
-    currentRepoId = visibleRepo.id
+    currentWorkspaceId = visibleRepo.id
 
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
       await Promise.resolve()
     })
 
     expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
-    expect(useReposStore.getState().repos[visibleRepo.id]).toBeUndefined()
-    expect(useReposStore.getState().repos[restoredRepo.id]).toBeDefined()
+    expect(useWorkspacesStore.getState().workspaces[visibleRepo.id]).toBeUndefined()
+    expect(useWorkspacesStore.getState().workspaces[restoredRepo.id]).toBeDefined()
   })
 
-  test('open-recent-repo opens without store activation and then delegates activation to navigation', async () => {
-    useReposStore.setState({
-      ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, id: '/tmp/recent-repo' })),
+  test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
+    useWorkspacesStore.setState({
+      ensureWorkspaceOpen: vi.fn(async () => ({
+        ok: true as const,
+        workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace'),
+      })),
     })
 
     await renderHookHost()
@@ -375,26 +427,28 @@ describe('useClientEffectIntentRouter', () => {
     await act(async () => {
       for (const listener of intentListeners) {
         listener({
-          type: 'open-recent-repo-requested',
-          entry: { kind: 'local', id: '/tmp/recent-repo' },
+          type: 'open-recent-workspace-requested',
+          entry: { id: 'goblin+file:///tmp/recent-workspace' },
         })
       }
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({ kind: 'local', id: '/tmp/recent-repo' })
-    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/recent-repo')
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
+      id: 'goblin+file:///tmp/recent-workspace',
+    })
+    expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')
   })
 
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
-    currentRepoId = repo.id
+    currentWorkspaceId = repo.id
     workspaceShortcutSuppressed = true
 
     await renderHookHost()
@@ -404,12 +458,12 @@ describe('useClientEffectIntentRouter', () => {
         listener({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
         listener({ type: 'workspace-zen-mode-toggle-requested' })
-        listener({ type: 'close-repo-requested' })
+        listener({ type: 'close-workspace-requested' })
       }
       await Promise.resolve()
     })
 
-    const state = useReposStore.getState()
+    const state = useWorkspacesStore.getState()
     expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
@@ -417,7 +471,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('native new-terminal and close intents preserve a static route opener', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -430,25 +484,39 @@ describe('useClientEffectIntentRouter', () => {
         ],
       },
     })
-    currentRepoId = repo.id
+    currentWorkspaceId = repo.id
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
+    currentFilesystemTarget = gitWorktreePaneFilesystemTarget({
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      worktreePath: '/tmp/repo-worktree',
+      head: { kind: 'branch', branchName: 'main' },
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.workspaceRuntimeId)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
     let workspacePaneTabsTestBridge!: ReturnType<typeof installWorkspacePaneTabsTestBridge>
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
+    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
+      const coordinates = terminalSessionCoordinates(base)
+      const branchName = terminalPresentationBranch(base.presentation)
+      if (!branchName) throw new Error('expected Git worktree terminal fixture')
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       workspacePaneTabsTestBridge.addRuntimeTab({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
+        workspaceId: coordinates.workspaceId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
+        branchName,
+        worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
-      useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
       return terminalSessionId
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
@@ -456,7 +524,8 @@ describe('useClientEffectIntentRouter', () => {
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(terminalWorktreeKey, visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () =>
+        terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey, visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -471,8 +540,8 @@ describe('useClientEffectIntentRouter', () => {
     })
     const host = renderInJsdom(<HookHost />)
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-worktree',
       route: { kind: 'static', tab: 'status' },
@@ -501,8 +570,8 @@ describe('useClientEffectIntentRouter', () => {
       })?.activeTab?.identity,
     ).toBe('terminal:term-222222222222222222222')
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-worktree',
       route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
@@ -515,26 +584,29 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await waitFor(() => {
-      expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-        repoRoot: repo.id,
-        repoRuntimeId: repo.repoRuntimeId,
-        branch: 'main',
-        worktreePath: '/tmp/repo-worktree',
-      })
+      expect(closeTerminalByDescriptor).toHaveBeenCalledWith(
+        'term-222222222222222222222',
+        terminalSessionBaseForTest({
+          repoRoot: repo.id,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          branch: 'main',
+          worktreePath: '/tmp/repo-worktree',
+        }),
+      )
     })
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 
   test('drains externally opened repo paths through the centralized intent router', async () => {
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       ensureWorkspaceOpen: vi.fn(async (path: string | { id: string }) => ({
         ok: true as const,
-        id: typeof path === 'string' ? path : path.id,
+        workspaceId: workspaceIdForTest(typeof path === 'string' ? path : path.id),
       })),
     })
     consumeExternalOpenPathsSpy
-      .mockResolvedValueOnce(['/tmp/repo-a', '/tmp/repo-b'] as string[])
+      .mockResolvedValueOnce(['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'] as string[])
       .mockResolvedValueOnce([] as string[])
 
     await renderHookHost()
@@ -544,9 +616,9 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-a')
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-b')
-    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+    expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
   })
 
   test('theme menu intents update theme through the client store', async () => {
@@ -581,21 +653,21 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'clear-recent-repos-requested' })
+      for (const listener of intentListeners) listener({ type: 'clear-recent-workspaces-requested' })
       await Promise.resolve()
     })
 
-    expect(appDataClientMocks.clearRecentRepoHistory).toHaveBeenCalledTimes(1)
+    expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
   })
 })
 
 function preferredWorkspacePaneTab(repoId: string) {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           'main',
         ),
       )
@@ -609,13 +681,24 @@ async function renderHookHost() {
 function HookHost() {
   useClientEffectIntentRouter({
     navigation,
-    currentRepoId,
-    currentBranchName,
-    currentWorkspacePaneRoute,
+    currentWorkspaceId,
+    currentWorkspacePaneCommandTarget: currentBranchName
+      ? currentFilesystemTarget?.kind === 'git-worktree'
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: currentWorkspacePaneRoute,
+            filesystemTarget: currentFilesystemTarget,
+          }
+        : {
+            kind: 'git-branch',
+            branchName: currentBranchName,
+            workspacePaneRoute: currentWorkspacePaneRoute,
+          }
+      : null,
     closeAllOverlays,
-    openRepoPathDialog: () => {},
+    openWorkspacePathDialog: () => {},
     openCloneRepo: () => {},
-    openRemoteRepo: () => {},
+    openRemoteWorkspace: () => {},
     openCreateWorktree: () => {},
     isOverlayOpen: () => overlayOpen,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,
@@ -623,15 +706,17 @@ function HookHost() {
   return null
 }
 
-function terminalWorktreeSnapshot(
-  terminalWorktreeKey: string,
+function terminalFilesystemTargetSnapshot(
+  terminalFilesystemTargetKey: string,
   terminalSessionIds: readonly string[],
-): TerminalWorktreeSnapshot {
-  const selectedKey = useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+): TerminalFilesystemTargetSnapshot {
+  const selectedKey =
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ??
+    null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId,
-    terminalWorktreeKey,
+    terminalFilesystemTargetKey,
     index: index + 1,
     title: `terminal ${index + 1}`,
     phase: 'open' as const,
@@ -641,16 +726,19 @@ function terminalWorktreeSnapshot(
   }))
   const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
   return {
-    terminalWorktreeKey,
+    terminalFilesystemTargetKey,
     selectedDescriptor: selectedSession
       ? {
           terminalSessionId: selectedSession.terminalSessionId,
-          terminalWorktreeKey,
           index: selectedSession.index,
-          repoRoot: '/tmp/repo',
-          repoRuntimeId: useReposStore.getState().repos['/tmp/repo']?.repoRuntimeId ?? '',
-          branch: 'main',
-          worktreePath: '/tmp/repo-worktree',
+          target: {
+            kind: 'git-worktree' as const,
+            workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
+            workspaceRuntimeId:
+              useWorkspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
+            root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
+          },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         }
       : null,
     sessions,

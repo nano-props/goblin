@@ -2,40 +2,34 @@ import { describe, expect, test } from 'vitest'
 import {
   projectCreateResultForClient,
   projectServerTerminalSession,
-  projectTerminalAttachResultForClient,
+  projectTerminalStartResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
-import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
-const REPO_ROOT = '/repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
-const WORKTREE_PATH = '/repo'
-
-function makeRepoIndex(): TerminalRepoIndex {
-  return {
-    [REPO_ROOT]: {
-      repoRuntimeId: 'repo-runtime-test',
-      branchByWorktreePath: { [WORKTREE_PATH]: 'main' },
-    },
-  }
-}
+const REPO_ROOT = workspaceIdForTest('goblin+file:///example-repo')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const WORKTREE_PATH = '/example-repo'
+const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
+  kind: 'git-worktree' as const,
+  workspaceId: REPO_ROOT,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+  worktreePath: WORKTREE_PATH,
+})
 
 describe('terminal session projection helpers', () => {
   test('projects server session summaries into client hydration input', () => {
     const projected = projectServerTerminalSession({
-      repoIndex: makeRepoIndex(),
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_a',
       index: 2,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: 'shell',
@@ -49,14 +43,11 @@ describe('terminal session projection helpers', () => {
     expect(projected).toEqual({
       descriptor: {
         terminalSessionId: 'term-222222222222222222222',
-        terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         index: 2,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       },
-      terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
+      terminalFilesystemTargetKey: `${REPO_ROOT}\0${REPO_ROOT}`,
       hydrateInput: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -78,20 +69,16 @@ describe('terminal session projection helpers', () => {
 
   test('uses null when the server snapshot is missing', () => {
     const projected = projectServerTerminalSession({
-      repoIndex: makeRepoIndex(),
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
@@ -109,22 +96,18 @@ describe('terminal session projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
-  test('rejects server sessions from a different repo runtime', () => {
+  test('rejects server sessions from a different workspace runtime', () => {
     const projected = projectServerTerminalSession({
-      repoIndex: makeRepoIndex(),
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: 'repo-runtime-current',
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: 'repo-runtime-current',
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -138,27 +121,21 @@ describe('terminal session projection helpers', () => {
     expect(projected).toBeNull()
   })
 
-  test('uses server session branch metadata when the repo branch index is not loaded', () => {
+  test('uses server session presentation metadata', () => {
     const projected = projectServerTerminalSession({
-      repoIndex: {
-        [REPO_ROOT]: {
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchByWorktreePath: {},
-        },
-      },
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'feature/restored',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
+        presentation: {
+          kind: 'git-worktree' as const,
+          head: { kind: 'branch' as const, branchName: 'feature/restored' },
+        },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -169,30 +146,24 @@ describe('terminal session projection helpers', () => {
       },
     })
 
-    expect(projected?.descriptor.branch).toBe('feature/restored')
+    expect(projected?.descriptor.presentation).toEqual({
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/restored' },
+    })
   })
 
-  test('keeps the current repo-index branch when catalog metadata is stale', () => {
+  test('does not replace server presentation from a second client-side authority', () => {
     const projected = projectServerTerminalSession({
-      repoIndex: {
-        [REPO_ROOT]: {
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchByWorktreePath: { [WORKTREE_PATH]: 'feature/current' },
-        },
-      },
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'feature/stale',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -203,14 +174,18 @@ describe('terminal session projection helpers', () => {
       },
     })
 
-    expect(projected?.descriptor.branch).toBe('feature/current')
+    expect(projected?.descriptor.presentation).toEqual({
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/stale' },
+    })
   })
 
   test('projects attach results into local controller state for the active attachment', () => {
-    const projected = projectTerminalAttachResultForClient(
+    const projected = projectTerminalStartResultForClient(
       {
         ok: true,
         frame: 'snapshot',
+        terminalProjectionEffect: { kind: 'none' },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         snapshot: '',
@@ -233,13 +208,19 @@ describe('terminal session projection helpers', () => {
 
   test('materializes a prepared create projection with the committed canonical branch', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'feature/stale', worktreePath: WORKTREE_PATH },
+      {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } },
+      },
       {
         ok: true,
         action: 'created',
-        branch: 'feature/renamed',
+        presentation: {
+          kind: 'git-worktree' as const,
+          head: { kind: 'branch' as const, branchName: 'feature/renamed' },
+        },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',
@@ -256,11 +237,8 @@ describe('terminal session projection helpers', () => {
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      repoRoot: REPO_ROOT,
-      branch: 'feature/renamed',
-      worktreePath: WORKTREE_PATH,
-      cwd: WORKTREE_PATH,
+      target: RUNTIME_TARGET,
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
       controller: { clientId: 'client_a', status: 'connected' },
       processName: 'zsh',
       canonicalTitle: null,
@@ -273,13 +251,16 @@ describe('terminal session projection helpers', () => {
 
   test('uses authoritative create metadata for the projected session', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      },
       {
         ok: true,
         action: 'created',
-        branch: 'main',
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'new-shell',
@@ -297,9 +278,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
@@ -308,17 +287,32 @@ describe('terminal session projection helpers', () => {
         rows: 40,
       }),
     )
+
+    const recovered = projectServerTerminalSession({
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      clientId: 'client_a',
+      index: 0,
+      serverSession: projected.serverSession,
+    })
+    expect(recovered?.descriptor).toMatchObject({
+      target: projected.serverSession.target,
+      presentation: projected.serverSession.presentation,
+    })
   })
 
   test('projects restored create metadata for the durable terminal session id', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      },
       {
         ok: true,
         action: 'restored',
-        branch: 'main',
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',

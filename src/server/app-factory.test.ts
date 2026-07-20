@@ -65,7 +65,11 @@ const appRealtimeHostStub = {
 } satisfies ServerAppRealtimeHost
 
 const workspacePaneTabsHostStub = {
-  restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+  restoreTabs: vi.fn(async () => ({
+    kind: 'restored' as const,
+    snapshot: { revision: 0, entries: [] },
+    repaired: false,
+  })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
@@ -110,6 +114,10 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
 }))
 
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
+
 describe('server app body limit', () => {
   test('rejects POST bodies over 1 MiB with a 413 JSON response', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
@@ -117,6 +125,7 @@ describe('server app body limit', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -143,6 +152,7 @@ describe('server app body limit', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -196,6 +206,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -216,6 +227,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -249,6 +261,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -273,6 +286,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -292,6 +306,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -326,12 +341,68 @@ describe('per-sub-path body limits and auth ordering', () => {
     }
   })
 
+  test('mounts workspace runtime routes behind authentication', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    })
+    const request = (accessToken?: string) =>
+      app.request(
+        new Request('http://127.0.0.1:32100/api/workspace/runtime-list', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(accessToken ? { 'x-goblin-access-token': accessToken } : {}),
+          },
+          body: JSON.stringify({}),
+        }),
+      )
+
+    expect((await request()).status).toBe(401)
+    const response = await request('secret')
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ runtimes: [] })
+  })
+
+  test('applies the standard API body limit to workspace routes', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    })
+    const oversized = 'x'.repeat(2 * 1024 * 1024)
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/workspace/runtime-list', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(oversized.length),
+          'x-goblin-access-token': 'secret',
+        },
+        body: oversized,
+      }),
+    )
+    expect(response.status).toBe(413)
+  })
+
   test('unauth probe to /api/settings/* with oversized body sees 401, not 413', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -356,6 +427,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -389,6 +461,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -420,6 +493,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -449,6 +523,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
@@ -473,6 +548,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       appRealtimeHost: appRealtimeHostStub,
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,

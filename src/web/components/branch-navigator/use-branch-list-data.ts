@@ -4,30 +4,32 @@
 // and remote metadata stay on one selector.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
+import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
 // data query; the store contributes only identity, UI, operation, and
 // remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
   branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
-  ui: Pick<RepoUiState, 'branchViewMode'>
+  ui: GitWorkspaceProjection['ui']
 }
 
 type BranchListRepoShell = Omit<BranchListRepo, 'branchModel' | 'branchAction'> & {
-  operations: Pick<RepoState['operations'], 'branchAction'>
+  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
 }
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
-  'repoRuntimeId',
+  'workspaceRuntimeId',
   'ui',
   'operations',
   'remote',
+  'remoteLifecycle',
 ]
 
 function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchListRepoShell | undefined): boolean {
@@ -39,7 +41,6 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
     } else if (field === 'remote') {
       const ra = a.remote
       const rb = b.remote
-      if (ra.lifecycle !== rb.lifecycle) return false
       if (ra.hasRemotes !== rb.hasRemotes) return false
       if (ra.hasBrowserRemote !== rb.hasBrowserRemote) return false
       if (ra.hasGitHubRemote !== rb.hasGitHubRemote) return false
@@ -57,38 +58,42 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   return true
 }
 
-export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
+export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefined {
   const repoShell = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) => {
-      const repo: RepoState | undefined = s.repos[repoId]
-      return repo
+      const repo: WorkspaceState | undefined = s.workspaces[repoId]
+      return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             ui: {
-              branchViewMode: repo.ui.branchViewMode,
+              branchViewMode: repo.capability.git.ui.branchViewMode,
             },
             operations: {
-              branchAction: repo.operations.branchAction,
+              branchAction: repo.capability.git.operations.branchAction,
             },
             remote: {
-              lifecycle: repo.remote.lifecycle,
-              hasRemotes: repo.remote.hasRemotes,
-              hasBrowserRemote: repo.remote.hasBrowserRemote,
-              hasGitHubRemote: repo.remote.hasGitHubRemote,
-              browserRemoteProvider: repo.remote.browserRemoteProvider,
-              remoteProviders: repo.remote.remoteProviders,
+              hasRemotes: repo.capability.git.remote.hasRemotes,
+              hasBrowserRemote: repo.capability.git.remote.hasBrowserRemote,
+              hasGitHubRemote: repo.capability.git.remote.hasGitHubRemote,
+              browserRemoteProvider: repo.capability.git.remote.browserRemoteProvider,
+              remoteProviders: repo.capability.git.remote.remoteProviders,
             },
+            remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
           }
         : undefined
     },
     branchListRepoShellEqual,
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
-  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', !!repoShell)
+  const branchReadModel = useRepoBranchReadModel(
+    repoShell?.id ?? null,
+    repoShell?.workspaceRuntimeId ?? '',
+    !!repoShell,
+  )
   if (!repoShell || !branchReadModel) return undefined
   return {
     ...projectBranchActionRepo(repoShell, operationsReadModel.data?.operations),

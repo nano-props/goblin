@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 interface MockMenuRuntimeState {
-  recentRepos: RepoSessionEntry[]
+  recentWorkspaces: WorkspaceSessionEntry[]
   shortcutsDisabled: boolean
   langPref: 'auto' | 'en' | 'zh' | 'ko' | 'ja'
 }
 
 function defaultMenuRuntimeState(): MockMenuRuntimeState {
   return {
-    recentRepos: [],
+    recentWorkspaces: [],
     shortcutsDisabled: false,
     langPref: 'auto',
   }
@@ -119,11 +120,11 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.open-local-repo')
+    clickMenuItem('menu.file', 'menu.file.open-local-workspace')
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('reuses an existing primary window for menu actions', async () => {
@@ -131,11 +132,11 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.open-local-repo')
+    clickMenuItem('menu.file', 'menu.file.open-local-workspace')
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('ignores close commands when no window exists', async () => {
@@ -143,7 +144,7 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
-    clickMenuItem('menu.file', 'menu.file.close-tab')
+    clickMenuItem('menu.file', 'menu.file.close-workspace')
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
@@ -169,17 +170,17 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.open-local-repo-path')
+    clickMenuItem('menu.file', 'menu.file.open-local-workspace-path')
     await Promise.resolve()
 
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-path-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-path-requested' })
   })
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? 'C:\\Users\\user' : '/data'))
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
-      recentRepos: [{ kind: 'local', id: 'C:\\Users\\user\\Developer\\repo' }],
+      recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///C:/Users/user/Developer/repo') }],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
@@ -190,21 +191,12 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.[0]?.label).toBe('~\\Developer\\repo')
   })
 
-  test('groups recent repos by local and remote entries', async () => {
+  test('groups recent workspaces by local and remote locators', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
-      recentRepos: [
-        {
-          kind: 'remote',
-          id: 'remote:work/srv/remote-repo',
-          ref: {
-            id: 'remote:work/srv/remote-repo',
-            alias: 'work',
-            remotePath: '/srv/remote-repo',
-            displayName: 'remote-repo',
-          },
-        },
-        { kind: 'local', id: '/home/user/Developer/local-repo' },
+      recentWorkspaces: [
+        { id: workspaceIdForTest('goblin+ssh://work/srv/remote-workspace') },
+        { id: workspaceIdForTest('goblin+file:///home/user/Developer/local-repo') },
       ],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
@@ -216,7 +208,7 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.map((entry: any) => entry.label ?? entry.type)).toEqual([
       '~/Developer/local-repo',
       'separator',
-      'work:/srv/remote-repo',
+      'work:/srv/remote-workspace',
       'separator',
       'menu.file.clear-recent',
     ])
@@ -288,7 +280,7 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
-    const remoteItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-remote-repo')
+    const remoteItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-remote-workspace')
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 
@@ -303,7 +295,7 @@ describe('app menu actions', () => {
     const closeWorkspaceTabItem = fileMenu?.submenu?.find(
       (entry: any) => entry.label === 'menu.file.close-workspace-tab-or-window',
     )
-    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
+    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-workspace')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
     expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+T')
     expect(createWorktreeItem?.accelerator).toBe('CmdOrCtrl+N')
@@ -439,7 +431,7 @@ describe('app menu actions', () => {
   test('routes clear recent through client intent', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
-      recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+      recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
@@ -452,7 +444,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'clear-recent-repos-requested',
+      type: 'clear-recent-workspaces-requested',
     })
   })
 

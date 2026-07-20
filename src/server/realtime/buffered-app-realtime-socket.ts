@@ -9,8 +9,7 @@ export interface AppRealtimeOutputFlushBoundary {
 }
 
 export type AppRealtimeOutputFlushBoundaryContext =
-  | AppRealtimeOutputFlushBoundary
-  | readonly AppRealtimeOutputFlushBoundary[]
+  AppRealtimeOutputFlushBoundary | readonly AppRealtimeOutputFlushBoundary[]
 
 export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtimeOutputFlushBoundaryContext> {
   private readonly flushBoundaryByRuntimeBinding = new Map<string, AppRealtimeOutputFlushBoundary>()
@@ -93,10 +92,7 @@ function normalizeBoundary(boundary: AppRealtimeOutputFlushBoundary): AppRealtim
   }
 }
 
-function runtimeBindingKey(binding: {
-  terminalRuntimeSessionId: string
-  terminalRuntimeGeneration: number
-}): string {
+function runtimeBindingKey(binding: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }): string {
   return `${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
 }
 
