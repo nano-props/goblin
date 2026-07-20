@@ -192,7 +192,6 @@ describe('settings routes', () => {
         gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,
-          operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' as const },
           loadedAt: 1,
         },

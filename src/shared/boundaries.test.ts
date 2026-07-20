@@ -236,7 +236,7 @@ describe('architecture boundary rules', () => {
         },
         {
           relativeFilePath: '/src/web/hooks/useRepoStoreInvalidationRefresh.ts',
-          source: "if (event.query === 'repo-snapshot') invalidateRepoDataQueries(event.repoId)\n",
+          source: "if (event.query === 'repo-snapshot') invalidateRepoSnapshotQueries(event.repoId)\n",
         },
       ]),
     ).toEqual([])

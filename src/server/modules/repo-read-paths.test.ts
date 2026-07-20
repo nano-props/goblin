@@ -172,42 +172,7 @@ describe('readRepoProjection', () => {
       mode: 'full',
       signal: expect.any(AbortSignal),
     })
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith(WORKSPACE_ID, {
-      signal,
-      workspaceRuntimeId: undefined,
-    })
-  })
-
-  test('scopes embedded operations to the requested workspace runtime', async () => {
-    mocks.listRepoWriteOperationsForRepo.mockResolvedValue([
-      {
-        id: 'op-current',
-        repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-current',
-        kind: 'fetch',
-        source: 'background',
-        phase: 'running',
-        enqueuedAt: 1,
-        startedAt: 2,
-        settledAt: null,
-        error: null,
-      },
-    ])
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const signal = new AbortController().signal
-
-    const result = await readRepoProjection(WORKSPACE_ID, {
-      signal,
-      workspaceRuntimeId: 'repo-runtime-current',
-    })
-
-    expect(result.operations.operations).toMatchObject([
-      { id: 'op-current', workspaceRuntimeId: 'repo-runtime-current' },
-    ])
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith(WORKSPACE_ID, {
-      signal,
-      workspaceRuntimeId: 'repo-runtime-current',
-    })
+    expect(mocks.listRepoWriteOperationsForRepo).not.toHaveBeenCalled()
   })
 
   test('does not read all pull requests when no branch is requested', async () => {

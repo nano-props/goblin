@@ -370,7 +370,7 @@ describe('workspace routes', () => {
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
     expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith(USER_ID, {
       repoId: WORKSPACE_ID,
-      query: 'repo-snapshot',
+      query: 'repo-worktree-snapshot',
     })
   })
 

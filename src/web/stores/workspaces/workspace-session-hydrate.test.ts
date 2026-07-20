@@ -118,7 +118,6 @@ describe('repo session hydration', () => {
             gitProjection: {
               snapshot: { branches: [branchSnapshot('main')], current: 'main' },
               pullRequests: null,
-              operations: { operations: [], loadedAt: 0 },
               requested: { branch: null, pullRequestMode: 'full' },
               loadedAt: 10,
             },
@@ -187,7 +186,6 @@ describe('repo session hydration', () => {
           gitProjection: {
             snapshot: { branches: [branchSnapshot('server-main')], current: 'server-main' },
             pullRequests: null,
-            operations: { operations: [], loadedAt: 0 },
             requested: { branch: null, pullRequestMode: 'full' },
             loadedAt: 10,
           },
@@ -297,7 +295,6 @@ describe('repo session hydration', () => {
     const projection = {
       snapshot: { branches: [branchSnapshot('main')], current: 'main' },
       pullRequests: null,
-      operations: { operations: [], loadedAt: 0 },
       requested: { branch: null, pullRequestMode: 'full' as const },
       loadedAt: 10,
     }
@@ -369,7 +366,6 @@ describe('repo session hydration', () => {
         gitProjection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
           pullRequests: null,
-          operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' },
           loadedAt: 10,
         },
@@ -427,7 +423,6 @@ describe('repo session hydration', () => {
         gitProjection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
           pullRequests: null,
-          operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' as const },
           loadedAt: 10,
         },

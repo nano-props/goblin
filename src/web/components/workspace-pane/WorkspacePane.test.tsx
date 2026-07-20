@@ -1875,7 +1875,6 @@ describe('WorkspacePane', () => {
     setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, 'feature/pr', 'full', {
       snapshot: { current: 'feature/pr', branches: [branch] },
       pullRequests: [{ branch: 'feature/pr', pullRequest }],
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/pr', pullRequestMode: 'full' },
       loadedAt: 123,
     })

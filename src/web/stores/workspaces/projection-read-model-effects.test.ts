@@ -34,7 +34,6 @@ describe('repo projection read-model effects', () => {
         current: 'feature/a',
       },
       pullRequests: null,
-      operations: { operations: [], loadedAt },
       requested: { branch, pullRequestMode: mode },
       loadedAt,
     }
@@ -150,7 +149,6 @@ describe('repo projection read-model effects', () => {
         branches: [createBranchSnapshot('feature/a')],
         current: 'feature/a',
       },
-      operations: { operations: [], loadedAt },
       loadedAt,
     }
     const secondProjection: GitWorkspaceRuntimeProjection = {

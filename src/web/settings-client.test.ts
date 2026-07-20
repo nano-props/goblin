@@ -188,9 +188,7 @@ describe('settings-client', () => {
         name: 'routed-repo',
         gitProjection: {
           snapshot: { current: 'main', branches: [] },
-          status: [],
           pullRequests: null,
-          operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' as const },
           loadedAt: 1,
         },
@@ -390,9 +388,7 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(
-      addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///tmp/repo') }),
-    ).resolves.toMatchObject({
+    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///tmp/repo') })).resolves.toMatchObject({
       recentWorkspaces: [{ id: 'goblin+file:///tmp/repo' }],
       addedWorkspace: { id: 'goblin+file:///tmp/repo' },
     })
@@ -502,9 +498,7 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(
-      addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///candidate') }),
-    ).resolves.toMatchObject({
+    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///candidate') })).resolves.toMatchObject({
       recentWorkspaces: [{ id: 'goblin+file:///existing' }],
       addedWorkspace: null,
     })
@@ -605,9 +599,9 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(
-      addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') }),
-    ).rejects.toThrow('projection IPC rejected')
+    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).rejects.toThrow(
+      'projection IPC rejected',
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

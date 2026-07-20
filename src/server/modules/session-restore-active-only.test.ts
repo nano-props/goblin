@@ -96,9 +96,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
     mocks.readRepoProjection.mockImplementation(async (workspaceId: string) => ({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: workspaceId } }] },
-      status: [],
       pullRequests: null,
-      operations: { operations: [], loadedAt: 0 },
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     }))
@@ -113,10 +111,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('non-active workspaces restore root layout without eagerly reading the Git projection', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [
-        { id: ACTIVE_WORKSPACE_ID },
-        { id: STUB_WORKSPACE_ID },
-      ],
+      openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, { id: STUB_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
@@ -290,10 +285,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('uses activeWorkspaceId instead of restoredWorkspaceId to choose the eager restore repo', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [
-        { id: REPO_A_ID },
-        { id: REPO_B_ID },
-      ],
+      openWorkspaceEntries: [{ id: REPO_A_ID }, { id: REPO_B_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
@@ -333,10 +325,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('restores a non-active nested directory as a plain Workspace', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [
-        { id: ACTIVE_WORKSPACE_ID },
-        { id: NESTED_STUB_WORKSPACE_ID },
-      ],
+      openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, { id: NESTED_STUB_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeWorkspace.mockImplementation(async (workspaceId: string) =>
@@ -423,10 +412,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [
-        { id: ACTIVE_WORKSPACE_ID },
-        { id: STUB_WORKSPACE_ID },
-      ],
+      openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, { id: STUB_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         // The Git target cannot be validated without the deferred projection;
         // workspace-level tabs can still be restored independently.

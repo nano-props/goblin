@@ -218,7 +218,10 @@ export function createWorkspaceRoutes(options: {
       publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
     }
     if (executionTarget.kind === 'git-worktree' && (result.ok || result.repositoryStateChanged === true)) {
-      publishUserRepoQueryInvalidation(userId, { repoId: executionTarget.workspaceId, query: 'repo-snapshot' })
+      publishUserRepoQueryInvalidation(userId, {
+        repoId: executionTarget.workspaceId,
+        query: 'repo-worktree-snapshot',
+      })
     }
     return c.json(result)
   })

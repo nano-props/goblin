@@ -31,12 +31,11 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 
 export function repoProjection(
   snapshot: RepoSnapshot | null,
-  options: Partial<Pick<GitWorkspaceRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
+  options: Partial<Pick<GitWorkspaceRuntimeProjection, 'pullRequests' | 'requested' | 'loadedAt'>> = {},
 ): GitWorkspaceRuntimeProjection {
   return {
     snapshot,
     pullRequests: options.pullRequests ?? null,
-    operations: options.operations ?? { operations: [], loadedAt: 0 },
     requested: options.requested ?? { branch: null, pullRequestMode: 'full' },
     loadedAt: options.loadedAt ?? Date.now(),
   }

@@ -1019,17 +1019,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             snapshot?: unknown
             status?: unknown
             pullRequests?: unknown
-            operations?: unknown
             requested?: unknown
             loadedAt?: unknown
           }
           return {
             snapshot: projection.snapshot ?? null,
             pullRequests: projection.pullRequests ?? null,
-            operations:
-              projection.operations && typeof projection.operations === 'object'
-                ? projection.operations
-                : { operations: [], loadedAt: Date.now() },
             requested:
               projection.requested && typeof projection.requested === 'object'
                 ? projection.requested
@@ -1394,7 +1389,6 @@ export function seedRepoReadModelQueryData(
       current: readModel.currentBranch,
     },
     pullRequests: null,
-    operations: { operations: [], loadedAt: 0 },
     requested: {
       branch: null,
       pullRequestMode: 'full',

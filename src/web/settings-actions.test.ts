@@ -59,7 +59,6 @@ const appDataClientMocks = vi.hoisted(() => ({
       gitProjection: {
         snapshot: { current: 'main', branches: [] },
         pullRequests: null,
-        operations: { operations: [], loadedAt: 0 },
         requested: { branch: null, pullRequestMode: 'full' as const },
         loadedAt: 1,
       },
@@ -137,7 +136,6 @@ describe('settings actions', () => {
         gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,
-          operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' },
           loadedAt: 1,
         },

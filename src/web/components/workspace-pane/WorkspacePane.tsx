@@ -20,7 +20,11 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import {
+  useRepoOperationsReadModel,
+  useRepoProjectionReadModel,
+  useRepoWorktreeStatusReadModel,
+} from '#/web/repo-data-query.ts'
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
@@ -368,6 +372,7 @@ function GitWorkspacePaneLoaded({
     true,
   )
   const projection = projectionReadModel.data
+  const operationsReadModel = useRepoOperationsReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId)
   const statusReadModel = useRepoWorktreeStatusReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, true)
   const statusSnapshot = statusReadModel.data
   if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
@@ -409,7 +414,7 @@ function GitWorkspacePaneLoaded({
     }
   }
   const gitWorkspaceProjection: GitWorkspacePaneProjection = {
-    ...projectBranchActionRepo(gitWorkspace, projection.operations.operations, currentBranchName),
+    ...projectBranchActionRepo(gitWorkspace, operationsReadModel.data?.operations, currentBranchName),
     branchModel: presentationBranchModel,
     probe: gitWorkspace.probe,
   }

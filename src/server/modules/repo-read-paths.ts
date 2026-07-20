@@ -273,10 +273,6 @@ export async function readRepoProjection(
   return {
     snapshot: result.snapshot,
     pullRequests: result.pullRequests,
-    operations: await readRepoOperationsSnapshot(cwd, {
-      signal: options.signal,
-      workspaceRuntimeId: options.workspaceRuntimeId,
-    }),
     requested: {
       branch,
       pullRequestMode: mode,

@@ -79,13 +79,15 @@ describe('useRepoStoreInvalidationRefresh', () => {
       {
         queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-7'),
         refetchType: 'active',
+        predicate: expect.any(Function),
       },
       { cancelRefetch: false },
     )
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
     invalidateSpy.mockRestore()
   })
 
-  test('handles repo-runtime invalidations through runtime projection query invalidation', async () => {
+  test('limits repo-runtime invalidations to operation queries', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
@@ -96,18 +98,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'projection'],
-        refetchType: 'active',
-      },
-      { cancelRefetch: false },
-    )
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      {
         queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
         refetchType: 'active',
       },
       { cancelRefetch: false },
     )
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
     invalidateSpy.mockRestore()
   })
 
@@ -129,6 +125,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       {
         queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-7'),
         refetchType: 'active',
+        predicate: expect.any(Function),
       },
       { cancelRefetch: false },
     )

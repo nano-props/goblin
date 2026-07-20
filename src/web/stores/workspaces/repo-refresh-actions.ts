@@ -1,5 +1,9 @@
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } from '#/web/repo-data-query.ts'
+import {
+  invalidateRepoOperationsQueries,
+  invalidateRepoSnapshotQueries,
+  invalidateRepoWorktreeSnapshotQueries,
+} from '#/web/repo-data-query.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
@@ -28,8 +32,12 @@ export async function handleRepoInvalidationRefresh(
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
   if (!gitWorkspaceCanExecute(repo)) return
   if (event.query === 'repo-runtime') {
-    invalidateRepoRuntimeProjectionQueries(repoId, workspaceRuntimeId)
+    invalidateRepoOperationsQueries(repoId, workspaceRuntimeId)
     return
   }
-  invalidateRepoDataQueries(repoId, workspaceRuntimeId)
+  if (event.query === 'repo-worktree-snapshot') {
+    invalidateRepoWorktreeSnapshotQueries(repoId, workspaceRuntimeId)
+    return
+  }
+  invalidateRepoSnapshotQueries(repoId, workspaceRuntimeId)
 }

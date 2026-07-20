@@ -262,7 +262,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { branches: [], current: 'main' },
       pullRequests: [],
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
       loadedAt: 123,
     })

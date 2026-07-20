@@ -109,9 +109,35 @@ describe('repo refresh actions', () => {
 
     expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith(
-      { queryKey: repoDataQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'), refetchType: 'active' },
+      {
+        queryKey: repoDataQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'),
+        refetchType: 'active',
+        predicate: expect.any(Function),
+      },
       { cancelRefetch: false },
     )
+    invalidateSpy.mockRestore()
+  })
+
+  test('routes worktree snapshot invalidation through its narrower query domain', async () => {
+    const store = repoRefreshStoreAccess()
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+
+    await handleRepoInvalidationRefresh(
+      store,
+      { repoId: WORKSPACE_ID, query: 'repo-worktree-snapshot' },
+      'workspace-runtime-test-9',
+    )
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoDataQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'),
+        refetchType: 'active',
+        predicate: expect.any(Function),
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledOnce()
     invalidateSpy.mockRestore()
   })
 })

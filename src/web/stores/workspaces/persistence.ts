@@ -95,7 +95,6 @@ export function seedRepoProjectionQueryFromCacheEntry(
   const cachedProjection = {
     snapshot: cachedSnapshot,
     pullRequests: null,
-    operations: { operations: [], loadedAt: 0 },
     loadedAt: 0,
   }
   seedRepoProjectionQueryData(repoRoot, workspaceRuntimeId, {

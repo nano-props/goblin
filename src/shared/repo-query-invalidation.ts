@@ -1,6 +1,6 @@
 import { toSafeCanonicalWorkspaceId, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-runtime'] as const
+export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-worktree-snapshot', 'repo-runtime'] as const
 
 export type RepoQueryKind = (typeof REPO_QUERY_KINDS)[number]
 

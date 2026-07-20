@@ -380,7 +380,6 @@ export interface RepoOperationsSnapshot {
 export interface GitWorkspaceRuntimeProjection {
   snapshot: RepoSnapshot | null
   pullRequests: PullRequestEntry[] | null
-  operations: RepoOperationsSnapshot
   requested: {
     branch: string | null
     pullRequestMode: PullRequestFetchMode

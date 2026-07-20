@@ -22,7 +22,7 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
-  markRepoRuntimeProjectionInvalidated,
+  invalidateRepoSnapshotQueries,
   getRepoWorktreeStatusQueryData,
   repoDataQueryKey,
   repoProjectionQueryKey,
@@ -769,9 +769,7 @@ describe('projection refresh request ordering', () => {
       projectionCalls += 1
       return {
         snapshot: { branches: [branch('main')], current: 'main' },
-        status: [],
         pullRequests: null,
-        operations: { operations: [], loadedAt: 123 },
         requested: { branch: null, pullRequestMode: 'full' },
         loadedAt: 123,
       }
@@ -792,7 +790,6 @@ describe('projection refresh request ordering', () => {
     const projection = {
       snapshot,
       pullRequests: null,
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'full' as const },
       loadedAt: 123,
     }
@@ -817,9 +814,7 @@ describe('projection refresh request ordering', () => {
       seedRepo([branch('reopened')], 'repo-runtime-test-2')
       return {
         snapshot: { branches: [branch('stale')], current: 'stale' },
-        status: [],
         pullRequests: null,
-        operations: { operations: [], loadedAt: 123 },
         requested: { branch: null, pullRequestMode: 'full' },
         loadedAt: 123,
       }
@@ -1247,7 +1242,7 @@ describe('projection refresh request ordering', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    markRepoRuntimeProjectionInvalidated(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
     resolveStatus({ workspaceRuntimeId, status: staleStatus, loadedAt: Date.now() })
     await refresh
 
@@ -1270,7 +1265,7 @@ describe('projection refresh request ordering', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    markRepoRuntimeProjectionInvalidated(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
 
     rejectStatus(new Error('error.path-not-found'))
     await refresh

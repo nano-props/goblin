@@ -92,9 +92,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
-      status: [],
       pullRequests: null,
-      operations: { operations: [], loadedAt: 0 },
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })

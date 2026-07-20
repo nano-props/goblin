@@ -113,7 +113,6 @@ describe('WorkspaceDashboardPane', () => {
     setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [createRepoBranch('main')] },
       pullRequests: null,
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
@@ -152,7 +151,6 @@ describe('WorkspaceDashboardPane', () => {
     setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [mainBranch] },
       pullRequests: null,
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
@@ -217,7 +215,6 @@ describe('WorkspaceDashboardPane', () => {
           }),
         },
       ],
-      operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })

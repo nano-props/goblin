@@ -98,13 +98,13 @@ describe('repo query invalidation source', () => {
     FakeWebSocket.instances[0]?.emitMessage({
       type: 'repo-query-invalidated',
       repoId: WORKSPACE_ID,
-      query: 'repo-snapshot',
+      query: 'repo-worktree-snapshot',
     })
 
     expect(listener).toHaveBeenCalledWith({
       type: 'repo-query-invalidated',
       repoId: WORKSPACE_ID,
-      query: 'repo-snapshot',
+      query: 'repo-worktree-snapshot',
     })
     dispose()
   })
