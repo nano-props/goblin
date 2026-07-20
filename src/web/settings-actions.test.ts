@@ -52,7 +52,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   })),
   restoreWorkspaceTabs: vi.fn(async () => ({
     workspace: {
-      entry: { kind: 'local' as const, id: 'goblin+file:///tmp/repo-a' },
+      entry: { id: 'goblin+file:///tmp/repo-a' },
       workspaceId: 'goblin+file:///tmp/repo-a',
       workspaceRuntimeId: 'repo_runtime_test',
       name: 'repo-a',
@@ -130,7 +130,7 @@ describe('settings actions', () => {
     appDataClientMocks.restoreWorkspaceTabs.mockReset()
     appDataClientMocks.restoreWorkspaceTabs.mockResolvedValue({
       workspace: {
-        entry: { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
+        entry: { id: 'goblin+file:///tmp/repo-a' },
         workspaceId: 'goblin+file:///tmp/repo-a',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-a',
@@ -163,22 +163,22 @@ describe('settings actions', () => {
   test('recordRecentWorkspace syncs recent repos into the settings snapshot cache', async () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     appDataClientMocks.addRecentWorkspace.mockResolvedValue({
-      recentWorkspaces: [{ kind: 'local', id: WORKSPACE_A }],
-      addedWorkspace: { kind: 'local', id: WORKSPACE_A },
+      recentWorkspaces: [{ id: WORKSPACE_A }],
+      addedWorkspace: { id: WORKSPACE_A },
     })
     const { recordRecentWorkspace } = await import('#/web/settings-actions.ts')
 
-    await recordRecentWorkspace({ kind: 'local', id: WORKSPACE_A })
+    await recordRecentWorkspace({ id: WORKSPACE_A })
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
-      recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo-a' }],
+      recentWorkspaces: [{ id: 'goblin+file:///tmp/repo-a' }],
     })
   })
 
   test('clearRecentWorkspaceHistory clears recent repos from the settings snapshot cache', async () => {
     primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ recentWorkspaces: [{ kind: 'local', id: WORKSPACE_A }] }),
+      defaultSettingsSnapshot({ recentWorkspaces: [{ id: WORKSPACE_A }] }),
     )
     const { clearRecentWorkspaceHistory } = await import('#/web/settings-actions.ts')
 
@@ -193,7 +193,7 @@ describe('settings actions', () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: WORKSPACE_A }],
+      openWorkspaceEntries: [{ id: WORKSPACE_A }],
       restoredWorkspaceId: WORKSPACE_A,
       workspacePaneSize: 333,
     }

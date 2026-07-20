@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   formatLocalWorkspaceLocation,
-  formatRemoteWorkspaceRefLocator,
   formatRemoteWorkspaceTargetLocator,
   formatRemoteWorktreeLocator,
   formatWorkspaceDisplayLocation,
@@ -20,10 +19,6 @@ describe('workspace display locations', () => {
     expect(formatRemoteWorkspaceTargetLocator({ user: 'git', host: 'example.test', remotePath: '/srv/repo' })).toBe(
       'git@example.test:/srv/repo',
     )
-  })
-
-  test('formats persisted remote ref locators with the SSH alias', () => {
-    expect(formatRemoteWorkspaceRefLocator({ alias: 'prod', remotePath: '/srv/repo' })).toBe('prod:/srv/repo')
   })
 
   test('formats workspace locations from the best available remote metadata', () => {
@@ -62,22 +57,13 @@ describe('workspace display locations', () => {
   test('formats recent workspace session entry locators', () => {
     expect(
       formatWorkspaceSessionEntryLocator(
-        { kind: 'local', id: workspaceIdForTest('goblin+file:///Users/example/workspace') },
+        { id: workspaceIdForTest('goblin+file:///Users/example/workspace') },
         '/Users/example',
       ),
     ).toBe('~/workspace')
     expect(
       formatWorkspaceSessionEntryLocator(
-        {
-          kind: 'remote',
-          id: workspaceIdForTest('goblin+ssh://prod/srv/workspace'),
-          ref: {
-            id: workspaceIdForTest('goblin+ssh://prod/srv/workspace'),
-            alias: 'prod',
-            remotePath: '/srv/workspace',
-            displayName: 'prod:workspace',
-          },
-        },
+        { id: workspaceIdForTest('goblin+ssh://prod/srv/workspace') },
         '/Users/example',
       ),
     ).toBe('prod:/srv/workspace')

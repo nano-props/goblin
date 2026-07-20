@@ -1,5 +1,5 @@
 import { IpcError, type RestoredWorkspaceRuntime, type WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   isCurrentWorkspaceRuntimeMembership,
@@ -63,7 +63,7 @@ async function projectWorkspace(
   input: RestoreWorkspaceTabsInput,
   entry: WorkspaceSessionEntry,
 ): Promise<RestoredWorkspaceRuntime | null> {
-  if (entry.kind === 'remote') {
+  if (isRemoteWorkspaceId(entry.id)) {
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteWorkspaceLifecycleWrite(
         {
@@ -100,7 +100,7 @@ async function projectWorkspace(
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
         name: lifecycle.name,
-        remoteLifecycle: lifecycle.lifecycle,
+        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
       }
@@ -111,7 +111,7 @@ async function projectWorkspace(
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
         name: lifecycle.name,
-        remoteLifecycle: lifecycle.lifecycle,
+        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
       }
@@ -128,7 +128,7 @@ async function projectWorkspace(
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
         name: lifecycle.name,
-        remoteLifecycle: lifecycle.lifecycle,
+        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
       }
@@ -138,7 +138,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: lifecycle.name,
-      remoteLifecycle: lifecycle.lifecycle,
+      transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
       workspaceProbe,
       gitProjection: projection,
     }
@@ -174,7 +174,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: probe.name ?? workspaceDisplayName(entry.id),
-      remoteLifecycle: null,
+      transport: { kind: 'file' },
       workspaceProbe: probe,
       gitProjection: null,
     }
@@ -191,7 +191,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: probe.name ?? workspaceDisplayName(entry.id),
-      remoteLifecycle: null,
+      transport: { kind: 'file' },
       workspaceProbe: probe,
       gitProjection: null,
     }
@@ -201,7 +201,7 @@ async function projectWorkspace(
     workspaceId: entry.id,
     workspaceRuntimeId: input.workspaceRuntimeId,
     name: probe.name ?? workspaceDisplayName(entry.id),
-    remoteLifecycle: null,
+    transport: { kind: 'file' },
     workspaceProbe: probe,
     gitProjection: projection,
   }

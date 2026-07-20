@@ -51,13 +51,13 @@ test('commits a layout CAS with one durable write', async () => {
 
 test('does not expose failed settings writes through the in-memory cache', async () => {
   const mod = await import('#/server/modules/settings-source.ts')
-  await mod.addServerRecentWorkspace({ kind: 'local', id: REPO_A })
+  await mod.addServerRecentWorkspace({ id: REPO_A })
   persistence.failNextWrite = true
-  await expect(mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B })).rejects.toThrow('disk full')
-  expect(await mod.getServerRecentWorkspaces()).toEqual([{ kind: 'local', id: REPO_A }])
-  await expect(mod.addServerRecentWorkspace({ kind: 'local', id: REPO_C })).resolves.toEqual([
-    { kind: 'local', id: REPO_C },
-    { kind: 'local', id: REPO_A },
+  await expect(mod.addServerRecentWorkspace({ id: REPO_B })).rejects.toThrow('disk full')
+  expect(await mod.getServerRecentWorkspaces()).toEqual([{ id: REPO_A }])
+  await expect(mod.addServerRecentWorkspace({ id: REPO_C })).resolves.toEqual([
+    { id: REPO_C },
+    { id: REPO_A },
   ])
 })
 

@@ -91,7 +91,5 @@ function isLangPref(value: unknown): value is LangPref {
 }
 
 function isWorkspaceSessionEntry(value: unknown): value is WorkspaceSessionEntry {
-  if (!isRecord(value)) return false
-  if (value.kind === 'local') return typeof value.id === 'string' && value.id.length > 0
-  return value.kind === 'remote' && isRecord(value.ref) && normalizeWorkspaceSessionEntry(value) !== null
+  return isRecord(value) && normalizeWorkspaceSessionEntry(value) !== null
 }

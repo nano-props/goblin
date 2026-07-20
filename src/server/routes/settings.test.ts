@@ -152,7 +152,7 @@ describe('settings routes', () => {
 
   test('delegates authenticated workspace membership commands', async () => {
     const workspace = {
-      openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo-a' }],
+      openWorkspaceEntries: [{ id: 'goblin+file:///repo-a' }],
       workspacePaneTabsByTargetByWorkspace: {},
     }
     mocks.addServerWorkspaceEntry.mockResolvedValue(workspace)
@@ -168,7 +168,7 @@ describe('settings routes', () => {
     const addResponse = await app.request('/workspace/entries/add', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ entry: { kind: 'local', id: 'goblin+file:///repo-a' } }),
+      body: JSON.stringify({ entry: { id: 'goblin+file:///repo-a' } }),
     })
     const removeResponse = await app.request('/workspace/entries/remove', {
       method: 'POST',
@@ -178,14 +178,14 @@ describe('settings routes', () => {
 
     await expect(addResponse.json()).resolves.toEqual(workspace)
     await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openWorkspaceEntries: [] })
-    expect(mocks.addServerWorkspaceEntry).toHaveBeenCalledWith({ kind: 'local', id: 'goblin+file:///repo-a' })
+    expect(mocks.addServerWorkspaceEntry).toHaveBeenCalledWith({ id: 'goblin+file:///repo-a' })
     expect(mocks.removeServerWorkspaceEntry).toHaveBeenCalledWith('goblin+file:///repo-a')
   })
 
   test('delegates lazy repo tab restore to the server restore coordinator', async () => {
     const restored = {
       repo: {
-        entry: { kind: 'local' as const, id: 'goblin+file:///repo-active' },
+        entry: { id: 'goblin+file:///repo-active' },
         repoRoot: 'goblin+file:///repo-active',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-active',
@@ -273,7 +273,7 @@ describe('settings routes', () => {
   })
 
   test('delegates recent-workspace writes to the settings command handler layer', async () => {
-    const repo = { kind: 'local', id: 'goblin+file:///tmp/repo-a' } as const
+    const repo = { id: 'goblin+file:///tmp/repo-a' }
     mocks.handleAddRecentWorkspace.mockResolvedValue({ ok: true, recentWorkspaces: [repo], addedWorkspace: repo })
     mocks.handleClearRecentWorkspaces.mockResolvedValue({ ok: true })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')

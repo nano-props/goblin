@@ -8,7 +8,6 @@ import {
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import { toSafeWorkspaceSessionEntry } from '#/shared/input-validation.ts'
 import type { WorkspaceSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -76,15 +75,10 @@ export function handleSetGlobalShortcutRegistered(
 export async function handleAddRecentWorkspace(
   input: AddRecentWorkspaceInput,
 ): Promise<{ ok: true; recentWorkspaces: WorkspaceSessionEntry[]; addedWorkspace: WorkspaceSessionEntry | null }> {
-  // The route schema has already confirmed the shape; re-run
-  // `toSafeWorkspaceSessionEntry` as a defence in depth check in case the
-  // shape ever loosens.
-  const requestedWorkspace = toSafeWorkspaceSessionEntry(input.workspace)
   const recentWorkspaces = await addServerRecentWorkspace(input.workspace)
   const addedWorkspace =
-    requestedWorkspace &&
     recentWorkspaces.length > 0 &&
-    workspaceSessionEntryId(recentWorkspaces[0]) === workspaceSessionEntryId(requestedWorkspace)
+    workspaceSessionEntryId(recentWorkspaces[0]) === workspaceSessionEntryId(input.workspace)
       ? recentWorkspaces[0]
       : null
   publishSettingsInvalidation(['settings-snapshot'])

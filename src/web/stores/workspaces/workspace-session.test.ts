@@ -88,7 +88,7 @@ describe('repo lifecycle', () => {
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
-    expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
+    expect(calls.recent).toEqual([{ id: REPO_A }])
     await vi.waitFor(() => {
       expect(calls.projection).toEqual([REPO_A])
     })

@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 /**
  * Single authority for syncing the recent-workspaces list into every macOS
@@ -22,9 +23,8 @@ export function syncRecentWorkspaces(recentWorkspaces: WorkspaceSessionEntry[]):
 
 function syncDockRecentDocuments(recentWorkspaces: WorkspaceSessionEntry[]): void {
   app.clearRecentDocuments()
-  for (const repo of recentWorkspaces) {
-    if (repo.kind === 'local') {
-      app.addRecentDocument(repo.id)
-    }
+  for (const workspace of recentWorkspaces) {
+    const locator = parseWorkspaceLocator(workspace.id, process.platform === 'win32' ? 'win32' : 'posix')
+    if (locator?.transport === 'file') app.addRecentDocument(locator.path)
   }
 }

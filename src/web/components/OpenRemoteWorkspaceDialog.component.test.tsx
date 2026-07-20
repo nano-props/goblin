@@ -441,16 +441,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
     click('button[type="submit"]')
     await flush()
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith({
-      kind: 'remote',
-      id: target.id,
-      ref: {
-        id: target.id,
-        alias: 'prod',
-        remotePath: '/srv/repo',
-        displayName: 'prod:repo',
-      },
-    })
+    expect(ensureWorkspaceOpen).toHaveBeenCalledWith({ id: target.id })
     expect(activateWorkspace).toHaveBeenCalledWith(target.id)
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })

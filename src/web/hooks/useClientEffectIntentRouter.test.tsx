@@ -428,14 +428,13 @@ describe('useClientEffectIntentRouter', () => {
       for (const listener of intentListeners) {
         listener({
           type: 'open-recent-workspace-requested',
-          entry: { kind: 'local', id: 'goblin+file:///tmp/recent-workspace' },
+          entry: { id: 'goblin+file:///tmp/recent-workspace' },
         })
       }
       await Promise.resolve()
     })
 
     expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
-      kind: 'local',
       id: 'goblin+file:///tmp/recent-workspace',
     })
     expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')

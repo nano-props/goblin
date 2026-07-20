@@ -93,7 +93,7 @@ test('persists updates and notifies subscribers from the server settings store',
   await writeWorkspacePaneLayout(mod, REPO_B, {
     entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
   })
-  await mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B })
+  await mod.addServerRecentWorkspace({ id: REPO_B })
   await mod.trustServerWorkspaceWorktreeBootstrapConfig({
     workspaceId: REPO_B,
     configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -124,7 +124,7 @@ test('persists updates and notifies subscribers from the server settings store',
       },
     },
   })
-  expect(await reloaded.getServerRecentWorkspaces()).toEqual([{ kind: 'local', id: REPO_B }])
+  expect(await reloaded.getServerRecentWorkspaces()).toEqual([{ id: REPO_B }])
   expect(await reloaded.getServerWorkspaceSettings()).toEqual([
     {
       workspaceId: REPO_B,
@@ -171,15 +171,15 @@ test('serializes concurrent settings mutations without dropping updates', async 
   const mod = await import('#/server/modules/settings-source.ts')
 
   await Promise.all([
-    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_A }),
-    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B }),
-    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_C }),
+    mod.addServerRecentWorkspace({ id: REPO_A }),
+    mod.addServerRecentWorkspace({ id: REPO_B }),
+    mod.addServerRecentWorkspace({ id: REPO_C }),
   ])
 
   expect(await mod.getServerRecentWorkspaces()).toEqual([
-    { kind: 'local', id: REPO_C },
-    { kind: 'local', id: REPO_B },
-    { kind: 'local', id: REPO_A },
+    { id: REPO_C },
+    { id: REPO_B },
+    { id: REPO_A },
   ])
   expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
@@ -190,7 +190,6 @@ test('stores the shared open repo order without applying the recent-workspace li
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
   const entries = Array.from({ length: 12 }, (_, index) => ({
-    kind: 'local' as const,
     id: workspaceIdForTest(`goblin+file:///repo-${index}`),
   }))
 
@@ -205,9 +204,9 @@ test('repairs open repos only when the source membership is unchanged', async ()
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoA = { kind: 'local' as const, id: REPO_A }
-  const repoB = { kind: 'local' as const, id: REPO_B }
-  const repoC = { kind: 'local' as const, id: REPO_C }
+  const repoA = { id: REPO_A }
+  const repoB = { id: REPO_B }
+  const repoC = { id: REPO_C }
   await mod.addServerWorkspaceEntry(repoA)
   await mod.addServerWorkspaceEntry(repoB)
 
@@ -227,7 +226,7 @@ test('confirms one canonical workspace repo entry without writing settings', asy
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const entry = { kind: 'local' as const, id: REPO_A }
+  const entry = { id: REPO_A }
   await mod.addServerWorkspaceEntry(entry)
 
   await expect(mod.confirmServerWorkspaceEntry(entry)).resolves.toMatchObject({ matched: true })
@@ -272,7 +271,7 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoEntry = { kind: 'local' as const, id: REPO_A }
+  const repoEntry = { id: REPO_A }
   const empty = { entries: [] }
   const history: WorkspacePaneDurableLayout = {
     entries: [
@@ -374,7 +373,7 @@ test('workspace pane restore does not write or classify persistence failures', a
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  const repoEntry = { kind: 'local' as const, id: REPO_A }
+  const repoEntry = { id: REPO_A }
   const staleLayout: WorkspacePaneDurableLayout = {
     entries: [
       {

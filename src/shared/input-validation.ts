@@ -1,13 +1,7 @@
 import path from 'node:path'
 import { MAX_WORKSPACE_LOCATOR_LENGTH } from '#/shared/workspace-locator.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import {
-  isRemoteWorkspaceId,
-  normalizeRemoteWorkspaceRef,
-  normalizeWorkspaceSessionEntry,
-  parseRemoteWorkspaceId,
-  type WorkspaceSessionEntry,
-} from '#/shared/remote-workspace.ts'
+import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   formatWorkspaceLocator,
   parseWorkspaceLocator,
@@ -59,12 +53,9 @@ export function toSafeWorkspaceLocator(value: unknown): WorkspaceId | null {
 
 export function toSafeWorkspaceSessionEntry(value: unknown): WorkspaceSessionEntry | null {
   const entry = normalizeWorkspaceSessionEntry(value)
-  const id = toSafeWorkspaceLocator(entry?.id ?? value)
+  const id = toSafeWorkspaceLocator(entry?.id)
   if (!id) return null
-  if (!isRemoteWorkspaceId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null
-  const parsed = parseRemoteWorkspaceId(id)
-  const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
-  return ref && entry?.kind === 'remote' && entry.ref.id === id ? { kind: 'remote', id: ref.id, ref } : null
+  return { id }
 }
 
 function currentPlatform(): WorkspaceLocatorPlatform {

@@ -20,6 +20,7 @@ import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 
@@ -47,17 +48,6 @@ const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, configTrusted: v.boolean() }),
 ])
 
-const RemoteWorkspaceRefSchema = v.object({
-  id: WorkspaceIdSchema,
-  alias: v.string(),
-  remotePath: v.string(),
-  displayName: v.string(),
-})
-
-const WorkspaceSessionEntrySchema = v.variant('kind', [
-  v.object({ kind: v.literal('local'), id: WorkspaceIdSchema }),
-  v.object({ kind: v.literal('remote'), id: WorkspaceIdSchema, ref: RemoteWorkspaceRefSchema }),
-])
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const WorkspaceRuntimeOpenSchema = v.union([
   v.object({ workspaceId: WorkspaceIdSchema, clientId: ClientIdSchema }),

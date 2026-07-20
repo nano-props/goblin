@@ -65,14 +65,18 @@ describe('isClientEffectIntent', () => {
     expect(
       isClientEffectIntent({
         type: 'open-recent-workspace-requested',
-        entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
+        entry: { id: 'goblin+file:///tmp/repo' },
       }),
     ).toBe(true)
-    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'local', id: '' } })).toBe(
-      false,
-    )
+    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: '' } })).toBe(false)
     expect(
-      isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'remote', id: 'remote:repo' } }),
+      isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: 'remote:repo' } }),
+    ).toBe(false)
+    expect(
+      isClientEffectIntent({
+        type: 'open-recent-workspace-requested',
+        entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
+      }),
     ).toBe(false)
   })
 })

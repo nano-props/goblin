@@ -23,22 +23,13 @@ export interface RemoteWorkspaceTarget extends RemoteWorkspaceRef {
   }
 }
 
-export type LocalWorkspaceSessionEntry = { kind: 'local'; id: WorkspaceId }
-export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: WorkspaceId; ref: RemoteWorkspaceRef }
-export type WorkspaceSessionEntry = LocalWorkspaceSessionEntry | RemoteWorkspaceSessionEntry
+export type WorkspaceSessionEntry = { id: WorkspaceId }
 
 export function sameWorkspaceSessionEntry(
   a: WorkspaceSessionEntry | null | undefined,
   b: WorkspaceSessionEntry | null | undefined,
 ): boolean {
-  if (!a || !b || a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.id === b.ref.id &&
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName
-  )
+  return !!a && !!b && a.id === b.id
 }
 
 export interface SshConfigHost {
@@ -355,35 +346,24 @@ export function workspaceSessionEntryId(entry: WorkspaceSessionEntry): Workspace
   return entry.id
 }
 
-export function localWorkspaceSessionEntry(id: WorkspaceId): LocalWorkspaceSessionEntry {
-  return { kind: 'local', id }
+export function localWorkspaceSessionEntry(id: WorkspaceId): WorkspaceSessionEntry {
+  return { id }
 }
 
 export function remoteWorkspaceSessionEntry(
   ref: RemoteWorkspaceRef | RemoteWorkspaceTarget,
-): RemoteWorkspaceSessionEntry {
+): WorkspaceSessionEntry {
   const normalized = normalizeRemoteWorkspaceRef(ref)
   if (!normalized) throw new TypeError('Invalid remote workspace reference')
-  return { kind: 'remote', id: normalized.id, ref: normalized }
+  return { id: normalized.id }
 }
 
 export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSessionEntry | null {
-  if (!input || typeof input !== 'object') return null
-  const kind = Reflect.get(input, 'kind')
+  if (!input || typeof input !== 'object' || Object.keys(input).length !== 1 || !Object.hasOwn(input, 'id')) return null
   const rawId = Reflect.get(input, 'id')
-  if (kind === 'local') {
-    if (typeof rawId !== 'string') return null
-    const id = canonicalWorkspaceLocator(rawId)
-    const parsed = id ? (parseWorkspaceLocator(id, 'posix') ?? parseWorkspaceLocator(id, 'win32')) : null
-    return id && parsed?.transport === 'file' ? { kind: 'local', id } : null
-  }
-  if (kind === 'remote') {
-    if (typeof rawId !== 'string') return null
-    const ref = normalizeRemoteWorkspaceRef(Reflect.get(input, 'ref'))
-    if (!ref || rawId !== ref.id) return null
-    return { kind: 'remote', id: ref.id, ref }
-  }
-  return null
+  if (typeof rawId !== 'string') return null
+  const id = canonicalWorkspaceLocator(rawId)
+  return id ? { id } : null
 }
 
 export function parseRemoteWorkspaceId(workspaceId: string): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {

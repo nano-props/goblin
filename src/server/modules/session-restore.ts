@@ -9,10 +9,9 @@ import {
   type ServerWorkspaceState,
 } from '#/shared/api-types.ts'
 import {
+  isRemoteWorkspaceId,
   workspaceSessionEntryId,
   sameWorkspaceSessionEntry,
-  type LocalWorkspaceSessionEntry,
-  type RemoteWorkspaceSessionEntry,
   type RemoteWorkspaceRuntimeLifecycle,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
@@ -222,7 +221,7 @@ async function openWorkspaceRuntime(
 ): Promise<OpenWorkspaceResult> {
   input.signal?.throwIfAborted()
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
-  if (entry.kind === 'remote') return await openRemoteWorkspace(input, entry, options)
+  if (isRemoteWorkspaceId(entry.id)) return await openRemoteWorkspace(input, entry, options)
   return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
     let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.workspaceRuntimeId)
     if (authoritativeProbe?.status === 'probing') {
@@ -241,10 +240,7 @@ async function openWorkspaceRuntime(
       throw new Error('workspace runtime was superseded during restore')
     }
     const name = authoritativeProbe.status === 'ready' ? authoritativeProbe.name : workspaceDisplayName(entry.id)
-    if (
-      !workspaceGitAvailable(authoritativeProbe) ||
-      !options.active
-    ) {
+    if (!workspaceGitAvailable(authoritativeProbe) || !options.active) {
       return {
         kind: 'opened',
         opened: stubWorkspace({
@@ -252,7 +248,7 @@ async function openWorkspaceRuntime(
           workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
-          remoteLifecycle: null,
+          transport: { kind: 'file' },
           lease,
         }),
       }
@@ -270,7 +266,7 @@ async function openWorkspaceRuntime(
           workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
-          remoteLifecycle: null,
+          transport: { kind: 'file' },
           lease,
         }),
       }
@@ -282,7 +278,7 @@ async function openWorkspaceRuntime(
         workspaceId: lease.workspaceId,
         name,
         workspaceProbe: authoritativeProbe,
-        remoteLifecycle: null,
+        transport: { kind: 'file' },
         gitProjection: projection,
         lease,
       }),
@@ -292,7 +288,7 @@ async function openWorkspaceRuntime(
 
 async function openRemoteWorkspace(
   input: RestoreServerWorkspaceInput,
-  entry: RemoteWorkspaceSessionEntry,
+  entry: WorkspaceSessionEntry,
   options: { active: boolean },
 ): Promise<OpenWorkspaceResult> {
   return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
@@ -317,7 +313,7 @@ async function openRemoteWorkspace(
             workspaceId: lease.workspaceId,
             name: lifecycle.name,
             workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
-            remoteLifecycle: lifecycle.lifecycle,
+            transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
             lease,
           }),
         }
@@ -325,10 +321,7 @@ async function openRemoteWorkspace(
       throw new Error('workspace workspace runtime was superseded during restore')
     }
     const workspaceProbe = requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId)
-    if (
-      !workspaceGitAvailable(workspaceProbe) ||
-      !options.active
-    ) {
+    if (!workspaceGitAvailable(workspaceProbe) || !options.active) {
       return {
         kind: 'opened',
         opened: stubWorkspace({
@@ -336,7 +329,7 @@ async function openRemoteWorkspace(
           workspaceId: lease.workspaceId,
           name: lifecycle.name,
           workspaceProbe,
-          remoteLifecycle: lifecycle.lifecycle,
+          transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
           lease,
         }),
       }
@@ -354,7 +347,7 @@ async function openRemoteWorkspace(
           workspaceId: lease.workspaceId,
           name: lifecycle.name,
           workspaceProbe,
-          remoteLifecycle: lifecycle.lifecycle,
+          transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
           lease,
         }),
       }
@@ -366,7 +359,7 @@ async function openRemoteWorkspace(
         workspaceId: lease.workspaceId,
         name: lifecycle.name,
         workspaceProbe,
-        remoteLifecycle: lifecycle.lifecycle,
+        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         gitProjection: projection,
         lease,
       }),
@@ -431,12 +424,17 @@ interface OpenedWorkspaceRuntimeInputBase {
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }
 
-type OpenedWorkspaceRuntimeTransport =
-  | { entry: LocalWorkspaceSessionEntry; remoteLifecycle: null }
+type OpenedWorkspaceRuntimeTransport = {
+  entry: WorkspaceSessionEntry
+} & (
+  | { transport: { kind: 'file' } }
   | {
-      entry: RemoteWorkspaceSessionEntry
-      remoteLifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      transport: {
+        kind: 'ssh'
+        lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      }
     }
+)
 
 type OpenedWorkspaceRuntimeInput = OpenedWorkspaceRuntimeInputBase & OpenedWorkspaceRuntimeTransport
 
@@ -465,9 +463,9 @@ function stubWorkspace(input: OpenedWorkspaceRuntimeInput): OpenedWorkspaceRunti
 function gitProjectedWorkspace(
   input: Omit<OpenedWorkspaceRuntimeInputBase, 'workspaceProbe'> &
     OpenedWorkspaceRuntimeTransport & {
-    workspaceProbe: WorkspaceGitReadyProbeState
-    gitProjection: GitWorkspaceRuntimeProjection
-  },
+      workspaceProbe: WorkspaceGitReadyProbeState
+      gitProjection: GitWorkspaceRuntimeProjection
+    },
 ): OpenedWorkspaceRuntime {
   return {
     ...input,

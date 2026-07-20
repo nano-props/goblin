@@ -23,7 +23,7 @@ import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { formatWorkspaceSessionEntryLocator } from '#/shared/workspace-display-location.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { readMenuRuntimeState } from '#/main/menu-state.ts'
@@ -177,10 +177,10 @@ function createRecentWorkspacesMenu(recentWorkspaces: WorkspaceSessionEntry[]): 
 
   const home = app.getPath('home')
   const localWorkspaceItems = recentWorkspaces
-    .filter((entry) => entry.kind === 'local')
+    .filter((entry) => !isRemoteWorkspaceId(entry.id))
     .map((entry) => createRecentWorkspaceMenuItem(entry, home))
   const remoteWorkspaceItems = recentWorkspaces
-    .filter((entry) => entry.kind === 'remote')
+    .filter((entry) => isRemoteWorkspaceId(entry.id))
     .map((entry) => createRecentWorkspaceMenuItem(entry, home))
 
   return [

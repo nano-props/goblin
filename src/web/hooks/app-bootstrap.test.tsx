@@ -12,6 +12,7 @@ import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBoo
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
+import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -102,7 +103,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('goblin+file:///tmp/repo', 'main')
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
         workspacePaneTabsByTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             [targetKey]: [],
@@ -188,7 +189,7 @@ describe('app bootstrap hooks', () => {
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -228,7 +229,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when server workspace restore fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -262,7 +263,7 @@ describe('app bootstrap hooks', () => {
   test('continues with a repaired session returned by server restore', async () => {
     const persistedSession = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -317,7 +318,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/missing-repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/missing-repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/missing-repo'),
@@ -444,7 +445,7 @@ describe('app bootstrap hooks', () => {
     vi.useFakeTimers()
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+        openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -613,54 +614,62 @@ function restoredRuntimeForWorkspace(
 ): WorkspaceRuntimeRestoreSnapshot {
   const restoredWorkspace = restoredWorkspaceId ? workspaceIdForTest(restoredWorkspaceId) : null
   return {
-    workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => ({
-      ...(entry.kind === 'remote'
-        ? {
-            entry,
-            remoteLifecycle: {
-              kind: 'ready' as const,
-              attemptId: 1,
-              target: { ...entry.ref, host: 'example.test', user: 'developer', port: 22 },
-            },
-          }
-        : { entry, remoteLifecycle: null }),
-      workspaceId: workspaceIdForTest(entry.id),
-      workspaceRuntimeId: `repo-runtime-${entry.id}`,
-      name: entry.id.split('/').pop() || entry.id,
-      workspaceProbe: {
-        status: 'ready',
+    workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => {
+      const remoteRef = isRemoteWorkspaceId(entry.id)
+        ? normalizeRemoteWorkspaceRef(parseRemoteWorkspaceId(entry.id))
+        : null
+      return {
+        entry,
+        ...(remoteRef
+          ? {
+              transport: {
+                kind: 'ssh' as const,
+                lifecycle: {
+                  kind: 'ready' as const,
+                  attemptId: 1,
+                  target: { ...remoteRef, host: 'example.test', user: 'developer', port: 22 },
+                },
+              },
+            }
+          : { transport: { kind: 'file' as const } }),
+        workspaceId: workspaceIdForTest(entry.id),
+        workspaceRuntimeId: `repo-runtime-${entry.id}`,
         name: entry.id.split('/').pop() || entry.id,
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        workspaceProbe: {
+          status: 'ready',
+          name: entry.id.split('/').pop() || entry.id,
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+          },
+          diagnostics: [],
         },
-        diagnostics: [],
-      },
-      gitProjection: {
-        snapshot: {
-          current: 'main',
-          branches: [
-            {
-              name: 'main',
-              isCurrent: true,
-              ahead: 0,
-              behind: 0,
-              lastCommitHash: 'abc123',
-              lastCommitShortHash: 'abc123',
-              lastCommitMessage: 'Initial commit',
-              lastCommitDate: '2024-01-01T00:00:00.000Z',
-              lastCommitAuthor: 'Test User',
-            },
-          ],
+        gitProjection: {
+          snapshot: {
+            current: 'main',
+            branches: [
+              {
+                name: 'main',
+                isCurrent: true,
+                ahead: 0,
+                behind: 0,
+                lastCommitHash: 'abc123',
+                lastCommitShortHash: 'abc123',
+                lastCommitMessage: 'Initial commit',
+                lastCommitDate: '2024-01-01T00:00:00.000Z',
+                lastCommitAuthor: 'Test User',
+              },
+            ],
+          },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 1,
         },
-        status: [],
-        pullRequests: null,
-        operations: { operations: [], loadedAt: 0 },
-        requested: { branch: null, pullRequestMode: 'full' as const },
-        loadedAt: 1,
-      },
-    })),
+      }
+    }),
     workspacePaneTabs: [],
     restoredWorkspaceId: restoredWorkspace,
   }

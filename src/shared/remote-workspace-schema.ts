@@ -13,14 +13,4 @@ export const RemoteWorkspaceRefSchema = v.object({
   displayName: v.string(),
 })
 
-export const WorkspaceSessionEntrySchema = v.union([
-  v.object({
-    kind: v.literal('local'),
-    id: WorkspaceIdSchema,
-  }),
-  v.object({
-    kind: v.literal('remote'),
-    id: WorkspaceIdSchema,
-    ref: RemoteWorkspaceRefSchema,
-  }),
-])
+export const WorkspaceSessionEntrySchema = v.strictObject({ id: WorkspaceIdSchema })

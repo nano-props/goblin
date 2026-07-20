@@ -1,8 +1,7 @@
 import { tildifyPath } from '#/shared/paths.ts'
-import type { RemoteWorkspaceRef, RemoteWorkspaceTarget, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { RemoteWorkspaceTarget, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-export type RemoteWorkspaceRefLocatorInput = Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'>
 export type RemoteWorkspaceTargetLocatorInput = Pick<RemoteWorkspaceTarget, 'host' | 'user' | 'remotePath'>
 export type RemoteWorktreeLocatorInput = Pick<RemoteWorkspaceTarget, 'host' | 'user'>
 
@@ -22,16 +21,11 @@ export function formatWorkspaceDisplayLocation(
 }
 
 export function formatWorkspaceSessionEntryLocator(entry: WorkspaceSessionEntry, home: string): string {
-  if (entry.kind === 'remote') return formatRemoteWorkspaceRefLocator(entry.ref)
   return formatWorkspaceDisplayLocation(entry.id, home)
 }
 
 export function formatLocalWorkspaceLocation(path: string, home: string): string {
   return tildifyPath(path, home)
-}
-
-export function formatRemoteWorkspaceRefLocator(ref: RemoteWorkspaceRefLocatorInput): string {
-  return `${ref.alias}:${ref.remotePath}`
 }
 
 export function formatRemoteWorkspaceTargetLocator(target: RemoteWorkspaceTargetLocatorInput): string {

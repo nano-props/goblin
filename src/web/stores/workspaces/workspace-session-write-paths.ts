@@ -92,7 +92,7 @@ function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): Wor
   const parsed = parseRemoteWorkspaceId(input)
   const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   return ref
-    ? { kind: 'workspace-entry', entry: { kind: 'remote', id: ref.id, ref } }
+    ? { kind: 'workspace-entry', entry: { id: ref.id } }
     : { kind: 'command-input', input }
 }
 
@@ -739,10 +739,10 @@ export function addResolvedWorkspace(
  * the authoritative runtime projection. No-op if the workspace is already in the store (so
  * calling this twice for the same entry is safe).
  *
- * Note: the ref only carries alias/remotePath; host/user/port require
- * `resolveRemoteWorkspaceTarget`, which hasn't run yet. Until the probe
+ * The canonical locator carries the SSH profile and remote path; host/user/port
+ * require `resolveRemoteWorkspaceTarget`, which hasn't run yet. Until the probe
  * succeeds and addResolvedWorkspace fills in the target, the placeholder lives
- * in a "known alias, unknown concrete host" state —
+ * in a "known profile, unknown concrete host" state —
  * `deriveWorkspaceConnectivity(workspace) === 'connecting'` is the signal callers should
  * branch on rather than reading target fields.
  */
@@ -755,7 +755,10 @@ export function insertPlaceholderWorkspace(
   return upsertWorkspace(s, entry.id, {
     rankById,
     create: () => {
-      const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
+      const remoteRef = isRemoteWorkspaceId(entry.id)
+        ? normalizeRemoteWorkspaceRef(parseRemoteWorkspaceId(entry.id))
+        : null
+      const fallbackName = remoteRef?.displayName ?? null
       const workspace = buildNewWorkspace(s, entry.id, [fallbackName], workspaceRuntimeId)
       workspace.session = {
         entry,
@@ -784,7 +787,7 @@ export function createWorkspaceLifecycleActions(
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)
-      if (admission.kind === 'workspace-entry' && admission.entry.kind === 'remote') {
+      if (admission.kind === 'workspace-entry' && isRemoteWorkspaceId(admission.entry.id)) {
         return await openRemoteWorkspace(set, get, admission.entry)
       }
       const workspaceInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
@@ -821,7 +824,7 @@ async function openLocalWorkspace(
     const workspaceRuntimeId = opened.workspaceRuntimeId
     const workspaceEntry = workspace.target
       ? remoteWorkspaceSessionEntry(workspace.target)
-      : { kind: 'local' as const, id: workspace.id }
+      : { id: workspace.id }
     const membership = await addWorkspaceMembershipResult(workspaceEntry)
     if (!membership.ok) {
       workspacesLog.warn('failed to add local workspace to server workspace', {
@@ -848,7 +851,7 @@ async function openLocalWorkspace(
   if (initialRefreshRef.current) refreshInitialWorkspaceState(set, get, initialRefreshRef.current)
   const recentEntry = resolved.workspace.target
     ? remoteWorkspaceSessionEntry(resolved.workspace.target)
-    : { kind: 'local' as const, id: resolved.workspace.id }
+    : localWorkspaceSessionEntry(resolved.workspace.id)
   return { ok: true, workspaceId: resolved.workspace.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 

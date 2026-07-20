@@ -15,11 +15,11 @@ describe('workspace pane layout restore admission', () => {
       workspace: defaultServerWorkspaceState(),
     }))
     const workspace = {
-      entry: { kind: 'local' as const, id: WORKSPACE_ID },
+      entry: { id: WORKSPACE_ID },
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'workspace-runtime-test',
       name: 'workspace',
-      remoteLifecycle: null,
+      transport: { kind: 'file' as const },
       workspaceProbe: {
         status: 'ready' as const,
         name: 'workspace',

@@ -114,8 +114,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
-        { kind: 'local', id: STUB_WORKSPACE_ID },
+        { id: ACTIVE_WORKSPACE_ID },
+        { id: STUB_WORKSPACE_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -174,8 +174,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('converges to a repo added while restore is opening the original membership', async () => {
-    const repoA = { kind: 'local' as const, id: REPO_A_ID }
-    const repoB = { kind: 'local' as const, id: REPO_B_ID }
+    const repoA = { id: REPO_A_ID }
+    const repoB = { id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -209,8 +209,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('releases only a repo removed while restore is in flight', async () => {
-    const repoA = { kind: 'local' as const, id: REPO_A_ID }
-    const repoB = { kind: 'local' as const, id: REPO_B_ID }
+    const repoA = { id: REPO_A_ID }
+    const repoB = { id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -239,8 +239,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('converges when workspace membership changes during pane projection', async () => {
-    const repoA = { kind: 'local' as const, id: REPO_A_ID }
-    const repoB = { kind: 'local' as const, id: REPO_B_ID }
+    const repoA = { id: REPO_A_ID }
+    const repoB = { id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -264,7 +264,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('releases every attempt lease after persistent membership conflicts', async () => {
-    const repo = { kind: 'local' as const, id: LOCAL_WORKSPACE_ID }
+    const repo = { id: LOCAL_WORKSPACE_ID }
     const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repo] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.compareAndReplaceServerWorkspaceEntries.mockResolvedValue({
@@ -291,8 +291,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: REPO_A_ID },
-        { kind: 'local', id: REPO_B_ID },
+        { id: REPO_A_ID },
+        { id: REPO_B_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -334,8 +334,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
-        { kind: 'local', id: NESTED_STUB_WORKSPACE_ID },
+        { id: ACTIVE_WORKSPACE_ID },
+        { id: NESTED_STUB_WORKSPACE_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -380,19 +380,10 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('non-active remote Workspaces are probed and retain their display name', async () => {
-    const remoteEntry = {
-      kind: 'remote' as const,
-      id: REMOTE_WORKSPACE_ID,
-      ref: {
-        id: REMOTE_WORKSPACE_ID,
-        alias: 'prod',
-        remotePath: '/srv/repo',
-        displayName: 'prod:repo',
-      },
-    }
+    const remoteEntry = { id: REMOTE_WORKSPACE_ID }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: ACTIVE_WORKSPACE_ID }, remoteEntry],
+      openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
@@ -433,8 +424,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
-        { kind: 'local', id: STUB_WORKSPACE_ID },
+        { id: ACTIVE_WORKSPACE_ID },
+        { id: STUB_WORKSPACE_ID },
       ],
       workspacePaneTabsByTargetByWorkspace: {
         // The Git target cannot be validated without the deferred projection;
@@ -469,7 +460,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspaceId = 'goblin+file:///repo'
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceId }],
+      openWorkspaceEntries: [{ id: workspaceId }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.workspaceProbes.set(workspaceId, {
@@ -498,7 +489,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId,
       workspaceRuntimeId: expect.any(String),
-      expectedWorkspaceEntry: { kind: 'local', id: workspaceId },
+      expectedWorkspaceEntry: { id: workspaceId },
       targets: [{ kind: 'workspace-root' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([

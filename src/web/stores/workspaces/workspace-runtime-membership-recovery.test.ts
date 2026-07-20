@@ -158,7 +158,7 @@ describe('workspace runtime membership recovery', () => {
       }),
       'workspace.runtimeReconcile': reconcile,
       'settings.addWorkspaceEntry': async () => ({
-        openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
+        openWorkspaceEntries: [{ id: REPO_ROOT }],
         workspacePaneTabsByTargetByWorkspace: {},
       }),
     })

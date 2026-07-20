@@ -35,8 +35,6 @@ import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
-  LocalWorkspaceSessionEntry,
-  RemoteWorkspaceSessionEntry,
   WorkspaceSessionEntry,
   RemoteWorkspaceTarget,
   RemoteWorkspaceRuntimeLifecycle,
@@ -153,12 +151,17 @@ interface RestoredWorkspaceRuntimeBase {
   workspaceProbe: WorkspaceProbeState
 }
 
-type RestoredWorkspaceTransport =
-  | { entry: LocalWorkspaceSessionEntry; remoteLifecycle: null }
+type RestoredWorkspaceTransport = {
+  entry: WorkspaceSessionEntry
+} & (
+  | { transport: { kind: 'file' } }
   | {
-      entry: RemoteWorkspaceSessionEntry
-      remoteLifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      transport: {
+        kind: 'ssh'
+        lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      }
     }
+)
 
 export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
   RestoredWorkspaceTransport & {

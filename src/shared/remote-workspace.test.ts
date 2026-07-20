@@ -11,21 +11,18 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('remote repository normalization', () => {
-  test('compares complete persisted repo entry identity', () => {
+  test('compares persisted workspace identity by canonical ID', () => {
     const entry = remoteWorkspaceSessionEntry({
       id: workspaceIdForTest('goblin+ssh://host/repo'),
       alias: 'host',
       remotePath: '/repo',
       displayName: 'host:repo',
     })
-    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref } })).toBe(true)
-    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(
-      false,
-    )
+    expect(sameWorkspaceSessionEntry(entry, { ...entry })).toBe(true)
     expect(
       sameWorkspaceSessionEntry(
-        { kind: 'local', id: workspaceIdForTest('goblin+file:///repo') },
-        { kind: 'local', id: workspaceIdForTest('goblin+file:///repo') },
+        { id: workspaceIdForTest('goblin+file:///repo') },
+        { id: workspaceIdForTest('goblin+file:///repo') },
       ),
     ).toBe(true)
     expect(sameWorkspaceSessionEntry(null, entry)).toBe(false)
@@ -81,7 +78,7 @@ describe('remote repository normalization', () => {
     })
   })
 
-  test('normalizes persisted remote session entries before reuse', () => {
+  test('constructs a canonical ID-only session entry from a remote reference', () => {
     expect(
       remoteWorkspaceSessionEntry({
         id: workspaceIdForTest('goblin+ssh://prod/'),
@@ -89,16 +86,7 @@ describe('remote repository normalization', () => {
         remotePath: '/srv/repo',
         displayName: 'prod:/',
       }),
-    ).toEqual({
-      kind: 'remote',
-      id: 'goblin+ssh://prod/srv/repo',
-      ref: {
-        id: 'goblin+ssh://prod/srv/repo',
-        alias: 'prod',
-        remotePath: '/srv/repo',
-        displayName: 'prod:repo',
-      },
-    })
+    ).toEqual({ id: 'goblin+ssh://prod/srv/repo' })
   })
 
   test('treats display names as canonical target data', () => {

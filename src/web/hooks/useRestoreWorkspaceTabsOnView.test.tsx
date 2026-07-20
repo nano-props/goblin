@@ -65,7 +65,7 @@ function stubRepo(
     id,
     workspaceRuntimeId,
     session: {
-      entry: { kind: 'local' as const, id },
+      entry: { id },
       projectionState: options.projectionState ?? 'stub',
     },
     dataLoads: {

@@ -270,7 +270,7 @@ describe('client effect intent plans', () => {
     const plan = createAppLevelIntentPlan(
       {
         type: 'open-recent-workspace-requested',
-        entry: { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo') },
+        entry: { id: workspaceIdForTest('goblin+file:///tmp/repo') },
       },
       { overlayBlocked: true },
     )

@@ -47,7 +47,7 @@ describe('session restore runtime ownership', () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
+      openWorkspaceEntries: [{ id: REPO_ROOT }],
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
   })
@@ -87,7 +87,7 @@ describe('session restore runtime ownership', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: lease.workspaceRuntimeId,
-      expectedWorkspaceEntry: { kind: 'local', id: REPO_ROOT },
+      expectedWorkspaceEntry: { id: REPO_ROOT },
       targets: [{ kind: 'workspace-root' }],
     })
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)

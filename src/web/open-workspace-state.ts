@@ -1,11 +1,4 @@
-import {
-  isRemoteWorkspaceId,
-  remoteWorkspaceConnectionTarget,
-  remoteWorkspaceRefFromTarget,
-  remoteWorkspaceSessionEntry,
-  type WorkspaceSessionEntry,
-} from '#/shared/remote-workspace.ts'
-import type { WorkspaceAdmissionState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /** Minimal shape this helper needs from a `WorkspaceState`. Defined
@@ -16,7 +9,6 @@ interface OpenWorkspaceLike {
   session?: {
     entry: WorkspaceSessionEntry | null
   }
-  admission: WorkspaceAdmissionState
 }
 
 export function persistedOpenWorkspaceEntries(
@@ -26,19 +18,7 @@ export function persistedOpenWorkspaceEntries(
   return workspaceOrder.flatMap<WorkspaceSessionEntry>((id) => {
     const workspace = workspaces[id]
     if (!workspace) return []
-    if (workspace.session?.entry) return [workspace.session.entry]
-    if (!isRemoteWorkspaceId(workspace.id)) return [{ kind: 'local', id: workspace.id }]
-    // For remote workspaces, reconstruct the session entry from the
-    // last-known target (lifecycle.target). A failed lifecycle
-    // may or may not have a retained target; without one we
-    // can't reconstruct a session entry, so the workspace is dropped
-    // from the recent-workspace list. This is the same
-    // intentional trade-off: a placeholder with no target is just a
-    // connecting spinner, not a workspace the user explicitly opened.
-    if (workspace.admission.kind !== 'remote') return []
-    const target = remoteWorkspaceConnectionTarget(workspace.admission.lifecycle)
-    if (!target) return []
-    return [remoteWorkspaceSessionEntry(remoteWorkspaceRefFromTarget(target))]
+    return [workspace.session?.entry ?? { id: workspace.id }]
   })
 }
 

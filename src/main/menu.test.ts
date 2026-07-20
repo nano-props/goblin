@@ -180,7 +180,7 @@ describe('app menu actions', () => {
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? 'C:\\Users\\user' : '/data'))
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
-      recentWorkspaces: [{ kind: 'local', id: workspaceIdForTest('goblin+file:///C:/Users/user/Developer/repo') }],
+      recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///C:/Users/user/Developer/repo') }],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
@@ -191,21 +191,12 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.[0]?.label).toBe('~\\Developer\\repo')
   })
 
-  test('groups recent repos by local and remote entries', async () => {
+  test('groups recent workspaces by local and remote locators', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
       recentWorkspaces: [
-        {
-          kind: 'remote',
-          id: workspaceIdForTest('goblin+ssh://work/srv/remote-repo'),
-          ref: {
-            id: workspaceIdForTest('goblin+ssh://work/srv/remote-repo'),
-            alias: 'work',
-            remotePath: '/srv/remote-repo',
-            displayName: 'remote-repo',
-          },
-        },
-        { kind: 'local', id: workspaceIdForTest('goblin+file:///home/user/Developer/local-repo') },
+        { id: workspaceIdForTest('goblin+ssh://work/srv/remote-workspace') },
+        { id: workspaceIdForTest('goblin+file:///home/user/Developer/local-repo') },
       ],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
@@ -217,7 +208,7 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.map((entry: any) => entry.label ?? entry.type)).toEqual([
       '~/Developer/local-repo',
       'separator',
-      'work:/srv/remote-repo',
+      'work:/srv/remote-workspace',
       'separator',
       'menu.file.clear-recent',
     ])
@@ -440,7 +431,7 @@ describe('app menu actions', () => {
   test('routes clear recent through client intent', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
-      recentWorkspaces: [{ kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo') }],
+      recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],
     })
     const { buildAppMenu } = await import('#/main/menu.ts')
 

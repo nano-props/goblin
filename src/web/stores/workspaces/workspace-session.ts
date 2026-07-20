@@ -57,13 +57,14 @@ function createRestorableWorkspaceLifecycleActions(
         if (!rankById.has(workspace.workspaceId)) rankById.set(workspace.workspaceId, index)
       })
       await Promise.all(
-        runtime.workspaces.map((workspace) =>
-          updateWorkspaceRuntimeCache({
+        runtime.workspaces.map((workspace) => {
+          const remoteLifecycle = workspace.transport.kind === 'ssh' ? workspace.transport.lifecycle : null
+          return updateWorkspaceRuntimeCache({
             workspaceId: workspace.workspaceId,
             workspaceRuntimeId: workspace.workspaceRuntimeId,
-            ...(workspace.entry.kind === 'remote' ? { remoteLifecycle: workspace.remoteLifecycle } : {}),
-          }),
-        ),
+            ...(remoteLifecycle ? { remoteLifecycle } : {}),
+          })
+        }),
       )
       if (signal?.aborted) return
       const initialRefreshes: InitialWorkspaceRefresh[] = []
@@ -71,16 +72,17 @@ function createRestorableWorkspaceLifecycleActions(
         writeWorkspacePaneTabsSnapshotQueryData(tabs.workspaceId, tabs.workspaceRuntimeId, tabs.snapshot)
       }
       for (const restoredWorkspace of runtime.workspaces) {
+        const remoteLifecycle =
+          restoredWorkspace.transport.kind === 'ssh' ? restoredWorkspace.transport.lifecycle : null
         const hasCurrentRemoteRuntime =
-          restoredWorkspace.entry.kind === 'remote' &&
+          remoteLifecycle !== null &&
           get().workspaces[restoredWorkspace.workspaceId]?.workspaceRuntimeId === restoredWorkspace.workspaceRuntimeId
         if (
           hasCurrentRemoteRuntime &&
-          restoredWorkspace.entry.kind === 'remote' &&
           !acceptRemoteWorkspaceRuntimeProjection(set, get, {
             workspaceId: restoredWorkspace.workspaceId,
             workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
-            remoteLifecycle: restoredWorkspace.remoteLifecycle,
+            remoteLifecycle,
             workspaceProbe: restoredWorkspace.workspaceProbe,
           })
         ) {
@@ -116,12 +118,12 @@ function createRestorableWorkspaceLifecycleActions(
           return { workspaces, workspaceOrder, restoredWorkspaceId: nextRestoredWorkspaceId }
         })
         if (
-          restoredWorkspace.entry.kind === 'remote' &&
+          remoteLifecycle !== null &&
           !hasCurrentRemoteRuntime &&
           !acceptRemoteWorkspaceRuntimeProjection(set, get, {
             workspaceId: restoredWorkspace.workspaceId,
             workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
-            remoteLifecycle: restoredWorkspace.remoteLifecycle,
+            remoteLifecycle,
             workspaceProbe: restoredWorkspace.workspaceProbe,
           })
         ) {
@@ -175,12 +177,13 @@ function createRestorableWorkspaceLifecycleActions(
       ) {
         return false
       }
+      const remoteLifecycle = restoredWorkspace.transport.kind === 'ssh' ? restoredWorkspace.transport.lifecycle : null
       if (
-        restoredWorkspace.entry.kind === 'remote' &&
+        remoteLifecycle &&
         !acceptRemoteWorkspaceRuntimeProjection(set, get, {
           workspaceId: restoredWorkspace.workspaceId,
           workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
-          remoteLifecycle: restoredWorkspace.remoteLifecycle,
+          remoteLifecycle,
           workspaceProbe: restoredWorkspace.workspaceProbe,
         })
       ) {
@@ -312,7 +315,7 @@ function resolvedWorkspaceFromRestoredRuntime(restored: RestoredWorkspaceRuntime
         ? ('projected' as const)
         : ('stub' as const),
   }
-  if (restored.entry.kind === 'remote') {
+  if (restored.transport.kind === 'ssh') {
     return { id: restored.workspaceId, name: restored.name, session }
   }
   return {

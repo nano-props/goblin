@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoredWorkspaceIdAfterWorkspaceHydration,
   nextRestoredWorkspaceIdAfterWorkspaceClose,
@@ -12,68 +11,21 @@ const REPO_B = workspaceIdForTest('goblin+file:///tmp/repo-b')
 const REPO_C = workspaceIdForTest('goblin+file:///tmp/repo-c')
 
 describe('persistedOpenWorkspaceEntries', () => {
-  test('preserves order, skips missing repos, and serializes remote targets as session entries', () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'alice',
-      port: 22,
-      remotePath: '/srv/repo',
-      displayName: 'example:repo',
-    })
-    if (!target) throw new Error('expected a valid remote target fixture')
-
+  test('preserves order, skips missing workspaces, and persists canonical IDs', () => {
+    const remoteId = workspaceIdForTest('goblin+ssh://example/srv/repo')
     expect(
-      persistedOpenWorkspaceEntries([REPO_A, target.id, workspaceIdForTest('goblin+file:///tmp/missing')], {
+      persistedOpenWorkspaceEntries([REPO_A, remoteId, workspaceIdForTest('goblin+file:///tmp/missing')], {
         [REPO_A]: {
           id: REPO_A,
-          admission: { kind: 'local' },
         },
-        [target.id]: {
-          id: target.id,
-          admission: {
-            kind: 'remote',
-            lifecycle: { kind: 'ready', target },
-            lifecycleAttemptId: 1,
-          },
+        [remoteId]: {
+          id: remoteId,
         },
       }),
     ).toEqual([
-      { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
-      {
-        kind: 'remote',
-        id: target.id,
-        ref: {
-          id: target.id,
-          alias: 'example',
-          remotePath: '/srv/repo',
-          displayName: 'example:repo',
-        },
-      },
+      { id: 'goblin+file:///tmp/repo-a' },
+      { id: remoteId },
     ])
-  })
-
-  test('uses the preserved session entry for a remote restore stub without a target', () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'alice',
-      port: 22,
-      remotePath: '/srv/repo',
-      displayName: 'example:repo',
-    })
-    if (!target) throw new Error('expected a valid remote target fixture')
-    const entry = remoteWorkspaceSessionEntry(target)
-
-    expect(
-      persistedOpenWorkspaceEntries([target.id], {
-        [target.id]: {
-          id: target.id,
-          session: { entry },
-          admission: { kind: 'remote', lifecycle: null, lifecycleAttemptId: null },
-        },
-      }),
-    ).toEqual([entry])
   })
 })
 

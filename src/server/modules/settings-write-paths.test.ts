@@ -68,7 +68,7 @@ describe('settings command handlers', () => {
   })
 
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
-    const repo = { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-a') } as const
+    const repo = { id: workspaceIdForTest('goblin+file:///tmp/repo-a') }
     mocks.addServerRecentWorkspace.mockResolvedValue([repo])
     const { handleAddRecentWorkspace } = await import('#/server/modules/settings-write-paths.ts')
 
