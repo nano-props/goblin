@@ -24,8 +24,6 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   workspacePaneFilesystemRootPath,
@@ -33,6 +31,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -96,22 +95,27 @@ export function WorkspacePaneTargetToolbar({
       sessionId: string,
       presentation: TerminalPresentation,
       runtimeTarget: RuntimeWorkspacePaneTarget,
+      presentationToken: PrimaryWindowPresentationToken,
     ) => {
       if (type !== 'terminal') return false
-      if (target.kind === 'workspace-root') {
-        if (presentation.kind !== 'workspace-root') return false
-        const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(
-          formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId),
+      if (target.kind === 'git-branch') return false
+      if (runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
+        return showCreatedTerminalWorkspacePaneRuntimeTab(
+          { target: runtimeTarget, presentation },
           sessionId,
+          navigation,
+          presentationToken,
         )
-        state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
-        return true
       }
-      if (target.kind !== 'git-worktree') return false
-      if (presentation.kind !== 'git-worktree') return false
-      if (runtimeTarget.kind !== 'git-worktree') return false
-      return showCreatedTerminalWorkspacePaneRuntimeTab({ target: runtimeTarget, presentation }, sessionId, navigation)
+      if (runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
+        return showCreatedTerminalWorkspacePaneRuntimeTab(
+          { target: runtimeTarget, presentation },
+          sessionId,
+          navigation,
+          presentationToken,
+        )
+      }
+      return false
     },
     [navigation, persistenceTarget, target],
   )
@@ -119,23 +123,24 @@ export function WorkspacePaneTargetToolbar({
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
       if (type !== 'terminal') return false
       if (target.kind === 'workspace-root') {
-        const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(
-          formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId),
-          sessionId,
+        return (
+          navigation.showWorkspaceRootPaneTab?.(target.workspaceId, {
+            kind: 'terminal',
+            terminalSessionId: sessionId,
+          }) ?? false
         )
-        state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
-        return true
       }
       if (target.kind !== 'git-worktree') return false
       const targetBranch = gitHeadBranch(target.head)
-      if (targetBranch) return navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
-      const state = useWorkspacesStore.getState()
-      state.setSelectedTerminal(formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId), sessionId)
-      state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
-      return true
+      return targetBranch
+        ? navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
+        : (navigation.showRepoWorktreeTerminalSession?.(
+            target.workspaceId,
+            workspacePaneFilesystemRootPath(target),
+            sessionId,
+          ) ?? false)
     },
-    [navigation, persistenceTarget, target],
+    [navigation, rootPath, target],
   )
   const runtimeActionContext = useWorkspacePaneRuntimeTabActionContext({ showRuntimeTab })
   const createAction = useWorkspacePaneRuntimeTabCreateAction({

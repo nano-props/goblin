@@ -13,6 +13,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   base: TerminalSessionBase | null
@@ -23,6 +24,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
     sessionId: string,
     presentation: TerminalPresentation,
     target: RuntimeWorkspacePaneTarget,
+    presentationToken: PrimaryWindowPresentationToken,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
@@ -50,8 +52,10 @@ export function useWorkspacePaneRuntimeTabCreateAction({
     () =>
       workspacePaneRuntimeTabCreateAction('terminal', {
         runtimeTabStateByType,
-        showCreatedRuntimeTab: (type, sessionId, presentation) =>
-          terminalBase?.target ? showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target) : false,
+        showCreatedRuntimeTab: (type, sessionId, presentation, presentationToken) =>
+          terminalBase?.target
+            ? showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target, presentationToken)
+            : false,
         t,
         terminal: {
           base: terminalBase,

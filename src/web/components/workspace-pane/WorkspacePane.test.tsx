@@ -174,13 +174,17 @@ describe('WorkspacePane', () => {
       workspaceProbe: directoryWorkspaceProbe('plain-workspace'),
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
+    const showWorkspaceRootPaneTab = vi.fn(() => true)
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+        <PrimaryWindowNavigationProvider value={{ ...navigation, showWorkspaceRootPaneTab }}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane
+                workspaceId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
+              />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -202,6 +206,13 @@ describe('WorkspacePane', () => {
         undefined,
       )
     })
+    await waitFor(() =>
+      expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+        workspaceId,
+        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        expect.objectContaining({ presentationToken: expect.any(Object) }),
+      ),
+    )
   })
 
   test('keeps the selected workspace-root pane when Git capability becomes available', async () => {

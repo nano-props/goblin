@@ -1080,15 +1080,8 @@ describe('workspace commands', () => {
     await expect(duplicateCommand).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledTimes(2)
     expect(createOperationCount()).toBe(2)
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledTimes(2)
-    expect(showRepoBranchTerminalSession).toHaveBeenNthCalledWith(
-      1,
-      REPO_ID,
-      'feature/worktree',
-      'term-222222222222222222222',
-    )
-    expect(showRepoBranchTerminalSession).toHaveBeenNthCalledWith(
-      2,
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledTimes(1)
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
       'term-222222222222222222222',

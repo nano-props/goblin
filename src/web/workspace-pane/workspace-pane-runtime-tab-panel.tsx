@@ -13,6 +13,7 @@ import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/Workspa
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -72,20 +73,30 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
+      const presentationToken = beginPrimaryWindowPresentation()
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId, presentation) =>
-          base.target.kind === 'workspace-root'
-            ? presentation.kind === 'workspace-root'
-            : base.target.kind === 'git-worktree' &&
-              presentation.kind === 'git-worktree' &&
-              showCreatedTerminalWorkspacePaneRuntimeTab(
-                { target: base.target, presentation },
-                terminalSessionId,
-                navigation,
-              ),
+        showCreatedTerminalTab: (terminalSessionId, presentation) => {
+          if (base.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
+            return showCreatedTerminalWorkspacePaneRuntimeTab(
+              { target: base.target, presentation },
+              terminalSessionId,
+              navigation,
+              presentationToken,
+            )
+          }
+          if (base.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
+            return showCreatedTerminalWorkspacePaneRuntimeTab(
+              { target: base.target, presentation },
+              terminalSessionId,
+              navigation,
+              presentationToken,
+            )
+          }
+          return false
+        },
         t,
         logMessage: 'workspace pane terminal create failed',
       })

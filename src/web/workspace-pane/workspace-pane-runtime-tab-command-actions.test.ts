@@ -25,6 +25,11 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  resetPrimaryWindowPresentationForTest,
+} from '#/web/primary-window-presentation.ts'
 
 const terminalBase: TerminalSessionBase = {
   target: {
@@ -43,6 +48,7 @@ describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
+    resetPrimaryWindowPresentationForTest()
   })
 
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
@@ -140,16 +146,21 @@ describe('workspace pane runtime tab command actions', () => {
       showCreatedRuntimeTab,
     })
 
-    await context.terminal?.showCreatedTerminalSession('term-111111111111111111111', {
-      kind: 'git-worktree' as const,
-      head: { kind: 'branch', branchName: 'feature/renamed' },
-    })
+    await context.terminal?.showCreatedTerminalSession(
+      'term-111111111111111111111',
+      {
+        kind: 'git-worktree' as const,
+        head: { kind: 'branch', branchName: 'feature/renamed' },
+      },
+      beginPrimaryWindowPresentation(),
+    )
 
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
       'terminal',
       'term-111111111111111111111',
       { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
       terminalExecutionPath(terminalBase.target),
+      expect.objectContaining({ generation: expect.any(Number) }),
     )
   })
 
@@ -187,7 +198,10 @@ describe('workspace pane runtime tab command actions', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showTerminalSession).toHaveBeenCalledWith('term-111111111111111111111')
+    expect(showTerminalSession).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      expect.objectContaining({ generation: expect.any(Number) }),
+    )
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
@@ -217,7 +231,7 @@ describe('workspace pane runtime tab command actions', () => {
     let sessions = [terminalSession('term-111111111111111111111', true)]
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
-    const showTerminalSession = vi.fn(() => true)
+    const showTerminalSession = vi.fn((_sessionId, token) => primaryWindowPresentationIsCurrent(token))
     const bridge: TerminalSessionCommandBridge = {
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey: '/repo\0/repo-worktree',
@@ -247,11 +261,16 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).not.toHaveBeenCalled()
 
     sessions = [terminalSession('term-222222222222222222222', true)]
+    beginPrimaryWindowPresentation()
     releaseCoordinator()
     await coordinatorBlocker
 
-    await expect(actionPromise).resolves.toBe(true)
-    expect(showTerminalSession).toHaveBeenCalledWith('term-222222222222222222222')
+    await expect(actionPromise).resolves.toBe(false)
+    expect(showTerminalSession).toHaveBeenCalledWith(
+      'term-222222222222222222222',
+      expect.objectContaining({ generation: expect.any(Number) }),
+    )
+    expect(showTerminalSession).toHaveReturnedWith(false)
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
@@ -274,6 +293,7 @@ describe('workspace pane runtime tab command actions', () => {
       selectTerminal: vi.fn(),
     }
 
+    const pendingCreatePresentation = beginPrimaryWindowPresentation()
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
@@ -288,6 +308,42 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
+    expect(primaryWindowPresentationIsCurrent(pendingCreatePresentation)).toBe(true)
+  })
+
+  test('primary terminal action presents an existing session while another create is pending', async () => {
+    const showTerminalSession = vi.fn(() => true)
+    const bridge: TerminalSessionCommandBridge = {
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions: [terminalSession('term-111111111111111111111', true)],
+        count: 1,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: true,
+      }),
+      createTerminal: vi.fn(async () => 'created-session'),
+      createTerminalWithAdmission: vi.fn(),
+      selectTerminal: vi.fn(),
+    }
+
+    await expect(
+      runWorkspacePaneRuntimePrimaryAction('terminal', {
+        terminal: {
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(showTerminalSession).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      expect.objectContaining({ generation: expect.any(Number) }),
+    )
   })
 
   test('new terminal action joins a pending duplicate create through terminal ownership', async () => {

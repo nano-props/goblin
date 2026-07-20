@@ -13,6 +13,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -21,12 +22,17 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
   branchName: string | null
   filesystemTarget: WorkspacePaneFilesystemTarget | null
   workspacePaneRoute: WorkspacePaneCommandRoute
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    presentationToken: PrimaryWindowPresentationToken,
+  ) => boolean | Promise<boolean>
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
     presentation: TerminalPresentation,
     worktreePath: string,
+    presentationToken: PrimaryWindowPresentationToken,
   ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
@@ -69,10 +75,17 @@ function assignTerminalRuntimeTabCommandContext(
             workspacePaneRoute: input.workspacePaneRoute,
           })
         : null,
-    showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
-    showCreatedTerminalSession: (terminalSessionId, presentation) =>
+    showTerminalSession: (terminalSessionId, presentationToken) =>
+      input.showRuntimeTab('terminal', terminalSessionId, presentationToken),
+    showCreatedTerminalSession: (terminalSessionId, presentation, presentationToken) =>
       base
-        ? input.showCreatedRuntimeTab('terminal', terminalSessionId, presentation, terminalExecutionPath(base.target))
+        ? input.showCreatedRuntimeTab(
+            'terminal',
+            terminalSessionId,
+            presentation,
+            terminalExecutionPath(base.target),
+            presentationToken,
+          )
         : false,
     t: input.terminalCreateTranslator,
   }

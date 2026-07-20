@@ -30,6 +30,10 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  beginPrimaryWindowPresentation,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -44,6 +48,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
     presentation: TerminalPresentation,
+    presentationToken: PrimaryWindowPresentationToken,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
@@ -137,6 +142,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   base: TerminalSessionBase,
   terminalSessionId: string,
   navigation: WorkspacePaneTabControllerCommitNavigation,
+  presentationToken: PrimaryWindowPresentationToken,
 ): boolean | Promise<boolean> {
   const resolvedBase = terminalSessionBaseWithRuntime(base)
   if (!resolvedBase) return false
@@ -144,16 +150,23 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   const paneTarget = workspacePaneTabsTargetFromRuntime(resolvedBase.target)
   if (!paneTarget) return false
   const workspaceRoot = resolvedBase.target.kind === 'workspace-root'
-  if (
-    !workspaceRoot &&
-    resolvedBase.presentation.kind === 'git-worktree' &&
-    resolvedBase.presentation.head.kind === 'detached'
-  ) {
+  if (workspaceRoot) {
+    if (resolvedBase.presentation.kind !== 'workspace-root') return false
+    return (
+      navigation.showWorkspaceRootPaneTab?.(
+        coordinates.workspaceId,
+        { kind: 'terminal', terminalSessionId },
+        { presentationToken },
+      ) ?? false
+    )
+  }
+  if (resolvedBase.presentation.kind === 'git-worktree' && resolvedBase.presentation.head.kind === 'detached') {
     return (
       navigation.showRepoWorktreeTerminalSession?.(
         coordinates.workspaceId,
         terminalExecutionPath(resolvedBase.target),
         terminalSessionId,
+        { presentationToken },
       ) ?? false
     )
   }
@@ -161,12 +174,14 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
     {
       workspaceId: coordinates.workspaceId,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
-      branchName: workspaceRoot ? null : terminalPresentationBranch(resolvedBase.presentation),
-      worktreePath: workspaceRoot ? null : terminalExecutionPath(resolvedBase.target),
+      branchName: terminalPresentationBranch(resolvedBase.presentation),
+      worktreePath: terminalExecutionPath(resolvedBase.target),
       paneTarget,
     },
     { kind: 'terminal', terminalSessionId },
     navigation,
+    undefined,
+    presentationToken,
   )
 }
 
@@ -251,12 +266,13 @@ function terminalRuntimeTabCreateAction(
       if (context.runtimeTabStateByType.terminal.createPending) return
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = terminal.captureOpenerIdentity()
+      const presentationToken = beginPrimaryWindowPresentation()
       void dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal: terminal.createTerminal,
         openerIdentity,
         showCreatedTerminalTab: (terminalSessionId, presentation) =>
-          context.showCreatedRuntimeTab('terminal', terminalSessionId, presentation),
+          context.showCreatedRuntimeTab('terminal', terminalSessionId, presentation, presentationToken),
         t: context.t,
       })
     },

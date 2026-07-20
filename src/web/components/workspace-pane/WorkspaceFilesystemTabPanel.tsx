@@ -24,6 +24,7 @@ import {
   workspacePaneFilesystemTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneFilesystemTarget }) {
   const workspaceId = target.workspaceId
@@ -108,6 +109,7 @@ export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneF
       if (node.kind !== 'file') return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
+      const presentationToken = beginPrimaryWindowPresentation()
       try {
         const openerIdentity = workspacePaneStaticTabId('files')
         const base = workspacePaneFilesystemTerminalBase(target)
@@ -117,7 +119,13 @@ export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneF
           createTerminal: createTerminalWithAdmission,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-            showCreatedWorkspacePaneFilesystemTerminal(target, terminalSessionId, canonicalBranch, navigation),
+            showCreatedWorkspacePaneFilesystemTerminal(
+              target,
+              terminalSessionId,
+              canonicalBranch,
+              navigation,
+              presentationToken,
+            ),
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {

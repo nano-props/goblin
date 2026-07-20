@@ -1360,6 +1360,7 @@ describe('GitWorkspacePaneContent', () => {
       executionRoot: '/Users/example/Workspace/sample-project',
     })
     let startupShellCommand: string | null = null
+    const showWorkspaceRootPaneTab = vi.fn(() => true)
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
       async (base, options) => {
         startupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
@@ -1383,7 +1384,7 @@ describe('GitWorkspacePaneContent', () => {
 
     renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({})}>
+        <PrimaryWindowNavigationProvider value={navigationWith({ showWorkspaceRootPaneTab })}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               target={workspaceRootPaneFilesystemTarget({
@@ -1420,11 +1421,11 @@ describe('GitWorkspacePaneContent', () => {
       { resolveStartupShellCommand: expect.any(Function) },
       { insertAfterIdentity: 'workspace-pane:files' },
     )
-    expect(
-      useWorkspacesStore.getState().workspaces[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[
-        `${workspaceId}\0workspace-root`
-      ],
-    ).toBe('terminal')
+    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+      workspaceId,
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",
     )

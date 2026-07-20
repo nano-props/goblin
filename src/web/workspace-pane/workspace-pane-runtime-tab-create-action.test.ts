@@ -13,6 +13,11 @@ import {
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  resetPrimaryWindowPresentationForTest,
+} from '#/web/primary-window-presentation.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -39,6 +44,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  resetPrimaryWindowPresentationForTest()
   resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
@@ -62,12 +68,51 @@ describe('workspace pane runtime tab create action', () => {
     }
 
     expect(
-      showCreatedTerminalWorkspacePaneRuntimeTab(detachedBase, TERMINAL_SESSION_ID, {
-        commitWorkspacePaneRoute: vi.fn(async () => false),
-        showRepoWorktreeTerminalSession,
-      }),
+      showCreatedTerminalWorkspacePaneRuntimeTab(
+        detachedBase,
+        TERMINAL_SESSION_ID,
+        {
+          commitWorkspacePaneRoute: vi.fn(async () => false),
+          showRepoWorktreeTerminalSession,
+        },
+        beginPrimaryWindowPresentation(),
+      ),
     ).toBe(true)
-    expect(showRepoWorktreeTerminalSession).toHaveBeenCalledWith(REPO_ROOT, WORKTREE_PATH, TERMINAL_SESSION_ID)
+    expect(showRepoWorktreeTerminalSession).toHaveBeenCalledWith(
+      REPO_ROOT,
+      WORKTREE_PATH,
+      TERMINAL_SESSION_ID,
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
+  })
+
+  test('commits a workspace root terminal route through navigation authority', () => {
+    const showWorkspaceRootPaneTab = vi.fn(() => true)
+    const workspaceRootBase: TerminalSessionBase = {
+      target: {
+        kind: 'workspace-root',
+        workspaceId: BASE.target.workspaceId,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      },
+      presentation: { kind: 'workspace-root' },
+    }
+
+    expect(
+      showCreatedTerminalWorkspacePaneRuntimeTab(
+        workspaceRootBase,
+        TERMINAL_SESSION_ID,
+        {
+          commitWorkspacePaneRoute: vi.fn(async () => false),
+          showWorkspaceRootPaneTab,
+        },
+        beginPrimaryWindowPresentation(),
+      ),
+    ).toBe(true)
+    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+      REPO_ROOT,
+      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
   })
 
   test('returns no terminal create action without a runtime target', () => {
@@ -112,10 +157,43 @@ describe('workspace pane runtime tab create action', () => {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
     await commandInput.commitCreatedTerminalTab(createAdmission())
-    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, {
-      kind: 'git-worktree' as const,
-      head: { kind: 'branch', branchName: BRANCH_NAME },
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
+      'terminal',
+      TERMINAL_SESSION_ID,
+      {
+        kind: 'git-worktree' as const,
+        head: { kind: 'branch', branchName: BRANCH_NAME },
+      },
+      expect.objectContaining({ generation: expect.any(Number) }),
+    )
+  })
+
+  test('captures presentation authority before create and does not revive it after later navigation', async () => {
+    const showCreatedRuntimeTab = vi.fn((_type, _sessionId, _presentation, token) =>
+      primaryWindowPresentationIsCurrent(token),
+    )
+    const action = workspacePaneRuntimeTabCreateAction('terminal', {
+      runtimeTabStateByType: runtimeTabState(),
+      showCreatedRuntimeTab,
+      t: translate,
+      terminal: {
+        base: BASE,
+        createTerminal: vi.fn(async () => createAdmission()),
+        captureOpenerIdentity: vi.fn(() => null),
+      },
     })
+
+    action?.onCreate()
+    await vi.waitFor(() => expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce())
+    beginPrimaryWindowPresentation()
+    const commandInput = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls[0]?.[0] as {
+      commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
+    }
+
+    await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({
+      status: 'navigation-rejected',
+    })
+    expect(showCreatedRuntimeTab).toHaveReturnedWith(false)
   })
 
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
