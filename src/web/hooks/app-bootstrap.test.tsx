@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   defaultClientWorkspaceState,
@@ -24,12 +25,18 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { ClientWorkspaceState, ServerWorkspaceState, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
+import type {
+  ClientWorkspaceState,
+  ServerWorkspaceState,
+  SettingsSnapshot,
+  WorkspaceRuntimeRestoreSnapshot,
+} from '#/shared/api-types.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type * as SettingsClient from '#/web/settings-client.ts'
 import type * as SettingsActions from '#/web/settings-actions.ts'
+import { bootstrapLog } from '#/web/logger.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof SettingsClient>()
@@ -391,6 +398,27 @@ describe('app bootstrap hooks', () => {
     )
   })
 
+  test('cancels a timed-out shared query so retry starts fresh work', async () => {
+    vi.useFakeTimers()
+    mockedGetSettingsSnapshot.mockImplementationOnce(({ signal }: { signal?: AbortSignal } = {}) => {
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+    mockedGetSettingsSnapshot.mockResolvedValueOnce(defaultSettingsSnapshot())
+    const result = renderInJsdom(<Harness />)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    vi.useRealTimers()
+    await vi.waitFor(() =>
+      expect(result.container.textContent).toBe('authenticated workspace restore timed out after 30000ms'),
+    )
+    result.container.querySelector('button')?.click()
+
+    await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
+    expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
+  })
+
   test('reports timeout when server workspace restore does not return after abort', async () => {
     vi.useFakeTimers()
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -448,7 +476,7 @@ describe('app bootstrap hooks', () => {
     )
   })
 
-  test('aborts authenticated workspace restore on unmount without committing restore failure', async () => {
+  test('stops waiting on unmount without cancelling the shared settings query', async () => {
     let signal: AbortSignal | undefined
     mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
       signal = options.signal
@@ -467,7 +495,7 @@ describe('app bootstrap hooks', () => {
     result.unmount()
     await flushMicrotasks(2)
 
-    expect(signal?.aborted).toBe(true)
+    expect(signal?.aborted).toBe(false)
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
@@ -487,32 +515,45 @@ describe('app bootstrap hooks', () => {
     expect(hydrateHostInfo).not.toHaveBeenCalled()
   })
 
-  test('allows a cancelled StrictMode-style first run to restart and finish', async () => {
-    const first = Promise.withResolvers<never>()
-    const secondSettings = defaultSettingsSnapshot()
-    mockedGetSettingsSnapshot.mockImplementationOnce((options: { signal?: AbortSignal } = {}) => {
-      options.signal?.addEventListener('abort', () => first.reject(options.signal?.reason), { once: true })
-      return first.promise
+  test('shares the settings query across the StrictMode effect restart', async () => {
+    const settings = Promise.withResolvers<SettingsSnapshot>()
+    const externalApps = Promise.withResolvers<ReturnType<typeof defaultExternalAppsSnapshot>>()
+    let settingsSignal: AbortSignal | undefined
+    let externalAppsSignal: AbortSignal | undefined
+    mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
+      settingsSignal = options.signal
+      return settings.promise
     })
-    mockedGetSettingsSnapshot.mockResolvedValueOnce(secondSettings)
+    mockedGetExternalAppsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
+      externalAppsSignal = options.signal
+      return externalApps.promise
+    })
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    const warn = vi.spyOn(bootstrapLog, 'warn')
 
-    const result = renderInJsdom(<Harness />)
+    renderInJsdom(
+      <StrictMode>
+        <Harness />
+      </StrictMode>,
+    )
     await flushMicrotasks(1)
-    result.unmount()
-    await flushMicrotasks(2)
+    settings.resolve(defaultSettingsSnapshot())
+    externalApps.resolve(defaultExternalAppsSnapshot())
 
-    renderInJsdom(<Harness />)
     await vi.waitFor(() => {
       expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
     })
 
-    expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
+    expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
+    expect(mockedGetExternalAppsSnapshot).toHaveBeenCalledTimes(1)
+    expect(settingsSignal?.aborted).toBe(false)
+    expect(externalAppsSignal?.aborted).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
     expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
+    expect(warn).not.toHaveBeenCalled()
   })
 })
 

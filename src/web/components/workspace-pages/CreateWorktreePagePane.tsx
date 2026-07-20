@@ -20,6 +20,7 @@ import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
+import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
@@ -268,7 +269,10 @@ async function loadBootstrap(
   if (previewResult.ok && previewResult.preview.hasOperations && previewResult.preview.configHash) {
     try {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      settingsSnapshot = await primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions({ signal }))
+      settingsSnapshot = await waitForPromiseWithSignal(
+        primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions()),
+        signal,
+      )
     } catch {
       settingsError = true
     }

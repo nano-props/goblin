@@ -9,10 +9,11 @@ import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-stat
 import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restorable-workspace-state.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { externalAppsQueryOptions, settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
+import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
-import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+import { createTimeoutAbortController, waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -78,12 +79,20 @@ function startAuthenticatedWorkspaceRestoreRun(
   )
   // QueryClient owns the settings and external-app reads. Mounted consumers
   // join these in-flight queries and observe the same cached snapshot.
-  const settingsSnapshot = primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions({ signal: timeout.signal }))
-  void primaryWindowQueryClient.fetchQuery(externalAppsQueryOptions({ signal: timeout.signal })).catch((err) => {
-    if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
-  })
+  const settingsSnapshot = primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions())
+  void waitForPromiseWithSignal(primaryWindowQueryClient.fetchQuery(externalAppsQueryOptions()), timeout.signal).catch(
+    (err) => {
+      if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
+    },
+  )
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
-  void restoreBootSession(settingsSnapshot, timeout.signal, activeWorkspaceId).then((outcome) => {
+  void restoreBootSession(settingsSnapshot, timeout.signal, activeWorkspaceId).then(async (outcome) => {
+    if (!cancelled && outcome.status === 'failed' && timeout.signal.aborted) {
+      await Promise.all([
+        primaryWindowQueryClient.cancelQueries({ queryKey: settingsSnapshotQueryKey(), exact: true }),
+        primaryWindowQueryClient.cancelQueries({ queryKey: externalAppsQueryKey(), exact: true }),
+      ])
+    }
     timeout.dispose()
     if (!cancelled && outcome.status !== 'cancelled') onSettled(outcome)
   })
@@ -104,7 +113,9 @@ async function hydrateNonCriticalAuthenticatedState(
     runOptionalBootstrapTask(
       'theme hydrate',
       async () => {
-        await useThemeStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
+        await useThemeStore
+          .getState()
+          .hydrateFromSettingsSnapshot(await waitForPromiseWithSignal(settingsSnapshot, signal))
       },
       signal,
     ),
@@ -120,9 +131,9 @@ async function restoreBootSession(
   try {
     useWorkspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     const presentation = await readClientWorkspaceState()
-    const snapshot = await abortable(settingsSnapshot, signal)
+    const snapshot = await waitForPromiseWithSignal(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)
-    const restored = await abortable(
+    const restored = await waitForPromiseWithSignal(
       restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
         activeWorkspaceId: activeWorkspaceId ?? presentation.restoredWorkspaceId,
         signal,
@@ -138,7 +149,7 @@ async function restoreBootSession(
       restored.runtime.restoredWorkspaceId,
     )
     applyRestoredClientWorkspace(clientWorkspace)
-    await abortable(
+    await waitForPromiseWithSignal(
       useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
         restoredClientWorkspace: clientWorkspace,
@@ -173,20 +184,6 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
   restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
-}
-
-async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) throw abortReason(signal)
-  let onAbort: (() => void) | null = null
-  const aborted = new Promise<never>((_resolve, reject) => {
-    onAbort = () => reject(abortReason(signal))
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-  try {
-    return await Promise.race([promise, aborted])
-  } finally {
-    if (onAbort) signal.removeEventListener('abort', onAbort)
-  }
 }
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {

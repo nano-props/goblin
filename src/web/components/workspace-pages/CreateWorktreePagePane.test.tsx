@@ -14,6 +14,8 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { getSettingsSnapshot } from '#/web/settings-client.ts'
+import type * as SettingsClient from '#/web/settings-client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -31,6 +33,13 @@ const surfaceMocks = vi.hoisted(() => ({
     worktreesByPath: Record<string, never>
   } | null,
 }))
+
+vi.mock('#/web/settings-client.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingsClient>()
+  return { ...actual, getSettingsSnapshot: vi.fn() }
+})
+
+const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
 
 vi.mock('#/web/components/create-worktree/CreateWorktreeSurface.tsx', () => ({
   CreateWorktreePageBody: ({
@@ -85,6 +94,8 @@ beforeEach(() => {
     ok: false,
     message: 'error.failed-read-repo',
   }))
+  mockedGetSettingsSnapshot.mockReset()
+  mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ workspaceSettings: [] }))
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
   seedRepoWithReadModelForTest({ id: REPO_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
 })
@@ -270,6 +281,41 @@ describe('CreateWorktreePagePane', () => {
       expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
       expect(button(container).dataset.loading).toBe('false')
     })
+  })
+
+  test('reuses a pending settings query after the first consumer unmounts', async () => {
+    primaryWindowQueryClient.clear()
+    const settings = Promise.withResolvers<ReturnType<typeof defaultSettingsSnapshot>>()
+    let querySignal: AbortSignal | undefined
+    mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
+      querySignal = options.signal
+      return settings.promise
+    })
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockResolvedValue({
+      ok: true,
+      preview: {
+        hasConfig: true,
+        hasOperations: true,
+        configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        copyCount: 1,
+        symlinkCount: 0,
+        hardlinkCount: 0,
+        excludeCount: 0,
+      },
+    })
+
+    const first = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+    await waitFor(() => expect(mockedGetSettingsSnapshot).toHaveBeenCalledOnce())
+    first.unmount()
+
+    const second = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+    await flushMicrotasks(2)
+    expect(mockedGetSettingsSnapshot).toHaveBeenCalledOnce()
+    expect(querySignal?.aborted).toBe(false)
+
+    settings.resolve(defaultSettingsSnapshot({ workspaceSettings: [] }))
+    await waitFor(() => expect(second.container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
+    expect(mockedGetSettingsSnapshot).toHaveBeenCalledOnce()
   })
 
   test('releases the form when settings fails after a trust-relevant bootstrap preview', async () => {
