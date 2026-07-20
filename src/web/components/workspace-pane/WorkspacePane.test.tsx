@@ -346,7 +346,7 @@ describe('WorkspacePane', () => {
       </QueryClientProvider>,
     )
 
-    screen.getByRole('button', { name: 'workspace.back-to-branch-navigator' }).click()
+    screen.getByRole('button', { name: 'workspace.back-to-workspace-navigator' }).click()
     expect(onBackToNavigator).toHaveBeenCalledOnce()
   })
 

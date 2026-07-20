@@ -52,7 +52,7 @@ export function WorkspacePaneToolbar({
   const t = useT()
   const compact = useIsCompactUi()
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
-  const backLabel = t('workspace.back-to-branch-navigator')
+  const backLabel = t('workspace.back-to-workspace-navigator')
 
   return (
     <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>

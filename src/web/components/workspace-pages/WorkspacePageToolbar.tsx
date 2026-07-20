@@ -28,7 +28,7 @@ export function WorkspacePageToolbar({
   onBack,
 }: WorkspacePageToolbarProps) {
   const t = useT()
-  const backLabel = t('workspace.back-to-branch-navigator')
+  const backLabel = t('workspace.back-to-workspace-navigator')
   const tab = (
     <ToolbarClosableTab
       closeButton={false}

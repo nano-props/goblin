@@ -276,7 +276,7 @@ export const en = {
   'workspace.zen-mode-toggle-tooltip.enable': 'Zen Mode',
   'workspace.navigation-back': 'Back',
   'workspace.navigation-forward': 'Forward',
-  'workspace.back-to-branch-navigator': 'Back to Branch Navigator',
+  'workspace.back-to-workspace-navigator': 'Back to Workspace Navigator',
   'workspace.open-externally.open': 'Open externally',
   'branches.gone': 'gone',
   'branches.dirty': 'dirty',

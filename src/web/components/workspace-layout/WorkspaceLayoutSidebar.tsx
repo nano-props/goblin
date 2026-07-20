@@ -6,9 +6,9 @@ import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import {
   BranchFilterAction,
   CreateWorktreeRowAction,
-  DashboardRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
+import { WorkspaceDashboardRowAction } from '#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx'
 import { WorkspaceRefreshAction } from '#/web/components/workspace-toolbar/WorkspaceRefreshAction.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
@@ -134,7 +134,7 @@ function WorkspaceShellPrimaryActions({
         <WorkspacePickerRow workspaceId={workspaceId} />
         {workspaceId ? (
           <>
-            <DashboardRowAction selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
+            <WorkspaceDashboardRowAction selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
             {gitAvailable ? (
               <CreateWorktreeRowAction
                 repoId={workspaceId}

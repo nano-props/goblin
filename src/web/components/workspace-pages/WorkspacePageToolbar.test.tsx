@@ -11,7 +11,7 @@ describe('WorkspacePageToolbar', () => {
 
     expect(container.querySelector('[role="tablist"]')).not.toBeNull()
     expect(container.querySelector('[role="tab"]')?.getAttribute('aria-selected')).toBe('true')
-    expect(container.querySelector('button[aria-label="workspace.back-to-branch-navigator"]')).toBeNull()
+    expect(container.querySelector('button[aria-label="workspace.back-to-workspace-navigator"]')).toBeNull()
   })
 
   test('renders compact back-title chrome without a tab strip', () => {
@@ -23,7 +23,9 @@ describe('WorkspacePageToolbar', () => {
     expect(container.querySelector('[role="tablist"]')).toBeNull()
     expect(container.textContent).toContain('Dashboard')
 
-    const back = container.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
+    const back = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="workspace.back-to-workspace-navigator"]',
+    )
     back?.click()
 
     expect(onBack).toHaveBeenCalledTimes(1)

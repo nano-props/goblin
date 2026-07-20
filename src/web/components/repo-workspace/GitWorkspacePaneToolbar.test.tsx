@@ -846,7 +846,7 @@ describe('GitWorkspacePaneToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
+    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-workspace-navigator"]')
     const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
     // After the refactor the back button lives at the toolbar level, so the
     // tablist is no longer a sibling of an internal "leading action" wrapper.
@@ -882,7 +882,7 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
     // The back button must remain visible so the user can navigate back to
     // the branch navigator — otherwise closing the status tab strands them.
-    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
+    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-workspace-navigator"]')
     expect(back).not.toBeNull()
   })
 
@@ -895,7 +895,7 @@ describe('GitWorkspacePaneToolbar', () => {
 
     // In expanded mode the toolbar delegates navigation to the branch row,
     // so the back button must stay out of the workspace pane toolbar.
-    expect(c.querySelector('button[aria-label="workspace.back-to-branch-navigator"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace.back-to-workspace-navigator"]')).toBeNull()
     // Sanity check: tabs are still rendered in expanded mode.
     expect(c.querySelectorAll('[role="tab"]').length).toBeGreaterThan(0)
   })

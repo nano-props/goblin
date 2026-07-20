@@ -261,7 +261,7 @@ export const zh: Record<DictKey, string> = {
   'workspace.zen-mode-toggle-tooltip.enable': '禅模式',
   'workspace.navigation-back': '后退',
   'workspace.navigation-forward': '前进',
-  'workspace.back-to-branch-navigator': '返回 Branch Navigator',
+  'workspace.back-to-workspace-navigator': '返回工作区导航',
   'workspace.open-externally.open': '在外部打开',
   'branches.gone': '已失联',
   'branches.dirty': '有改动',

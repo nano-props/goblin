@@ -80,7 +80,7 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', () => ({
           ? (workspacePaneRouteContext.route?.kind ?? 'bare')
           : workspacePaneRouteContext?.kind === 'workspace-root'
             ? (workspacePaneRouteContext.route?.kind ?? 'workspace-root')
-          : (workspacePaneRouteContext?.kind ?? 'inactive')
+            : (workspacePaneRouteContext?.kind ?? 'inactive')
       }
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
@@ -125,7 +125,7 @@ vi.mock('#/web/components/workspace-pages/WorkspaceDashboardPane.tsx', () => ({
       <button
         type="button"
         data-testid="workspace-dashboard-back"
-        aria-label="workspace.back-to-branch-navigator"
+        aria-label="workspace.back-to-workspace-navigator"
         onClick={onBack}
       />
     </div>
@@ -139,7 +139,17 @@ vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
 vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   BranchFilterAction: () => <div data-testid="branch-filter-action" />,
   CreateWorktreeRowAction: () => <button data-testid="create-worktree-row-action" type="button" />,
-  DashboardRowAction: ({ onOpenDashboard, selected = false }: { onOpenDashboard?: () => void; selected?: boolean }) => (
+  RepoSyncAction: () => <div data-testid="repo-sync-action" />,
+}))
+
+vi.mock('#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx', () => ({
+  WorkspaceDashboardRowAction: ({
+    onOpenDashboard,
+    selected = false,
+  }: {
+    onOpenDashboard?: () => void
+    selected?: boolean
+  }) => (
     <button
       data-testid="dashboard-row-action"
       data-selected={selected ? 'true' : 'false'}
@@ -147,7 +157,6 @@ vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
       onClick={onOpenDashboard}
     />
   ),
-  RepoSyncAction: () => <div data-testid="repo-sync-action" />,
 }))
 
 vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
@@ -592,7 +601,7 @@ describe('WorkspaceView workspace navigation', () => {
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
 
-    buttonByLabel(container, 'workspace.back-to-branch-navigator')?.click()
+    buttonByLabel(container, 'workspace.back-to-workspace-navigator')?.click()
 
     expect(onOpenWorkspaceNavigator).toHaveBeenCalledWith(REPO_ID)
   })

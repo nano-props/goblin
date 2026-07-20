@@ -2,7 +2,7 @@ import { useContext } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { GitBranchPlus, LayoutDashboard } from 'lucide-react'
+import { GitBranchPlus } from 'lucide-react'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
@@ -26,32 +26,12 @@ interface CreateWorktreeRowActionProps extends Props {
   onCreateWorktree?: () => void
 }
 
-interface DashboardRowActionProps {
-  selected?: boolean
-  onOpenDashboard?: () => void
-}
-
 export function RepoSyncAction({ repoId }: Props) {
   return <RepoActivityControl repoId={repoId} />
 }
 
 export function BranchFilterAction({ repoId }: Props) {
   return <WorktreeFilterToggle repoId={repoId} />
-}
-
-export function DashboardRowAction({ selected = false, onOpenDashboard }: DashboardRowActionProps) {
-  const t = useT()
-  return (
-    <SidebarRowButton
-      onClick={() => onOpenDashboard?.()}
-      aria-label={t('workspace.dashboard')}
-      size="dense"
-      selected={selected}
-      leading={<LayoutDashboard size={16} />}
-    >
-      {t('workspace.dashboard')}
-    </SidebarRowButton>
-  )
 }
 
 function WorktreeFilterToggle({ repoId }: Props) {
