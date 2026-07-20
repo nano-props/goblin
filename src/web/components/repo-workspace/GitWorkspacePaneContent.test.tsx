@@ -118,7 +118,7 @@ function GitWorkspacePaneContentInner(props: GitWorkspacePaneContentHarnessProps
 function useHarnessWorkspacePaneRoute(
   props: GitWorkspacePaneContentHarnessProps,
 ): WorkspacePaneRoute | null | undefined {
-  if (props.workspacePaneRouteMode === 'bare-branch') return undefined
+  if (props.workspacePaneRouteMode === 'bare-branch') return null
   const branch = props.detail.branch
   const preferredTab = preferredWorkspacePaneTabForTarget(
     props.repo.ui,
@@ -867,6 +867,37 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container.textContent).toContain('feature/no-worktree')
     expect(container.textContent).toContain('branch-status.worktree.none')
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
+  })
+
+  test('selects the first authoritative tab on a bare branch route without a saved preference', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/first-open', {
+          worktree: { path: '/tmp/goblin-first-open' },
+        }),
+      ],
+      currentBranchName: 'feature/first-open',
+      workspacePaneTabsByBranch: { 'feature/first-open': [staticEntry('status')] },
+    })
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = getTestGitWorkspacePanePresentation(presentationRepo)
+
+    const { container } = renderInJsdom(
+      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+          <GitWorkspacePaneContentHarness
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneRouteMode="bare-branch"
+          />
+        </BranchActionSurfaceContext>
+      </TerminalSessionReadContext>,
+    )
+
+    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 

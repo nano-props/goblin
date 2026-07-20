@@ -173,6 +173,18 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
+    const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
+    await vi.waitFor(() =>
+      expect(primaryWindowQueryClient.getQueryCache().find({ queryKey: statusQueryKey, exact: true })?.getObserversCount()).toBe(
+        1,
+      ),
+    )
+    await primaryWindowQueryClient.invalidateQueries({
+      queryKey: statusQueryKey,
+      exact: true,
+      refetchType: 'active',
+    })
+
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
     expect(container.textContent).toContain('error.try-again')

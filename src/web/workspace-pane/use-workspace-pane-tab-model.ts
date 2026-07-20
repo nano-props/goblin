@@ -86,15 +86,14 @@ export function useGitWorkspacePaneTabModelInput(
   )
 
   const preferredTab = useMemo(() => {
-    if (workspacePaneRoute === null) return null
     if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
     if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
     if (workspacePaneRoute?.kind === 'invalid-static') return null
     return preferredWorkspacePaneTabForTarget(
       gitWorkspace.ui,
       branchName ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath) : null,
-    )
-  }, [gitWorkspace.ui, gitWorkspace.id, branchName, worktreePath, workspacePaneRoute])
+    ) ?? workspacePaneTabEntries[0]?.type ?? null
+  }, [gitWorkspace.ui, gitWorkspace.id, branchName, worktreePath, workspacePaneRoute, workspacePaneTabEntries])
 
   const input = useMemo<WorkspacePaneTabModelInput>(
     () => ({
@@ -105,7 +104,7 @@ export function useGitWorkspacePaneTabModelInput(
         : { kind: 'inactive', workspaceId: gitWorkspace.id },
       worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
       preferredTab,
-      allowPreferredTabFallback: workspacePaneRoute === undefined,
+      allowPreferredTabFallback: workspacePaneRoute === null || workspacePaneRoute === undefined,
       tabEntries: workspacePaneTabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,

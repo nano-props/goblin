@@ -829,7 +829,7 @@ describe('repo projection query data', () => {
 })
 
 describe('repo worktree status query data', () => {
-  test('shares a mount fetch across observers and refetches once after remount', async () => {
+  test('shares cached status across observers and only refetches after invalidation', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(
@@ -858,6 +858,13 @@ describe('repo worktree status query data', () => {
       createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
     )
     try {
+      expect(queryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, 'repo-runtime-1'))?.fetchStatus).toBe(
+        'idle',
+      )
+      expect(releases).toHaveLength(1)
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+
+      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       await vi.waitFor(() => expect(releases).toHaveLength(2))
       releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
       await vi.waitFor(() =>

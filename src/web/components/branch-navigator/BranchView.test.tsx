@@ -213,6 +213,12 @@ describe('BranchView', () => {
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderBranchView()
 
+    await primaryWindowQueryClient.invalidateQueries({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
+      exact: true,
+      refetchType: 'active',
+    })
+
     expect(await screen.findByText('status.stale-title')).toBeTruthy()
     expect(screen.getByText('main')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
