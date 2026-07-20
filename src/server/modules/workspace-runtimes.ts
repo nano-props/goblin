@@ -798,13 +798,6 @@ function workspaceProbeTransitionForRemoteCommit(
   const workspaceProbe = plan.workspaceProbe
   if (!workspaceProbe) return null
   if (workspaceProbe.mode === 'initial-only' && current.status !== 'probing') return null
-  if (
-    workspaceProbe.mode === 'refresh' &&
-    current.status !== 'probing' &&
-    !workspaceRefreshMayCommit(workspaceProbe.probe)
-  ) {
-    return null
-  }
   return { before: current, after: workspaceProbe.probe }
 }
 

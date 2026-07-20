@@ -359,6 +359,46 @@ describe('remote lifecycle write path', () => {
     })
   })
 
+  test('atomically commits a diagnosed Git downgrade for a readable remote workspace', async () => {
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/repo',
+    })!
+    mocks.resolveConnection
+      .mockResolvedValueOnce({
+        kind: 'ready',
+        name: 'repo',
+        lifecycle: { kind: 'ready', target },
+        gitAvailable: true,
+      })
+      .mockResolvedValueOnce({
+        kind: 'ready',
+        name: 'repo',
+        lifecycle: { kind: 'ready', target },
+        gitAvailable: false,
+        gitDiagnostic: 'Git probe timed out',
+      })
+    await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
+    const cleanup = vi.fn(async () => {})
+
+    await runRemoteWorkspaceLifecycleWrite(
+      { userId, workspaceId, workspaceRuntimeId, mode: 'restart' },
+      { beforeCapabilityCommit: cleanup },
+    )
+
+    expect(cleanup).toHaveBeenCalledOnce()
+    expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toMatchObject({
+      status: 'ready',
+      capabilities: { git: { status: 'unavailable' } },
+      diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
+    })
+    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'ready', attemptId: 2 })
+  })
+
   test.each([
     ['path-missing', 'error.workspace-path-not-found'],
     ['unreachable', 'error.workspace-transport-unavailable'],
