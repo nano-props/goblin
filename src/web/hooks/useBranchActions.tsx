@@ -14,11 +14,8 @@ import {
 } from '#/web/workspace-external-app-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { getBranchWorktreeState } from '#/web/stores/workspaces/worktree-state.ts'
-import {
-  dispatchRepoBranchAction,
-  dispatchRepoUiAction,
-  isPushProtected,
-} from '#/web/stores/workspaces/branch-action-write-paths.ts'
+import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
+import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
 import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
@@ -132,9 +129,10 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchRepoUiAction(repo.id, repo.workspaceRuntimeId, op, fn, setLastResult, {
+      const result = await dispatchWorkspaceUiAction(repo.id, repo.workspaceRuntimeId, op, fn, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
+        reportResult: setLastResult,
       })
       return result
     })

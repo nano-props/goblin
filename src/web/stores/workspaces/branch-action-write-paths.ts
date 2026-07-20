@@ -41,29 +41,3 @@ export async function dispatchRepoBranchAction(
   options?.handleResult?.(result)
   return result
 }
-
-export async function dispatchRepoUiAction(
-  repoId: WorkspaceId,
-  workspaceRuntimeId: string,
-  op: string,
-  fn: () => Promise<ExecResult>,
-  setLastResult: (repoId: WorkspaceId, result: ExecResult, workspaceRuntimeId: string) => void,
-  options?: {
-    silentSuccessOps?: Set<string>
-    handleResult?: (result: ExecResult) => boolean
-  },
-): Promise<ExecResult | null> {
-  let result: ExecResult
-  try {
-    result = await fn()
-  } catch (err) {
-    result = { ok: false, message: err instanceof Error ? err.message : String(err) }
-  }
-  if (!result.ok && result.message === 'cancelled') return null
-  // Caller handled it (e.g. opened a follow-up dialog); surface the result so
-  // they can inspect it instead of double-toasting from the dispatcher path.
-  if (options?.handleResult?.(result)) return result
-  const skipSuccessToast = result.ok && options?.silentSuccessOps?.has(op)
-  if (!skipSuccessToast) setLastResult(repoId, result, workspaceRuntimeId)
-  return result
-}

@@ -1,12 +1,9 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
@@ -16,45 +13,39 @@ import {
   workspaceExternalAppAvailable,
   type WorkspaceExternalAppItem,
 } from '#/web/external-workspace-apps.tsx'
-import { getRecentWorkspaceExternalAppId, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
+import { getRecentWorkspaceExternalAppId, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { setRecentWorkspaceExternalAppPreference } from '#/web/settings-actions.ts'
 import { cn } from '#/web/lib/cn.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  useWorkspaceFilesystemExternalActions,
+  type WorkspaceFilesystemExternalActions,
+} from '#/web/hooks/useWorkspaceFilesystemExternalActions.ts'
 
 interface Props {
-  repo: BranchActionRepo
-  branch: RepoBranchState
-  branchActions: BranchActions
+  target: WorkspacePaneFilesystemTarget
 }
 
-export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Props) {
+export function WorkspaceOpenExternallyMenu({ target }: Props) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const { pending, run } = useAsyncPending<string>()
-  const { blocked, capabilities, actions } = branchActions
+  const actions = useWorkspaceFilesystemExternalActions(target)
+  const { capabilities } = actions
   const externalApps = useExternalAppSettings()
   const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
-  const isRemoteRepo = isRemoteWorkspaceId(repo.id)
+  const isRemoteRepo = isRemoteWorkspaceId(target.workspaceId)
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const { data: settingsSnapshot } = useSettingsSnapshotQuery()
   const workspaceSettings = settingsSnapshot?.workspaceSettings
-  const externalAppTarget = useMemo(
-    () => (branch.worktree ? workspaceExternalAppTargetForWorktree(repo.id, branch.worktree.path) : null),
-    [branch.worktree, repo.id],
-  )
+  const externalAppTarget: WorkspaceExternalAppTarget =
+    target.kind === 'workspace-root' ? { kind: 'workspace-root' } : { kind: 'git-worktree', root: target.rootId }
   const serverRecentItemId = useMemo(
-    () => getRecentWorkspaceExternalAppId(workspaceSettings ?? [], repo.id, externalAppTarget),
-    [externalAppTarget, repo.id, workspaceSettings],
+    () => getRecentWorkspaceExternalAppId(workspaceSettings ?? [], target.workspaceId, externalAppTarget),
+    [externalAppTarget, target.workspaceId, workspaceSettings],
   )
-  // Mirror the server-derived recent in local state so the split-button
-  // primary icon swaps instantly on click, then re-syncs once the
-  // server's `settings-snapshot` invalidation lands. The server is the
-  // source of truth — the mirror only bridges the async round-trip.
-  const [recentItemId, setRecentItemId] = useState<string | null>(serverRecentItemId)
-  useEffect(() => {
-    setRecentItemId(serverRecentItemId)
-  }, [serverRecentItemId])
 
   const localItems = useMemo(
     () =>
@@ -70,41 +61,43 @@ export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: 
     [capabilities, externalApps, finderAvailable, isRemoteRepo],
   )
   const primaryItem = useMemo(
-    () => selectPrimaryWorkspaceExternalApp(localItems, recentItemId),
-    [recentItemId, localItems],
+    () => selectPrimaryWorkspaceExternalApp(localItems, serverRecentItemId),
+    [serverRecentItemId, localItems],
   )
 
   if (localItems.length === 0) return null
 
-  const busy = pending !== null || blocked
+  const busy = pending !== null
   const menuLabel = t('workspace.open-externally.open')
 
   function runLocalItem(item: WorkspaceExternalAppItem) {
     if (busy) return
     setOpen(false)
-    const previousRecentItemId = recentItemId
-    const shouldWriteRecent = externalAppTarget !== null && item.id !== recentItemId
-    if (shouldWriteRecent) {
-      setRecentItemId(item.id)
-    }
+    const shouldWriteRecent = item.id !== serverRecentItemId
     void run(item.id, async () => {
       if (shouldWriteRecent) {
         try {
           await setRecentWorkspaceExternalAppPreference({
-            workspaceId: repo.id,
+            workspaceId: target.workspaceId,
             target: externalAppTarget,
             itemId: item.id,
           })
         } catch (err) {
-          setRecentItemId(previousRecentItemId)
           toast.error(t('action.result-error'), {
             description: err instanceof Error ? err.message : String(err),
           })
         }
       }
-      if (item.kind === 'terminal') return actions.openTerminal(item.app)
-      if (item.kind === 'editor') return actions.openEditor(item.app)
-      return actions.openFinder()
+      const result =
+        item.kind === 'terminal'
+          ? await actions.openTerminal(item.app)
+          : item.kind === 'editor'
+            ? await actions.openEditor(item.app)
+            : await actions.openFinder()
+      if (result && !result.ok) {
+        toast.error(t('action.result-error'), { description: result.message })
+      }
+      return result
     })
   }
 
@@ -256,7 +249,7 @@ function workspaceExternalAppItemVisible({
   isRemoteRepo,
 }: {
   item: WorkspaceExternalAppItem
-  capabilities: BranchActions['capabilities']
+  capabilities: WorkspaceFilesystemExternalActions['capabilities']
   externalApps: ReturnType<typeof useExternalAppSettings>
   finderAvailable: boolean
   isRemoteRepo: boolean

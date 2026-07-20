@@ -583,7 +583,6 @@ function GitWorkspacePaneSurface({
         workspacePaneRoute={workspacePaneRoute}
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
-        branchActions={branchActions}
         onBackToBranchNavigator={onBackToBranchNavigator}
       />
       <GitWorkspacePaneContent

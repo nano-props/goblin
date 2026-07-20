@@ -32,6 +32,7 @@ import {
 import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -205,7 +206,12 @@ export function WorkspacePaneTargetToolbar({
       createAction={target.capabilities.terminal.available ? createAction : null}
       trafficLightOffset={trafficLightOffset}
       onBackToNavigator={onBackToNavigator}
-      trailingActions={trailingActions}
+      trailingActions={
+        <>
+          {target.kind !== 'git-branch' ? <WorkspaceOpenExternallyMenu target={target} /> : null}
+          {trailingActions}
+        </>
+      }
       onSelect={(item) => selectItem(item, false)}
       onReselect={(item) => selectItem(item, true)}
       onClose={(item) => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -8,7 +8,11 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-client.ts'
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
-import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
+import { WorkspaceOpenExternallyMenu } from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
   type GitWorkspacePaneProjection,
@@ -16,7 +20,6 @@ import {
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionContext,
@@ -93,6 +96,8 @@ const appShellMocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
 }))
 const workspaceExternalAppMocks = vi.hoisted(() => ({
+  openWorkspaceTerminal: vi.fn(async () => ({ ok: true, message: '' })),
+  openWorkspaceEditor: vi.fn(async () => ({ ok: true, message: '' })),
   openWorkspaceInFinder: vi.fn(async () => ({ ok: true, message: '' })),
 }))
 
@@ -112,6 +117,8 @@ vi.mock('#/web/workspace-external-app-client.ts', async () => {
   const actual = (await vi.importActual('#/web/workspace-external-app-client.ts')) as typeof WorkspaceExternalAppClient
   return {
     ...actual,
+    openWorkspaceTerminal: workspaceExternalAppMocks.openWorkspaceTerminal,
+    openWorkspaceEditor: workspaceExternalAppMocks.openWorkspaceEditor,
     openWorkspaceInFinder: workspaceExternalAppMocks.openWorkspaceInFinder,
   }
 })
@@ -146,15 +153,12 @@ function defaultRuntimeExternalAppSettings() {
 
 type GitWorkspacePaneToolbarHarnessProps = Omit<
   ComponentProps<typeof GitWorkspacePaneToolbar>,
-  'workspacePaneTabModel' | 'branchActions'
+  'workspacePaneTabModel'
 > & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
 function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessProps) {
   const workspacePaneTabModel = useGitWorkspacePaneTabModel(props.repo, props.detail, props.workspacePaneRoute)
-  const branchActions = useBranchActions(props.repo, props.detail.branch!)
-  return (
-    <GitWorkspacePaneToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
-  )
+  return <GitWorkspacePaneToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
 function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
@@ -331,6 +335,122 @@ describe('GitWorkspacePaneToolbar', () => {
     ])
   })
 
+  test('opens a workspace root through the shared external app launcher', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-external-app-workspace')
+    const target = workspaceRootPaneFilesystemTarget({
+      workspaceId,
+      workspaceRuntimeId: 'workspace-runtime-external-app',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+    })
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+        <WorkspaceOpenExternallyMenu target={target} />
+      </QueryClientProvider>,
+    )
+
+    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
+    expect(primary).not.toBeNull()
+    await act(async () => {
+      primary?.click()
+      await Promise.resolve()
+    })
+
+    await waitFor(() =>
+      expect(workspaceExternalAppMocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+        {
+          kind: 'workspace-root',
+          workspaceId,
+          workspaceRuntimeId: 'workspace-runtime-external-app',
+        },
+        'ghostty',
+      ),
+    )
+  })
+
+  test('opens a detached worktree through its filesystem execution target', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    })
+    const projection = gitWorkspacePaneProjection(repo)
+    if (projection.probe.status !== 'ready') throw new Error('expected ready Git workspace fixture')
+    const target = gitWorktreePaneFilesystemTarget({
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      worktreePath: WORKTREE_PATH,
+      head: { kind: 'detached' },
+      capabilities: projection.probe.capabilities,
+    })
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+        <WorkspaceOpenExternallyMenu target={target} />
+      </QueryClientProvider>,
+    )
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')?.click()
+      await Promise.resolve()
+    })
+
+    await waitFor(() =>
+      expect(workspaceExternalAppMocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+        {
+          kind: 'git-worktree',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`),
+        },
+        'ghostty',
+      ),
+    )
+  })
+
+  test('does not render the external app launcher for a branch without a filesystem target', () => {
+    const { container } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      worktree: false,
+    })
+
+    expect(container.querySelector('[data-testid="workspace-open-externally-menu-primary"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-open-externally-menu-trigger"]')).toBeNull()
+  })
+
+  test('keeps remote-capable apps and hides Finder for a remote workspace root', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
+    const target = workspaceRootPaneFilesystemTarget({
+      workspaceId,
+      workspaceRuntimeId: 'workspace-runtime-remote-external-app',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+    })
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+        <WorkspaceOpenExternallyMenu target={target} />
+      </QueryClientProvider>,
+    )
+
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger?.click()
+      await Promise.resolve()
+    })
+
+    const labels = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
+      (button) => button.textContent,
+    )
+    expect(labels).toEqual(['settings.terminal.ghostty', 'settings.terminal.terminal', 'settings.editor.vscode'])
+    expect(labels).not.toContain('worktrees.reveal-title')
+  })
+
   test('hides the open-externally menu when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
@@ -483,8 +603,6 @@ describe('GitWorkspacePaneToolbar', () => {
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     })
-    const branchActions = menuBranchActions()
-
     const { container, rerender } = renderInJsdom(
       <QueryClientProvider
         client={seededQueryClientWithWorkspaceSettings([
@@ -499,11 +617,7 @@ describe('GitWorkspacePaneToolbar', () => {
           },
         ])}
       >
-        <GitWorkspaceOpenExternallyMenu
-          repo={gitWorkspacePaneProjection(repo)}
-          branch={createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
-          branchActions={branchActions}
-        />
+        <WorkspaceOpenExternallyMenu target={externalMenuTarget(repo, WORKTREE_PATH)} />
       </QueryClientProvider>,
     )
 
@@ -523,11 +637,7 @@ describe('GitWorkspacePaneToolbar', () => {
           },
         ])}
       >
-        <GitWorkspaceOpenExternallyMenu
-          repo={gitWorkspacePaneProjection(repo)}
-          branch={createBranchSnapshot('feature/worktree', { worktree: { path: nextWorktreePath } })}
-          branchActions={branchActions}
-        />
+        <WorkspaceOpenExternallyMenu target={externalMenuTarget(repo, nextWorktreePath)} />
       </QueryClientProvider>,
     )
 
@@ -1271,33 +1381,6 @@ describe('GitWorkspacePaneToolbar', () => {
   })
 })
 
-function menuBranchActions(): BranchActions {
-  return {
-    blocked: false,
-    busyAction: null,
-    capabilities: {
-      canRemoveWorktree: false,
-      isRegularBranch: false,
-      canCopyPatch: false,
-      canPull: false,
-      canPush: false,
-      canOpenTerminal: true,
-      canOpenEditor: true,
-      canOpenFinder: true,
-    },
-    actions: {
-      copyPatch: vi.fn(async () => false),
-      pull: vi.fn(),
-      push: vi.fn(),
-      openTerminal: vi.fn(async () => ({ ok: true, message: '' })),
-      openEditor: vi.fn(async () => ({ ok: true, message: '' })),
-      openFinder: vi.fn(async () => ({ ok: true, message: '' })),
-      requestDeleteBranch: vi.fn(),
-      requestRemoveWorktree: vi.fn(),
-    },
-  }
-}
-
 function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
@@ -1720,11 +1803,23 @@ function externalAppTargetKey(worktreePath: string): string {
 /**
  * Build a fresh `QueryClient` whose settings snapshot cache already
  * contains the given `workspaceSettings`. Used by the worktree-scope test
- * which renders `GitWorkspaceOpenExternallyMenu` directly (it doesn't go
+ * which renders `WorkspaceOpenExternallyMenu` directly (it doesn't go
  * through `renderToolbar`).
  */
 function seededQueryClientWithWorkspaceSettings(workspaceSettings: WorkspaceSettingsEntry[]): QueryClient {
   const queryClient = new QueryClient()
   queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings }))
   return queryClient
+}
+
+function externalMenuTarget(repo: WorkspaceState, worktreePath: string) {
+  const projection = gitWorkspacePaneProjection(repo)
+  if (projection.probe.status !== 'ready') throw new Error('expected ready Git workspace fixture')
+  return gitWorktreePaneFilesystemTarget({
+    workspaceId: repo.id,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    worktreePath,
+    head: { kind: 'branch', branchName: 'feature/worktree' },
+    capabilities: projection.probe.capabilities,
+  })
 }

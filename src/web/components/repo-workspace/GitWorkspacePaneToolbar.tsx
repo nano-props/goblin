@@ -1,11 +1,9 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
-import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -26,7 +24,6 @@ interface Props {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: WorkspacePaneTabModel
   trafficLightOffset?: boolean
-  branchActions?: BranchActions
   onBackToBranchNavigator?: () => void
 }
 
@@ -37,7 +34,6 @@ export function GitWorkspacePaneToolbar({
   workspacePaneRoute,
   workspacePaneTabModel,
   trafficLightOffset = false,
-  branchActions,
   onBackToBranchNavigator,
 }: Props) {
   const compact = useIsCompactUi()
@@ -76,11 +72,6 @@ export function GitWorkspacePaneToolbar({
       statusCount={detail.statusCount}
       trafficLightOffset={trafficLightOffset}
       onBackToNavigator={onBackToBranchNavigator}
-      trailingActions={
-        branchActions ? (
-          <GitWorkspaceOpenExternallyMenu repo={repo} branch={branch} branchActions={branchActions} />
-        ) : null
-      }
     />
   )
 }
