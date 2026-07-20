@@ -4,7 +4,6 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import {
   commitWorkspacePaneCurrentTargetRoute,
   selectWorkspacePaneControllerTab,
@@ -110,14 +109,6 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
         workspaceRuntimeId,
         workspacePaneStaticTabId(input.type),
         openerIdentity,
-      )
-    }
-    if (provider.refreshOnOpen && branchName) {
-      void requestVisibleWorkspaceStatusRefresh(
-        { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
-        input.workspaceId,
-        workspaceRuntimeId,
-        branchName,
       )
     }
     const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, presentationToken)
@@ -316,7 +307,6 @@ async function openWorkspacePaneStaticTabAction(
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(target, input.workspaceRuntimeId, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  if (provider.refreshOnOpen) requestVisibleStatusRefreshOnOpen(input)
   if (transaction.kind === 'current' && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
@@ -326,15 +316,6 @@ async function openWorkspacePaneStaticTabAction(
   const navigationOutcome = await commitWorkspacePaneStaticTab(input, sourceRoute, transaction)
   if (!workspacePaneActionOutcomeSucceeded(navigationOutcome)) return navigationOutcome
   return navigationOutcome.kind === 'completed' ? { ...navigationOutcome, changed: !alreadyOpen } : navigationOutcome
-}
-
-function requestVisibleStatusRefreshOnOpen(input: ResolvedOpenWorkspacePaneStaticTabActionOptions): void {
-  void requestVisibleWorkspaceStatusRefresh(
-    { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
-    input.workspaceId,
-    input.workspaceRuntimeId,
-    input.branchName,
-  )
 }
 
 async function commitWorkspacePaneStaticTab(

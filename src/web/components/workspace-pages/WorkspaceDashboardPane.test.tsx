@@ -21,12 +21,28 @@ import {
   setWorkspaceProbeForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type * as RepoClient from '#/web/repo-client.ts'
+
+const repoClientMocks = vi.hoisted(() => ({
+  getRepoWorktreeStatus: vi.fn(),
+}))
+
+vi.mock('#/web/repo-client.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof RepoClient>()
+  return { ...actual, getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus }
+})
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
+  repoClientMocks.getRepoWorktreeStatus.mockReset()
+  repoClientMocks.getRepoWorktreeStatus.mockImplementation(async (_workspaceId, workspaceRuntimeId) => ({
+    workspaceRuntimeId,
+    status: [],
+    loadedAt: 1,
+  }))
 })
 
 afterEach(() => {
@@ -118,16 +134,9 @@ describe('WorkspaceDashboardPane', () => {
     })
     const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
     primaryWindowQueryClient.removeQueries({ queryKey: statusQueryKey })
-    primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
-    await expect(
-      primaryWindowQueryClient.fetchQuery({
-        queryKey: statusQueryKey,
-        queryFn: async () => {
-          throw new Error('status failed')
-        },
-        retry: false,
-      }),
-    ).rejects.toThrow('status failed')
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(async () => {
+      throw new Error('status failed')
+    })
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -135,10 +144,10 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
+    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(container.textContent).toContain('error.failed-read-repo'))
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
-    primaryWindowQueryClient.setQueryDefaults(statusQueryKey, {})
   })
 
   test('keeps accepted dashboard data visible with a stale warning after status refresh fails', async () => {
@@ -154,18 +163,9 @@ describe('WorkspaceDashboardPane', () => {
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
-    const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
-    primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
-    await expect(
-      primaryWindowQueryClient.fetchQuery({
-        queryKey: statusQueryKey,
-        queryFn: async () => {
-          throw new Error('status failed')
-        },
-        retry: false,
-        staleTime: 0,
-      }),
-    ).rejects.toThrow('status failed')
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(async () => {
+      throw new Error('status failed')
+    })
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -173,10 +173,10 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
-    expect(container.textContent).toContain('status.stale-title')
+    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).toContain('dashboard.metric.branches')
-    primaryWindowQueryClient.setQueryDefaults(statusQueryKey, {})
   })
 
   test('hides the attention section when no branch needs attention', () => {

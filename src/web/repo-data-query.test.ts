@@ -27,6 +27,7 @@ import {
   useRepoOperationsReadModel,
   useRepoLogQuery,
   useRepoRemoteBranchesQuery,
+  useRepoWorktreeStatusReadModel,
 } from '#/web/repo-data-query.ts'
 import type {
   PullRequestEntry,
@@ -828,6 +829,47 @@ describe('repo projection query data', () => {
 })
 
 describe('repo worktree status query data', () => {
+  test('shares a mount fetch across observers and refetches once after remount', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(
+      () =>
+        new Promise<RepoWorktreeStatusSnapshot>((resolve) => {
+          releases.push(resolve)
+        }),
+    )
+    function StatusObservers() {
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
+      return null
+    }
+
+    const first = renderInJsdom(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+    )
+    await vi.waitFor(() => expect(releases).toHaveLength(1))
+    releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+    await vi.waitFor(() =>
+      expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(1),
+    )
+    first.unmount()
+
+    const second = renderInJsdom(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+    )
+    try {
+      await vi.waitFor(() => expect(releases).toHaveLength(2))
+      releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+      await vi.waitFor(() =>
+        expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2),
+      )
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+    } finally {
+      second.unmount()
+      queryClient.clear()
+    }
+  })
+
   test('reruns an in-flight status read after a worktree snapshot invalidation', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []

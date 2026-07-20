@@ -15,7 +15,6 @@ import {
   useGitWorkspacePaneTabModel,
   type WorkspacePaneRuntimeContext,
 } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { useGitWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-git-workspace-pane-visible-status-refresh.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -564,12 +563,6 @@ function GitWorkspacePaneSurface({
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const workspacePaneTabModel = useGitWorkspacePaneTabModel(repo, detail, workspacePaneRoute)
-  useGitWorkspacePaneVisibleStatusRefresh({
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
-    branchName: workspacePaneTabModel.branchName,
-    renderedTab: workspacePaneTabModel.renderedTab,
-  })
   useGitWorkspacePaneRouteController({
     enabled: workspacePaneRouteContext.kind === 'routed',
     workspaceId: repo.id,

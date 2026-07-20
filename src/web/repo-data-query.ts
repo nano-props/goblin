@@ -600,6 +600,7 @@ export function useRepoWorktreeStatusReadModel(
     retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: 'always',
     enabled: active,
     subscribed: active,
   })
