@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { serverDataDir } from '#/shared/data-dir.ts'
@@ -84,7 +84,6 @@ async function createAccessTokenFile(dataDir: string, filePath: string): Promise
     // Best-effort cleanup of the orphan tmp file; the rename error is
     // the one the caller cares about.
     try {
-      const { unlink } = await import('node:fs/promises')
       await unlink(tmp)
     } catch {}
     throw err

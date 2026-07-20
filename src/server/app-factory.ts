@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
@@ -306,7 +307,6 @@ export function createApp(options: ServerAppOptions): Hono {
         return errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`)
       }
       try {
-        const { readFile } = await import('node:fs/promises')
         return c.html(await readFile(webIndexHtmlPath, 'utf8'))
       } catch {
         return c.text('Not Found', 404)
