@@ -165,7 +165,15 @@ export class WorkspacePaneRuntimeApplication {
           return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
         switch (input.runtimeType) {
           case 'terminal':
-            return await this.closeTerminal(clientId, userId, target.target, executionPath, input.sessionId, scope)
+            return await this.closeTerminal(
+              clientId,
+              userId,
+              target.target,
+              executionPath,
+              input.sessionId,
+              scope,
+              () => this.isCurrentTarget(clientId, userId, target),
+            )
         }
       })
     } catch (error) {
@@ -272,8 +280,10 @@ export class WorkspacePaneRuntimeApplication {
     executionPath: string,
     terminalSessionId: string,
     scope: string,
+    isCurrentMembership: () => boolean,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
+    if (!isCurrentMembership()) return runtimeFailure('terminal', 'error.workspace-runtime-stale')
     const targetKey = runtimeWorkspacePaneTargetKey(target)
     if (!targetKey) return runtimeFailure('terminal', 'error.invalid-arguments')
     const session = sessions.find((candidate) => candidate.terminalSessionId === terminalSessionId)

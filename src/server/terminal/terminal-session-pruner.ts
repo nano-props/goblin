@@ -32,6 +32,7 @@ class TerminalSessionPruner {
     assertCurrent: () => void
   }): Promise<{ pruned: number; remaining: number }> {
     const allSessions = await this.manager.listSessionsForUser(input.userId, input.scope)
+    input.assertCurrent()
     if (isRemoteWorkspaceId(input.workspaceId)) return { pruned: 0, remaining: allSessions.length }
 
     const workspacePath = localWorkspaceNativePath(input.workspaceId)
@@ -43,11 +44,11 @@ class TerminalSessionPruner {
     for (const session of allSessions) {
       if (terminalSessionCoordinates(session).workspaceId !== input.workspaceId) continue
       if (liveWorktreePaths.has(path.resolve(terminalExecutionPath(session.target)))) continue
+      input.assertCurrent()
       if (await this.manager.requestSessionRetirement(session.terminalRuntimeSessionId)) pruned += 1
     }
-    const remaining = await this.manager
-      .listSessionsForUser(input.userId, input.scope)
-      .then((sessions) => sessions.length)
+    const remaining = (await this.manager.listSessionsForUser(input.userId, input.scope)).length
+    input.assertCurrent()
     return { pruned, remaining }
   }
 }

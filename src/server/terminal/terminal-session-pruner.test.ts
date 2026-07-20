@@ -84,11 +84,11 @@ describe('terminal session pruner', () => {
       }),
     ).resolves.toEqual({ pruned: 0, remaining: 2 })
     expect(getWorktrees).not.toHaveBeenCalled()
-    expect(assertCurrent).not.toHaveBeenCalled()
+    expect(assertCurrent).toHaveBeenCalledOnce()
     expect(closeSession).not.toHaveBeenCalled()
   })
 
-  test('checks workspace runtime freshness after reading local worktrees and before closing sessions', async () => {
+  test('checks workspace runtime freshness after reading sessions before Git or close work', async () => {
     const closeSession = vi.fn()
     const assertCurrent = vi.fn(() => {
       throw new Error('error.workspace-runtime-stale')
@@ -110,9 +110,31 @@ describe('terminal session pruner', () => {
         assertCurrent,
       }),
     ).rejects.toThrow('error.workspace-runtime-stale')
-    expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
+    expect(getWorktrees).not.toHaveBeenCalled()
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()
+  })
+
+  test('stops pruning when membership becomes stale between session retirements', async () => {
+    const sessions = [
+      terminalSession('term-staleonestaleone001', { repoRoot: REPO_ROOT, worktreePath: '/repo/stale-one' }),
+      terminalSession('term-staletwostaletwo002', { repoRoot: REPO_ROOT, worktreePath: '/repo/stale-two' }),
+    ]
+    const closeSession = vi.fn(async () => true)
+    const assertCurrent = vi.fn(() => {
+      if (assertCurrent.mock.calls.length === 4) throw new Error('error.workspace-runtime-stale')
+    })
+    const pruner = createTerminalSessionPruner({
+      manager: {
+        listSessionsForUser: vi.fn(async () => sessions),
+        requestSessionRetirement: closeSession,
+      },
+    })
+
+    await expect(
+      pruner.prune({ userId: USER_ID, workspaceId: REPO_ROOT, scope: SCOPE, assertCurrent }),
+    ).rejects.toThrow('error.workspace-runtime-stale')
+    expect(closeSession).toHaveBeenCalledOnce()
   })
 })
 

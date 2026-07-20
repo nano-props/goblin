@@ -352,6 +352,38 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
+  test('does not close a terminal when membership is released while reading the session projection', async () => {
+    const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
+    const sessions = deferred<(typeof session)[]>()
+    let current = true
+    const close = vi.fn(() => true)
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalSessions: { listSessionsForUser: async () => await sessions.promise },
+      terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentWorkspaceRuntimeMembership: () => current,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    const closing = application.close('client-test', 'user-test', {
+      runtimeType: 'terminal',
+      sessionId: session.terminalSessionId,
+      target: { target: request.target },
+    })
+    await Promise.resolve()
+    current = false
+    sessions.resolve([session])
+
+    await expect(closing).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.workspace-runtime-stale',
+    })
+    expect(close).not.toHaveBeenCalled()
+  })
+
   test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: request.workspaceId,
