@@ -95,21 +95,6 @@ describe('terminal create command', () => {
     ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'superseded' })
   })
 
-  test('keeps a server create successful when local projection is deferred to recovery', async () => {
-    const admission = createAdmission()
-    await expect(
-      runCreateTerminalTabCommand({
-        base: BASE,
-        createTerminal: vi.fn(async () => admission),
-        commitCreatedTerminalTab: vi.fn(() => ({ status: 'projection-failed' as const })),
-      }),
-    ).resolves.toEqual({
-      ok: true,
-      terminalSessionId: admission.terminalSessionId,
-      presentationStatus: 'projection-failed',
-    })
-  })
-
   test('reports exact-route rejection without destroying the committed server session', async () => {
     await expect(
       runCreateTerminalTabCommand({

@@ -21,10 +21,7 @@ export type TerminalCreateCommandResult =
 export type TerminalCreateCommandAdmission = TerminalCreateAdmissionResult
 
 export type TerminalCreatedTabCommitResult =
-  | { status: 'committed' }
-  | { status: 'superseded' }
-  | { status: 'projection-failed' }
-  | { status: 'navigation-rejected' }
+  { status: 'committed' } | { status: 'superseded' } | { status: 'navigation-rejected' }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 
@@ -36,9 +33,9 @@ export async function runCreateTerminalTabCommand(input: {
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   /**
-   * Applies the server projection and commits the exact route for the created
-   * session. This is required so every leader request has one explicit
-   * presentation boundary after server admission.
+   * Commits the exact route using the canonical presentation returned by the
+   * server. Every leader request has one explicit presentation boundary after
+   * server admission.
    */
   commitCreatedTerminalTab: (
     admission: TerminalCreateLeaderAdmissionResult,

@@ -254,6 +254,22 @@ describe('workspace pane runtime tab create action', () => {
     expect(useWorkspacesStore.getState().workspaces[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
   })
 
+  test('rejects a server presentation that does not match the execution target', async () => {
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base: BASE,
+        admission: { ...createAdmission(), presentation: { kind: 'workspace-root' } },
+        openerIdentity: 'workspace-pane:status',
+        showCreatedTerminalTab,
+      }),
+    ).rejects.toThrow('terminal target and presentation disagree')
+
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
+  })
+
   test('marks the terminal create action busy only while terminal creation is pending', () => {
     const pendingAction = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState({ createPending: true }),
