@@ -6,7 +6,6 @@ import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.t
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { workspaceGitProbeConclusion } from '#/server/modules/workspace-capability-transition.ts'
 
 interface WorkspacePaneTabsRestoreInput {
   userId: string
@@ -90,7 +89,7 @@ function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime
     })
     return { kind: 'ready', targets: [{ kind: 'workspace-root' }, ...gitTargets] }
   }
-  return workspaceGitProbeConclusion(workspace.workspaceProbe) === 'conclusive-unavailable'
+  return workspace.workspaceProbe.status === 'ready'
     ? { kind: 'ready', targets: [{ kind: 'workspace-root' }] }
     : { kind: 'deferred' }
 }

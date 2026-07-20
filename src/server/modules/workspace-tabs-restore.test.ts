@@ -241,7 +241,7 @@ describe('restoreWorkspaceTabs', () => {
     })
   })
 
-  test('keeps Git layout deferred for a lazy workspace with an operational Git diagnostic', async () => {
+  test('restores workspace-root tabs while Git layout remains deferred after an operational diagnostic', async () => {
     const workspace = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local' as const, id: LOCAL_WORKSPACE_ID }],
@@ -264,8 +264,13 @@ describe('restoreWorkspaceTabs', () => {
     })
 
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
-    expect(result.snapshot).toBeNull()
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      targets: [{ kind: 'workspace-root' }],
+    })
+    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
   })
 
   test('restores workspace tabs for a lazy remote plain workspace', async () => {
@@ -437,7 +442,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
-  test('keeps the existing membership when lazy local projection fails', async () => {
+  test('keeps the existing membership and restores root tabs when lazy local Git projection fails', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
@@ -455,13 +460,18 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
     expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, gitProjection: null })
-    expect(result.snapshot).toBeNull()
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: LOCAL_WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedWorkspaceEntry: { kind: 'local', id: LOCAL_WORKSPACE_ID },
+      targets: [{ kind: 'workspace-root' }],
+    })
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
-  test('keeps the existing membership when lazy remote projection fails', async () => {
+  test('keeps the existing membership and restores root tabs when lazy remote Git projection fails', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
       id: REMOTE_WORKSPACE_ID,
@@ -495,8 +505,13 @@ describe('restoreWorkspaceTabs', () => {
       remoteLifecycle: { kind: 'ready', attemptId: 3, target: remoteEntry.ref },
       gitProjection: null,
     })
-    expect(result.snapshot).toBeNull()
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: remoteEntry.id,
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedWorkspaceEntry: remoteEntry,
+      targets: [{ kind: 'workspace-root' }],
+    })
   })
 
   test('keeps the existing membership when lazy remote ensure fails', async () => {

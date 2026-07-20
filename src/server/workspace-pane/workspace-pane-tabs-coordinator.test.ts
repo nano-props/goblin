@@ -698,9 +698,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      targetProjection: testTargetProjection([
-        { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'main' },
-      ]),
+      targetProjection: testTargetProjection([{ kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'main' }]),
     })
     const input = {
       userId: 'user-a',
@@ -778,6 +776,59 @@ describe('workspace pane tabs coordinator queues', () => {
         }).target,
       },
     ])
+  })
+
+  test('projects workspace-root independently without deleting deferred Git layout', async () => {
+    const repository = memoryRepository({
+      entries: [
+        { target: { kind: 'workspace-root' }, tabs: [workspacePaneStaticTabEntry('status')] },
+        { target: { kind: 'git-branch', branch: 'feature/deferred' }, tabs: [workspacePaneStaticTabEntry('history')] },
+      ],
+    })
+    const rootProjection: WorkspacePaneTargetProjection = {
+      target: {
+        kind: 'workspace-root',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+      },
+      nativeWorktreePath: null,
+      canonicalBranch: null,
+    }
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(repository),
+      runtimeProviders: [],
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      targetProjection: { captureTargets: async () => [rootProjection] },
+    })
+    const scope = {
+      userId: 'user-a',
+      workspaceId: WORKSPACE_ID,
+      scope: 'goblin+file:///repo\0runtime-a',
+      assertCurrent: () => {},
+    }
+
+    await expect(
+      coordinator.restoreScope({
+        ...scope,
+        targets: [rootProjection],
+        expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
+      }),
+    ).resolves.toMatchObject({
+      kind: 'validated',
+      snapshot: { entries: [{ target: { kind: 'workspace-root' } }] },
+    })
+    await coordinator.updateTabs({
+      ...scope,
+      target: rootProjection.target,
+      nativeWorktreePath: null,
+      operation: { type: 'open-static', tabType: 'files' },
+    })
+
+    expect((await repository.load(WORKSPACE_ID)).layout.entries).toContainEqual({
+      target: { kind: 'git-branch', branch: 'feature/deferred' },
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
   })
 
   test('commits no epoch or physical index when restore membership conflicts', async () => {

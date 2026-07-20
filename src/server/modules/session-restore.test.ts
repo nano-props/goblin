@@ -260,7 +260,7 @@ describe('restoreServerWorkspace', () => {
     ])
   })
 
-  test('keeps an active Git Workspace as a stub when projection is temporarily unavailable', async () => {
+  test('restores root layout for an active Workspace when its Git projection is temporarily unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
@@ -295,8 +295,19 @@ describe('restoreServerWorkspace', () => {
         gitProjection: null,
       }),
     ])
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
-    expect(result.runtime.workspacePaneTabs).toEqual([])
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: LOCAL_WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedWorkspaceEntry: { kind: 'local', id: LOCAL_WORKSPACE_ID },
+      targets: [{ kind: 'workspace-root' }],
+    })
+    expect(result.runtime.workspacePaneTabs).toEqual([
+      {
+        workspaceId: LOCAL_WORKSPACE_ID,
+        workspaceRuntimeId: 'repo-runtime-test',
+        snapshot: { revision: 0, entries: [] },
+      },
+    ])
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
