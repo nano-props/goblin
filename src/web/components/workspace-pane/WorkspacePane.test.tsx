@@ -175,11 +175,18 @@ describe('WorkspacePane', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     const showWorkspaceRootPaneTab = vi.fn(() => true)
+    const terminalCreate = Promise.withResolvers<string>()
+    const createTerminal = vi.fn(async () => await terminalCreate.promise)
+    const deferredTerminalCommandContext = terminalSessionContextForTest({
+      ...terminalCommandContext,
+      createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForContextTest(createTerminal),
+    })
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={{ ...navigation, showWorkspaceRootPaneTab }}>
-          <TerminalSessionContext value={terminalCommandContext}>
+          <TerminalSessionContext value={deferredTerminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
@@ -198,7 +205,7 @@ describe('WorkspacePane', () => {
     await waitFor(() => expect(newTerminalButton.disabled).toBe(false))
     newTerminalButton.click()
     await waitFor(() => {
-      expect(terminalCommandContext.createTerminalWithAdmission).toHaveBeenCalledWith(
+      expect(deferredTerminalCommandContext.createTerminalWithAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
           target: expect.objectContaining({ kind: 'workspace-root', workspaceId }),
           presentation: { kind: 'workspace-root' },
@@ -206,6 +213,8 @@ describe('WorkspacePane', () => {
         undefined,
       )
     })
+    expect(showWorkspaceRootPaneTab).not.toHaveBeenCalled()
+    terminalCreate.resolve('term-111111111111111111111')
     await waitFor(() =>
       expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
         workspaceId,
