@@ -438,6 +438,7 @@ async function createAdmittedTerminal(
     ...(input.clientId ? { clientId: input.clientId } : {}),
     target: input.target ?? terminalCreateTarget(input),
   }
+  acquireWorkspaceRuntime(userId, request.target.workspaceId, clientId)
   const result = await application.openRuntime(clientId, userId, {
     runtimeType: 'terminal',
     request: request.clientId ? request : { ...request, clientId },
@@ -2097,6 +2098,7 @@ describe('server terminal runtime', () => {
     })
     expect(result.ok).toBe(true)
 
+    acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_2')
     const sessions = await host.listSessions('client_2', USER_1, {
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -2141,6 +2143,7 @@ describe('server terminal runtime', () => {
       terminalSessionId: userACreate.terminalSessionId,
     }
 
+    acquireWorkspaceRuntime(USER_2, REPO_ROOT, 'client_shared')
     expect(
       await host.listSessions('client_shared', USER_2, {
         workspaceId: REPO_ROOT,
@@ -2239,6 +2242,7 @@ describe('server terminal runtime', () => {
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
         workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
         'req_list_after_detached_ttl',
+        { clientId: 'client_b', userId: USER_1 },
       ),
     ).resolves.toMatchObject({ entries: [] })
 

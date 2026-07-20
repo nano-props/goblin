@@ -11,6 +11,7 @@ import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
@@ -41,43 +42,47 @@ function worktreeTarget(workspaceRuntimeId: string) {
 // shared/terminal-validators.ts.
 const RUNTIME_SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
+function terminalCloseOutcome(): TerminalSessionCloseOutcome {
+  return {
+    kind: 'closed',
+    session: {
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      target: worktreeTarget(WORKSPACE_RUNTIME_ID),
+      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
+      controller: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      cols: 80,
+      rows: 24,
+    },
+  }
+}
+
 function makeActions(
   options: {
-    closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean | Promise<boolean>
-    getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
+    closeSessionForUserOutcome: (
+      userId: string,
+      terminalRuntimeSessionId: string,
+    ) => TerminalSessionCloseOutcome | Promise<TerminalSessionCloseOutcome>
     isValidTerminalClientId?: (value: unknown) => value is string
     isCurrentWorkspaceRuntimeMembership?: typeof isCurrentWorkspaceRuntimeMembership
     physicalWorktreeCapability?: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
     worktreeOperations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     broadcasts?: ReturnType<typeof vi.fn>
-  } = { closeSessionForUser: () => false },
+  } = { closeSessionForUserOutcome: () => ({ kind: 'already-closed' }) },
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const physicalWorktreeCapability =
     options.physicalWorktreeCapability ?? testPhysicalWorktreeExecutionCapability(REPO_ROOT)
   const worktreeOperations = options.worktreeOperations ?? createPhysicalWorktreeOperationCoordinator()
   const manager = {
-    getSessionSummaryForUser: vi.fn((userId: string, terminalRuntimeSessionId: string) =>
-      options.getSlotScope?.(userId, terminalRuntimeSessionId)
-        ? ({
-            terminalRuntimeSessionId,
-            terminalRuntimeGeneration: 1,
-            terminalSessionId: 'term-111111111111111111111',
-            target: worktreeTarget(WORKSPACE_RUNTIME_ID),
-            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
-            controller: null,
-            processName: 'zsh',
-            canonicalTitle: null,
-            phase: 'open',
-            message: null,
-            cols: 80,
-            rows: 24,
-          } as const)
-        : null,
-    ),
-    closeSessionForUser: vi.fn(
+    closeSessionForUserOutcome: vi.fn(
       async (userId: string, terminalRuntimeSessionId: string) =>
-        await options.closeSessionForUser(userId, terminalRuntimeSessionId),
+        await options.closeSessionForUserOutcome(userId, terminalRuntimeSessionId),
     ),
     getPhysicalWorktreeExecutionCapabilityForUser: vi.fn(() => physicalWorktreeCapability),
     // The other manager methods are unused by `close`, but the
@@ -272,10 +277,9 @@ describe('terminal-runtime-actions close broadcast', () => {
     // Repo/session-list invalidation is owned by the manager close
     // lifecycle. The action owns only the targeted sibling-window
     // event that lets clients drop the local entry immediately.
-    const close = vi.fn(() => true)
+    const close = vi.fn(terminalCloseOutcome)
     const { actions, broadcasts } = makeActions({
-      closeSessionForUser: close,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: close,
     })
 
     const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -296,8 +300,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // A non-user close must not leak a phantom session-closed to
     // sibling windows. The guard is `if (closed && workspaceId)`.
     const { actions, broadcasts } = makeActions({
-      closeSessionForUser: () => false,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: () => ({ kind: 'failed' }),
     })
 
     const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -306,18 +309,14 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
-  test('emits NEITHER broadcast when the session has no scope (lookup miss)', async () => {
-    // Defensive: if the scope lookup misses (e.g. the session
-    // was already removed server-side by a parallel path), the close
-    // path must not synthesize a session-closed with a fake workspaceId.
+  test('reports an already-closed workspace pane outcome when session authority was removed', async () => {
     const { actions, broadcasts } = makeActions({
-      closeSessionForUser: () => true,
-      getSlotScope: () => undefined,
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
     })
 
-    const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
-
-    expect(closed).toBe(true)
+    await expect(
+      actions.closeForWorkspacePane(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID }),
+    ).resolves.toEqual({ kind: 'already-closed' })
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
@@ -326,7 +325,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // (16+ alphanumerics) is rejected by the validator; the action
     // returns false and the broker is not consulted.
     const { actions, broadcasts } = makeActions({
-      closeSessionForUser: () => true,
+      closeSessionForUserOutcome: terminalCloseOutcome,
     })
 
     const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: '' })
@@ -337,13 +336,12 @@ describe('terminal-runtime-actions close broadcast', () => {
 
   test('rejects an invalid clientId without emitting', async () => {
     // The `isValidTerminalClientId` guard is the first check. A bad
-    // clientId must never reach `closeSessionForUser` (which would
+    // clientId must never reach `closeSessionForUserOutcome` (which would
     // also reject it) and must not emit a session-closed with a
     // stale terminalRuntimeSessionId.
-    const close = vi.fn(() => true)
+    const close = vi.fn(terminalCloseOutcome)
     const { actions, broadcasts } = makeActions({
-      closeSessionForUser: close,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: close,
     })
 
     const closed = await actions.close('not_a_client', USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -358,7 +356,9 @@ describe('terminal-runtime-actions prune', () => {
   test('rejects stale repo-runtime prune requests before touching session state', async () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     syncCurrentWorkspaceRuntime()
-    const { actions, broadcasts, sessionService } = makeActions({ closeSessionForUser: () => false })
+    const { actions, broadcasts, sessionService } = makeActions({
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
+    })
 
     await expect(
       actions.prune(CLIENT_ID, USER_ID, {
@@ -418,7 +418,7 @@ describe('terminal-runtime-actions clientId gate', () => {
   // never undefined, and the manager's tightened
   // `clientId: string` (no longer optional) contract holds.
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
-    const { actions, manager } = makeActions({ closeSessionForUser: () => false })
+    const { actions, manager } = makeActions({ closeSessionForUserOutcome: () => ({ kind: 'already-closed' }) })
 
     await actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
     actions.resize(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, cols: 80, rows: 24 } as never)
@@ -456,8 +456,7 @@ describe('terminal-runtime-actions clientId gate', () => {
 
   test('restart rejects invalid arguments before looking up the session scope', async () => {
     const { actions, manager } = makeActions({
-      closeSessionForUser: () => false,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
     })
 
     await expect(actions.restart(CLIENT_ID, USER_ID, undefined as never)).resolves.toEqual({
@@ -485,7 +484,6 @@ describe('terminal-runtime-actions clientId gate', () => {
       message: 'error.invalid-arguments',
     })
 
-    expect(manager.getSessionSummaryForUser).not.toHaveBeenCalled()
     expect(manager.restartSessionWithProjectionOutcome).not.toHaveBeenCalled()
   })
 
@@ -493,8 +491,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(REPO_ROOT)
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const { actions, manager } = makeActions({
-      closeSessionForUser: () => false,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
       physicalWorktreeCapability,
       worktreeOperations,
     })
@@ -519,7 +516,9 @@ describe('terminal-runtime-actions clientId gate', () => {
   })
 
   test('restart failure without a projection mutation does not broadcast sessions changed', async () => {
-    const { actions, manager, broadcasts } = makeActions({ closeSessionForUser: () => false })
+    const { actions, manager, broadcasts } = makeActions({
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
+    })
     manager.restartSessionWithProjectionOutcome.mockResolvedValueOnce({
       result: { ok: false, message: 'restart rejected' },
       projectionChanged: null,
@@ -540,8 +539,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(REPO_ROOT)
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const { actions, manager } = makeActions({
-      closeSessionForUser: () => false,
-      getSlotScope: () => REPO_ROOT,
+      closeSessionForUserOutcome: () => ({ kind: 'already-closed' }),
       physicalWorktreeCapability,
       worktreeOperations,
     })

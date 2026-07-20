@@ -428,7 +428,7 @@ export class TerminalSessionProjection {
   // for the broader `sessions-changed` list-rescan. We route through
   // `discardLocalSessionAndDismissDetailIfLast` (rather than
   // `closeTerminal`) because the server has already killed the PTY
-  // — calling `close` again would no-op the `closeSessionForUser` check
+  // — calling `close` again would no-op the server close-authority check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(event: {
     terminalRuntimeSessionId: string

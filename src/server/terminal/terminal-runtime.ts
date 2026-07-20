@@ -308,7 +308,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     workspaceTabsCoordinator,
     worktreeOperations,
     physicalWorktrees,
-    terminal: { ...terminalCreateProvider, close: actions.close },
+    terminal: { ...terminalCreateProvider, close: actions.closeForWorkspacePane },
     terminalSessions: manager,
     isCurrentWorkspaceRuntimeMembership,
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,

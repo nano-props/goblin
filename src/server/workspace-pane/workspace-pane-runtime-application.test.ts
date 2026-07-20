@@ -116,7 +116,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted, close: () => false },
+      terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -138,7 +138,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: vi.fn(), close: () => false },
+      terminal: { createAdmitted: vi.fn(), close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -180,7 +180,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => testPhysicalWorktreeExecutionCapability(request.worktreePath) },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted, close: () => false },
+      terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -209,7 +209,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close: () => false },
+      terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
@@ -268,7 +268,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: {
         createAdmitted: async () => ({ ok: false, message: 'error.terminal-create-failed' }),
-        close: () => false,
+        close: () => ({ kind: 'failed' as const }),
       },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntimeMembership: () => true,
@@ -297,7 +297,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted, close: () => false },
+      terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -320,7 +320,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       workspaceId,
       workspaceRuntimeId: request.workspaceRuntimeId,
     }
-    const close = vi.fn(() => true)
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: {
@@ -356,7 +356,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const sessions = deferred<(typeof session)[]>()
     let current = true
-    const close = vi.fn(() => true)
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
@@ -401,7 +401,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         },
       },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close: () => false },
+      terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -437,7 +437,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => capability },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close: () => false },
+      terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -462,7 +462,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         action === 'created'
           ? { ...runtime.admission, kind: 'prepared', abort: retire }
           : { ...runtime.admission, kind: 'existing', abort: vi.fn() }
-      const close = vi.fn(() => true)
+      const close = vi.fn(() => ({ kind: 'closed' as const }))
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.workspace-runtime-stale' }
       const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
         input.isRuntimeCurrent()
@@ -504,7 +504,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('closes a terminal by durable session id and leaves projection cleanup to the close event', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
-    const close = vi.fn(() => true)
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
     const broadcastWorkspaceTabsChanged = vi.fn()
     const listSessions = vi.fn().mockResolvedValueOnce([session])
     const application = createWorkspacePaneRuntimeApplication({
@@ -592,7 +592,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       worktreePath: '/repo',
     }
-    const close = vi.fn(() => true)
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: {
@@ -633,7 +633,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       target: sessionTarget,
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
     }
-    const close = vi.fn(() => true)
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: {
@@ -662,7 +662,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       terminalSessions: { listSessionsForUser: async () => [session] },
-      terminal: { createAdmitted: async () => terminalCreateSuccess(), close: async () => false },
+      terminal: {
+        createAdmitted: async () => terminalCreateSuccess(),
+        close: async () => ({ kind: 'failed' as const }),
+      },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -679,6 +682,39 @@ describe('WorkspacePaneRuntimeApplication', () => {
     ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.unavailable' })
   })
 
+  test('treats capability cleanup during close as an idempotent already-closed outcome', async () => {
+    const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalSessions: { listSessionsForUser: async () => [session] },
+      terminal: {
+        createAdmitted: async () => terminalCreateSuccess(),
+        close: async () => ({ kind: 'already-closed' as const }),
+      },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentWorkspaceRuntimeMembership: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: session.terminalSessionId,
+        target: { target: request.target },
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        action: 'already-closed',
+        terminalSessionId: session.terminalSessionId,
+        terminalRuntimeSessionId: null,
+        terminalRuntimeGeneration: null,
+      },
+    })
+  })
+
   test('serializes open and close through the shared user/runtime/worktree queue', async () => {
     const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
@@ -689,7 +725,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: listSessions },
       terminal: {
         createAdmitted: async () => await createResult.promise,
-        close: () => true,
+        close: () => ({ kind: 'closed' as const }),
       },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
@@ -722,7 +758,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const create = vi.fn(async () => await createResult.promise)
-    const close = vi.fn(async () => true)
+    const close = vi.fn(async () => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations,
       physicalWorktrees: testPhysicalWorktrees,
@@ -771,7 +807,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations,
       physicalWorktrees: { capture: async () => physicalWorktreeCapability },
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted, close: () => false },
+      terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -791,7 +827,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const runtime = terminalCreateSuccess()
     const retire = vi.fn()
     runtime.admission = { ...runtime.admission, kind: 'prepared', abort: retire }
-    const close = vi.fn(async () => true)
+    const close = vi.fn(async () => ({ kind: 'closed' as const }))
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
@@ -825,7 +861,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: async () => runtime, close: () => false },
+      terminal: { createAdmitted: async () => runtime, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async () => {
           throw new WorkspacePaneRuntimeStaleError()
@@ -851,7 +887,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: async () => runtime, close: () => false },
+      terminal: { createAdmitted: async () => runtime, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }) },
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
@@ -871,7 +907,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const retire = vi.fn()
     const publishCommittedEffects = vi.fn()
     runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects, abort: retire }
-    const close = vi.fn(async () => true)
+    const close = vi.fn(async () => ({ kind: 'closed' as const }))
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),

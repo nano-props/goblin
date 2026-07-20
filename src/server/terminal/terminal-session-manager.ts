@@ -50,10 +50,13 @@ import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const INVALIDATED_SESSION_RETIREMENT_RETRY_BASE_MS = 100
 const INVALIDATED_SESSION_RETIREMENT_RETRY_MAX_MS = 5_000
+
+type TerminalSessionRetirementOutcome = 'detached' | 'already-detached' | 'failed'
 const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
 export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
@@ -149,7 +152,10 @@ export interface TerminalSessionInvalidationCommit {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
-  private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
+  private readonly closeOperationsByTerminalRuntimeSessionId = new Map<
+    string,
+    Promise<TerminalSessionRetirementOutcome>
+  >()
   private readonly invalidatedSessionRetirements = new Map<
     string,
     {
@@ -501,25 +507,48 @@ export class TerminalSessionManager<TUser extends string | number> {
     return { result, projectionChanged }
   }
 
-  async closeSessionForUser(userId: TUser, terminalRuntimeSessionId: string): Promise<boolean> {
-    if (!this.getSession(userId, terminalRuntimeSessionId)) return false
-    return await this.requestSessionRetirement(terminalRuntimeSessionId)
+  async closeSessionForUserOutcome(
+    userId: TUser,
+    terminalRuntimeSessionId: string,
+  ): Promise<TerminalSessionCloseOutcome> {
+    const session = this.getSession(userId, terminalRuntimeSessionId)
+    if (!session) return { kind: 'already-closed' }
+    const summary = this.sessionSummary(session)
+    const retirement = await this.requestSessionRetirementOutcome(terminalRuntimeSessionId)
+    if (retirement.admission === 'initiated' && retirement.outcome === 'detached') {
+      return { kind: 'closed', session: summary }
+    }
+    if (retirement.outcome !== 'failed' || this.directory.get(terminalRuntimeSessionId) !== session) {
+      return { kind: 'already-closed' }
+    }
+    return { kind: 'failed' }
   }
 
   async requestSessionRetirement(
     terminalRuntimeSessionId: string,
     reason: TerminalSessionCloseReason = 'session',
   ): Promise<boolean> {
+    const retirement = await this.requestSessionRetirementOutcome(terminalRuntimeSessionId, reason)
+    return retirement.admission !== 'absent' && retirement.outcome !== 'failed'
+  }
+
+  private async requestSessionRetirementOutcome(
+    terminalRuntimeSessionId: string,
+    reason: TerminalSessionCloseReason = 'session',
+  ): Promise<{
+    admission: 'initiated' | 'joined' | 'absent'
+    outcome: TerminalSessionRetirementOutcome
+  }> {
     const existing = this.closeOperationsByTerminalRuntimeSessionId.get(terminalRuntimeSessionId)
-    if (existing) return await existing
+    if (existing) return { admission: 'joined', outcome: await existing }
     const session = this.directory.get(terminalRuntimeSessionId)
-    if (!session) return false
+    if (!session) return { admission: 'absent', outcome: 'already-detached' }
     // Publish the single-flight operation before disposal can synchronously
     // deliver PTY exit and re-enter closeSession through the lifecycle sink.
     const operation = Promise.resolve().then(async () => await this.closeSessionAndWait(session, reason))
     this.closeOperationsByTerminalRuntimeSessionId.set(terminalRuntimeSessionId, operation)
     try {
-      return await operation
+      return { admission: 'initiated', outcome: await operation }
     } finally {
       if (this.closeOperationsByTerminalRuntimeSessionId.get(terminalRuntimeSessionId) === operation) {
         this.closeOperationsByTerminalRuntimeSessionId.delete(terminalRuntimeSessionId)
@@ -530,20 +559,21 @@ export class TerminalSessionManager<TUser extends string | number> {
   private async closeSessionAndWait(
     session: TerminalSessionView<TUser>,
     reason: TerminalSessionCloseReason,
-  ): Promise<boolean> {
+  ): Promise<TerminalSessionRetirementOutcome> {
     session.ptyBinding.invalidateOwnership()
     try {
       await session.ptyBinding.disposeAndWait(session)
     } catch (error) {
+      if (this.directory.get(session.id) !== session) return 'already-detached'
       if (markTerminalSessionError(session, error instanceof Error ? error.message : String(error))) {
         this.emitLifecycle(session)
       }
-      return false
+      return 'failed'
     }
-    if (this.directory.get(session.id) !== session) return true
+    if (this.directory.get(session.id) !== session) return 'already-detached'
     const closedSession = this.detachSession(session)
     this.sink.onSessionClosed?.(session.userId, closedSession, reason)
-    return true
+    return 'detached'
   }
 
   private detachSession(session: TerminalSessionView<TUser>): TerminalSessionSummary {

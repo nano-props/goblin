@@ -24,6 +24,7 @@ import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import type { TerminalCloseOutcome, TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 interface TerminalSessionServiceLike {
   prune(
@@ -160,32 +161,16 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {
-      if (!isValidTerminalClientId(clientId)) return false
-      // Look up the session BEFORE closing so we know its scope
-      // (for the per-session broadcast). The session is gone after
-      // `closeSessionForUser` returns, so a post-close lookup would
-      // always miss. The lookup is also gated on validity so a
-      // malformed input never throws inside the action.
-      const session = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? manager.getSessionSummaryForUser(userId, input.terminalRuntimeSessionId)
-        : null
-      const closed = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? await manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
-        : false
-      if (closed && session) {
-        // General repo/session-list invalidation is emitted by the
-        // manager close lifecycle. This action owns only the targeted
-        // sibling-window event; other users must not hear about this
-        // session id.
-        broker.broadcastToUser(userId, {
-          type: 'session-closed',
-          terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-          terminalSessionId: session.terminalSessionId,
-          workspaceId: terminalSessionCoordinates(session).workspaceId,
-        })
-      }
-      return closed
+      return (await closeOutcome(clientId, userId, input)).kind === 'closed'
+    },
+
+    async closeForWorkspacePane(
+      clientId: string,
+      userId: string,
+      input: TerminalSessionInput,
+    ): Promise<TerminalCloseOutcome> {
+      const outcome = await closeOutcome(clientId, userId, input)
+      return { kind: outcome.kind }
     },
 
     takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
@@ -229,6 +214,31 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         assertCurrentMembership,
       )
     },
+  }
+
+  async function closeOutcome(
+    clientId: string,
+    userId: string,
+    input: TerminalSessionInput,
+  ): Promise<TerminalSessionCloseOutcome> {
+    if (!isValidTerminalClientId(clientId)) return { kind: 'failed' }
+    if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)) return { kind: 'failed' }
+    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId)
+    if (outcome.kind === 'closed') {
+      const session = outcome.session
+      // General repo/session-list invalidation is emitted by the
+      // manager close lifecycle. This action owns only the targeted
+      // sibling-window event; other users must not hear about this
+      // session id.
+      broker.broadcastToUser(userId, {
+        type: 'session-closed',
+        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+        terminalSessionId: session.terminalSessionId,
+        workspaceId: terminalSessionCoordinates(session).workspaceId,
+      })
+    }
+    return outcome
   }
 
   function membershipAssertion(clientId: string, userId: string, input: TerminalListSessionsInput): () => void {

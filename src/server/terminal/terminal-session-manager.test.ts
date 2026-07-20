@@ -567,6 +567,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     await vi.waitFor(() => expect(finishRetirement).toBeTypeOf('function'))
     finishRetirement?.()
     await expect(retirement).resolves.toBe(true)
+    await expect(manager.requestSessionRetirement(created.terminalRuntimeSessionId)).resolves.toBe(false)
   })
 
   test('prepares without spawning, then starts at fitted geometry and snapshots only later attaches', async () => {
@@ -714,7 +715,9 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
     expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
 
-    await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(false)
+    await expect(manager.closeSessionForUserOutcome(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toEqual({
+      kind: 'already-closed',
+    })
     if (prepared.admission.kind === 'prepared') prepared.admission.abort()
     expect(supervisor.spawn).not.toHaveBeenCalled()
     expect(supervisor.killed).toEqual([])
@@ -779,11 +782,11 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const [openingSession] = await manager.listSessionsForUser(USER_ID, SCOPE)
     expect(openingSession).toBeDefined()
     expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
-    const close = manager.closeSessionForUser(USER_ID, openingSession!.terminalRuntimeSessionId)
+    const close = manager.closeSessionForUserOutcome(USER_ID, openingSession!.terminalRuntimeSessionId)
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_spawn_123456'))
 
-    await expect(close).resolves.toBe(true)
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
     await expect(pending).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
     expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
@@ -926,7 +929,9 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
     ])
 
-    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
     expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_two_123'])
   })
 
@@ -983,6 +988,51 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 })
 
 describe('TerminalSessionManager physical worktree quiescence', () => {
+  test.each(['resolve', 'reject'] as const)(
+    'reports an already-closed outcome when Git cleanup removes authority before PTY disposal %s',
+    async (disposalResult) => {
+      const supervisor = createDeferredPtySupervisor()
+      let resolveDirectClose!: () => void
+      let rejectDirectClose!: (error: Error) => void
+      const directCloseDisposal = new Promise<void>((resolve, reject) => {
+        resolveDirectClose = resolve
+        rejectDirectClose = reject
+      })
+      supervisor.killAndWait = vi
+        .fn()
+        .mockImplementationOnce(async () => await directCloseDisposal)
+        .mockResolvedValue(undefined)
+      const onLifecycle = vi.fn()
+      const manager = createManager(supervisor, { onLifecycle })
+      const pending = ensureSession(manager, {
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: TERMINAL_SESSION_ID,
+        cwd: WORKTREE_PATH,
+        cols: 80,
+        rows: 24,
+        clientId: CLIENT_ID,
+      })
+      supervisor.spawns.shift()?.(ptySpawnSuccess('pty_cleanup_close_race_123'))
+      const created = await pending
+      if (!created.ok) throw new Error(created.message)
+
+      const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+      await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledOnce())
+
+      const cleanup = manager.commitGitSessionInvalidation(USER_ID, SCOPE)
+      expect(cleanup.removedCount).toBe(1)
+      cleanup.publishEffects()
+      onLifecycle.mockClear()
+      if (disposalResult === 'resolve') resolveDirectClose()
+      else rejectDirectClose(new Error('PTY close failed after authority removal'))
+
+      await expect(close).resolves.toEqual({ kind: 'already-closed' })
+      await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+      expect(onLifecycle).not.toHaveBeenCalled()
+    },
+  )
+
   test('keeps the session authoritative when PTY exit re-enters close before kill acknowledgement', async () => {
     const supervisor = createDeferredPtySupervisor()
     let exitListener: (() => void) | null = null
@@ -1014,14 +1064,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    const close = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
+    const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
     await Promise.resolve()
     await Promise.resolve()
     expect(onSessionClosed).not.toHaveBeenCalled()
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toHaveLength(1)
 
     acknowledgeKill()
-    await expect(close).resolves.toBe(true)
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
     expect(onSessionClosed).toHaveBeenCalledOnce()
   })
 
@@ -1051,7 +1101,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     if (!created.ok) throw new Error(created.message)
 
     const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))
-    const directClose = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
+    const directClose = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
     await Promise.resolve()
     expect(killAndWait).toHaveBeenCalledOnce()
     expect(onSessionClosed).not.toHaveBeenCalled()
@@ -1073,7 +1123,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       ok: true,
       scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
-    await expect(directClose).resolves.toBe(true)
+    await expect(directClose).resolves.toEqual({ kind: 'already-closed' })
     expect(onSessionClosed).toHaveBeenCalledOnce()
   })
 
@@ -1348,7 +1398,9 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess(replacementPtySessionId))
     await expect(retry).resolves.toMatchObject({ ok: true })
-    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
     expect(killAndWait.mock.calls.map(([handle]) => handle.ptySessionId)).toEqual([
       retiredPtySessionId,
       retiredPtySessionId,
@@ -1436,7 +1488,9 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(resizedSnapshot.revision).toBe(beforeResize)
     expect(resizedSnapshot.sessions[0]).toMatchObject({ cols: 100, rows: 30 })
 
-    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
     const closedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
     expect(closedSnapshot.revision).toBe(resizedSnapshot.revision + 1)
     expect(closedSnapshot.sessions).toEqual([])

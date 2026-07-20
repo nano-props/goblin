@@ -30,6 +30,7 @@ import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-targ
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -39,7 +40,7 @@ interface WorkspacePaneRuntimeApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminal: ServerTerminalCreateProvider & {
-    close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<boolean>
+    close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalCloseOutcome>
   }
   terminalSessions: {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
@@ -295,10 +296,22 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure('terminal', 'error.workspace-runtime-stale')
     }
     if (session) {
-      const closed = await this.deps.terminal.close(clientId, userId, {
+      const close = await this.deps.terminal.close(clientId, userId, {
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
       })
-      if (!closed) return runtimeFailure('terminal', 'error.unavailable')
+      if (close.kind === 'failed') return runtimeFailure('terminal', 'error.unavailable')
+      if (close.kind === 'already-closed') {
+        return {
+          ok: true,
+          runtimeType: 'terminal',
+          runtime: {
+            action: 'already-closed',
+            terminalSessionId,
+            terminalRuntimeSessionId: null,
+            terminalRuntimeGeneration: null,
+          },
+        }
+      }
     }
     return {
       ok: true,
