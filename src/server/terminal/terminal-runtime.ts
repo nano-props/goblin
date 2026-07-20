@@ -52,7 +52,11 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { isCurrentWorkspaceRuntime, onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
+import {
+  isCurrentWorkspaceRuntime,
+  isCurrentWorkspaceRuntimeMembership,
+  onWorkspaceRuntimeClosed,
+} from '#/server/modules/workspace-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
@@ -296,6 +300,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     sessionService,
     isValidTerminalClientId,
+    isCurrentWorkspaceRuntimeMembership,
     worktreeOperations,
   })
   const terminalCreateProvider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
@@ -305,7 +310,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     physicalWorktrees,
     terminal: { ...terminalCreateProvider, close: actions.close },
     terminalSessions: manager,
-    isCurrentWorkspaceRuntime,
+    isCurrentWorkspaceRuntimeMembership,
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
@@ -333,7 +338,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
-    isCurrentWorkspaceRuntime: isCurrentWorkspaceRuntime,
+    isCurrentWorkspaceRuntimeMembership,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
     async restoreTabs(userId, input) {

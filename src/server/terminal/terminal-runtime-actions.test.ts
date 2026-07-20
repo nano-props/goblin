@@ -1,7 +1,12 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
+import {
+  acquireWorkspaceRuntime,
+  clearWorkspaceRuntimesForUser,
+  isCurrentWorkspaceRuntimeMembership,
+  releaseWorkspaceRuntime,
+} from '#/server/modules/workspace-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -41,6 +46,7 @@ function makeActions(
     closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean | Promise<boolean>
     getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
+    isCurrentWorkspaceRuntimeMembership?: typeof isCurrentWorkspaceRuntimeMembership
     physicalWorktreeCapability?: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
     worktreeOperations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     broadcasts?: ReturnType<typeof vi.fn>
@@ -110,6 +116,8 @@ function makeActions(
       broker,
       sessionService,
       isValidTerminalClientId,
+      isCurrentWorkspaceRuntimeMembership:
+        options.isCurrentWorkspaceRuntimeMembership ?? isCurrentWorkspaceRuntimeMembership,
       worktreeOperations,
     }),
     broadcasts,
@@ -124,6 +132,26 @@ function syncCurrentWorkspaceRuntime(): void {
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
+  test('rejects workspace-scoped actions after the calling client releases its membership', async () => {
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
+    const otherClientId = 'client_terminal_actions_other'
+    expect(acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, otherClientId)).toBe(WORKSPACE_RUNTIME_ID)
+    expect(releaseWorkspaceRuntime(USER_ID, WORKSPACE_ID, WORKSPACE_RUNTIME_ID, CLIENT_ID)).toEqual({
+      released: true,
+      runtimeClosed: false,
+    })
+    const { actions, manager, sessionService } = makeActions()
+    const input = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+
+    await expect(actions.prune(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(actions.recoverSessions(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(actions.listSessions(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
+    expect(sessionService.prune).not.toHaveBeenCalled()
+    expect(sessionService.listSessions).not.toHaveBeenCalled()
+    expect(manager.terminalSessionsSnapshotForUser).not.toHaveBeenCalled()
+  })
+
   test('does not emit workspace tab invalidation after a successful create', async () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     syncCurrentWorkspaceRuntime()

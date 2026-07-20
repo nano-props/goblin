@@ -149,7 +149,11 @@ class TerminalSessionService {
     })
   }
 
-  async replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot> {
+  async replaceTabs(
+    userId: string,
+    input: WorkspacePaneTabsReplaceInput,
+    assertCurrentMembership?: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot> {
     const nativeExecutionPath = nativeExecutionPathForRuntimeTarget(input.target)
     if (
       nativeExecutionPath === undefined ||
@@ -168,8 +172,10 @@ class TerminalSessionService {
       target: input.target,
       nativeWorktreePath: executionPath,
       tabs: input.tabs,
-      assertCurrent: () =>
-        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
+      assertCurrent: () => {
+        assertCurrentMembership?.()
+        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId)
+      },
     })
     this.broadcastDurableLayoutChange(input.target.workspaceId, result.affectedUserIds)
     return result.snapshot
@@ -216,7 +222,11 @@ class TerminalSessionService {
     return { kind: 'restored', snapshot: result.snapshot, repaired: false }
   }
 
-  async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
+  async updateTabs(
+    userId: string,
+    input: WorkspacePaneTabsUpdateInput,
+    assertCurrentMembership?: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot> {
     const nativeExecutionPath = nativeExecutionPathForRuntimeTarget(input.target)
     if (
       nativeExecutionPath === undefined ||
@@ -236,8 +246,10 @@ class TerminalSessionService {
       target: input.target,
       nativeWorktreePath: executionPath,
       operation: input.operation,
-      assertCurrent: () =>
-        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
+      assertCurrent: () => {
+        assertCurrentMembership?.()
+        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId)
+      },
     })
     this.broadcastDurableLayoutChange(input.target.workspaceId, result.affectedUserIds)
     return result.snapshot
@@ -258,6 +270,7 @@ class TerminalSessionService {
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
+    assertCurrentMembership?: () => void,
   ): Promise<WorkspacePaneTabsSnapshot> {
     if (!isValidWorkspaceLocatorInput(workspaceId)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
@@ -265,7 +278,10 @@ class TerminalSessionService {
       userId,
       workspaceId: workspaceId,
       scope,
-      assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
+      assertCurrent: () => {
+        assertCurrentMembership?.()
+        this.assertCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)
+      },
     })
   }
 
@@ -273,12 +289,15 @@ class TerminalSessionService {
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
+    assertCurrentMembership?: () => void,
   ): Promise<TerminalSessionSummary[]> {
     if (!isValidWorkspaceLocatorInput(workspaceId)) return []
-    return await this.options.manager.listSessionsForUser(
+    const sessions = await this.options.manager.listSessionsForUser(
       userId,
       terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId),
     )
+    assertCurrentMembership?.()
+    return sessions
   }
 
   async prune(
@@ -286,6 +305,7 @@ class TerminalSessionService {
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
+    assertCurrentMembership?: () => void,
   ): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidWorkspaceLocatorInput(workspaceId)) return { pruned: 0, remaining: 0 }
@@ -295,7 +315,10 @@ class TerminalSessionService {
       userId,
       workspaceId,
       scope: sessionScope,
-      assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
+      assertCurrent: () => {
+        assertCurrentMembership?.()
+        this.assertCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)
+      },
     })
   }
 

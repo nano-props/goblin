@@ -61,6 +61,44 @@ const request = {
 const paneTabsSnapshot = { revision: 1, entries: [] }
 
 describe('WorkspacePaneRuntimeApplication', () => {
+  test('rejects runtime commands when the calling client no longer owns the workspace membership', async () => {
+    const isCurrentWorkspaceRuntimeMembership = vi.fn(() => false)
+    const capture = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture },
+      terminalSessions: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: vi.fn(), close: vi.fn() },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentWorkspaceRuntimeMembership,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.workspace-runtime-stale',
+    })
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        target: { target: request.target },
+        sessionId: 'term-111111111111111111111',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.workspace-runtime-stale',
+    })
+    expect(isCurrentWorkspaceRuntimeMembership).toHaveBeenCalledWith(
+      'user-test',
+      request.target.workspaceId,
+      request.target.workspaceRuntimeId,
+      'client-test',
+    )
+    expect(capture).not.toHaveBeenCalled()
+  })
+
   test('rejects terminal creation from an unavailable authoritative capability', async () => {
     workspaceProbeStateForRuntimeMock.mockReturnValueOnce({
       status: 'ready',
@@ -80,7 +118,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -102,7 +140,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: vi.fn(), close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -144,7 +182,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -173,7 +211,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -233,7 +271,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => false,
       },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -261,7 +299,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -300,7 +338,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       },
       terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -333,7 +371,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -369,7 +407,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -407,14 +445,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
         current = false
         return result
       })
-      const isCurrentWorkspaceRuntime = vi.fn(() => current)
+      const isCurrentWorkspaceRuntimeMembership = vi.fn(() => current)
       const application = createWorkspacePaneRuntimeApplication({
         worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
         physicalWorktrees: testPhysicalWorktrees,
         terminalSessions: { listSessionsForUser: async () => [] },
         terminal: { createAdmitted: create, close },
         workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-        isCurrentWorkspaceRuntime,
+        isCurrentWorkspaceRuntimeMembership,
         broadcastWorkspaceTabsChanged,
       })
 
@@ -424,7 +462,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       providerResult.resolve(runtime)
       await expect(open).resolves.toEqual(stale)
       expect(current).toBe(false)
-      expect(isCurrentWorkspaceRuntime).toHaveBeenCalledTimes(2)
+      expect(isCurrentWorkspaceRuntimeMembership).toHaveBeenCalledTimes(3)
       expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
       expect(retire).toHaveBeenCalledTimes(action === 'created' ? 1 : 0)
       expect(close).not.toHaveBeenCalled()
@@ -443,7 +481,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: listSessions },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -479,7 +517,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -531,7 +569,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -572,7 +610,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -594,7 +632,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close: async () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -627,7 +665,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: () => {},
     })
 
@@ -669,7 +707,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -703,7 +741,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -733,7 +771,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new Error('projection failed')
         },
       },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -761,7 +799,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new WorkspacePaneRuntimeStaleError()
         },
       },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -783,7 +821,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }) },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -814,7 +852,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new Error('invariant failure after admission')
         },
       },
-      isCurrentWorkspaceRuntime: () => true,
+      isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged,
     })
 

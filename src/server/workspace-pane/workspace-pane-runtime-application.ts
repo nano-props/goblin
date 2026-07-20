@@ -44,7 +44,12 @@ interface WorkspacePaneRuntimeApplicationDependencies {
   terminalSessions: {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
-  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
+  isCurrentWorkspaceRuntimeMembership(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    clientId: string,
+  ): boolean
   broadcastWorkspaceTabsChanged(
     userId: string,
     workspaceId: WorkspaceId,
@@ -80,7 +85,7 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     }
     const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-    if (!this.deps.isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) {
+    if (!this.isCurrentMembership(clientId, userId, workspaceId, workspaceRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
     }
     // Runtime admission is a server-owned capability boundary. The client may
@@ -103,6 +108,9 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
+        if (!this.isCurrentMembership(clientId, userId, workspaceId, workspaceRuntimeId)) {
+          return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+        }
         if (!this.terminalCapabilityAvailable(userId, workspaceId, workspaceRuntimeId)) {
           return runtimeFailure(input.runtimeType, 'error.unavailable')
         }
@@ -136,7 +144,9 @@ export class WorkspacePaneRuntimeApplication {
     const executionPath = terminalSessionTargetExecutionPath(target.target)
     if (!executionPath) return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     const scope = terminalSessionRuntimeScope(target.target.workspaceId, target.target.workspaceRuntimeId)
-    if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+    if (!this.isCurrentTarget(clientId, userId, target)) {
+      return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+    }
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(
@@ -151,7 +161,7 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeCloseResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-        if (!this.isCurrentTarget(userId, target))
+        if (!this.isCurrentTarget(clientId, userId, target))
           return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
         switch (input.runtimeType) {
           case 'terminal':
@@ -207,7 +217,7 @@ export class WorkspacePaneRuntimeApplication {
         permit,
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
-          this.deps.isCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId),
+          this.isCurrentMembership(clientId, userId, target.workspaceId, target.workspaceRuntimeId),
         commitAdmission: (canonicalBranch) => {
           const presentation =
             target.kind === 'workspace-root'
@@ -296,8 +306,17 @@ export class WorkspacePaneRuntimeApplication {
     return await this.deps.terminalSessions.listSessionsForUser(userId, scope)
   }
 
-  private isCurrentTarget(userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
-    return this.deps.isCurrentWorkspaceRuntime(userId, target.target.workspaceId, target.target.workspaceRuntimeId)
+  private isCurrentTarget(clientId: string, userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
+    return this.isCurrentMembership(clientId, userId, target.target.workspaceId, target.target.workspaceRuntimeId)
+  }
+
+  private isCurrentMembership(
+    clientId: string,
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): boolean {
+    return this.deps.isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)
   }
 
   private terminalCapabilityAvailable(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean {

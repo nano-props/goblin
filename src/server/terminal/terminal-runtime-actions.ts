@@ -21,7 +21,6 @@ import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { isCurrentWorkspaceRuntime as isCurrentWorkspaceRuntimeOpen } from '#/server/modules/workspace-runtimes.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -32,8 +31,14 @@ interface TerminalSessionServiceLike {
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
   ): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<TerminalSessionSummary[]>
+  listSessions(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
+  ): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -41,6 +46,12 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
+  isCurrentWorkspaceRuntimeMembership(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    clientId: string,
+  ): boolean
   worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'runOperation'>
 }
 
@@ -116,8 +127,15 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
       if (!isValidWorkspaceLocatorInput(input.workspaceId)) return { pruned: 0, remaining: 0 }
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
-      return await sessionService.prune(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input)
+      assertCurrentMembership()
+      return await sessionService.prune(
+        clientId,
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
@@ -190,7 +208,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.workspaceId)) {
         return { revision: 0, sessions: [] }
       }
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
+      membershipAssertion(clientId, userId, input)()
       const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
       return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
@@ -202,14 +220,22 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidWorkspaceLocatorInput(input.workspaceId)) return []
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
-      return await sessionService.listSessions(userId, input.workspaceId, input.workspaceRuntimeId)
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input)
+      assertCurrentMembership()
+      return await sessionService.listSessions(
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
   }
 
-  function assertCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
-    if (!isCurrentWorkspaceRuntimeOpen(userId, workspaceId, workspaceRuntimeId)) {
-      throw new Error('error.workspace-runtime-stale')
+  function membershipAssertion(clientId: string, userId: string, input: TerminalListSessionsInput): () => void {
+    return () => {
+      if (!deps.isCurrentWorkspaceRuntimeMembership(userId, input.workspaceId, input.workspaceRuntimeId, clientId)) {
+        throw new Error('error.workspace-runtime-stale')
+      }
     }
   }
 }

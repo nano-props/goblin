@@ -13,15 +13,29 @@ export interface WorkspacePaneTabsActionService {
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
+    assertCurrentMembership: () => void,
   ): Promise<WorkspacePaneTabsSnapshot>
-  replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot>
-  updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot>
+  replaceTabs(
+    userId: string,
+    input: WorkspacePaneTabsReplaceInput,
+    assertCurrentMembership: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
+  updateTabs(
+    userId: string,
+    input: WorkspacePaneTabsUpdateInput,
+    assertCurrentMembership: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
 }
 
 export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
-  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
+  isCurrentWorkspaceRuntimeMembership(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    clientId: string,
+  ): boolean
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -35,8 +49,9 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
-      return await sessionService.replaceTabs(userId, input)
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.replaceTabs(userId, input, assertCurrentMembership)
     },
 
     async updateTabs(
@@ -46,8 +61,9 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
-      return await sessionService.updateTabs(userId, input)
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.updateTabs(userId, input, assertCurrentMembership)
     },
 
     async listWorkspaceTabs(
@@ -57,14 +73,27 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!isValidWorkspaceLocatorInput(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
-      return await sessionService.listWorkspaceTabs(userId, input.workspaceId, input.workspaceRuntimeId)
+      const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
+      assertCurrentMembership()
+      return await sessionService.listWorkspaceTabs(
+        userId,
+        input.workspaceId,
+        input.workspaceRuntimeId,
+        assertCurrentMembership,
+      )
     },
   }
 
-  function assertCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
-    if (!deps.isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) {
-      throw new Error('error.workspace-runtime-stale')
+  function membershipAssertion(
+    clientId: string,
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): () => void {
+    return () => {
+      if (!deps.isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)) {
+        throw new Error('error.workspace-runtime-stale')
+      }
     }
   }
 }
