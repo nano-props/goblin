@@ -51,6 +51,32 @@ describe('remote ssh command builders', () => {
     expect(result.stdout.trim().split('\n').at(-1)).toBe('2\t1\t15')
   })
 
+  testPosix('keeps directory facts when recursive size collection fails', async () => {
+    const root = path.join(os.tmpdir(), `goblin-directory-overview-partial-${process.pid}-${Date.now()}`)
+    const bin = path.join(root, 'bin')
+    tempDirs.push(root)
+    mkdirSync(path.join(root, 'blocked'), { recursive: true })
+    mkdirSync(bin)
+    writeFileSync(path.join(root, 'visible'), 'abc')
+    writeFileSync(path.join(root, 'blocked', 'nested'), 'not measurable')
+    const statShim = path.join(bin, 'stat')
+    writeFileSync(
+      statShim,
+      '#!/bin/sh\ncase "$*" in *blocked*) exit 1;; esac\nPATH=/usr/bin:/bin\nexport PATH\nexec stat "$@"\n',
+    )
+    chmodSync(statShim, 0o755)
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'directoryOverview',
+      path: root,
+    })
+
+    const result = await execa('sh', ['-c', invocation.script], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` },
+    })
+
+    expect(result.stdout.trim().split('\n').at(-1)).toBe('1\t2\t-')
+  })
+
   test('uses an ssh executable discovered on PATH', () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)

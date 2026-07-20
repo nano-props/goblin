@@ -210,6 +210,7 @@ export const en = {
   'dashboard.directory.files': 'Files',
   'dashboard.directory.folders': 'Folders',
   'dashboard.directory.size': 'Folder size',
+  'dashboard.directory.size-unavailable': 'Some files could not be inspected',
   'dashboard.directory.top-level': 'At the top level',
   'dashboard.directory.total-size': 'All nested files',
   'dashboard.directory.read-failed': 'Could not read the folder overview.',

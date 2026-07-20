@@ -19,9 +19,12 @@ vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOrigi
   return { ...actual, refreshRepoWorktreeStatus: vi.fn(async () => {}) }
 })
 
-function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unavailable = false) {
+function repoRefreshStoreAccess(
+  workspaceRuntimeId = 'workspace-runtime-test-9',
+  capability: 'git' | 'filesystem' | 'unavailable' = 'git',
+) {
   const workspace = emptyWorkspace(WORKSPACE_ID, 'workspace', workspaceRuntimeId)
-  if (unavailable) {
+  if (capability === 'unavailable') {
     acceptWorkspaceProbeState(workspace, {
       status: 'unavailable',
       reason: 'error.workspace-path-not-found',
@@ -33,7 +36,10 @@ function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unav
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        git:
+          capability === 'git'
+            ? { status: 'available', worktrees: true, pullRequests: { provider: 'none' } }
+            : { status: 'unavailable' },
       },
       diagnostics: [],
     })
@@ -54,30 +60,56 @@ describe('repo refresh actions', () => {
   test('requests visible status only for the current available runtime with a branch', () => {
     const store = repoRefreshStoreAccess()
 
-    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-test-9', 'feature/query')).toBe(true)
-    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-stale', 'feature/query')).toBe(false)
-    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-test-9', null)).toBe(false)
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'workspace-runtime-test-9', 'feature/query')).toBe(
+      true,
+    )
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'workspace-runtime-stale', 'feature/query')).toBe(
+      false,
+    )
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'workspace-runtime-test-9', null)).toBe(false)
     expect(
       requestVisibleWorkspaceStatusRefresh(
-        repoRefreshStoreAccess('repo-runtime-test-9', true),
+        repoRefreshStoreAccess('workspace-runtime-test-9', 'unavailable'),
         WORKSPACE_ID,
-        'repo-runtime-test-9',
+        'workspace-runtime-test-9',
         'feature/query',
       ),
     ).toBe(false)
     expect(refreshRepoWorktreeStatus).toHaveBeenCalledOnce()
-    expect(refreshRepoWorktreeStatus).toHaveBeenCalledWith(store, WORKSPACE_ID, 'repo-runtime-test-9')
+    expect(refreshRepoWorktreeStatus).toHaveBeenCalledWith(store, WORKSPACE_ID, 'workspace-runtime-test-9')
+  })
+
+  test('does not issue Git refreshes for a filesystem-only workspace', async () => {
+    const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'filesystem')
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'workspace-runtime-test-9', 'stale-branch')).toBe(
+      false,
+    )
+    await handleRepoInvalidationRefresh(
+      store,
+      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
+      'workspace-runtime-test-9',
+    )
+
+    expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
+    expect(invalidateSpy).not.toHaveBeenCalled()
+    invalidateSpy.mockRestore()
   })
 
   test('routes repo snapshot invalidation through query invalidation only', async () => {
     const store = repoRefreshStoreAccess()
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
 
-    await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, query: 'repo-snapshot' }, 'repo-runtime-test-9')
+    await handleRepoInvalidationRefresh(
+      store,
+      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
+      'workspace-runtime-test-9',
+    )
 
     expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith(
-      { queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-9'), refetchType: 'active' },
+      { queryKey: repoDataQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'), refetchType: 'active' },
       { cancelRefetch: false },
     )
     invalidateSpy.mockRestore()

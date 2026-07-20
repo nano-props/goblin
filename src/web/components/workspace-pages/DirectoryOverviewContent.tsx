@@ -13,6 +13,8 @@ export function DirectoryOverviewContent({
   compact?: boolean
 }) {
   const t = useT()
+  const sizeAvailable = overview.totalSizeBytes !== null
+  const sizeDetailKey = sizeAvailable ? 'dashboard.directory.total-size' : 'dashboard.directory.size-unavailable'
   return (
     <div className={cn('grid gap-2', compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3')}>
       <DashboardMetricCard
@@ -30,8 +32,8 @@ export function DirectoryOverviewContent({
       <DashboardMetricCard
         icon={HardDrive}
         label={t('dashboard.directory.size')}
-        value={formatByteSize(overview.totalSizeBytes)}
-        detail={t('dashboard.directory.total-size')}
+        value={sizeAvailable ? formatByteSize(overview.totalSizeBytes) : '—'}
+        detail={t(sizeDetailKey)}
       />
     </div>
   )

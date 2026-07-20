@@ -81,7 +81,7 @@ The combined symptom list across the root causes:
   atomic-snapshot fix removed that race, but still treated an output checkpoint
   as a visually committed frame. A shell can emit a prompt redraw across
   multiple PTY chunks, so a sequence-consistent snapshot may still be transient.
- - **R1 — Close authority was split across view disposal and Workspace commands.**
+- **R1 — Close authority was split across view disposal and Workspace commands.**
   Local xterm disposal could issue a direct server close independently of
   route/opener settlement and the server-owned retirement boundary.
 - **R2 — The session service reused orphan sessions by terminalSessionId.** The terminal
@@ -147,7 +147,6 @@ Snapshot presence is explicit in the client projection. `null` means recovery
 did not supply a snapshot; an empty string is a supplied authoritative blank
 screen and must reset any previous binding's xterm. String length is never used
 to decide whether a recovery frame exists.
-
 
 ### Transport ordering
 
@@ -277,9 +276,9 @@ Add to `TerminalRealtimeMessage`:
 | {
     type: 'session-closed'
     terminalRuntimeSessionId: string
+    terminalRuntimeGeneration: number
     terminalSessionId: string
-    repoRoot: string
-    worktreePath: string
+    workspaceId: WorkspaceId
   }
 ```
 
@@ -291,13 +290,13 @@ After a user-initiated close succeeds:
 broker.broadcastToUser(userId, {
   type: 'session-closed',
   terminalRuntimeSessionId,
+  terminalRuntimeGeneration,
   terminalSessionId,
-  repoRoot,
-  worktreePath,
+  workspaceId,
 })
 ```
 
-The `repoRoot`, `worktreePath`, and `terminalSessionId` are captured
+The `workspaceId`, runtime generation, and `terminalSessionId` are captured
 before the close removes the session from the manager. The message is
 sent only to sockets for the same `userId`; other users never see
 the closed session id. Internal/non-user closes (PTY exit, shutdown)
@@ -352,8 +351,8 @@ When `sessionPhase === 'opening' && !hasSessions`, render an overlay
 with a "New terminal" button.
 
 - Reuse the existing `terminal.new` and `terminal.empty` i18n keys.
-- The button calls the session's create handler with the worktree's
-  base (`repoRoot`, `branch`, `worktreePath`).
+- The button calls the session's create handler with its authoritative
+  `TerminalSessionBase` (execution target plus matching presentation).
 - Guard against double-click with a local `creating` state.
 - On failure, toast via the existing terminal-create error path.
 

@@ -1280,7 +1280,7 @@ describe('projection refresh request ordering', () => {
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 
-  test('workspace status refresh guards stale runtimes and unavailable repos', async () => {
+  test('workspace status refresh requires a current runtime with Git capability', async () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     let statusCalls = 0
     ipcHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => {
@@ -1294,6 +1294,19 @@ describe('projection refresh request ordering', () => {
       acceptWorkspaceProbeState(repo, {
         status: 'unavailable',
         reason: 'error.workspace-path-not-found',
+      })
+    })
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
+    updateRepoForTest((repo) => {
+      acceptWorkspaceProbeState(repo, {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
       })
     })
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)

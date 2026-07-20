@@ -201,6 +201,7 @@ export const ko: Record<DictKey, string> = {
   'dashboard.directory.files': '파일',
   'dashboard.directory.folders': '폴더',
   'dashboard.directory.size': '폴더 크기',
+  'dashboard.directory.size-unavailable': '일부 파일을 확인할 수 없습니다',
   'dashboard.directory.top-level': '최상위',
   'dashboard.directory.total-size': '모든 하위 파일',
   'dashboard.directory.read-failed': '폴더 개요를 읽을 수 없습니다.',

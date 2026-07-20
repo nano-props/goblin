@@ -6,6 +6,7 @@ import { useT } from '#/web/stores/i18n.ts'
 
 export function WorkspaceDirectoryStatus({ overview }: { overview: WorkspaceDirectoryOverview }) {
   const t = useT()
+  const size = overview.totalSizeBytes === null ? '—' : formatByteSize(overview.totalSizeBytes)
   return (
     <StatusRows>
       <StatusRow
@@ -23,7 +24,7 @@ export function WorkspaceDirectoryStatus({ overview }: { overview: WorkspaceDire
       <StatusRow
         icon={<HardDrive size={14} />}
         label={t('dashboard.directory.size')}
-        value={<StatusChip>{formatByteSize(overview.totalSizeBytes)}</StatusChip>}
+        value={<StatusChip>{size}</StatusChip>}
         valueLayout="inline"
       />
     </StatusRows>

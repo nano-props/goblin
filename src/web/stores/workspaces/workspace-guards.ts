@@ -125,6 +125,11 @@ export function workspaceCanExecute(workspace: WorkspaceState): boolean {
   return workspace.admission.kind === 'local' || workspace.admission.lifecycle?.kind === 'ready'
 }
 
+/** Whether the current runtime admits operations that require Git capability. */
+export function gitWorkspaceCanExecute(workspace: WorkspaceState): boolean {
+  return workspace.capability.kind === 'git' && workspaceCanExecute(workspace)
+}
+
 function requiredRemoteWorkspaceAdmission(
   workspace: WorkspaceState,
 ): Extract<WorkspaceState['admission'], { kind: 'remote' }> {

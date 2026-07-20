@@ -24,6 +24,7 @@ import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/we
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
@@ -193,7 +194,7 @@ function DirectoryDashboard({
   compact,
 }: {
   workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
-  overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
+  overview: WorkspaceDirectoryOverview
   compact: boolean
 }) {
   const t = useT()

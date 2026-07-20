@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -44,12 +44,39 @@ describe('workspace directory overview', () => {
     })
   })
 
+  it.runIf(process.platform !== 'win32')('keeps root facts when a nested size cannot be inspected', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'goblin-overview-'))
+    const unreadable = path.join(root, 'unreadable')
+    roots.push(root)
+    await mkdir(unreadable)
+    await writeFile(path.join(root, 'visible.txt'), 'abc')
+    await writeFile(path.join(unreadable, 'hidden.txt'), 'not available to the scan')
+    await chmod(unreadable, 0o000)
+
+    try {
+      await expect(readLocalDirectoryOverview(root)).resolves.toEqual({
+        topLevelFileCount: 1,
+        topLevelDirectoryCount: 1,
+        totalSizeBytes: null,
+      })
+    } finally {
+      await chmod(unreadable, 0o700)
+    }
+  })
+
   it('rejects malformed remote output instead of guessing', () => {
     expect(parseRemoteDirectoryOverview('2\t3\t4096\n')).toEqual({
       topLevelFileCount: 2,
       topLevelDirectoryCount: 3,
       totalSizeBytes: 4096,
     })
-    expect(() => parseRemoteDirectoryOverview('2\tbad\t4096')).toThrow('invalid remote directory overview')
+    for (const malformed of ['2\tbad\t4096', '\t\t-', '01\t2\t3', '1e2\t2\t3', ' 2\t2\t3']) {
+      expect(() => parseRemoteDirectoryOverview(malformed)).toThrow('invalid remote directory overview')
+    }
+    expect(parseRemoteDirectoryOverview('2\t3\t-\n')).toEqual({
+      topLevelFileCount: 2,
+      topLevelDirectoryCount: 3,
+      totalSizeBytes: null,
+    })
   })
 })

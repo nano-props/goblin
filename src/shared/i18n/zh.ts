@@ -195,6 +195,7 @@ export const zh: Record<DictKey, string> = {
   'dashboard.directory.files': '文件',
   'dashboard.directory.folders': '文件夹',
   'dashboard.directory.size': '文件夹大小',
+  'dashboard.directory.size-unavailable': '部分文件无法检查',
   'dashboard.directory.top-level': '最高层',
   'dashboard.directory.total-size': '包含所有下级文件',
   'dashboard.directory.read-failed': '无法读取文件夹概况。',

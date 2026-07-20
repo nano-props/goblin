@@ -208,6 +208,7 @@ export const ja: Record<DictKey, string> = {
   'dashboard.directory.files': 'ファイル',
   'dashboard.directory.folders': 'フォルダ',
   'dashboard.directory.size': 'フォルダサイズ',
+  'dashboard.directory.size-unavailable': '一部のファイルを確認できませんでした',
   'dashboard.directory.top-level': 'トップレベル',
   'dashboard.directory.total-size': 'すべての配下ファイル',
   'dashboard.directory.read-failed': 'フォルダの概要を読み込めませんでした。',

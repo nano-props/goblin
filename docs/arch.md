@@ -12,7 +12,7 @@ Use this doc for app shell and process control rules.
 - Prefer server-first runtime authority. The client should send intent plus explicit preconditions, and the server should accept or reject with fast-fail semantics.
 - Keep user commands sequential. Resolve route/state supplements at the action boundary, perform the accepted write, then navigate to the precomputed result. Do not use effects, background observers, or client-only tokens to repair command state after the fact.
 - Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For workspace runtimes this means the server mints the live `workspaceRuntimeId` on open and invalidates it on close/reopen.
-- Do not treat a stable locator such as `repoRoot` as a full runtime identity when reopen/recreate can mint a new live runtime.
+- Do not treat a stable `workspaceId` locator as a full runtime identity when reopen/recreate can mint a new live runtime.
 - Do not add client-side freshness heuristics when the server can reject stale work directly. Push runtime validity checks into shared protocol contracts first, and let stale mutations fail instead of trying to "heal" them in the client.
 - When a server-owned runtime id already identifies the write target precisely enough, use that id directly and let the server decide. Do not add a second client-side freshness dependency "just in case" if it can only make a valid server action fail locally.
 - Server push should be the default way client projections converge after a successful write. Avoid immediate client-issued read-backs on the same path unless the server contract truly cannot return or broadcast the authoritative post-write state.
@@ -65,7 +65,7 @@ The ownership split is:
   realtime invalidation, and the cross-provider runtime-open operation. Provider
   snapshots are the sole live-membership authority; list and restore never copy
   or write derived membership.
-- The aggregate owns the `repoRoot` layout queue. Restore uses a separate
+- The aggregate owns the per-`workspaceId` layout queue. Restore uses a separate
   settings transaction port that checks durable workspace membership and
   filters invalid target keys from the transaction's current layout in one
   atomic settings write.
