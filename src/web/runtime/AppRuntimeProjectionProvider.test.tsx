@@ -156,6 +156,12 @@ describe('AppRuntimeProjectionProvider', () => {
         document.dispatchEvent(new Event('visibilitychange'))
       })
       expect(invalidate).toHaveBeenCalledWith(repo.id, repo.workspaceRuntimeId)
+
+      invalidate.mockClear()
+      await act(async () => {
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+      })
+      expect(invalidate).toHaveBeenCalledWith(repo.id, repo.workspaceRuntimeId)
     } finally {
       invalidate.mockRestore()
       result.unmount()

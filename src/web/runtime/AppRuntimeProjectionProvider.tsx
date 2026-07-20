@@ -137,7 +137,9 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
       refreshCurrentWorkspaceStatus()
     }
     const onPageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) appRealtimeClient.kickReconnect()
+      if (!event.persisted) return
+      appRealtimeClient.kickReconnect()
+      refreshCurrentWorkspaceStatus()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pageshow', onPageShow)
