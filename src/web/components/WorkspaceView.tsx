@@ -1,8 +1,8 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import { WorkspacePane, type WorkspacePaneRouteContext } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
   BranchNavigatorSkeleton,
@@ -29,6 +29,7 @@ import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
+import { invalidateRepoSnapshotQueries } from '#/web/repo-data-query.ts'
 
 interface WorkspaceProjectionRestoreController {
   state: WorkspaceProjectionPromotionViewState
@@ -86,6 +87,15 @@ export function WorkspaceView({
   )
   const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
   const workspace = useWorkspacesStore((s) => s.workspaces[workspaceId])
+  const previousWorkspaceRoute = useRef({ workspaceId, terminal: workspaceRouteViewIsTerminal(routeView) })
+  useEffect(() => {
+    const previous = previousWorkspaceRoute.current
+    const terminal = workspaceRouteViewIsTerminal(routeView)
+    previousWorkspaceRoute.current = { workspaceId, terminal }
+    if (previous.workspaceId !== workspaceId || !previous.terminal || terminal) return
+    if (!workspace || !gitWorkspaceCanExecute(workspace)) return
+    invalidateRepoSnapshotQueries(workspace.id, workspace.workspaceRuntimeId)
+  }, [routeView, workspace, workspaceId])
   const git = workspace?.capability.kind === 'git' ? workspace.capability.git : null
   const gitAvailable = git !== null
   const gitUnavailable = workspace?.capability.kind === 'filesystem'
@@ -343,6 +353,13 @@ export function WorkspaceView({
     <GitWorkspaceEffects workspaceId={workspaceId}>{renderWorkspace}</GitWorkspaceEffects>
   ) : (
     renderWorkspace(null)
+  )
+}
+
+function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boolean {
+  return (
+    (routeView?.kind === 'branch' || routeView?.kind === 'worktree' || routeView?.kind === 'workspace-root') &&
+    routeView.workspacePaneRoute?.kind === 'terminal'
   )
 }
 
