@@ -91,7 +91,7 @@ export function WorkspacePaneToolbar({
             activateKeyboardNavigationSelection
           />
         </WorkspaceToolbarPrimary>
-        {!compact && trailingActions ? (
+        {trailingActions ? (
           <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
             {trailingActions}
           </WorkspaceToolbarActions>

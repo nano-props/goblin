@@ -656,7 +656,7 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
-  test('hides the external app launcher in compact mode', () => {
+  test('keeps the external app launcher available in compact filesystem toolbars', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -664,8 +664,9 @@ describe('GitWorkspacePaneToolbar', () => {
       navigation: navigationWith({}),
     })
 
-    expect(c.querySelector('button[aria-label="workspace.open-externally.open"]')).toBeNull()
-    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
+    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.open-externally.open"]')
+    expect(trigger).not.toBeNull()
+    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')?.contains(trigger)).toBe(true)
   })
 
   test('renders status and terminal tabs in one workspace tab strip with a separator', () => {
