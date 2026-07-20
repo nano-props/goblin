@@ -418,12 +418,12 @@ describe('WorkspacePane', () => {
   })
 
   test('does not expose a terminal surface when the workspace capability is unavailable', () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///tmp/files-only-workspace')
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/terminal-unavailable-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('files-only-workspace', {
+      workspaceProbe: directoryWorkspaceProbe('terminal-unavailable-workspace', {
         filesWritable: false,
         terminalAvailable: false,
       }),

@@ -24,7 +24,10 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import type {
+  WorkspacePaneFilesystemTarget,
+  WorkspacePaneSurfaceTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   workspacePaneFilesystemRootPath,
   workspacePaneFilesystemTerminalBase,
@@ -50,7 +53,7 @@ interface WorkspacePaneTargetToolbarProps {
 }
 
 type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbarProps, 'target'> & {
-  target: Exclude<WorkspacePaneSurfaceTarget, { kind: 'git-branch' }>
+  target: WorkspacePaneFilesystemTarget
 }
 
 export function WorkspacePaneTargetToolbar(props: WorkspacePaneTargetToolbarProps) {

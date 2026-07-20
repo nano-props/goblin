@@ -37,7 +37,7 @@ type HarnessSnapshot = {
 }
 
 interface HarnessProps {
-  readonly repoId: string
+  readonly workspaceRootPath: string
   readonly workspaceRuntimeId?: string
   readonly worktreePath: string
   readonly targetKind?: 'workspace-root' | 'git-worktree'
@@ -46,26 +46,26 @@ interface HarnessProps {
 }
 
 function Harness({
-  repoId,
+  workspaceRootPath,
   workspaceRuntimeId = WORKSPACE_RUNTIME_ID,
   worktreePath,
   targetKind = 'git-worktree',
   expandedKeys,
   onSnapshot,
 }: HarnessProps) {
-  const target = mockExecutionTarget(repoId, workspaceRuntimeId, worktreePath, targetKind)
+  const target = mockExecutionTarget(workspaceRootPath, workspaceRuntimeId, worktreePath, targetKind)
   const result = useWorkspaceFilesystemTree({ target, expandedKeys })
   onSnapshot(result)
   return null
 }
 
 function mockExecutionTarget(
-  repoId: string,
+  workspaceRootPath: string,
   workspaceRuntimeId: string,
   worktreePath: string,
   targetKind: 'workspace-root' | 'git-worktree' = 'git-worktree',
 ) {
-  const workspaceId = canonicalWorkspaceLocator(`goblin+file://${repoId}`)
+  const workspaceId = canonicalWorkspaceLocator(`goblin+file://${workspaceRootPath}`)
   const root = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
   if (!workspaceId || !root) throw new Error('invalid mock workspace target')
   return targetKind === 'workspace-root'
@@ -171,7 +171,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)
@@ -241,7 +241,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src/web'],
       onSnapshot: (snapshot) => {
@@ -262,7 +262,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -285,7 +285,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce(result)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -310,7 +310,7 @@ describe('useWorkspaceFilesystemTree', () => {
         <QueryClientProvider client={queryClient}>
           <StrictMode>
             <Harness
-              repoId="/repo-a"
+              workspaceRootPath="/repo-a"
               worktreePath="/repo-a/main"
               onSnapshot={(snapshot) => {
                 lastSnapshot = snapshot
@@ -331,7 +331,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -348,7 +348,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockRejectedValueOnce(new Error('boom'))
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -367,7 +367,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(second.promise)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -375,7 +375,7 @@ describe('useWorkspaceFilesystemTree', () => {
     })
 
     await setProps({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/feature',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -411,7 +411,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -429,7 +429,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -452,11 +452,11 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
   })
 
-  test('ignores invalidation events for a different repoId', async () => {
+  test('ignores invalidation events for a different workspace root', async () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -483,7 +483,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -521,7 +521,7 @@ describe('useWorkspaceFilesystemTree', () => {
       })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -551,7 +551,7 @@ describe('useWorkspaceFilesystemTree', () => {
       .mockReturnValueOnce(child.promise)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -567,7 +567,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
 
     await setProps({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src'],
       onSnapshot: (snapshot) => {
@@ -619,7 +619,7 @@ describe('useWorkspaceFilesystemTree', () => {
       })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src'],
       onSnapshot: (snapshot) => {
@@ -644,7 +644,7 @@ describe('useWorkspaceFilesystemTree', () => {
       .mockRejectedValueOnce(new Error('child boom'))
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src'],
       onSnapshot: (snapshot) => {
@@ -674,7 +674,7 @@ describe('useWorkspaceFilesystemTree', () => {
       })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -723,7 +723,7 @@ describe('useWorkspaceFilesystemTree', () => {
       })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src'],
       onSnapshot: (snapshot) => {
@@ -758,7 +758,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -809,7 +809,7 @@ describe('useWorkspaceFilesystemTree', () => {
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise).mockResolvedValueOnce(current)
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
@@ -849,8 +849,8 @@ describe('useWorkspaceFilesystemTree', () => {
     await act(async () => {
       root!.render(
         <QueryClientProvider client={queryClient}>
-          <Harness repoId="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
-          <Harness repoId="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+          <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+          <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
         </QueryClientProvider>,
       )
     })
@@ -878,7 +878,7 @@ describe('useWorkspaceFilesystemTree', () => {
       ],
       truncated: false,
     })
-    await render({ repoId: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
+    await render({ workspaceRootPath: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
     await flush()
 
     act(() => root?.unmount())
@@ -889,7 +889,7 @@ describe('useWorkspaceFilesystemTree', () => {
       })
     }
     root = createRoot(container!)
-    await render({ repoId: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
+    await render({ workspaceRootPath: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
     await flush()
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
@@ -904,14 +904,14 @@ describe('useWorkspaceFilesystemTree', () => {
     })
 
     await render({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a',
       targetKind: 'workspace-root',
       onSnapshot: () => {},
     })
     await flush()
     await setProps({
-      repoId: '/repo-a',
+      workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a',
       targetKind: 'git-worktree',
       onSnapshot: () => {},
