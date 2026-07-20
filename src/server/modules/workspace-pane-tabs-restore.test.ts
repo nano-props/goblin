@@ -8,7 +8,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('workspace pane layout restore admission', () => {
-  test('defers a projection envelope without an authoritative snapshot', async () => {
+  test('restores the workspace-root layout while the Git projection is deferred', async () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     const confirmMembership = vi.fn(async () => ({
       matched: true as const,
@@ -50,8 +50,23 @@ describe('workspace pane layout restore admission', () => {
       membershipPolicy: 'confirm-after-restore',
     })
 
-    expect(result).toEqual({ matched: true, snapshots: [], repaired: false })
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      matched: true,
+      snapshots: [
+        {
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: 'workspace-runtime-test',
+          snapshot: { revision: 0, entries: [] },
+        },
+      ],
+      repaired: false,
+    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'workspace-runtime-test',
+      expectedWorkspaceEntry: workspace.entry,
+      targets: [{ kind: 'workspace-root' }],
+    })
     expect(confirmMembership).toHaveBeenCalledOnce()
   })
 })

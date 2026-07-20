@@ -52,7 +52,7 @@ describe('session restore runtime ownership', () => {
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
   })
 
-  test('preserves the existing stub membership when lazy projection is deferred', async () => {
+  test('preserves membership and restores workspace-root layout while the Git projection is deferred', async () => {
     const lease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
     commitWorkspaceProbeState({
       userId: USER_ID,
@@ -83,8 +83,13 @@ describe('session restore runtime ownership', () => {
     })
 
     expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, gitProjection: null })
-    expect(result.snapshot).toBeNull()
-    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      expectedWorkspaceEntry: { kind: 'local', id: REPO_ROOT },
+      targets: [{ kind: 'workspace-root' }],
+    })
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)
     expect(releaseWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
       released: true,
