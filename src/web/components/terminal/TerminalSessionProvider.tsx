@@ -8,7 +8,6 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
-import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { useTerminalRuntimeMembershipIndex } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
@@ -71,8 +70,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // keeps its projection visible until that close command settles.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[event.workspaceId]?.workspaceRuntimeId
-      if (typeof workspaceRuntimeId === 'string') refreshWorkspacePaneTabs(event.workspaceId, workspaceRuntimeId)
     })
 
     const disposeCommandBridge = setTerminalSessionCommandBridge({

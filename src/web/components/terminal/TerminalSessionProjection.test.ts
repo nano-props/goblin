@@ -17,17 +17,12 @@ import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/ter
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
-  refreshTabs: vi.fn(),
 }))
 
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     close: workspacePaneRuntimeMocks.close,
   },
-}))
-
-vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', () => ({
-  refreshWorkspacePaneTabsQueryData: workspacePaneRuntimeMocks.refreshTabs,
 }))
 
 function workspaceIdFixture(input: string) {
@@ -123,8 +118,6 @@ describe('TerminalSessionProjection', () => {
     resetWorkspacesStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
-    workspacePaneRuntimeMocks.refreshTabs.mockReset()
-    workspacePaneRuntimeMocks.refreshTabs.mockResolvedValue(undefined)
     selectedChanges = []
     projection = new TerminalSessionProjection((terminalFilesystemTargetKey, terminalSessionId) =>
       selectedChanges.push({ terminalFilesystemTargetKey, terminalSessionId }),
@@ -1119,48 +1112,6 @@ describe('TerminalSessionProjection', () => {
         'term-111111111111111111111',
       )
       expect(dispose).not.toHaveBeenCalled()
-    })
-
-    test('completes a successful server close when projection refresh fails', async () => {
-      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      projection.reconcileServerSessions(
-        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-      )
-      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      workspacePaneRuntimeMocks.refreshTabs.mockRejectedValueOnce(new Error('projection unavailable'))
-
-      await expect(
-        projection.closeTerminalByDescriptor(terminalSessionId, {
-          target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
-        }),
-      ).resolves.toBe(true)
-
-      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, WORKSPACE_RUNTIME_ID)
-    })
-
-    test('applies a successful close without waiting for workspace tabs refresh', async () => {
-      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      projection.reconcileServerSessions(
-        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-      )
-      const refresh = Promise.withResolvers<void>()
-      workspacePaneRuntimeMocks.refreshTabs.mockReturnValueOnce(refresh.promise)
-
-      await expect(
-        projection.closeTerminalByDescriptor('term-111111111111111111111', {
-          target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
-        }),
-      ).resolves.toBe(true)
-
-      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
-      refresh.resolve()
     })
 
     test('closeTerminalByDescriptor rejects a mismatched workspace runtime scope', async () => {

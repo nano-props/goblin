@@ -60,13 +60,7 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  runtimeWorkspacePaneTargetForTest,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/test-utils/workspace-pane-tabs.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 
 const mockSessions = vi.hoisted(
@@ -415,17 +409,6 @@ function currentTerminalSessionBase() {
 
 function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
   return sessions.map(completeServerSession)
-}
-
-function tabsFor(workspaceId: string, branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useWorkspacesStore.getState().workspaces[workspaceId]
-  const target = repo
-    ? workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
-        branchName,
-      )
-    : null
-  return target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : []
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
@@ -1322,47 +1305,11 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('invalidates workspace tabs query from session-closed events', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-          workspacePaneStaticTabEntry('history'),
-        ],
-      },
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'git-worktree' as const,
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
-      worktreePath: WORKTREE_PATH,
-      tabs: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        workspacePaneStaticTabEntry('history'),
-      ],
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
+  test('does not treat session-closed as workspace tabs projection authority', async () => {
+    const { unmount } = await renderProviderWithProbe(formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH))
 
     try {
-      listWorkspaceTabsMock.mockResolvedValue([
-        {
-          target: runtimeWorkspacePaneTargetForTest({
-            kind: 'git-worktree' as const,
-            workspaceId: REPO_ID,
-            workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
-            worktreePath: WORKTREE_PATH,
-          }),
-          tabs: [workspacePaneStaticTabEntry('history')],
-        },
-      ])
-
+      listWorkspaceTabsMock.mockClear()
       await act(async () => {
         sessionClosedHandler?.({
           terminalRuntimeSessionId: 'server_session_1',
@@ -1372,9 +1319,7 @@ describe('TerminalSessionProvider', () => {
         })
       })
 
-      await vi.waitFor(() => {
-        expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
-      })
+      expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
     } finally {
       await unmount()
     }

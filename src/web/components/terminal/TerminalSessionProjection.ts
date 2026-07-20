@@ -59,7 +59,6 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
@@ -1301,7 +1300,6 @@ export class TerminalSessionProjection {
     base: TerminalSessionBase,
     requestedBinding: TerminalRuntimeBindingIdentity,
   ): Promise<boolean> {
-    const workspaceRuntimeId = terminalSessionCoordinates(base).workspaceRuntimeId
     let result: WorkspacePaneRuntimeCloseResult
     try {
       result = await workspacePaneRuntimeClient.close({
@@ -1317,16 +1315,6 @@ export class TerminalSessionProjection {
     }
     if (!result.ok) return false
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).workspaceId, workspaceRuntimeId).catch(
-      (err) => {
-        terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
-          terminalSessionId,
-          workspaceId: terminalSessionCoordinates(base).workspaceId,
-          workspaceRuntimeId,
-          err,
-        })
-      },
-    )
     return true
   }
 
