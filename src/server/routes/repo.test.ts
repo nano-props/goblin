@@ -359,6 +359,41 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
   })
 
+  test.each([{ cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
+    'rejects a partial operations runtime scope at the request boundary',
+    async (body) => {
+      const app = createTestRepoRoutes()
+      const response = await app.request(
+        new Request('http://localhost/operations', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+
+      expect(response.status).toBe(400)
+      expect(mocks.readRepoOperationsSnapshot).not.toHaveBeenCalled()
+    },
+  )
+
+  test('accepts an explicitly unscoped operations request', async () => {
+    mocks.readRepoOperationsSnapshot.mockResolvedValue({ operations: [], loadedAt: 123 })
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/operations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ includeSettled: true }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(undefined, {
+      includeSettled: true,
+      signal: expect.any(AbortSignal),
+    })
+  })
+
   test('passes patch body through to getRepoPatch', async () => {
     mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
     const app = createTestRepoRoutes()

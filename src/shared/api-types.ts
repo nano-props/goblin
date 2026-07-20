@@ -451,11 +451,9 @@ export interface AppIpcHandlers {
       branch?: string
       mode?: PullRequestFetchMode
     }) => Promise<GitWorkspaceRuntimeProjection>
-    operations: (input: {
-      cwd?: WorkspaceId
-      workspaceRuntimeId?: string
-      includeSettled?: boolean
-    }) => Promise<RepoOperationsSnapshot>
+    operations: (
+      input: { includeSettled?: boolean } | { cwd: WorkspaceId; workspaceRuntimeId: string; includeSettled?: boolean },
+    ) => Promise<RepoOperationsSnapshot>
     patch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: WorkspaceId

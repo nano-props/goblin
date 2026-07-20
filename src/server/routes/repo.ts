@@ -180,14 +180,24 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/operations', async (c) => {
-    const { cwd, workspaceRuntimeId, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
-    if (cwd && workspaceRuntimeId) {
+    const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
+    if ('cwd' in input) {
       const userId = userIdFromContext(c)
-      assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
-      assertGitCapability(userId, cwd, workspaceRuntimeId)
+      assertCurrentWorkspaceRuntimeForRead(userId, input.cwd, input.workspaceRuntimeId)
+      assertGitCapability(userId, input.cwd, input.workspaceRuntimeId)
+      return c.json(
+        await readRepoOperationsSnapshot(input.cwd, {
+          includeSettled: input.includeSettled,
+          workspaceRuntimeId: input.workspaceRuntimeId,
+          signal: c.req.raw.signal,
+        }),
+      )
     }
     return c.json(
-      await readRepoOperationsSnapshot(cwd, { includeSettled, workspaceRuntimeId, signal: c.req.raw.signal }),
+      await readRepoOperationsSnapshot(undefined, {
+        includeSettled: input.includeSettled,
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/fetch', async (c) => {
