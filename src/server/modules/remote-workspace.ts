@@ -134,16 +134,8 @@ export async function resolveServerRemoteWorkspaceConnection(
   deps: RemoteWorkspaceConnectionDeps = defaultRemoteWorkspaceConnectionDeps(),
 ): Promise<RemoteWorkspaceConnectionResult> {
   const workspaceId = input.workspaceId
-  // Defensive: local ids should never reach this server entry.
-  // The command client gates on `isRemoteWorkspaceId` before calling;
-  // if a non-remote id sneaks through, return a 'failed' with a
-  // synthesized reason rather than letting the SSH resolver throw.
   if (!isRemoteWorkspaceId(workspaceId)) {
-    return {
-      kind: 'failed',
-      name: workspaceId,
-      lifecycle: { kind: 'failed', reason: 'not-a-repo' },
-    }
+    throw new TypeError('remote workspace connection requires an SSH workspace id')
   }
 
   // Step 1: parse the id into a ref.
@@ -189,16 +181,19 @@ export async function resolveServerRemoteWorkspaceConnection(
         },
       }
     }
-    const reason = toRemoteWorkspaceFailureReason(probe.category ?? probe.message ?? 'unknown')
+    const probeReason = probe.category ?? probe.message ?? 'unknown'
+    const gitUnavailable =
+      probeReason === 'not-a-repo' || probeReason === 'git-missing' || probeReason === 'error.workspace-git-unavailable'
+    const reason = toRemoteWorkspaceFailureReason(probeReason)
     const directoryReadable = probe.stages?.some((stage) => stage.name === 'path' && stage.status === 'passed')
-    if (reason === 'not-a-repo' || directoryReadable) {
+    if (gitUnavailable || directoryReadable) {
       return {
         kind: 'ready',
         name: ref.displayName,
         gitAvailable: false,
-        ...(probe.category === 'git-missing'
+        ...(probeReason === 'git-missing'
           ? { gitDiagnostic: probe.message ?? 'git-missing' }
-          : reason === 'not-a-repo'
+          : probeReason === 'not-a-repo'
             ? {}
             : { gitDiagnostic: probe.message ?? probe.category ?? 'Git probe failed' }),
         lifecycle: { kind: 'ready', target },

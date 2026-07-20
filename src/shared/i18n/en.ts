@@ -186,8 +186,6 @@ export const en = {
     'Goblin could not resolve the remote home directory for this SSH target. Check the login shell and SSH config, then retry.',
   'workspace-unavailable.remote-path-missing':
     'Goblin connected to the SSH target, but the saved remote path no longer exists. Update the remote path and reconnect.',
-  'workspace-unavailable.remote-not-a-repo':
-    'Goblin connected to the SSH target, but the saved workspace path is unavailable. Check the path or reconnect to a different workspace.',
   'workspace-unavailable.path': 'Path',
   'workspace-unavailable.reason': 'Reason',
   'workspace-unavailable.retry': 'Check again',

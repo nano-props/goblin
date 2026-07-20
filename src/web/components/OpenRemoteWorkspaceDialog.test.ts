@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   buildRemoteConnectionInput,
-  canSubmitRemoteRepository,
+  canSubmitRemoteWorkspace,
   formatRemoteDialogError,
   remoteDiagnosticsAllowWorkspaceOpen,
   remotePathError,
@@ -16,11 +16,11 @@ describe('OpenRemoteWorkspaceDialog helpers', () => {
 
   test('allows manual aliases as long as alias and path are valid', () => {
     for (const alias of ['-F', '.', '..', 'bad alias', '服务器']) {
-      expect(canSubmitRemoteRepository({ alias, remotePath: '/srv/repo', pending: false })).toBe(false)
+      expect(canSubmitRemoteWorkspace({ alias, remotePath: '/srv/repo', pending: false })).toBe(false)
       expect(buildRemoteConnectionInput(alias, '/srv/repo')).toBeNull()
     }
     expect(
-      canSubmitRemoteRepository({
+      canSubmitRemoteWorkspace({
         alias: 'prod',
         remotePath: '/srv/repo',
         pending: false,

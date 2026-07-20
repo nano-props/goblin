@@ -127,7 +127,6 @@ export type RemoteWorkspaceFailureReason =
   | 'unreachable'
   | 'handshake-failed'
   | 'path-missing'
-  | 'not-a-repo'
   | 'timeout'
   | 'unknown'
 
@@ -138,7 +137,6 @@ export const REMOTE_WORKSPACE_FAILURE_REASONS: readonly RemoteWorkspaceFailureRe
   'unreachable',
   'handshake-failed',
   'path-missing',
-  'not-a-repo',
   'timeout',
   'unknown',
 ]
@@ -174,10 +172,6 @@ export function toRemoteWorkspaceFailureReason(reason: string): RemoteWorkspaceF
     case 'error.path-not-found':
     case 'error.path-not-directory':
       return 'path-missing'
-    case 'not-a-repo':
-    case 'git-missing':
-    case 'error.workspace-git-unavailable':
-      return 'not-a-repo'
     case 'timeout':
       return 'timeout'
     default:

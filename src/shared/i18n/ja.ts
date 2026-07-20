@@ -184,8 +184,6 @@ export const ja: Record<DictKey, string> = {
     'Goblin はこの SSH 接続先のホームディレクトリを解決できませんでした。ログインシェルと SSH 設定を確認してから再試行してください。',
   'workspace-unavailable.remote-path-missing':
     'Goblin は SSH 接続先には到達できましたが、保存済みのリモートパスが存在しなくなっています。リモートパスを更新してから再接続してください。',
-  'workspace-unavailable.remote-not-a-repo':
-    'Goblin は SSH 接続先には到達できましたが、保存済みのワークスペースパスを利用できません。パスを確認するか、別のワークスペースに再接続してください。',
   'workspace-unavailable.path': 'パス',
   'workspace-unavailable.reason': '理由',
   'workspace-unavailable.retry': '再確認',

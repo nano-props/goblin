@@ -28,7 +28,6 @@ export function unavailableBodyKey(isRemote: boolean, reason: string): string {
   if (reason === 'error.ssh-config-changed') return 'workspace-unavailable.remote-config-changed'
   if (reason === 'workspace-picker.open-remote-home-unavailable') return 'workspace-unavailable.remote-home-unavailable'
   if (reason === 'path-missing') return 'workspace-unavailable.remote-path-missing'
-  if (reason === 'not-a-repo') return 'workspace-unavailable.remote-not-a-repo'
   if (REMOTE_DIAGNOSTIC_REASONS.has(reason)) return 'workspace-unavailable.remote-connect-failed'
   return 'workspace-unavailable.remote-body'
 }

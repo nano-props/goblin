@@ -63,6 +63,25 @@ describe('remote lifecycle write path', () => {
     })
   })
 
+  test('rejects a local workspace before entering the remote lifecycle', async () => {
+    const localWorkspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, localWorkspaceId, 'client-test')
+    const before = listWorkspaceRuntimes(userId)
+
+    await expect(
+      runRemoteWorkspaceLifecycleWrite({
+        userId,
+        workspaceId: localWorkspaceId,
+        workspaceRuntimeId,
+        mode: 'restart',
+      }),
+    ).rejects.toThrow('remote workspace lifecycle requires an SSH workspace id')
+
+    expect(mocks.resolveConnection).not.toHaveBeenCalled()
+    expect(mocks.publishInvalidation).not.toHaveBeenCalled()
+    expect(listWorkspaceRuntimes(userId)).toEqual(before)
+  })
+
   test('serializes a conclusive Git downgrade through capability cleanup before committing it', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
     const target = normalizeRemoteTarget({

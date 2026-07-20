@@ -1,7 +1,7 @@
 import { publishUserWorkspaceRuntimeInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
 import { runRemoteWorkspaceLifecycle, workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
-import type { RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
+import { isRemoteWorkspaceId, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -22,6 +22,9 @@ export async function runRemoteWorkspaceLifecycleWrite(
   options: RunRemoteWorkspaceLifecycleOptions = {},
 ): Promise<RemoteWorkspaceLifecycleCommandResult> {
   const { userId, workspaceId, workspaceRuntimeId, mode } = input
+  if (!isRemoteWorkspaceId(workspaceId)) {
+    throw new TypeError('remote workspace lifecycle requires an SSH workspace id')
+  }
   const result = await runRemoteWorkspaceLifecycle(
     userId,
     workspaceId,

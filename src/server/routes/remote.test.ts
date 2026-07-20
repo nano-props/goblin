@@ -112,4 +112,24 @@ describe('remote lifecycle route', () => {
     expect(response.status).toBe(400)
     expect(mocks.runLifecycleWrite).not.toHaveBeenCalled()
   })
+
+  test('rejects a local workspace before invoking the remote lifecycle write path', async () => {
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+      },
+    }).request(
+      new Request('http://localhost/lifecycle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'goblin+file:///workspace',
+          workspaceRuntimeId: 'repo-runtime-test',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.runLifecycleWrite).not.toHaveBeenCalled()
+  })
 })

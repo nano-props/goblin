@@ -177,8 +177,6 @@ export const ko: Record<DictKey, string> = {
     'Goblin 이 이 SSH 대상의 원격 홈 디렉터리를 확인하지 못했습니다. 로그인 셸과 SSH 설정을 확인한 뒤 다시 시도하세요.',
   'workspace-unavailable.remote-path-missing':
     'Goblin 이 SSH 대상에는 연결했지만 저장된 원격 경로가 더 이상 존재하지 않습니다. 원격 경로를 수정한 뒤 다시 연결하세요.',
-  'workspace-unavailable.remote-not-a-repo':
-    'Goblin 이 SSH 대상에는 연결했지만 저장된 작업 공간 경로를 사용할 수 없습니다. 경로를 확인하거나 다른 작업 공간에 다시 연결하세요.',
   'workspace-unavailable.path': '경로',
   'workspace-unavailable.reason': '이유',
   'workspace-unavailable.retry': '다시 확인',

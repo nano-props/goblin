@@ -171,8 +171,6 @@ export const zh: Record<DictKey, string> = {
     'Goblin 无法解析这个 SSH 目标的远端主目录。请检查登录 shell 和 SSH 配置后再试。',
   'workspace-unavailable.remote-path-missing':
     'Goblin 已连接到 SSH 目标，但保存的远端路径已不存在。请更新远端路径后重新连接。',
-  'workspace-unavailable.remote-not-a-repo':
-    'Goblin 已连接到 SSH 目标，但保存的工作区路径不可用。请检查路径或重新连接到其他工作区。',
   'workspace-unavailable.path': '路径',
   'workspace-unavailable.reason': '原因',
   'workspace-unavailable.retry': '重新检测',

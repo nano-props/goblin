@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   isRemoteWorkspaceTarget,
+  isRemoteWorkspaceFailureReason,
   normalizeRemoteWorkspaceRef,
   normalizeWorkspaceSessionEntry,
   normalizeRemoteTarget,
@@ -10,7 +11,12 @@ import {
 } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-describe('remote repository normalization', () => {
+describe('remote workspace normalization', () => {
+  test('keeps Git probe outcomes out of lifecycle failure reasons', () => {
+    expect(isRemoteWorkspaceFailureReason('not-a-repo')).toBe(false)
+    expect(isRemoteWorkspaceFailureReason('git-missing')).toBe(false)
+  })
+
   test('compares persisted workspace identity by canonical ID', () => {
     const entry = remoteWorkspaceSessionEntry({
       id: workspaceIdForTest('goblin+ssh://host/repo'),

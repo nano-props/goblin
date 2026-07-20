@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   listSshConfigHosts: vi.fn(),
@@ -87,6 +88,14 @@ describe('server remote target resolution', () => {
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
     })
+  })
+
+  test('rejects a local workspace at the remote connection boundary', async () => {
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+
+    await expect(
+      resolveServerRemoteWorkspaceConnection({ workspaceId: workspaceIdForTest('goblin+file:///srv/workspace') }),
+    ).rejects.toThrow('remote workspace connection requires an SSH workspace id')
   })
 
   test('keeps a readable directory ready when Git enrichment times out', async () => {

@@ -21,6 +21,7 @@ import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.t
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 
@@ -195,7 +196,10 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // Starts a server-owned attempt for one workspace-runtime generation and
   // returns its accepted terminal lifecycle projection.
   remoteLifecycle: v.object({
-    workspaceId: WorkspaceIdSchema,
+    workspaceId: v.pipe(
+      WorkspaceIdSchema,
+      v.check((workspaceId) => isRemoteWorkspaceId(workspaceId), 'remote lifecycle requires an SSH workspace id'),
+    ),
     workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),

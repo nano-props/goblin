@@ -44,7 +44,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const pending = loading
   const pathError = remotePathError(remotePath)
   const pathFieldError = remotePath.trim() ? pathError.errorKey : null
-  const canSubmit = canSubmitRemoteRepository({ alias, remotePath, pending })
+  const canSubmit = canSubmitRemoteWorkspace({ alias, remotePath, pending })
   const error = actionError ?? loadError
   const remotePathSuggestions = useRemotePathSuggestions({
     enabled: open && !pending,
@@ -320,7 +320,7 @@ export function remotePathError(value: string): { errorKey: string | null } {
   return { errorKey: null }
 }
 
-export function canSubmitRemoteRepository(input: { alias: string; remotePath: string; pending: boolean }): boolean {
+export function canSubmitRemoteWorkspace(input: { alias: string; remotePath: string; pending: boolean }): boolean {
   if (input.pending || remotePathError(input.remotePath).errorKey) return false
   return isValidSshProfile(input.alias)
 }
