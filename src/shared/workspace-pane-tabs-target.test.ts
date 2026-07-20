@@ -3,6 +3,7 @@ import {
   parseRestorableWorkspacePaneTargetKey,
   parseWorkspacePaneTabsTargetIdentityKey,
   restorableWorkspacePaneTarget,
+  restorableWorkspacePaneTargetFromRuntime,
   restorableWorkspacePaneTargetKey,
   workspacePaneTabsTargetFromRestorable,
   workspacePaneTabsTargetFromRuntime,
@@ -90,6 +91,28 @@ describe('restorable workspace pane targets', () => {
         workspaceId: workspaceIdForTest('goblin+ssh://server-a/repo'),
         workspaceRuntimeId,
         root: workspaceIdForTest('goblin+ssh://server-b/repo/worktree'),
+      }),
+    ).toBeNull()
+    expect(
+      workspacePaneTabsTargetFromRestorable(workspaceIdForTest('goblin+file:///repo'), {
+        kind: 'git-worktree',
+        root: workspaceIdForTest('goblin+file:///C:/repo/worktree'),
+      }),
+    ).toBeNull()
+    expect(
+      workspacePaneTabsTargetFromRuntime({
+        kind: 'git-worktree',
+        workspaceId: workspaceIdForTest('goblin+file:///repo'),
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///C:/repo/worktree'),
+      }),
+    ).toBeNull()
+    expect(
+      restorableWorkspacePaneTargetFromRuntime({
+        kind: 'git-worktree',
+        workspaceId: workspaceIdForTest('goblin+file:///repo'),
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///C:/repo/worktree'),
       }),
     ).toBeNull()
   })

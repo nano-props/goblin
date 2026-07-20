@@ -154,10 +154,7 @@ export function restorableWorkspacePaneTargetFromRuntime(
   if (!target.workspaceId || !target.workspaceRuntimeId) return null
   if (target.kind === 'workspace-root') return { kind: 'workspace-root' }
   if (target.kind === 'git-branch') return target.branch ? { kind: 'git-branch', branch: target.branch } : null
-  const workspace = parseCanonicalWorkspaceLocator(target.workspaceId)
-  const root = parseCanonicalWorkspaceLocator(target.root)
-  if (!workspace || !root || workspace.transport !== root.transport) return null
-  if (workspace.transport === 'ssh' && (root.transport !== 'ssh' || workspace.profile !== root.profile)) return null
+  if (!workspaceLocatorsShareTransport(target.workspaceId, target.root)) return null
   return { kind: 'git-worktree', root: target.root }
 }
 
@@ -199,9 +196,7 @@ export function workspacePaneTabsTargetFromRestorable(
     return { kind: 'git-branch', workspaceId: workspaceId, branchName: target.branch }
   }
   const root = parseCanonicalWorkspaceLocator(target.root)
-  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
-  if (!root || !workspace || root.transport !== workspace.transport) return null
-  if (root.transport === 'ssh' && (workspace.transport !== 'ssh' || root.profile !== workspace.profile)) return null
+  if (!root || !workspaceLocatorsShareTransport(workspaceId, target.root)) return null
   return { kind: 'git-worktree', workspaceId: workspaceId, worktreePath: root.path }
 }
 
@@ -213,10 +208,8 @@ export function workspacePaneTabsTargetFromRuntime(target: RuntimeWorkspacePaneT
   if (target.kind === 'git-branch') {
     return target.branch ? { kind: 'git-branch', workspaceId: target.workspaceId, branchName: target.branch } : null
   }
-  const workspace = parseCanonicalWorkspaceLocator(target.workspaceId)
   const root = parseCanonicalWorkspaceLocator(target.root)
-  if (!workspace || !root || workspace.transport !== root.transport) return null
-  if (workspace.transport === 'ssh' && (root.transport !== 'ssh' || workspace.profile !== root.profile)) return null
+  if (!root || !workspaceLocatorsShareTransport(target.workspaceId, target.root)) return null
   return { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: root.path }
 }
 
