@@ -23,6 +23,16 @@ export interface WorkspaceFilesystemExternalActions {
   openFinder: () => Promise<ExecResult | null>
 }
 
+export function workspaceFilesystemExternalCapabilities(
+  target: WorkspacePaneFilesystemTarget,
+): WorkspaceFilesystemExternalActions['capabilities'] {
+  return {
+    canOpenTerminal: target.capabilities.terminal.available,
+    canOpenEditor: target.capabilities.files.read,
+    canOpenFinder: !isRemoteWorkspaceId(target.workspaceId),
+  }
+}
+
 export function useWorkspaceFilesystemExternalActions(
   target: WorkspacePaneFilesystemTarget,
 ): WorkspaceFilesystemExternalActions {
@@ -33,11 +43,7 @@ export function useWorkspaceFilesystemExternalActions(
   }
 
   return {
-    capabilities: {
-      canOpenTerminal: target.capabilities.terminal.available,
-      canOpenEditor: target.capabilities.files.read,
-      canOpenFinder: !isRemoteWorkspaceId(target.workspaceId),
-    },
+    capabilities: workspaceFilesystemExternalCapabilities(target),
     openTerminal: async (app) => await run(async () => await openWorkspaceTerminal(executionTarget, app)),
     openEditor: async (app) => await run(async () => await openWorkspaceEditor(executionTarget, app)),
     openFinder: async () => await run(async () => await openWorkspaceInFinder(executionTarget)),

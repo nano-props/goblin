@@ -8,9 +8,13 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-client.ts'
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+import {
+  WorkspaceOpenExternallyMenuContent,
+  useWorkspaceOpenExternallyItems,
+} from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
 import {
   gitWorktreePaneFilesystemTarget,
+  type WorkspacePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -207,6 +211,11 @@ afterEach(() => {
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
+
+function WorkspaceOpenExternallyMenu({ target }: { target: WorkspacePaneFilesystemTarget }) {
+  const items = useWorkspaceOpenExternallyItems(target)
+  return items.length > 0 ? <WorkspaceOpenExternallyMenuContent target={target} items={items} /> : null
+}
 
 describe('GitWorkspacePaneToolbar', () => {
   test('renders a status tab for a selected branch without a worktree', async () => {
@@ -418,6 +427,7 @@ describe('GitWorkspacePaneToolbar', () => {
 
     expect(container.querySelector('[data-testid="workspace-open-externally-menu-primary"]')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-open-externally-menu-trigger"]')).toBeNull()
+    expect(container.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
   test('keeps remote-capable apps and hides Finder for a remote workspace root', async () => {
@@ -471,6 +481,7 @@ describe('GitWorkspacePaneToolbar', () => {
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
     expect(primary).toBeNull()
     expect(trigger).toBeNull()
+    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
   test('uses the first visible external app as the split-button primary action without recent state', () => {

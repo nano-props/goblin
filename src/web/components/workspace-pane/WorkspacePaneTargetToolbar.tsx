@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -32,7 +32,11 @@ import {
 import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+import {
+  WorkspaceOpenExternallyMenuContent,
+  useWorkspaceOpenExternallyItems,
+} from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -42,11 +46,27 @@ interface WorkspacePaneTargetToolbarProps {
   statusCount: number
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
-  trailingActions?: ReactNode
   staticTabAvailable?: Parameters<typeof workspacePaneTabItems>[0]['staticTabAvailable']
 }
 
-export function WorkspacePaneTargetToolbar({
+type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbarProps, 'target'> & {
+  target: Exclude<WorkspacePaneSurfaceTarget, { kind: 'git-branch' }>
+}
+
+export function WorkspacePaneTargetToolbar(props: WorkspacePaneTargetToolbarProps) {
+  return props.target.kind === 'git-branch' ? (
+    <WorkspacePaneTargetToolbarContent {...props} externalItems={[]} />
+  ) : (
+    <WorkspacePaneFilesystemTargetToolbar {...props} target={props.target} />
+  )
+}
+
+function WorkspacePaneFilesystemTargetToolbar(props: WorkspacePaneFilesystemTargetToolbarProps) {
+  const externalItems = useWorkspaceOpenExternallyItems(props.target)
+  return <WorkspacePaneTargetToolbarContent {...props} externalItems={externalItems} />
+}
+
+function WorkspacePaneTargetToolbarContent({
   target,
   model,
   workspacePaneId,
@@ -54,9 +74,9 @@ export function WorkspacePaneTargetToolbar({
   statusCount,
   trafficLightOffset = false,
   onBackToNavigator,
-  trailingActions,
   staticTabAvailable,
-}: WorkspacePaneTargetToolbarProps) {
+  externalItems,
+}: WorkspacePaneTargetToolbarProps & { externalItems: readonly WorkspaceExternalAppItem[] }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const branchName =
@@ -66,6 +86,7 @@ export function WorkspacePaneTargetToolbar({
         ? target.branchName
         : gitHeadBranch(target.head)
   const rootPath = target.kind === 'git-branch' ? null : workspacePaneFilesystemRootPath(target)
+  const filesystemTarget = target.kind === 'git-branch' ? null : target
   const commandTarget: WorkspacePaneCommandTarget =
     target.kind === 'workspace-root'
       ? { kind: 'workspace-root', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
@@ -118,7 +139,7 @@ export function WorkspacePaneTargetToolbar({
       }
       return false
     },
-    [navigation, persistenceTarget, target],
+    [navigation, target],
   )
   const showRuntimeTab = useCallback(
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
@@ -207,10 +228,9 @@ export function WorkspacePaneTargetToolbar({
       trafficLightOffset={trafficLightOffset}
       onBackToNavigator={onBackToNavigator}
       trailingActions={
-        <>
-          {target.kind !== 'git-branch' ? <WorkspaceOpenExternallyMenu target={target} /> : null}
-          {trailingActions}
-        </>
+        filesystemTarget && externalItems.length > 0 ? (
+          <WorkspaceOpenExternallyMenuContent target={filesystemTarget} items={externalItems} />
+        ) : null
       }
       onSelect={(item) => selectItem(item, false)}
       onReselect={(item) => selectItem(item, true)}

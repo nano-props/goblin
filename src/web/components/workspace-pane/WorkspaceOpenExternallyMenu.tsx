@@ -19,6 +19,7 @@ import { setRecentWorkspaceExternalAppPreference } from '#/web/settings-actions.
 import { cn } from '#/web/lib/cn.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
+  workspaceFilesystemExternalCapabilities,
   useWorkspaceFilesystemExternalActions,
   type WorkspaceFilesystemExternalActions,
 } from '#/web/hooks/useWorkspaceFilesystemExternalActions.ts'
@@ -27,17 +28,30 @@ interface Props {
   target: WorkspacePaneFilesystemTarget
 }
 
-export function WorkspaceOpenExternallyMenu({ target }: Props) {
+export function useWorkspaceOpenExternallyItems(
+  target: WorkspacePaneFilesystemTarget,
+): readonly WorkspaceExternalAppItem[] {
+  const externalApps = useExternalAppSettings()
+  const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
+  return useMemo(() => {
+    const capabilities = workspaceFilesystemExternalCapabilities(target)
+    const isRemoteWorkspace = isRemoteWorkspaceId(target.workspaceId)
+    const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
+    return WORKSPACE_EXTERNAL_APPS.filter((item) =>
+      workspaceExternalAppItemVisible({ item, capabilities, externalApps, finderAvailable, isRemoteWorkspace }),
+    )
+  }, [externalApps, hostPlatform, target])
+}
+
+export function WorkspaceOpenExternallyMenuContent({
+  target,
+  items,
+}: Props & { items: readonly WorkspaceExternalAppItem[] }) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const { pending, run } = useAsyncPending<string>()
   const actions = useWorkspaceFilesystemExternalActions(target)
-  const { capabilities } = actions
-  const externalApps = useExternalAppSettings()
-  const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
-  const isRemoteRepo = isRemoteWorkspaceId(target.workspaceId)
-  const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const { data: settingsSnapshot } = useSettingsSnapshotQuery()
   const workspaceSettings = settingsSnapshot?.workspaceSettings
   const externalAppTarget: WorkspaceExternalAppTarget =
@@ -47,25 +61,12 @@ export function WorkspaceOpenExternallyMenu({ target }: Props) {
     [externalAppTarget, target.workspaceId, workspaceSettings],
   )
 
-  const localItems = useMemo(
-    () =>
-      WORKSPACE_EXTERNAL_APPS.filter((item) =>
-        workspaceExternalAppItemVisible({
-          item,
-          capabilities,
-          externalApps,
-          finderAvailable,
-          isRemoteRepo,
-        }),
-      ),
-    [capabilities, externalApps, finderAvailable, isRemoteRepo],
-  )
   const primaryItem = useMemo(
-    () => selectPrimaryWorkspaceExternalApp(localItems, serverRecentItemId),
-    [serverRecentItemId, localItems],
+    () => selectPrimaryWorkspaceExternalApp(items, serverRecentItemId),
+    [serverRecentItemId, items],
   )
 
-  if (localItems.length === 0) return null
+  if (items.length === 0) return null
 
   const busy = pending !== null
   const menuLabel = t('workspace.open-externally.open')
@@ -151,9 +152,9 @@ export function WorkspaceOpenExternallyMenu({ target }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div role="list">
-          {localItems.length > 0 && (
+          {items.length > 0 && (
             <div className="space-y-0.5 p-1">
-              {localItems.map((item) => (
+              {items.map((item) => (
                 <div key={item.id} role="listitem">
                   <WorkspaceOpenExternallyItem
                     item={item}
@@ -246,15 +247,15 @@ function workspaceExternalAppItemVisible({
   capabilities,
   externalApps,
   finderAvailable,
-  isRemoteRepo,
+  isRemoteWorkspace,
 }: {
   item: WorkspaceExternalAppItem
   capabilities: WorkspaceFilesystemExternalActions['capabilities']
   externalApps: ReturnType<typeof useExternalAppSettings>
   finderAvailable: boolean
-  isRemoteRepo: boolean
+  isRemoteWorkspace: boolean
 }): boolean {
-  if (isRemoteRepo && !item.supportsRemote) return false
+  if (isRemoteWorkspace && !item.supportsRemote) return false
   if (item.kind === 'terminal' && !capabilities.canOpenTerminal) return false
   if (item.kind === 'editor' && !capabilities.canOpenEditor) return false
   if (item.kind === 'finder' && !capabilities.canOpenFinder) return false
