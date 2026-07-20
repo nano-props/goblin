@@ -68,7 +68,7 @@ describe('terminal create command', () => {
     expect(commitCreatedTerminalTab).toHaveBeenCalledWith(admission)
   })
 
-  test('does not repeat presentation side effects for a duplicate create observer', async () => {
+  test('presents the admitted terminal for a coalesced create observer', async () => {
     const admission = createAdmission({ requestRole: 'observer' })
     const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
@@ -78,9 +78,9 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => admission),
         commitCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'observer' })
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'committed' })
 
-    expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(commitCreatedTerminalTab).toHaveBeenCalledWith(admission)
   })
 
   test('treats a superseded client presentation as a committed server operation', async () => {

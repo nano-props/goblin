@@ -236,6 +236,22 @@ describe('workspace pane runtime tab create action', () => {
     })
   })
 
+  test('presents a coalesced create observer without claiming opener ownership', async () => {
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base: BASE,
+        admission: { ...createAdmission(), requestRole: 'observer' },
+        openerIdentity: 'workspace-pane:status',
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toEqual({ status: 'committed' })
+
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BASE.presentation)
+    expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
+  })
+
   test('does not navigate or record opener after the command target runtime is superseded', async () => {
     seedCurrentWorkspaceRuntime('repo-runtime-replacement')
     const showCreatedTerminalTab = vi.fn(() => true)

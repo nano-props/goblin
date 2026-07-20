@@ -68,6 +68,8 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
@@ -222,6 +224,45 @@ describe('WorkspacePane', () => {
         expect.objectContaining({ presentationToken: expect.any(Object) }),
       ),
     )
+  })
+
+  test('renders shared external app actions for a local non-Git workspace', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/filesystem-toolbar-workspace')
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('filesystem-toolbar-workspace'),
+    })
+    primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), {
+      terminal: {
+        available: true,
+        appAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
+        detectedAt: 1,
+      },
+      editor: { available: true, appAvailability: { vscode: true }, detectedAt: 1 },
+    })
+    useHostInfoStore.setState({
+      snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
+    })
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(container.querySelector('[data-testid="workspace-open-externally-menu-primary"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-open-externally-menu-trigger"]')).not.toBeNull()
   })
 
   test('keeps the selected workspace-root pane when Git capability becomes available', async () => {

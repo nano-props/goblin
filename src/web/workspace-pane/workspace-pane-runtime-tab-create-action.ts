@@ -14,7 +14,7 @@ import {
   type TerminalCreateCommandResult,
   type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
-import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import {
@@ -84,7 +84,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
 
 export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
-  admission: TerminalCreateLeaderAdmissionResult
+  admission: TerminalCreateAdmissionResult
   openerIdentity: string | null
   showCreatedTerminalTab: (terminalSessionId: string, presentation: TerminalPresentation) => boolean | Promise<boolean>
 }
@@ -197,7 +197,9 @@ export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
 function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): void {
-  if (!options.openerIdentity || options.admission.resourceDisposition !== 'created') return
+  const ownsCreatedResource =
+    options.admission.requestRole === 'leader' && options.admission.resourceDisposition === 'created'
+  if (!options.openerIdentity || !ownsCreatedResource) return
   const coordinates = terminalExecutionCoordinates(options.base.target)
   const paneTarget = workspacePaneTabsTargetFromRuntime(options.base.target)
   if (!paneTarget) return
