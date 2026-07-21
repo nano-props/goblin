@@ -29,9 +29,8 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const [pathSuggestionsOpen, setPathSuggestionsOpen] = useState(false)
   const { pending, reset, runLatest } = useLatestAsyncTask()
 
-  const trimmedPath = path.trim()
-  const resolvedPath = untildify(trimmedPath)
-  const canSubmit = resolvedPath.length > 0 && !pending
+  const resolvedPath = untildify(path)
+  const canSubmit = path.trim().length > 0 && !pending
   const canChoosePath = hasNativeDirectoryPicker()
   const statusText = error ?? ''
   const hostInfoHydrated = useHostInfoStore((state) => state.hydrated && state.snapshot !== null)

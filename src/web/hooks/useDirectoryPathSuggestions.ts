@@ -22,7 +22,7 @@ export function useDirectoryPathSuggestions(input: {
   source: DirectoryPathSuggestionSource
   prefix: string
 }): Omit<SuggestionState, 'identity'> {
-  const prefix = input.prefix.trim()
+  const prefix = input.source.kind === 'local' ? input.prefix : input.prefix.trim()
   const alias = input.source.kind === 'ssh' ? input.source.alias.trim() : ''
   const eligible = input.enabled && isEligible(input.source, prefix, alias)
   const identity = eligible ? `${input.source.kind}\0${alias}\0${prefix}` : ''

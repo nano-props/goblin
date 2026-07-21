@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
+import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
 
 const temporaryDirectories: string[] = []
 
@@ -64,6 +65,16 @@ describe('getLocalPathSuggestions', () => {
       await expect(getLocalPathSuggestions(`${root}${path.sep}`)).resolves.toEqual([path.join(root, 'valid')])
     },
   )
+
+  test.runIf(process.platform !== 'win32')('preserves trailing spaces from suggestion through admission', async () => {
+    const root = await temporaryDirectory()
+    await mkdir(path.join(root, 'repo'))
+    await mkdir(path.join(root, 'repo '))
+
+    const [suggestion] = await getLocalPathSuggestions(path.join(root, 'repo '))
+    expect(suggestion).toBe(path.join(root, 'repo '))
+    expect(workspaceLocatorFromNativeCommandInput(suggestion!, 'posix', '/home/example')).toContain('repo%20')
+  })
 })
 
 async function temporaryDirectory(): Promise<string> {

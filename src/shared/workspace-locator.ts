@@ -231,6 +231,6 @@ function encodeSegment(segment: string): string {
   return encoded
 }
 
-function asWorkspaceLocator(value: string): WorkspaceLocator {
-  return value as WorkspaceLocator
+function asWorkspaceLocator(value: string): WorkspaceLocator | null {
+  return value.length <= MAX_WORKSPACE_LOCATOR_LENGTH ? (value as WorkspaceLocator) : null
 }

@@ -19,7 +19,7 @@ export function workspaceLocatorFromNativeCommandInput(
   platform: WorkspaceLocatorPlatform,
   homeDir: string,
 ): WorkspaceId | null {
-  const input = rawInput.trim()
+  const input = rawInput
   const parsed = parseWorkspaceLocator(input, platform)
   if (parsed?.transport === 'file') return formatWorkspaceLocator(parsed, platform)
   const expanded = expandNativeHomePath(input, platform, homeDir)
@@ -32,8 +32,8 @@ export function planNativeDirectorySuggestions(
   platform: WorkspaceLocatorPlatform,
   homeDir: string,
 ): NativeDirectorySuggestionPlan | null {
-  const prefix = rawPrefix.trim()
-  if (!prefix || prefix.startsWith('goblin+file://')) return null
+  const prefix = rawPrefix
+  if (!prefix.trim() || prefix.startsWith('goblin+file://')) return null
   const expanded = expandNativeHomePath(prefix, platform, homeDir)
   if (!expanded || !isNativeAbsolutePrefix(expanded, platform)) return null
 
