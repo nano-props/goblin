@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
+import { getLocalPathSuggestionsForHost } from '#/server/modules/local-path-suggestions.ts'
 
 const mocks = vi.hoisted(() => ({
   opendir: vi.fn(),
@@ -16,7 +16,7 @@ describe('getLocalPathSuggestions filesystem boundary', () => {
     const directory = fakeDirectory(Array.from({ length: 600 }, (_, index) => fileEntry(`file-${index}`)))
     mocks.opendir.mockResolvedValue(directory)
 
-    await expect(getLocalPathSuggestions('/root/match')).resolves.toEqual([])
+    await expect(suggest('/root/match')).resolves.toEqual([])
     expect(directory.read).toHaveBeenCalledTimes(500)
     expect(directory.close).toHaveBeenCalledOnce()
   })
@@ -28,7 +28,7 @@ describe('getLocalPathSuggestions filesystem boundary', () => {
     )
     mocks.opendir.mockResolvedValue(directory)
 
-    await expect(getLocalPathSuggestions('/root/', controller.signal)).rejects.toThrow('stop')
+    await expect(suggest('/root/', controller.signal)).rejects.toThrow('stop')
     expect(directory.close).toHaveBeenCalledOnce()
   })
 
@@ -37,21 +37,30 @@ describe('getLocalPathSuggestions filesystem boundary', () => {
     directory.read.mockRejectedValueOnce(filesystemError('EACCES'))
     mocks.opendir.mockResolvedValue(directory)
 
-    await expect(getLocalPathSuggestions('/root/')).resolves.toEqual([])
+    await expect(suggest('/root/')).resolves.toEqual([])
     expect(directory.close).toHaveBeenCalledOnce()
   })
 
   test('propagates unexpected open and symlink stat errors', async () => {
     mocks.opendir.mockRejectedValueOnce(filesystemError('EIO'))
-    await expect(getLocalPathSuggestions('/root/')).rejects.toMatchObject({ code: 'EIO' })
+    await expect(suggest('/root/')).rejects.toMatchObject({ code: 'EIO' })
 
     const directory = fakeDirectory([symlinkEntry('linked')])
     mocks.opendir.mockResolvedValueOnce(directory)
     mocks.stat.mockRejectedValueOnce(filesystemError('EIO'))
-    await expect(getLocalPathSuggestions('/root/l')).rejects.toMatchObject({ code: 'EIO' })
+    await expect(suggest('/root/l')).rejects.toMatchObject({ code: 'EIO' })
     expect(directory.close).toHaveBeenCalledOnce()
   })
+
+  test('maps an overlong native path to no results', async () => {
+    mocks.opendir.mockRejectedValueOnce(filesystemError('ENAMETOOLONG'))
+    await expect(suggest(`/root/${'a'.repeat(4000)}`)).resolves.toEqual([])
+  })
 })
+
+async function suggest(prefix: string, signal?: AbortSignal): Promise<string[]> {
+  return await getLocalPathSuggestionsForHost({ prefix, platform: 'posix', homeDir: '/home/example', signal })
+}
 
 function fakeDirectory(entries: Dirent[], afterFirstRead?: () => void) {
   let index = 0
