@@ -1,5 +1,5 @@
 import PQueue from 'p-queue'
-import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
+import { resolveRepoWriteBoundary } from '#/server/modules/repo-write-boundary-registry.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {
@@ -24,6 +24,7 @@ export interface RepoWriteOperationLifecycle {
 }
 
 export interface RepoWriteOperationContext {
+  readonly boundaryKey: string
   runNetworkOperation<T extends ExecResult>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
 }
 
@@ -365,6 +366,7 @@ function createRepoWriteOperationContext(
   callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
+    boundaryKey: runtime.boundaryKey,
     async runNetworkOperation(task) {
       return await runRepoWriteNetworkOperation(runtime, operation, task, callerSignal)
     },
@@ -380,7 +382,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   if (signal?.aborted) return cancelledRepoWriteResult()
   let boundaryKey: string
   try {
-    boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
+    boundaryKey = await resolveRepoWriteBoundary(repoId, signal)
   } catch (err) {
     if (signal?.aborted) return cancelledRepoWriteResult()
     throw err
@@ -420,10 +422,9 @@ export async function listRepoWriteOperationsForRepo(
   repoId: WorkspaceId | undefined,
   options: { includeSettled?: boolean; workspaceRuntimeId?: string; signal?: AbortSignal } = {},
 ): Promise<RepoServerOperationState[]> {
-  const includeSettled = options.includeSettled === true
   let runtimes: RepoWriteOperationQueueRuntime[]
   if (repoId) {
-    const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
+    const boundaryKey = await resolveRepoWriteBoundary(repoId, options.signal)
     registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
     const runtime = repoWriteOperationRuntimesByBoundary.get(boundaryKey)
     if (!runtime) return []
@@ -431,6 +432,14 @@ export async function listRepoWriteOperationsForRepo(
   } else {
     runtimes = [...repoWriteOperationRuntimesByBoundary.values()]
   }
+  return listRuntimeOperations(runtimes, options)
+}
+
+function listRuntimeOperations(
+  runtimes: RepoWriteOperationQueueRuntime[],
+  options: { includeSettled?: boolean; workspaceRuntimeId?: string },
+): RepoServerOperationState[] {
+  const includeSettled = options.includeSettled === true
   return sortedOperations(
     runtimes.flatMap((runtime) =>
       [...runtime.operations.values()].filter((operation) => {
@@ -446,6 +455,17 @@ export async function listRepoWriteOperationsForRepo(
       }),
     ),
   ).map(cloneOperation)
+}
+
+export function listRepoWriteOperationsForBoundary(
+  repoId: WorkspaceId,
+  boundaryKey: string,
+  options: { includeSettled?: boolean; workspaceRuntimeId?: string } = {},
+): RepoServerOperationState[] {
+  registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
+  const runtime = repoWriteOperationRuntimesByBoundary.get(boundaryKey)
+  if (!runtime) return []
+  return listRuntimeOperations([runtime], options)
 }
 
 export function resetRepoWriteOperationCoordinatorForTests(): void {

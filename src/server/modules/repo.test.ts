@@ -179,8 +179,9 @@ beforeEach(async () => {
     await import('#/server/modules/repo-write-operation-coordinator.ts')
   resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
-  const { resetRepoSyncStateForTests } = await import('#/server/modules/repo-sync-state.ts')
-  resetRepoSyncStateForTests()
+  const { resetRepoWriteBoundaryRegistryForTests } =
+    await import('#/server/modules/repo-write-boundary-registry.ts')
+  resetRepoWriteBoundaryRegistryForTests()
   vi.clearAllMocks()
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
   mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
@@ -452,19 +453,35 @@ describe('fetchRepo invalidation publishing', () => {
     })
   })
 
-  test('records only successful fetches for the workspace runtime', async () => {
+  test('records only successful fetches for the repository write boundary', async () => {
     const runtimeId = 'repo-runtime-sync-time'
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const { getRepoLastFetchAt } = await import('#/server/modules/repo-sync-state.ts')
+    const { resolveRepoWriteBoundaryKey } = await import('#/server/modules/repo-source.ts')
+    const { getRepoBoundaryLastFetchAt } = await import('#/server/modules/repo-write-boundary-registry.ts')
+    const boundaryKey = await resolveRepoWriteBoundaryKey(REPO_ID)
 
-    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toBeNull()
+    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toBeNull()
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
-    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toEqual(expect.any(Number))
+    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toEqual(expect.any(Number))
 
     mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
-    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toEqual(expect.any(Number))
+    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toEqual(expect.any(Number))
+  })
+
+  test('shares successful fetch time across worktrees with one write boundary', async () => {
+    mocks.getRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    await fetchRepo(REPO_ID, 'user', undefined, 'workspace-runtime-a')
+
+    const primary = await readRepoOperationsSnapshot(REPO_ID, { workspaceRuntimeId: 'workspace-runtime-a' })
+    const linked = await readRepoOperationsSnapshot(LINKED_REPO_ID, { workspaceRuntimeId: 'workspace-runtime-b' })
+    expect(primary.lastFetchAt).toEqual(expect.any(Number))
+    expect(linked.lastFetchAt).toBe(primary.lastFetchAt)
   })
 
   test('publishes sibling worktree snapshot invalidations after a successful sync', async () => {
