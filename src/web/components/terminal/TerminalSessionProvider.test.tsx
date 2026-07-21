@@ -63,6 +63,8 @@ import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 
+vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
+
 const mockSessions = vi.hoisted(
   () =>
     [] as Array<{
@@ -565,7 +567,6 @@ beforeEach(() => {
   })
   resetWorkspacesStore()
   useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
-  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   primaryWindowQueryClient.clear()
   primaryWindowQueryClient.setQueryData(
     settingsSnapshotQueryKey(),
@@ -580,7 +581,7 @@ beforeEach(() => {
         bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       invokeIpc: vi.fn(async () => []),
       abortIpc: vi.fn(),
       onEvent: vi.fn(() => () => {}),
@@ -695,7 +696,7 @@ beforeEach(() => {
         bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [],
       },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     },
   })
   setClientBridgeForTests({
@@ -714,7 +715,7 @@ beforeEach(() => {
         bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
     invokeIpc: vi.fn(async () => []),
     abortIpc: vi.fn(async () => false),

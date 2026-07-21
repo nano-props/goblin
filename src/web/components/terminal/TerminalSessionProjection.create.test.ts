@@ -49,8 +49,8 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsSnapshot: mocks.writeWorkspaceTabsSnapshotMock,
 }))
 
-vi.mock('#/web/client-terminal-id.ts', () => ({
-  readOrCreateWebTerminalClientId: mocks.clientIdMock,
+vi.mock('#/web/client-page-id.ts', () => ({
+  readClientPageId: mocks.clientIdMock,
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({

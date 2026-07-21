@@ -26,7 +26,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       invokeIpc: vi.fn(),
       abortIpc: vi.fn(),
       onEvent: vi.fn(() => () => {}),
@@ -40,7 +40,7 @@ beforeEach(() => {
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     },
   })
 })

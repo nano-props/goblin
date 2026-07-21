@@ -38,7 +38,7 @@ import {
   isTerminalEmulatorInput,
   type TerminalInput,
 } from '#/web/components/terminal/terminal-input.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import {
   createXtermAuthorityGate,
   type AuthorizationDenialReason,
@@ -915,7 +915,7 @@ export class TerminalSession {
   private withLocalController(
     result: Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>,
   ): TerminalStartResultWithController {
-    const clientId = readOrCreateWebTerminalClientId()
+    const clientId = readClientPageId()
     return projectTerminalStartResultForClient(result, clientId)
   }
 

@@ -48,11 +48,6 @@ function normalizeServerUrl(value: string | null | undefined): string | null {
   }
 }
 
-function normalizeServerClientId(value: string | null | undefined): string | null {
-  if (!value) return null
-  return /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : null
-}
-
 function fillRuntimeDefaults(snapshot: ClientBootstrapSnapshot): ClientBootstrapSnapshot {
   if (snapshot.runtime) return snapshot
   // The `runtime` field is now optional in the input; substitute a
@@ -75,32 +70,27 @@ export function readInjectedWebBootstrap(): ClientBootstrapSnapshot | null {
   return null
 }
 
-export function readQueryBootstrap(createWebTerminalClientId: () => string): ClientBootstrapSnapshot | null {
+export function readQueryBootstrap(): ClientBootstrapSnapshot | null {
   try {
     const params = new URLSearchParams(window.location.search)
     const accessToken = params.get(ACCESS_TOKEN_URL_PARAM)?.trim()
-    const clientId = normalizeServerClientId(params.get('goblinServerClientId')?.trim()) ?? createWebTerminalClientId()
     if (!accessToken) return null
     const url = normalizeServerUrl(params.get('goblinServerUrl')?.trim() || window.location.origin)
-    if (!url || !clientId) return null
+    if (!url) return null
     return {
       ...EMPTY_BOOTSTRAP,
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-      initialServer: { url, accessToken, clientId },
+      initialServer: { url, accessToken },
     }
   } catch {
     return null
   }
 }
 
-export function readWebBootstrap(createWebTerminalClientId: () => string): ClientBootstrapSnapshot {
-  return readInjectedWebBootstrap() ?? readQueryBootstrap(createWebTerminalClientId) ?? EMPTY_BOOTSTRAP
+export function readWebBootstrap(): ClientBootstrapSnapshot {
+  return readInjectedWebBootstrap() ?? readQueryBootstrap() ?? EMPTY_BOOTSTRAP
 }
 
 export function emptyBootstrapSnapshot(): ClientBootstrapSnapshot {
   return EMPTY_BOOTSTRAP
-}
-
-export function normalizeClientServerClientId(value: string | null | undefined): string | null {
-  return normalizeServerClientId(value)
 }

@@ -12,6 +12,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
+  closeWorkspaceRuntimesForDurableRemoval,
   commitWorkspaceProbeState,
   releaseWorkspaceRuntime,
 } from '#/server/modules/workspace-runtimes.ts'
@@ -42,7 +43,7 @@ import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capab
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 // Under method 2 the host threads `userId` (derived from the
-// access token) alongside `clientId` (per-tab routing). Tests use
+// access token) alongside `clientId` (per-page routing). Tests use
 // a fixed value so the assertions don't have to mock the
 // derivation helper.
 const USER_1 = 'user_terminal_runtime'
@@ -54,7 +55,8 @@ let SSH_WORKSPACE_RUNTIME_ID = ''
 let USER_2_WORKSPACE_RUNTIME_ID = ''
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
-const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
+const CLIENT_STATE_GRACE_MS = 30_000
+const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS
 
 function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)
@@ -1320,10 +1322,7 @@ describe('server terminal runtime', () => {
     })
     socket.send.mockClear()
 
-    expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID, 'client_a')).toEqual({
-      released: true,
-      runtimeClosed: true,
-    })
+    expect(closeWorkspaceRuntimesForDurableRemoval(REPO_ROOT)).toBe(2)
     await vi.waitFor(() => {
       expect(
         sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
@@ -2889,7 +2888,7 @@ describe('server terminal runtime', () => {
       handle.host.registerSocket('client_expiring', USER_1, socket)
       handle.host.unregisterSocket('client_expiring', USER_1, socket)
 
-      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
 
       expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID, 'client_expiring')).toEqual({
         released: false,
@@ -2905,6 +2904,50 @@ describe('server terminal runtime', () => {
     }
   })
 
+  test('runtime: client expiry removes stale terminal authority while a replacement client keeps the session', async () => {
+    useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      const oldClientId = 'client_before_reload'
+      const replacementClientId = 'client_after_reload'
+      acquireWorkspaceRuntime(USER_1, REPO_ROOT, oldClientId)
+      const oldSocket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket(oldClientId, USER_1, oldSocket)
+      const terminalRuntimeSessionId = await createTerminalSession(handle.host, oldClientId)
+
+      handle.host.unregisterSocket(oldClientId, USER_1, oldSocket)
+      await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
+
+      expect(acquireWorkspaceRuntime(USER_1, REPO_ROOT, replacementClientId)).toBe(WORKSPACE_RUNTIME_ID)
+      const replacementSocket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket(replacementClientId, USER_1, replacementSocket)
+      await expect(
+        handle.host.listSessions(replacementClientId, USER_1, {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
+      ).resolves.toEqual([expect.objectContaining({ terminalRuntimeSessionId, controller: null })])
+
+      await expect(
+        handle.host.attach(replacementClientId, USER_1, {
+          terminalRuntimeSessionId,
+          cols: 100,
+          rows: 30,
+          clientId: replacementClientId,
+        }),
+      ).resolves.toMatchObject({
+        ok: true,
+        controller: { clientId: replacementClientId, status: 'connected' },
+      })
+      expect(handle.host.getDiagnostics().terminal.liveSessionCount).toBe(1)
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
   test('runtime: a repo membership that never establishes realtime presence expires', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
@@ -2913,7 +2956,7 @@ describe('server terminal runtime', () => {
       shutdownFn = handle.shutdown
       const runtimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_never_online')
 
-      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
 
       expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, runtimeId, 'client_never_online')).toEqual({
         released: false,
@@ -2999,7 +3042,7 @@ describe('server terminal runtime', () => {
       const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
       handle.host.registerSocket('client_renewed', USER_1, reconnectedSocket)
 
-      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
 
       expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID, 'client_renewed')).toEqual({
         released: true,

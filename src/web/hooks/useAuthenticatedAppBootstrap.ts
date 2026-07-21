@@ -14,7 +14,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController, waitForPromiseWithSignal } from '#/web/lib/abort.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -134,7 +134,7 @@ async function restoreBootSession(
     const snapshot = await waitForPromiseWithSignal(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)
     const restored = await waitForPromiseWithSignal(
-      restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
+      restoreWorkspaceAtBoot(readClientPageId(), {
         activeWorkspaceId: activeWorkspaceId ?? presentation.restoredWorkspaceId,
         signal,
       }),

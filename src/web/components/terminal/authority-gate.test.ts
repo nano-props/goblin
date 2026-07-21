@@ -6,6 +6,8 @@ import { createXtermAuthorityGate } from '#/web/components/terminal/authority-ga
 import { terminalLog } from '#/web/logger.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 
+vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_local' }))
+
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision
 // branches and ordering contracts are pinned here without booting a
@@ -60,11 +62,6 @@ function buildGate(
 }
 
 beforeEach(() => {
-  // Pin the attachment id so the takeover input is deterministic
-  // across tests. The real `readOrCreateWebTerminalClientId`
-  // reads `window.sessionStorage`, which the global vitest setup
-  // already shimmed with an in-memory Storage.
-  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   vi.clearAllMocks()
 })
 

@@ -51,12 +51,12 @@ Open:
 Close:
 
 1. The explicit close command removes the workspace from the shared durable workspace.
-2. The client removes the workspace from its local projection and releases its
-   `clientId` lease for the matching `workspaceRuntimeId`.
-3. Other client leases keep the shared epoch current until they converge or expire.
-4. The last release stops the epoch; stale and repeated releases are no-ops.
-5. Server-side workspace-runtime close events clean up runtime-scoped terminal
-   resources.
+2. That durable commit invalidates every user runtime epoch projected from the
+   removed global workspace entry, regardless of transient client or resource owners.
+3. Server-side workspace-runtime close events clean up runtime-scoped terminal
+   resources and notify every connected client to re-project the removal.
+4. Each client removes the workspace from its local projection; later stale
+   lease releases are no-ops.
 
 Restore:
 

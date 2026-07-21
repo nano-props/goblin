@@ -1,4 +1,4 @@
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
@@ -125,7 +125,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   let role: 'controller' | 'viewer' | 'unowned' = 'unowned'
 
   function readClientId(): string {
-    return readOrCreateWebTerminalClientId()
+    return readClientPageId()
   }
 
   return {

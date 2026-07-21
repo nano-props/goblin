@@ -4,8 +4,8 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientHostBridge, ClientBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
-import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
 import { createServerTerminalClient } from '#/web/client-terminal.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
@@ -58,12 +58,7 @@ function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
   //
   //  - QR-code URL bootstrap (`?accessToken=…`) drops a token on
   //    the URL before first paint; `useAccessTokenStatus` consumes
-  //    the token for the cookie. The `goblinServerClientId=` query
-  //    is still accepted for backward compatibility (older Goblin
-  //    builds emitted it) but is now optional — the server derives
-  //    its `userId` from the access token, not from `clientId`,
-  //    so the cross-browser takeover case no longer needs a
-  //    pre-shared `clientId`. See `identity.ts`.
+  //    the token for the cookie.
   //
   // Everything else (Electron embedded, standalone web, Vite-served
   // dev) authenticates via the http-only cookie set by either
@@ -73,16 +68,12 @@ function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
   // and use an empty `accessToken`; the WebSocket helper still
   // serializes that as `?t=`, but the server checks cookie before
   // query token so cookie auth remains the effective channel.
-  const fromBootstrap = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
+  const fromBootstrap = readWebBootstrap().initialServer
   if (fromBootstrap?.url) {
-    const clientId = normalizeClientServerClientId(fromBootstrap.clientId) ?? readOrCreateWebTerminalClientId()
-    if (!clientId) return null
-    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '', clientId }
+    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '', clientId: readClientPageId() }
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
-    const clientId = readOrCreateWebTerminalClientId()
-    if (!clientId) return null
-    return { url: window.location.origin, accessToken: '', clientId }
+    return { url: window.location.origin, accessToken: '', clientId: readClientPageId() }
   }
   return null
 }
@@ -172,7 +163,7 @@ function createClientBridge(): ClientBridge {
       // boot. Eager capture here would lock the first read (often
       // empty) into the bridge and prevent later, more populated
       // reads from being observed by `bootstrap.ts`'s re-read loop.
-      return readWebBootstrap(readOrCreateWebTerminalClientId)
+      return readWebBootstrap()
     },
     invokeIpc(request: IpcRequest) {
       const bridge = readNativeBridge()

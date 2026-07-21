@@ -18,7 +18,7 @@ describe('terminal web host client', () => {
     wsMock = installWebSocketMock({ autoOpen: false })
     installHostBootstrap({
       runtime: 'web',
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     vi.restoreAllMocks()
     vi.resetModules()
@@ -31,10 +31,11 @@ describe('terminal web host client', () => {
   test('attaches terminals through terminal websocket request-response in web host mode', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal.ts')
+    const { readClientPageId } = await import('#/web/client-page-id.ts')
 
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/app\?t=secret&clientId=client_sharedterminal$/)
+    expect(socket?.url).toBe(`ws://127.0.0.1:32100/ws/app?t=secret&clientId=${readClientPageId()}`)
     const attachPromise = terminalClient.attach({
       terminalRuntimeSessionId: 'pty_1234567890123456',
       cols: 100,
@@ -83,9 +84,9 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('prefers the bootstrap-provided shared terminal client id over localStorage state', async () => {
-    window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
+  test('uses the page instance id for the realtime connection', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
+    const { readClientPageId } = await import('#/web/client-page-id.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
@@ -123,15 +124,14 @@ describe('terminal web host client', () => {
     )
 
     await attachPromise
-    expect(socket?.url).toContain('clientId=client_sharedterminal')
-    expect(window.localStorage.getItem('goblin:terminal-client-id')).toBe('web_oldpersistedclient')
+    expect(socket?.url).toContain(`clientId=${readClientPageId()}`)
     dispose()
   })
 
   test('uses the websocket client id when resolving identity role', async () => {
-    window.localStorage.setItem('goblin:terminal-client-id', 'web_oldpersistedclient')
-    window.sessionStorage.setItem('goblin:terminal-client-id', 'web_oldsessionclient')
     const { terminalClient } = await import('#/web/terminal.ts')
+    const { readClientPageId } = await import('#/web/client-page-id.ts')
+    const clientId = readClientPageId()
     const onIdentity = vi.fn()
     const dispose = terminalClient.onIdentity(onIdentity)
     const socket = wsMock.instances[0]
@@ -145,14 +145,14 @@ describe('terminal web host client', () => {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          controller: { clientId: 'client_sharedterminal', status: 'connected' },
+          controller: { clientId, status: 'connected' },
           canonicalCols: 100,
           canonicalRows: 30,
         },
       }),
     )
 
-    expect(socket.url).toContain('clientId=client_sharedterminal')
+    expect(socket.url).toContain(`clientId=${clientId}`)
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,

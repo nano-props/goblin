@@ -129,15 +129,15 @@ projects to no effective controller, and the reattach re-claims through
 the user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
 
-This works because **window identity is per-sessionStorage, which
-survives a socket-level reconnect within the same window**, and
+This works because **page identity is held by the loaded renderer module, which
+survives a socket-level reconnect within the same page**, and
 **user identity is per-access-token, which is even more durable**.
-The two-tier identity means the model can tell "same window, brief
-network issue" apart from "different window, deliberate switch".
+The two-tier identity means the model can tell "same loaded page, brief
+network issue" apart from "different page instance, deliberate switch".
 
 ## When the original controller is _not_ the next to arrive
 
-The same-window reconnect is the friendly case. The less-friendly
+The same-page reconnect is the friendly case. The less-friendly
 case is a small but real race:
 
 1. Window A is the effective controller.

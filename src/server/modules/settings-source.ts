@@ -1,4 +1,3 @@
-import { toSafeWorkspaceLocator, toSafeWorkspaceSessionEntry } from '#/shared/input-validation.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   readUserSettingsJson,
@@ -8,6 +7,7 @@ import {
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
 import {
+  normalizeWorkspaceSessionEntry,
   workspaceSessionEntryId,
   sameWorkspaceSessionEntry,
   type WorkspaceSessionEntry,
@@ -38,7 +38,7 @@ import {
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { toSafeCanonicalWorkspaceId, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import {
   normalizeWorkspacePaneDurableLayout,
@@ -53,6 +53,7 @@ import type {
 } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
+import { closeWorkspaceRuntimesForDurableRemoval } from '#/server/modules/workspace-runtimes.ts'
 import {
   DEFAULT_COLOR_THEME,
   DEFAULT_FETCH_INTERVAL_SEC,
@@ -154,7 +155,7 @@ function normalizeWorkspacePaneTabsByTargetByWorkspace(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const normalized: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>> = {}
   for (const [workspaceId, rawByTarget] of Object.entries(value)) {
-    const safeWorkspaceId = toSafeWorkspaceLocator(workspaceId)
+    const safeWorkspaceId = toSafeCanonicalWorkspaceId(workspaceId)
     if (!safeWorkspaceId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneStaticTabEntry[]> = {}
     for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
@@ -207,7 +208,7 @@ function normalizeRecentWorkspaces(value: unknown): WorkspaceSessionEntry[] {
 function normalizeWorkspaceEntries(value: unknown): WorkspaceSessionEntry[] {
   if (!Array.isArray(value)) return []
   return dedupeWorkspaceEntries(
-    value.map(toSafeWorkspaceSessionEntry).filter((entry): entry is WorkspaceSessionEntry => entry !== null),
+    value.map(normalizeWorkspaceSessionEntry).filter((entry): entry is WorkspaceSessionEntry => entry !== null),
   )
 }
 
@@ -253,7 +254,7 @@ function normalizeWorkspaceSettings(value: unknown): WorkspaceSettingsEntry[] {
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
     const raw = item as RawWorkspaceSettingsEntry
-    const workspaceId = toSafeWorkspaceLocator(raw.workspaceId)
+    const workspaceId = toSafeCanonicalWorkspaceId(raw.workspaceId)
     if (!workspaceId || seen.has(workspaceId)) continue
     seen.add(workspaceId)
     const entry: WorkspaceSettingsEntry = { workspaceId }
@@ -360,6 +361,7 @@ async function mutateUserSettings<T>(
         await writeUserSettingsFile(commit.next)
         settingsData = commit.next
         settingsLoadPromise = Promise.resolve(commit.next)
+        invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
       }
       commit.afterCommit?.()
       result = commit.result
@@ -370,6 +372,14 @@ async function mutateUserSettings<T>(
   )
   await run
   return result!
+}
+
+function invalidateRemovedWorkspaceRuntimes(before: ServerWorkspaceState, after: ServerWorkspaceState): void {
+  const retainedWorkspaceIds = new Set(after.openWorkspaceEntries.map(workspaceSessionEntryId))
+  for (const entry of before.openWorkspaceEntries) {
+    const workspaceId = workspaceSessionEntryId(entry)
+    if (!retainedWorkspaceIds.has(workspaceId)) closeWorkspaceRuntimesForDurableRemoval(workspaceId)
+  }
 }
 
 /**
@@ -779,7 +789,7 @@ export async function pruneServerWorkspaceSettingsForRemovedWorktree(input: {
 
 export async function addServerRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<WorkspaceSessionEntry[]> {
   return await mutateUserSettings(async (data) => {
-    const safeWorkspace = toSafeWorkspaceSessionEntry(workspace)
+    const safeWorkspace = normalizeWorkspaceSessionEntry(workspace)
     if (!safeWorkspace) return unchangedUserSettings(data, [...data.recentWorkspaces])
     const safeId = workspaceSessionEntryId(safeWorkspace)
     const recentWorkspaces = [

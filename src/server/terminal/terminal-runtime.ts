@@ -56,6 +56,7 @@ import {
   isCurrentWorkspaceRuntime,
   isCurrentWorkspaceRuntimeMembership,
   onWorkspaceRuntimeClosed,
+  retainWorkspaceRuntimeResource,
 } from '#/server/modules/workspace-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
@@ -70,10 +71,10 @@ import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-
 // timer here; it has been removed — controller effectiveness now derives from
 // broker presence.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
-// A window's repo membership survives the same long disconnect window as its
-// terminals, but remains a separate policy input so the two lifecycles are not
-// structurally coupled if product retention changes later.
-const WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
+// Realtime presence detects a disconnected page. This additional grace absorbs
+// a normal socket reconnect without retaining an expired page's memberships,
+// background targets, or terminal authority for the terminal session TTL.
+const CLIENT_STATE_DISCONNECT_GRACE_MS = 30_000
 const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
 const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
@@ -144,6 +145,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       },
     },
     (userId, clientId) => broker.isClientOnline(userId, clientId),
+    {
+      retain(userId, workspaceId, workspaceRuntimeId, terminalRuntimeSessionId) {
+        return retainWorkspaceRuntimeResource(
+          userId,
+          workspaceId,
+          workspaceRuntimeId,
+          terminalRuntimeSessionId,
+        )
+      },
+    },
   )
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
@@ -156,7 +167,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
-    repoMembershipTtlMs: WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS,
+    clientStateTtlMs: CLIENT_STATE_DISCONNECT_GRACE_MS,
   })
   broker = coordinator.broker
   sessionService = createTerminalSessionService({

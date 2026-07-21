@@ -17,6 +17,7 @@ let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
 const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
 const REPO_B = workspaceIdForTest('goblin+file:///repo-b')
 const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
+const RUNTIME_USER_ID = 'settings-source-runtime-user'
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
@@ -152,6 +153,25 @@ test('quarantines corrupt settings JSON before rebuilding defaults', async () =>
   expect(readdirSync(tmp).some((name) => name.startsWith('user-settings.json.corrupt-'))).toBe(true)
 })
 
+test('rejects oversized workspace identities while decoding durable settings', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const oversizedEntry = { id: `goblin+file:///${'a'.repeat(4096)}` }
+  await writeFile(
+    path.join(tmp, 'user-settings.json'),
+    JSON.stringify({
+      workspace: { openWorkspaceEntries: [oversizedEntry] },
+      recentWorkspaces: [oversizedEntry],
+    }),
+    'utf-8',
+  )
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  expect((await mod.getServerWorkspaceState()).openWorkspaceEntries).toEqual([])
+  expect(await mod.getServerRecentWorkspaces()).toEqual([])
+})
+
 test('fails fast when the settings file cannot be read', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -199,6 +219,55 @@ test('stores the shared open repo order without applying the recent-workspace li
   expect((await mod.getServerWorkspaceState()).openWorkspaceEntries).toEqual(entries)
 })
 
+test('invalidates runtime epochs only inside a committed workspace removal transition', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const source = await import('#/server/modules/settings-source.ts')
+  const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+  runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  try {
+    const initialRuntimeId = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-initial')
+
+    await source.removeServerWorkspaceEntry(REPO_A)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, initialRuntimeId)).toBe(true)
+
+    await source.addServerWorkspaceEntry({ id: REPO_A })
+    await source.removeServerWorkspaceEntry(REPO_A)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, initialRuntimeId)).toBe(false)
+
+    await source.addServerWorkspaceEntry({ id: REPO_A })
+    const reopenedRuntimeId = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-reopened')
+    expect(reopenedRuntimeId).not.toBe(initialRuntimeId)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, reopenedRuntimeId)).toBe(true)
+  } finally {
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  }
+})
+
+test('preserves runtime epochs when durable workspace removal fails to persist', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const source = await import('#/server/modules/settings-source.ts')
+  const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+  runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  try {
+    await source.addServerWorkspaceEntry({ id: REPO_A })
+    const runtimeId = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-write-failure')
+    const settingsFile = path.join(tmp, 'user-settings.json')
+    rmSync(settingsFile)
+    await mkdir(settingsFile)
+
+    await expect(source.removeServerWorkspaceEntry(REPO_A)).rejects.toMatchObject({
+      name: 'SettingsPersistenceWriteError',
+    })
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, runtimeId)).toBe(true)
+  } finally {
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  }
+})
+
 test('repairs open repos only when the source membership is unchanged', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -209,16 +278,57 @@ test('repairs open repos only when the source membership is unchanged', async ()
   const repoC = { id: REPO_C }
   await mod.addServerWorkspaceEntry(repoA)
   await mod.addServerWorkspaceEntry(repoB)
+  const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+  runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  try {
+    const runtimeA = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-a')
+    const runtimeB = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_B, 'client-b')
+    runtimes.retainWorkspaceRuntimeResource(RUNTIME_USER_ID, REPO_B, runtimeB, 'terminal-b')
 
-  await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA, repoB], [repoA])).resolves.toMatchObject({
-    matched: true,
-    workspace: { openWorkspaceEntries: [repoA] },
-  })
-  await mod.addServerWorkspaceEntry(repoC)
-  await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA], [])).resolves.toMatchObject({
-    matched: false,
-    latestWorkspace: { openWorkspaceEntries: [repoA, repoC] },
-  })
+    await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA, repoB], [repoA])).resolves.toMatchObject({
+      matched: true,
+      workspace: { openWorkspaceEntries: [repoA] },
+    })
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, runtimeA)).toBe(true)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_B, runtimeB)).toBe(false)
+
+    await mod.addServerWorkspaceEntry(repoC)
+    const runtimeC = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_C, 'client-c')
+    await expect(mod.compareAndReplaceServerWorkspaceEntries([repoA], [])).resolves.toMatchObject({
+      matched: false,
+      latestWorkspace: { openWorkspaceEntries: [repoA, repoC] },
+    })
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, runtimeA)).toBe(true)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_C, runtimeC)).toBe(true)
+  } finally {
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  }
+})
+
+test('does not invalidate runtimes when durable workspace membership is only reordered', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const source = await import('#/server/modules/settings-source.ts')
+  const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+  const repoA = { id: REPO_A }
+  const repoB = { id: REPO_B }
+  await source.addServerWorkspaceEntry(repoA)
+  await source.addServerWorkspaceEntry(repoB)
+  runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  try {
+    const runtimeA = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-a')
+    const runtimeB = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_B, 'client-b')
+
+    await expect(source.compareAndReplaceServerWorkspaceEntries([repoA, repoB], [repoB, repoA])).resolves.toMatchObject({
+      matched: true,
+      workspace: { openWorkspaceEntries: [repoB, repoA] },
+    })
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, runtimeA)).toBe(true)
+    expect(runtimes.isCurrentWorkspaceRuntime(RUNTIME_USER_ID, REPO_B, runtimeB)).toBe(true)
+  } finally {
+    runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+  }
 })
 
 test('confirms one canonical workspace repo entry without writing settings', async () => {

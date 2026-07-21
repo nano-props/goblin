@@ -13,7 +13,7 @@ import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
@@ -24,8 +24,7 @@ const REPO_REQUEST_TIMEOUT_MS = {
   patch: 15 * 60_000,
 } as const
 
-const BACKGROUND_SYNC_REVISION_STORAGE_KEY = 'goblin:background-sync-registration-revision'
-let fallbackBackgroundSyncRevision = 0
+let backgroundSyncRegistrationRevision = 0
 
 async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   try {
@@ -263,7 +262,7 @@ export async function setBackgroundSyncRepos(targets: GitBackgroundSyncTarget[],
   await postServerJson(
     '/api/repo/background-sync-repos',
     {
-      clientId: readOrCreateWebTerminalClientId(),
+      clientId: readClientPageId(),
       revision: nextBackgroundSyncRegistrationRevision(),
       targets,
     },
@@ -272,15 +271,6 @@ export async function setBackgroundSyncRepos(targets: GitBackgroundSyncTarget[],
 }
 
 function nextBackgroundSyncRegistrationRevision(): number {
-  const clockRevision = Date.now() * 1000
-  try {
-    const stored = Number(window.sessionStorage.getItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY))
-    const canIncrementStored = Number.isSafeInteger(stored) && stored > 0 && stored < Number.MAX_SAFE_INTEGER
-    const next = Math.max(canIncrementStored ? stored + 1 : 1, clockRevision)
-    window.sessionStorage.setItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY, String(next))
-    return next
-  } catch {
-    fallbackBackgroundSyncRevision = Math.max(fallbackBackgroundSyncRevision + 1, clockRevision)
-    return fallbackBackgroundSyncRevision
-  }
+  backgroundSyncRegistrationRevision += 1
+  return backgroundSyncRegistrationRevision
 }

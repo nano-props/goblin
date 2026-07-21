@@ -4,6 +4,7 @@ import {
   attachTerminalClient,
   claimTerminalClientControl,
   effectiveTerminalController,
+  expireTerminalClient,
   explainAuthority,
   isAuthoritative,
   registerTerminalClient,
@@ -39,6 +40,24 @@ describe('registerTerminalClient', () => {
     registerTerminalClient(state, 'a2', 100, 30)
     expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24 })
     expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30 })
+  })
+})
+
+describe('expireTerminalClient', () => {
+  test('removes only the expired page attachment and its controller intent', () => {
+    const state = createState({
+      attachments: new Map([
+        ['expired', { cols: 80, rows: 24 }],
+        ['current', { cols: 100, rows: 30 }],
+      ]),
+      controllerClientId: 'expired',
+      userSticky: true,
+    })
+
+    expect(expireTerminalClient(state, 'expired')).toBe(true)
+    expect(state.attachments).toEqual(new Map([['current', { cols: 100, rows: 30 }]]))
+    expect(state.controllerClientId).toBeNull()
+    expect(state.userSticky).toBe(true)
   })
 })
 

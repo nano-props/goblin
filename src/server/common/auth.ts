@@ -18,7 +18,7 @@ import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/
  *
  * On success the middleware stashes an `userId` derived from the
  * token on the Hono context so downstream handlers can partition
- * in-memory state by token identity (rather than by per-tab
+ * in-memory state by token identity (rather than by per-page
  * `clientId`). See `identity.ts` for the full model.
  */
 export function createAccessTokenMiddleware(token: string): MiddlewareHandler {
