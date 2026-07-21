@@ -143,6 +143,7 @@ describe('client effect intent handlers', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+      lastFetchAt: null,
       loadedAt: 123,
     })
     const d = deps(REPO_ID)

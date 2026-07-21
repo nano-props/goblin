@@ -188,6 +188,7 @@ export function listRepoServerOperations(options: ListRepoServerOperationsOption
 export function getRepoOperationsSnapshot(options: ListRepoServerOperationsOptions = {}): RepoOperationsSnapshot {
   return {
     operations: listRepoServerOperations(options),
+    lastFetchAt: null,
     loadedAt: Date.now(),
   }
 }

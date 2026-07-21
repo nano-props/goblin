@@ -35,7 +35,6 @@ describe('repo projection read-model effects', () => {
       },
       pullRequests: null,
       requested: { branch, pullRequestMode: mode },
-      lastFetchAt: null,
       loadedAt,
     }
   }

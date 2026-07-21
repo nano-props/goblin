@@ -48,6 +48,7 @@ describe('RepoActivityControl component', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
+      lastFetchAt: null,
       loadedAt: 123,
     })
 
@@ -61,6 +62,7 @@ describe('RepoActivityControl component', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
+      lastFetchAt: null,
       loadedAt: 123,
     })
 
@@ -81,6 +83,7 @@ describe('RepoActivityControl component', () => {
           branch: 'feature/a',
         }),
       ],
+      lastFetchAt: null,
       loadedAt: 123,
     })
 
@@ -131,22 +134,11 @@ describe('RepoActivityControl component', () => {
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    if (repo.capability.kind !== 'git') throw new Error('Expected Git repo fixture')
-    const capability = repo.capability
-    const dataLoads = { ...capability.git.dataLoads, fetch: { ...capability.git.dataLoads.fetch, loadedAt } }
-    useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: {
-          ...repo,
-          dataLoads,
-          capability: {
-            ...capability,
-            git: { ...capability.git, dataLoads, lastFetchAt: loadedAt },
-          },
-        },
-      },
-    }))
+    setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
+      operations: [],
+      lastFetchAt: loadedAt,
+      loadedAt,
+    })
 
     const { container } = renderControl()
 
@@ -181,7 +173,11 @@ function renderControl() {
 
 function seedRepoForControl(input: Parameters<typeof seedRepoWithReadModelForTest>[0]) {
   const repo = seedRepoWithReadModelForTest(input)
-  setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, { operations: [], loadedAt: 0 })
+  setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
+    operations: [],
+    lastFetchAt: null,
+    loadedAt: 0,
+  })
   return repo
 }
 

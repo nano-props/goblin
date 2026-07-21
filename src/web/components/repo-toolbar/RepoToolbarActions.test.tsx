@@ -66,6 +66,7 @@ describe('RepoToolbarActions', () => {
     const repo = seedRepoShellForTest({ id: REPO_ID })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+      lastFetchAt: null,
       loadedAt: 123,
     })
 

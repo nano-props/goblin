@@ -42,7 +42,6 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
 export function emptyGitWorkspaceProjection(): GitWorkspaceProjection {
   return {
     dataLoads: emptyWorkspaceDataLoadBundle(),
-    lastFetchAt: null,
     operations: emptyWorkspaceOperations(),
     ui: { branchViewMode: 'all' },
     projection: { source: 'fresh', savedAt: null },

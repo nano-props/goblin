@@ -664,7 +664,6 @@ function restoredRuntimeForWorkspace(
           },
           pullRequests: null,
           requested: { branch: null, pullRequestMode: 'full' as const },
-          lastFetchAt: null,
           loadedAt: 1,
         },
       }

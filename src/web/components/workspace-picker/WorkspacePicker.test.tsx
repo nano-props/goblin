@@ -38,7 +38,10 @@ describe('WorkspacePicker', () => {
   test('keeps the current workspace button as the only workspace chrome inside the current workspace group', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -51,7 +54,9 @@ describe('WorkspacePicker', () => {
 
     const currentWorkspaceGroup = document.body.querySelector('[data-current-workspace-group]')
     expect(currentWorkspaceGroup).not.toBeNull()
-    expect(currentWorkspaceGroup?.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')).not.toBeNull()
+    expect(
+      currentWorkspaceGroup?.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]'),
+    ).not.toBeNull()
     // The "All repositories" chevron button is gone — the tab is the
     // single popover trigger now.
     expect(currentWorkspaceGroup?.querySelector('button[aria-label="More"]')).toBeNull()
@@ -61,7 +66,10 @@ describe('WorkspacePicker', () => {
   test('exposes the current workspace button as a selected tab in a horizontal tablist', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -86,7 +94,10 @@ describe('WorkspacePicker', () => {
   test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('Repo-A', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -100,7 +111,9 @@ describe('WorkspacePicker', () => {
 
     expect(document.body.querySelector('[data-current-workspace-group]')).toBeNull()
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector(
+      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
+    )
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
     expect(currentWorkspaceButton.getAttribute('role')).toBeNull()
     expect(currentWorkspaceButton.getAttribute('aria-selected')).toBeNull()
@@ -118,7 +131,10 @@ describe('WorkspacePicker', () => {
   test('opens the workspace menu popover from the sidebar surface', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -176,7 +192,10 @@ describe('WorkspacePicker', () => {
   test('opens the workspace menu popover when the current workspace tab is clicked', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -272,7 +291,10 @@ describe('WorkspacePicker', () => {
   test('keeps current workspace chrome borderless with hover and shows two-line rows with path in the popover', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        workspaces={[
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+        ]}
         currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
@@ -283,7 +305,9 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector(
+      '[data-current-workspace-id="goblin+file:///tmp/workspace-a"]',
+    )
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     const currentWorkspaceChrome = currentWorkspaceButton.closest('[data-current-workspace-chrome]')
@@ -423,7 +447,7 @@ function workspace(name: string, id: string, overrides: Partial<WorkspacePickerI
     id: workspaceIdForTest(id),
     name,
     gitCapability: 'available',
-    git: { remoteDetails: [], lastSyncedAt: null },
+    git: { remoteDetails: [] },
     lifecycle: null,
     ...overrides,
   }

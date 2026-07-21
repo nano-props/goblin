@@ -35,7 +35,6 @@ export function getRepoProjectionPlaceholderData(
     snapshot: cached.snapshot,
     pullRequests: null,
     requested: { branch: requestedBranch, pullRequestMode: requestedMode },
-    lastFetchAt: null,
     loadedAt: 0,
   }
 }

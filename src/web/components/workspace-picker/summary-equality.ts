@@ -61,7 +61,6 @@ export function workspacePickerItemsEqual(a: WorkspacePickerItem[], b: Workspace
     if (!lifecycleEqual(x.lifecycle, y.lifecycle)) return false
     if ((x.git === null) !== (y.git === null)) return false
     if (!x.git || !y.git) continue
-    if (x.git.lastSyncedAt !== y.git.lastSyncedAt) return false
     if (x.git.remoteDetails === y.git.remoteDetails) continue
     if (!x.git.remoteDetails || !y.git.remoteDetails) return false
     if (x.git.remoteDetails.length !== y.git.remoteDetails.length) return false

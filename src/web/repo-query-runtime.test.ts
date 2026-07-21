@@ -90,7 +90,6 @@ describe('repo projection query data', () => {
         },
       ],
       requested: { branch: null, pullRequestMode: 'full' },
-      lastFetchAt: null,
       loadedAt: 123,
     }
 
@@ -100,7 +99,6 @@ describe('repo projection query data', () => {
       snapshot: cachedProjection.snapshot,
       pullRequests: null,
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      lastFetchAt: null,
       loadedAt: 0,
     })
   })
@@ -111,14 +109,12 @@ describe('repo projection query data', () => {
       snapshot: { branches: [], current: 'feature/other' },
       pullRequests: null,
       requested: { branch: 'feature/other', pullRequestMode: 'summary' },
-      lastFetchAt: null,
       loadedAt: 101,
     }
     const repoProjection: GitWorkspaceRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' },
-      lastFetchAt: null,
       loadedAt: 202,
     }
 
@@ -130,7 +126,6 @@ describe('repo projection query data', () => {
     ).toMatchObject({
       snapshot: repoProjection.snapshot,
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      lastFetchAt: null,
       loadedAt: 0,
     })
   })
@@ -153,7 +148,6 @@ describe('repo projection query data', () => {
       snapshot,
       pullRequests,
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      lastFetchAt: null,
       loadedAt: 123,
     }
 
@@ -171,7 +165,6 @@ describe('repo projection query data', () => {
       snapshot: { branches: [], current: 'main' },
       pullRequests: null,
       requested: { branch: 'feature/a', pullRequestMode: 'summary' },
-      lastFetchAt: null,
       loadedAt: 123,
     }
 
@@ -1031,11 +1024,10 @@ function repoProjectionForTest(
     snapshot: { branches: [], current: 'main' },
     pullRequests: null,
     requested: { branch, pullRequestMode: mode },
-    lastFetchAt: null,
     loadedAt,
   }
 }
 
 function repoOperationsForTest(loadedAt: number): RepoOperationsSnapshot {
-  return { operations: [], loadedAt }
+  return { operations: [], lastFetchAt: null, loadedAt }
 }

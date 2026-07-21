@@ -31,7 +31,7 @@ interface Props {
 const COMPLETION_VISIBLE_MS = 1500
 
 type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
-  Pick<GitWorkspaceProjection, 'dataLoads' | 'lastFetchAt' | 'projection' | 'remote'> &
+  Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
   RepoActivityProjectionRepo
 
 function useRepoActivityControlPresentation(
@@ -73,7 +73,6 @@ export function RepoActivityControl({ repoId }: Props) {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
             dataLoads: repo.capability.git.dataLoads,
-            lastFetchAt: repo.capability.git.lastFetchAt,
             branchAction: repo.capability.git.operations.branchAction,
             projection: repo.capability.git.projection,
             remote: repo.capability.git.remote,
@@ -104,7 +103,11 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
     case 'refresh-button':
       return (
         <div className="flex items-center gap-2">
-          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} />
+          <RepoRefreshButton
+            repo={repo}
+            manualSyncBusy={view.manualSyncBusy}
+            lastFetchAt={operationsReadModel.data?.lastFetchAt ?? null}
+          />
           <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />
         </div>
@@ -152,7 +155,15 @@ function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControlRepo; manualSyncBusy: boolean }) {
+function RepoRefreshButton({
+  repo,
+  manualSyncBusy,
+  lastFetchAt,
+}: {
+  repo: RepoActivityControlRepo
+  manualSyncBusy: boolean
+  lastFetchAt: number | null
+}) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
@@ -167,7 +178,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     presentWorkspaceRefreshOutcome(outcome, t)
   }
 
-  const lastSyncedAt = latestRepoSyncTime(repo)
+  const lastSyncedAt = latestRepoSyncTime({ lastFetchAt })
   const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
   const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang) : null
 

@@ -100,7 +100,6 @@ export type WorkspaceAdmissionState =
 /** Git-only client state, owned exclusively by the Git capability. */
 export interface GitWorkspaceProjection {
   dataLoads: RepoDataLoadBundle
-  lastFetchAt: number | null
   operations: RepoOperationsState
   ui: { branchViewMode: BranchViewMode }
   projection: RepoProjectionMeta

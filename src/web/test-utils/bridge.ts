@@ -1020,7 +1020,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             status?: unknown
             pullRequests?: unknown
             requested?: unknown
-            lastFetchAt?: unknown
             loadedAt?: unknown
           }
           return {
@@ -1033,7 +1032,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
                     branch,
                     pullRequestMode: mode,
                   },
-            lastFetchAt: typeof projection.lastFetchAt === 'number' ? projection.lastFetchAt : null,
             loadedAt: typeof projection.loadedAt === 'number' ? projection.loadedAt : Date.now(),
           }
         }
@@ -1395,7 +1393,6 @@ export function seedRepoReadModelQueryData(
       branch: null,
       pullRequestMode: 'full',
     },
-    lastFetchAt: null,
     loadedAt: 0,
   }
   setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', projection)

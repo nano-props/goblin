@@ -278,7 +278,6 @@ export async function readRepoProjection(
       branch,
       pullRequestMode: mode,
     },
-    lastFetchAt: getRepoLastFetchAt(cwd, options.workspaceRuntimeId),
     loadedAt: Date.now(),
   }
 }
@@ -315,6 +314,7 @@ export async function readRepoOperationsSnapshot(
   const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
   return {
     operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
+    lastFetchAt: cwd ? getRepoLastFetchAt(cwd, options.workspaceRuntimeId) : null,
     loadedAt: Date.now(),
   }
 }

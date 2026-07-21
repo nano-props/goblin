@@ -374,6 +374,7 @@ export interface RepoServerOperationState {
 
 export interface RepoOperationsSnapshot {
   operations: RepoServerOperationState[]
+  lastFetchAt: number | null
   loadedAt: number
 }
 
@@ -384,7 +385,6 @@ export interface GitWorkspaceRuntimeProjection {
     branch: string | null
     pullRequestMode: PullRequestFetchMode
   }
-  lastFetchAt: number | null
   loadedAt: number
 }
 
