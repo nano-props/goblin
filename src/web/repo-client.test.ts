@@ -240,7 +240,7 @@ describe('repo-client', () => {
 
     await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toMatchObject({
       message: 'error.failed-read-repo',
-      cause: expect.objectContaining({ message: 'Server request failed (BAD_REQUEST: error.failed-read-repo)' }),
+      cause: expect.objectContaining({ message: 'error.failed-read-repo', code: 'BAD_REQUEST', status: 400 }),
     })
   })
 

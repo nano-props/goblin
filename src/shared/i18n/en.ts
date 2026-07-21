@@ -518,6 +518,8 @@ export const en = {
   'error.workspace-close-failed': 'Failed to close workspace',
   'error.failed-read-repo': 'Failed to read repository',
   'error.ssh-config-changed': 'SSH config changed',
+  'error.repository-boundary-unavailable': 'Repository identity could not be confirmed',
+  'error.repository-target-changed': 'Repository target changed before the operation started',
   'error.git-not-found': 'Git not found',
   'error.path-not-found': 'Path not found',
   'error.path-not-directory': 'Path is not a folder',

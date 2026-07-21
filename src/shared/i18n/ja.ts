@@ -514,6 +514,8 @@ export const ja: Record<DictKey, string> = {
   'error.workspace-close-failed': 'ワークスペースを閉じられませんでした',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
+  'error.repository-boundary-unavailable': 'リポジトリの識別情報を確認できませんでした',
+  'error.repository-target-changed': '操作開始前にリポジトリの対象が変更されました',
   'error.git-not-found': 'Git が見つかりません',
   'error.path-not-found': 'パスが見つかりません',
   'error.path-not-directory': 'フォルダではありません',

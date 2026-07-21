@@ -10,6 +10,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -160,6 +161,27 @@ describe('RepoActivityControl component', () => {
     // generic fetch title — not the "Last synced" line.
     expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-label')
     expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-unknown')
+  })
+
+  test('does not present cached sync state after canonical operations read fails', async () => {
+    const loadedAt = Date.now() - 5_000
+    const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    const queryKey = repoOperationsQueryKey(repo.id, repo.workspaceRuntimeId)
+    setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
+      lastFetchAt: loadedAt,
+      loadedAt,
+    })
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('Missing operations query')
+    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
+
+    const { container } = renderControl()
+
+    expect(button(container).disabled).toBe(false)
+    const tooltip = await openTooltip(button(container))
+    expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-unknown')
+    expect(tooltip.textContent).not.toMatch(/5\s+seconds?/)
   })
 })
 

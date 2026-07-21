@@ -25,6 +25,7 @@ import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/worksp
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-client-intent-handlers-repo')
@@ -151,6 +152,24 @@ describe('client effect intent handlers', () => {
     await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
     expect(d.openCreateWorktree).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
+  test('create-worktree-requested does not project retained operations after a canonical read error', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+      lastFetchAt: null,
+      loadedAt: 123,
+    })
+    const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('Missing operations query')
+    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
+    const d = deps(REPO_ID)
+
+    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
+    expect(d.openCreateWorktree).toHaveBeenCalledOnce()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })
 

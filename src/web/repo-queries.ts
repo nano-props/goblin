@@ -8,6 +8,7 @@ import {
   repoRemoteBranchesQueryOptions,
   repoWorktreeStatusReadModelQueryOptions,
 } from '#/web/repo-query-options.ts'
+import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 
 export function useRepoProjectionReadModel(
   repoRoot: WorkspaceId | null,
@@ -49,5 +50,6 @@ export function useRepoOperationsReadModel(
   workspaceRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
-  return useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
+  const query = useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
+  return { ...query, data: projectRepoOperationsQueryData(query) }
 }

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { realpath } from 'node:fs/promises'
 import { omit } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
@@ -29,13 +30,18 @@ export async function getRepoRoot(cwd: string, options?: { signal?: AbortSignal 
   }
 }
 
-export async function getRepoCommonDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
-  try {
-    const commonDir = await git(cwd, ['rev-parse', '--git-common-dir'], { signal: options?.signal })
-    return path.isAbsolute(commonDir) ? path.normalize(commonDir) : path.resolve(cwd, commonDir)
-  } catch {
-    return ''
-  }
+export async function resolveRepoCommonDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  const commonDir = await git(cwd, ['rev-parse', '--git-common-dir'], { signal: options?.signal })
+  if (!commonDir) throw new Error('Git returned an empty common directory')
+  const absoluteCommonDir = path.isAbsolute(commonDir) ? path.normalize(commonDir) : path.resolve(cwd, commonDir)
+  return path.normalize(await realpath(absoluteCommonDir))
+}
+
+export async function resolveRepoObjectsDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  const objectsDir = await git(cwd, ['rev-parse', '--git-path', 'objects'], { signal: options?.signal })
+  if (!objectsDir) throw new Error('Git returned an empty objects directory')
+  const absoluteObjectsDir = path.isAbsolute(objectsDir) ? path.normalize(objectsDir) : path.resolve(cwd, objectsDir)
+  return path.normalize(await realpath(absoluteObjectsDir))
 }
 
 export async function getRepoName(cwd: string): Promise<string> {

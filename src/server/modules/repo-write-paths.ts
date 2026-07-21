@@ -3,7 +3,6 @@ import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { recordRepoFetchSuccess } from '#/server/modules/repo-sync-state.ts'
 import {
   beginRepoServerOperation,
   requestRepoServerOperationCancel,
@@ -11,10 +10,11 @@ import {
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
 import {
-  resolveRepoSource,
-  runWithCapturedRepoSource,
+  captureRepoWriteExecutionFromPhysicalWorktree,
   runWithRepoSource,
   type RepoMutationResult,
+  type RepoSource,
+  type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
@@ -138,7 +138,7 @@ async function runUserNetworkMutation(
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
   target: { branch?: string; worktreePath?: string } | null,
-  task: (signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
+  task: (source: RepoSource, signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoMutationResult> {
   return publishSnapshotInvalidationForMutation(
@@ -155,7 +155,10 @@ async function runUserNetworkMutation(
         canCancelUnderlying: true,
       },
       (_operation, context) => async () =>
-        await context.runNetworkOperation(async (networkSignal) => await task(networkSignal)),
+        await context.runWithRepoSource(
+          async (source) =>
+            await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
+        ),
     ),
   )
 }
@@ -187,7 +190,8 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
   kind: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   signal?: AbortSignal
-  task: () => Promise<T>
+  captureExecution?: (signal?: AbortSignal) => Promise<RepoWriteExecutionCapability>
+  task: (context: RepoWriteOperationContext) => Promise<T>
 }): Promise<T> {
   return await enqueueRepoWriteOperation(
     options.repoId,
@@ -199,8 +203,9 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       source: 'user',
       target: options.target,
       canCancelUnderlying: !!options.signal,
+      captureExecution: options.captureExecution,
     },
-    (operation) => {
+    (operation, context) => {
       const onAbort = () => {
         operation.requestCancel('caller-abort')
       }
@@ -214,7 +219,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
           return result
         }
         try {
-          const result = await options.task()
+          const result = await options.task(context)
           operation.settle(result)
           return result
         } catch (err) {
@@ -293,7 +298,6 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    if (result.ok) recordRepoFetchSuccess(cwd, workspaceRuntimeId)
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
   return await enqueueRepoWriteOperation(
@@ -307,11 +311,7 @@ export async function fetchRepo(
       canCancelUnderlying: true,
     },
     (_operation, context) => async () =>
-      await runWithRepoSource(
-        cwd,
-        async (source) => await runFetch((signal) => source.fetch(signal), context),
-        workspaceRuntimeId ? { workspaceRuntimeId } : undefined,
-      ),
+      await context.runWithRepoSource(async (source) => await runFetch((signal) => source.fetch(signal), context)),
   )
 }
 
@@ -322,17 +322,13 @@ export async function pullRepoBranch(
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoFilesystemMutationOutcome> {
-  const source = await resolveRepoSource(
-    cwd,
-    options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-  )
   return filesystemMutationOutcome(
     await runUserNetworkMutation(
       cwd,
       signal,
       'pull',
       { branch, worktreePath },
-      async (mergedSignal) => {
+      async (source, mergedSignal) => {
         return await source.pull(branch, worktreePath, mergedSignal)
       },
       options,
@@ -346,17 +342,13 @@ export async function pushRepoBranch(
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const source = await resolveRepoSource(
-    cwd,
-    options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-  )
   return execResultOnly(
     await runUserNetworkMutation(
       cwd,
       signal,
       'push',
       { branch },
-      async (mergedSignal) => {
+      async (source, mergedSignal) => {
         return await source.push(branch, mergedSignal)
       },
       options,
@@ -384,22 +376,14 @@ export async function createRepoWorktree(
     kind: 'create-worktree',
     target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
     signal,
-    task: async () => {
-      return await runWithRepoSource(
-        cwd,
-        async (source) => {
-          const result = await source.createWorktree(normalized, signal, {
-            worktreeBootstrap,
-          })
-          const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(
-            repoId,
-            worktreeBootstrap,
-            result,
-          )
-          return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
-        },
-        options?.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-      )
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
+        const result = await source.createWorktree(normalized, signal, {
+          worktreeBootstrap,
+        })
+        const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
+        return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
+      })
     },
   })
 }
@@ -454,31 +438,12 @@ export async function deleteRepoBranch(
     kind: 'delete-branch',
     target: { branch },
     signal,
-    task: async () => {
-      return await runWithRepoSource(
-        cwd,
-        async (source) => {
-          return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
-        },
-        runtime?.workspaceRuntimeId ? { workspaceRuntimeId: runtime.workspaceRuntimeId } : undefined,
-      )
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
+        return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
+      })
     },
   })
-}
-
-export async function removeRepoWorktree(
-  cwd: WorkspaceId,
-  input: {
-    branch: string
-    worktreePath: string
-    deleteBranch: boolean
-    forceDeleteBranch?: boolean
-    deleteUpstream?: boolean
-  },
-  lifecycle: RepoWorktreeRemovalLifecycle,
-  signal?: AbortSignal,
-): Promise<ExecResult> {
-  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, null)
 }
 
 export async function removeCapturedRepoWorktree(
@@ -509,7 +474,7 @@ async function removeRepoWorktreeWithBinding(
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal: AbortSignal | undefined,
-  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
   return await runRepoServerWriteOperation({
@@ -518,22 +483,15 @@ async function removeRepoWorktreeWithBinding(
     kind: 'remove-worktree',
     target: { branch: input.branch, worktreePath: input.worktreePath },
     signal,
-    task: async () => {
-      const runWithSource = physicalWorktreeCapability
-        ? async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) =>
-            await runWithCapturedRepoSource(
-              cwd,
-              physicalWorktreeCapability,
-              task,
-              options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-            )
-        : async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) =>
-            await runWithRepoSource(
-              cwd,
-              task,
-              options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-            )
-      return await runWithSource(async (source) => {
+    captureExecution: async (captureSignal) =>
+      await captureRepoWriteExecutionFromPhysicalWorktree(
+        cwd,
+        physicalWorktreeCapability,
+        options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
+        captureSignal,
+      ),
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
         const mutation = await source.removeWorktree(input, signal, lifecycle)
         const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
         if (!mutation.ok && !mutation.repositoryStateChanged) return result

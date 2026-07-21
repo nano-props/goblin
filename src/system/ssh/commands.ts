@@ -66,6 +66,7 @@ export type RemoteCommandKind =
   | { type: 'gitDirectoryChildren'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
+  | { type: 'resolveRepoExecutionIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitWorkspacePaneIdentities'; path: string }
   | { type: 'gitPatch'; path: string }
@@ -416,6 +417,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
       ].join('\n')
     case 'resolvePhysicalWorktreeIdentity':
       return remotePhysicalWorktreeIdentityScript(command.path)
+    case 'resolveRepoExecutionIdentity':
+      return remotePhysicalWorktreeIdentityScript(command.path, true)
     case 'gitSnapshot': {
       const repo = shellQuote(command.path)
       const branchFormat = [
@@ -706,7 +709,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
   return exhaustive
 }
 
-function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
+function remotePhysicalWorktreeIdentityScript(worktreePath: string, resolveGitCommonDir = false): string {
   return [
     'umask 077',
     'uid=$(id -u) || exit 1',
@@ -752,12 +755,33 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
     '  root_namespace_fact=$(printf "%s" "$root_namespace_fact" | tr -cd "A-Za-z0-9._:-" | head -c 128)',
     'fi',
     '[ -n "$root_namespace_fact" ] || exit 1',
-    `canonical=$(cd -- ${shellQuote(worktreePath)} && pwd -P) || exit 1`,
+    ...(resolveGitCommonDir
+      ? [
+          `common_dir=$(git -C ${shellQuote(worktreePath)} rev-parse --git-common-dir) || exit $?`,
+          `case "$common_dir" in (/*) ;; (*) common_dir=${shellQuote(worktreePath)}/$common_dir;; esac`,
+          'canonical=$(cd -- "$common_dir" && pwd -P) || exit 1',
+        ]
+      : [`canonical=$(cd -- ${shellQuote(worktreePath)} && pwd -P) || exit 1`]),
     'endpoint_stat=$(stat -c "%d %i" "$canonical" 2>/dev/null || stat -f "%d %i" "$canonical" 2>/dev/null) || exit 1',
     'set -- $endpoint_stat',
     '[ "$#" -eq 2 ] || exit 1',
     'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
-    'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
+    ...(resolveGitCommonDir
+      ? [
+          'common_dir_device=$1',
+          'common_dir_inode=$2',
+          `objects_dir=$(git -C ${shellQuote(worktreePath)} rev-parse --git-path objects) || exit $?`,
+          `case "$objects_dir" in (/*) ;; (*) objects_dir=${shellQuote(worktreePath)}/$objects_dir;; esac`,
+          'objects_canonical=$(cd -- "$objects_dir" && pwd -P) || exit 1',
+          'objects_stat=$(stat -c "%d %i" "$objects_canonical" 2>/dev/null || stat -f "%d %i" "$objects_canonical" 2>/dev/null) || exit 1',
+          'set -- $objects_stat',
+          '[ "$#" -eq 2 ] || exit 1',
+          'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
+          'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$common_dir_device" "$common_dir_inode" "$objects_canonical" "$1" "$2"',
+        ]
+      : [
+          'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
+        ]),
   ].join('\n')
 }
 

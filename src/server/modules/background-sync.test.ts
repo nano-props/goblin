@@ -286,6 +286,29 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo).toHaveBeenCalledTimes(3)
   })
 
+  test('backs off after repository boundary capture throws and keeps the scheduler healthy', async () => {
+    mocks.fetchRepo
+      .mockRejectedValueOnce(new Error('error.repository-boundary-unavailable'))
+      .mockResolvedValue({ ok: true, message: 'ok' })
+    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+
+    await registerRepos([REPO])
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([
+      expect.objectContaining({ repoId: REPO, failureCount: 1, backoffUntil: expect.any(Number) }),
+    ])
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([
+      expect.objectContaining({ repoId: REPO, failureCount: 0, backoffUntil: null }),
+    ])
+  })
+
   test('reports diagnostics for registered repos', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')

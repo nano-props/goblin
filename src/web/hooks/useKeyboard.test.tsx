@@ -36,6 +36,7 @@ import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/tes
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
@@ -499,6 +500,34 @@ describe('useKeyboard', () => {
 
     expect(openCreateWorktree).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
+  test('primary modifier plus n does not project retained operations after a canonical read error', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+    })
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+      lastFetchAt: null,
+      loadedAt: 123,
+    })
+    const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('Missing operations query')
+    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).toHaveBeenCalledOnce()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   test('does not run menu-backed primary shortcuts from the client in electron', async () => {

@@ -32,4 +32,25 @@ describe('remote physical worktree identity command', () => {
     expect(invocation.script).not.toContain('$HOME')
     expect(invocation.script).not.toContain('example.invalid')
   })
+
+  test('resolves repository execution identity from the canonical Git common directory', () => {
+    const invocation = buildRemoteCommandInvocation(target, {
+      type: 'resolveRepoExecutionIdentity',
+      path: '/srv/worktrees/feature',
+    })
+
+    expect(invocation.script).toContain('git -C')
+    expect(invocation.script).toContain('rev-parse --git-common-dir')
+    expect(invocation.script).toContain('cd -- "$common_dir" && pwd -P')
+    expect(invocation.script).toContain('stat -c "%d %i" "$canonical"')
+    expect(invocation.script).toContain('rev-parse --git-path objects')
+    expect(invocation.script).toContain('cd -- "$objects_dir" && pwd -P')
+    expect(invocation.script).toContain('stat -c "%d %i" "$objects_canonical"')
+    const identityOutput = invocation.script
+      .split('\n')
+      .find((line) => line.startsWith("printf '") && line.includes('"$objects_canonical"'))
+    expect(identityOutput).toBe(
+      'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$common_dir_device" "$common_dir_inode" "$objects_canonical" "$1" "$2"',
+    )
+  })
 })

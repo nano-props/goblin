@@ -506,6 +506,8 @@ export const ko: Record<DictKey, string> = {
   'error.workspace-close-failed': '작업 공간을 닫지 못했습니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
   'error.ssh-config-changed': 'SSH 설정이 변경됨',
+  'error.repository-boundary-unavailable': '저장소 ID를 확인할 수 없습니다',
+  'error.repository-target-changed': '작업 시작 전에 저장소 대상이 변경되었습니다',
   'error.git-not-found': 'Git을 찾을 수 없습니다',
   'error.path-not-found': '경로를 찾을 수 없습니다',
   'error.path-not-directory': '폴더가 아닙니다',
