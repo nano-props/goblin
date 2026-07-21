@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
-import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('workspacePickerItemsEqual', () => {
@@ -24,7 +22,7 @@ describe('workspacePickerItemsEqual', () => {
         id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         lifecycle: {
           kind: 'ready',
           target: {
@@ -44,7 +42,7 @@ describe('workspacePickerItemsEqual', () => {
         id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         lifecycle: {
           kind: 'ready',
           target: {
@@ -78,7 +76,7 @@ describe('workspacePickerItemsEqual', () => {
         id: target.id,
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -91,7 +89,7 @@ describe('workspacePickerItemsEqual', () => {
         id: target.id,
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -108,36 +106,13 @@ describe('workspacePickerItemsEqual', () => {
     expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
-  test('treats last sync time changes as unequal', () => {
-    const left: WorkspacePickerItem[] = [
-      {
-        id: workspaceIdForTest('goblin+file:///tmp/repo'),
-        name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: 1_000 },
-        lifecycle: null,
-      },
-    ]
-    const right: WorkspacePickerItem[] = [
-      {
-        id: workspaceIdForTest('goblin+file:///tmp/repo'),
-        name: 'repo',
-        gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: 2_000 },
-        lifecycle: null,
-      },
-    ]
-
-    expect(workspacePickerItemsEqual(left, right)).toBe(false)
-  })
-
   test('treats terminal bell count changes as unequal', () => {
     const left: WorkspacePickerItem[] = [
       {
         id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         terminalBellCount: 1,
         lifecycle: null,
       },
@@ -147,29 +122,12 @@ describe('workspacePickerItemsEqual', () => {
         id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
-        git: { remoteDetails: [], lastSyncedAt: null },
+        git: { remoteDetails: [] },
         terminalBellCount: 2,
         lifecycle: null,
       },
     ]
 
     expect(workspacePickerItemsEqual(left, right)).toBe(false)
-  })
-
-  test('does not treat warm cache read-model time as a sync time', () => {
-    const git = emptyGitWorkspaceProjection()
-    git.projection = { source: 'cache', savedAt: 2_000 }
-    git.dataLoads.repoReadModel.loadedAt = 2_000
-
-    expect(latestRepoSyncTime(git)).toBeNull()
-  })
-
-  test('uses fresh read-model and fetch data-load times as sync candidates', () => {
-    const git = emptyGitWorkspaceProjection()
-    git.projection = { source: 'fresh', savedAt: null }
-    git.dataLoads.repoReadModel.loadedAt = 2_000
-    git.dataLoads.fetch.loadedAt = 3_000
-
-    expect(latestRepoSyncTime(git)).toBe(3_000)
   })
 })

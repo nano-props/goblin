@@ -103,7 +103,11 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
     case 'refresh-button':
       return (
         <div className="flex items-center gap-2">
-          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} />
+          <RepoRefreshButton
+            repo={repo}
+            manualSyncBusy={view.manualSyncBusy}
+            lastFetchAt={operationsReadModel.data?.lastFetchAt ?? null}
+          />
           <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />
         </div>
@@ -151,7 +155,15 @@ function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControlRepo; manualSyncBusy: boolean }) {
+function RepoRefreshButton({
+  repo,
+  manualSyncBusy,
+  lastFetchAt,
+}: {
+  repo: RepoActivityControlRepo
+  manualSyncBusy: boolean
+  lastFetchAt: number | null
+}) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
@@ -166,8 +178,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     presentWorkspaceRefreshOutcome(outcome, t)
   }
 
-  const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
-  const lastSyncedAt = latestRepoSyncTime(repo)
+  const lastSyncedAt = latestRepoSyncTime({ lastFetchAt })
   const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
   const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang) : null
 
@@ -179,7 +190,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   // rest of the repo chrome tooltips.
   const tooltipLabel = lastSyncedLabel
     ? `${t('workspace-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
-    : t(fetchTooltipKey)
+    : `${t('workspace-picker.tooltip.last-sync-label')} ${t('workspace-picker.tooltip.last-sync-unknown')}`
 
   return (
     <Tip label={tooltipLabel}>

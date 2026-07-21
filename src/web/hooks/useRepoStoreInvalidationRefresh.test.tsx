@@ -83,7 +83,14 @@ describe('useRepoStoreInvalidationRefresh', () => {
       },
       { cancelRefetch: false },
     )
-    expect(invalidateSpy).toHaveBeenCalledTimes(1)
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledTimes(2)
     invalidateSpy.mockRestore()
   })
 
@@ -129,6 +136,14 @@ describe('useRepoStoreInvalidationRefresh', () => {
       },
       { cancelRefetch: false },
     )
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledTimes(2)
     invalidateSpy.mockRestore()
   })
 })

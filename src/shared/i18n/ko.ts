@@ -163,6 +163,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.open-remote-path-no-matches': '일치하는 경로가 없습니다',
   'workspace-picker.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
   'workspace-picker.tooltip.last-sync-label': '마지막 동기화',
+  'workspace-picker.tooltip.last-sync-unknown': '알 수 없음',
   'workspace-picker.connecting-title': 'SSH에 연결 중…',
   'workspace-unavailable.title': '워크스페이스를 사용할 수 없음',
   'workspace-unavailable.body':

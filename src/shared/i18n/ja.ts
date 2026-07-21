@@ -170,6 +170,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-remote-path-no-matches': '一致するパスがありません',
   'workspace-picker.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'workspace-picker.tooltip.last-sync-label': '最終同期',
+  'workspace-picker.tooltip.last-sync-unknown': '不明',
   'workspace-picker.connecting-title': 'SSH に接続中…',
   'workspace-unavailable.title': 'ワークスペースを利用できません',
   'workspace-unavailable.body':

@@ -12,7 +12,6 @@ import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/componen
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { workspacePickerStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useMemo } from 'react'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { toast } from 'sonner'
@@ -62,7 +61,6 @@ export function WorkspacePickerHost({
             git: git
               ? {
                   remoteDetails: git.remote.remoteDetails,
-                  lastSyncedAt: latestRepoSyncTime(git),
                 }
               : null,
             lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,

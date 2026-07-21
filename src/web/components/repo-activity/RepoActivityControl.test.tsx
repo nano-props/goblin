@@ -38,6 +38,7 @@ describe('RepoActivityControl', () => {
           canCancelUnderlying: true,
         },
       ],
+      lastFetchAt: null,
       loadedAt: 123,
     }
 

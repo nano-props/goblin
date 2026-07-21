@@ -73,7 +73,7 @@ describe('repo activity model', () => {
 })
 
 function operationsSnapshot(operations: RepoServerOperationState[]): RepoOperationsSnapshot {
-  return { operations, loadedAt: 123 }
+  return { operations, lastFetchAt: null, loadedAt: 123 }
 }
 
 function activityRepo(repo: WorkspaceState): RepoActivityProjectionRepo {

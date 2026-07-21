@@ -82,7 +82,5 @@ export function replaceWorkspaceState(
   mutator: WorkspaceMutator,
 ): WorkspacesPatch {
   const nextWorkspace = replaceWorkspace(workspace, mutator)
-  return nextWorkspace === workspace
-    ? state
-    : { workspaces: { ...state.workspaces, [workspace.id]: nextWorkspace } }
+  return nextWorkspace === workspace ? state : { workspaces: { ...state.workspaces, [workspace.id]: nextWorkspace } }
 }

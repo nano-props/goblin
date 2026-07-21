@@ -160,7 +160,7 @@ describe('server background sync scheduler', () => {
 
     const now = Date.now()
     const repoA = getBackgroundSyncDiagnostics(now).repos.find((repo) => repo.repoId === REPO_A)
-    expect(repoA?.lastFetchAt).not.toBeNull()
+    expect(repoA?.lastFetchStartedAt).not.toBeNull()
     expect(repoA?.nextEligibleAt).toBeGreaterThan(now)
     const remainingUntilDue = (repoA?.nextEligibleAt ?? now) - now
 
@@ -300,7 +300,7 @@ describe('server background sync scheduler', () => {
       repos: [
         {
           repoId: REPO_A,
-          lastFetchAt: expect.any(Number),
+          lastFetchStartedAt: expect.any(Number),
           failureCount: 0,
           backoffUntil: null,
           nextEligibleAt: expect.any(Number),

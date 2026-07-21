@@ -174,6 +174,7 @@ describe('useBranchActionDialogDisplay', () => {
       currentBranchName: 'feature/query',
     })
     setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
+      lastFetchAt: null,
       loadedAt: 123,
       operations: [
         serverOperation({

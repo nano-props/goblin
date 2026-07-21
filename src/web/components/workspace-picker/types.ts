@@ -8,8 +8,6 @@ export interface WorkspacePickerItem {
   gitCapability: 'unknown' | 'available' | 'unavailable'
   git: {
     remoteDetails: GitRemoteInfo[] | undefined
-    /** Last time this client refreshed Git data after a sync/invalidation. */
-    lastSyncedAt: number | null
   } | null
   /** Unread terminal bell count across this workspace's terminal sessions. */
   terminalBellCount?: number

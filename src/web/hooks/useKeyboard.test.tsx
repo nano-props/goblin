@@ -486,6 +486,7 @@ describe('useKeyboard', () => {
     })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+      lastFetchAt: null,
       loadedAt: 123,
     })
     const openCreateWorktree = vi.fn()

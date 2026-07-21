@@ -3,6 +3,7 @@ import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { recordRepoFetchSuccess } from '#/server/modules/repo-sync-state.ts'
 import {
   beginRepoServerOperation,
   requestRepoServerOperationCancel,
@@ -110,7 +111,10 @@ async function publishSnapshotInvalidationAfterMutation(
   return execResultOnly(publishSnapshotInvalidationForMutation(workspaceId, result))
 }
 
-function publishSnapshotInvalidationForMutation(workspaceId: WorkspaceId, result: RepoMutationResult): RepoMutationResult {
+function publishSnapshotInvalidationForMutation(
+  workspaceId: WorkspaceId,
+  result: RepoMutationResult,
+): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
   if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
     publishRepoSnapshotInvalidations(workspaceId, affectedRepoIds)
@@ -289,6 +293,7 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
+    if (result.ok) recordRepoFetchSuccess(cwd, workspaceRuntimeId)
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
   return await enqueueRepoWriteOperation(

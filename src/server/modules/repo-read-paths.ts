@@ -5,6 +5,7 @@ import {
 } from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
+import { getRepoLastFetchAt } from '#/server/modules/repo-sync-state.ts'
 import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -313,6 +314,7 @@ export async function readRepoOperationsSnapshot(
   const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
   return {
     operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
+    lastFetchAt: cwd ? getRepoLastFetchAt(cwd, options.workspaceRuntimeId) : null,
     loadedAt: Date.now(),
   }
 }

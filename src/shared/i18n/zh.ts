@@ -158,6 +158,7 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.open-remote-path-no-matches': '没有匹配的路径',
   'workspace-picker.open-remote-home-unavailable': '无法解析远程主目录',
   'workspace-picker.tooltip.last-sync-label': '上次同步',
+  'workspace-picker.tooltip.last-sync-unknown': '未知',
   'workspace-picker.connecting-title': '正在连接 SSH…',
   'workspace-unavailable.title': '工作区不可用',
   'workspace-unavailable.body': 'Goblin 无法读取这个工作区。请恢复文件夹及其访问权限后重试。',

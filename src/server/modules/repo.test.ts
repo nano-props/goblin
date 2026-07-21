@@ -179,6 +179,8 @@ beforeEach(async () => {
     await import('#/server/modules/repo-write-operation-coordinator.ts')
   resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
+  const { resetRepoSyncStateForTests } = await import('#/server/modules/repo-sync-state.ts')
+  resetRepoSyncStateForTests()
   vi.clearAllMocks()
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
   mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
@@ -448,6 +450,21 @@ describe('fetchRepo invalidation publishing', () => {
       repoId: REPO_ID,
       query: 'repo-snapshot',
     })
+  })
+
+  test('records only successful fetches for the workspace runtime', async () => {
+    const runtimeId = 'repo-runtime-sync-time'
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { getRepoLastFetchAt } = await import('#/server/modules/repo-sync-state.ts')
+
+    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toBeNull()
+    await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
+    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toEqual(expect.any(Number))
+
+    mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
+    await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
+    expect(getRepoLastFetchAt(REPO_ID, runtimeId)).toEqual(expect.any(Number))
   })
 
   test('publishes sibling worktree snapshot invalidations after a successful sync', async () => {

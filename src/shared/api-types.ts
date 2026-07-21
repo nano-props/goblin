@@ -374,6 +374,7 @@ export interface RepoServerOperationState {
 
 export interface RepoOperationsSnapshot {
   operations: RepoServerOperationState[]
+  lastFetchAt: number | null
   loadedAt: number
 }
 

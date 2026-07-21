@@ -5,10 +5,7 @@ import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import {
-  onWorkspaceRuntimeClosed,
-  onWorkspaceRuntimeMembershipReleased,
-} from '#/server/modules/workspace-runtimes.ts'
+import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
 
 interface RegisteredGitBackgroundSyncTarget extends GitBackgroundSyncTarget {
   userId: string
@@ -36,7 +33,7 @@ interface BackgroundSyncState {
   targetsByOwner: Map<string, RegisteredGitBackgroundSyncTarget[]>
   registrationAdmissionsByOwner: Map<string, ActiveBackgroundSyncRegistrationAdmission>
   latestRegistrationRevisionByOwner: Map<string, number>
-  lastFetchAtByTarget: Record<string, number | null>
+  lastFetchStartedAtByTarget: Record<string, number | null>
   failureCountByTarget: Record<string, number>
   backoffUntilByTarget: Record<string, number | null>
   intervalMs: number
@@ -59,7 +56,7 @@ export interface BackgroundSyncDiagnostics {
   queueSize: number
   repos: Array<{
     repoId: WorkspaceId
-    lastFetchAt: number | null
+    lastFetchStartedAt: number | null
     failureCount: number
     backoffUntil: number | null
     nextEligibleAt: number | null
@@ -71,7 +68,7 @@ const state: BackgroundSyncState = {
   targetsByOwner: new Map(),
   registrationAdmissionsByOwner: new Map(),
   latestRegistrationRevisionByOwner: new Map(),
-  lastFetchAtByTarget: {},
+  lastFetchStartedAtByTarget: {},
   failureCountByTarget: {},
   backoffUntilByTarget: {},
   intervalMs: 0,
@@ -153,8 +150,9 @@ function findNextDueTarget(now: number): RegisteredGitBackgroundSyncTarget | nul
     const target = state.targets[index]
     if (!target) continue
     const key = backgroundSyncTargetKey(target)
-    const lastFetchAt = state.lastFetchAtByTarget[key]
-    const nextIntervalAt = lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
+    const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
+    const nextIntervalAt =
+      lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
     const backoffUntil = state.backoffUntilByTarget[key] ?? null
     const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
     if (now >= nextEligibleAt) {
@@ -169,8 +167,9 @@ function hasDueRepo(now: number): boolean {
   if (state.targets.length === 0 || state.intervalMs <= 0) return false
   for (const target of state.targets) {
     const key = backgroundSyncTargetKey(target)
-    const lastFetchAt = state.lastFetchAtByTarget[key]
-    const nextIntervalAt = lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
+    const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
+    const nextIntervalAt =
+      lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
     const backoffUntil = state.backoffUntilByTarget[key] ?? null
     const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
     if (now >= nextEligibleAt) return true
@@ -184,8 +183,8 @@ function clearTargetBackoff(target: RegisteredGitBackgroundSyncTarget): void {
   delete state.backoffUntilByTarget[key]
 }
 
-function recordTargetFetchAttempt(target: RegisteredGitBackgroundSyncTarget, at: number): void {
-  state.lastFetchAtByTarget[backgroundSyncTargetKey(target)] = at
+function recordTargetFetchStartedAt(target: RegisteredGitBackgroundSyncTarget, at: number): void {
+  state.lastFetchStartedAtByTarget[backgroundSyncTargetKey(target)] = at
 }
 
 function computeBackoffDelayMs(failureCount: number): number {
@@ -207,8 +206,9 @@ function recordTargetFailure(target: RegisteredGitBackgroundSyncTarget, now: num
 function nextEligibleAt(target: RegisteredGitBackgroundSyncTarget, now: number = Date.now()): number | null {
   if (state.intervalMs <= 0) return null
   const key = backgroundSyncTargetKey(target)
-  const lastFetchAt = state.lastFetchAtByTarget[key]
-  const nextIntervalAt = lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
+  const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
+  const nextIntervalAt =
+    lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
   const backoffUntil = state.backoffUntilByTarget[key] ?? null
   return Math.max(nextIntervalAt, backoffUntil ?? 0)
 }
@@ -273,7 +273,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
       )
     }
     if (activeFetch.ctrl.signal.aborted) return
-    recordTargetFetchAttempt(target, now)
+    recordTargetFetchStartedAt(target, now)
     if (result.ok) {
       clearTargetBackoff(target)
       return
@@ -294,7 +294,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
   } catch (err) {
     if (activeFetch?.ctrl.signal.aborted) return
     if (target) {
-      recordTargetFetchAttempt(target, now)
+      recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)
     }
     const key = target ? backgroundSyncTargetKey(target) : null
@@ -371,7 +371,7 @@ function applyBackgroundSyncTargets(nextTargets: RegisteredGitBackgroundSyncTarg
   }
   for (const target of nextTargets) {
     const key = backgroundSyncTargetKey(target)
-    if (state.lastFetchAtByTarget[key] === undefined) state.lastFetchAtByTarget[key] = null
+    if (state.lastFetchStartedAtByTarget[key] === undefined) state.lastFetchStartedAtByTarget[key] = null
   }
   state.targets = nextTargets
   if (state.nextTargetIndex >= state.targets.length) state.nextTargetIndex = 0
@@ -388,7 +388,7 @@ export function stopBackgroundSync(): void {
   }
   state.registrationAdmissionsByOwner.clear()
   state.latestRegistrationRevisionByOwner.clear()
-  state.lastFetchAtByTarget = {}
+  state.lastFetchStartedAtByTarget = {}
   state.failureCountByTarget = {}
   state.backoffUntilByTarget = {}
   state.intervalMs = 0
@@ -426,7 +426,7 @@ export function getBackgroundSyncDiagnostics(now: number = Date.now()): Backgrou
       const key = backgroundSyncTargetKey(target)
       return {
         repoId: target.workspaceId,
-        lastFetchAt: state.lastFetchAtByTarget[key] ?? null,
+        lastFetchStartedAt: state.lastFetchStartedAtByTarget[key] ?? null,
         failureCount: state.failureCountByTarget[key] ?? 0,
         backoffUntil: state.backoffUntilByTarget[key] ?? null,
         nextEligibleAt: nextEligibleAt(target, now),
@@ -494,7 +494,7 @@ function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, w
   const closedTarget = { userId, workspaceId, workspaceRuntimeId }
   const key = backgroundSyncTargetKey(closedTarget)
   const wasRegistered = state.targets.some((target) => backgroundSyncTargetKey(target) === key)
-  const hadCadence = state.lastFetchAtByTarget[key] !== undefined
+  const hadCadence = state.lastFetchStartedAtByTarget[key] !== undefined
   if (!wasRegistered && !hadCadence) return
   if (wasRegistered) {
     for (const [ownerKey, targets] of state.targetsByOwner) {
@@ -509,7 +509,7 @@ function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, w
 
 function clearTargetState(target: RegisteredGitBackgroundSyncTarget): void {
   const key = backgroundSyncTargetKey(target)
-  delete state.lastFetchAtByTarget[key]
+  delete state.lastFetchStartedAtByTarget[key]
   delete state.failureCountByTarget[key]
   delete state.backoffUntilByTarget[key]
 }

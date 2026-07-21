@@ -1029,5 +1029,5 @@ function repoProjectionForTest(
 }
 
 function repoOperationsForTest(loadedAt: number): RepoOperationsSnapshot {
-  return { operations: [], loadedAt }
+  return { operations: [], lastFetchAt: null, loadedAt }
 }
