@@ -10,6 +10,7 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 
 vi.mock('#/web/remote-workspace-client.ts', () => ({
@@ -148,7 +149,7 @@ describe('useDirectoryPathSuggestions', () => {
   })
 
   test('clears loading while a new query is waiting out debounce', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let resolveFetch: ((value: string[]) => void) | null = null
     mockedFetch.mockImplementation(
       () =>
@@ -171,54 +172,44 @@ describe('useDirectoryPathSuggestions', () => {
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/" />)
 
-    try {
-      await act(async () => {
-        vi.advanceTimersByTime(400)
-        await Promise.resolve()
-      })
+    await act(async () => await advanceTimersAndFlush(400))
 
-      expect(snapshots.at(-1)).toEqual({
-        suggestions: [],
-        isLoading: true,
-        hasFetched: false,
-      })
+    expect(snapshots.at(-1)).toEqual({
+      suggestions: [],
+      isLoading: true,
+      hasFetched: false,
+    })
 
-      rerender(<Host prefix="/srv/r" />)
+    rerender(<Host prefix="/srv/r" />)
 
-      expect(snapshots.at(-1)).toEqual({
-        suggestions: [],
-        isLoading: false,
-        hasFetched: false,
-      })
+    expect(snapshots.at(-1)).toEqual({
+      suggestions: [],
+      isLoading: false,
+      hasFetched: false,
+    })
 
-      await act(async () => {
-        vi.advanceTimersByTime(400)
-        await Promise.resolve()
-      })
+    await act(async () => await advanceTimersAndFlush(400))
 
-      expect(snapshots.at(-1)).toEqual({
-        suggestions: [],
-        isLoading: true,
-        hasFetched: false,
-      })
+    expect(snapshots.at(-1)).toEqual({
+      suggestions: [],
+      isLoading: true,
+      hasFetched: false,
+    })
 
-      await act(async () => {
-        resolveFetch?.(['/srv/result'])
-        await Promise.resolve()
-      })
+    await act(async () => {
+      resolveFetch?.(['/srv/result'])
+      await Promise.resolve()
+    })
 
-      expect(snapshots.at(-1)).toEqual({
-        suggestions: ['/srv/result'],
-        isLoading: false,
-        hasFetched: true,
-      })
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(snapshots.at(-1)).toEqual({
+      suggestions: ['/srv/result'],
+      isLoading: false,
+      hasFetched: true,
+    })
   })
 
   test('uses the local source and hides stale rows synchronously when identity changes', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     mockedLocalFetch.mockResolvedValueOnce(['/srv/alpha']).mockResolvedValueOnce(['/srv/beta'])
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
@@ -229,27 +220,19 @@ describe('useDirectoryPathSuggestions', () => {
     }
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/a" />)
-    try {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(350)
-      })
-      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/alpha'])
-      expect(mockedLocalFetch).toHaveBeenCalledWith('/srv/a', expect.any(AbortSignal))
+    await act(async () => await advanceTimersAndFlush(350))
+    expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/alpha'])
+    expect(mockedLocalFetch).toHaveBeenCalledWith('/srv/a', expect.any(AbortSignal))
 
-      rerender(<Host prefix="/srv/b" />)
-      expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
+    rerender(<Host prefix="/srv/b" />)
+    expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(350)
-      })
-      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/beta'])
-    } finally {
-      vi.useRealTimers()
-    }
+    await act(async () => await advanceTimersAndFlush(350))
+    expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/beta'])
   })
 
   test('aborts an alias query and ignores its late completion after identity changes', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const first = Promise.withResolvers<string[]>()
     const second = Promise.withResolvers<string[]>()
     mockedFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
@@ -262,30 +245,26 @@ describe('useDirectoryPathSuggestions', () => {
     }
 
     const { rerender } = renderInJsdom(<Host alias="first" />)
-    try {
-      await act(async () => await vi.advanceTimersByTimeAsync(350))
-      const firstSignal = mockedFetch.mock.calls[0]?.[1]
-      expect(firstSignal?.aborted).toBe(false)
+    await act(async () => await advanceTimersAndFlush(350))
+    const firstSignal = mockedFetch.mock.calls[0]?.[1]
+    expect(firstSignal?.aborted).toBe(false)
 
-      rerender(<Host alias="second" />)
-      expect(firstSignal?.aborted).toBe(true)
-      expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
-      await act(async () => await vi.advanceTimersByTimeAsync(350))
+    rerender(<Host alias="second" />)
+    expect(firstSignal?.aborted).toBe(true)
+    expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
+    await act(async () => await advanceTimersAndFlush(350))
 
-      await act(async () => {
-        second.resolve(['/srv/current'])
-        await Promise.resolve()
-      })
-      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
+    await act(async () => {
+      second.resolve(['/srv/current'])
+      await Promise.resolve()
+    })
+    expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
 
-      await act(async () => {
-        first.resolve(['/srv/stale'])
-        await Promise.resolve()
-      })
-      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
-    } finally {
-      vi.useRealTimers()
-    }
+    await act(async () => {
+      first.resolve(['/srv/stale'])
+      await Promise.resolve()
+    })
+    expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
   })
 
   test('distinguishes a successful empty result from a rejected request', async () => {
@@ -310,7 +289,7 @@ interface RenderInput {
 }
 
 async function renderHookAndWaitForFetch(input: RenderInput) {
-  vi.useFakeTimers()
+  useFakeTimers()
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
   function Host() {
     captured = useDirectoryPathSuggestions({
@@ -323,16 +302,12 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
   renderInJsdom(<Host />)
   // The hook debounces by 350ms before firing; advance past that and
   // let the queued microtasks settle so the state update lands.
-  try {
-    await act(async () => await vi.advanceTimersByTimeAsync(350))
-    return captured
-  } finally {
-    vi.useRealTimers()
-  }
+  await act(async () => await advanceTimersAndFlush(350))
+  return captured
 }
 
 async function renderHookLifecycle(input: RenderInput) {
-  vi.useFakeTimers()
+  useFakeTimers()
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
   function Host() {
     const state = useDirectoryPathSuggestions({
@@ -344,10 +319,6 @@ async function renderHookLifecycle(input: RenderInput) {
     return null
   }
   renderInJsdom(<Host />)
-  try {
-    await act(async () => await vi.advanceTimersByTimeAsync(350))
-    return snapshots
-  } finally {
-    vi.useRealTimers()
-  }
+  await act(async () => await advanceTimersAndFlush(350))
+  return snapshots
 }

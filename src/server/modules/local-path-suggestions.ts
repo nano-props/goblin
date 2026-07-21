@@ -64,7 +64,9 @@ async function isDirectoryEntry(
   signal?: AbortSignal,
 ): Promise<boolean> {
   if (entry.isDirectory()) return true
-  if (!entry.isSymbolicLink()) return false
+  const knownNonDirectory =
+    entry.isFile() || entry.isBlockDevice() || entry.isCharacterDevice() || entry.isFIFO() || entry.isSocket()
+  if (!entry.isSymbolicLink() && knownNonDirectory) return false
   throwIfAborted(signal)
   try {
     const implementation = plan.platform === 'win32' ? path.win32 : path.posix

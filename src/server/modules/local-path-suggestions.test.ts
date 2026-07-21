@@ -13,19 +13,28 @@ afterEach(async () => {
 })
 
 describe('getLocalPathSuggestions', () => {
-  test('returns only matching directories and directory symlinks in deterministic order', async () => {
+  test('returns only matching directories in deterministic order', async () => {
     const root = await temporaryDirectory()
     await mkdir(path.join(root, 'alpha'))
     await mkdir(path.join(root, 'alpine'))
     await mkdir(path.join(root, 'beta'))
     await writeFile(path.join(root, 'almanac.txt'), '')
+
+    await expect(getLocalPathSuggestions(path.join(root, 'al'))).resolves.toEqual([
+      path.join(root, 'alpha'),
+      path.join(root, 'alpine'),
+    ])
+  })
+
+  test.runIf(process.platform !== 'win32')('includes directory symlinks and omits broken symlinks', async () => {
+    const root = await temporaryDirectory()
+    await mkdir(path.join(root, 'alpha'))
     await symlink(path.join(root, 'alpha'), path.join(root, 'alias'))
     await symlink(path.join(root, 'missing'), path.join(root, 'also-broken'))
 
     await expect(getLocalPathSuggestions(path.join(root, 'al'))).resolves.toEqual([
       path.join(root, 'alias'),
       path.join(root, 'alpha'),
-      path.join(root, 'alpine'),
     ])
   })
 

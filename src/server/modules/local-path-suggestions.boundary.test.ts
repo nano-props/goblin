@@ -52,6 +52,16 @@ describe('getLocalPathSuggestions filesystem boundary', () => {
     expect(directory.close).toHaveBeenCalledOnce()
   })
 
+  test('stats an entry whose filesystem does not expose a directory type', async () => {
+    const directory = fakeDirectory([unknownEntry('unknown-directory')])
+    mocks.opendir.mockResolvedValueOnce(directory)
+    mocks.stat.mockResolvedValueOnce({ isDirectory: () => true })
+
+    await expect(suggest('/root/u')).resolves.toEqual(['/root/unknown-directory'])
+    expect(mocks.stat).toHaveBeenCalledWith('/root/unknown-directory')
+    expect(directory.close).toHaveBeenCalledOnce()
+  })
+
   test('maps an overlong native path to no results', async () => {
     mocks.opendir.mockRejectedValueOnce(filesystemError('ENAMETOOLONG'))
     await expect(suggest(`/root/${'a'.repeat(4000)}`)).resolves.toEqual([])
@@ -82,7 +92,11 @@ function symlinkEntry(name: string): Dirent {
   return directoryEntry(name, 'symlink')
 }
 
-function directoryEntry(name: string, kind: 'file' | 'symlink'): Dirent {
+function unknownEntry(name: string): Dirent {
+  return directoryEntry(name, 'unknown')
+}
+
+function directoryEntry(name: string, kind: 'file' | 'symlink' | 'unknown'): Dirent {
   return {
     name,
     parentPath: '/root',
