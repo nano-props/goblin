@@ -768,6 +768,7 @@ describe('projection refresh request ordering', () => {
         snapshot: { branches: [branch('main')], current: 'main' },
         pullRequests: null,
         requested: { branch: null, pullRequestMode: 'full' },
+        lastFetchAt: null,
         loadedAt: 123,
       }
     }
@@ -788,6 +789,7 @@ describe('projection refresh request ordering', () => {
       snapshot,
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' as const },
+      lastFetchAt: null,
       loadedAt: 123,
     }
     ipcHandlers['repo.projection'] = async () => projection
@@ -813,6 +815,7 @@ describe('projection refresh request ordering', () => {
         snapshot: { branches: [branch('stale')], current: 'stale' },
         pullRequests: null,
         requested: { branch: null, pullRequestMode: 'full' },
+        lastFetchAt: null,
         loadedAt: 123,
       }
     }

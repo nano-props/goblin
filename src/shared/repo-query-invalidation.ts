@@ -9,6 +9,7 @@ export interface RepoQueryInvalidationEvent {
   type: 'repo-query-invalidated'
   repoId: WorkspaceId
   query: RepoQueryKind
+  lastFetchAt?: number
 }
 
 export function isRepoQueryInvalidationEvent(value: unknown): value is RepoQueryInvalidationEvent {

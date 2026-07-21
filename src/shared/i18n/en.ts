@@ -173,6 +173,7 @@ export const en = {
   'workspace-picker.open-remote-path-no-matches': 'No matching paths',
   'workspace-picker.open-remote-home-unavailable': 'Could not resolve the remote home directory',
   'workspace-picker.tooltip.last-sync-label': 'Last synced',
+  'workspace-picker.tooltip.last-sync-unknown': 'unknown',
   'workspace-picker.connecting-title': 'Connecting to SSH…',
   'workspace-unavailable.title': 'Workspace unavailable',
   'workspace-unavailable.body': 'Goblin cannot read this workspace. Restore the folder and its access, then retry.',

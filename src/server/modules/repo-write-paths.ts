@@ -3,6 +3,7 @@ import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { getRepoLastFetchAt, recordRepoFetchSuccess } from '#/server/modules/repo-sync-state.ts'
 import {
   beginRepoServerOperation,
   requestRepoServerOperationCancel,
@@ -95,33 +96,46 @@ function isValidCloneDirectoryName(value: unknown): value is string {
   )
 }
 
-function repoSnapshotInvalidationEvent(workspaceId: WorkspaceId) {
-  return { repoId: workspaceId, query: 'repo-snapshot' as const }
+function repoSnapshotInvalidationEvent(workspaceId: WorkspaceId, lastFetchAt?: number) {
+  return {
+    repoId: workspaceId,
+    query: 'repo-snapshot' as const,
+    ...(lastFetchAt === undefined ? {} : { lastFetchAt }),
+  }
 }
 
-function publishRepoSnapshotInvalidation(workspaceId: WorkspaceId): void {
-  publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(workspaceId))
+function publishRepoSnapshotInvalidation(workspaceId: WorkspaceId, lastFetchAt?: number): void {
+  publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(workspaceId, lastFetchAt))
 }
 
 async function publishSnapshotInvalidationAfterMutation(
   workspaceId: WorkspaceId,
   result: RepoMutationResult,
+  lastFetchAt?: number,
 ): Promise<ExecResult> {
-  return execResultOnly(publishSnapshotInvalidationForMutation(workspaceId, result))
+  return execResultOnly(publishSnapshotInvalidationForMutation(workspaceId, result, lastFetchAt))
 }
 
-function publishSnapshotInvalidationForMutation(workspaceId: WorkspaceId, result: RepoMutationResult): RepoMutationResult {
+function publishSnapshotInvalidationForMutation(
+  workspaceId: WorkspaceId,
+  result: RepoMutationResult,
+  lastFetchAt?: number,
+): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
   if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
-    publishRepoSnapshotInvalidations(workspaceId, affectedRepoIds)
+    publishRepoSnapshotInvalidations(workspaceId, affectedRepoIds, lastFetchAt)
   }
   return result
 }
 
-function publishRepoSnapshotInvalidations(workspaceId: WorkspaceId, affectedRepoIds: readonly WorkspaceId[]): void {
+function publishRepoSnapshotInvalidations(
+  workspaceId: WorkspaceId,
+  affectedRepoIds: readonly WorkspaceId[],
+  lastFetchAt?: number,
+): void {
   const uniqueRepoIds = Array.from(new Set([workspaceId, ...affectedRepoIds]))
   for (const repoId of uniqueRepoIds) {
-    publishRepoSnapshotInvalidation(repoId)
+    publishRepoSnapshotInvalidation(repoId, lastFetchAt)
   }
 }
 
@@ -289,7 +303,12 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    return await publishSnapshotInvalidationAfterMutation(cwd, result)
+    if (result.ok) recordRepoFetchSuccess(cwd, workspaceRuntimeId)
+    return await publishSnapshotInvalidationAfterMutation(
+      cwd,
+      result,
+      result.ok ? (getRepoLastFetchAt(cwd, workspaceRuntimeId) ?? undefined) : undefined,
+    )
   }
   return await enqueueRepoWriteOperation(
     cwd,

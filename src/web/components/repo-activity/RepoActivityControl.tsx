@@ -31,7 +31,7 @@ interface Props {
 const COMPLETION_VISIBLE_MS = 1500
 
 type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
-  Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
+  Pick<GitWorkspaceProjection, 'dataLoads' | 'lastFetchAt' | 'projection' | 'remote'> &
   RepoActivityProjectionRepo
 
 function useRepoActivityControlPresentation(
@@ -73,6 +73,7 @@ export function RepoActivityControl({ repoId }: Props) {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
             dataLoads: repo.capability.git.dataLoads,
+            lastFetchAt: repo.capability.git.lastFetchAt,
             branchAction: repo.capability.git.operations.branchAction,
             projection: repo.capability.git.projection,
             remote: repo.capability.git.remote,
@@ -166,7 +167,6 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     presentWorkspaceRefreshOutcome(outcome, t)
   }
 
-  const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
   const lastSyncedAt = latestRepoSyncTime(repo)
   const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
   const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang) : null
@@ -179,7 +179,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   // rest of the repo chrome tooltips.
   const tooltipLabel = lastSyncedLabel
     ? `${t('workspace-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
-    : t(fetchTooltipKey)
+    : `${t('workspace-picker.tooltip.last-sync-label')} ${t('workspace-picker.tooltip.last-sync-unknown')}`
 
   return (
     <Tip label={tooltipLabel}>

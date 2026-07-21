@@ -89,6 +89,7 @@ describe('restoreServerWorkspace', () => {
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' },
+      lastFetchAt: null,
       loadedAt: 1,
     })
     mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(
@@ -449,6 +450,7 @@ describe('restoreServerWorkspace', () => {
         snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
         pullRequests: null,
         requested: { branch: null, pullRequestMode: 'full' },
+        lastFetchAt: null,
         loadedAt: 1,
       }
     })

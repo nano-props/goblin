@@ -42,6 +42,7 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
 export function emptyGitWorkspaceProjection(): GitWorkspaceProjection {
   return {
     dataLoads: emptyWorkspaceDataLoadBundle(),
+    lastFetchAt: null,
     operations: emptyWorkspaceOperations(),
     ui: { branchViewMode: 'all' },
     projection: { source: 'fresh', savedAt: null },
@@ -82,7 +83,5 @@ export function replaceWorkspaceState(
   mutator: WorkspaceMutator,
 ): WorkspacesPatch {
   const nextWorkspace = replaceWorkspace(workspace, mutator)
-  return nextWorkspace === workspace
-    ? state
-    : { workspaces: { ...state.workspaces, [workspace.id]: nextWorkspace } }
+  return nextWorkspace === workspace ? state : { workspaces: { ...state.workspaces, [workspace.id]: nextWorkspace } }
 }

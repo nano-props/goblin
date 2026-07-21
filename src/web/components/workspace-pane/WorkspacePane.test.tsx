@@ -1914,6 +1914,7 @@ describe('WorkspacePane', () => {
       snapshot: { current: 'feature/pr', branches: [branch] },
       pullRequests: [{ branch: 'feature/pr', pullRequest }],
       requested: { branch: 'feature/pr', pullRequestMode: 'full' },
+      lastFetchAt: null,
       loadedAt: 123,
     })
 

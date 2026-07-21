@@ -156,7 +156,7 @@ describe('workspacePickerItemsEqual', () => {
     expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
-  test('does not treat warm cache read-model time as a sync time', () => {
+  test('shows unknown when no successful fetch time exists', () => {
     const git = emptyGitWorkspaceProjection()
     git.projection = { source: 'cache', savedAt: 2_000 }
     git.dataLoads.repoReadModel.loadedAt = 2_000
@@ -164,12 +164,13 @@ describe('workspacePickerItemsEqual', () => {
     expect(latestRepoSyncTime(git)).toBeNull()
   })
 
-  test('uses fresh read-model and fetch data-load times as sync candidates', () => {
+  test('uses the server-owned successful fetch time', () => {
     const git = emptyGitWorkspaceProjection()
     git.projection = { source: 'fresh', savedAt: null }
     git.dataLoads.repoReadModel.loadedAt = 2_000
     git.dataLoads.fetch.loadedAt = 3_000
+    git.lastFetchAt = 4_000
 
-    expect(latestRepoSyncTime(git)).toBe(3_000)
+    expect(latestRepoSyncTime(git)).toBe(4_000)
   })
 })

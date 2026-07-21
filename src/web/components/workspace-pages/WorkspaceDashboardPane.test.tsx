@@ -127,6 +127,7 @@ describe('WorkspaceDashboardPane', () => {
       snapshot: { current: 'main', branches: [createRepoBranch('main')] },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'summary' },
+      lastFetchAt: null,
       loadedAt: 123,
     })
     const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
@@ -158,6 +159,7 @@ describe('WorkspaceDashboardPane', () => {
       snapshot: { current: 'main', branches: [mainBranch] },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'summary' },
+      lastFetchAt: null,
       loadedAt: 123,
     })
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(async () => {
@@ -225,6 +227,7 @@ describe('WorkspaceDashboardPane', () => {
         },
       ],
       requested: { branch: null, pullRequestMode: 'summary' },
+      lastFetchAt: null,
       loadedAt: 123,
     })
 

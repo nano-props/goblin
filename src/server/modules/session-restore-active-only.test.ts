@@ -98,6 +98,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: workspaceId } }] },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' },
+      lastFetchAt: null,
       loadedAt: 1,
     }))
     mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(

@@ -133,23 +133,16 @@ describe('RepoActivityControl component', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     if (repo.capability.kind !== 'git') throw new Error('Expected Git repo fixture')
     const capability = repo.capability
-    const dataLoads = {
-      ...capability.git.dataLoads,
-      fetch: { ...capability.git.dataLoads.fetch, loadedAt },
-    }
+    const dataLoads = { ...capability.git.dataLoads, fetch: { ...capability.git.dataLoads.fetch, loadedAt } }
     useWorkspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: {
           ...repo,
-          // Use the fetch data load since `latestRepoSyncTime` reads
-          // `dataLoads.fetch.loadedAt` directly; setting the read model
-          // requires `projection.source === 'fresh'` which would also
-          // work but couples this test to a second code path.
           dataLoads,
           capability: {
             ...capability,
-            git: { ...capability.git, dataLoads },
+            git: { ...capability.git, dataLoads, lastFetchAt: loadedAt },
           },
         },
       },
@@ -165,7 +158,7 @@ describe('RepoActivityControl component', () => {
     expect(tooltip.textContent).toMatch(/5\s+seconds?/)
   })
 
-  test('falls back to the fetch action title in the refresh button tooltip before the first sync', async () => {
+  test('shows an unknown sync time before the first successful sync', async () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
 
     const { container } = renderControl()
@@ -173,8 +166,8 @@ describe('RepoActivityControl component', () => {
     const tooltip = await openTooltip(button(container))
     // No sync time has been recorded, so the tooltip shows the
     // generic fetch title — not the "Last synced" line.
-    expect(tooltip.textContent).toContain('action.fetch-title')
-    expect(tooltip.textContent).not.toContain('workspace-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-unknown')
   })
 })
 

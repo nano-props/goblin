@@ -113,6 +113,8 @@ export function acceptRepoProjectionReadModel(
   }
 
   updateIfFresh(set, repoRoot, workspaceRuntimeId, (repo) => {
+    if (!isGitWorkspace(repo)) return
+    gitWorkspaceProjection(repo).lastFetchAt = projection.lastFetchAt
     applyRepoSnapshotShellState(repo, projection.snapshot!, projection.loadedAt)
   })
 

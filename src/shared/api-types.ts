@@ -384,6 +384,7 @@ export interface GitWorkspaceRuntimeProjection {
     branch: string | null
     pullRequestMode: PullRequestFetchMode
   }
+  lastFetchAt: number | null
   loadedAt: number
 }
 

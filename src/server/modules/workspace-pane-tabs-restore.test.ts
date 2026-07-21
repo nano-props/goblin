@@ -34,6 +34,7 @@ describe('workspace pane layout restore admission', () => {
         snapshot: null,
         pullRequests: null,
         requested: { branch: null, pullRequestMode: 'full' as const },
+        lastFetchAt: null,
         loadedAt: 1,
       },
     } satisfies RestoredWorkspaceRuntime
