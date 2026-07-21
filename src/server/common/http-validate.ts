@@ -15,7 +15,7 @@ import { errorJson } from '#/server/common/responses.ts'
 export function parseHttpInput<T>(schema: v.GenericSchema<unknown, T>, input: unknown): T {
   const parsed = v.safeParse(schema, input)
   if (!parsed.success) throw new IpcError({ code: 'BAD_REQUEST', message: formatHttpValidationError(parsed.issues) })
-  return parsed.output as T
+  return parsed.output
 }
 
 /**

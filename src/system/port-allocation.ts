@@ -1,4 +1,5 @@
 import { createServer } from 'node:net'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export async function findAvailablePort(
   host: string,
@@ -34,7 +35,7 @@ export async function reserveAvailablePort(
   try {
     return await findAvailablePort(host, preferredPort, errorMessage)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException | null)?.code !== 'EADDRINUSE') throw error
+    if (!hasErrorCode(error, 'EADDRINUSE')) throw error
     return await findAvailablePort(host, 0, errorMessage)
   }
 }

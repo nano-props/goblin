@@ -1,3 +1,5 @@
+import { isStringIn } from '#/shared/string-literals.ts'
+
 export const SETTINGS_PAGES = [
   'general',
   'shortcuts',
@@ -13,7 +15,7 @@ export const SETTINGS_PAGES = [
 export type SettingsPage = (typeof SETTINGS_PAGES)[number]
 
 export function isSettingsPage(value: string | null | undefined): value is SettingsPage {
-  return value !== undefined && value !== null && SETTINGS_PAGES.includes(value as SettingsPage)
+  return isStringIn(SETTINGS_PAGES, value)
 }
 
 export const SETTINGS_PAGE_CONFIG = {

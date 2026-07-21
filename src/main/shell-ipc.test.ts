@@ -10,7 +10,7 @@ import {
 
 const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendClientEffectIntent, activatePrimaryWindow } =
   vi.hoisted(() => ({
-    ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
+    ipcHandlers: new Map<string, (_event: unknown, input: unknown) => unknown>(),
     browserWindowFromWebContents: vi.fn(),
     showOpenDialog: vi.fn(),
     sendClientEffectIntent: vi.fn(),
@@ -19,7 +19,7 @@ const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendClientEff
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn((channel: string, handler: (_event: unknown, input: any) => unknown) => {
+    handle: vi.fn((channel: string, handler: (_event: unknown, input: unknown) => unknown) => {
       ipcHandlers.set(channel, handler)
     }),
   },
@@ -40,12 +40,12 @@ const trustedSender = { id: 1, once: vi.fn() }
 const trustedEvent = {
   sender: trustedSender,
   senderFrame: { url: 'http://127.0.0.1:5173/' },
-} as any
+}
 
 describe('shell IPC', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents(trustedSender as any)
+    registerTrustedWebContents(trustedSender)
     wireShellIpc()
   })
 
@@ -61,7 +61,7 @@ describe('shell IPC', () => {
   })
 
   test('parents directory dialogs to the sender window', async () => {
-    const senderWindow = {} as any
+    const senderWindow = {}
     browserWindowFromWebContents.mockReturnValue(senderWindow)
     showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/repo'] })
 
@@ -76,7 +76,7 @@ describe('shell IPC', () => {
   })
 
   test('opens settings through an effect intent on the activated primary window', async () => {
-    const primaryWindow = {} as any
+    const primaryWindow = {}
     activatePrimaryWindow.mockResolvedValue(primaryWindow)
 
     const result = await invoke(HOST_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
@@ -89,10 +89,14 @@ describe('shell IPC', () => {
   })
 
   test('rejects untrusted shell IPC senders', async () => {
-    const result = await invokeWithEvent(HOST_OPEN_DIRECTORY_DIALOG_CHANNEL, { title: 'Open Git Repository' }, {
-      sender: { id: 99, once: vi.fn() },
-      senderFrame: { url: 'https://example.com/' },
-    } as any)
+    const result = await invokeWithEvent(
+      HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,
+      { title: 'Open Git Repository' },
+      {
+        sender: { id: 99, once: vi.fn() },
+        senderFrame: { url: 'https://example.com/' },
+      },
+    )
 
     expect(result).toBeNull()
     expect(showOpenDialog).not.toHaveBeenCalled()

@@ -1,32 +1,21 @@
 import type { AppRealtimeResponseMessage } from '#/shared/app-realtime-socket.ts'
 import {
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
-  type WorkspacePaneRuntimeSocketAction,
   type WorkspacePaneRuntimeSocketRequestInputs,
   type WorkspacePaneRuntimeSocketResponseOutputs,
 } from '#/shared/workspace-pane-runtime.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
+import { invokeRealtimeRpcHandler, type RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
+import type { RealtimeRpcRequestMessage } from '#/shared/realtime-rpc.ts'
 
-type MaybePromise<T> = T | Promise<T>
+export type WorkspacePaneRuntimeRealtimeRequestMessage =
+  RealtimeRpcRequestMessage<WorkspacePaneRuntimeSocketRequestInputs>
 
-export type WorkspacePaneRuntimeRealtimeRequestMessage = {
-  [TAction in WorkspacePaneRuntimeSocketAction]: {
-    type: 'request'
-    requestId: string
-    action: TAction
-    input: WorkspacePaneRuntimeSocketRequestInputs[TAction]
-  }
-}[WorkspacePaneRuntimeSocketAction]
-
-export function createWorkspacePaneRuntimeRealtimeHandlers(host: ServerWorkspacePaneRuntimeHost): {
-  [TAction in WorkspacePaneRuntimeSocketAction]: (
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneRuntimeSocketRequestInputs[TAction],
-  ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[TAction]>
-} {
+export function createWorkspacePaneRuntimeRealtimeHandlers(
+  host: ServerWorkspacePaneRuntimeHost,
+): RealtimeRpcHandlers<WorkspacePaneRuntimeSocketRequestInputs, WorkspacePaneRuntimeSocketResponseOutputs> {
   return {
     [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open](clientId, userId, input) {
       return host.openRuntime(clientId, userId, bindRuntimeProviderClientId(input, clientId))
@@ -48,13 +37,7 @@ function bindRuntimeProviderClientId(
 }
 
 export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
-  handlers: {
-    [TAction in WorkspacePaneRuntimeSocketAction]: (
-      clientId: string,
-      userId: string,
-      input: WorkspacePaneRuntimeSocketRequestInputs[TAction],
-    ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[TAction]>
-  },
+  handlers: RealtimeRpcHandlers<WorkspacePaneRuntimeSocketRequestInputs, WorkspacePaneRuntimeSocketResponseOutputs>,
   clientId: string,
   userId: string,
   socket: RealtimeSocket,
@@ -63,12 +46,7 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
 ): Promise<void> {
   let response: AppRealtimeResponseMessage
   try {
-    const handler = handlers[message.action] as (
-      clientId: string,
-      userId: string,
-      input: WorkspacePaneRuntimeSocketRequestInputs[typeof message.action],
-    ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[typeof message.action]>
-    const payload = await handler(clientId, userId, message.input)
+    const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
     response = {
       type: 'response',
       requestId: message.requestId,

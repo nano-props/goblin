@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { BrowserWindow } from 'electron'
 import { HOST_IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
 
 const mocks = vi.hoisted(() => ({
-  getFocusedWindow: vi.fn(() => null),
+  getFocusedWindow: vi.fn<() => BrowserWindow | null>(() => null),
 }))
 let nextWebContentsId = 1
 
@@ -19,7 +20,7 @@ function makeWindow() {
     once: vi.fn(),
     close: vi.fn(),
     webContents,
-  } as any
+  } as unknown as BrowserWindow
 }
 
 describe('client surface registry', () => {

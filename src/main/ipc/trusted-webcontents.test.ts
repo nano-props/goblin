@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import type { BrowserWindow } from 'electron'
 import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
 import {
   allowTrustedAppUrlForWebContents,
@@ -25,31 +26,31 @@ describe('trusted app web contents', () => {
 
   test('does not trust an app URL from an unregistered webContents id', () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 1, once: vi.fn() })
 
     expect(
       isTrustedIpcEvent({
         sender: { id: 99 },
         senderFrame: { url: 'http://127.0.0.1:5173/?theme=light' },
-      } as any),
+      }),
     ).toBe(false)
   })
 
   test('trusts registered webContents only on the registered app origin', () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 7, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 7, once: vi.fn() })
 
     expect(
       isTrustedIpcEvent({
         sender: { id: 7 },
         senderFrame: { url: 'http://127.0.0.1:5173/?theme=light' },
-      } as any),
+      }),
     ).toBe(true)
     expect(
       isTrustedIpcEvent({
         sender: { id: 7 },
         senderFrame: { url: 'http://127.0.0.1:4173/?theme=light' },
-      } as any),
+      }),
     ).toBe(false)
   })
 
@@ -59,7 +60,7 @@ describe('trusted app web contents', () => {
       {
         isDestroyed: () => false,
         webContents: { id: 17, isDestroyed: () => false },
-      } as any,
+      } as unknown as BrowserWindow,
       { windowKey: 'primary' },
     )
 
@@ -67,13 +68,13 @@ describe('trusted app web contents', () => {
       isTrustedIpcEvent({
         sender: { id: 17 },
         senderFrame: { url: 'http://127.0.0.1:5173/?theme=light' },
-      } as any),
+      }),
     ).toBe(true)
   })
 
   test('trusts the registered dev server app origin across history-routed paths', () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 8, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 8, once: vi.fn() })
 
     expect(isTrustedAppUrl('http://127.0.0.1:5173/?theme=light')).toBe(true)
     expect(isTrustedAppUrl('http://127.0.0.1:5173/settings')).toBe(true)
@@ -81,24 +82,24 @@ describe('trusted app web contents', () => {
       isTrustedIpcEvent({
         sender: { id: 8 },
         senderFrame: { url: 'http://127.0.0.1:5173/?theme=light&colorTheme=macos' },
-      } as any),
+      }),
     ).toBe(true)
     expect(
       isTrustedIpcEvent({
         sender: { id: 8 },
         senderFrame: { url: 'http://127.0.0.1:5173/settings/general?theme=light&colorTheme=macos' },
-      } as any),
+      }),
     ).toBe(true)
     expect(
       isTrustedIpcEvent({
         sender: { id: 8 },
         senderFrame: { url: 'http://127.0.0.1:4173/?theme=light' },
-      } as any),
+      }),
     ).toBe(false)
   })
 
   test('scopes a trusted webContents to the specific app origin it loaded', () => {
-    const webContents = { id: 18, once: vi.fn() } as any
+    const webContents = { id: 18, once: vi.fn() }
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents(webContents)
     allowTrustedAppUrlForWebContents(webContents, 'http://127.0.0.1:5173/?theme=light')
@@ -107,13 +108,13 @@ describe('trusted app web contents', () => {
       isTrustedIpcEvent({
         sender: { id: 18 },
         senderFrame: { url: 'http://127.0.0.1:5173/settings?theme=dark' },
-      } as any),
+      }),
     ).toBe(true)
     expect(
       isTrustedIpcEvent({
         sender: { id: 18 },
         senderFrame: { url: 'http://127.0.0.1:4173/?theme=light' },
-      } as any),
+      }),
     ).toBe(false)
   })
 })

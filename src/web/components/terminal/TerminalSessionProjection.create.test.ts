@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  requiredTerminalSession,
+  terminalSessionProjectionAccess,
+} from '#/web/test-utils/terminal-session-projection-access.ts'
 
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
@@ -240,14 +244,11 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
 }
 
 function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId: string): void {
-  ;(projection as any).bellState.handleBell(
+  terminalSessionProjectionAccess(projection).bellState.handleBell(
     {
       terminalSessionId,
-      terminalFilesystemTargetKey: WORKTREE_KEY,
       index: 1,
-      workspaceId: REPO_ROOT,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
-      worktreePath: WORKTREE_PATH,
+      ...terminalBase(),
     },
     { processName: 'zsh', visible: false },
   )
@@ -308,7 +309,7 @@ describe('TerminalSessionProjection create flow', () => {
         value: originalResizeObserver,
       })
     } else {
-      delete (globalThis as any).ResizeObserver
+      Reflect.deleteProperty(globalThis, 'ResizeObserver')
     }
     MockResizeObserver.instances = []
   })
@@ -364,7 +365,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(2)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    expect((projection as any).sessions.get('term-111111111111111111111').currentRuntimeBinding()).toEqual({
+    expect(requiredTerminalSession(projection, 'term-111111111111111111111').currentRuntimeBinding()).toEqual({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
     })
@@ -643,7 +644,7 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
-    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(true)
+    expect(terminalSessionProjectionAccess(projection).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     // Attach the rejection handler before destroy() so the rejected
@@ -652,7 +653,7 @@ describe('TerminalSessionProjection create flow', () => {
     const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
     projection.destroy()
     await expectation
-    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
+    expect(terminalSessionProjectionAccess(projection).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
   })
 
@@ -745,7 +746,7 @@ describe('TerminalSessionProjection create flow', () => {
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
-    ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
+    terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -761,7 +762,7 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
-    ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
+    terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
@@ -784,7 +785,7 @@ describe('TerminalSessionProjection create flow', () => {
       })
     }
 
-    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+    const pendingBells = terminalSessionProjectionAccess(projection).pendingServerBellByRuntimeBindingKey as Map<
       string,
       { terminalSessionId: string; terminalRuntimeSessionId: string }
     >
@@ -807,7 +808,7 @@ describe('TerminalSessionProjection create flow', () => {
       canonicalTitle: null,
     })
 
-    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+    const pendingBells = terminalSessionProjectionAccess(projection).pendingServerBellByRuntimeBindingKey as Map<
       string,
       { terminalSessionId: string; terminalRuntimeSessionId: string }
     >
@@ -850,7 +851,7 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-unknownunknownunknown',
     })
 
-    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+    const pendingBells = terminalSessionProjectionAccess(projection).pendingServerBellByRuntimeBindingKey as Map<
       string,
       { terminalSessionId: string; terminalRuntimeSessionId: string }
     >
@@ -868,14 +869,11 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
     const terminalSessionId = await projection.createTerminal(terminalBase())
     mocks.setBadgeMock.mockClear()
-    ;(projection as any).bellState.handleBell(
+    terminalSessionProjectionAccess(projection).bellState.handleBell(
       {
         terminalSessionId,
-        terminalFilesystemTargetKey: WORKTREE_KEY,
         index: 1,
-        workspaceId: REPO_ROOT,
-        branch: BRANCH,
-        worktreePath: WORKTREE_PATH,
+        ...terminalBase(),
       },
       { processName: 'zsh', visible: false },
     )

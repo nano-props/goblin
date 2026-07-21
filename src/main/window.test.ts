@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { BrowserWindowConstructorOptions } from 'electron'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
@@ -7,8 +8,8 @@ const mocks = vi.hoisted(() => {
   const state = {
     isPackaged: false,
     clientIndexHtml,
-    windows: [] as any[],
-    windowOptions: [] as any[],
+    windows: [] as unknown[],
+    windowOptions: [] as BrowserWindowConstructorOptions[],
     webContentsOn: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     windowOn: vi.fn(),
@@ -36,7 +37,7 @@ const mocks = vi.hoisted(() => {
     ),
   }
   const BrowserWindow = Object.assign(
-    vi.fn(function BrowserWindow(options: any) {
+    vi.fn(function BrowserWindow(options: BrowserWindowConstructorOptions) {
       const win = {
         webContents: {
           id: 1,

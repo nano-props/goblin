@@ -6,10 +6,10 @@ const mocks = vi.hoisted(() => {
   const runtimeShutdown = vi.fn()
   const disconnectAllInvalidationSockets = vi.fn()
   const websocketClose = vi.fn()
-  const websocketClients = new Set<any>()
+  const websocketClients = new Set<{ close(): void }>()
   const createServerRuntime = vi.fn(() => ({
     app: { fetch: vi.fn() },
-    appRealtimeHost: {} as any,
+    appRealtimeHost: {},
     shutdown: runtimeShutdown,
   }))
 

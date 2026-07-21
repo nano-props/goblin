@@ -21,6 +21,7 @@ import type {
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RealtimeRpcRequestMessage, RealtimeRpcResponseMessage } from '#/shared/realtime-rpc.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -71,34 +72,12 @@ export interface TerminalSocketResponseOutputs {
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
 
-export type TerminalSocketRequestMessage = {
-  [TAction in TerminalSocketRequestAction]: {
-    type: 'request'
-    requestId: string
-    action: TAction
-    input: TerminalSocketRequestInputs[TAction]
-  }
-}[TerminalSocketRequestAction]
+export type TerminalSocketRequestMessage = RealtimeRpcRequestMessage<TerminalSocketRequestInputs>
 
-export type TerminalSocketResponseMessage =
-  | {
-      [TAction in TerminalSocketRequestAction]: {
-        type: 'response'
-        requestId: string
-        ok: true
-        action: TAction
-        payload: TerminalSocketResponseOutputs[TAction]
-      }
-    }[TerminalSocketRequestAction]
-  | {
-      [TAction in TerminalSocketRequestAction]: {
-        type: 'response'
-        requestId: string
-        ok: false
-        action: TAction
-        error: string
-      }
-    }[TerminalSocketRequestAction]
+export type TerminalSocketResponseMessage = RealtimeRpcResponseMessage<
+  TerminalSocketRequestInputs,
+  TerminalSocketResponseOutputs
+>
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
 export type TerminalClientMessage = TerminalSocketRequestMessage

@@ -20,10 +20,8 @@ export function getLanAddresses(): string[] {
   for (const [, infos] of Object.entries(interfaces)) {
     if (!infos) continue
     for (const iface of infos) {
-      const info = iface as unknown as { family: string | number; internal: boolean; address: string }
-      const family = typeof info.family === 'number' ? `IPv${info.family}` : info.family
-      if (family === 'IPv4' && !info.internal && isLanAddress(info.address)) {
-        addresses.push(info.address)
+      if (iface.family === 'IPv4' && !iface.internal && isLanAddress(iface.address)) {
+        addresses.push(iface.address)
       }
     }
   }

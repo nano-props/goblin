@@ -18,6 +18,7 @@ import {
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
+  type RemoteGitRunner,
   resolveRemoteWorktree,
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
@@ -43,7 +44,7 @@ const LINKED_TARGET = normalizeRemoteTarget({
 
 describe('remote git helpers', () => {
   test('builds browser URLs from remote verbose output', async () => {
-    const run = async (command: { type: string }) => {
+    const run: RemoteGitRunner = async (command) => {
       switch (command.type) {
         case 'gitRemoteVerbose':
           return okRemoteResult(
@@ -56,32 +57,30 @@ describe('remote git helpers', () => {
       }
     }
 
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'root' }, { run: run as any })).resolves.toBe(
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'root' }, { run: run })).resolves.toBe(
       'https://github.com/acme/project',
     )
-    await expect(
-      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test' }, { run: run as any }),
-    ).resolves.toBe('https://github.com/acme/project/tree/feature/test')
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'abcdef1' }, { run: run as any })).resolves.toBe(
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test' }, { run: run })).resolves.toBe(
+      'https://github.com/acme/project/tree/feature/test',
+    )
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'abcdef1' }, { run: run })).resolves.toBe(
       'https://github.com/acme/project/commit/abcdef1',
     )
   })
 
   test('getRemoteBrowserUrl rejects unsafe URL targets before running remote commands', async () => {
-    const run = vi.fn(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
 
     await expect(
-      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test;echo bad' }, { run: run as any }),
+      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test;echo bad' }, { run: run }),
     ).resolves.toBeNull()
-    await expect(
-      getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'not-a-hash' }, { run: run as any }),
-    ).resolves.toBeNull()
+    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'not-a-hash' }, { run: run })).resolves.toBeNull()
 
     expect(run).not.toHaveBeenCalled()
   })
 
   test('includes remote metadata in remote snapshots', async () => {
-    const run = async (command: { type: string }) => {
+    const run: RemoteGitRunner = async (command) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -107,7 +106,7 @@ describe('remote git helpers', () => {
       }
     }
 
-    const snapshot = await getRemoteSnapshot(TARGET, { run: run as any })
+    const snapshot = await getRemoteSnapshot(TARGET, { run: run })
 
     expect(snapshot?.remote).toMatchObject({
       hasRemotes: true,
@@ -118,7 +117,7 @@ describe('remote git helpers', () => {
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
-    const run = vi.fn(async (command: { type: string }) =>
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
       command.type === 'gitWorkspacePaneIdentities'
         ? okRemoteResult(
             'main\nfeature/no-worktree\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n',
@@ -128,7 +127,7 @@ describe('remote git helpers', () => {
           })(),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
       { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
@@ -139,23 +138,21 @@ describe('remote git helpers', () => {
   })
 
   test('does not turn a failed remote worktree membership read into branch-only targets', async () => {
-    const run = vi.fn(async (command: { type: string }) =>
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
       command.type === 'gitWorkspacePaneIdentities'
         ? ({ ok: false, stdout: '', stderr: '', message: 'worktree list failed' } as RemoteCommandResult)
         : okRemoteResult(''),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).rejects.toThrow(
-      'worktree list failed',
-    )
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).rejects.toThrow('worktree list failed')
   })
 
   test('returns detached worktree identity for an unborn repository', async () => {
-    const run = vi.fn(async () =>
+    const run = vi.fn<RemoteGitRunner>(async () =>
       okRemoteResult('\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n'),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
     ])
     expect(run).toHaveBeenCalledOnce()
@@ -173,38 +170,40 @@ describe('remote git helpers', () => {
   })
 
   test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
-    const run = vi.fn(async (command: { type: string; ancestor?: string; descendant?: string; branch?: string }) => {
-      switch (command.type) {
-        case 'gitSnapshot':
-          return okRemoteResult(
-            [
-              '__GOBLIN_REMOTE_CURRENT__',
-              'release/1.0',
-              '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
-              '__GOBLIN_REMOTE_BRANCHES__',
-              'release/1.0\x1ff00ba4\x1fRelease\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/release/1.0\x1f',
-              'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1f\x1f',
-            ].join('\n'),
-          )
-        case 'gitWorktreeList':
-          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
-        case 'gitStatus':
-          return okRemoteResult('')
-        case 'gitRemoteVerbose':
-          return okRemoteResult('')
-        case 'gitIsAncestor':
-          return command.descendant === 'release/1.0' ? okRemoteResult('') : failRemoteResult('not merged')
-        case 'gitUpstream':
-          return failRemoteResult('no upstream')
-        case 'gitBranchDelete':
-          return okRemoteResult('Deleted branch feature/test')
-        default:
-          return okRemoteResult('')
-      }
-    })
+    const run = vi.fn<RemoteGitRunner>(
+      async (command: { type: string; ancestor?: string; descendant?: string; branch?: string }) => {
+        switch (command.type) {
+          case 'gitSnapshot':
+            return okRemoteResult(
+              [
+                '__GOBLIN_REMOTE_CURRENT__',
+                'release/1.0',
+                '__GOBLIN_REMOTE_DEFAULT__',
+                'main',
+                '__GOBLIN_REMOTE_BRANCHES__',
+                'release/1.0\x1ff00ba4\x1fRelease\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/release/1.0\x1f',
+                'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1f\x1f',
+              ].join('\n'),
+            )
+          case 'gitWorktreeList':
+            return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+          case 'gitStatus':
+            return okRemoteResult('')
+          case 'gitRemoteVerbose':
+            return okRemoteResult('')
+          case 'gitIsAncestor':
+            return command.descendant === 'release/1.0' ? okRemoteResult('') : failRemoteResult('not merged')
+          case 'gitUpstream':
+            return failRemoteResult('no upstream')
+          case 'gitBranchDelete':
+            return okRemoteResult('Deleted branch feature/test')
+          default:
+            return okRemoteResult('')
+        }
+      },
+    )
 
-    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run as any })
+    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run })
 
     expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test' })
     expect(run).toHaveBeenCalledWith(
@@ -215,7 +214,7 @@ describe('remote git helpers', () => {
   })
 
   test('deleteRemoteBranch deletes the configured upstream when requested', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -249,7 +248,7 @@ describe('remote git helpers', () => {
     const result = await deleteRemoteBranch(TARGET, {
       branch: 'feature/test',
       deleteUpstream: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: true, message: 'deleted upstream' })
@@ -261,7 +260,7 @@ describe('remote git helpers', () => {
   })
 
   test('deleteRemoteBranch reports upstream delete failure after deleting the local branch', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -294,14 +293,14 @@ describe('remote git helpers', () => {
     const result = await deleteRemoteBranch(TARGET, {
       branch: 'feature/test',
       deleteUpstream: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: false, message: 'remote rejected delete', repositoryStateChanged: true })
   })
 
   test('removeRemoteWorktree allows deleting branch when merged into current HEAD without upstream', async () => {
-    const run = vi.fn(
+    const run = vi.fn<RemoteGitRunner>(
       async (command: {
         type: string
         descendant?: string
@@ -356,7 +355,7 @@ describe('remote git helpers', () => {
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       deleteBranch: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({
@@ -377,7 +376,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree resolves equivalent absolute worktree paths', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(
@@ -407,7 +406,7 @@ describe('remote git helpers', () => {
       branch: 'feature/test',
       worktreePath: '/srv/./repo-feature/',
       deleteBranch: false,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({
@@ -423,7 +422,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree rejects relative worktree paths before running remote commands', async () => {
-    const run = vi.fn(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
@@ -432,7 +431,7 @@ describe('remote git helpers', () => {
       branch: 'feature/test',
       worktreePath: 'repo-feature',
       deleteBranch: false,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
@@ -440,7 +439,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n')
       }
@@ -454,7 +453,7 @@ describe('remote git helpers', () => {
       branch: 'main',
       worktreePath: '/srv/./repo/',
       deleteBranch: false,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
@@ -462,7 +461,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree deletes the configured upstream after worktree and branch deletion', async () => {
-    const run = vi.fn(
+    const run = vi.fn<RemoteGitRunner>(
       async (command: {
         type: string
         descendant?: string
@@ -520,7 +519,7 @@ describe('remote git helpers', () => {
       worktreePath: '/srv/repo-feature',
       deleteBranch: true,
       deleteUpstream: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({
@@ -536,7 +535,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree rejects unsafe branch names before running remote commands', async () => {
-    const run = vi.fn(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
@@ -545,7 +544,7 @@ describe('remote git helpers', () => {
       branch: 'feature/test;echo bad',
       worktreePath: '/srv/repo-feature',
       deleteBranch: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
@@ -553,7 +552,7 @@ describe('remote git helpers', () => {
   })
 
   test('removeRemoteWorktree removes the currently opened linked worktree from the primary path', async () => {
-    const run = vi.fn(
+    const run = vi.fn<RemoteGitRunner>(
       async (command: {
         type: string
         path?: string
@@ -613,7 +612,7 @@ describe('remote git helpers', () => {
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       deleteBranch: true,
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({
@@ -635,12 +634,12 @@ describe('remote git helpers', () => {
   })
 
   test('createRemoteWorktree rejects relative paths before running remote commands', async () => {
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
     const result = await createRemoteWorktree(TARGET, {
       worktreePath: 'relative/path',
       mode: { kind: 'newBranch', newBranch: 'feature/test', baseRef: 'main' },
-      run: run as any,
+      run: run,
     })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
@@ -648,7 +647,7 @@ describe('remote git helpers', () => {
   })
 
   test('pullRemoteBranch reports missing upstream remote explicitly', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -672,13 +671,13 @@ describe('remote git helpers', () => {
       }
     })
 
-    const result = await pullRemoteBranch(TARGET, 'feature/test', undefined, { run: run as any })
+    const result = await pullRemoteBranch(TARGET, 'feature/test', undefined, { run: run })
 
     expect(result).toEqual({ ok: false, message: 'error.pull-no-remote' })
   })
 
   test('pushRemoteBranch prefers the configured upstream remote and branch', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitRemoteVerbose':
           return okRemoteResult(
@@ -698,7 +697,7 @@ describe('remote git helpers', () => {
       }
     })
 
-    const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run as any })
+    const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run })
 
     expect(result).toEqual({ ok: true, message: 'pushed' })
     expect(run).toHaveBeenCalledWith(
@@ -716,7 +715,7 @@ describe('remote git helpers', () => {
   })
 
   test('pushRemoteBranch falls back to origin and sets upstream when no upstream is configured', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitRemoteVerbose':
           return okRemoteResult(
@@ -731,7 +730,7 @@ describe('remote git helpers', () => {
       }
     })
 
-    const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run as any })
+    const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run })
 
     expect(result).toEqual({ ok: true, message: 'pushed' })
     expect(run).toHaveBeenCalledWith(
@@ -749,7 +748,7 @@ describe('remote git helpers', () => {
   })
 
   test('fetchRemoteRepo prefers the current branch upstream remote over fetch --all', async () => {
-    const run = vi.fn(async (command: { type: string; remote?: string; branch?: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string; remote?: string; branch?: string }) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -780,7 +779,7 @@ describe('remote git helpers', () => {
       }
     })
 
-    const result = await fetchRemoteRepo(TARGET, { run: run as any })
+    const result = await fetchRemoteRepo(TARGET, { run: run })
 
     expect(result).toEqual({ ok: true, message: 'fetched fork' })
     expect(run).toHaveBeenCalledWith({ type: 'gitFetchRemote', path: '/srv/repo', remote: 'fork' }, TARGET, {
@@ -791,7 +790,7 @@ describe('remote git helpers', () => {
   })
 
   test('getRemoteTrackingBranches filters */HEAD and malformed refs', async () => {
-    const run = vi.fn(async () =>
+    const run = vi.fn<RemoteGitRunner>(async () =>
       okRemoteResult(
         ['origin/HEAD', 'origin/main', 'origin/feature/auth', 'origin/feature/ui', 'not-a-valid-ref-line'].join('\n'),
       ),
@@ -802,13 +801,13 @@ describe('remote git helpers', () => {
   })
 
   test('getRemoteTrackingBranches returns [] when the remote command fails', async () => {
-    const run = vi.fn(async () => ({ ok: false, stdout: '', stderr: 'ssh: connection refused' }))
+    const run = vi.fn<RemoteGitRunner>(async () => ({ ok: false, stdout: '', stderr: 'ssh: connection refused' }))
     const refs = await getRemoteTrackingBranches(TARGET, { run })
     expect(refs).toEqual([])
   })
 
   test('getRemoteWorktreeBootstrapPreview reads config without running bootstrap', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') {
         return okRemoteResult(
           '[worktree]\ncopy = [".env", "config/*"]\nsymlink = ["linked.txt"]\nexclude = ["config/*.log"]\nsetup = "bun install"',
@@ -817,7 +816,7 @@ describe('remote git helpers', () => {
       return okRemoteResult('')
     })
 
-    const result = await getRemoteWorktreeBootstrapPreview(TARGET, { run: run as any })
+    const result = await getRemoteWorktreeBootstrapPreview(TARGET, { run: run })
 
     expect(result).toEqual({
       ok: true,
@@ -848,19 +847,19 @@ describe('remote git helpers', () => {
   })
 
   test('bootstrapRemoteWorktreeAfterCreate does nothing when goblin.toml is absent', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('')
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run })
 
     expect(result).toEqual({ ok: true, message: '' })
     expect(run).toHaveBeenCalledTimes(2)
   })
 
   test('bootstrapRemoteWorktreeAfterCreate runs remote bootstrap and formats output', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') {
         return okRemoteResult('[worktree]\ncopy = [".env"]\nsetup = "bun install"')
       }
@@ -870,7 +869,7 @@ describe('remote git helpers', () => {
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run })
 
     expect(result).toEqual({
       ok: true,
@@ -909,14 +908,14 @@ describe('remote git helpers', () => {
 
   test('bootstrapRemoteWorktreeAfterCreate does not run when goblin.toml changed after confirmation', async () => {
     const trustedHash = worktreeBootstrapConfigHash('[worktree]\ncopy = [".env"]')
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = ["other.env"]')
       if (command.type === 'bootstrapRemoteWorktree') return okRemoteResult('GOBLIN_BOOTSTRAP_COPY other.env')
       return okRemoteResult('')
     })
 
     const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', {
-      run: run as any,
+      run: run,
       expectedConfigHash: trustedHash,
     })
 
@@ -939,14 +938,14 @@ describe('remote git helpers', () => {
       port: 22,
       remotePath: '/srv/repo/packages/app',
     })!
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'revParseTopLevel') return okRemoteResult('/srv/repo')
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = [".env"]')
       if (command.type === 'bootstrapRemoteWorktree') return okRemoteResult('GOBLIN_BOOTSTRAP_COPY .env')
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(target, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(target, '/srv/repo-worktree', { run: run })
 
     expect(result.ok).toBe(true)
     expect(run).toHaveBeenCalledWith({ type: 'readRemoteFile', path: '/srv/repo/goblin.toml' }, target, {
@@ -961,24 +960,24 @@ describe('remote git helpers', () => {
   })
 
   test('bootstrapRemoteWorktreeAfterCreate returns error when config is invalid', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = "not-an-array"')
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run })
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('Worktree bootstrap failed')
   })
 
   test('bootstrapRemoteWorktreeAfterCreate rejects unsafe paths before running remote bootstrap', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = ["../secret.env"]')
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run })
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('bootstrap path escapes repo root')
@@ -990,31 +989,31 @@ describe('remote git helpers', () => {
   })
 
   test('bootstrapRemoteWorktreeAfterCreate returns error when remote bootstrap fails', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\nsetup = "bun install"')
       if (command.type === 'bootstrapRemoteWorktree') return failRemoteResult('bun: command not found')
       return okRemoteResult('')
     })
 
-    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run as any })
+    const result = await bootstrapRemoteWorktreeAfterCreate(TARGET, '/srv/repo-worktree', { run: run })
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('bun: command not found')
   })
 
   test('getRemoteLog rejects unsafe branch names before running remote commands', async () => {
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
-    const entries = await getRemoteLog(TARGET, '../feature', undefined, undefined, { run: run as any })
+    const entries = await getRemoteLog(TARGET, '../feature', undefined, undefined, { run: run })
 
     expect(entries).toEqual([])
     expect(run).not.toHaveBeenCalled()
   })
 
   test('deleteRemoteBranch rejects unsafe branch names before running remote commands', async () => {
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
-    const result = await deleteRemoteBranch(TARGET, { branch: '../feature', run: run as any })
+    const result = await deleteRemoteBranch(TARGET, { branch: '../feature', run: run })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
     expect(run).not.toHaveBeenCalled()
@@ -1042,9 +1041,9 @@ describe('getRemoteStatusAndWorktrees', () => {
       `/srv/repo${NUL}M  README.md${NUL}${NUL}`,
       `/srv/repo-feature${NUL}?? new.ts${NUL}${NUL}`,
     ].join('')
-    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
 
-    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
+    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
 
     expect(run).toHaveBeenCalledTimes(1)
     expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeListAndStatus', path: '/srv/repo' }, TARGET, {
@@ -1073,9 +1072,9 @@ describe('getRemoteStatusAndWorktrees', () => {
       'branch refs/heads/feature/test',
     ].join('\n')
     const statusStream = `/srv/repo-feature${NUL}${NUL}`
-    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
 
-    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
+    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
 
     // worktrees still includes the bare entry (callers may need it)
     expect(result.worktrees).toHaveLength(2)
@@ -1086,15 +1085,15 @@ describe('getRemoteStatusAndWorktrees', () => {
   })
 
   test('rejects when the remote command fails', async () => {
-    const run = vi.fn(async () => failRemoteResult('boom'))
-    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run as any })).rejects.toThrow('boom')
+    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('boom'))
+    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('boom')
   })
 
   test('rejects when a non-bare worktree is missing from the status stream', async () => {
     const worktreeListOutput = ['worktree /srv/repo', 'HEAD f00ba4', 'branch refs/heads/main'].join('\n')
-    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, '')))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, '')))
 
-    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run as any })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('error.failed-read-repo')
   })
 })
 
@@ -1107,7 +1106,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       const NUL = String.fromCharCode(0)
       switch (command.type) {
         case 'gitDirectoryChildren':
@@ -1118,7 +1117,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     })
 
     const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', {
-      run: run as any,
+      run: run,
       knownWorktrees,
     })
 
@@ -1133,7 +1132,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
   })
 
   test('still falls back to gitWorktreeList when knownWorktrees is omitted', async () => {
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(['worktree /srv/repo-feature', 'HEAD a', 'branch refs/heads/feat'].join('\n'))
@@ -1144,7 +1143,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
       }
     })
 
-    const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', { run: run as any })
+    const result = await getRemoteTreeWalk(TARGET, '/srv/repo-feature', { run: run })
 
     expect(result).toMatchObject({ ok: true })
     expect(run).toHaveBeenCalledWith(
@@ -1156,9 +1155,9 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
 
   test('rejects a request for an unknown worktree path even when knownWorktrees is supplied', async () => {
     const knownWorktrees: WorktreeInfo[] = [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }]
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
     const result = await getRemoteTreeWalk(TARGET, '/srv/repo-missing', {
-      run: run as any,
+      run: run,
       knownWorktrees,
     })
     expect(result).toEqual({ ok: false, message: 'error.worktree-not-found' })
@@ -1171,10 +1170,10 @@ describe('resolveRemoteWorktree', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
     const result = await resolveRemoteWorktree(TARGET, '/srv/repo-feature/', {
-      run: run as any,
+      run: run,
       knownWorktrees,
     })
 
@@ -1183,11 +1182,9 @@ describe('resolveRemoteWorktree', () => {
   })
 
   test('throws the remote read failure instead of returning an empty authority set', async () => {
-    const run = vi.fn(async () => failRemoteResult('ssh unavailable'))
+    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('ssh unavailable'))
 
-    await expect(resolveRemoteWorktree(TARGET, '/srv/repo-feature', { run: run as any })).rejects.toThrow(
-      'ssh unavailable',
-    )
+    await expect(resolveRemoteWorktree(TARGET, '/srv/repo-feature', { run: run })).rejects.toThrow('ssh unavailable')
 
     expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeList', path: '/srv/repo' }, TARGET, { signal: undefined })
   })
@@ -1195,11 +1192,11 @@ describe('resolveRemoteWorktree', () => {
 
 describe('remoteCommandExists', () => {
   test('checks an explicitly authorized workspace root without inventing a worktree', async () => {
-    const run = vi.fn(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
 
-    await expect(
-      remoteCommandExistsAtWorkspaceRoot(TARGET, '/srv/plain-workspace', 'bat', { run: run as any }),
-    ).resolves.toBe(true)
+    await expect(remoteCommandExistsAtWorkspaceRoot(TARGET, '/srv/plain-workspace', 'bat', { run: run })).resolves.toBe(
+      true,
+    )
     expect(run).toHaveBeenCalledWith(
       { type: 'commandExists', path: '/srv/plain-workspace', commandName: 'bat' },
       TARGET,
@@ -1211,13 +1208,13 @@ describe('remoteCommandExists', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'commandExists') return okRemoteResult('')
       return failRemoteResult('unexpected')
     })
 
     const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat', {
-      run: run as any,
+      run: run,
       knownWorktrees,
     })
 
@@ -1236,13 +1233,13 @@ describe('remoteCommandExists', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'commandExists') return okRemoteResult('')
       return failRemoteResult('unexpected')
     })
 
     const result = await remoteCommandExists(TARGET, '/srv/repo-feature/', 'bat', {
-      run: run as any,
+      run: run,
       knownWorktrees,
     })
 
@@ -1253,19 +1250,19 @@ describe('remoteCommandExists', () => {
   })
 
   test('returns false for unsafe command names without touching the remote', async () => {
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
-    const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat; whoami', { run: run as any })
+    const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat; whoami', { run: run })
 
     expect(result).toBe(false)
     expect(run).not.toHaveBeenCalled()
   })
 
   test('returns false for unknown worktrees', async () => {
-    const run = vi.fn()
+    const run = vi.fn<RemoteGitRunner>()
 
     const result = await remoteCommandExists(TARGET, '/srv/missing', 'bat', {
-      run: run as any,
+      run: run,
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false }],
     })
 

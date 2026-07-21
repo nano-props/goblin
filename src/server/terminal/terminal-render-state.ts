@@ -186,6 +186,8 @@ function createScreenState(cols: number, rows: number): TerminalScreenState {
   terminal.loadAddon(new Unicode11Addon() as ITerminalAddon)
   terminal.unicode.activeVersion = '11'
   const serializer = new SerializeAddon()
+  // The serializer declares the browser Terminal in activate(), while the
+  // supported addon contract also works with the headless Terminal at runtime.
   terminal.loadAddon(serializer as unknown as ITerminalAddon)
   return {
     terminal,

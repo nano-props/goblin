@@ -250,7 +250,7 @@ function createTestConnection(options: {
   hasRealtimeSubscribers?: () => boolean
   onOpen?: (currentClientId: string) => void
 }) {
-  return createClientRealtimeSocketConnection<TestInputs, TestOutputs, TestServerMessage, TestRealtimeMessage>({
+  return createClientRealtimeSocketConnection<TestInputs, TestOutputs, TestRealtimeMessage>({
     resolveConnection: () => ({ url: 'ws://example.test/ws/realtime', clientId: 'client_realtime' }),
     hasRealtimeSubscribers: options.hasRealtimeSubscribers ?? (() => false),
     onRealtimeMessage: options.onRealtimeMessage,

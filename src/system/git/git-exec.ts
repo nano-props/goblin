@@ -1,5 +1,6 @@
 import { execa, ExecaError } from 'execa'
 import type { ExecResult } from '#/shared/git-types.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 /** Default per-call timeout. Network ops (push/pull/fetch) override via opts. */
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -30,8 +31,7 @@ async function probeGitAvailable(): Promise<GitAvailability> {
     await git(process.cwd(), ['--version'])
     return { ok: true }
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') return { ok: false, message: 'error.git-not-found' }
+    if (hasErrorCode(err, 'ENOENT')) return { ok: false, message: 'error.git-not-found' }
     return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
 }

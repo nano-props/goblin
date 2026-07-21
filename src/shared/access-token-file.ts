@@ -3,6 +3,7 @@ import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { serverDataDir } from '#/shared/data-dir.ts'
 import { ACCESS_TOKEN_FILE_NAME } from '#/shared/access-token.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 // 25 base36 chars, exactly 128 bits of entropy (16 random bytes).
 // Keep this regex in lockstep with `generateAccessToken` below — it
@@ -66,7 +67,7 @@ async function readExistingToken(filePath: string): Promise<string | null> {
   try {
     raw = await readFile(filePath, 'utf8')
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (hasErrorCode(err, 'ENOENT')) return null
     throw err
   }
   const trimmed = raw.trim()

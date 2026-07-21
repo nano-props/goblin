@@ -43,7 +43,17 @@ interface TerminalSessionServiceLike {
 }
 
 interface TerminalRuntimeActionDependencies {
-  manager: TerminalSessionManager<string>
+  manager: Pick<
+    TerminalSessionManager<string>,
+    | 'attachSession'
+    | 'restartSessionWithProjectionOutcome'
+    | 'writeSession'
+    | 'resizeSession'
+    | 'takeoverSession'
+    | 'closeSessionForUserOutcome'
+    | 'getPhysicalWorktreeExecutionCapabilityForUser'
+    | 'terminalSessionsSnapshotForUser'
+  >
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string

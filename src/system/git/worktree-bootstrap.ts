@@ -6,6 +6,7 @@ import { parse } from 'smol-toml'
 import { glob, isDynamicPattern } from 'tinyglobby'
 import { getRepoRoot } from '#/system/git/branches.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import {
   compactWorktreeBootstrapPaths,
   formatWorktreeBootstrapSummary,
@@ -127,7 +128,7 @@ async function loadBootstrapConfig(
   try {
     raw = await fs.readFile(path.join(sourceRoot, CONFIG_FILE), 'utf8')
   } catch (err) {
-    if (isErrno(err, 'ENOENT')) return { kind: 'none' }
+    if (hasErrorCode(err, 'ENOENT')) return { kind: 'none' }
     return { kind: 'error', message: `failed to read ${CONFIG_FILE}: ${errorMessage(err)}` }
   }
   const loaded = parseBootstrapConfig(raw)
@@ -355,7 +356,7 @@ async function validateMaterializations(
     try {
       stat = await fs.lstat(item.abs)
     } catch (err) {
-      if (isErrno(err, 'ENOENT')) {
+      if (hasErrorCode(err, 'ENOENT')) {
         missingSources.add(item.rel)
         continue
       }
@@ -428,7 +429,7 @@ async function firstSymlinkAncestor(sourceRoot: string, rel: string): Promise<st
       const stat = await fs.lstat(current)
       if (stat.isSymbolicLink()) return segments.slice(0, index + 1).join('/')
     } catch (err) {
-      if (isErrno(err, 'ENOENT')) return null
+      if (hasErrorCode(err, 'ENOENT')) return null
       throw err
     }
   }
@@ -466,7 +467,7 @@ async function materializePlan(
           break
       }
     } catch (err) {
-      if (isErrno(err, 'EEXIST')) return { ok: false, message: `destination already exists: ${item.rel}` }
+      if (hasErrorCode(err, 'EEXIST')) return { ok: false, message: `destination already exists: ${item.rel}` }
       return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}` }
     }
   }
@@ -625,7 +626,7 @@ async function pathExists(target: string, options?: { useLstat?: boolean }): Pro
     else await fs.access(target, fsConstants.F_OK)
     return true
   } catch (err) {
-    if (isErrno(err, 'ENOENT')) return false
+    if (hasErrorCode(err, 'ENOENT')) return false
     throw err
   }
 }
@@ -656,10 +657,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null
-}
-
-function isErrno(err: unknown, code: string): boolean {
-  return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === code
 }
 
 function errorMessage(err: unknown): string {

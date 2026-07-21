@@ -2,6 +2,7 @@ import { mkdir, readFile, rename } from 'node:fs/promises'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { serverDataFile } from '#/shared/data-dir.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 
 const USER_SETTINGS_FILE = 'user-settings.json'
@@ -49,7 +50,7 @@ export async function readUserSettingsJson(): Promise<unknown | null> {
       await quarantineCorruptSettingsFile(file, err)
       return null
     }
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (hasErrorCode(err, 'ENOENT')) return null
     serverNodeLog.warn({ err, file }, 'failed to read settings file')
     throw err
   }

@@ -14,6 +14,11 @@ import { terminalClient } from '#/web/terminal.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
+import {
+  requiredTerminalSession,
+  terminalSessionProjectionAccess,
+  terminalSessionRuntimeAccess,
+} from '#/web/test-utils/terminal-session-projection-access.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
@@ -242,10 +247,10 @@ describe('TerminalSessionProjection', () => {
       expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
       expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect((projection as any).futureExitOrphans.size()).toBe(1)
+      expect(terminalSessionProjectionAccess(projection).futureExitOrphans.size()).toBe(1)
 
       projection.reconcileServerSessionsSnapshot(scope, { revision: 11, sessions: [] }, 'client_local')
-      expect((projection as any).futureExitOrphans.size()).toBe(0)
+      expect(terminalSessionProjectionAccess(projection).futureExitOrphans.size()).toBe(0)
     })
 
     test('does not turn a gapped partial session delta into full catalog coverage', () => {
@@ -256,7 +261,12 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [sessionA] }, 'client_local')
 
       expect(
-        (projection as any).applyServerSessionEffect(scope, { kind: 'delta', revision: 3 }, sessionA, 'client_local'),
+        terminalSessionProjectionAccess(projection).applyServerSessionEffect(
+          scope,
+          { kind: 'delta', revision: 3 },
+          sessionA,
+          'client_local',
+        ),
       ).toBe(true)
       expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(1)
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
@@ -308,7 +318,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect((projection as any).sessions.get(terminalSessionId).currentRuntimeBinding()).toEqual({
+      expect(requiredTerminalSession(projection, terminalSessionId).currentRuntimeBinding()).toEqual({
         terminalRuntimeSessionId,
         terminalRuntimeGeneration: 2,
       })
@@ -363,7 +373,7 @@ describe('TerminalSessionProjection', () => {
 
       const terminalFilesystemTargetSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       const terminalSessionId = terminalFilesystemTargetSnapshot.sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
@@ -400,7 +410,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
@@ -436,7 +446,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
       projection.handleOutput({
@@ -462,7 +472,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({
@@ -499,9 +509,11 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
-      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.delete('pty_session_a_aaaaaaaaa')
+      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.delete(
+        'pty_session_a_aaaaaaaaa',
+      )
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
@@ -522,7 +534,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
       projection.handleServerTitle({
@@ -544,7 +556,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
       projection.handleExit({
@@ -582,12 +594,14 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
       const handleIdentitySpy = vi.spyOn(session, 'handleIdentity')
       const handleLifecycleSpy = vi.spyOn(session, 'handleLifecycle')
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
-      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.delete('pty_session_a_aaaaaaaaa')
+      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.delete(
+        'pty_session_a_aaaaaaaaa',
+      )
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
@@ -650,7 +664,7 @@ describe('TerminalSessionProjection', () => {
 
       // Simulate metadata change via internal notifySession
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      ;(projection as any).notifySession(terminalSessionId)
+      terminalSessionProjectionAccess(projection).notifySession(terminalSessionId)
 
       expect(listener).toHaveBeenCalledTimes(1)
       unsubscribe()
@@ -678,7 +692,7 @@ describe('TerminalSessionProjection', () => {
 
     test('removes local sessions absent from the authoritative catalog', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      ;(projection as any).ensureSession(makeDescriptor('term-111111111111111111111', 1))
+      terminalSessionProjectionAccess(projection).ensureSession(makeDescriptor('term-111111111111111111111', 1))
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       projection.reconcileServerSessions(
@@ -823,7 +837,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
+      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -909,7 +923,7 @@ describe('TerminalSessionProjection', () => {
 
       await expect(close).resolves.toBe(true)
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect((projection as any).sessions.get(terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
+      expect(requiredTerminalSession(projection, terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
         'pty_session_2_aaaaaaaaa',
       )
     })
@@ -1090,7 +1104,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
       const dispose = vi.spyOn(session, 'dispose')
@@ -1187,7 +1201,7 @@ describe('TerminalSessionProjection', () => {
       if (!activeSessionId) throw new Error('missing term-222222222222222222222')
 
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
-      ;(projection as any).removeSession(activeSessionId, { dispose: false })
+      terminalSessionProjectionAccess(projection).removeSession(activeSessionId, { dispose: false })
 
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',
@@ -1238,10 +1252,10 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
+      const session = requiredTerminalSession(projection, terminalSessionId)
 
       // reconcile pre-populates the cache; clear it to test the caching path
-      ;(projection as any).snapshotCache.delete(terminalSessionId)
+      terminalSessionProjectionAccess(projection).snapshotCache.delete(terminalSessionId)
 
       const snapshotSpy = vi.spyOn(session, 'snapshot')
       const s1 = projection.snapshot(terminalSessionId)
@@ -1262,7 +1276,7 @@ describe('TerminalSessionProjection', () => {
       const s1 = projection.snapshot(terminalSessionId)
 
       // metadata notify forces cache refresh
-      ;(projection as any).notifySession(terminalSessionId, 'metadata')
+      terminalSessionProjectionAccess(projection).notifySession(terminalSessionId)
       const s2 = projection.snapshot(terminalSessionId)
       expect(s1).not.toBe(s2)
     })
@@ -1315,14 +1329,9 @@ describe('TerminalSessionProjection', () => {
       // state injected before the remount is still visible after.
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const descriptor = makeDescriptor('term-111111111111111111111', 1)
-      // Add a session via the internal API (no real WS, no
-      // TerminalSession — just the projection bookkeeping).
-      ;(projection as any).sessions.set(descriptor.terminalSessionId, {
-        descriptor,
-        snapshot: () => ({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null }),
-        currentTerminalRuntimeSessionId: () => 'pty_session_1_aaaaaaaaa',
-        dispose: () => {},
-      })
+      // Add a session through the projection's materialization seam without a
+      // websocket or attached terminal view.
+      terminalSessionProjectionAccess(projection).ensureSession(descriptor)
       // Synthesize a remount: re-fetch the singleton via the
       // getter (the Provider's mount effect does exactly this).
       const after = getTerminalSessionProjection({
@@ -1331,9 +1340,8 @@ describe('TerminalSessionProjection', () => {
       expect(after).toBe(projection)
       // The session we injected is still in the projection's map —
       // i.e. the state survived the synthetic remount.
-      const stored = (after as any).sessions.get(descriptor.terminalSessionId) as
-        { descriptor: TerminalDescriptor } | undefined
-      expect(stored?.descriptor.terminalSessionId).toBe('term-111111111111111111111')
+      const stored = requiredTerminalSession(after, descriptor.terminalSessionId)
+      expect(stored.descriptor.terminalSessionId).toBe('term-111111111111111111111')
     })
   })
 })
@@ -1351,7 +1359,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       ],
       'client_local',
     )
-    const session = (localProjection as any).sessions.get('term-111111111111111111111')
+    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
     session.restart()
 
     localProjection.handleExit({
@@ -1389,7 +1397,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
     )
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
-    expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
+    expect(terminalSessionProjectionAccess(localProjection).pendingServerBellByRuntimeBindingKey.size).toBe(0)
     localProjection.destroy()
   })
 
@@ -1456,8 +1464,8 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
     )
-    const session = (localProjection as any).sessions.get(terminalSessionId)
-    session.runtime.failRuntime('error.restart-failed')
+    const session = requiredTerminalSession(localProjection, terminalSessionId)
+    terminalSessionRuntimeAccess(session).runtime.failRuntime('error.restart-failed')
 
     localProjection.handleExit({
       terminalRuntimeSessionId,
@@ -1490,7 +1498,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
       ],
       'client_local',
     )
-    const session = (localProjection as any).sessions.get('term-111111111111111111111')
+    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
     const bellBase = {
       terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
       terminalSessionId: 'term-111111111111111111111',
@@ -1518,7 +1526,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
     })
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
-    expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
+    expect(terminalSessionProjectionAccess(localProjection).pendingServerBellByRuntimeBindingKey.size).toBe(0)
     localProjection.destroy()
   })
 })
@@ -1544,7 +1552,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
     )
-    const session = (projection as any).sessions.get(terminalSessionId)
+    const session = requiredTerminalSession(projection, terminalSessionId)
     session.restart()
     return { projection, session }
   }
@@ -1582,20 +1590,20 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       'client_local',
     )
 
-    ;(projection as any).applyServerSessionEffect(
+    terminalSessionProjectionAccess(projection).applyServerSessionEffect(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       { kind: 'delta', revision: 1 },
       makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 }),
       'client_local',
     )
-    ;(projection as any).applyServerSessionEffect(
+    terminalSessionProjectionAccess(projection).applyServerSessionEffect(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       { kind: 'delta', revision: 1 },
       makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 }),
       'client_local',
     )
 
-    const session = (projection as any).sessions.get(terminalSessionId)
+    const session = requiredTerminalSession(projection, terminalSessionId)
     expect(session.currentRuntimeBinding()).toEqual({
       terminalRuntimeSessionId: lineageA,
       terminalRuntimeGeneration: 2,
@@ -1638,7 +1646,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     })
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    expect((projection as any).futureExitOrphans.blocksActivation(exitFor(lineageB))).toBe(true)
+    expect(terminalSessionProjectionAccess(projection).futureExitOrphans.blocksActivation(exitFor(lineageB))).toBe(true)
     projection.destroy()
   })
 
@@ -1692,14 +1700,14 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
     )
-    expect((projection as any).futureExitOrphans.size()).toBe(2)
+    expect(terminalSessionProjectionAccess(projection).futureExitOrphans.size()).toBe(2)
 
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
       'client_local',
     )
-    expect((projection as any).futureExitOrphans.size()).toBe(1)
+    expect(terminalSessionProjectionAccess(projection).futureExitOrphans.size()).toBe(1)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })

@@ -453,6 +453,8 @@ interface XtermCoreUserInputService {
 }
 
 function xtermCoreUserInputService(term: XTermTerminal): XtermCoreUserInputService | null {
+  // xterm exposes no public user-input event. Keep access to its optional
+  // private service isolated here and verify the callable shape before use.
   const coreService = (term as unknown as { _core?: { coreService?: { onUserInput?: unknown } } })._core?.coreService
   const onUserInput = coreService?.onUserInput
   if (!coreService || typeof onUserInput !== 'function') return null

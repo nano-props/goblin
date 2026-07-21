@@ -1,3 +1,5 @@
+import { isStringIn } from '#/shared/string-literals.ts'
+
 export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history', 'files'] as const
 export type WorkspacePaneDefaultTargetKind = 'git' | 'workspace-root'
 export const WORKSPACE_PANE_RUNTIME_TAB_TYPES = ['terminal'] as const
@@ -41,7 +43,7 @@ export const WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES = WORKSPACE_PANE_STATIC_TA
 export const WORKSPACE_PANE_WORKTREE_TAB_TYPES = [
   ...WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
   ...WORKSPACE_PANE_RUNTIME_TAB_TYPES,
-] as readonly WorkspacePaneWorktreeTabType[]
+] satisfies readonly WorkspacePaneWorktreeTabType[]
 // Session-persistence allow-list for selected workspace-pane tab types.
 // Server-owned runtime tab entries are modeled by WORKSPACE_PANE_RUNTIME_TAB_TYPES.
 export const WORKSPACE_PANE_SESSION_TAB_TYPES = WORKSPACE_PANE_TAB_TYPES
@@ -60,25 +62,25 @@ export interface WorkspacePaneRuntimeTabEntry {
 export type WorkspacePaneTabEntry = WorkspacePaneStaticTabEntry | WorkspacePaneRuntimeTabEntry
 
 export function isWorkspacePaneTabType(value: string | null | undefined): value is WorkspacePaneTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_TAB_TYPES, value)
 }
 
 export function isWorkspacePaneStaticTabType(value: string | null | undefined): value is WorkspacePaneStaticTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_STATIC_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_STATIC_TAB_TYPES, value)
 }
 
 export function isWorkspacePaneRuntimeTabType(value: string | null | undefined): value is WorkspacePaneRuntimeTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_RUNTIME_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_RUNTIME_TAB_TYPES, value)
 }
 
 export function isWorkspacePaneBranchTabType(value: string | null | undefined): value is WorkspacePaneBranchTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_BRANCH_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_BRANCH_TAB_TYPES, value)
 }
 
 export function isWorkspacePaneWorktreeStaticTabType(
   value: string | null | undefined,
 ): value is WorkspacePaneWorktreeStaticTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, value)
 }
 
 export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): WorkspacePaneTabScope {
@@ -98,7 +100,7 @@ export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boo
 }
 
 export function isWorkspacePaneSessionTabType(value: string | null | undefined): value is WorkspacePaneSessionTabType {
-  return typeof value === 'string' && (WORKSPACE_PANE_SESSION_TAB_TYPES as readonly string[]).includes(value)
+  return isStringIn(WORKSPACE_PANE_SESSION_TAB_TYPES, value)
 }
 
 export function isWorkspacePaneTabEntry(value: unknown): value is WorkspacePaneTabEntry {

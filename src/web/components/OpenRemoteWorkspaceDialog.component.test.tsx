@@ -46,7 +46,7 @@ beforeEach(() => {
     vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
       const body =
-        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
       if (url.pathname === '/api/remote/ssh-hosts') {
         return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
       }
@@ -150,7 +150,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
         }
@@ -201,7 +203,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
         }
@@ -251,7 +255,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
         }
@@ -305,7 +311,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return {
             ok: true,
@@ -380,7 +388,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return {
             ok: true,
@@ -477,7 +487,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
       vi.fn(async (input: string | URL, init?: RequestInit) => {
         const url = new URL(typeof input === 'string' ? input : input.toString())
         const body =
-          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+          typeof init?.body === 'string' && init.body.length > 0
+            ? (JSON.parse(init.body) as Record<string, unknown>)
+            : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
           return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
         }

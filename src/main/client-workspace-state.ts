@@ -3,6 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import type { ClientWorkspaceState, NativeClientWorkspaceReadResult } from '#/shared/api-types.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import { windowStateNodeLog } from '#/node/logger.ts'
 
 const CLIENT_WORKSPACE_FILE = 'client-workspace.json'
@@ -16,7 +17,7 @@ export async function readNativeClientWorkspaceState(): Promise<NativeClientWork
   try {
     return { kind: 'loaded', state: JSON.parse(await readFile(clientWorkspaceFile(), 'utf-8')) }
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'missing' }
+    if (hasErrorCode(err, 'ENOENT')) return { kind: 'missing' }
     windowStateNodeLog.warn({ err }, 'failed to read client workspace state')
     throw err
   }

@@ -66,14 +66,15 @@ export class ClientRealtimeRequestError extends Error {
 export interface ClientRealtimeSocketConnectionOptions<
   TInputs extends object,
   TOutputs extends object,
-  TServerMessage,
   TRealtimeMessage,
 > {
   resolveConnection: () => ClientRealtimeSocketConnectionConfig | null
   hasRealtimeSubscribers: () => boolean
   onOpen?(currentClientId: string): void
   onRealtimeMessage(message: TRealtimeMessage, currentClientId: string): void
-  parseServerMessage(data: unknown): TServerMessage | null
+  parseServerMessage(
+    data: unknown,
+  ): TRealtimeMessage | RealtimeResponseMessage<RealtimeAction<TInputs, TOutputs>> | RealtimePongMessage | null
   encodeClientMessage(message: unknown): string
   createRequestId(): string
   errorPrefix: string
@@ -89,13 +90,8 @@ export interface ClientRealtimeSocketConnection<TInputs extends object, TOutputs
   ): Promise<TOutputs[TAction]>
 }
 
-export function createClientRealtimeSocketConnection<
-  TInputs extends object,
-  TOutputs extends object,
-  TServerMessage,
-  TRealtimeMessage,
->(
-  options: ClientRealtimeSocketConnectionOptions<TInputs, TOutputs, TServerMessage, TRealtimeMessage>,
+export function createClientRealtimeSocketConnection<TInputs extends object, TOutputs extends object, TRealtimeMessage>(
+  options: ClientRealtimeSocketConnectionOptions<TInputs, TOutputs, TRealtimeMessage>,
 ): ClientRealtimeSocketConnection<TInputs, TOutputs> {
   type Action = RealtimeAction<TInputs, TOutputs>
   type Output = TOutputs[Action]
@@ -296,7 +292,10 @@ export function createClientRealtimeSocketConnection<
     }, REALTIME_SOCKET_OPEN_TIMEOUT_MS)
   }
 
-  function handleSocketMessage(message: TServerMessage, currentClientId: string): void {
+  function handleSocketMessage(
+    message: TRealtimeMessage | RealtimeResponseMessage<Action> | RealtimePongMessage,
+    currentClientId: string,
+  ): void {
     if (isRealtimeResponseMessage<Action>(message)) {
       settleSocketRequest(message)
       return
@@ -305,7 +304,7 @@ export function createClientRealtimeSocketConnection<
       settleHealthProbe(message)
       return
     }
-    options.onRealtimeMessage(message as unknown as TRealtimeMessage, currentClientId)
+    options.onRealtimeMessage(message, currentClientId)
   }
 
   function startHeartbeat(currentSocket: WebSocket, generation: number): void {

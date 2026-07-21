@@ -536,7 +536,7 @@ export interface AppIpcHandlers {
 
 export interface NativeHostIpcHandlers {
   clientWorkspace: {
-    read: () => Promise<NativeClientWorkspaceReadResult>
+    read: (_input: undefined) => Promise<NativeClientWorkspaceReadResult>
     write: (input: ClientWorkspaceState) => Promise<void>
   }
   settings: {
@@ -589,42 +589,29 @@ export class IpcError extends Error {
   }
 }
 
-type ValibotSchema = Parameters<typeof v.safeParse>[0]
+type IpcInputSchema<TInput> = v.BaseSchema<unknown, TInput, v.BaseIssue<unknown>>
 
-function parseIpcInput<T>(schema: ValibotSchema, input: unknown): T {
+function parseIpcInput<TInput>(schema: IpcInputSchema<TInput>, input: unknown): TInput {
   const parsed = v.safeParse(schema, input)
   if (!parsed.success) throw new IpcError({ code: 'BAD_REQUEST', message: 'Invalid IPC input' })
-  return parsed.output as T
+  return parsed.output
 }
 
 function createValidatedProcedure<TInput, TOutput>(
-  schema: ValibotSchema,
+  schema: IpcInputSchema<TInput>,
   handler: (input: TInput) => Promise<TOutput> | TOutput,
 ): (input: unknown) => Promise<TOutput> {
   return async (input: unknown) => await handler(parseIpcInput<TInput>(schema, input))
 }
 
-function createValidatedNamespace<THandlers extends Record<string, (...args: never[]) => unknown>>(
-  handlers: THandlers,
-  schemas: { [K in keyof THandlers]: ValibotSchema },
-): { [K in keyof THandlers]: (input: unknown) => Promise<Awaited<ReturnType<THandlers[K]>>> } {
-  const procedures = {} as { [K in keyof THandlers]: (input: unknown) => Promise<Awaited<ReturnType<THandlers[K]>>> }
-  for (const key of Object.keys(schemas) as Array<keyof THandlers>) {
-    const schema = schemas[key]
-    const handler = handlers[key]
-    procedures[key] = createValidatedProcedure(
-      schema,
-      async (input: unknown) => await (handler as unknown as (input: unknown) => unknown)(input),
-    ) as {
-      [K in keyof THandlers]: (input: unknown) => Promise<Awaited<ReturnType<THandlers[K]>>>
-    }[typeof key]
-  }
-  return procedures
-}
-
+// These projections are intentionally derived from the handler authority: a
+// new native procedure must add a schema and a caller implementation before
+// createAppRouter can satisfy AppRouter.
 type AppRouterCaller = {
-  [NS in keyof NativeHostIpcHandlers]: {
-    [K in keyof NativeHostIpcHandlers[NS]]: NativeHostIpcHandlers[NS][K] extends (...args: never[]) => infer TOutput
+  [Namespace in keyof NativeHostIpcHandlers]: {
+    [Procedure in keyof NativeHostIpcHandlers[Namespace]]: NativeHostIpcHandlers[Namespace][Procedure] extends (
+      ...args: never[]
+    ) => infer TOutput
       ? (input: unknown) => Promise<Awaited<TOutput>>
       : never
   }
@@ -635,17 +622,32 @@ export interface AppRouter {
 }
 
 type NativeHostIpcProcedureSchemas = {
-  [NS in keyof NativeHostIpcHandlers]: { [Proc in keyof NativeHostIpcHandlers[NS]]: ValibotSchema }
+  [Namespace in keyof NativeHostIpcHandlers]: {
+    [Procedure in keyof NativeHostIpcHandlers[Namespace]]: NativeHostIpcHandlers[Namespace][Procedure] extends (
+      input: infer TInput,
+    ) => unknown
+      ? IpcInputSchema<TInput>
+      : never
+  }
 }
 
 export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: NativeHostIpcProcedureSchemas): AppRouter {
   return {
-    createCaller: () => {
-      const caller: Record<string, unknown> = {}
-      for (const namespace of Object.keys(schemas) as Array<keyof NativeHostIpcHandlers>) {
-        caller[namespace] = createValidatedNamespace(handlers[namespace], schemas[namespace])
-      }
-      return caller as AppRouterCaller
-    },
+    createCaller: () => ({
+      clientWorkspace: {
+        read: createValidatedProcedure(schemas.clientWorkspace.read, handlers.clientWorkspace.read),
+        write: createValidatedProcedure(schemas.clientWorkspace.write, handlers.clientWorkspace.write),
+      },
+      settings: {
+        setGlobalShortcut: createValidatedProcedure(
+          schemas.settings.setGlobalShortcut,
+          handlers.settings.setGlobalShortcut,
+        ),
+        applyNativeHostProjection: createValidatedProcedure(
+          schemas.settings.applyNativeHostProjection,
+          handlers.settings.applyNativeHostProjection,
+        ),
+      },
+    }),
   }
 }

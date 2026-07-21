@@ -62,6 +62,7 @@ function runTypeScript(project: (typeof PROJECTS)[number], index: number): Promi
 
 await runPreflightCheck('scripts/check-boundaries.ts', 'architecture boundary check')
 await runPreflightCheck('scripts/check-no-html-injection.ts', 'no-html-injection check')
+await runPreflightCheck('scripts/check-type-assertions.ts', 'type assertion check')
 
 for (const [index, project] of PROJECTS.entries()) {
   await runTypeScript(project, index)
