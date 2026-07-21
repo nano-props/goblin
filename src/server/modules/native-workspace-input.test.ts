@@ -40,6 +40,20 @@ describe('native workspace input', () => {
     expect(formatNativeDirectorySuggestion(plan, 'Developer')).toBe('~/Developer')
   })
 
+  test.each([
+    ['posix' as const, '/', '~/Developer', '/Developer'],
+    ['win32' as const, 'C:\\', '~\\Developer', 'C:\\Developer'],
+  ])('expands a root home without duplicating separators on %s', (platform, home, input, expected) => {
+    expect(workspaceLocatorFromNativeCommandInput(input, platform, home)).toContain(expected.replaceAll('\\', '/'))
+    expect(planNativeDirectorySuggestions(input, platform, home)?.searchRoot).toBe(home)
+  })
+
+  test('rejects a completed suggestion that final workspace admission cannot represent', () => {
+    const plan = planNativeDirectorySuggestions('/tmp/bad', 'posix', '/home/example')!
+    expect(formatNativeDirectorySuggestion(plan, 'bad\\name')).toBeNull()
+    expect(formatNativeDirectorySuggestion(plan, 'bad\nname')).toBeNull()
+  })
+
   test('uses platform case policy while preserving actual names', () => {
     expect(nativeLeafMatches('Developer', 'dev', 'posix')).toBe(false)
     expect(nativeLeafMatches('Developer', 'dev', 'win32')).toBe(true)

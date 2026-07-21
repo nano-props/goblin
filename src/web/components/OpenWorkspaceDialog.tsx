@@ -26,6 +26,7 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const compact = useIsCompactUi()
   const [path, setPath] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [pathSuggestionsOpen, setPathSuggestionsOpen] = useState(false)
   const { pending, reset, runLatest } = useLatestAsyncTask()
 
   const trimmedPath = path.trim()
@@ -86,6 +87,9 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
       showCloseButton={!pending}
       title={t('workspace-picker.open-title')}
       description={t('workspace-picker.open-description')}
+      onEscapeKeyDown={(event) => {
+        if (pathSuggestionsOpen) event.preventDefault()
+      }}
     >
       <form
         className="space-y-0"
@@ -113,6 +117,7 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
               placeholder={t('workspace-picker.open-path-placeholder')}
               className="min-w-0 flex-1"
               inputClassName="text-xs"
+              onPopupOpenChange={setPathSuggestionsOpen}
             />
             {canChoosePath ? (
               <Button

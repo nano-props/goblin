@@ -49,9 +49,11 @@ export function planNativeDirectorySuggestions(
   }
 }
 
-export function formatNativeDirectorySuggestion(plan: NativeDirectorySuggestionPlan, name: string): string {
+export function formatNativeDirectorySuggestion(plan: NativeDirectorySuggestionPlan, name: string): string | null {
   const implementation = plan.platform === 'win32' ? path.win32 : path.posix
   const absolute = implementation.join(plan.searchRoot, name)
+  if (!formatWorkspaceLocator({ transport: 'file', platform: plan.platform, path: absolute }, plan.platform))
+    return null
   if (plan.displayMode === 'absolute') return absolute
   const relative = implementation.relative(plan.homeDir, absolute)
   const separator = plan.platform === 'win32' ? '\\' : '/'
@@ -68,7 +70,8 @@ function expandNativeHomePath(input: string, platform: WorkspaceLocatorPlatform,
   if (!isHomeRelative(input, platform)) return input
   if (!homeDir || !isNativeAbsoluteWorkspacePath(homeDir, platform)) return null
   if (input === '~') return homeDir
-  return `${homeDir}${input.slice(1)}`
+  const separator = platform === 'win32' ? '\\' : '/'
+  return homeDir.endsWith(separator) ? `${homeDir}${input.slice(2)}` : `${homeDir}${input.slice(1)}`
 }
 
 function isHomeRelative(input: string, platform: WorkspaceLocatorPlatform): boolean {

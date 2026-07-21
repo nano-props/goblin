@@ -39,6 +39,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [pathSuggestionsOpen, setPathSuggestionsOpen] = useState(false)
   const hostInputRef = useRef<HTMLInputElement | null>(null)
   const pathInputRef = useRef<HTMLInputElement | null>(null)
   const pending = loading
@@ -171,6 +172,9 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
       className="sm:max-w-xl"
       title={t('workspace-picker.open-remote-title')}
       description={t('workspace-picker.open-remote-description')}
+      onEscapeKeyDown={(event) => {
+        if (pathSuggestionsOpen) event.preventDefault()
+      }}
     >
       <form
         className="space-y-3"
@@ -257,6 +261,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
             emptyLabel={t('workspace-picker.open-remote-path-no-matches')}
             placeholder={t('workspace-picker.open-remote-path-placeholder')}
             aria-invalid={!!pathFieldError}
+            onPopupOpenChange={setPathSuggestionsOpen}
           />
           {pathFieldError ? (
             <FieldError reserveHeight>{t(pathFieldError)}</FieldError>

@@ -49,6 +49,7 @@ interface DirectoryPathSuggestionsProps {
   autoFocus?: boolean
   className?: string
   inputClassName?: string
+  onPopupOpenChange?: (open: boolean) => void
   ref?: Ref<HTMLInputElement>
   /** Forwarded onto the underlying <input>; mirror the same `aria-invalid`
    *  you would put on Input so the error styling still applies. */
@@ -69,6 +70,7 @@ export function DirectoryPathSuggestions({
   autoFocus,
   className,
   inputClassName,
+  onPopupOpenChange,
   ref,
   'aria-invalid': ariaInvalid,
   'aria-describedby': ariaDescribedBy,
@@ -115,6 +117,11 @@ export function DirectoryPathSuggestions({
   const showEmptyState = !hasMatches && hasTypedQuery && hasFetched && !isLoading
   const showContent = !disabled && (hasMatches || showEmptyState)
   const isOpen = open && showContent
+
+  useEffect(() => {
+    onPopupOpenChange?.(isOpen)
+    return () => onPopupOpenChange?.(false)
+  }, [isOpen, onPopupOpenChange])
 
   useEffect(() => {
     if (!isOpen) return

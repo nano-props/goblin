@@ -2,6 +2,7 @@
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -84,6 +85,34 @@ describe('OpenWorkspaceDialog', () => {
     expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer')
     expect(input('#open-workspace-path').parentElement?.className).toContain('min-w-0')
     expect(mocks.getLocalDirectoryPathSuggestions).toHaveBeenCalledWith('/Users/tester/Dev', expect.any(AbortSignal))
+  })
+
+  test('lets the popup own the first Escape before the dialog owns the second', async () => {
+    useFakeTimers()
+    const onClose = vi.fn()
+    mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
+    render(
+      <OpenWorkspaceDialog
+        open
+        onClose={onClose}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer'),
+        }))}
+      />,
+    )
+    setInputValue('#open-workspace-path', '/Users/tester/Dev')
+    await act(async () => await advanceTimersAndFlush(350))
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    expect(document.querySelector('[role="listbox"]')).not.toBeNull()
+
+    await user.keyboard('{Escape}')
+    expect(document.querySelector('[role="listbox"]')).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   test('keeps the inline status row mounted', () => {

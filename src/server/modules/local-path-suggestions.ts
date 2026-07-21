@@ -36,7 +36,8 @@ export async function getLocalPathSuggestions(prefix: string, signal?: AbortSign
       inspected += 1
       if (!nativeLeafMatches(entry.name, plan.typedLeaf, plan.platform)) continue
       if (!(await isDirectoryEntry(entry, plan.searchRoot, signal))) continue
-      suggestions.push(formatNativeDirectorySuggestion(plan, entry.name))
+      const suggestion = formatNativeDirectorySuggestion(plan, entry.name)
+      if (suggestion) suggestions.push(suggestion)
     }
   } catch (error) {
     if (!isExpectedFilesystemError(error)) throw error

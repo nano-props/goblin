@@ -43,6 +43,15 @@ describe('getLocalPathSuggestions', () => {
     const root = await temporaryDirectory()
     await expect(getLocalPathSuggestions(path.join(root, 'missing', 'child'))).resolves.toEqual([])
   })
+
+  test('omits directories that final workspace admission cannot represent', async () => {
+    const root = await temporaryDirectory()
+    await mkdir(path.join(root, 'valid'))
+    await mkdir(path.join(root, 'invalid\\name'))
+    await mkdir(path.join(root, 'invalid\nname'))
+
+    await expect(getLocalPathSuggestions(`${root}${path.sep}`)).resolves.toEqual([path.join(root, 'valid')])
+  })
 })
 
 async function temporaryDirectory(): Promise<string> {
