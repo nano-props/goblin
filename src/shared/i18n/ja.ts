@@ -91,6 +91,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-description': 'ローカルパスを入力するか、フォルダを選択します。',
   'workspace-picker.open-path-label': 'フォルダのパス',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
+  'workspace-picker.open-path-no-matches': '一致するフォルダがありません',
   'workspace-picker.open-path-choose': '選択…',
   'workspace-picker.open-local-confirm': 'ワークスペースを開く',
   'workspace-picker.open-opening': '開いています…',

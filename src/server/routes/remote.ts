@@ -48,8 +48,8 @@ export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost:
     )
   })
   app.post('/path-suggestions', async (c) => {
-    const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)
-    return c.json(await getServerRemotePathSuggestions({ alias, remotePath, prefix }, c.req.raw.signal))
+    const { alias, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)
+    return c.json(await getServerRemotePathSuggestions({ alias, prefix }, c.req.raw.signal))
   })
   app.post('/test-workspace', async (c) => {
     const { target } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.testWorkspace, c)

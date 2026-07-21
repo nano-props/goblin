@@ -200,7 +200,7 @@ describe('CreateWorktreePageBody', () => {
     render(<CreateWorktreePageBody repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
-    const pathInput = screen.getByRole('textbox', { name: /action.create-worktree-path-label/i })
+    const pathInput = screen.getByRole('combobox', { name: /action.create-worktree-path-label/i })
     await user.clear(pathInput)
     await user.type(pathInput, '~/trees/repo-feature-new')
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))

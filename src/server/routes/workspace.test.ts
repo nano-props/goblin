@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   publishUserRepoQueryInvalidation: vi.fn(),
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
+  getLocalPathSuggestions: vi.fn(),
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
@@ -49,6 +50,9 @@ vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
   openWorkspaceTerminal: mocks.openWorkspaceTerminal,
   openWorkspaceEditor: mocks.openWorkspaceEditor,
   openWorkspaceInFinder: mocks.openWorkspaceInFinder,
+}))
+vi.mock('#/server/modules/local-path-suggestions.ts', () => ({
+  getLocalPathSuggestions: mocks.getLocalPathSuggestions,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishUserRepoQueryInvalidation: mocks.publishUserRepoQueryInvalidation,
@@ -92,7 +96,26 @@ describe('workspace routes', () => {
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '' })
+    mocks.getLocalPathSuggestions.mockResolvedValue(['/srv/repo'])
   })
+
+  test('returns bounded local path suggestions from a validated POST body', async () => {
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+    const response = await post(app, '/path-suggestions', { prefix: '/srv/re' })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(['/srv/repo'])
+    expect(mocks.getLocalPathSuggestions).toHaveBeenCalledWith('/srv/re', expect.any(AbortSignal))
+  })
+
+  test.each([`/srv/${'a'.repeat(4096)}`, '/srv/line\nbreak'])(
+    'rejects an invalid local path suggestion prefix',
+    async (prefix) => {
+      const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+      expect((await post(app, '/path-suggestions', { prefix })).status).toBe(400)
+      expect(mocks.getLocalPathSuggestions).not.toHaveBeenCalled()
+    },
+  )
 
   test('opens a command input as one canonical workspace runtime', async () => {
     const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))

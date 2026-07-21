@@ -4,10 +4,10 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
-import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
+import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
-import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
+import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import {
   getRemoteSshHosts,
@@ -46,10 +46,9 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const pathFieldError = remotePath.trim() ? pathError.errorKey : null
   const canSubmit = canSubmitRemoteWorkspace({ alias, remotePath, pending })
   const error = actionError ?? loadError
-  const remotePathSuggestions = useRemotePathSuggestions({
+  const remotePathSuggestions = useDirectoryPathSuggestions({
     enabled: open && !pending,
-    alias,
-    remotePath: remotePath.trim() || '/',
+    source: { kind: 'ssh', alias },
     prefix: remotePath,
   })
 
@@ -243,7 +242,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
 
         <Field className="gap-2" data-invalid={pathFieldError ? true : undefined}>
           <FieldLabel htmlFor="remote-path">{t('workspace-picker.open-remote-path-label')}</FieldLabel>
-          <RemotePathSuggestions
+          <DirectoryPathSuggestions
             id="remote-path"
             ref={pathInputRef}
             disabled={pending}

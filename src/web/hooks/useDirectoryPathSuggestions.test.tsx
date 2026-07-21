@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// Tests for the dedupe + filter behavior of useRemotePathSuggestions.
+// Tests for the current-query lifecycle shared by local and SSH suggestions.
 // The hook's contract with the server is:
 //   • only fetch when `enabled`, an `alias`, and a resolvable
 //     `prefix` are all present
@@ -11,33 +11,42 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
+import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 
 vi.mock('#/web/remote-workspace-client.ts', () => ({
   getRemotePathSuggestions: vi.fn(),
 }))
+vi.mock('#/web/workspace-client.ts', () => ({
+  getLocalDirectoryPathSuggestions: vi.fn(),
+}))
+vi.mock('#/web/stores/host-info.ts', () => ({
+  getPlatform: () => 'linux',
+}))
 
 import { getRemotePathSuggestions } from '#/web/remote-workspace-client.ts'
+import { getLocalDirectoryPathSuggestions } from '#/web/workspace-client.ts'
 
 const mockedFetch = vi.mocked(getRemotePathSuggestions)
+const mockedLocalFetch = vi.mocked(getLocalDirectoryPathSuggestions)
 
 beforeEach(() => {
   // Default no-op so the debounced fetch in the hook settles without
   // hitting the network. Per-test mocks override this.
   mockedFetch.mockResolvedValue([])
+  mockedLocalFetch.mockResolvedValue([])
 })
 
 afterEach(() => {
   mockedFetch.mockReset()
+  mockedLocalFetch.mockReset()
 })
 
-describe('useRemotePathSuggestions', () => {
+describe('useDirectoryPathSuggestions', () => {
   test('dedupes duplicate paths while preserving server order', async () => {
     mockedFetch.mockResolvedValue(['/srv/a', '/srv/b', '/srv/a', '/srv/c', '/srv/b'])
     const result = await renderHookAndWaitForFetch({
       enabled: true,
       alias: 'host',
-      remotePath: '/srv',
       prefix: '/srv/',
     })
 
@@ -55,7 +64,6 @@ describe('useRemotePathSuggestions', () => {
     const result = await renderHookAndWaitForFetch({
       enabled: true,
       alias: 'host',
-      remotePath: '/srv',
       prefix: '/srv/',
     })
 
@@ -71,14 +79,13 @@ describe('useRemotePathSuggestions', () => {
     const result = await renderHookAndWaitForFetch({
       enabled: true,
       alias: 'host',
-      remotePath: '/srv',
       prefix: '/srv/',
     })
 
     expect(result).toEqual({
       suggestions: [],
       isLoading: false,
-      hasFetched: true,
+      hasFetched: false,
     })
   })
 
@@ -86,7 +93,6 @@ describe('useRemotePathSuggestions', () => {
     const emptyAlias = await renderHookAndWaitForFetch({
       enabled: true,
       alias: '',
-      remotePath: '/srv',
       prefix: '/srv/',
     })
     expect(emptyAlias).toEqual({
@@ -99,7 +105,6 @@ describe('useRemotePathSuggestions', () => {
     const emptyPrefix = await renderHookAndWaitForFetch({
       enabled: true,
       alias: 'host',
-      remotePath: '/srv',
       prefix: '',
     })
     expect(emptyPrefix).toEqual({
@@ -122,7 +127,6 @@ describe('useRemotePathSuggestions', () => {
     const snapshots = await renderHookLifecycle({
       enabled: true,
       alias: 'host',
-      remotePath: '/srv',
       prefix: '/srv/',
     })
 
@@ -157,10 +161,9 @@ describe('useRemotePathSuggestions', () => {
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
     function Host({ prefix }: { prefix: string }) {
-      const state = useRemotePathSuggestions({
+      const state = useDirectoryPathSuggestions({
         enabled: true,
-        alias: 'host',
-        remotePath: '/srv',
+        source: { kind: 'ssh', alias: 'host' },
         prefix,
       })
       snapshots.push(state)
@@ -214,19 +217,53 @@ describe('useRemotePathSuggestions', () => {
       vi.useRealTimers()
     }
   })
+
+  test('uses the local source and hides stale rows synchronously when identity changes', async () => {
+    vi.useFakeTimers()
+    mockedLocalFetch.mockResolvedValueOnce(['/srv/alpha']).mockResolvedValueOnce(['/srv/beta'])
+    const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
+
+    function Host({ prefix }: { prefix: string }) {
+      const state = useDirectoryPathSuggestions({ enabled: true, source: { kind: 'local' }, prefix })
+      snapshots.push(state)
+      return null
+    }
+
+    const { rerender } = renderInJsdom(<Host prefix="/srv/a" />)
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(350)
+      })
+      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/alpha'])
+      expect(mockedLocalFetch).toHaveBeenCalledWith('/srv/a', expect.any(AbortSignal))
+
+      rerender(<Host prefix="/srv/b" />)
+      expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(350)
+      })
+      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/beta'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 interface RenderInput {
   enabled: boolean
   alias: string
-  remotePath: string
   prefix: string
 }
 
 async function renderHookAndWaitForFetch(input: RenderInput) {
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
   function Host() {
-    captured = useRemotePathSuggestions(input)
+    captured = useDirectoryPathSuggestions({
+      enabled: input.enabled,
+      source: { kind: 'ssh', alias: input.alias },
+      prefix: input.prefix,
+    })
     return null
   }
   renderInJsdom(<Host />)
@@ -241,7 +278,11 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
 async function renderHookLifecycle(input: RenderInput) {
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
   function Host() {
-    const state = useRemotePathSuggestions(input)
+    const state = useDirectoryPathSuggestions({
+      enabled: input.enabled,
+      source: { kind: 'ssh', alias: input.alias },
+      prefix: input.prefix,
+    })
     snapshots.push(state)
     return null
   }

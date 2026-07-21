@@ -2,11 +2,11 @@ import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   RemoteDiagnosticsResult,
-  RemotePathSuggestionsInput,
   RemoteWorkspaceLifecycleCommandResult,
   RemoteWorkspaceTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
+import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /** Server-side result for resolve-target: concrete target or an i18n
@@ -41,7 +41,7 @@ export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {
 }
 
 export async function getRemotePathSuggestions(
-  input: RemotePathSuggestionsInput,
+  input: RemoteDirectoryPathSuggestionsInput,
   signal?: AbortSignal,
 ): Promise<string[]> {
   return await postServerJson('/api/remote/path-suggestions', input, { signal })

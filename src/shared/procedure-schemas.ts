@@ -24,6 +24,7 @@ import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
@@ -62,6 +63,7 @@ const WorkspaceRuntimeCloseSchema = v.object({
 const EmptyBodySchema = v.optional(v.object({}))
 
 export const WORKSPACE_PROCEDURE_SCHEMAS = {
+  pathSuggestions: v.object({ prefix: DirectoryPathPrefixSchema }),
   refresh: v.object({
     workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
