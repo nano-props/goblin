@@ -99,17 +99,15 @@ import {
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
-type RepoWriteBoundary =
-  | { kind: 'local-git'; commonDir: string; generationKey: RepositoryGenerationKey }
-  | { kind: 'remote-git'; executionIdentity: string; generationKey: RepositoryGenerationKey }
-
 /**
- * Identifies the physical common-dir/object-store incarnation. A logical reset
- * that preserves both directories (but rewrites HEAD, refs, or config)
- * intentionally remains the same repository boundary; detecting that would
+ * generationKey identifies the physical common-dir/object-store incarnation.
+ * A logical reset that preserves both directories (but rewrites HEAD, refs, or
+ * config) intentionally remains the same boundary; detecting that would
  * require an application-owned persistent token.
  */
-type RepositoryGenerationKey = string
+type RepoWriteBoundary =
+  | { kind: 'local-git'; commonDir: string; generationKey: string }
+  | { kind: 'remote-git'; executionIdentity: string; generationKey: string }
 
 export interface RepoMutationResult extends ExecResult {
   /**
