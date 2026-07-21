@@ -23,10 +23,19 @@ export interface GoblinNativeBridge {
     consumeExternalOpenPaths: () => Promise<string[]>
   }
   terminal: {
+    // Optional methods allow an older or partial preload to expose only the
+    // capabilities it implements. The client derives feature flags from the
+    // live bridge shape and hides controls for unavailable methods.
     notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
     sendTestNotification?: (input: TerminalTestNotificationInput) => Promise<boolean>
     setBadge?: (count: number) => void
   }
+  /**
+   * Persist clipboard or dropped file blobs through the native host. The
+   * preload returns an empty list on failure, so callers distinguish transfer
+   * failures from unsafe-path filtering outside this bridge contract.
+   */
   saveClipboardFiles: (files: File[]) => Promise<string[]>
+  /** Embedded Electron capability; browser and older preload builds omit it. */
   rotateAccessToken?: () => Promise<{ accessToken: string }>
 }
