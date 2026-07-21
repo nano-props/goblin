@@ -1,24 +1,17 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/background-sync-client')
 
 describe('background sync client registration', () => {
-  beforeEach(() => {
-    window.sessionStorage.clear()
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
-  })
-
   afterEach(() => {
-    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
-  test('persists a strictly increasing revision with each client declaration', async () => {
+  test('increments the page-scoped revision with each client declaration', async () => {
     const bodies: Array<{ clientId: string; revision: number }> = []
     vi.stubGlobal(
       'fetch',
@@ -35,8 +28,5 @@ describe('background sync client registration', () => {
     expect(bodies).toHaveLength(2)
     expect(bodies[0]?.clientId).toBe(bodies[1]?.clientId)
     expect(bodies[1]?.revision).toBe((bodies[0]?.revision ?? 0) + 1)
-    expect(window.sessionStorage.getItem('goblin:background-sync-registration-revision')).toBe(
-      String(bodies[1]?.revision),
-    )
   })
 })

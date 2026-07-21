@@ -10,5 +10,5 @@ Use this doc for the server-first client model.
 - Prefer shared server-backed terminal, session, and realtime paths across web and Electron.
 - Keep client identity semantics aligned across web and Electron:
   - `userId`: authenticated terminal user. The server partitions session visibility, lifecycle cleanup, and realtime fanout by this id.
-  - `clientId`: logical client for one browser tab or Electron client. It validates and routes requests, but it does not own sessions.
+  - `clientId`: logical client for one loaded browser page or Electron renderer instance. It validates and routes requests, but it does not own sessions.
   - Describe reconnect, mirror, and takeover in user/client/attachment terms, not Electron window terms. In the terminal wire protocol, the attachment/controller identity is represented by `clientId`; do not introduce a separate `attachmentId` for multiple independent views inside one client, because that product mode is intentionally out of scope.

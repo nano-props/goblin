@@ -347,7 +347,7 @@ authority.
 The terminal system relies on these identity/grouping scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
-- **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
+- **clientId**: the logical client for one loaded browser page or Electron renderer instance. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
 - **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane runtime tabs store this value as their generic `runtimeSessionId`.
 - **terminalFilesystemTargetKey**: the runtime-neutral grouping key produced by `formatTerminalFilesystemTargetKey(workspaceId, executionRootId)`. It is used for per-filesystem-target selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It does not contain `workspaceRuntimeId` and is not a terminal identity or execution authority.
 - **terminalRuntimeSessionId**: the server-owned runtime lookup id used by attach,

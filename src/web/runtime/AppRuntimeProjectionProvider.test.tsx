@@ -41,6 +41,8 @@ const projectionMocks = vi.hoisted(() => ({
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(),
 }))
 
+vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
+
 vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,
 }))
@@ -93,7 +95,6 @@ describe('AppRuntimeProjectionProvider', () => {
     resetWorkspacesStore()
     useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
     primaryWindowQueryClient.clear()
-    window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
@@ -102,7 +103,7 @@ describe('AppRuntimeProjectionProvider', () => {
           bridgeVersion: CLIENT_BRIDGE_VERSION,
           capabilities: [],
         },
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
     })
     setClientBridgeForTests(testBridge())

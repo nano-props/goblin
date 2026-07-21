@@ -67,7 +67,7 @@ interface TerminalRuntimeActionDependencies {
 }
 
 // Manager, broker, and session service all use `userId` as the terminal
-// partition. `clientId` remains a per-tab request validator/routing
+// partition. `clientId` remains a per-page request validator/routing
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {

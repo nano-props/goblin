@@ -96,6 +96,14 @@ export function registerTerminalClient(
   state.attachments.set(clientId, { cols, rows })
 }
 
+/** Removes transient authority owned by an expired page instance. */
+export function expireTerminalClient(state: TerminalControllerState, clientId: string): boolean {
+  const attachmentRemoved = state.attachments.delete(clientId)
+  const controlled = state.controllerClientId === clientId
+  if (controlled) state.controllerClientId = null
+  return attachmentRemoved || controlled
+}
+
 export function attachTerminalClient(
   state: TerminalControllerState,
   clientId: string,

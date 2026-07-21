@@ -146,7 +146,7 @@ describe('client bootstrap', () => {
 
   test('prefers the configured client bridge over directly reading window.goblinNative', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
-      initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret' },
     })
     const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setClientBridgeForTests({
@@ -211,7 +211,7 @@ describe('client bootstrap', () => {
 
   test('reads injected web bootstrap when the Electron bridge is unavailable', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -227,7 +227,7 @@ describe('client bootstrap', () => {
 
   test('reads injected web bootstrap from the html json script when the Electron bridge is unavailable', async () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -269,7 +269,6 @@ describe('client bootstrap', () => {
       initialServer: {
         url: 'http://127.0.0.1:32100/',
         accessToken: 'test-secret',
-        clientId: expect.stringMatching(/^client-/),
       },
     })
   })

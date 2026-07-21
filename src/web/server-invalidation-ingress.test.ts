@@ -55,7 +55,7 @@ describe('server invalidation source', () => {
       configurable: true,
       value: {
         runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-        initialServer: { url: 'http://127.0.0.1:5173/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:5173/', accessToken: 'secret' },
       },
     })
   })

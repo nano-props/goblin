@@ -32,8 +32,8 @@ vi.mock('#/web/settings-actions.ts', () => ({
   restoreWorkspaceTabsOnView: mocks.restoreWorkspaceTabsOnView,
 }))
 
-vi.mock('#/web/client-terminal-id.ts', () => ({
-  readOrCreateWebTerminalClientId: () => 'test-client-id',
+vi.mock('#/web/client-page-id.ts', () => ({
+  readClientPageId: () => 'test-client-id',
 }))
 
 vi.mock('#/web/stores/workspaces/store.ts', async (importActual) => {

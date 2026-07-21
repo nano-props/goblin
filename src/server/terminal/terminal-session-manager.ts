@@ -26,6 +26,7 @@ import {
   attachTerminalClient,
   claimTerminalClientControl,
   effectiveTerminalController,
+  expireTerminalClient,
   explainAuthority,
   isAuthoritative,
   registerTerminalClient,
@@ -107,6 +108,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
    *  realtime event can tell siblings to disable the write path
    *  the moment the takeover starts. */
   takeoverPending: boolean
+  workspaceRuntimeRetention: { release(): void } | null
 }
 
 export interface TerminalEventSink<TUser extends string | number> {
@@ -126,6 +128,15 @@ export interface TerminalEventSink<TUser extends string | number> {
    * reconstructed from incremental terminal events alone.
    */
   onSessionsProjectionChanged?(userId: TUser, event: TerminalSessionsChangedEvent): void
+}
+
+export interface TerminalWorkspaceRuntimeRetentionHost<TUser extends string | number> {
+  retain(
+    userId: TUser,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    terminalRuntimeSessionId: string,
+  ): { release(): void }
 }
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
@@ -169,15 +180,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
+  private readonly workspaceRuntimeRetentions: TerminalWorkspaceRuntimeRetentionHost<TUser>
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
+    workspaceRuntimeRetentions: TerminalWorkspaceRuntimeRetentionHost<TUser>,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
     this.isClientOnline = isClientOnline
+    this.workspaceRuntimeRetentions = workspaceRuntimeRetentions
   }
 
   prepareSession(input: TerminalEnsureSessionInput<TUser>): TerminalSessionPrepareResult {
@@ -285,6 +299,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       // pending flag set on one tab can immediately disable the
       // write path on the others without an identity round-trip.
       takeoverPending: false,
+      workspaceRuntimeRetention: null,
     }
     const reservation = this.directory.reserve({
       id,
@@ -310,7 +325,19 @@ export class TerminalSessionManager<TUser extends string | number> {
         const processName = session.ptyBinding.processName()
         session.presentation = presentation
         committedEffect = this.commitStagedAdmissionController(session, stagedController)
-        reservation.commit(session)
+        const retention = this.workspaceRuntimeRetentions.retain(
+          session.userId,
+          coordinates.workspaceId,
+          coordinates.workspaceRuntimeId,
+          session.id,
+        )
+        try {
+          reservation.commit(session)
+          session.workspaceRuntimeRetention = retention
+        } catch (error) {
+          retention.release()
+          throw error
+        }
         admissionState = 'committed'
         return {
           action: 'created',
@@ -581,6 +608,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     const summary = this.sessionSummary(session)
     this.directory.remove(session)
+    this.releaseWorkspaceRuntimeRetention(session)
     return summary
   }
 
@@ -591,6 +619,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     session.ptyBinding.invalidateOwnership()
     const lifecycleChanged = markTerminalSessionClosed(session)
     this.directory.remove(session)
+    this.releaseWorkspaceRuntimeRetention(session)
     let summary: TerminalSessionSummary | null = null
     try {
       summary = this.sessionSummary(session)
@@ -601,6 +630,13 @@ export class TerminalSessionManager<TUser extends string | number> {
       )
     }
     return { summary, lifecycleChanged }
+  }
+
+  private releaseWorkspaceRuntimeRetention(session: TerminalSessionView<TUser>): void {
+    const retention = session.workspaceRuntimeRetention
+    if (!retention) return
+    session.workspaceRuntimeRetention = null
+    retention.release()
   }
 
   async closeSessionsForUser(userId: TUser): Promise<TerminalBatchRetirementResult> {
@@ -795,6 +831,15 @@ export class TerminalSessionManager<TUser extends string | number> {
       const previousController = this.effectiveControllerWithOverride(session, clientId, previousOnline)
       if (terminalIdentityChanged(session, previousController, this.sessionPresence(session)))
         this.emitIdentity(session)
+    }
+  }
+
+  expireClientAttachments(userId: TUser, clientId: string): void {
+    for (const session of Array.from(this.directory.entries())) {
+      if (session.userId !== userId) continue
+      const previousController = this.effectiveController(session)
+      if (!expireTerminalClient(session, clientId)) continue
+      if (terminalIdentityChanged(session, previousController, this.sessionPresence(session))) this.emitIdentity(session)
     }
   }
 

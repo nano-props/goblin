@@ -18,6 +18,7 @@ interface WorkspaceRuntimeState {
   workspaceId: WorkspaceId
   currentWorkspaceRuntimeId: string | null
   members: Map<string, number>
+  resourceRetainers: Set<string>
   nextMembershipGeneration: number
   remoteLifecycle: RemoteWorkspaceRuntimeLifecycle
   remoteAttemptController: AbortController | null
@@ -109,6 +110,7 @@ function workspaceRuntimeState(userId: string, workspaceId: WorkspaceId): Worksp
     workspaceId,
     currentWorkspaceRuntimeId: null,
     members: new Map(),
+    resourceRetainers: new Set(),
     nextMembershipGeneration: 0,
     remoteLifecycle: { kind: 'idle', attemptId: 0 },
     remoteAttemptController: null,
@@ -202,7 +204,7 @@ function rollbackWorkspaceRuntimeAdmission(input: {
     return
   }
   state.members.delete(clientId)
-  if (state.members.size > 0 || state.activeWorkspaceLifecycleOperations > 0) return
+  if (workspaceRuntimeHasOwners(state)) return
   const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
   if (!workspaceRuntimeId) return
   emitWorkspaceRuntimeClosed({ userId, workspaceId: lease.workspaceId, workspaceRuntimeId })
@@ -278,8 +280,7 @@ function releaseWorkspaceRuntimeMembershipForCurrentState(
   }
   state.members.delete(clientId)
   emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, lease.workspaceId, lease.workspaceRuntimeId)
-  if (state.members.size > 0) return { released: true, runtimeClosed: false }
-  if (state.activeWorkspaceLifecycleOperations > 0) return { released: true, runtimeClosed: false }
+  if (workspaceRuntimeHasOwners(state)) return { released: true, runtimeClosed: false }
   stopWorkspaceRuntimeEpoch(state)
   emitWorkspaceRuntimeClosed({ userId, workspaceId: lease.workspaceId, workspaceRuntimeId: lease.workspaceRuntimeId })
   return { released: true, runtimeClosed: true }
@@ -330,7 +331,7 @@ export function expireWorkspaceRuntimeMembershipLease(
       entry.workspaceId,
       entry.workspaceRuntimeId,
     )
-    if (state.members.size > 0 || state.activeWorkspaceLifecycleOperations > 0) continue
+    if (workspaceRuntimeHasOwners(state)) continue
     const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
     if (!workspaceRuntimeId) continue
     const event = { userId: lease.userId, workspaceId: entry.workspaceId, workspaceRuntimeId }
@@ -357,6 +358,59 @@ export function listWorkspaceRuntimes(userId: string): WorkspaceRuntimeEntry[] {
   return runtimes
 }
 
+export interface WorkspaceRuntimeResourceRetention {
+  release(): void
+}
+
+/** Keeps one server-owned resource attached to its exact runtime generation. */
+export function retainWorkspaceRuntimeResource(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  resourceId: string,
+): WorkspaceRuntimeResourceRetention {
+  const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  if (!state || state.currentWorkspaceRuntimeId !== workspaceRuntimeId) {
+    throw new Error('error.workspace-runtime-stale')
+  }
+  if (state.resourceRetainers.has(resourceId)) throw new Error('workspace runtime resource retention conflict')
+  state.resourceRetainers.add(resourceId)
+  let released = false
+  return {
+    release() {
+      if (released) return
+      released = true
+      releaseWorkspaceRuntimeResource(userId, workspaceId, workspaceRuntimeId, resourceId)
+    },
+  }
+}
+
+function releaseWorkspaceRuntimeResource(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  resourceId: string,
+): void {
+  const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  if (!state || state.currentWorkspaceRuntimeId !== workspaceRuntimeId) return
+  if (!state.resourceRetainers.delete(resourceId) || workspaceRuntimeHasOwners(state)) return
+  stopWorkspaceRuntimeEpoch(state)
+  emitWorkspaceRuntimeClosed({ userId, workspaceId, workspaceRuntimeId })
+}
+
+/** Durable workspace removal invalidates every runtime projected from that global entry. */
+export function closeWorkspaceRuntimesForDurableRemoval(workspaceId: WorkspaceId): number {
+  const closed: WorkspaceRuntimeClosedEvent[] = []
+  for (const [userId, states] of workspaceRuntimesByUser) {
+    const state = states.get(workspaceId)
+    if (!state?.currentWorkspaceRuntimeId) continue
+    const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
+    if (workspaceRuntimeId) closed.push({ userId, workspaceId, workspaceRuntimeId })
+  }
+  for (const event of closed) emitWorkspaceRuntimeClosed(event)
+  return closed.length
+}
+
 /**
  * Reconciles one window's complete membership declaration in a single
  * synchronous server transaction. Other clients' memberships are untouched.
@@ -376,8 +430,7 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
       const workspaceRuntimeId = state.currentWorkspaceRuntimeId
       if (!workspaceRuntimeId || !state.members.delete(clientId)) continue
       emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, state.workspaceId, workspaceRuntimeId)
-      if (state.members.size > 0) continue
-      if (state.activeWorkspaceLifecycleOperations > 0) continue
+      if (workspaceRuntimeHasOwners(state)) continue
       stopWorkspaceRuntimeEpoch(state)
       closed.push({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
     }
@@ -552,6 +605,7 @@ function releaseWorkspaceLifecycleOperation(
   if (
     state.activeWorkspaceLifecycleOperations > 0 ||
     state.members.size > 0 ||
+    state.resourceRetainers.size > 0 ||
     state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId ||
     workspaceRuntimesByUser.get(input.userId)?.get(input.workspaceId) !== state
   ) {
@@ -894,13 +948,15 @@ function startWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string {
     state.currentWorkspaceRuntimeId ||
     state.remoteAttemptController ||
     state.remoteAttemptPromise ||
-    state.activeWorkspaceLifecycleOperations > 0
+    state.activeWorkspaceLifecycleOperations > 0 ||
+    state.resourceRetainers.size > 0
   ) {
     throw new Error('workspace runtime epoch must stop before it starts')
   }
   const workspaceRuntimeId = createOpaqueId('workspace-runtime')
   state.currentWorkspaceRuntimeId = workspaceRuntimeId
   state.members.clear()
+  state.resourceRetainers.clear()
   state.nextMembershipGeneration = 0
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
   return workspaceRuntimeId
@@ -915,7 +971,14 @@ function stopWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string | null 
   state.pendingWorkspaceProbeTransition = null
   state.currentWorkspaceRuntimeId = null
   state.members.clear()
+  state.resourceRetainers.clear()
   return workspaceRuntimeId
+}
+
+function workspaceRuntimeHasOwners(state: WorkspaceRuntimeState): boolean {
+  return (
+    state.members.size > 0 || state.resourceRetainers.size > 0 || state.activeWorkspaceLifecycleOperations > 0
+  )
 }
 
 export function onWorkspaceRuntimeClosed(listener: (event: WorkspaceRuntimeClosedEvent) => void): () => void {

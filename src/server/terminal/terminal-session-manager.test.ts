@@ -39,6 +39,12 @@ const LINKED_WORKTREE_TARGET = {
   root: requiredWorkspaceLocator('goblin+file:///repo-linked/worktree'),
 }
 
+function createWorkspaceRuntimeRetentionHost() {
+  return {
+    retain: vi.fn(() => ({ release: vi.fn() })),
+  }
+}
+
 function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)
   if (!locator) throw new Error('invalid workspace locator fixture')
@@ -136,6 +142,7 @@ function createManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSin
       ...sink,
     },
     () => true,
+    createWorkspaceRuntimeRetentionHost(),
   )
 }
 
@@ -227,6 +234,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
         if (presenceFails) throw new Error('presence unavailable')
         return true
       },
+      createWorkspaceRuntimeRetentionHost(),
     )
     const input = {
       userId: USER_ID,
@@ -270,6 +278,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
         if (presenceFails) throw new Error('presence unavailable')
         return true
       },
+      createWorkspaceRuntimeRetentionHost(),
     )
     const baseInput = {
       userId: USER_ID,
@@ -452,6 +461,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       supervisor,
       { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
       (_userId, clientId) => onlineClients.has(clientId),
+      createWorkspaceRuntimeRetentionHost(),
     )
     const created = await createSession(manager, supervisor)
     onlineClients.delete(CLIENT_ID)
@@ -568,6 +578,72 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     finishRetirement?.()
     await expect(retirement).resolves.toBe(true)
     await expect(manager.requestSessionRetirement(created.terminalRuntimeSessionId)).resolves.toBe(false)
+  })
+
+  test('retains the exact workspace runtime until the terminal session is detached', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const release = vi.fn()
+    const retentions = {
+      retain: vi.fn(() => ({ release })),
+    }
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn() },
+      () => true,
+      retentions,
+    )
+    const created = await createSession(manager, supervisor)
+
+    expect(retentions.retain).toHaveBeenCalledOnce()
+    expect(retentions.retain).toHaveBeenCalledWith(
+      USER_ID,
+      WORKSPACE_ID,
+      WORKTREE_TARGET.workspaceRuntimeId,
+      created.terminalRuntimeSessionId,
+    )
+    expect(release).not.toHaveBeenCalled()
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  test('releases the admission reservation when runtime retention rejects a stale generation', () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn() },
+      () => true,
+      {
+        retain: vi.fn(() => {
+          throw new Error('error.workspace-runtime-stale')
+        }),
+      },
+    )
+    const input = {
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    }
+    const prepared = manager.prepareSession(input)
+    if (!prepared.ok || prepared.admission.kind !== 'prepared') throw new Error('expected prepared admission')
+
+    expect(() =>
+      prepared.admission.commit({
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      }),
+    ).toThrow('error.workspace-runtime-stale')
+    prepared.admission.abort()
+
+    const retried = manager.prepareSession(input)
+    expect(retried).toMatchObject({ ok: true, admission: { kind: 'prepared' } })
+    if (retried.ok && retried.admission.kind === 'prepared') retried.admission.abort()
   })
 
   test('prepares without spawning, then starts at fitted geometry and snapshots only later attaches', async () => {
@@ -814,7 +890,13 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
   test('invalidates a workspace runtime session before failed PTY cleanup settles', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionClosed = vi.fn()
-    const manager = createManager(supervisor, { onSessionClosed })
+    const release = vi.fn()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
+      () => true,
+      { retain: vi.fn(() => ({ release })) },
+    )
     const created = await createSession(manager, supervisor)
     supervisor.killAndWait = vi
       .fn()
@@ -839,6 +921,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       'scope',
     )
     await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledTimes(3))
+    manager.forceShutdown()
+    expect(release).toHaveBeenCalledOnce()
   })
 
   test('keeps a committed invalidation when publication effects fail', async () => {

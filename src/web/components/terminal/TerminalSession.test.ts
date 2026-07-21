@@ -25,6 +25,8 @@ import type {
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
+vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_local' }))
+
 const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
   const fitAddons: any[] = []
@@ -513,7 +515,6 @@ beforeEach(() => {
     configurable: true,
     value: (handle: number) => window.clearTimeout(handle),
   })
-  window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   HTMLElement.prototype.getBoundingClientRect = vi.fn(
     () =>
       ({
@@ -538,7 +539,7 @@ beforeEach(() => {
         bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       pathForFile: vi.fn(),
       onEvent: vi.fn(),
       host: {
@@ -583,7 +584,7 @@ beforeEach(() => {
         bridgeVersion: CLIENT_BRIDGE_VERSION,
         capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
     invokeIpc,
     abortIpc: vi.fn(async () => false),

@@ -51,7 +51,7 @@ function installBootstrap(url: string | null, accessToken: string | null) {
     configurable: true,
     value: {
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-      initialServer: url && accessToken !== null ? { url, accessToken, clientId: 'cid' } : null,
+      initialServer: url && accessToken !== null ? { url, accessToken } : null,
     },
   })
 }

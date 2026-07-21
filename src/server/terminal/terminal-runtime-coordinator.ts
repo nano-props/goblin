@@ -16,7 +16,7 @@ export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
   workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'closeUser'>
   detachedTtlMs: number
-  repoMembershipTtlMs: number
+  clientStateTtlMs: number
 }
 
 export interface TerminalRuntimeCoordinator {
@@ -27,13 +27,13 @@ export interface TerminalRuntimeCoordinator {
 export function createTerminalRuntimeCoordinator(
   options: TerminalRuntimeCoordinatorOptions,
 ): TerminalRuntimeCoordinator {
-  const { manager, workspaceTabsCoordinator, detachedTtlMs, repoMembershipTtlMs } = options
+  const { manager, workspaceTabsCoordinator, detachedTtlMs, clientStateTtlMs } = options
 
   // Detached-user timers key by userId, not clientId. clientId is only
-  // the per-tab routing id; terminal lifetime is owned by the
+  // the page-instance routing id; terminal lifetime is owned by the
   // access-token-derived userId.
   const detachedUsers = new DelayedPresenceExpiry<string>(detachedTtlMs)
-  const detachedClients = new DelayedPresenceExpiry<string>(repoMembershipTtlMs)
+  const clientStateExpiry = new DelayedPresenceExpiry<string>(clientStateTtlMs)
 
   const broker = new RealtimeBroker<AppRealtimeMessage>({
     heartbeatTimeoutReason: 'terminal heartbeat timeout',
@@ -41,9 +41,9 @@ export function createTerminalRuntimeCoordinator(
       const clientKey = workspaceRuntimeClientLeaseKey(event.userId, event.clientId)
       if (event.online) {
         detachedUsers.cancel(event.userId)
-        detachedClients.cancel(clientKey)
+        clientStateExpiry.cancel(clientKey)
       } else {
-        scheduleWorkspaceRuntimeMembershipExpiry(event.userId, event.clientId)
+        scheduleClientStateExpiry(event.userId, event.clientId)
       }
       manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
     },
@@ -64,10 +64,10 @@ export function createTerminalRuntimeCoordinator(
   const unsubscribeMembershipAcquired = onWorkspaceRuntimeMembershipAcquired(({ userId, clientId }) => {
     const clientKey = workspaceRuntimeClientLeaseKey(userId, clientId)
     if (broker.isClientOnline(userId, clientId)) {
-      detachedClients.cancel(clientKey)
+      clientStateExpiry.cancel(clientKey)
       return
     }
-    scheduleWorkspaceRuntimeMembershipExpiry(userId, clientId)
+    scheduleClientStateExpiry(userId, clientId)
   })
 
   return {
@@ -79,7 +79,7 @@ export function createTerminalRuntimeCoordinator(
       broker.disconnectAll()
       unsubscribeMembershipAcquired()
       detachedUsers.shutdown()
-      detachedClients.shutdown()
+      clientStateExpiry.shutdown()
     },
   }
 
@@ -89,12 +89,15 @@ export function createTerminalRuntimeCoordinator(
     await workspaceTabsCoordinator.closeUser({ userId })
   }
 
-  function scheduleWorkspaceRuntimeMembershipExpiry(userId: string, clientId: string): void {
+  function scheduleClientStateExpiry(userId: string, clientId: string): void {
     const lease = captureWorkspaceRuntimeMembershipLease(userId, clientId)
-    detachedClients.schedule(
+    clientStateExpiry.schedule(
       workspaceRuntimeClientLeaseKey(userId, clientId),
       () => broker.isClientOnline(userId, clientId),
-      () => expireWorkspaceRuntimeMembershipLease(lease),
+      () => {
+        manager.expireClientAttachments(userId, clientId)
+        expireWorkspaceRuntimeMembershipLease(lease)
+      },
     )
   }
 }

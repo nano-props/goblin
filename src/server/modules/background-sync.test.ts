@@ -438,6 +438,31 @@ describe('server background sync scheduler', () => {
     expect(getBackgroundSyncRepos(USER_ID)).toEqual([REPO_B])
   })
 
+  test('accepts a fresh revision sequence for a different page owner', async () => {
+    const {
+      beginBackgroundSyncRegistration,
+      commitBackgroundSyncRegistration,
+      getBackgroundSyncRepos,
+      prepareBackgroundSync,
+    } = await import('#/server/modules/background-sync.ts')
+    await prepareBackgroundSync()
+
+    const firstPage = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [
+        { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
+      ]),
+    )
+    const newPage = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, 'background-sync-new-page', 1, [
+        { workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID },
+      ]),
+    )
+
+    expect(commitBackgroundSyncRegistration(firstPage)).toBe(true)
+    expect(commitBackgroundSyncRegistration(newPage)).toBe(true)
+    expect(getBackgroundSyncRepos(USER_ID)).toEqual([REPO_A, REPO_B])
+  })
+
   test('removes a registration when its authoritative Workspace runtime closes', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const {
@@ -462,20 +487,19 @@ describe('server background sync scheduler', () => {
     expect(getBackgroundSyncRepos(USER_ID)).toEqual([])
   })
 
-  test('removes a client-owned target when that membership ends but the shared runtime stays open', async () => {
+  test('removes a client-owned target when a server resource keeps the runtime open', async () => {
     const {
       beginBackgroundSyncRegistration,
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
     } = await import('#/server/modules/background-sync.ts')
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import(
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime, retainWorkspaceRuntimeResource } = await import(
       '#/server/modules/workspace-runtimes.ts'
     )
     const ownerClientId = 'background-sync-owner-client'
-    const remainingClientId = 'background-sync-remaining-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, ownerClientId)
-    expect(acquireWorkspaceRuntime(USER_ID, REPO, remainingClientId)).toBe(workspaceRuntimeId)
+    const retention = retainWorkspaceRuntimeResource(USER_ID, REPO, workspaceRuntimeId, 'terminal-session')
     await prepareBackgroundSync()
     const admission = requiredAdmission(
       beginBackgroundSyncRegistration(USER_ID, ownerClientId, 1, [{ workspaceId: REPO, workspaceRuntimeId }]),
@@ -488,6 +512,7 @@ describe('server background sync scheduler', () => {
     })
 
     expect(getBackgroundSyncRepos(USER_ID)).toEqual([])
+    retention.release()
   })
 
   test('aborts pending admission when its Workspace membership is released', async () => {

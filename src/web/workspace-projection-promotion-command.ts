@@ -1,6 +1,6 @@
 import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import { restoreWorkspaceTabsOnView } from '#/web/settings-actions.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -23,7 +23,7 @@ export function runWorkspaceProjectionPromotion(
   if (existing) return existing
 
   const command = restoreWorkspaceTabsOnView(
-    readOrCreateWebTerminalClientId(),
+    readClientPageId(),
     target.workspaceId,
     target.workspaceRuntimeId,
   ).then(

@@ -8,7 +8,7 @@ import {
   parseTerminalFilesystemTargetKey,
 } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalClient } from '#/web/terminal.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,
@@ -762,7 +762,7 @@ export class TerminalSessionProjection {
   ): Promise<TerminalCreateQueueResult> {
     this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     const request = pending.options
-    const clientId = readOrCreateWebTerminalClientId()
+    const clientId = readClientPageId()
     const createKind = createOptions.startupShellCommand
       ? 'additional'
       : this.visibleSessionsForFilesystemTarget(terminalFilesystemTargetKey).length === 0

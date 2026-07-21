@@ -32,13 +32,6 @@ export interface InitialServerSnapshot {
    * can drop a token into the bootstrap before the first paint.
    */
   accessToken?: string
-  /**
-   * Client-generated client id. Surfaced through
-   * `readQueryBootstrap` so a QR-code URL of the form
-   * `?accessToken=…&goblinServerClientId=…` can hand the client
-   * a deterministic id on first paint.
-   */
-  clientId?: string
 }
 
 export interface ClientRuntimeSnapshot {

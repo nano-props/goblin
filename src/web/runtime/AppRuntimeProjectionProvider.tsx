@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { appRealtimeClient } from '#/web/app-realtime.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientPageId } from '#/web/client-page-id.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { appRuntimeProjectionLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -44,7 +44,7 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     () =>
       new AppTerminalProjectionRecovery({
         projection: terminalProjection,
-        readClientId: readOrCreateWebTerminalClientId,
+        readClientId: readClientPageId,
         recoverSessions: async (target) => await terminalClient.recoverSessions(target),
         hydrationEntry: (workspaceId) =>
           useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId),

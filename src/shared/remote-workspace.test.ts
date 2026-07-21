@@ -52,6 +52,14 @@ describe('remote workspace normalization', () => {
     ).toBeNull()
   })
 
+  test('accepts bounded cross-platform identities and rejects oversized durable entries', () => {
+    expect(normalizeWorkspaceSessionEntry({ id: 'goblin+file:///repo' })).toEqual({ id: 'goblin+file:///repo' })
+    expect(normalizeWorkspaceSessionEntry({ id: 'goblin+file:///C:/repo' })).toEqual({
+      id: 'goblin+file:///C:/repo',
+    })
+    expect(normalizeWorkspaceSessionEntry({ id: `goblin+file:///${'a'.repeat(4096)}` })).toBeNull()
+  })
+
   test('derives ref display names from the normalized remote path', () => {
     expect(
       normalizeRemoteWorkspaceRef({

@@ -1,7 +1,7 @@
 import {
-  canonicalWorkspaceLocator,
   formatWorkspaceLocator,
   parseWorkspaceLocator,
+  toSafeCanonicalWorkspaceId,
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 import { isStringIn } from '#/shared/string-literals.ts'
@@ -355,7 +355,7 @@ export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSession
   if (!input || typeof input !== 'object' || Object.keys(input).length !== 1 || !Object.hasOwn(input, 'id')) return null
   const rawId = Reflect.get(input, 'id')
   if (typeof rawId !== 'string') return null
-  const id = canonicalWorkspaceLocator(rawId)
+  const id = toSafeCanonicalWorkspaceId(rawId)
   return id ? { id } : null
 }
 

@@ -4,6 +4,7 @@ import {
   acquireWorkspaceRuntimeLease,
   captureWorkspaceRuntimeMembershipLease,
   clearWorkspaceRuntimesForUser,
+  closeWorkspaceRuntimesForDurableRemoval,
   commitOrReadInitialWorkspaceProbeState,
   commitWorkspaceProbeState,
   expireWorkspaceRuntimeMembershipLease,
@@ -13,6 +14,7 @@ import {
   onWorkspaceRuntimeClosed,
   releaseWorkspaceRuntime,
   releaseWorkspaceRuntimeMembershipLease,
+  retainWorkspaceRuntimeResource,
   replaceWorkspaceRuntimeMembershipsForClient,
   runSerializedWorkspaceRefresh,
   runRemoteWorkspaceLifecycle,
@@ -60,6 +62,58 @@ describe('workspace runtimes', () => {
       unsubscribeBad()
       unsubscribeGood()
       clearWorkspaceRuntimesForUser(USER_ID)
+    }
+  })
+
+  test('keeps an epoch alive while a server resource retains it', () => {
+    const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const retention = retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, runtimeId, 'terminal-a')
+
+    expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: false,
+    })
+    expect(acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')).toBe(runtimeId)
+    expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-b')).toEqual({
+      released: true,
+      runtimeClosed: false,
+    })
+
+    retention.release()
+    expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
+  })
+
+  test('does not let a stale resource retention release affect a later epoch', () => {
+    const oldRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const staleRetention = retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, oldRuntimeId, 'terminal-a')
+    expect(closeWorkspaceRuntimesForDurableRemoval(REPO_ROOT)).toBe(1)
+    const newRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
+    retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, newRuntimeId, 'terminal-a')
+
+    staleRetention.release()
+
+    expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, newRuntimeId)).toBe(true)
+  })
+
+  test('durable removal closes every user epoch regardless of its owners', () => {
+    const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
+    retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, runtimeId, 'terminal-a')
+    const otherUserId = `${USER_ID}_other`
+    const otherRuntimeId = acquireWorkspaceRuntime(otherUserId, REPO_ROOT, 'client-b')
+    retainWorkspaceRuntimeResource(otherUserId, REPO_ROOT, otherRuntimeId, 'terminal-b')
+    const closed = vi.fn()
+    const unsubscribe = onWorkspaceRuntimeClosed(closed)
+    try {
+      expect(closeWorkspaceRuntimesForDurableRemoval(REPO_ROOT)).toBe(2)
+      expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
+      expect(isCurrentWorkspaceRuntime(otherUserId, REPO_ROOT, otherRuntimeId)).toBe(false)
+      expect(closed.mock.calls.map(([event]) => event)).toEqual([
+        { userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId },
+        { userId: otherUserId, workspaceId: REPO_ROOT, workspaceRuntimeId: otherRuntimeId },
+      ])
+    } finally {
+      unsubscribe()
+      clearWorkspaceRuntimesForUser(otherUserId)
     }
   })
 
