@@ -10,6 +10,7 @@ import {
   runSerializedWorkspaceRefresh,
 } from '#/server/modules/workspace-runtimes.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -356,6 +357,26 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       signal: expect.any(AbortSignal),
     })
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
+  })
+
+  test('returns a stable repository boundary error from operations reads', async () => {
+    mocks.readRepoOperationsSnapshot.mockRejectedValueOnce(new RepositoryBoundaryUnavailableError())
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+
+    const response = await app.request(
+      new Request('http://localhost/operations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'error.repository-boundary-unavailable',
+    })
   })
 
   test.each([{ cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
@@ -893,6 +914,26 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(mocks.fetchRepo).toHaveBeenCalledWith(WORKSPACE_ID, 'user', expect.any(AbortSignal), workspaceRuntimeId)
   })
 
+  test('returns a stable repository boundary error from writes', async () => {
+    mocks.fetchRepo.mockRejectedValueOnce(new RepositoryBoundaryUnavailableError())
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+
+    const response = await app.request(
+      new Request('http://localhost/fetch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'error.repository-boundary-unavailable',
+    })
+  })
+
   test('clone route forwards url/parentPath/directoryName and the request abort signal', async () => {
     mocks.cloneRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
     const app = createTestRepoRoutes()
@@ -981,6 +1022,45 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       expect.any(AbortSignal),
       { workspaceRuntimeId },
     )
+  })
+
+  test('returns a stable repository boundary error from captured worktree removal', async () => {
+    const worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
+      removeWorktree: vi.fn(async (_userId, input) => {
+        return await input.remove(
+          testPhysicalWorktreeExecutionCapability('/tmp/repo-remove'),
+          {
+            beforeRemove: async () => ({ ok: true, message: '' }),
+            afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+            afterRemoveFailed: async () => {},
+          },
+          new AbortController().signal,
+        )
+      }),
+    }
+    mocks.removeCapturedRepoWorktree.mockRejectedValueOnce(new RepositoryBoundaryUnavailableError())
+    const app = createTestRepoRoutes(worktreeRemovalApplication)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+
+    const response = await app.request(
+      new Request('http://localhost/remove-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          branch: 'feature/remove',
+          worktreePath: '/tmp/repo-remove',
+          deleteBranch: false,
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'error.repository-boundary-unavailable',
+    })
   })
 
   test('open-url route forwards repo URL targets', async () => {

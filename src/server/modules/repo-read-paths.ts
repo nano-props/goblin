@@ -318,7 +318,10 @@ export async function readRepoOperationsSnapshot(
   let writeOperations: RepoServerOperationState[]
   let lastFetchAt: number | null = null
   if (cwd) {
-    const boundary = await resolveRepoWriteBoundaryForRead(cwd, options.signal)
+    const boundary = await resolveRepoWriteBoundaryForRead(cwd, {
+      signal: options.signal,
+      workspaceRuntimeId: options.workspaceRuntimeId,
+    })
     writeOperations = listRepoWriteOperationsForBoundary(cwd, boundary, options)
     lastFetchAt = getRepoBoundaryLastFetchAt(boundary)
   } else {

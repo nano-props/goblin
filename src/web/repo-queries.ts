@@ -49,5 +49,9 @@ export function useRepoOperationsReadModel(
   workspaceRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
-  return useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
+  const query = useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
+  // Query caches retain the previous payload after a refetch error. Repository
+  // operations are identity-scoped authority, so no consumer may project that
+  // payload while the current canonical read is unconfirmed.
+  return query.isError ? { ...query, data: undefined } : query
 }

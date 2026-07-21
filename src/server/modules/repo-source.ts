@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
@@ -8,7 +9,7 @@ import {
   getBranchWorktreeIdentities,
   getBranches,
   getCurrentBranch,
-  getRepoCommonDir,
+  resolveRepoCommonDir,
   getHeadHash,
   getLog as getBranchLog,
   getUpstream,
@@ -55,7 +56,7 @@ import {
   getRemotePatch,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  getRemoteRepoWriteGroupPath,
+  resolveRemoteRepoExecutionIdentity,
   getRemoteSnapshot,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
@@ -97,9 +98,8 @@ import {
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
 type RepoWriteBoundary =
-  | { kind: 'local-git'; commonDir: string }
-  | { kind: 'local-path'; repoPath: string }
-  | { kind: 'remote-git'; executionIdentity: string }
+  | { kind: 'local-git'; commonDir: string; generationKey: string }
+  | { kind: 'remote-git'; executionIdentity: string; generationKey: string }
 
 export interface RepoMutationResult extends ExecResult {
   /**
@@ -170,15 +170,22 @@ export interface RepoWriteExecutionCapability {
 }
 
 interface RepoWriteExecutionState {
-  boundaryKey: string
+  coordinationKey: string
+  repositoryKey: string
   source: RepoSource
   validate(signal?: AbortSignal): Promise<boolean>
 }
 
 interface RepoWriteExecutionSnapshot {
-  boundaryKey: string
+  coordinationKey: string
+  repositoryKey: string
   executionIdentity: string
   source: RepoSource
+}
+
+interface LocalRepoExecutionSnapshot {
+  boundary: Extract<RepoWriteBoundary, { kind: 'local-git' }>
+  canonicalRepoPath: string
 }
 
 const repoWriteExecutions = new WeakMap<RepoWriteExecutionCapability, RepoWriteExecutionState>()
@@ -240,23 +247,30 @@ async function resolveRepoWriteExecutionState(
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator) throw new Error('error.workspace-locator-malformed')
   if (locator.transport === 'file') {
-    const boundary = await resolveLocalRepoWriteBoundary(repoId, signal)
-    signal?.throwIfAborted()
-    const boundaryKey = repoWriteBoundaryKey(boundary)
+    const execution = await resolveLocalRepoExecution(locator.path, signal)
+    const coordinationKey = repoWriteBoundaryCoordinationKey(execution.boundary)
     return {
-      boundaryKey,
-      executionIdentity: boundaryKey,
-      source: createLocalRepoSource(locator.path),
+      coordinationKey,
+      repositoryKey: repoWriteBoundaryRepositoryKey(execution.boundary),
+      executionIdentity: JSON.stringify({
+        coordinationKey,
+        canonicalRepoPath: execution.canonicalRepoPath,
+        generationKey: execution.boundary.generationKey,
+      }),
+      source: createLocalRepoSource(execution.canonicalRepoPath),
     }
   }
 
   const target = await resolveRemoteWorkspaceTarget(repoId, runtime, signal)
   const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
-  const boundaryKey = repoWriteBoundaryKey(await resolveRemoteRepoWriteBoundaryForTarget(target, signal, run))
+  const boundary = await resolveRemoteRepoWriteBoundaryForTarget(target, signal, run)
+  const coordinationKey = repoWriteBoundaryCoordinationKey(boundary)
   return {
-    boundaryKey,
+    coordinationKey,
+    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
     executionIdentity: JSON.stringify({
-      boundaryKey,
+      coordinationKey,
+      generationKey: boundary.generationKey,
       alias: target.alias,
       destination: target.sshConnection?.destination,
       host: target.host,
@@ -295,10 +309,6 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
   signal?: AbortSignal,
 ): Promise<RepoWriteExecutionCapability> {
   const execution = physicalWorktreeExecutionBinding(physicalWorktreeCapability)
-  const source =
-    execution.kind === 'remote'
-      ? await createRemoteRepoSource(repoId, execution.target, physicalWorktreeCapability, runtime)
-      : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability)
   const boundary =
     execution.kind === 'remote'
       ? await resolveRemoteRepoWriteBoundaryForTarget(
@@ -307,12 +317,25 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
           runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
         )
       : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, signal)
+  const source =
+    execution.kind === 'remote'
+      ? await createRemoteRepoSource(repoId, execution.target, physicalWorktreeCapability, runtime)
+      : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability)
   const state: RepoWriteExecutionState = {
-    boundaryKey: repoWriteBoundaryKey(boundary),
+    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
+    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
     source,
     async validate(validationSignal) {
       await validatePhysicalWorktreeExecution(physicalWorktreeCapability, validationSignal)
-      return true
+      const currentBoundary =
+        execution.kind === 'remote'
+          ? await resolveRemoteRepoWriteBoundaryForTarget(
+              execution.target,
+              validationSignal,
+              runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
+            )
+          : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, validationSignal)
+      return repoWriteBoundaryRepositoryKey(currentBoundary) === repoWriteBoundaryRepositoryKey(boundary)
     },
   }
   const capability = Object.freeze({}) as RepoWriteExecutionCapability
@@ -321,7 +344,11 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
 }
 
 export function repoWriteExecutionBoundaryKey(capability: RepoWriteExecutionCapability): string {
-  return repoWriteExecutionState(capability).boundaryKey
+  return repoWriteExecutionState(capability).repositoryKey
+}
+
+export function repoWriteExecutionCoordinationKey(capability: RepoWriteExecutionCapability): string {
+  return repoWriteExecutionState(capability).coordinationKey
 }
 
 export async function runWithCapturedRepoWriteExecution<T>(
@@ -348,12 +375,10 @@ function serverWorkspaceLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
-function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
+function repoWriteBoundaryCoordinationKey(boundary: RepoWriteBoundary): string {
   switch (boundary.kind) {
     case 'local-git':
       return `local-git:${boundary.commonDir}`
-    case 'local-path':
-      return `local-path:${boundary.repoPath}`
     case 'remote-git':
       return `remote-git:${boundary.executionIdentity}`
   }
@@ -361,20 +386,8 @@ function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
   return exhaustive
 }
 
-async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
-  if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
-  return await resolveLocalRepoWriteBoundaryForPath(locator.path, signal)
-}
-
-async function resolveLocalRepoWriteBoundaryForPath(repoPath: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  const commonDir = await getRepoCommonDir(repoPath, { signal })
-  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(repoPath) }
-}
-
-async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  const target = await resolveRemoteWorkspaceTarget(repoId, undefined, signal)
-  return await resolveRemoteRepoWriteBoundaryForTarget(target, signal)
+function repoWriteBoundaryRepositoryKey(boundary: RepoWriteBoundary): string {
+  return JSON.stringify({ coordinationKey: repoWriteBoundaryCoordinationKey(boundary), generationKey: boundary.generationKey })
 }
 
 /**
@@ -384,14 +397,53 @@ async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: Abor
  * identity when resolution fails. Fail before observing state or admitting an
  * operation instead.
  */
+async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
+  if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
+  return (await resolveLocalRepoExecution(locator.path, signal)).boundary
+}
+
+async function resolveLocalRepoWriteBoundaryForPath(repoPath: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+  return (await resolveLocalRepoExecution(repoPath, signal)).boundary
+}
+
+async function resolveLocalRepoExecution(
+  repoPath: string,
+  signal?: AbortSignal,
+): Promise<LocalRepoExecutionSnapshot> {
+  try {
+    const canonicalRepoPath = await fs.realpath(repoPath)
+    signal?.throwIfAborted()
+    const commonDir = await resolveRepoCommonDir(canonicalRepoPath, { signal })
+    const commonDirStat = await fs.stat(commonDir, { bigint: true })
+    signal?.throwIfAborted()
+    return {
+      canonicalRepoPath,
+      boundary: {
+        kind: 'local-git',
+        commonDir,
+        generationKey: `${commonDirStat.dev.toString(10)}\0${commonDirStat.ino.toString(10)}`,
+      },
+    }
+  } catch {
+    signal?.throwIfAborted()
+    throw new RepositoryBoundaryUnavailableError()
+  }
+}
+
+async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+  const target = await resolveRemoteWorkspaceTarget(repoId, undefined, signal)
+  return await resolveRemoteRepoWriteBoundaryForTarget(target, signal)
+}
+
 async function resolveRemoteRepoWriteBoundaryForTarget(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<RepoWriteBoundary> {
-  const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal, run })
+  const identity = await resolveRemoteRepoExecutionIdentity(target, { signal, run })
   signal?.throwIfAborted()
-  if (!writeGroupPath) throw new Error('error.repository-boundary-unavailable')
+  if (!identity) throw new RepositoryBoundaryUnavailableError()
   const sshOptions = target.sshConnection?.options ?? []
   return {
     kind: 'remote-git',
@@ -403,8 +455,9 @@ async function resolveRemoteRepoWriteBoundaryForTarget(
       ...(sshOptions.some(sshOptionUsesOriginalDestination)
         ? { destination: target.sshConnection?.destination ?? target.alias }
         : {}),
-      writeGroupPath: path.posix.resolve(writeGroupPath),
+      writeGroupPath: identity.commonDir,
     }),
+    generationKey: identity.generationKey,
   }
 }
 
@@ -421,12 +474,17 @@ function sshOptionUsesOriginalDestination(option: string): boolean {
   return false
 }
 
-export async function resolveRepoWriteBoundaryKey(repoId: WorkspaceId, signal?: AbortSignal): Promise<string> {
-  return repoWriteBoundaryKey(
-    isRemoteWorkspaceId(repoId)
-      ? await resolveRemoteRepoWriteBoundary(repoId, signal)
-      : await resolveLocalRepoWriteBoundary(repoId, signal),
-  )
+export async function resolveRepoWriteBoundaryIdentity(
+  repoId: WorkspaceId,
+  signal?: AbortSignal,
+): Promise<{ coordinationKey: string; repositoryKey: string }> {
+  const boundary = isRemoteWorkspaceId(repoId)
+    ? await resolveRemoteRepoWriteBoundary(repoId, signal)
+    : await resolveLocalRepoWriteBoundary(repoId, signal)
+  return {
+    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
+    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
+  }
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {

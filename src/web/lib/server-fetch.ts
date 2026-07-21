@@ -5,6 +5,18 @@ import { requireClientServerConfig } from '#/web/lib/server-config.ts'
 export const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 120_000
 export const SERVER_REQUEST_TIMEOUT_ERROR = 'error.request-timeout'
 
+export class ServerRequestError extends Error {
+  readonly status: number
+  readonly code: string | null
+
+  constructor(input: { status: number; code?: string; message?: string }) {
+    super(input.message ?? `Server request failed (HTTP ${input.status})`)
+    this.name = 'ServerRequestError'
+    this.status = input.status
+    this.code = input.code ?? null
+  }
+}
+
 export interface ServerFetchOptions extends RequestInit {
   /** Request-level watchdog. Set to 0 to disable. */
   timeoutMs?: number
@@ -63,12 +75,11 @@ export async function fetchServerJson<T>(path: string | URL, init?: ServerFetchO
   try {
     const response = await fetch(url, { ...rest, signal: requestSignal.signal, headers, credentials: 'include' })
     if (!response.ok) {
-      let detail = `HTTP ${response.status}`
+      let body: { message?: string; code?: string } | undefined
       try {
-        const body = (await response.json()) as { message?: string; code?: string } | undefined
-        if (body?.message) detail = `${body.code ?? response.status}: ${body.message}`
+        body = (await response.json()) as { message?: string; code?: string } | undefined
       } catch {}
-      throw new Error(`Server request failed (${detail})`)
+      throw new ServerRequestError({ status: response.status, code: body?.code, message: body?.message })
     }
     return (await response.json()) as T
   } catch (err) {

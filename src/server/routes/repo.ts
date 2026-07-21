@@ -186,11 +186,17 @@ export function createRepoRoutes(options: {
       assertCurrentWorkspaceRuntimeForRead(userId, input.cwd, input.workspaceRuntimeId)
       assertGitCapability(userId, input.cwd, input.workspaceRuntimeId)
       return c.json(
-        await readRepoOperationsSnapshot(input.cwd, {
-          includeSettled: input.includeSettled,
-          workspaceRuntimeId: input.workspaceRuntimeId,
-          signal: c.req.raw.signal,
-        }),
+        await runtimeReadJsonOrThrow(
+          userId,
+          () =>
+            readRepoOperationsSnapshot(input.cwd, {
+              includeSettled: input.includeSettled,
+              workspaceRuntimeId: input.workspaceRuntimeId,
+              signal: c.req.raw.signal,
+            }),
+          'operations',
+          c.req.raw.signal,
+        ),
       )
     }
     return c.json(
@@ -288,11 +294,11 @@ export function createRepoRoutes(options: {
     const { cwd, workspaceRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     const userId = userIdFromContext(c)
-    if (!userId) throw new Error('error.unauthorized')
     assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await jsonOr(
+      await runtimeReadJsonOrThrow(
+        userId,
         () =>
           options.worktreeRemovalApplication.removeWorktree(userId, {
             repoRoot: cwd,
@@ -315,8 +321,8 @@ export function createRepoRoutes(options: {
                 { workspaceRuntimeId },
               ),
           }),
-        READ_REPO_ERROR,
         'remove-worktree',
+        c.req.raw.signal,
       ),
     )
   })

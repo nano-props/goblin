@@ -32,4 +32,16 @@ describe('remote physical worktree identity command', () => {
     expect(invocation.script).not.toContain('$HOME')
     expect(invocation.script).not.toContain('example.invalid')
   })
+
+  test('resolves repository execution identity from the canonical Git common directory', () => {
+    const invocation = buildRemoteCommandInvocation(target, {
+      type: 'resolveRepoExecutionIdentity',
+      path: '/srv/worktrees/feature',
+    })
+
+    expect(invocation.script).toContain('git -C')
+    expect(invocation.script).toContain('rev-parse --git-common-dir')
+    expect(invocation.script).toContain('cd -- "$common_dir" && pwd -P')
+    expect(invocation.script).toContain('stat -c "%d %i" "$canonical"')
+  })
 })

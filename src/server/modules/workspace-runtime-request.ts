@@ -4,6 +4,8 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { isRepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
+import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
 
 const workspaceRuntimeRequestLogger = serverLogger.child({ module: 'workspace-runtime-request' })
 
@@ -49,6 +51,13 @@ async function runRuntimeRequest<T>(
       await settleRemoteWorkspaceRuntimeFailure(input.userId, error)
       workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
       throw new IpcError({ code: 'BAD_REQUEST', message: remoteFailureMessage })
+    }
+    if (isRepositoryBoundaryUnavailableError(error)) {
+      workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'repository boundary unavailable')
+      throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
+    }
+    if (isWorkspaceRuntimeAdmissionClosedError(error)) {
+      throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
     }
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
     throw error

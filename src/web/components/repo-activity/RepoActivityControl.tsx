@@ -87,12 +87,13 @@ export function RepoActivityControl({ repoId }: Props) {
 
 function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
   const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.workspaceRuntimeId)
-  const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
+  const operationsSnapshot = operationsReadModel.data
+  const visibleActivity = useRepoActivityControlPresentation(repo, operationsSnapshot)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
     visibleActivity,
     completion,
-    manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operationsReadModel.data),
+    manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operationsSnapshot),
   })
 
   switch (view.kind) {
@@ -106,7 +107,7 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
           <RepoRefreshButton
             repo={repo}
             manualSyncBusy={view.manualSyncBusy}
-            lastFetchAt={operationsReadModel.data?.lastFetchAt ?? null}
+            lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
           />
           <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />

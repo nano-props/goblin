@@ -79,6 +79,11 @@ export interface RemoteRepoSnapshot {
   remote: RepoRemoteInfo
 }
 
+export interface RemoteRepoExecutionIdentity {
+  commonDir: string
+  generationKey: string
+}
+
 export interface RemoteWorktreeMutationResult extends ExecResult {
   affectedWorktreePaths?: readonly string[]
 }
@@ -678,6 +683,48 @@ export async function getRemoteRepoWriteGroupPath(
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
   return worktrees.find((worktree) => worktree.isPrimary && !worktree.isBare)?.path ?? worktrees[0]?.path ?? null
+}
+
+export async function resolveRemoteRepoExecutionIdentity(
+  target: RemoteWorkspaceTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<RemoteRepoExecutionIdentity | null> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'resolveRepoExecutionIdentity', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  if (options.signal?.aborted || !result.ok) return null
+  return parseRemoteRepoExecutionIdentity(result.stdout)
+}
+
+export function parseRemoteRepoExecutionIdentity(output: string): RemoteRepoExecutionIdentity | null {
+  const fields = output.split('\0')
+  const runtimeToken = fields[0] ?? ''
+  const machineFact = fields[1] ?? ''
+  const rootNamespaceFact = fields[2] ?? ''
+  const commonDir = fields[3] ?? ''
+  const deviceId = fields[4] ?? ''
+  const inode = fields[5] ?? ''
+  if (
+    fields.length !== 7 ||
+    fields[6] !== '' ||
+    !/^[a-f0-9]{32}$/u.test(runtimeToken) ||
+    !validRemoteExecutionFact(machineFact) ||
+    !validRemoteExecutionFact(rootNamespaceFact) ||
+    !commonDir.startsWith('/') ||
+    !/^\d{1,32}$/u.test(deviceId) ||
+    !/^\d{1,32}$/u.test(inode)
+  ) {
+    return null
+  }
+  return {
+    commonDir: path.posix.normalize(commonDir),
+    generationKey: JSON.stringify({ runtimeToken, machineFact, rootNamespaceFact, deviceId, inode }),
+  }
+}
+
+function validRemoteExecutionFact(value: string): boolean {
+  return value.length > 0 && value.length <= 256 && /^[A-Za-z0-9._:-]+$/u.test(value)
 }
 
 export async function removeRemoteWorktree(

@@ -16,6 +16,7 @@ import {
   remoteCommandExists,
   remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
+  parseRemoteRepoExecutionIdentity,
   remoteExecResult,
   removeRemoteWorktree,
   type RemoteGitRunner,
@@ -43,6 +44,29 @@ const LINKED_TARGET = normalizeRemoteTarget({
 })!
 
 describe('remote git helpers', () => {
+  test('parses a canonical repository execution identity with its object generation', () => {
+    expect(
+      parseRemoteRepoExecutionIdentity(
+        ['0123456789abcdef0123456789abcdef', 'machine-a', 'mnt-a', '/srv/repo/.git', '10', '20', ''].join(
+          '\0',
+        ),
+      ),
+    ).toEqual({
+      commonDir: '/srv/repo/.git',
+      generationKey: JSON.stringify({
+        runtimeToken: '0123456789abcdef0123456789abcdef',
+        machineFact: 'machine-a',
+        rootNamespaceFact: 'mnt-a',
+        deviceId: '10',
+        inode: '20',
+      }),
+    })
+  })
+
+  test('rejects malformed repository execution identity output', () => {
+    expect(parseRemoteRepoExecutionIdentity('invalid')).toBeNull()
+  })
+
   test('builds browser URLs from remote verbose output', async () => {
     const run: RemoteGitRunner = async (command) => {
       switch (command.type) {

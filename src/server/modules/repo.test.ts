@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   deleteUpstreamBranch: vi.fn(),
   fsAccess: vi.fn(),
   fsMkdir: vi.fn(),
+  fsRealpath: vi.fn(),
   fsStat: vi.fn(),
   isGitRepo: vi.fn(),
   getBranches: vi.fn(),
@@ -29,7 +30,7 @@ const mocks = vi.hoisted(() => ({
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
-  getRepoCommonDir: vi.fn(),
+  resolveRepoCommonDir: vi.fn(),
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
@@ -52,7 +53,7 @@ const mocks = vi.hoisted(() => ({
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteWorkspacePaneTargetIdentities: vi.fn(),
-  getRemoteRepoWriteGroupPath: vi.fn(),
+  resolveRemoteRepoExecutionIdentity: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
   getServerWorkspaceSettings: vi.fn(),
@@ -69,7 +70,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getBranchWorktreeIdentities: mocks.getBranchWorktreeIdentities,
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
-  getRepoCommonDir: mocks.getRepoCommonDir,
+  resolveRepoCommonDir: mocks.resolveRepoCommonDir,
   getRepoName: mocks.getRepoName,
   getRepoRoot: mocks.getRepoRoot,
   getUpstream: mocks.getUpstream,
@@ -89,6 +90,7 @@ vi.mock('node:fs', () => ({
   promises: {
     access: mocks.fsAccess,
     mkdir: mocks.fsMkdir,
+    realpath: mocks.fsRealpath,
     stat: mocks.fsStat,
   },
   constants: {
@@ -154,7 +156,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities: mocks.getRemoteWorkspacePaneTargetIdentities,
-  getRemoteRepoWriteGroupPath: mocks.getRemoteRepoWriteGroupPath,
+  resolveRemoteRepoExecutionIdentity: mocks.resolveRemoteRepoExecutionIdentity,
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
@@ -181,9 +183,10 @@ beforeEach(async () => {
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
-  mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
+  mocks.fsStat.mockResolvedValue({ isDirectory: () => true, dev: 1n, ino: 1n })
   mocks.fsAccess.mockResolvedValue(undefined)
   mocks.fsMkdir.mockResolvedValue(undefined)
+  mocks.fsRealpath.mockImplementation(async (cwd: string) => cwd)
   mocks.isGitRepo.mockResolvedValue(true)
   mocks.pullBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.pushBranch.mockResolvedValue({ ok: true, message: 'ok' })
@@ -238,9 +241,12 @@ beforeEach(async () => {
   mocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched' })
   mocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
-  mocks.getRemoteRepoWriteGroupPath.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
+  mocks.resolveRemoteRepoExecutionIdentity.mockImplementation(async (target: { remotePath: string }) => ({
+    commonDir: target.remotePath,
+    generationKey: 'remote-generation-1',
+  }))
   mocks.getCurrentBranch.mockResolvedValue('main')
-  mocks.getRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
+  mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
   mocks.getRepoName.mockResolvedValue('repo')
   mocks.getRepoRoot.mockResolvedValue('/tmp/repo')
   mocks.getWorktrees.mockResolvedValue([])
@@ -468,7 +474,7 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('shares successful fetch time across worktrees with one write boundary', async () => {
-    mocks.getRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
+    mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
@@ -535,7 +541,7 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('user sync waits for an active sibling worktree background sync before fetching', async () => {
-    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+    mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
     mocks.getWorktrees.mockResolvedValue([
@@ -658,11 +664,171 @@ describe('fetchRepo invalidation publishing', () => {
 
   test('does not admit a remote write without a confirmed canonical boundary', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue(null)
+    mocks.resolveRemoteRepoExecutionIdentity.mockResolvedValue(null)
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     await expect(fetchRepo(repoId, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
     expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
+  })
+
+  test('does not admit a local write without a confirmed canonical boundary', async () => {
+    mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails when a local locator changes its canonical execution root', async () => {
+    mocks.fsRealpath.mockResolvedValueOnce('/physical/repo-a').mockResolvedValueOnce('/physical/repo-b')
+    mocks.resolveRepoCommonDir.mockResolvedValue('/physical/shared/.git')
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
+      ok: false,
+      message: 'error.repository-target-changed',
+    })
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails when a local repository is replaced at the same canonical path', async () => {
+    mocks.fsStat
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
+      ok: false,
+      message: 'error.repository-target-changed',
+    })
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails when a remote repository is replaced at the same canonical path', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.resolveRemoteRepoExecutionIdentity
+      .mockResolvedValueOnce({ commonDir: '/srv/repo/.git', generationKey: 'remote-generation-1' })
+      .mockResolvedValueOnce({ commonDir: '/srv/repo/.git', generationKey: 'remote-generation-2' })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(repoId, 'user')).resolves.toEqual({
+      ok: false,
+      message: 'error.repository-target-changed',
+    })
+    expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
+  })
+
+  test('does not bind a local read to a locator when canonical resolution fails', async () => {
+    mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
+
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { repoWriteOperationCoordinatorStatsForTests } =
+      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    await expect(readRepoOperationsSnapshot(REPO_ID)).rejects.toThrow('error.repository-boundary-unavailable')
+    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+    })
+  })
+
+  test('does not start captured worktree removal without a confirmed local boundary', async () => {
+    mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const lifecycle = {
+      beforeRemove,
+      afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
+      afterRemoveFailed: vi.fn(async () => {}),
+    }
+    const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
+      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/worktree-removal/physical-worktree-capability.ts'),
+    ])
+    const physicalWorktreeCapability = issuePhysicalWorktreeExecutionCapability(
+      { kind: 'local', executionNamespaceId: 'local', endpoint: '/tmp/repo-worktree' },
+      {
+        userId: 'test-user',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'test-runtime',
+        worktreePath: '/tmp/repo-worktree',
+        execution: {
+          kind: 'local',
+          canonicalWorktreePath: '/tmp/repo-worktree',
+          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
+        },
+        runtimeSignal: new AbortController().signal,
+        validateExecution: async () => undefined,
+      },
+    )
+
+    await expect(
+      removeCapturedRepoWorktree(
+        REPO_ID,
+        { branch: 'feature/a', worktreePath: '/tmp/repo-worktree', deleteBranch: true },
+        lifecycle,
+        physicalWorktreeCapability,
+      ),
+    ).rejects.toThrow('error.repository-boundary-unavailable')
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails captured worktree removal when its repository generation changes', async () => {
+    mocks.fsStat
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const lifecycle = {
+      beforeRemove,
+      afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
+      afterRemoveFailed: vi.fn(async () => {}),
+    }
+    const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
+      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/worktree-removal/physical-worktree-capability.ts'),
+    ])
+    const physicalWorktreeCapability = issuePhysicalWorktreeExecutionCapability(
+      { kind: 'local', executionNamespaceId: 'local', endpoint: '/tmp/repo-worktree' },
+      {
+        userId: 'test-user',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'test-runtime',
+        worktreePath: '/tmp/repo-worktree',
+        execution: {
+          kind: 'local',
+          canonicalWorktreePath: '/tmp/repo-worktree',
+          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
+        },
+        runtimeSignal: new AbortController().signal,
+        validateExecution: async () => undefined,
+      },
+    )
+
+    await expect(
+      removeCapturedRepoWorktree(
+        REPO_ID,
+        { branch: 'feature/a', worktreePath: '/tmp/repo-worktree', deleteBranch: true },
+        lifecycle,
+        physicalWorktreeCapability,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
+  })
+
+  test('preserves cancellation while resolving a local canonical boundary', async () => {
+    const caller = new AbortController()
+    mocks.resolveRepoCommonDir.mockImplementationOnce(
+      async (_cwd: string, options?: { signal?: AbortSignal }) =>
+        await new Promise<string>((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true })
+        }),
+    )
+
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const read = readRepoOperationsSnapshot(REPO_ID, { signal: caller.signal })
+    caller.abort(new Error('client disconnected'))
+
+    await expect(read).rejects.toThrow('client disconnected')
   })
 
   test('user sync waits for an active linked remote background sync with the same alias', async () => {
@@ -790,7 +956,10 @@ describe('fetchRepo invalidation publishing', () => {
         displayName: `${ref.alias}:${ref.remotePath}`,
       },
     }))
-    mocks.getRemoteRepoWriteGroupPath.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
+    mocks.resolveRemoteRepoExecutionIdentity.mockImplementation(async (target: { remotePath: string }) => ({
+      commonDir: target.remotePath,
+      generationKey: 'remote-generation-1',
+    }))
     const first = deferred<{ ok: true; message: string }>()
     const second = deferred<{ ok: true; message: string }>()
     const fetchPaths: string[] = []
@@ -1388,7 +1557,7 @@ describe('repo mutation invalidation publishing', () => {
   test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
     const firstDelete = deferred<{ ok: true; message: string }>()
     const secondRemove = deferred<{ ok: true; message: string }>()
-    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+    mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
     mocks.getWorktrees.mockResolvedValueOnce([]).mockResolvedValueOnce([
@@ -1458,7 +1627,7 @@ describe('repo mutation invalidation publishing', () => {
   test('repo write service operations serialize linked worktree network mutations by common git dir', async () => {
     const firstDelete = deferred<{ ok: true; message: string }>()
     const secondPull = deferred<{ ok: true; message: string }>()
-    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+    mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)

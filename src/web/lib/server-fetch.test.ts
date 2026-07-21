@@ -85,4 +85,20 @@ describe('server-fetch', () => {
     await vi.advanceTimersByTimeAsync(60 * 60_000)
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  test('preserves a structured server error message for domain handling', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ code: 'BAD_REQUEST', message: 'error.repository-boundary-unavailable' }),
+    })
+
+    const { fetchServerJson, ServerRequestError } = await import('#/web/lib/server-fetch.ts')
+    await expect(fetchServerJson('/api/repo/fetch')).rejects.toMatchObject({
+      name: 'ServerRequestError',
+      message: 'error.repository-boundary-unavailable',
+      status: 400,
+      code: 'BAD_REQUEST',
+    } satisfies Partial<InstanceType<typeof ServerRequestError>>)
+  })
 })

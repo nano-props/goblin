@@ -4,11 +4,16 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const mocks = vi.hoisted(() => ({ resolveRepoWriteBoundaryKey: vi.fn() }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
-  captureRepoWriteExecution: async (repoId: typeof REMOTE_REPO) => ({
-    boundaryKey: await mocks.resolveRepoWriteBoundaryKey(repoId),
-  }),
-  repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
-  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
+  captureRepoWriteExecution: async (repoId: typeof REMOTE_REPO) => {
+    const key = await mocks.resolveRepoWriteBoundaryKey(repoId)
+    return { coordinationKey: key, repositoryKey: key }
+  },
+  repoWriteExecutionBoundaryKey: (capability: { repositoryKey: string }) => capability.repositoryKey,
+  repoWriteExecutionCoordinationKey: (capability: { coordinationKey: string }) => capability.coordinationKey,
+  resolveRepoWriteBoundaryIdentity: async (repoId: typeof REMOTE_REPO) => {
+    const key = await mocks.resolveRepoWriteBoundaryKey(repoId)
+    return { coordinationKey: key, repositoryKey: key }
+  },
   runWithCapturedRepoWriteExecution: async (
     _capability: unknown,
     task: (source: object) => Promise<unknown>,
@@ -27,7 +32,6 @@ async function recordSuccessfulFetch(repoId: typeof REMOTE_REPO): Promise<void> 
     { repoId, kind: 'fetch', source: 'background' },
     (operation, context) => async () => {
       operation.start()
-      context.recordFetchSuccess()
       operation.settle({ ok: true })
       return { ok: true, message: 'fetched' }
     },

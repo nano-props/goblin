@@ -297,7 +297,6 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    if (result.ok) context.recordFetchSuccess()
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
   return await enqueueRepoWriteOperation(
