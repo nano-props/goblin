@@ -331,11 +331,7 @@ export type RepoServerOperationKind =
   'fetch' | 'clone' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
 export type RepoServerOperationSource = NetworkOpKind | 'system'
 export type RepoOperationCancellationReason =
-  | 'caller-abort'
-  | 'request-watchdog-timeout'
-  | 'git-timeout'
-  | 'network-op-superseded'
-  | 'runtime-closed'
+  'caller-abort' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
 export type RepoOperationFailureReason = RepoOperationCancellationReason
 
 export interface RepoServerOperationTarget {
