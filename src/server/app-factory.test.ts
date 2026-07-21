@@ -341,7 +341,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     }
   })
 
-  test('mounts workspace runtime routes behind authentication', async () => {
+  test('mounts workspace path suggestions behind authentication', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
@@ -354,20 +354,20 @@ describe('per-sub-path body limits and auth ordering', () => {
     })
     const request = (accessToken?: string) =>
       app.request(
-        new Request('http://127.0.0.1:32100/api/workspace/runtime-list', {
+        new Request('http://127.0.0.1:32100/api/workspace/path-suggestions', {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
             ...(accessToken ? { 'x-goblin-access-token': accessToken } : {}),
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ prefix: 'relative' }),
         }),
       )
 
     expect((await request()).status).toBe(401)
     const response = await request('secret')
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ runtimes: [] })
+    await expect(response.json()).resolves.toEqual([])
   })
 
   test('applies the standard API body limit to workspace routes', async () => {
@@ -383,7 +383,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/api/workspace/runtime-list', {
+      new Request('http://127.0.0.1:32100/api/workspace/path-suggestions', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',

@@ -2,8 +2,7 @@
 
 // Tests for the current-query lifecycle shared by local and SSH suggestions.
 // The hook's contract with the server is:
-//   • only fetch when `enabled`, an `alias`, and a resolvable
-//     `prefix` are all present
+//   • fetch only eligible native local prefixes or resolvable SSH prefixes
 //   • dedupe the server's response in-place — duplicates would collide
 //     when used as React keys downstream — and drop non-string entries
 //   • surface request lifecycle so the input can render a loading hint
@@ -248,6 +247,60 @@ describe('useDirectoryPathSuggestions', () => {
       vi.useRealTimers()
     }
   })
+
+  test('aborts an alias query and ignores its late completion after identity changes', async () => {
+    vi.useFakeTimers()
+    const first = Promise.withResolvers<string[]>()
+    const second = Promise.withResolvers<string[]>()
+    mockedFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
+
+    function Host({ alias }: { alias: string }) {
+      const state = useDirectoryPathSuggestions({ enabled: true, source: { kind: 'ssh', alias }, prefix: '/srv/' })
+      snapshots.push(state)
+      return null
+    }
+
+    const { rerender } = renderInJsdom(<Host alias="first" />)
+    try {
+      await act(async () => await vi.advanceTimersByTimeAsync(350))
+      const firstSignal = mockedFetch.mock.calls[0]?.[1]
+      expect(firstSignal?.aborted).toBe(false)
+
+      rerender(<Host alias="second" />)
+      expect(firstSignal?.aborted).toBe(true)
+      expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
+      await act(async () => await vi.advanceTimersByTimeAsync(350))
+
+      await act(async () => {
+        second.resolve(['/srv/current'])
+        await Promise.resolve()
+      })
+      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
+
+      await act(async () => {
+        first.resolve(['/srv/stale'])
+        await Promise.resolve()
+      })
+      expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('distinguishes a successful empty result from a rejected request', async () => {
+    mockedFetch.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('offline'))
+    expect(await renderHookAndWaitForFetch({ enabled: true, alias: 'host', prefix: '/empty/' })).toEqual({
+      suggestions: [],
+      isLoading: false,
+      hasFetched: true,
+    })
+    expect(await renderHookAndWaitForFetch({ enabled: true, alias: 'host', prefix: '/failed/' })).toEqual({
+      suggestions: [],
+      isLoading: false,
+      hasFetched: false,
+    })
+  })
 })
 
 interface RenderInput {
@@ -257,6 +310,7 @@ interface RenderInput {
 }
 
 async function renderHookAndWaitForFetch(input: RenderInput) {
+  vi.useFakeTimers()
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
   function Host() {
     captured = useDirectoryPathSuggestions({
@@ -269,13 +323,16 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
   renderInJsdom(<Host />)
   // The hook debounces by 350ms before firing; advance past that and
   // let the queued microtasks settle so the state update lands.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400))
-  })
-  return captured
+  try {
+    await act(async () => await vi.advanceTimersByTimeAsync(350))
+    return captured
+  } finally {
+    vi.useRealTimers()
+  }
 }
 
 async function renderHookLifecycle(input: RenderInput) {
+  vi.useFakeTimers()
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
   function Host() {
     const state = useDirectoryPathSuggestions({
@@ -287,8 +344,10 @@ async function renderHookLifecycle(input: RenderInput) {
     return null
   }
   renderInJsdom(<Host />)
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400))
-  })
-  return snapshots
+  try {
+    await act(async () => await vi.advanceTimersByTimeAsync(350))
+    return snapshots
+  } finally {
+    vi.useRealTimers()
+  }
 }

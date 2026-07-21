@@ -155,6 +155,9 @@ export function DirectoryPathSuggestions({
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Escape') {
+        if (!isOpen) return
+        event.preventDefault()
+        event.stopPropagation()
         setOpen(false)
         return
       }
@@ -201,7 +204,7 @@ export function DirectoryPathSuggestions({
         return
       }
     },
-    [activeIndex, commit, disabled, open, suggestions],
+    [activeIndex, commit, disabled, isOpen, open, suggestions],
   )
 
   const setOptionRef = useCallback((index: number, node: HTMLDivElement | null) => {
@@ -263,9 +266,9 @@ export function DirectoryPathSuggestions({
           <ScrollArea className="max-h-72" scrollbarMode="compact">
             <div id={listboxId} role="listbox" className="p-1">
               {showEmptyState ? (
-                <SuggestionRow active={false}>
-                  <span className="truncate text-muted-foreground">{emptyLabel}</span>
-                </SuggestionRow>
+                <div role="status" className="px-2 py-1.5 text-sm text-muted-foreground">
+                  <span className="truncate">{emptyLabel}</span>
+                </div>
               ) : (
                 suggestions.map((item, index) => (
                   <SuggestionRow

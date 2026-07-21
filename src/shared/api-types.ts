@@ -572,7 +572,7 @@ export const RemoteConnectionInputSchema = v.object({
   remotePath: v.string(),
 })
 
-export const RemotePathSuggestionsInputSchema = v.object({
+export const RemoteDirectoryPathSuggestionsInputSchema = v.object({
   alias: v.string(),
   prefix: DirectoryPathPrefixSchema,
 })

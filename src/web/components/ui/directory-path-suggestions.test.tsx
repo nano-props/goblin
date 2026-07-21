@@ -298,6 +298,27 @@ describe('DirectoryPathSuggestions', () => {
     expect(input().getAttribute('aria-activedescendant')).toBeNull()
   })
 
+  test('consumes Escape only while the suggestion popup is open', async () => {
+    const onKeyDown = vi.fn()
+    render(
+      <div onKeyDown={onKeyDown}>
+        <Harness suggestions={['/srv/a']} hasFetched />
+      </div>,
+    )
+    await flush()
+    focusInput()
+    await flush()
+
+    pressKey('Escape')
+    await flush()
+    expect(onKeyDown).not.toHaveBeenCalled()
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+
+    pressKey('Escape')
+    await flush()
+    expect(onKeyDown).toHaveBeenCalledTimes(1)
+  })
+
   test('forwards aria-invalid onto the underlying input', async () => {
     render(<Harness suggestions={['/srv/repo']} ariaInvalid hasFetched />)
     await flush()
@@ -315,6 +336,8 @@ describe('DirectoryPathSuggestions', () => {
     await flush()
 
     expect(screenText()).toContain('No matching paths')
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('No matching paths')
+    expect(document.querySelector('[role="option"]')).toBeNull()
   })
 
   test('does not show the empty-state label before the first fetch resolves', async () => {

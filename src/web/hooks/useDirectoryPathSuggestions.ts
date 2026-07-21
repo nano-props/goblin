@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getRemotePathSuggestions } from '#/web/remote-workspace-client.ts'
 import { getLocalDirectoryPathSuggestions } from '#/web/workspace-client.ts'
 import { isResolvableRemotePathInput } from '#/shared/remote-workspace.ts'
@@ -26,8 +26,6 @@ export function useDirectoryPathSuggestions(input: {
   const alias = input.source.kind === 'ssh' ? input.source.alias.trim() : ''
   const eligible = input.enabled && isEligible(input.source, prefix, alias)
   const identity = eligible ? `${input.source.kind}\0${alias}\0${prefix}` : ''
-  const currentIdentityRef = useRef(identity)
-  currentIdentityRef.current = identity
   const [state, setState] = useState<SuggestionState>(EMPTY_STATE)
 
   useEffect(() => {
@@ -44,7 +42,7 @@ export function useDirectoryPathSuggestions(input: {
           : getRemotePathSuggestions({ alias, prefix }, controller.signal)
       void request
         .then((items) => {
-          if (controller.signal.aborted || currentIdentityRef.current !== identity) return
+          if (controller.signal.aborted) return
           const seen = new Set<string>()
           const suggestions = items.filter((item): item is string => {
             if (typeof item !== 'string' || seen.has(item)) return false
@@ -54,7 +52,7 @@ export function useDirectoryPathSuggestions(input: {
           setState({ identity, suggestions, isLoading: false, hasFetched: true })
         })
         .catch(() => {
-          if (!controller.signal.aborted && currentIdentityRef.current === identity) {
+          if (!controller.signal.aborted) {
             setState({ identity, suggestions: [], isLoading: false, hasFetched: false })
           }
         })

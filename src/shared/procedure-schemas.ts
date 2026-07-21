@@ -11,7 +11,7 @@ import * as v from 'valibot'
 import {
   CwdInput,
   RemoteConnectionInputSchema,
-  RemotePathSuggestionsInputSchema,
+  RemoteDirectoryPathSuggestionsInputSchema,
   RemoteWorkspaceTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
@@ -205,7 +205,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
     workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
-  pathSuggestions: RemotePathSuggestionsInputSchema,
+  pathSuggestions: RemoteDirectoryPathSuggestionsInputSchema,
   testWorkspace: v.object({ target: RemoteWorkspaceTargetSchema }),
 } as const
 

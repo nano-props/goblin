@@ -5,6 +5,7 @@ import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
@@ -64,6 +65,7 @@ afterEach(() => {
 
 describe('OpenWorkspaceDialog', () => {
   test('shows local directory suggestions while preserving the picker layout wrapper', async () => {
+    useFakeTimers()
     mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
     render(
       <OpenWorkspaceDialog
@@ -77,9 +79,7 @@ describe('OpenWorkspaceDialog', () => {
     )
 
     setInputValue('#open-workspace-path', '/Users/tester/Dev')
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400))
-    })
+    await act(async () => await advanceTimersAndFlush(350))
 
     expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer')
     expect(input('#open-workspace-path').parentElement?.className).toContain('min-w-0')
