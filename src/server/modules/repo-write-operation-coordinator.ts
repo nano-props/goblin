@@ -19,6 +19,7 @@ export interface RepoWriteOperationLifecycle {
   id: string
   start(): void
   requestCancel(reason: RepoOperationCancellationReason): void
+  isCancellationRequested(): boolean
   recordWaitCancellation(reason: RepoOperationCancellationReason): void
   settle(result: { ok: boolean; message?: string }): void
 }
@@ -43,6 +44,7 @@ interface RepoWriteOperationQueueRuntime {
   repoIds: Set<WorkspaceId>
   queue: RepoWriteOperationQueue
   operations: Map<string, RepoServerOperationState>
+  lifecycles: Map<string, RepoWriteOperationLifecycle>
   activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
 }
 
@@ -128,6 +130,7 @@ function beginRepoWriteOperation(
 ): RepoWriteOperationLifecycle {
   const now = Date.now()
   let settled = false
+  let cancellationRequested = false
   const operation: RepoServerOperationState = {
     id: input.id ?? freshWriteOperationId(),
     repoId: input.repoId ?? null,
@@ -162,11 +165,15 @@ function beginRepoWriteOperation(
       publishRepoRuntimeInvalidation(runtime, operation)
     },
     requestCancel(reason) {
+      cancellationRequested = true
       operation.cancellation.underlyingRequested = true
       operation.cancellation.reason = reason
       operation.cancellation.requestedAt = Date.now()
       if (operation.phase === 'queued' || operation.phase === 'running') operation.phase = 'cancelling'
       publishRepoRuntimeInvalidation(runtime, operation)
+    },
+    isCancellationRequested() {
+      return cancellationRequested
     },
     recordWaitCancellation(reason) {
       operation.cancellation.waitCancelledCount += 1
@@ -188,6 +195,7 @@ function beginRepoWriteOperation(
           }
       publishRepoRuntimeInvalidation(runtime, operation)
       pruneSettledOperations()
+      runtime.lifecycles.delete(operation.id)
     },
   }
 }
@@ -243,6 +251,16 @@ function deleteRepoWriteOperationBoundaryIfEmpty(boundaryKey: string): void {
 function ensureRepoRuntimeCloseSubscription(): void {
   if (workspaceRuntimeCloseSubscription) return
   workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
+    for (const runtime of repoWriteOperationRuntimesByBoundary.values()) {
+      for (const [operationId, lifecycle] of runtime.lifecycles) {
+        const operation = runtime.operations.get(operationId)
+        if (operation?.workspaceRuntimeId !== event.workspaceRuntimeId) continue
+        lifecycle.requestCancel('runtime-closed')
+        if (runtime.activeNetworkOperation?.operation === lifecycle) {
+          runtime.activeNetworkOperation.ctrl.abort()
+        }
+      }
+    }
     unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId)
   })
 }
@@ -259,6 +277,7 @@ function repoWriteOperationRuntimeForBoundary(
       repoIds,
       queue: new PQueue({ concurrency: 1 }),
       operations: new Map(),
+      lifecycles: new Map(),
       activeNetworkOperation: null,
     }
     repoWriteOperationRuntimesByBoundary.set(boundaryKey, runtime)
@@ -303,6 +322,11 @@ async function runResolvedRepoWriteOperation<T extends ExecResult>(
       async () => {
         started = true
         callerSignal?.removeEventListener('abort', cancelQueuedOperation)
+        if (operation.isCancellationRequested()) {
+          const result = cancelledRepoWriteResult<T>()
+          operation.settle(result)
+          return result
+        }
         return await task()
       },
       queuedAbortCtrl ? { signal: queuedAbortCtrl.signal } : undefined,
@@ -344,7 +368,8 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
   runtime.activeNetworkOperation = slot
   operation.start()
   try {
-    const result = await task(ctrl.signal)
+    const taskResult = await task(ctrl.signal)
+    const result = operation.isCancellationRequested() ? cancelledRepoWriteResult<T>() : taskResult
     operation.settle(result)
     return result
   } catch (err) {
@@ -392,6 +417,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   // boundary still enter the same PQueue before the next async turn.
   const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey, repoId)
   const operation = beginRepoWriteOperation(runtime, operationInput)
+  runtime.lifecycles.set(operation.id, operation)
   const context = createRepoWriteOperationContext(runtime, operation, signal)
   let task: () => Promise<T>
   try {
