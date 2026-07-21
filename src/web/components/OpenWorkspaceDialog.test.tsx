@@ -78,9 +78,10 @@ describe('OpenWorkspaceDialog', () => {
     )
 
     await setInputValue('#open-workspace-path', '/Users/tester/Dev')
-    await vi.waitFor(() => expect(mocks.getLocalDirectoryPathSuggestions).toHaveBeenCalled())
+    await vi.waitFor(() =>
+      expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer'),
+    )
 
-    expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer')
     expect(input('#open-workspace-path').parentElement?.className).toContain('min-w-0')
     expect(mocks.getLocalDirectoryPathSuggestions).toHaveBeenCalledWith('/Users/tester/Dev', expect.any(AbortSignal))
   })
