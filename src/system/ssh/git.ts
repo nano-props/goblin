@@ -694,23 +694,38 @@ export function parseRemoteRepoExecutionIdentity(output: string): RemoteRepoExec
   const machineFact = fields[1] ?? ''
   const rootNamespaceFact = fields[2] ?? ''
   const commonDir = fields[3] ?? ''
-  const deviceId = fields[4] ?? ''
-  const inode = fields[5] ?? ''
+  const commonDirDeviceId = fields[4] ?? ''
+  const commonDirInode = fields[5] ?? ''
+  const objectsDir = fields[6] ?? ''
+  const objectsDirDeviceId = fields[7] ?? ''
+  const objectsDirInode = fields[8] ?? ''
   if (
-    fields.length !== 7 ||
-    fields[6] !== '' ||
+    fields.length !== 10 ||
+    fields[9] !== '' ||
     !/^[a-f0-9]{32}$/u.test(runtimeToken) ||
     !validRemoteExecutionFact(machineFact) ||
     !validRemoteExecutionFact(rootNamespaceFact) ||
     !commonDir.startsWith('/') ||
-    !/^\d{1,32}$/u.test(deviceId) ||
-    !/^\d{1,32}$/u.test(inode)
+    !/^\d{1,32}$/u.test(commonDirDeviceId) ||
+    !/^\d{1,32}$/u.test(commonDirInode) ||
+    !objectsDir.startsWith('/') ||
+    !/^\d{1,32}$/u.test(objectsDirDeviceId) ||
+    !/^\d{1,32}$/u.test(objectsDirInode)
   ) {
     return null
   }
   return {
     commonDir: path.posix.normalize(commonDir),
-    generationKey: JSON.stringify({ runtimeToken, machineFact, rootNamespaceFact, deviceId, inode }),
+    generationKey: JSON.stringify({
+      runtimeToken,
+      machineFact,
+      rootNamespaceFact,
+      commonDirDeviceId,
+      commonDirInode,
+      objectsDir: path.posix.normalize(objectsDir),
+      objectsDirDeviceId,
+      objectsDirInode,
+    }),
   }
 }
 

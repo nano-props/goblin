@@ -74,6 +74,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
   resolveRepoCommonDir: vi.fn(),
+  resolveRepoObjectsDir: vi.fn(),
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
@@ -114,6 +115,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
   resolveRepoCommonDir: mocks.resolveRepoCommonDir,
+  resolveRepoObjectsDir: mocks.resolveRepoObjectsDir,
   getRepoName: mocks.getRepoName,
   getRepoRoot: mocks.getRepoRoot,
   getUpstream: mocks.getUpstream,
@@ -291,6 +293,9 @@ beforeEach(async () => {
   mocks.getCurrentBranch.mockResolvedValue('main')
   mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
+  )
+  mocks.resolveRepoObjectsDir.mockImplementation(async (cwd: string) =>
+    cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git/objects' : `${cwd}/.git/objects`,
   )
   mocks.getRepoName.mockResolvedValue('repo')
   mocks.getRepoRoot.mockResolvedValue('/tmp/repo')
@@ -736,16 +741,37 @@ describe('fetchRepo invalidation publishing', () => {
     expect(mocks.fetchAll).not.toHaveBeenCalled()
   })
 
-  test('fast-fails when a local repository is replaced at the same canonical path', async () => {
+  test('fast-fails when a local common directory is replaced at the same canonical path', async () => {
     mocks.fsStat
       .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
       .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
       ok: false,
       message: 'error.repository-target-changed',
     })
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails when a local object store is recreated inside the retained common directory', async () => {
+    mocks.fsStat
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
+      ok: false,
+      message: 'error.repository-target-changed',
+    })
+    expect(mocks.fsStat).toHaveBeenNthCalledWith(1, '/tmp/repo/.git', { bigint: true })
+    expect(mocks.fsStat).toHaveBeenNthCalledWith(2, '/tmp/repo/.git/objects', { bigint: true })
+    expect(mocks.fsStat).toHaveBeenNthCalledWith(3, '/tmp/repo/.git', { bigint: true })
+    expect(mocks.fsStat).toHaveBeenNthCalledWith(4, '/tmp/repo/.git/objects', { bigint: true })
     expect(mocks.fetchAll).not.toHaveBeenCalled()
   })
 
@@ -847,12 +873,94 @@ describe('fetchRepo invalidation publishing', () => {
     })
   })
 
+  test('rejects real captured removal when its runtime closes during physical capture', async () => {
+    const userId = 'test-user-runtime-capture'
+    const clientId = 'test-client-runtime-capture'
+    const captureStarted = deferred<void>()
+    const releaseCapture = deferred<void>()
+    let commonDirReads = 0
+    mocks.resolveRepoCommonDir.mockImplementation(async () => {
+      commonDirReads += 1
+      if (commonDirReads === 2) {
+        captureStarted.resolve()
+        await releaseCapture.promise
+      }
+      return '/tmp/repo/.git'
+    })
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const [writePaths, capabilityModule, workspaceRuntimes, coordinator] = await Promise.all([
+      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/worktree-removal/physical-worktree-capability.ts'),
+      import('#/server/modules/workspace-runtimes.ts'),
+      import('#/server/modules/repo-write-operation-coordinator.ts'),
+    ])
+    workspaceRuntimes.clearWorkspaceRuntimesForUser(userId)
+    const lease = workspaceRuntimes.acquireWorkspaceRuntimeLease(userId, REPO_ID, clientId)
+    const physicalWorktreeCapability = capabilityModule.issuePhysicalWorktreeExecutionCapability(
+      { kind: 'local', executionNamespaceId: 'local', endpoint: '/tmp/repo-worktree' },
+      {
+        userId,
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
+        worktreePath: '/tmp/repo-worktree',
+        execution: {
+          kind: 'local',
+          canonicalWorktreePath: '/tmp/repo-worktree',
+          endpointMarker: { deviceId: '1', inode: '1' },
+        },
+        runtimeSignal: new AbortController().signal,
+        validateExecution: async () => undefined,
+      },
+    )
+
+    const removal = writePaths.removeCapturedRepoWorktree(
+      REPO_ID,
+      { branch: 'feature/a', worktreePath: '/tmp/repo-worktree', deleteBranch: true },
+      {
+        beforeRemove,
+        afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
+        afterRemoveFailed: vi.fn(async () => {}),
+      },
+      physicalWorktreeCapability,
+      undefined,
+      { workspaceRuntimeId: lease.workspaceRuntimeId },
+    )
+
+    try {
+      await captureStarted.promise
+      expect(workspaceRuntimes.releaseWorkspaceRuntimeMembershipLease(userId, clientId, lease)).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
+      releaseCapture.resolve()
+
+      await expect(removal).rejects.toThrow('error.workspace-runtime-stale')
+      expect(mocks.getWorktrees).not.toHaveBeenCalled()
+      expect(beforeRemove).not.toHaveBeenCalled()
+      expect(mocks.removeWorktree).not.toHaveBeenCalled()
+      expect(coordinator.repoWriteOperationCoordinatorStatsForTests()).toEqual({
+        boundaryRuntimes: 0,
+        registeredBoundaries: 0,
+        registeredRepoIds: 0,
+        queuedOperations: 0,
+        runningOperations: 0,
+      })
+    } finally {
+      releaseCapture.resolve()
+      workspaceRuntimes.clearWorkspaceRuntimesForUser(userId)
+    }
+  })
+
   test('fast-fails captured worktree removal when its repository generation changes', async () => {
     mocks.fsStat
       .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
       .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
+      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
     const lifecycle = {
       beforeRemove,

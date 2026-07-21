@@ -11,6 +11,7 @@ import {
   getBranches,
   getCurrentBranch,
   resolveRepoCommonDir,
+  resolveRepoObjectsDir,
   getHeadHash,
   getLog as getBranchLog,
   getUpstream,
@@ -413,14 +414,22 @@ async function resolveLocalRepoExecution(repoPath: string, signal?: AbortSignal)
     const canonicalRepoPath = await fs.realpath(repoPath)
     signal?.throwIfAborted()
     const commonDir = await resolveRepoCommonDir(canonicalRepoPath, { signal })
+    const objectsDir = await resolveRepoObjectsDir(canonicalRepoPath, { signal })
     const commonDirStat = await fs.stat(commonDir, { bigint: true })
+    const objectsDirStat = await fs.stat(objectsDir, { bigint: true })
     signal?.throwIfAborted()
     return {
       canonicalRepoPath,
       boundary: {
         kind: 'local-git',
         commonDir,
-        generationKey: `${commonDirStat.dev.toString(10)}\0${commonDirStat.ino.toString(10)}`,
+        generationKey: JSON.stringify({
+          commonDirDeviceId: commonDirStat.dev.toString(10),
+          commonDirInode: commonDirStat.ino.toString(10),
+          objectsDir,
+          objectsDirDeviceId: objectsDirStat.dev.toString(10),
+          objectsDirInode: objectsDirStat.ino.toString(10),
+        }),
       },
     }
   } catch {

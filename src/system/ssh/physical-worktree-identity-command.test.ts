@@ -43,5 +43,14 @@ describe('remote physical worktree identity command', () => {
     expect(invocation.script).toContain('rev-parse --git-common-dir')
     expect(invocation.script).toContain('cd -- "$common_dir" && pwd -P')
     expect(invocation.script).toContain('stat -c "%d %i" "$canonical"')
+    expect(invocation.script).toContain('rev-parse --git-path objects')
+    expect(invocation.script).toContain('cd -- "$objects_dir" && pwd -P')
+    expect(invocation.script).toContain('stat -c "%d %i" "$objects_canonical"')
+    const identityOutput = invocation.script
+      .split('\n')
+      .find((line) => line.startsWith("printf '") && line.includes('"$objects_canonical"'))
+    expect(identityOutput).toBe(
+      'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$common_dir_device" "$common_dir_inode" "$objects_canonical" "$1" "$2"',
+    )
   })
 })

@@ -766,7 +766,22 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string, resolveGitCo
     'set -- $endpoint_stat',
     '[ "$#" -eq 2 ] || exit 1',
     'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
-    'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
+    ...(resolveGitCommonDir
+      ? [
+          'common_dir_device=$1',
+          'common_dir_inode=$2',
+          `objects_dir=$(git -C ${shellQuote(worktreePath)} rev-parse --git-path objects) || exit $?`,
+          `case "$objects_dir" in (/*) ;; (*) objects_dir=${shellQuote(worktreePath)}/$objects_dir;; esac`,
+          'objects_canonical=$(cd -- "$objects_dir" && pwd -P) || exit 1',
+          'objects_stat=$(stat -c "%d %i" "$objects_canonical" 2>/dev/null || stat -f "%d %i" "$objects_canonical" 2>/dev/null) || exit 1',
+          'set -- $objects_stat',
+          '[ "$#" -eq 2 ] || exit 1',
+          'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
+          'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$common_dir_device" "$common_dir_inode" "$objects_canonical" "$1" "$2"',
+        ]
+      : [
+          'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
+        ]),
   ].join('\n')
 }
 

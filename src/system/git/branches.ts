@@ -37,6 +37,13 @@ export async function resolveRepoCommonDir(cwd: string, options?: { signal?: Abo
   return path.normalize(await realpath(absoluteCommonDir))
 }
 
+export async function resolveRepoObjectsDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  const objectsDir = await git(cwd, ['rev-parse', '--git-path', 'objects'], { signal: options?.signal })
+  if (!objectsDir) throw new Error('Git returned an empty objects directory')
+  const absoluteObjectsDir = path.isAbsolute(objectsDir) ? path.normalize(objectsDir) : path.resolve(cwd, objectsDir)
+  return path.normalize(await realpath(absoluteObjectsDir))
+}
+
 export async function getRepoName(cwd: string): Promise<string> {
   const root = await getRepoRoot(cwd)
   if (!root) return ''

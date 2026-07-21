@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { realpath } from 'node:fs/promises'
-import { getBranchWorktreeIdentities, resolveRepoCommonDir } from '#/system/git/branches.ts'
+import { getBranchWorktreeIdentities, resolveRepoCommonDir, resolveRepoObjectsDir } from '#/system/git/branches.ts'
 import { git } from '#/system/git/git-exec.ts'
 
 vi.mock('#/system/git/git-exec.ts', () => ({
@@ -75,5 +75,15 @@ describe('repository common directory', () => {
 
     await expect(resolveRepoCommonDir('/repo')).rejects.toThrow('git unavailable')
   })
+})
 
+describe('repository objects directory', () => {
+  test('resolves the effective object store through Git', async () => {
+    vi.mocked(git).mockResolvedValueOnce('../../object-store')
+    vi.mocked(realpath).mockResolvedValueOnce('/physical/object-store')
+
+    await expect(resolveRepoObjectsDir('/repo/worktree')).resolves.toBe('/physical/object-store')
+    expect(git).toHaveBeenCalledWith('/repo/worktree', ['rev-parse', '--git-path', 'objects'], { signal: undefined })
+    expect(realpath).toHaveBeenCalledWith('/object-store')
+  })
 })
