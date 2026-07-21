@@ -21,17 +21,14 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoDataQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import {
-  invalidateRepoSnapshotQueries,
   getRepoWorktreeStatusQueryData,
-  repoDataQueryKey,
-  repoProjectionQueryKey,
-  repoProjectionQueryOptions,
-  repoWorktreeStatusQueryKey,
-  repoWorktreeStatusQueryOptions,
   setRepoProjectionQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-data-query.ts'
+} from '#/web/repo-query-cache.ts'
+import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
+import { invalidateRepoSnapshotQueries } from '#/web/repo-query-runtime.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'

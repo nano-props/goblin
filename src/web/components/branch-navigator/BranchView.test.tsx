@@ -19,7 +19,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 

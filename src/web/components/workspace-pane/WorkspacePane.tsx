@@ -23,7 +23,7 @@ import {
   useRepoOperationsReadModel,
   useRepoProjectionReadModel,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-data-query.ts'
+} from '#/web/repo-queries.ts'
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'

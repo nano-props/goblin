@@ -14,7 +14,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {

@@ -9,7 +9,7 @@ import {
   seedRepoShellForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'

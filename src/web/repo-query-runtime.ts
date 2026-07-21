@@ -1,20 +1,22 @@
-import { hashKey, queryOptions, skipToken, useQuery, type QueryClient } from '@tanstack/react-query'
+import { hashKey, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  getRepoLog,
-  getRepoOperations,
-  getRepoProjection,
-  getRepoRemoteBranches,
-  getRepoWorktreeStatus,
-} from '#/web/repo-client.ts'
+import { getRepoOperations, getRepoProjection, getRepoWorktreeStatus } from '#/web/repo-client.ts'
 import type {
   RepoOperationsSnapshot,
   GitWorkspaceRuntimeProjection,
-  RepoServerOperationState,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
-import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { PullRequestFetchMode } from '#/shared/git-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  normalizeRepoProjectionBranch,
+  normalizeRepoProjectionMode,
+  repoDataQueryKey,
+  repoOperationsQueryKey,
+  repoOperationsQueryPrefix,
+  repoProjectionQueryKey,
+  repoWorktreeStatusQueryKey,
+} from '#/web/repo-query-keys.ts'
 
 class StaleRepoRuntimeReadError extends Error {
   constructor() {
@@ -34,73 +36,6 @@ const repoSnapshotInvalidationVersionsByClient = new WeakMap<QueryClient, Map<st
 const worktreeStatusInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const operationsInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const repoProjectionFetchInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
-
-function normalizeProjectionBranch(branch?: string | null): string | null {
-  return branch || null
-}
-
-function normalizeProjectionMode(mode?: PullRequestFetchMode): PullRequestFetchMode {
-  return mode ?? 'full'
-}
-
-export function repoProjectionQueryKey(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch?: string | null,
-  mode?: PullRequestFetchMode,
-) {
-  return [
-    'repo-data',
-    repoRoot,
-    workspaceRuntimeId,
-    'projection',
-    { branch: normalizeProjectionBranch(branch), mode: normalizeProjectionMode(mode) },
-  ] as const
-}
-
-export interface ParsedRepoProjectionQueryKey {
-  repoRoot: WorkspaceId
-  workspaceRuntimeId: string
-  branch: string | null
-  mode: PullRequestFetchMode
-}
-
-export function parseRepoProjectionQueryKey(queryKey: readonly unknown[]): ParsedRepoProjectionQueryKey | null {
-  if (queryKey.length !== 5) return null
-  if (queryKey[0] !== 'repo-data') return null
-  if (queryKey[3] !== 'projection') return null
-  const repoRoot = queryKey[1]
-  const workspaceRuntimeId = queryKey[2]
-  if (typeof repoRoot !== 'string' || typeof workspaceRuntimeId !== 'string') return null
-  const workspaceId = canonicalWorkspaceLocator(repoRoot)
-  if (!workspaceId) return null
-  const options = queryKey[4]
-  if (!options || typeof options !== 'object') return null
-  const projection = options as { branch?: unknown; mode?: unknown }
-  const branch = typeof projection.branch === 'string' && projection.branch.length > 0 ? projection.branch : null
-  const mode = projection.mode === 'summary' ? 'summary' : 'full'
-  return { repoRoot: workspaceId, workspaceRuntimeId, branch, mode }
-}
-
-export function repoOperationsQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string, includeSettled = false) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const
-}
-
-export function repoWorktreeStatusQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const
-}
-
-export function repoDataQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId] as const
-}
-
-function repoProjectionQueryPrefix(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'projection'] as const
-}
-
-function repoOperationsQueryPrefix(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'operations'] as const
-}
 
 function repoRuntimeScopeKey(repoRoot: WorkspaceId, workspaceRuntimeId: string): string {
   return `${repoRoot}\0${workspaceRuntimeId}`
@@ -220,7 +155,7 @@ function markRepoProjectionFetchStarted(
   return version
 }
 
-function isStaleRepoRuntimeReadError(err: unknown): boolean {
+export function isStaleRepoRuntimeReadError(err: unknown): boolean {
   return err instanceof StaleRepoRuntimeReadError
 }
 
@@ -306,41 +241,7 @@ async function abortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): P
   }
 }
 
-function repoLogQueryKey(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string,
-  count: number,
-  skip: number,
-) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'log', branch, count, skip] as const
-}
-
-function repoRemoteBranchesQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'remote-branches'] as const
-}
-
-export function repoProjectionQueryOptions(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch?: string | null,
-  mode?: PullRequestFetchMode,
-) {
-  const requestedBranch = normalizeProjectionBranch(branch)
-  const requestedMode = normalizeProjectionMode(mode)
-  const placeholderData = getRepoProjectionPlaceholderData(repoRoot, workspaceRuntimeId, branch, mode)
-  return queryOptions({
-    queryKey: repoProjectionQueryKey(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode),
-    queryFn: ({ signal, client }) =>
-      fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    placeholderData,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-async function fetchRepoProjectionReadModel(
+export async function fetchRepoProjectionReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
@@ -357,49 +258,7 @@ async function fetchRepoProjectionReadModel(
   return projection
 }
 
-export function repoServerOperationActive(operation: Pick<RepoServerOperationState, 'phase'>): boolean {
-  return operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling'
-}
-
-export function getRepoProjectionPlaceholderData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch?: string | null,
-  mode?: PullRequestFetchMode,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const requestedBranch = branch || null
-  const requestedMode = mode ?? 'full'
-  const cached = findRepoProjectionPlaceholderSource(
-    repoRoot,
-    workspaceRuntimeId,
-    requestedBranch,
-    requestedMode,
-    queryClient,
-  )
-  if (!cached?.snapshot) return undefined
-  return {
-    snapshot: cached.snapshot,
-    pullRequests: null,
-    requested: {
-      branch: requestedBranch,
-      pullRequestMode: requestedMode,
-    },
-    loadedAt: 0,
-  }
-}
-
-export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return queryOptions({
-    queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-async function fetchRepoWorktreeStatusReadModel(
+export async function fetchRepoWorktreeStatusReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   signal: AbortSignal,
@@ -423,40 +282,7 @@ async function fetchRepoWorktreeStatusReadModel(
   return snapshot
 }
 
-function findRepoProjectionPlaceholderSource(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string | null,
-  mode: PullRequestFetchMode,
-  queryClient: QueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const candidates = queryClient
-    .getQueriesData<GitWorkspaceRuntimeProjection>({
-      queryKey: repoProjectionQueryPrefix(repoRoot, workspaceRuntimeId),
-    })
-    .map(([, projection]) => projection)
-    .filter((projection): projection is GitWorkspaceRuntimeProjection => !!projection?.snapshot)
-  candidates.sort(
-    (a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode),
-  )
-  return candidates[0]
-}
-
-function repoProjectionPlaceholderRank(
-  projection: GitWorkspaceRuntimeProjection,
-  branch: string | null,
-  mode: PullRequestFetchMode,
-): number {
-  const requested = projection.requested
-  if (requested.branch === branch && requested.pullRequestMode === mode) return 0
-  if (requested.branch === null && requested.pullRequestMode === mode) return 1
-  if (requested.branch === null && requested.pullRequestMode === 'full') return 2
-  if (requested.branch === null) return 3
-  if (requested.pullRequestMode === mode) return 4
-  return 5
-}
-
-async function fetchRepoSnapshotQuery<T>(
+export async function fetchRepoSnapshotQuery<T>(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   signal: AbortSignal,
@@ -480,61 +306,7 @@ async function fetchRepoSnapshotQuery<T>(
   }
 }
 
-function repoLogQueryOptions(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string,
-  options: { count?: number; skip?: number; enabled?: boolean } = {},
-) {
-  const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
-  const skip = options.skip ?? 0
-  return queryOptions({
-    queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, branch, count, skip),
-    queryFn: ({ signal, client }) =>
-      fetchRepoSnapshotQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
-        getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip, signal }),
-      ),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    enabled: options.enabled,
-  })
-}
-
-function repoRemoteBranchesQueryOptions(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  options: { enabled?: boolean } = {},
-) {
-  return queryOptions({
-    queryKey: repoRemoteBranchesQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal, client }) =>
-      fetchRepoSnapshotQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
-        getRepoRemoteBranches(repoRoot, workspaceRuntimeId, signal),
-      ),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    enabled: options.enabled,
-  })
-}
-
-export function repoOperationsQueryOptions(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  options: { includeSettled?: boolean; enabled?: boolean } = {},
-) {
-  const includeSettled = options.includeSettled === true
-  return queryOptions({
-    queryKey: repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled),
-    queryFn: ({ signal, client }) =>
-      fetchRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    enabled: options.enabled,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-async function fetchRepoOperationsReadModel(
+export async function fetchRepoOperationsReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   includeSettled: boolean,
@@ -548,183 +320,6 @@ async function fetchRepoOperationsReadModel(
     throw new StaleRepoRuntimeReadError()
   }
   return operations
-}
-
-export function useRepoProjectionReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
-  enabled: boolean,
-) {
-  const active = enabled && repoRoot !== null
-  const requestedBranch = normalizeProjectionBranch(branch)
-  const requestedMode = normalizeProjectionMode(mode)
-  const query = useQuery({
-    queryKey: [
-      'repo-data',
-      repoRoot,
-      workspaceRuntimeId,
-      'projection',
-      { branch: requestedBranch, mode: requestedMode },
-    ] as const,
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ signal, client }) =>
-            fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    placeholderData: repoRoot
-      ? getRepoProjectionPlaceholderData(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode)
-      : undefined,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: active,
-    subscribed: active,
-  })
-  return query
-}
-
-export function useRepoWorktreeStatusReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  enabled: boolean,
-) {
-  const active = enabled && repoRoot !== null
-  return useQuery({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const,
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: active,
-    subscribed: active,
-  })
-}
-
-export function useRepoLogQuery(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string,
-  options: { count?: number; skip?: number; enabled?: boolean } = {},
-) {
-  return useQuery(repoLogQueryOptions(repoRoot, workspaceRuntimeId, branch, options))
-}
-
-export function useRepoRemoteBranchesQuery(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  options: { enabled?: boolean } = {},
-) {
-  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, workspaceRuntimeId, options))
-}
-
-export function useRepoOperationsReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  options: { includeSettled?: boolean; enabled?: boolean } = {},
-) {
-  const includeSettled = options.includeSettled === true
-  const enabled = options.enabled !== false && repoRoot !== null
-  const query = useQuery({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const,
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ signal, client }) =>
-            fetchRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, signal, client),
-    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
-    retryDelay: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled,
-    subscribed: enabled,
-  })
-  return query
-}
-
-export function getRepoOperationsQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): RepoOperationsSnapshot | undefined {
-  return queryClient.getQueryData<RepoOperationsSnapshot>(repoOperationsQueryKey(repoRoot, workspaceRuntimeId, false))
-}
-
-export function setRepoOperationsQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  includeSettled: boolean,
-  operations: RepoOperationsSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  queryClient.setQueryData(repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled), operations)
-}
-
-export function getRepoProjectionQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  return queryClient.getQueryData<GitWorkspaceRuntimeProjection>(
-    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
-  )
-}
-
-export function getRepoWorktreeStatusQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): RepoWorktreeStatusSnapshot | undefined {
-  return queryClient.getQueryData<RepoWorktreeStatusSnapshot>(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId))
-}
-
-export function setRepoWorktreeStatusQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  snapshot: RepoWorktreeStatusSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  if (snapshot.workspaceRuntimeId !== workspaceRuntimeId) return
-  queryClient.setQueryData(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId), snapshot)
-}
-
-export function setRepoProjectionQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
-  projection: GitWorkspaceRuntimeProjection,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  queryClient.setQueryData(repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode), projection)
-}
-
-export function seedRepoProjectionQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  projection: GitWorkspaceRuntimeProjection | null,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  // A null Git projection is either deferred or conclusively unavailable.
-  // Nothing to seed — the lazy restore will fill the cache when the user
-  // navigates to the repo.
-  if (!projection) return
-  // Cache/session restore seed data is a UI placeholder, not an authoritative
-  // server read, so do not seed the active operations cache here.
-  queryClient.setQueryData(
-    repoProjectionQueryKey(
-      repoRoot,
-      workspaceRuntimeId,
-      projection.requested.branch,
-      projection.requested.pullRequestMode,
-    ),
-    projection,
-  )
 }
 
 interface RepoProjectionRefreshReadInput {
@@ -749,15 +344,11 @@ async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshR
 async function fetchRepoProjectionReadModelOnce(
   input: RepoProjectionRefreshReadInput,
 ): Promise<GitWorkspaceRuntimeProjection> {
-  const projectionQueryOptions = repoProjectionQueryOptions(
-    input.repoRoot,
-    input.workspaceRuntimeId,
-    input.branch,
-    input.mode,
-  )
   const hasSharedFetchInProgress = hasRepoProjectionFetchInProgress(input.queryClient, input.queryKey)
   const projectionPromise = input.queryClient.fetchQuery({
-    ...projectionQueryOptions,
+    queryKey: input.queryKey,
+    retry: (_failureCount, error) => isStaleRepoRuntimeReadError(error),
+    retryDelay: 0,
     staleTime: 0,
     queryFn: ({ signal }) =>
       fetchRepoProjectionReadModel(
@@ -816,8 +407,8 @@ export async function refreshRepoProjectionReadModel(
 ): Promise<GitWorkspaceRuntimeProjection> {
   options.signal?.throwIfAborted()
   const queryClient = options.queryClient ?? primaryWindowQueryClient
-  const requestedBranch = normalizeProjectionBranch(branch)
-  const requestedMode = normalizeProjectionMode(mode)
+  const requestedBranch = normalizeRepoProjectionBranch(branch)
+  const requestedMode = normalizeRepoProjectionMode(mode)
   const queryKey = repoProjectionQueryKey(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode)
   const refreshReadInput: RepoProjectionRefreshReadInput = {
     repoRoot,
@@ -847,7 +438,9 @@ export async function refreshRepoWorktreeStatusReadModel(
     try {
       const snapshot = await abortablePromise(
         queryClient.fetchQuery({
-          ...repoWorktreeStatusQueryOptions(repoRoot, workspaceRuntimeId),
+          queryKey,
+          retry: (_failureCount, error) => isStaleRepoRuntimeReadError(error),
+          retryDelay: 0,
           staleTime: 0,
           queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, queryClient),
         }),

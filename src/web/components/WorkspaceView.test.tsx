@@ -14,7 +14,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import * as repoDataQuery from '#/web/repo-data-query.ts'
+import * as repoDataQuery from '#/web/repo-query-runtime.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -352,12 +352,7 @@ describe('WorkspaceView workspace navigation', () => {
     expect(invalidate).not.toHaveBeenCalled()
 
     act(() => {
-      result.rerender(
-        <WorkspaceView
-          workspaceId={REPO_ID}
-          routeView={{ kind: 'dashboard', workspaceId: REPO_ID }}
-        />,
-      )
+      result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
     })
 
     expect(invalidate).toHaveBeenCalledTimes(1)

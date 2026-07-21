@@ -20,7 +20,7 @@ import {
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -42,7 +42,9 @@ describe('workspace pane tab target read model', () => {
 
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+    useWorkspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 

@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { clearRepoProjectionFetchInvalidationVersion, parseRepoProjectionQueryKey } from '#/web/repo-data-query.ts'
+import { parseRepoProjectionQueryKey } from '#/web/repo-query-keys.ts'
+import { clearRepoProjectionFetchInvalidationVersion } from '#/web/repo-query-runtime.ts'
 
 export function useRepoProjectionQueryEffects(queryClient: QueryClient = primaryWindowQueryClient): void {
   useEffect(() => {

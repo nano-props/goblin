@@ -17,7 +17,7 @@ import {
 import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { invalidateRepoWorktreeSnapshotQueries } from '#/web/repo-data-query.ts'
+import { invalidateRepoWorktreeSnapshotQueries } from '#/web/repo-query-runtime.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 
 interface AppRuntimeProjectionProviderProps {
@@ -109,11 +109,14 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
             .markProjectionReady(scope.target.workspaceId, scope.target.workspaceRuntimeId)
         },
         afterAccept: options.resynchronizeConnectedViews
-          ? () => terminalProjection.resynchronizeConnectedViews(scope.target.workspaceId, scope.target.workspaceRuntimeId)
+          ? () =>
+              terminalProjection.resynchronizeConnectedViews(scope.target.workspaceId, scope.target.workspaceRuntimeId)
           : undefined,
         reject: (error) => {
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error })
-          const hydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(scope.target.workspaceId)
+          const hydration = useTerminalProjectionHydrationStore
+            .getState()
+            .hydrationByWorkspace.get(scope.target.workspaceId)
           if (hydration?.workspaceRuntimeId !== scope.target.workspaceRuntimeId || hydration.phase !== 'pending') return
           useTerminalProjectionHydrationStore
             .getState()
@@ -213,7 +216,10 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
             scopeRegistry.disposeScopes()
             for (const target of recovery.targets) {
               if (workspaceRuntimeIdForRoot(target.workspaceId) !== target.workspaceRuntimeId) continue
-              const projectionTarget = { workspaceId: target.workspaceId, workspaceRuntimeId: target.workspaceRuntimeId }
+              const projectionTarget = {
+                workspaceId: target.workspaceId,
+                workspaceRuntimeId: target.workspaceRuntimeId,
+              }
               const scope = scopeRegistry.scopeFor(projectionTarget)
               scope.commit(() => {
                 useTerminalProjectionHydrationStore
@@ -239,7 +245,8 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
         if (
           message.change === 'revision' &&
           message.workspaceRuntimeId === scope.target.workspaceRuntimeId &&
-          (workspacePaneTabsProjectionRevision(message.workspaceId, message.workspaceRuntimeId) ?? -1) >= message.revision
+          (workspacePaneTabsProjectionRevision(message.workspaceId, message.workspaceRuntimeId) ?? -1) >=
+            message.revision
         ) {
           return
         }

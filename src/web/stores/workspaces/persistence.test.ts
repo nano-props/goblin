@@ -18,7 +18,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/workspaces/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { getRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')

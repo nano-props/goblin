@@ -20,7 +20,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 

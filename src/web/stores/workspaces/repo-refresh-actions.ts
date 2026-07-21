@@ -3,7 +3,7 @@ import {
   invalidateRepoOperationsQueries,
   invalidateRepoSnapshotQueries,
   invalidateRepoWorktreeSnapshotQueries,
-} from '#/web/repo-data-query.ts'
+} from '#/web/repo-query-runtime.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
 

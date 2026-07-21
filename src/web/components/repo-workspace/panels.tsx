@@ -4,7 +4,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { useRepoLogQuery } from '#/web/repo-data-query.ts'
+import { useRepoLogQuery } from '#/web/repo-queries.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import type {

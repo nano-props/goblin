@@ -3,9 +3,8 @@ import {
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   getRepoWorktreeStatusQueryData,
-  useRepoProjectionReadModel,
-  useRepoWorktreeStatusReadModel,
-} from '#/web/repo-data-query.ts'
+} from '#/web/repo-query-cache.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import {
   stripBranchWorktreeMetadata,
   worktreeStatesFromBranchReadModel,

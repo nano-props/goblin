@@ -8,7 +8,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
