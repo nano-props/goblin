@@ -79,6 +79,8 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
       new WorkspaceRuntimeReconnectRecovery({
         scopeRegistry,
         reconcileMemberships: async () =>
+          // Reconnect-only admission: the server resolves these stable workspace IDs and
+          // mints the canonical runtime epochs; this is not a client-owned membership snapshot.
           await reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
         currentWorkspaceRuntimeId: workspaceRuntimeIdForRoot,
         terminalRecovery,
