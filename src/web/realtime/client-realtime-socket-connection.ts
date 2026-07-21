@@ -1,5 +1,6 @@
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
+import type { RealtimeRpcAction, RealtimeRpcOutputs } from '#/shared/realtime-rpc.ts'
 
 const CLIENT_REALTIME_HEARTBEAT_INTERVAL_MS = 30_000
 const REALTIME_SOCKET_OPEN_TIMEOUT_MS = 10_000
@@ -10,8 +11,6 @@ export interface ClientRealtimeSocketConnectionConfig {
   url: string
   clientId: string
 }
-
-type RealtimeAction<TInputs, TOutputs> = keyof TInputs & keyof TOutputs & string
 
 type PendingSocketRequest<TAction extends string, TValue> = {
   action: TAction
@@ -65,7 +64,7 @@ export class ClientRealtimeRequestError extends Error {
 
 export interface ClientRealtimeSocketConnectionOptions<
   TInputs extends object,
-  TOutputs extends object,
+  TOutputs extends RealtimeRpcOutputs<TInputs>,
   TRealtimeMessage,
 > {
   resolveConnection: () => ClientRealtimeSocketConnectionConfig | null
@@ -74,26 +73,30 @@ export interface ClientRealtimeSocketConnectionOptions<
   onRealtimeMessage(message: TRealtimeMessage, currentClientId: string): void
   parseServerMessage(
     data: unknown,
-  ): TRealtimeMessage | RealtimeResponseMessage<RealtimeAction<TInputs, TOutputs>> | RealtimePongMessage | null
+  ): TRealtimeMessage | RealtimeResponseMessage<RealtimeRpcAction<TInputs>> | RealtimePongMessage | null
   encodeClientMessage(message: unknown): string
   createRequestId(): string
   errorPrefix: string
 }
 
-export interface ClientRealtimeSocketConnection<TInputs extends object, TOutputs extends object> {
+export interface ClientRealtimeSocketConnection<TInputs extends object, TOutputs extends RealtimeRpcOutputs<TInputs>> {
   openForRealtime(): void
   closeSocketIfIdle(): void
   kickReconnect(): void
-  request<TAction extends RealtimeAction<TInputs, TOutputs>>(
+  request<TAction extends RealtimeRpcAction<TInputs>>(
     action: TAction,
     input: TInputs[TAction],
   ): Promise<TOutputs[TAction]>
 }
 
-export function createClientRealtimeSocketConnection<TInputs extends object, TOutputs extends object, TRealtimeMessage>(
+export function createClientRealtimeSocketConnection<
+  TInputs extends object,
+  TOutputs extends RealtimeRpcOutputs<TInputs>,
+  TRealtimeMessage,
+>(
   options: ClientRealtimeSocketConnectionOptions<TInputs, TOutputs, TRealtimeMessage>,
 ): ClientRealtimeSocketConnection<TInputs, TOutputs> {
-  type Action = RealtimeAction<TInputs, TOutputs>
+  type Action = RealtimeRpcAction<TInputs>
   type Output = TOutputs[Action]
 
   const socketLabel = `${options.errorPrefix} socket`

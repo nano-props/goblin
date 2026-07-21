@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { parse } from '@babel/parser'
 import { glob } from 'tinyglobby'
+import { findTypeAssertionViolations } from '#scripts/type-assertion-policy.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 
@@ -28,26 +28,7 @@ const sourceFiles = await glob(
 const violations: string[] = []
 for (const file of sourceFiles) {
   const source = await readFile(path.join(repoRoot, file), 'utf8')
-  for (const match of source.matchAll(/\/\/\s*@ts-ignore\b/g)) {
-    violations.push(`${file}:${sourceLineAt(source, match.index)}: @ts-ignore is forbidden`)
-  }
-  const ast = parse(source, {
-    sourceType: 'module',
-    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
-  })
-  visitAst(ast, (node) => {
-    if (node.type !== 'TSAsExpression') return
-    const lineNumber = node.loc?.start.line ?? 1
-    if (node.typeAnnotation?.type === 'TSAnyKeyword') {
-      violations.push(`${file}:${lineNumber}: production "as any" is forbidden`)
-    }
-    if (node.expression?.type !== 'TSAsExpression' || node.expression.typeAnnotation?.type !== 'TSUnknownKeyword') {
-      return
-    }
-    const expression = source.slice(node.start ?? 0, node.end ?? 0)
-    const allowed = DOUBLE_ASSERTION_ALLOWLIST.get(file)?.some((snippet) => expression.includes(snippet)) ?? false
-    if (!allowed) violations.push(`${file}:${lineNumber}: unreviewed double assertion`)
-  })
+  violations.push(...findTypeAssertionViolations(source, file, DOUBLE_ASSERTION_ALLOWLIST))
 }
 
 if (violations.length > 0) {
@@ -58,31 +39,3 @@ if (violations.length > 0) {
 }
 
 console.log('[type-assertions] production escape hatches are reviewed')
-
-interface AstNode {
-  type?: string
-  start?: number | null
-  end?: number | null
-  loc?: { start: { line: number } } | null
-  expression?: AstNode
-  typeAnnotation?: AstNode
-  [key: string]: unknown
-}
-
-function visitAst(value: unknown, visit: (node: AstNode) => void): void {
-  if (!value || typeof value !== 'object') return
-  if (Array.isArray(value)) {
-    for (const item of value) visitAst(item, visit)
-    return
-  }
-  const node = value as AstNode
-  if (typeof node.type === 'string') visit(node)
-  for (const [key, child] of Object.entries(node)) {
-    if (key === 'loc') continue
-    visitAst(child, visit)
-  }
-}
-
-function sourceLineAt(source: string, index: number): number {
-  return source.slice(0, index).split('\n').length
-}

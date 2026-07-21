@@ -1,4 +1,6 @@
-export type RealtimeRpcAction<TInputs extends object, TOutputs extends object> = keyof TInputs & keyof TOutputs & string
+export type RealtimeRpcOutputs<TInputs extends object> = { [Action in keyof TInputs]: unknown }
+
+export type RealtimeRpcAction<TInputs extends object> = keyof TInputs & string
 
 export type RealtimeRpcRequestMessage<
   TInputs extends object,
@@ -14,8 +16,8 @@ export type RealtimeRpcRequestMessage<
 
 export type RealtimeRpcResponseMessage<
   TInputs extends object,
-  TOutputs extends object,
-  TAction extends RealtimeRpcAction<TInputs, TOutputs> = RealtimeRpcAction<TInputs, TOutputs>,
+  TOutputs extends RealtimeRpcOutputs<TInputs>,
+  TAction extends RealtimeRpcAction<TInputs> = RealtimeRpcAction<TInputs>,
 > = {
   [Action in TAction]:
     | {

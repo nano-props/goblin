@@ -1,9 +1,9 @@
-import type { RealtimeRpcAction } from '#/shared/realtime-rpc.ts'
+import type { RealtimeRpcAction, RealtimeRpcOutputs } from '#/shared/realtime-rpc.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
-export type RealtimeRpcHandlers<TInputs extends object, TOutputs extends object> = {
-  [Action in RealtimeRpcAction<TInputs, TOutputs>]: (
+export type RealtimeRpcHandlers<TInputs extends object, TOutputs extends RealtimeRpcOutputs<TInputs>> = {
+  [Action in RealtimeRpcAction<TInputs>]: (
     clientId: string,
     userId: string,
     input: TInputs[Action],
@@ -12,8 +12,8 @@ export type RealtimeRpcHandlers<TInputs extends object, TOutputs extends object>
 
 export async function invokeRealtimeRpcHandler<
   TInputs extends object,
-  TOutputs extends object,
-  TAction extends RealtimeRpcAction<TInputs, TOutputs>,
+  TOutputs extends RealtimeRpcOutputs<TInputs>,
+  TAction extends RealtimeRpcAction<TInputs>,
 >(
   handlers: RealtimeRpcHandlers<TInputs, TOutputs>,
   clientId: string,
