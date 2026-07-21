@@ -56,7 +56,7 @@ export interface BackgroundSyncDiagnostics {
   queueSize: number
   repos: Array<{
     repoId: WorkspaceId
-    lastFetchAt: number | null
+    lastFetchStartedAt: number | null
     failureCount: number
     backoffUntil: number | null
     nextEligibleAt: number | null
@@ -426,7 +426,7 @@ export function getBackgroundSyncDiagnostics(now: number = Date.now()): Backgrou
       const key = backgroundSyncTargetKey(target)
       return {
         repoId: target.workspaceId,
-        lastFetchAt: state.lastFetchStartedAtByTarget[key] ?? null,
+        lastFetchStartedAt: state.lastFetchStartedAtByTarget[key] ?? null,
         failureCount: state.failureCountByTarget[key] ?? 0,
         backoffUntil: state.backoffUntilByTarget[key] ?? null,
         nextEligibleAt: nextEligibleAt(target, now),
