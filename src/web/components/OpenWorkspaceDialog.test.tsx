@@ -2,6 +2,7 @@
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -9,6 +10,14 @@ import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
+
+const mocks = vi.hoisted(() => ({
+  getLocalDirectoryPathSuggestions: vi.fn(),
+}))
+
+vi.mock('#/web/workspace-client.ts', () => ({
+  getLocalDirectoryPathSuggestions: mocks.getLocalDirectoryPathSuggestions,
+}))
 
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as {
@@ -18,6 +27,8 @@ const testWindow = window as unknown as {
 
 beforeEach(() => {
   ipcCalls = []
+  mocks.getLocalDirectoryPathSuggestions.mockReset()
+  mocks.getLocalDirectoryPathSuggestions.mockResolvedValue([])
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
@@ -53,6 +64,54 @@ afterEach(() => {
 })
 
 describe('OpenWorkspaceDialog', () => {
+  test('shows local directory suggestions while preserving the picker layout wrapper', async () => {
+    mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
+    render(
+      <OpenWorkspaceDialog
+        open
+        onClose={vi.fn()}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer'),
+        }))}
+      />,
+    )
+
+    await setInputValue('#open-workspace-path', '/Users/tester/Dev')
+    await vi.waitFor(() =>
+      expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer'),
+    )
+
+    expect(input('#open-workspace-path').parentElement?.className).toContain('min-w-0')
+    expect(mocks.getLocalDirectoryPathSuggestions).toHaveBeenCalledWith('/Users/tester/Dev', expect.any(AbortSignal))
+  })
+
+  test('lets the popup own the first Escape before the dialog owns the second', async () => {
+    const onClose = vi.fn()
+    mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
+    render(
+      <OpenWorkspaceDialog
+        open
+        onClose={onClose}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer'),
+        }))}
+      />,
+    )
+    await setInputValue('#open-workspace-path', '/Users/tester/Dev')
+    await vi.waitFor(() => expect(document.querySelector('[role="listbox"]')).not.toBeNull())
+    const user = userEvent.setup()
+    expect(document.querySelector('[role="listbox"]')).not.toBeNull()
+
+    await user.keyboard('{Escape}')
+    expect(document.querySelector('[role="listbox"]')).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   test('keeps the inline status row mounted', () => {
     render(
       <OpenWorkspaceDialog
@@ -83,7 +142,7 @@ describe('OpenWorkspaceDialog', () => {
     expect(document.activeElement).toBe(input('#open-workspace-path'))
   })
 
-  test('does not echo the typed path into the inline status row during normal input', () => {
+  test('does not echo the typed path into the inline status row during normal input', async () => {
     render(
       <OpenWorkspaceDialog
         open
@@ -95,7 +154,7 @@ describe('OpenWorkspaceDialog', () => {
       />,
     )
 
-    setInputValue('#open-workspace-path', '~/asdasdasd')
+    await setInputValue('#open-workspace-path', '~/asdasdasd')
 
     const status = document.body.querySelector('[data-slot="dialog-status-text"]')
     expect(status?.textContent).toBe('')
@@ -109,8 +168,8 @@ describe('OpenWorkspaceDialog', () => {
 
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    await setInputValue('#open-workspace-path', '~/Developer/repo')
+    await click('button[type="submit"]')
 
     expect(onOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
     expect(onClose).not.toHaveBeenCalled()
@@ -132,7 +191,7 @@ describe('OpenWorkspaceDialog', () => {
 
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    clickButtonByText('workspace-picker.open-path-choose')
+    await clickButtonByText('workspace-picker.open-path-choose')
     await flush()
     expect(testWindow.goblinNative).toEqual(
       expect.objectContaining({
@@ -141,7 +200,7 @@ describe('OpenWorkspaceDialog', () => {
     )
     expect(input('#open-workspace-path').value).toBe('~/Developer/repo')
 
-    click('button[type="submit"]')
+    await click('button[type="submit"]')
     await flush()
 
     expect(onClose).not.toHaveBeenCalled()
@@ -160,14 +219,14 @@ describe('OpenWorkspaceDialog', () => {
 
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    await setInputValue('#open-workspace-path', '~/Developer/repo')
+    await click('button[type="submit"]')
     await flush()
 
     expect(document.body.textContent).toContain('boom')
     expect(button('button[type="submit"]').disabled).toBe(false)
 
-    click('button[type="submit"]')
+    await click('button[type="submit"]')
     await flush()
 
     expect(onOpen).toHaveBeenNthCalledWith(1, '/Users/tester/Developer/repo')
@@ -183,8 +242,8 @@ describe('OpenWorkspaceDialog', () => {
 
     const { rerender } = render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    await setInputValue('#open-workspace-path', '~/Developer/repo')
+    await click('button[type="submit"]')
 
     rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
     rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
@@ -195,8 +254,8 @@ describe('OpenWorkspaceDialog', () => {
     expect(onClose).not.toHaveBeenCalled()
     expect(button('button[type="submit"]').disabled).toBe(true)
 
-    setInputValue('#open-workspace-path', '~/Developer/repo-next')
-    click('button[type="submit"]')
+    await setInputValue('#open-workspace-path', '~/Developer/repo-next')
+    await click('button[type="submit"]')
     second.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo-next') })
     await flush()
 
@@ -209,13 +268,13 @@ describe('OpenWorkspaceDialog', () => {
 
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    await setInputValue('#open-workspace-path', '~/Developer/repo')
+    await click('button[type="submit"]')
     await flush()
 
     expect(document.body.textContent).toContain('boom')
 
-    setInputValue('#open-workspace-path', '~/Developer/repo-next')
+    await setInputValue('#open-workspace-path', '~/Developer/repo-next')
 
     expect(document.body.textContent).not.toContain('boom')
   })
@@ -264,28 +323,22 @@ function buttonByText(text: string): HTMLButtonElement {
   return element
 }
 
-function setInputValue(selector: string, value: string) {
-  const element = input(selector)
-  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
-  descriptor?.set?.call(element, value)
-  act(() => {
-    element.dispatchEvent(new Event('input', { bubbles: true }))
-    element.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+async function setInputValue(selector: string, value: string) {
+  const user = setupUser()
+  await user.clear(input(selector))
+  await user.type(input(selector), value)
 }
 
-function click(selector: string) {
-  const element = button(selector)
-  act(() => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
+async function click(selector: string) {
+  await setupUser().click(button(selector))
 }
 
-function clickButtonByText(text: string) {
-  const element = buttonByText(text)
-  act(() => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
+async function clickButtonByText(text: string) {
+  await setupUser().click(buttonByText(text))
+}
+
+function setupUser() {
+  return userEvent.setup()
 }
 
 async function flush() {

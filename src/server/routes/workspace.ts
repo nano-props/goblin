@@ -34,20 +34,22 @@ import {
 } from '#/server/workspace-capability-transition-host.ts'
 import { IpcError } from '#/shared/api-types.ts'
 import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import {
-  formatWorkspaceLocator,
-  parseWorkspaceLocator,
-  type WorkspaceId,
-  type WorkspaceLocatorPlatform,
-} from '#/shared/workspace-locator.ts'
-import path from 'node:path'
+import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
+import { homedir } from 'node:os'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
+import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
   const app = createRouteApp()
+
+  app.post('/path-suggestions', async (c) => {
+    const { prefix } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.pathSuggestions, c)
+    return c.json(await getLocalPathSuggestions(prefix, c.req.raw.signal))
+  })
 
   app.post('/refresh', async (c) => {
     const { workspaceId, workspaceRuntimeId } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.refresh, c)
@@ -77,7 +79,7 @@ export function createWorkspaceRoutes(options: {
     const input = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.runtimeOpen, c)
     if ('workspaceInput' in input) {
       const platform = serverLocatorPlatform()
-      const workspaceId = workspaceLocatorFromCommandInput(input.workspaceInput, platform)
+      const workspaceId = workspaceLocatorFromNativeCommandInput(input.workspaceInput, platform, homedir())
       if (!workspaceId) {
         return c.json({ ok: false as const, input: input.workspaceInput, reason: 'error.workspace-locator-malformed' })
       }
@@ -298,12 +300,4 @@ function requiredFilesystemExecutionTarget(target: RuntimeWorkspacePaneTarget): 
 
 function serverLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
-}
-
-function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): WorkspaceId | null {
-  const parsed = parseWorkspaceLocator(input, platform)
-  if (parsed?.transport === 'file') return formatWorkspaceLocator(parsed, platform)
-  const implementation = platform === 'win32' ? path.win32 : path.posix
-  if (!implementation.isAbsolute(input)) return null
-  return formatWorkspaceLocator({ transport: 'file', platform, path: input }, platform)
 }

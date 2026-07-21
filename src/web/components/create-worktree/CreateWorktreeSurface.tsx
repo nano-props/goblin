@@ -16,10 +16,10 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { CollapseTransition } from '#/web/components/ui/collapse-transition.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
-import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
+import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
-import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
+import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
@@ -131,10 +131,9 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
     if (shouldClose) onCancel()
   }
 
-  const remotePathSuggestions = useRemotePathSuggestions({
+  const remotePathSuggestions = useDirectoryPathSuggestions({
     enabled: !creating && !!remoteTarget && derived.pathName.length > 0,
-    alias: remoteTarget?.alias ?? '',
-    remotePath: remoteTarget?.remotePath ?? '/',
+    source: { kind: 'ssh', alias: remoteTarget?.alias ?? '' },
     prefix: worktreePath,
   })
 
@@ -312,7 +311,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
         <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
           {remoteTarget ? (
-            <RemotePathSuggestions
+            <DirectoryPathSuggestions
               id="cwt-path"
               value={worktreePath}
               disabled={creating || !derived.pathName}

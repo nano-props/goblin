@@ -83,6 +83,7 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.open-description': '输入本地路径，或选择一个文件夹。',
   'workspace-picker.open-path-label': '文件夹路径',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
+  'workspace-picker.open-path-no-matches': '没有匹配的文件夹',
   'workspace-picker.open-path-choose': '选择…',
   'workspace-picker.open-local-confirm': '打开工作区',
   'workspace-picker.open-opening': '正在打开…',

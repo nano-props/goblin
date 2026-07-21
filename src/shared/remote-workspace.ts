@@ -47,10 +47,6 @@ export interface SshConfigHostsResult {
 
 export type RemoteConnectionInput = { alias: string; remotePath: string }
 
-export interface RemotePathSuggestionsInput extends RemoteConnectionInput {
-  prefix: string
-}
-
 export interface ResolvedRemoteWorkspaceTarget {
   target: RemoteWorkspaceTarget
 }

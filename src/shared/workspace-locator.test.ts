@@ -12,12 +12,17 @@ describe('toSafeCanonicalWorkspaceId', () => {
     expect(toSafeCanonicalWorkspaceId(locator)).toBe(locator),
   )
 
-  it.each(['', '/workspace', 'C:\\workspace', 'C:/workspace', '\\\\server\\workspace', 'relative/workspace', 'workspace\0suffix'] as const)(
-    'rejects invalid locator %s',
-    (locator) => {
-      expect(toSafeCanonicalWorkspaceId(locator)).toBeNull()
-    },
-  )
+  it.each([
+    '',
+    '/workspace',
+    'C:\\workspace',
+    'C:/workspace',
+    '\\\\server\\workspace',
+    'relative/workspace',
+    'workspace\0suffix',
+  ] as const)('rejects invalid locator %s', (locator) => {
+    expect(toSafeCanonicalWorkspaceId(locator)).toBeNull()
+  })
 
   it('rejects canonical-looking locators beyond the wire identity limit', () => {
     expect(toSafeCanonicalWorkspaceId(`goblin+file:///${'a'.repeat(4096)}`)).toBeNull()
@@ -25,6 +30,12 @@ describe('toSafeCanonicalWorkspaceId', () => {
 })
 
 describe('workspace locator codec', () => {
+  it('rejects a locator whose encoded representation exceeds the canonical length limit', () => {
+    expect(
+      formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: `/${' '.repeat(1400)}` }, 'posix'),
+    ).toBeNull()
+  })
+
   it.each([
     ['goblin+file:///', 'posix', { transport: 'file', platform: 'posix', path: '/' }],
     [

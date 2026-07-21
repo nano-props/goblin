@@ -94,6 +94,7 @@ export const en = {
   'workspace-picker.open-description': 'Enter a local path or choose a folder.',
   'workspace-picker.open-path-label': 'Folder path',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
+  'workspace-picker.open-path-no-matches': 'No matching folders',
   'workspace-picker.open-path-choose': 'Choose…',
   'workspace-picker.open-local-confirm': 'Open Workspace',
   'workspace-picker.open-opening': 'Opening…',

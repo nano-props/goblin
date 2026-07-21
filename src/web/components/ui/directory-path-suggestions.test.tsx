@@ -13,13 +13,14 @@
 //     whatever the host (i.e. the server, after debounce) supplies.
 
 import { act } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { useState } from 'react'
-import type { ReactNode } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
-import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
+import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
-describe('RemotePathSuggestions', () => {
+describe('DirectoryPathSuggestions', () => {
   test('does not render the dropdown before any suggestion has landed', async () => {
     render(<Harness suggestions={[]} />)
     await flush()
@@ -35,7 +36,7 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo', '/srv/other']} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('true')
@@ -48,12 +49,34 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
-    pressKey('Enter')
+    await pressKey('Enter')
 
     expect(onChange).toHaveBeenCalledWith('/srv/repo')
+  })
+
+  test('lets a second Enter submit the surrounding form after a suggestion commit', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const onSubmit = vi.fn((event: FormEvent) => event.preventDefault())
+    render(
+      <form onSubmit={onSubmit}>
+        <Harness suggestions={['/srv/repo']} onChange={onChange} hasFetched />
+      </form>,
+    )
+    await flush()
+
+    await user.click(input())
+    await user.keyboard('{Enter}')
+    await flush()
+    expect(onChange).toHaveBeenCalledWith('/srv/repo')
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+
+    await user.keyboard('{Enter}')
+    await flush()
+    expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 
   test('ArrowDown advances and ArrowUp at the top wraps to the last entry', async () => {
@@ -61,29 +84,29 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
     // activeIndex starts at 0; ArrowDown advances to 1 (/srv/b).
-    pressKey('ArrowDown')
+    await pressKey('ArrowDown')
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
 
     expect(onChange).toHaveBeenLastCalledWith('/srv/b')
 
     // Focus is preserved across commit; ArrowUp moves back to index 0.
-    pressKey('ArrowUp')
+    await pressKey('ArrowUp')
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
 
     expect(onChange).toHaveBeenLastCalledWith('/srv/a')
 
     // ArrowUp at index 0 wraps to the last entry (/srv/c).
-    pressKey('ArrowUp')
+    await pressKey('ArrowUp')
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
 
     expect(onChange).toHaveBeenLastCalledWith('/srv/c')
@@ -94,24 +117,41 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} onChange={onChange} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
     // Move highlight to the middle (index 1) so Home/End have somewhere
     // to jump away from.
-    pressKey('ArrowDown')
+    await pressKey('ArrowDown')
     await flush()
 
-    pressKey('Home')
+    await pressKey('Home')
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
     expect(onChange).toHaveBeenLastCalledWith('/srv/a')
 
-    pressKey('End')
+    await pressKey('ArrowDown')
+    await pressKey('End')
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
     expect(onChange).toHaveBeenLastCalledWith('/srv/c')
+  })
+
+  test('resets the active option when a same-length result projection replaces the list', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<Harness suggestions={['/srv/a', '/srv/b']} onChange={onChange} hasFetched />)
+    await flush()
+    await focusInput()
+    await pressKey('ArrowDown')
+    await flush()
+
+    rerender(<Harness suggestions={['/opt/a', '/opt/b']} onChange={onChange} hasFetched />)
+    await flush()
+    await pressKey('Enter')
+    await flush()
+
+    expect(onChange).toHaveBeenLastCalledWith('/opt/a')
   })
 
   test('scrolls the highlighted option into view when it changes', async () => {
@@ -124,7 +164,7 @@ describe('RemotePathSuggestions', () => {
     try {
       render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} hasFetched />)
       await flush()
-      focusInput()
+      await focusInput()
       await flush()
 
       // Initial render: the active option is index 0; the useLayoutEffect
@@ -132,7 +172,7 @@ describe('RemotePathSuggestions', () => {
       // depending on React scheduling. Reset before the action under test.
       scrollSpy.mockClear()
 
-      pressKey('ArrowDown')
+      await pressKey('ArrowDown')
       await flush()
 
       expect(scrollSpy).toHaveBeenCalledWith({ block: 'nearest' })
@@ -146,16 +186,14 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
     const row = [...document.body.querySelectorAll('[role="option"]')].find((el) =>
       el.textContent?.includes('/srv/other'),
     )
     if (!row) throw new Error('Missing /srv/other row')
-    act(() => {
-      row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    })
+    await userEvent.setup().click(row)
     await flush()
 
     expect(onChange).toHaveBeenCalledWith('/srv/other')
@@ -167,18 +205,16 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo', '/srv/other']} onChange={onChange} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
     const row = [...document.body.querySelectorAll('[role="option"]')].find((el) =>
       el.textContent?.includes('/srv/other'),
     )
     if (!row) throw new Error('Missing /srv/other row')
-    act(() => {
-      row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
-    })
+    await userEvent.setup().hover(row)
     await flush()
-    pressKey('Enter')
+    await pressKey('Enter')
     await flush()
 
     expect(onChange).toHaveBeenCalledWith('/srv/other')
@@ -191,7 +227,7 @@ describe('RemotePathSuggestions', () => {
     try {
       render(<Harness suggestions={['/srv/repo', '/srv/other']} hasFetched />)
       await flush()
-      focusInput()
+      await focusInput()
       await flush()
       scrollSpy.mockClear()
 
@@ -199,9 +235,7 @@ describe('RemotePathSuggestions', () => {
         el.textContent?.includes('/srv/other'),
       )
       if (!row) throw new Error('Missing /srv/other row')
-      act(() => {
-        row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }))
-      })
+      await userEvent.setup().hover(row)
       await flush()
 
       expect(scrollSpy).not.toHaveBeenCalled()
@@ -214,9 +248,9 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo', '/srv/other', '/home/alice']} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
-    setInputValue('/srv')
+    await setInputValue('/srv')
     await flush()
 
     expect(screenText()).toContain('/srv/repo')
@@ -230,10 +264,10 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/a', '/srv/b', '/srv/c']} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
     // activeIndex starts at 0; ArrowDown moves it to 1.
-    pressKey('ArrowDown')
+    await pressKey('ArrowDown')
     await flush()
 
     const el = input()
@@ -247,15 +281,36 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/a', '/srv/b']} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
     expect(input().getAttribute('aria-activedescendant')).not.toBeNull()
 
-    pressKey('Escape')
+    await pressKey('Escape')
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('false')
     expect(input().getAttribute('aria-activedescendant')).toBeNull()
+  })
+
+  test('consumes Escape only while the suggestion popup is open', async () => {
+    const onKeyDown = vi.fn()
+    render(
+      <div onKeyDown={onKeyDown}>
+        <Harness suggestions={['/srv/a']} hasFetched />
+      </div>,
+    )
+    await flush()
+    await focusInput()
+    await flush()
+
+    await pressKey('Escape')
+    await flush()
+    expect(onKeyDown).not.toHaveBeenCalled()
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+
+    await pressKey('Escape')
+    await flush()
+    expect(onKeyDown).toHaveBeenCalledTimes(1)
   })
 
   test('forwards aria-invalid onto the underlying input', async () => {
@@ -269,21 +324,23 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={[]} hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
-    setInputValue('/srv/repo')
+    await setInputValue('/srv/repo')
     await flush()
 
     expect(screenText()).toContain('No matching paths')
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('No matching paths')
+    expect(document.querySelector('[role="option"]')).toBeNull()
   })
 
   test('does not show the empty-state label before the first fetch resolves', async () => {
     render(<Harness suggestions={[]} isLoading />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
-    setInputValue('/srv/repo')
+    await setInputValue('/srv/repo')
     await flush()
 
     expect(screenText()).not.toContain('No matching paths')
@@ -303,7 +360,7 @@ describe('RemotePathSuggestions', () => {
     render(<Harness suggestions={['/srv/repo']} disabled hasFetched />)
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
 
     expect(document.body.querySelector('[role="listbox"]')).toBeNull()
@@ -321,15 +378,15 @@ describe('RemotePathSuggestions', () => {
     await flush()
 
     // Open, then move focus outside so the dropdown dismisses.
-    focusInput()
+    await focusInput()
     await flush()
     expect(input().getAttribute('aria-expanded')).toBe('true')
 
-    focusOutside()
+    await focusOutside()
     await flush()
     expect(input().getAttribute('aria-expanded')).toBe('false')
 
-    focusInput()
+    await focusInput()
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('true')
@@ -347,17 +404,17 @@ describe('RemotePathSuggestions', () => {
     )
     await flush()
 
-    focusInput()
+    await focusInput()
     await flush()
-    setInputValue('/srv/repo')
+    await setInputValue('/srv/repo')
     await flush()
     expect(screenText()).toContain('No matching paths')
 
-    focusOutside()
+    await focusOutside()
     await flush()
     expect(input().getAttribute('aria-expanded')).toBe('false')
 
-    focusInput()
+    await focusInput()
     await flush()
 
     expect(input().getAttribute('aria-expanded')).toBe('true')
@@ -378,7 +435,7 @@ interface HarnessProps {
 function Harness({ suggestions, onChange = () => {}, disabled, isLoading, hasFetched, ariaInvalid }: HarnessProps) {
   const [value, setValue] = useState('')
   return (
-    <RemotePathSuggestions
+    <DirectoryPathSuggestions
       id="rps-test"
       value={value}
       onChange={(next) => {
@@ -396,7 +453,7 @@ function Harness({ suggestions, onChange = () => {}, disabled, isLoading, hasFet
 }
 
 function render(element: ReactNode) {
-  renderInJsdom(element)
+  return renderInJsdom(element)
 }
 
 function input(): HTMLInputElement {
@@ -405,33 +462,24 @@ function input(): HTMLInputElement {
   return element
 }
 
-function focusInput() {
-  act(() => {
-    input().focus()
-  })
+async function focusInput() {
+  await userEvent.setup().click(input())
 }
 
-function focusOutside() {
+async function focusOutside() {
   const target = document.querySelector('#outside-focus-target')
   if (!(target instanceof HTMLButtonElement)) throw new Error('Missing outside focus target')
-  act(() => {
-    target.focus()
-  })
+  await userEvent.setup().click(target)
 }
 
-function setInputValue(value: string) {
-  const element = input()
-  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
-  descriptor?.set?.call(element, value)
-  act(() => {
-    element.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+async function setInputValue(value: string) {
+  const user = userEvent.setup()
+  await user.clear(input())
+  await user.type(input(), value)
 }
 
-function pressKey(key: string) {
-  act(() => {
-    input().dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
-  })
+async function pressKey(key: string) {
+  await userEvent.setup().keyboard(`{${key}}`)
 }
 
 function screenText(): string {

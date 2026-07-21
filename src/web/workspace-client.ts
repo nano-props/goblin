@@ -64,3 +64,7 @@ export async function getWorkspaceDirectoryOverview(
 ): Promise<WorkspaceDirectoryOverview> {
   return await postServerJson('/api/workspace/directory-overview', { workspaceId, workspaceRuntimeId }, { signal })
 }
+
+export async function getLocalDirectoryPathSuggestions(prefix: string, signal?: AbortSignal): Promise<string[]> {
+  return await postServerJson('/api/workspace/path-suggestions', { prefix }, { signal })
+}

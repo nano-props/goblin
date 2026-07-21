@@ -84,6 +84,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.open-description': '로컬 경로를 입력하거나 폴더를 선택하세요.',
   'workspace-picker.open-path-label': '폴더 경로',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
+  'workspace-picker.open-path-no-matches': '일치하는 폴더가 없습니다',
   'workspace-picker.open-path-choose': '선택…',
   'workspace-picker.open-local-confirm': '작업 공간 열기',
   'workspace-picker.open-opening': '여는 중…',

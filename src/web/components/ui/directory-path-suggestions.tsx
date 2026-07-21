@@ -1,6 +1,6 @@
 // Typeable path input with a styled suggestion dropdown. Replaces the
-// HTML5 <datalist> autocomplete used by OpenRemoteWorkspaceDialog and
-// Create Worktree surfaces — <datalist> renders with browser-native chrome
+// HTML5 <datalist> autocomplete used by workspace path surfaces —
+// <datalist> renders with browser-native chrome
 // that ignores our design tokens and varies across Electron versions.
 //
 // Visual + interaction parity with the Select dropdown used by
@@ -15,8 +15,8 @@
 //     it stays visible while the user pages through long lists
 //
 // The parent owns `value` / `onChange`. No client-side filter is
-// applied — the server's `getServerRemotePathSuggestions` already
-// constrains results to entries under the typed prefix, and a second
+// applied — each server adapter already constrains results to entries
+// under the typed prefix, and a second
 // filter on top would drop legitimate siblings as soon as the user
 // commits one and continues typing from the committed path.
 
@@ -28,7 +28,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { composeRefs } from '#/web/components/ui/refs.ts'
 
-interface RemotePathSuggestionsProps {
+interface DirectoryPathSuggestionsProps {
   /** Controlled input value. */
   value: string
   onChange: (next: string) => void
@@ -46,7 +46,10 @@ interface RemotePathSuggestionsProps {
   /** ARIA / passthrough. */
   id?: string
   placeholder?: string
+  autoFocus?: boolean
   className?: string
+  inputClassName?: string
+  onPopupOpenChange?: (open: boolean) => void
   ref?: Ref<HTMLInputElement>
   /** Forwarded onto the underlying <input>; mirror the same `aria-invalid`
    *  you would put on Input so the error styling still applies. */
@@ -54,7 +57,7 @@ interface RemotePathSuggestionsProps {
   'aria-describedby'?: string
 }
 
-export function RemotePathSuggestions({
+export function DirectoryPathSuggestions({
   value,
   onChange,
   suggestions,
@@ -64,11 +67,14 @@ export function RemotePathSuggestions({
   disabled,
   id,
   placeholder,
+  autoFocus,
   className,
+  inputClassName,
+  onPopupOpenChange,
   ref,
   'aria-invalid': ariaInvalid,
   'aria-describedby': ariaDescribedBy,
-}: RemotePathSuggestionsProps) {
+}: DirectoryPathSuggestionsProps) {
   const innerRef = useRef<HTMLInputElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const setInnerRef = useCallback((node: HTMLInputElement | null) => {
@@ -80,15 +86,12 @@ export function RemotePathSuggestions({
   const optionRefs = useRef<(HTMLDivElement | null)[]>([])
   const shouldScrollActiveIntoViewRef = useRef(false)
 
-  // Clamp the highlight when the list shrinks, and drop refs to
-  // options that have fallen off the end so the array doesn't carry
-  // stale entries. Only depends on the list shape — re-running on
-  // every `activeIndex` change is wasted work and would create a
-  // setState loop on every keystroke.
+  // A new result projection always starts from its first row. Drop refs
+  // to options from the previous projection at the same boundary.
   useEffect(() => {
-    setActiveIndex((idx) => (idx >= suggestions.length ? 0 : idx))
+    setActiveIndex(0)
     optionRefs.current.length = suggestions.length
-  }, [suggestions.length])
+  }, [suggestions])
 
   // Keep the highlighted row in view as the user pages through long
   // lists. `useLayoutEffect` runs before paint so the highlight never
@@ -116,6 +119,11 @@ export function RemotePathSuggestions({
   const isOpen = open && showContent
 
   useEffect(() => {
+    onPopupOpenChange?.(isOpen)
+    return () => onPopupOpenChange?.(false)
+  }, [isOpen, onPopupOpenChange])
+
+  useEffect(() => {
     if (!isOpen) return
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null
@@ -138,11 +146,12 @@ export function RemotePathSuggestions({
   // Stable ids for the listbox and its options. The listbox id is
   // hoisted into a const so the input's `aria-controls` /
   // `aria-activedescendant` and the listbox element stay in sync.
-  const listboxId = `${id ?? 'remote-path'}-suggestions`
+  const listboxId = `${id ?? 'directory-path'}-suggestions`
   const activeOptionId = hasMatches ? `${listboxId}-option-${activeIndex}` : undefined
 
   const commit = useCallback(
     (next: string) => {
+      setOpen(false)
       onChange(next)
       // Keep focus on the input so the user can keep typing/editing.
       innerRef.current?.focus()
@@ -153,16 +162,14 @@ export function RemotePathSuggestions({
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Escape') {
+        if (!isOpen) return
+        event.preventDefault()
+        event.stopPropagation()
         setOpen(false)
         return
       }
       if (disabled) return
-      const wantsNav =
-        event.key === 'ArrowDown' ||
-        event.key === 'ArrowUp' ||
-        event.key === 'Home' ||
-        event.key === 'End' ||
-        event.key === 'Enter'
+      const wantsNav = event.key === 'ArrowDown' || event.key === 'ArrowUp'
       // Re-open the dropdown on navigation keys when the user has
       // dismissed it — keeps the workflow fluid.
       if (!open && wantsNav && suggestions.length > 0) {
@@ -183,28 +190,28 @@ export function RemotePathSuggestions({
         return
       }
       if (event.key === 'Home') {
-        if (suggestions.length === 0) return
+        if (!open || suggestions.length === 0) return
         event.preventDefault()
         shouldScrollActiveIntoViewRef.current = true
         setActiveIndex(0)
         return
       }
       if (event.key === 'End') {
-        if (suggestions.length === 0) return
+        if (!open || suggestions.length === 0) return
         event.preventDefault()
         shouldScrollActiveIntoViewRef.current = true
         setActiveIndex(suggestions.length - 1)
         return
       }
       if (event.key === 'Enter') {
-        if (suggestions.length === 0) return
+        if (!open || suggestions.length === 0) return
         event.preventDefault()
         const candidate = suggestions[activeIndex]
         if (candidate !== undefined) commit(candidate)
         return
       }
     },
-    [activeIndex, commit, disabled, open, suggestions],
+    [activeIndex, commit, disabled, isOpen, open, suggestions],
   )
 
   const setOptionRef = useCallback((index: number, node: HTMLDivElement | null) => {
@@ -212,7 +219,7 @@ export function RemotePathSuggestions({
   }, [])
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={cn('relative', className)}>
       <Input
         id={id}
         ref={setInputRef}
@@ -228,12 +235,14 @@ export function RemotePathSuggestions({
         onKeyDown={onKeyDown}
         disabled={disabled}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
         aria-autocomplete="list"
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}
@@ -243,7 +252,7 @@ export function RemotePathSuggestions({
         // as the user presses ↑/↓. Only set when the popup is
         // open and there's a real option to point at.
         aria-activedescendant={isOpen && activeOptionId ? activeOptionId : undefined}
-        className={cn('h-10 pr-8 font-mono text-sm', className)}
+        className={cn('h-10 pr-8 font-mono text-sm', inputClassName)}
       />
       {isLoading ? (
         <Loader2Icon
@@ -264,13 +273,13 @@ export function RemotePathSuggestions({
           <ScrollArea className="max-h-72" scrollbarMode="compact">
             <div id={listboxId} role="listbox" className="p-1">
               {showEmptyState ? (
-                <SuggestionRow active={false}>
-                  <span className="truncate text-muted-foreground">{emptyLabel}</span>
-                </SuggestionRow>
+                <div role="status" className="px-2 py-1.5 text-sm text-muted-foreground">
+                  <span className="truncate">{emptyLabel}</span>
+                </div>
               ) : (
                 suggestions.map((item, index) => (
                   <SuggestionRow
-                    // Suggestions are deduped in useRemotePathSuggestions,
+                    // Suggestions are deduped in useDirectoryPathSuggestions,
                     // so the path itself is a stable key.
                     key={item}
                     id={`${listboxId}-option-${index}`}

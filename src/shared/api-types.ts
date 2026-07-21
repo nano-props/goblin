@@ -34,7 +34,6 @@ import type {
 import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
-  RemotePathSuggestionsInput,
   WorkspaceSessionEntry,
   RemoteWorkspaceTarget,
   RemoteWorkspaceRuntimeLifecycle,
@@ -53,6 +52,8 @@ import type {
   WorkspacePaneFilesystemExecutionTarget,
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
+import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
+import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
@@ -502,7 +503,7 @@ export interface AppIpcHandlers {
   remote: {
     listSshHosts: () => Promise<SshConfigHostsResult>
     resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteWorkspaceTarget>
-    listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
+    listPathSuggestions: (input: RemoteDirectoryPathSuggestionsInput) => Promise<string[]>
     testWorkspace: (input: { target: RemoteWorkspaceTarget }) => Promise<RemoteDiagnosticsResult>
   }
   theme: {
@@ -571,10 +572,9 @@ export const RemoteConnectionInputSchema = v.object({
   remotePath: v.string(),
 })
 
-export const RemotePathSuggestionsInputSchema = v.object({
+export const RemoteDirectoryPathSuggestionsInputSchema = v.object({
   alias: v.string(),
-  remotePath: v.string(),
-  prefix: v.string(),
+  prefix: DirectoryPathPrefixSchema,
 })
 
 export type IpcErrorCode = 'FORBIDDEN' | 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL_SERVER_ERROR'

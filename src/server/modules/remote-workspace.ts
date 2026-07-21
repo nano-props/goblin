@@ -12,12 +12,12 @@ import {
   type RemoteConnectionInput,
   type RemoteDiagnosticCategory,
   type RemoteDiagnosticsResult,
-  type RemotePathSuggestionsInput,
   type RemoteWorkspaceConnectionResult,
   type RemoteWorkspaceTarget,
   type ResolvedRemoteWorkspaceTarget,
   type SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
+import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 import {
   listSshConfigHosts,
   resolveRemoteTarget as resolveSshRemoteTarget,
@@ -225,7 +225,7 @@ export async function resolveServerRemoteWorkspaceConnection(
 }
 
 export async function getServerRemotePathSuggestions(
-  input: RemotePathSuggestionsInput,
+  input: RemoteDirectoryPathSuggestionsInput,
   signal?: AbortSignal,
 ): Promise<string[]> {
   const prefix = input.prefix.trim()

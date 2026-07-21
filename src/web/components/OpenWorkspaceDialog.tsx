@@ -4,7 +4,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldLabel } from '#/web/components/ui/field.tsx'
-import { Input } from '#/web/components/ui/input.tsx'
+import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
 import { tildify, untildify } from '#/web/lib/paths.ts'
 import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
 import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
@@ -13,6 +13,8 @@ import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
+import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 interface Props {
   open: boolean
   onClose: () => void
@@ -24,13 +26,19 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const compact = useIsCompactUi()
   const [path, setPath] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [pathSuggestionsOpen, setPathSuggestionsOpen] = useState(false)
   const { pending, reset, runLatest } = useLatestAsyncTask()
 
-  const trimmedPath = path.trim()
-  const resolvedPath = untildify(trimmedPath)
-  const canSubmit = resolvedPath.length > 0 && !pending
+  const resolvedPath = untildify(path)
+  const canSubmit = path.trim().length > 0 && !pending
   const canChoosePath = hasNativeDirectoryPicker()
   const statusText = error ?? ''
+  const hostInfoHydrated = useHostInfoStore((state) => state.hydrated && state.snapshot !== null)
+  const pathSuggestions = useDirectoryPathSuggestions({
+    enabled: open && !pending && hostInfoHydrated,
+    source: { kind: 'local' },
+    prefix: path,
+  })
 
   useEffect(() => {
     if (!open) return
@@ -78,6 +86,9 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
       showCloseButton={!pending}
       title={t('workspace-picker.open-title')}
       description={t('workspace-picker.open-description')}
+      onEscapeKeyDown={(event) => {
+        if (pathSuggestionsOpen) event.preventDefault()
+      }}
     >
       <form
         className="space-y-0"
@@ -89,17 +100,23 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
         <Field>
           <FieldLabel htmlFor="open-workspace-path">{t('workspace-picker.open-path-label')}</FieldLabel>
           <div className={cn('gap-2', compact ? 'flex flex-col' : 'flex')}>
-            <Input
+            <DirectoryPathSuggestions
               id="open-workspace-path"
               autoFocus
               disabled={pending}
               value={path}
-              onChange={(event) => {
-                setPath(event.target.value)
+              onChange={(nextPath) => {
+                setPath(nextPath)
                 setError(null)
               }}
+              suggestions={pathSuggestions.suggestions}
+              isLoading={pathSuggestions.isLoading}
+              hasFetched={pathSuggestions.hasFetched}
+              emptyLabel={t('workspace-picker.open-path-no-matches')}
               placeholder={t('workspace-picker.open-path-placeholder')}
-              className="min-w-0 flex-1 font-mono text-xs"
+              className="min-w-0 flex-1"
+              inputClassName="text-xs"
+              onPopupOpenChange={setPathSuggestionsOpen}
             />
             {canChoosePath ? (
               <Button

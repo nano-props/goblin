@@ -3,11 +3,18 @@ import { createRemoteRoutes } from '#/server/routes/remote.ts'
 
 const mocks = vi.hoisted(() => ({
   runLifecycleWrite: vi.fn(),
+  getServerRemotePathSuggestions: vi.fn(),
 }))
 
 vi.mock('#/server/common/identity.ts', () => ({ userIdFromContext: () => 'user-test' }))
 vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
   runRemoteWorkspaceLifecycleWrite: mocks.runLifecycleWrite,
+}))
+vi.mock('#/server/modules/remote-workspace.ts', () => ({
+  getServerRemotePathSuggestions: mocks.getServerRemotePathSuggestions,
+  getServerSshHosts: vi.fn(),
+  resolveServerRemoteTarget: vi.fn(),
+  testServerRemoteWorkspace: vi.fn(),
 }))
 describe('remote lifecycle route', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -46,6 +53,26 @@ describe('remote lifecycle route', () => {
       { beforeCapabilityCommit: expect.any(Function) },
     )
     expect(await response.json()).toMatchObject({ kind: 'settled', name: 'repo' })
+  })
+
+  test('uses only alias and prefix for remote directory suggestions', async () => {
+    mocks.getServerRemotePathSuggestions.mockResolvedValue(['/srv/repo'])
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() },
+    }).request(
+      new Request('http://localhost/path-suggestions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ alias: 'example', prefix: '/srv/re' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(['/srv/repo'])
+    expect(mocks.getServerRemotePathSuggestions).toHaveBeenCalledWith(
+      { alias: 'example', prefix: '/srv/re' },
+      expect.any(AbortSignal),
+    )
   })
 
   test('injects Git downgrade cleanup into the serialized capability transition', async () => {
