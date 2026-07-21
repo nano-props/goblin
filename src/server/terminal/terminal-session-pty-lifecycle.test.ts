@@ -61,14 +61,13 @@ describe('TerminalPtyBinding aborted spawn retirement', () => {
     const lateHandle = createPtyHandle('pty_late_handle_123456')
     deferredSpawn.resolve({ ok: true, handle: lateHandle, processName: 'zsh' })
     await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledTimes(1))
-    expect((binding as any).retiringHandles.get(lateHandle.ptySessionId)?.handle).toBe(lateHandle)
 
     await expect(binding.disposeAndWait(session)).rejects.toThrow('PTY close timed out')
-    expect((binding as any).retiringHandles.get(lateHandle.ptySessionId)?.handle).toBe(lateHandle)
 
     await binding.disposeAndWait(session)
     expect(killAndWait).toHaveBeenCalledTimes(2)
-    expect((binding as any).retiringHandles.size).toBe(0)
+    await binding.disposeAndWait(session)
+    expect(killAndWait).toHaveBeenCalledTimes(2)
   })
 })
 

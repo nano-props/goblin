@@ -1,10 +1,11 @@
 import type { ComponentPropsWithoutRef, KeyboardEvent } from 'react'
+import type { DraggableAttributes } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { omit } from 'es-toolkit'
 
 interface UseSortableTabResult {
-  attributes: Record<string, unknown>
+  attributes: DraggableAttributes
   sortableListeners: ComponentPropsWithoutRef<'div'>
   sortableOnKeyDown: ((event: KeyboardEvent) => void) | undefined
   setContainerRef: (node: HTMLElement | null) => void
@@ -35,7 +36,7 @@ export function useSortableTab(
   }
 
   return {
-    attributes: attributes as unknown as Record<string, unknown>,
+    attributes,
     sortableListeners,
     sortableOnKeyDown,
     setContainerRef: setNodeRef as (node: HTMLElement | null) => void,

@@ -32,7 +32,7 @@ describe('getWorktreePatch', () => {
       stdout:
         'diff --git a/new file.txt b/new file.txt\nnew file mode 100644\n--- /dev/null\n+++ b/new file.txt\n+untracked\n',
       isCanceled: false,
-    } as any)
+    })
 
     const patch = await getWorktreePatch('/tmp/repo')
 

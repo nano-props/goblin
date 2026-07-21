@@ -128,7 +128,6 @@ describe('terminal write failure feedback', () => {
     const connection = createClientRealtimeSocketConnection<
       { write: { data: string } },
       { write: { status: 'accepted' } },
-      { type: 'pong'; requestId: string },
       never
     >({
       resolveConnection: () => ({ url: 'ws://example.test/ws/app', clientId: 'client_test' }),
@@ -174,7 +173,6 @@ describe('terminal write failure feedback', () => {
     const connection = createClientRealtimeSocketConnection<
       { write: { data: string } },
       { write: { status: 'accepted' } },
-      { type: 'pong'; requestId: string },
       never
     >({
       resolveConnection: () => ({ url: 'ws://example.test/ws/app', clientId: 'client_test' }),

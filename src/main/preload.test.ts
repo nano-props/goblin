@@ -3,6 +3,15 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
 import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
+import type { GoblinNativeBridge } from '#/shared/goblin-native-bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+type ExposedGoblinNativeBridge = Omit<GoblinNativeBridge, 'host' | 'terminal' | 'onIntent' | 'rotateAccessToken'> & {
+  host: NonNullable<GoblinNativeBridge['host']>
+  terminal: Required<GoblinNativeBridge['terminal']>
+  onIntent: NonNullable<GoblinNativeBridge['onIntent']>
+  rotateAccessToken: NonNullable<GoblinNativeBridge['rotateAccessToken']>
+}
 
 /**
  * Pull every single-quoted string literal out of `preload.cjs` that
@@ -51,7 +60,7 @@ function loadPreload(
     argv?: string[]
   } = {},
 ) {
-  const exposed: Record<string, any> = {}
+  const exposed = {} as { goblinNative: ExposedGoblinNativeBridge; [key: string]: unknown }
   const invocations: Array<{ channel: string; args: unknown[] }> = []
   const sends: Array<{ channel: string; args: unknown[] }> = []
   const ipcRenderer = {
@@ -179,7 +188,7 @@ describe('preload goblinNative bridge', () => {
       session: {
         target: {
           kind: 'workspace-root',
-          workspaceId: 'goblin+file:///workspace',
+          workspaceId: workspaceIdForTest('goblin+file:///workspace'),
           workspaceRuntimeId: 'workspace-runtime-test',
         },
         presentation: { kind: 'workspace-root' },

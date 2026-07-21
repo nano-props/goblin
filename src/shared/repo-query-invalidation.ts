@@ -1,4 +1,5 @@
 import { toSafeCanonicalWorkspaceId, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import { isStringIn } from '#/shared/string-literals.ts'
 
 export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-worktree-snapshot', 'repo-runtime'] as const
 
@@ -16,6 +17,6 @@ export function isRepoQueryInvalidationEvent(value: unknown): value is RepoQuery
   return (
     event.type === 'repo-query-invalidated' &&
     toSafeCanonicalWorkspaceId(event.repoId) !== null &&
-    REPO_QUERY_KINDS.includes(event.query as RepoQueryKind)
+    isStringIn(REPO_QUERY_KINDS, event.query)
   )
 }

@@ -1,11 +1,20 @@
-import type { IpcMainInvokeEvent, WebContents } from 'electron'
 import { isRegisteredClientSurfaceId } from '#/main/client-surface-registry.ts'
+
+interface TrustedWebContentsHandle {
+  readonly id: number
+  once(event: 'destroyed', listener: () => void): unknown
+}
+
+interface TrustedIpcEvent {
+  sender: { readonly id: number }
+  senderFrame: { readonly url: string } | null
+}
 
 const explicitlyTrustedWebContentsIds = new Set<number>()
 const trustedAppUrls = new Set<string>()
 const trustedAppUrlsByWebContentsId = new Map<number, Set<string>>()
 
-export function registerTrustedWebContents(webContents: WebContents): void {
+export function registerTrustedWebContents(webContents: TrustedWebContentsHandle): void {
   explicitlyTrustedWebContentsIds.add(webContents.id)
   webContents.once('destroyed', () => {
     explicitlyTrustedWebContentsIds.delete(webContents.id)
@@ -18,7 +27,7 @@ export function registerTrustedAppUrl(value: string): void {
   if (normalized) trustedAppUrls.add(normalized)
 }
 
-export function allowTrustedAppUrlForWebContents(webContents: WebContents, value: string): void {
+export function allowTrustedAppUrlForWebContents(webContents: TrustedWebContentsHandle, value: string): void {
   const normalized = normalizeTrustedAppUrl(value)
   if (!normalized) return
   const trustedUrls = trustedAppUrlsByWebContentsId.get(webContents.id) ?? new Set<string>()
@@ -41,7 +50,7 @@ export function isTrustedAppUrlForWebContents(webContentsId: number, value: stri
   return !scoped || scoped.has(normalized)
 }
 
-export function isTrustedIpcEvent(event: IpcMainInvokeEvent): boolean {
+export function isTrustedIpcEvent(event: TrustedIpcEvent): boolean {
   return (
     (isRegisteredClientSurfaceId(event.sender.id) || explicitlyTrustedWebContentsIds.has(event.sender.id)) &&
     event.senderFrame !== null &&

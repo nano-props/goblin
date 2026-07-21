@@ -6,6 +6,22 @@ import {
 } from '#/server/terminal/terminal-runtime-realtime.ts'
 import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
+
+function makeTerminalActionHost(overrides: Partial<ServerTerminalActionHost>): ServerTerminalActionHost {
+  return {
+    isClientOnline: () => true,
+    attach: async () => ({ ok: false, message: 'not configured' }),
+    restart: async () => ({ ok: false, message: 'not configured' }),
+    write: async () => ({ status: 'rejected' }),
+    resize: () => false,
+    takeover: () => ({ ok: false, message: 'not configured' }),
+    close: () => false,
+    listSessions: () => [],
+    recoverSessions: () => ({ revision: 0, sessions: [] }),
+    prune: () => ({ pruned: 0, remaining: 0 }),
+    ...overrides,
+  }
+}
 import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-validators.ts'
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
@@ -20,7 +36,7 @@ describe('terminal realtime handlers', () => {
   test('preserves every terminal write result through serialization and shared validation', async () => {
     for (const status of ['accepted', 'rejected', 'indeterminate'] as const) {
       const result: TerminalWriteResult = { status }
-      const host = { write: () => result } as unknown as ServerTerminalActionHost
+      const host = makeTerminalActionHost({ write: () => result })
       const handlers = createTerminalRealtimeHandlers(host)
       let serialized = ''
 
@@ -71,7 +87,7 @@ describe('terminal realtime handlers', () => {
         processName: 'zsh',
       },
     })
-    const host = {
+    const host = makeTerminalActionHost({
       attach: async () => {
         buffered.send(sessionsChanged)
         buffered.send(output)
@@ -90,7 +106,7 @@ describe('terminal realtime handlers', () => {
           canonicalRows: 30,
         }
       },
-    } as unknown as ServerTerminalActionHost
+    })
 
     await handleTerminalRealtimeRequestMessage(
       createTerminalRealtimeHandlers(host),
@@ -124,7 +140,7 @@ describe('terminal realtime handlers', () => {
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
     buffered.pause()
-    const host = {
+    const host = makeTerminalActionHost({
       attach: async () => {
         buffered.send(
           JSON.stringify({
@@ -158,7 +174,7 @@ describe('terminal realtime handlers', () => {
           canonicalRows: 30,
         }
       },
-    } as unknown as ServerTerminalActionHost
+    })
 
     await handleTerminalRealtimeRequestMessage(
       createTerminalRealtimeHandlers(host),
@@ -189,7 +205,7 @@ describe('terminal realtime handlers', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 6,
     })
-    const host = {
+    const host = makeTerminalActionHost({
       restart: async () => {
         buffered.send(sessionsChanged)
         return {
@@ -210,7 +226,7 @@ describe('terminal realtime handlers', () => {
           canonicalRows: 30,
         }
       },
-    } as unknown as ServerTerminalActionHost
+    })
 
     await handleTerminalRealtimeRequestMessage(
       createTerminalRealtimeHandlers(host),

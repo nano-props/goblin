@@ -9,8 +9,12 @@ const mocks = vi.hoisted(() => ({
   createServerTerminalRuntime: vi.fn(() => ({
     host: {
       isValidClientId: (_value: unknown): _value is string => true,
+      getDiagnostics: vi.fn(),
+      registerSocket: vi.fn(),
+      unregisterSocket: vi.fn(),
+      handleRealtimeMessage: vi.fn(),
       shutdown: vi.fn(),
-    } as unknown as ServerAppRealtimeHost,
+    },
     workspacePaneTabsHost: {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
@@ -50,6 +54,18 @@ function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
   }
 }
 
+function makeAppRealtimeHost(overrides: Partial<ServerAppRealtimeHost> = {}): ServerAppRealtimeHost {
+  return {
+    isValidClientId: (value: unknown): value is string => typeof value === 'string',
+    getDiagnostics: vi.fn(),
+    registerSocket: vi.fn(),
+    unregisterSocket: vi.fn(),
+    handleRealtimeMessage: vi.fn(),
+    shutdown: vi.fn(),
+    ...overrides,
+  }
+}
+
 const workspaceCapabilityTransitionHost = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
@@ -61,7 +77,7 @@ describe('server runtime', () => {
 
   test('injects the app realtime host into the server app factory', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
-    const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
+    const appRealtimeHost = makeAppRealtimeHost()
     const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
 
@@ -93,7 +109,7 @@ describe('server runtime', () => {
 
   test('rejects partial host injection instead of mixing injected and managed hosts', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
-    const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
+    const appRealtimeHost = makeAppRealtimeHost()
 
     expect(() =>
       createServerRuntime({
@@ -142,11 +158,11 @@ describe('server runtime', () => {
   test('shutdown is idempotent and stops background sync before app realtime host teardown', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
     const events: string[] = []
-    const appRealtimeHost = {
+    const appRealtimeHost = makeAppRealtimeHost({
       shutdown: vi.fn(() => {
         events.push('terminal')
       }),
-    } as unknown as ServerAppRealtimeHost
+    })
     const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
     mocks.stopBackgroundSync.mockImplementation(() => {

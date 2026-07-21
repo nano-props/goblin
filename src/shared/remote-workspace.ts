@@ -4,6 +4,7 @@ import {
   parseWorkspaceLocator,
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
+import { isStringIn } from '#/shared/string-literals.ts'
 
 export interface RemoteWorkspaceRef {
   id: WorkspaceId
@@ -142,7 +143,7 @@ export const REMOTE_WORKSPACE_FAILURE_REASONS: readonly RemoteWorkspaceFailureRe
 ]
 
 export function isRemoteWorkspaceFailureReason(value: unknown): value is RemoteWorkspaceFailureReason {
-  return typeof value === 'string' && (REMOTE_WORKSPACE_FAILURE_REASONS as readonly string[]).includes(value)
+  return isStringIn(REMOTE_WORKSPACE_FAILURE_REASONS, value)
 }
 
 /**
@@ -344,9 +345,7 @@ export function localWorkspaceSessionEntry(id: WorkspaceId): WorkspaceSessionEnt
   return { id }
 }
 
-export function remoteWorkspaceSessionEntry(
-  ref: RemoteWorkspaceRef | RemoteWorkspaceTarget,
-): WorkspaceSessionEntry {
+export function remoteWorkspaceSessionEntry(ref: RemoteWorkspaceRef | RemoteWorkspaceTarget): WorkspaceSessionEntry {
   const normalized = normalizeRemoteWorkspaceRef(ref)
   if (!normalized) throw new TypeError('Invalid remote workspace reference')
   return { id: normalized.id }

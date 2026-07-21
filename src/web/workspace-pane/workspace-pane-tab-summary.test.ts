@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  type WorkspacePaneGenericRuntimeTabSummary,
   workspacePanePendingRuntimeTabIdentity,
   workspacePaneRuntimeTabSummaryIdentity,
   workspacePaneRuntimeTabSummarySessionId,
@@ -27,11 +26,5 @@ describe('workspace pane tab model', () => {
   test('derives runtime summary identities from the runtime session id', () => {
     expect(workspacePaneRuntimeTabSummarySessionId(terminalView)).toBe('term-111111111111111111111')
     expect(workspacePaneRuntimeTabSummaryIdentity(terminalView)).toBe('terminal:term-111111111111111111111')
-    const genericView: WorkspacePaneGenericRuntimeTabSummary<'terminal'> = {
-      type: 'terminal',
-      runtimeSessionId: 'term-222222222222222222222',
-    }
-    expect(workspacePaneRuntimeTabSummarySessionId(genericView)).toBe('term-222222222222222222222')
-    expect(workspacePaneRuntimeTabSummaryIdentity(genericView)).toBe('terminal:term-222222222222222222222')
   })
 })

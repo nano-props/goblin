@@ -2,7 +2,6 @@ import type {
   AppRealtimeMessage,
   AppRealtimeRequestInputs,
   AppRealtimeResponseOutputs,
-  AppRealtimeSocketServerMessage,
 } from '#/shared/app-realtime-socket.ts'
 import {
   createAppRealtimeRequestId,
@@ -38,7 +37,6 @@ export function createClientAppRealtime(options: {
   const connection = createClientRealtimeSocketConnection<
     AppRealtimeRequestInputs,
     AppRealtimeResponseOutputs,
-    AppRealtimeSocketServerMessage,
     AppRealtimeMessage
   >({
     resolveConnection() {

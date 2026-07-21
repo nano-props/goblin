@@ -12,8 +12,7 @@ import type {
 } from '#/shared/terminal-socket.ts'
 import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
-
-type MaybePromise<T> = T | Promise<T>
+import { invokeRealtimeRpcHandler, type RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
 
 // Action → handler table. The handler receives the union-shaped input
 // and the WS request's `clientId`/`userId`. `clientId` is folded into
@@ -21,13 +20,9 @@ type MaybePromise<T> = T | Promise<T>
 // the host unchanged. Runtime tab creation intentionally lives on the
 // workspace-pane application command surface. See `identity.ts` for the
 // routing-vs-identity distinction.
-export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): {
-  [TAction in TerminalSocketRequestAction]: (
-    clientId: string,
-    userId: string,
-    input: TerminalSocketRequestInputs[TAction],
-  ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
-} {
+export function createTerminalRealtimeHandlers(
+  host: ServerTerminalActionHost,
+): RealtimeRpcHandlers<TerminalSocketRequestInputs, TerminalSocketResponseOutputs> {
   return {
     attach(clientId, userId, input) {
       return host.attach(clientId, userId, { ...input, clientId })
@@ -54,13 +49,7 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
 }
 
 export async function handleTerminalRealtimeRequestMessage(
-  handlers: {
-    [TAction in TerminalSocketRequestAction]: (
-      clientId: string,
-      userId: string,
-      input: TerminalSocketRequestInputs[TAction],
-    ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
-  },
+  handlers: RealtimeRpcHandlers<TerminalSocketRequestInputs, TerminalSocketResponseOutputs>,
   clientId: string,
   userId: string,
   socket: RealtimeSocket,
@@ -69,12 +58,7 @@ export async function handleTerminalRealtimeRequestMessage(
 ): Promise<void> {
   let response: TerminalSocketResponseMessage
   try {
-    const handler = handlers[message.action] as (
-      clientId: string,
-      userId: string,
-      input: TerminalSocketRequestInputs[typeof message.action],
-    ) => MaybePromise<TerminalSocketResponseOutputs[typeof message.action]>
-    const payload = await handler(clientId, userId, message.input)
+    const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
     response = {
       type: 'response',
       requestId: message.requestId,

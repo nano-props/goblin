@@ -2,8 +2,6 @@ import type {
   TerminalClientMessage,
   TerminalRealtimeMessage,
   TerminalSocketRequestInputs,
-  TerminalSocketRequestMessage,
-  TerminalSocketResponseMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
 import type {
@@ -15,6 +13,7 @@ import type {
   WorkspacePaneRuntimeSocketRequestInputs,
   WorkspacePaneRuntimeSocketResponseOutputs,
 } from '#/shared/workspace-pane-runtime.ts'
+import type { RealtimeRpcRequestMessage, RealtimeRpcResponseMessage } from '#/shared/realtime-rpc.ts'
 
 export type AppRealtimeMessage = TerminalRealtimeMessage | WorkspacePaneTabsRealtimeMessage
 
@@ -29,63 +28,12 @@ export interface AppRealtimeResponseOutputs
 
 export type AppRealtimeRequestAction = keyof AppRealtimeRequestInputs
 
-export type AppRealtimeRequestMessage =
-  | TerminalSocketRequestMessage
-  | {
-      [TAction in keyof WorkspacePaneTabsSocketRequestInputs]: {
-        type: 'request'
-        requestId: string
-        action: TAction
-        input: WorkspacePaneTabsSocketRequestInputs[TAction]
-      }
-    }[keyof WorkspacePaneTabsSocketRequestInputs]
-  | {
-      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
-        type: 'request'
-        requestId: string
-        action: TAction
-        input: WorkspacePaneRuntimeSocketRequestInputs[TAction]
-      }
-    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
+export type AppRealtimeRequestMessage = RealtimeRpcRequestMessage<AppRealtimeRequestInputs>
 
-export type AppRealtimeResponseMessage =
-  | TerminalSocketResponseMessage
-  | {
-      [TAction in keyof WorkspacePaneTabsSocketRequestInputs]: {
-        type: 'response'
-        requestId: string
-        ok: true
-        action: TAction
-        payload: WorkspacePaneTabsSocketResponseOutputs[TAction]
-      }
-    }[keyof WorkspacePaneTabsSocketRequestInputs]
-  | {
-      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
-        type: 'response'
-        requestId: string
-        ok: true
-        action: TAction
-        payload: WorkspacePaneRuntimeSocketResponseOutputs[TAction]
-      }
-    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
-  | {
-      [TAction in keyof WorkspacePaneTabsSocketRequestInputs]: {
-        type: 'response'
-        requestId: string
-        ok: false
-        action: TAction
-        error: string
-      }
-    }[keyof WorkspacePaneTabsSocketRequestInputs]
-  | {
-      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
-        type: 'response'
-        requestId: string
-        ok: false
-        action: TAction
-        error: string
-      }
-    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
+export type AppRealtimeResponseMessage = RealtimeRpcResponseMessage<
+  AppRealtimeRequestInputs,
+  AppRealtimeResponseOutputs
+>
 
 export type AppRealtimeHealthPongMessage = { type: 'pong'; requestId: string }
 

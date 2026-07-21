@@ -13,14 +13,7 @@ const execaMock = vi.hoisted(() => vi.fn())
 const canQueryGitHubHostMock = vi.hoisted(() => vi.fn())
 const getGitHubRepoRefMock = vi.hoisted(() => vi.fn())
 
-vi.mock('execa', async () => {
-  const actual = await vi.importActual<typeof import('execa')>('execa')
-  return {
-    ...actual,
-    execa: ((file: string, args?: readonly string[], options?: Record<string, unknown>) =>
-      file === 'gh' ? execaMock(file, args, options) : actual.execa(file, args, options as any)) as typeof actual.execa,
-  }
-})
+vi.mock('execa', () => ({ execa: execaMock }))
 
 vi.mock('#/system/github-cli.ts', () => ({
   buildGitHubCliPath: vi.fn(() => process.env.PATH ?? ''),

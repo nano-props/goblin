@@ -2,6 +2,7 @@ import { unlink } from 'node:fs/promises'
 import { app, ipcMain } from 'electron'
 import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
 import { accessTokenFilePath, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import { getPrimaryWindow } from '#/main/window.ts'
 import { createBrowserEntryUrl } from '#/main/window-security.ts'
@@ -58,7 +59,7 @@ async function doRotate(): Promise<{ accessToken: string }> {
   try {
     await unlink(tokenFile)
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    if (!hasErrorCode(err, 'ENOENT')) throw err
   }
   await stopEmbeddedServer('access-token-rotation')
   await startEmbeddedServer()

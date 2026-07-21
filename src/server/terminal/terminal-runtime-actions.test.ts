@@ -85,25 +85,16 @@ function makeActions(
         await options.closeSessionForUserOutcome(userId, terminalRuntimeSessionId),
     ),
     getPhysicalWorktreeExecutionCapabilityForUser: vi.fn(() => physicalWorktreeCapability),
-    // The other manager methods are unused by `close`, but the
-    // `TerminalSessionManager` type is required by the deps
-    // interface. Stub them with `vi.fn()` so TypeScript stays happy.
     attachSession: vi.fn(),
-    restartSession: vi.fn(),
     restartSessionWithProjectionOutcome: vi.fn(async () => ({
-      result: { ok: false, message: 'restart not configured' },
+      result: { ok: false as const, message: 'restart not configured' },
       projectionChanged: null,
     })),
-    writeSession: vi.fn(() => false),
+    writeSession: vi.fn(async () => ({ status: 'rejected' as const })),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    terminalSessionsChangedEventForScope: vi.fn((_userId, workspaceId, workspaceRuntimeId) => ({
-      workspaceId,
-      workspaceRuntimeId,
-      revision: 1,
-    })),
     terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
-  } as any
+  }
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
     createAdmitted: vi.fn(),

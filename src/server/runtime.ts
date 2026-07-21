@@ -110,7 +110,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : undefined,
       })
       return {
-        appRealtimeHost: terminalRuntime.host as ServerAppRealtimeHost,
+        appRealtimeHost: terminalRuntime.host,
         workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
         worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
         workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,

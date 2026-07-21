@@ -243,15 +243,25 @@ function clipboardDataWithFiles(files: File[]): DataTransfer {
   // the session's capture-phase handler can read `text/plain` and treat
   // the absence of text as empty string (matching the real browser
   // behaviour for a file-only clipboard).
-  const base = {
-    files: {
-      length: files.length,
-      item: (i: number) => files[i] ?? null,
-    } as unknown as FileList,
-    items: [] as unknown as DataTransferItemList,
+  return {
+    files: fileListFixture(files),
+    items: [],
     getData: (_format: string) => '',
-  }
-  return base as unknown as DataTransfer
+  } as unknown as DataTransfer
+}
+
+function fileListFixture(files: File[]): FileList {
+  return Object.assign([...files], {
+    item: (index: number) => files[index] ?? null,
+  }) as unknown as FileList
+}
+
+function dropDataWithFiles(files: File[]): DataTransfer {
+  return {
+    types: ['Files'],
+    files: fileListFixture(files),
+    dropEffect: '',
+  } as unknown as DataTransfer
 }
 
 /**
@@ -1245,11 +1255,7 @@ describe('TerminalSessionView', () => {
       // doesn't accept programmatic `files` assignment cleanly, so we
       // build a minimal proxy that satisfies the handler.
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
-      const dataTransfer = {
-        types: ['Files'],
-        files: [file] as unknown as FileList,
-        dropEffect: '',
-      } as unknown as DataTransfer
+      const dataTransfer = dropDataWithFiles([file])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
@@ -1369,11 +1375,7 @@ describe('TerminalSessionView', () => {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       expect(sessionRoot).toBeTruthy()
       const file = new File([new Uint8Array([1, 2, 3])], 'shot with space.png', { type: 'image/png' })
-      const dataTransfer = {
-        types: ['Files'],
-        files: [file] as unknown as FileList,
-        dropEffect: '',
-      } as unknown as DataTransfer
+      const dataTransfer = dropDataWithFiles([file])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 
@@ -1494,14 +1496,7 @@ describe('TerminalSessionView', () => {
     try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
-      const clipboardData = {
-        files: {
-          length: 1,
-          item: (i: number) => [file][i] ?? null,
-        } as unknown as FileList,
-        items: [] as unknown as DataTransferItemList,
-        getData: (_format: string) => '',
-      } as unknown as DataTransfer
+      const clipboardData = clipboardDataWithFiles([file])
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
@@ -1607,14 +1602,7 @@ describe('TerminalSessionView', () => {
     try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1, 2, 3])], 'weird name & space.png')
-      const clipboardData = {
-        files: {
-          length: 1,
-          item: (i: number) => [file][i] ?? null,
-        } as unknown as FileList,
-        items: [] as unknown as DataTransferItemList,
-        getData: (_format: string) => '',
-      } as unknown as DataTransfer
+      const clipboardData = clipboardDataWithFiles([file])
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
 
@@ -1734,14 +1722,7 @@ describe('TerminalSessionView', () => {
 
     try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
-      const clipboardData = {
-        files: {
-          length: 1,
-          item: (i: number) => [oversized][i] ?? null,
-        } as unknown as FileList,
-        items: [] as unknown as DataTransferItemList,
-        getData: (_format: string) => '',
-      } as unknown as DataTransfer
+      const clipboardData = clipboardDataWithFiles([oversized])
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
@@ -1850,11 +1831,7 @@ describe('TerminalSessionView', () => {
 
     try {
       const sessionRoot = rendered.sessionRoot
-      const dataTransfer = {
-        types: ['Files'],
-        files: [file] as unknown as FileList,
-        dropEffect: '',
-      } as unknown as DataTransfer
+      const dataTransfer = dropDataWithFiles([file])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
@@ -2025,11 +2002,7 @@ describe('TerminalSessionView', () => {
         new File([new Uint8Array([1])], 'b.png'),
         new File([new Uint8Array([1])], 'c.png'),
       ]
-      const dataTransfer = {
-        types: ['Files'],
-        files: files as unknown as FileList,
-        dropEffect: '',
-      } as unknown as DataTransfer
+      const dataTransfer = dropDataWithFiles(files)
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
@@ -2181,11 +2154,7 @@ describe('TerminalSessionView', () => {
     try {
       const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
       const file = new File([new Uint8Array([1])], 'a.png')
-      const dataTransfer = {
-        types: ['Files'],
-        files: [file] as unknown as FileList,
-        dropEffect: '',
-      } as unknown as DataTransfer
+      const dataTransfer = dropDataWithFiles([file])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 

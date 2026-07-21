@@ -250,7 +250,7 @@ async function invokeAbortIpc(input: unknown, event: unknown = trustedEvent): Pr
 describe('main repo ipc cancellation', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 1, once: vi.fn() })
     wireNativeHostIpc()
   })
 
@@ -522,9 +522,7 @@ describe('main repo ipc cancellation', () => {
   test('rejects recent workspace projections with invalid canonical IDs', async () => {
     const result = await invokeIpc('settings.applyNativeHostProjection', {
       recentWorkspaces: {
-        recentWorkspaces: [
-          { id: 'goblin+ssh://prodrepo' },
-        ],
+        recentWorkspaces: [{ id: 'goblin+ssh://prodrepo' }],
       },
     })
 

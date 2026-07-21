@@ -18,6 +18,8 @@ export interface TerminalRuntimeBinding {
   terminalRuntimeGeneration: number
 }
 
+// Keep Omit distributive over the successful stream/snapshot union. Applying
+// Omit directly to the union would retain only fields common to both frames.
 type TerminalRuntimeAttachFrame =
   Extract<TerminalAttachResult, { ok: true }> extends infer TResult
     ? TResult extends { ok: true }

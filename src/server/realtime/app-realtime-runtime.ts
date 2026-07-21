@@ -9,13 +9,11 @@ import {
 } from '#/shared/app-realtime-validators.ts'
 import type { AppRealtimeClientMessage, AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
-  TerminalSocketRequestAction,
   TerminalSocketRequestInputs,
   TerminalSocketRequestMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
 import type {
-  WorkspacePaneTabsSocketAction,
   WorkspacePaneTabsSocketRequestInputs,
   WorkspacePaneTabsSocketResponseOutputs,
 } from '#/shared/workspace-pane-tabs.ts'
@@ -32,12 +30,10 @@ import {
   type WorkspacePaneRuntimeRealtimeRequestMessage,
 } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type {
-  WorkspacePaneRuntimeSocketAction,
   WorkspacePaneRuntimeSocketRequestInputs,
   WorkspacePaneRuntimeSocketResponseOutputs,
 } from '#/shared/workspace-pane-runtime.ts'
-
-type MaybePromise<T> = T | Promise<T>
+import type { RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
 
 const appRealtimeRuntimeLogger = serverLogger.child({ module: 'app-realtime-runtime' })
 
@@ -45,27 +41,15 @@ export interface AppRealtimeRuntimeOptions {
   broker: RealtimeBroker<AppRealtimeMessage>
   isValidClientId(value: unknown): value is string
   getDiagnostics(): ServerAppRealtimeDiagnostics
-  terminalHandlers: {
-    [TAction in TerminalSocketRequestAction]: (
-      clientId: string,
-      userId: string,
-      input: TerminalSocketRequestInputs[TAction],
-    ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
-  }
-  workspacePaneTabsHandlers: {
-    [TAction in WorkspacePaneTabsSocketAction]: (
-      clientId: string,
-      userId: string,
-      input: WorkspacePaneTabsSocketRequestInputs[TAction],
-    ) => MaybePromise<WorkspacePaneTabsSocketResponseOutputs[TAction]>
-  }
-  workspacePaneRuntimeHandlers: {
-    [TAction in WorkspacePaneRuntimeSocketAction]: (
-      clientId: string,
-      userId: string,
-      input: WorkspacePaneRuntimeSocketRequestInputs[TAction],
-    ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[TAction]>
-  }
+  terminalHandlers: RealtimeRpcHandlers<TerminalSocketRequestInputs, TerminalSocketResponseOutputs>
+  workspacePaneTabsHandlers: RealtimeRpcHandlers<
+    WorkspacePaneTabsSocketRequestInputs,
+    WorkspacePaneTabsSocketResponseOutputs
+  >
+  workspacePaneRuntimeHandlers: RealtimeRpcHandlers<
+    WorkspacePaneRuntimeSocketRequestInputs,
+    WorkspacePaneRuntimeSocketResponseOutputs
+  >
   onShutdown(): void
 }
 

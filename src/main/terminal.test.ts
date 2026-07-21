@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { BrowserWindow, Notification as ElectronNotification } from 'electron'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import {
@@ -15,11 +16,12 @@ const { ipcHandlers, mockNotificationEmitting, broadcastClientEffectIntent } = v
   const ipcHandlers = new Map<string, (_event: unknown, input: unknown) => unknown>()
   const broadcastClientEffectIntent = vi.fn()
   const mockNotificationEmitting = (emitEvent: 'show' | 'failed') =>
-    function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
+    function MockNotification(this: ElectronNotification) {
       const listeners = new Map<string, () => void>()
       this.once = vi.fn((event: string, cb: () => void) => {
         listeners.set(event, cb)
-      })
+        return this
+      }) as unknown as ElectronNotification['once']
       this.show = vi.fn(() => {
         listeners.get(emitEvent)?.()
       })
@@ -49,7 +51,7 @@ vi.mock('electron', () => ({
 describe('terminal IPC', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 1, once: vi.fn() })
     wireTerminalIpc()
   })
 
@@ -102,11 +104,13 @@ describe('terminal IPC', () => {
   test('shows a system notification for trusted bell requests', async () => {
     const { BrowserWindow, Notification, app } = await import('electron')
     const flashFrame = vi.fn()
-    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce({
-      isDestroyed: () => false,
-      isFocused: () => false,
-      flashFrame,
-    } as any)
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce(
+      browserWindowFixture({
+        isDestroyed: () => false,
+        isFocused: () => false,
+        flashFrame,
+      }),
+    )
 
     await expect(
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
@@ -133,12 +137,14 @@ describe('terminal IPC', () => {
 
   test('returns false when the notification emits a failed event', async () => {
     const { BrowserWindow, Notification } = await import('electron')
-    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce({
-      isDestroyed: () => false,
-      isFocused: () => true,
-      flashFrame: vi.fn(),
-    } as any)
-    vi.mocked(Notification).mockImplementationOnce(mockNotificationEmitting('failed') as any)
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce(
+      browserWindowFixture({
+        isDestroyed: () => false,
+        isFocused: () => true,
+        flashFrame: vi.fn(),
+      }),
+    )
+    vi.mocked(Notification).mockImplementationOnce(mockNotificationEmitting('failed'))
 
     await expect(
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
@@ -159,16 +165,17 @@ describe('terminal IPC', () => {
 
   test('forwards terminal presentation when a native notification is clicked', async () => {
     const { Notification } = await import('electron')
-    vi.mocked(Notification).mockImplementationOnce(
-      function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
-        const listeners = new Map<string, () => void>()
-        this.once = vi.fn((event: string, callback: () => void) => listeners.set(event, callback))
-        this.show = vi.fn(() => {
-          listeners.get('show')?.()
-          listeners.get('click')?.()
-        })
-      } as any,
-    )
+    vi.mocked(Notification).mockImplementationOnce(function MockNotification(this: ElectronNotification) {
+      const listeners = new Map<string, () => void>()
+      this.once = vi.fn((event: string, callback: () => void) => {
+        listeners.set(event, callback)
+        return this
+      }) as unknown as ElectronNotification['once']
+      this.show = vi.fn(() => {
+        listeners.get('show')?.()
+        listeners.get('click')?.()
+      })
+    })
     const input = {
       title: 'Terminal bell',
       body: 'task completed',
@@ -195,11 +202,13 @@ describe('terminal IPC', () => {
   test('returns true when Notification.isSupported() is false (flashFrame/bounce already fired)', async () => {
     const { BrowserWindow, Notification } = await import('electron')
     const flashFrame = vi.fn()
-    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce({
-      isDestroyed: () => false,
-      isFocused: () => false,
-      flashFrame,
-    } as any)
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce(
+      browserWindowFixture({
+        isDestroyed: () => false,
+        isFocused: () => false,
+        flashFrame,
+      }),
+    )
     vi.mocked(Notification.isSupported).mockReturnValueOnce(false)
 
     await expect(
@@ -253,4 +262,8 @@ function invokeWithEvent<TInput>(channel: string, input: TInput, event: unknown)
   const handler = ipcHandlers.get(channel)
   if (!handler) throw new Error(`missing handler: ${channel}`)
   return handler(event, input)
+}
+
+function browserWindowFixture(window: Pick<BrowserWindow, 'isDestroyed' | 'isFocused' | 'flashFrame'>): BrowserWindow {
+  return window as BrowserWindow
 }
