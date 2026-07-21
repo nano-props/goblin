@@ -1,5 +1,13 @@
 import PQueue from 'p-queue'
-import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
+import {
+  captureRepoWriteExecution,
+  repoWriteExecutionBoundaryKey,
+  resolveRepoWriteBoundaryKey,
+  runWithCapturedRepoWriteExecution,
+  type RepoSource,
+  type RepoWriteExecutionCapability,
+  validateRepoWriteExecution,
+} from '#/server/modules/repo-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {
@@ -26,6 +34,7 @@ export interface RepoWriteOperationLifecycle {
 export interface RepoWriteOperationContext {
   recordFetchSuccess(): void
   runNetworkOperation<T extends ExecResult>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
+  runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>): Promise<T>
 }
 
 interface BeginRepoWriteOperationInput {
@@ -37,6 +46,7 @@ interface BeginRepoWriteOperationInput {
   target?: RepoServerOperationTarget | null
   deadlineAt?: number | null
   canCancelUnderlying?: boolean
+  execution?: RepoWriteExecutionCapability
 }
 
 export interface RepoWriteBoundaryHandle {
@@ -44,21 +54,11 @@ export interface RepoWriteBoundaryHandle {
 }
 
 interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
-  identity: RepoWriteBoundaryIdentity
-  state: RepoWriteBoundaryState
-  readonly queue: RepoWriteOperationQueue
-  activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
-  admissionBarrier: Promise<void> | null
-  currentGroup: RepoWriteBoundaryGroup | null
-}
-
-interface RepoWriteBoundaryIdentity {
+  readonly descriptor: string
   repoIds: Set<WorkspaceId>
-  descriptors: Set<string>
-}
-
-interface RepoWriteBoundaryState {
+  readonly queue: RepoWriteOperationQueue
   operations: Map<string, RepoServerOperationState>
+  activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
   lastSuccessfulFetchAt: number | null
 }
 
@@ -81,63 +81,20 @@ function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
 }
 
-function createBoundaryGroup(input: {
-  repoIds: Set<WorkspaceId>
-  descriptors: Set<string>
-}): RepoWriteBoundaryGroup {
+function createBoundaryGroup(descriptor: string): RepoWriteBoundaryGroup {
   const group: RepoWriteBoundaryGroup = {
     id: `repo-write-boundary-${nextBoundaryGroupId++}`,
-    identity: { repoIds: input.repoIds, descriptors: input.descriptors },
-    state: {
-      operations: new Map(),
-      lastSuccessfulFetchAt: null,
-    },
+    descriptor,
+    repoIds: new Set(),
     queue: new PQueue({ concurrency: 1 }),
+    operations: new Map(),
     activeNetworkOperation: null,
-    admissionBarrier: null,
-    currentGroup: null,
+    lastSuccessfulFetchAt: null,
   }
-  group.currentGroup = group
   boundaryGroups.add(group)
+  boundaryGroupByDescriptor.set(descriptor, group)
   boundaryGroupByHandle.set(group, group)
   return group
-}
-
-function currentRepoWriteBoundaryGroup(group: RepoWriteBoundaryGroup): RepoWriteBoundaryGroup {
-  if (!group.currentGroup || group.currentGroup === group) return group
-  group.currentGroup = currentRepoWriteBoundaryGroup(group.currentGroup)
-  return group.currentGroup
-}
-
-function mergeBoundaryGroups(
-  sourceInput: RepoWriteBoundaryGroup,
-  targetInput: RepoWriteBoundaryGroup,
-): RepoWriteBoundaryGroup {
-  const source = currentRepoWriteBoundaryGroup(sourceInput)
-  const target = currentRepoWriteBoundaryGroup(targetInput)
-  if (source === target) return target
-  for (const repoId of source.identity.repoIds) target.identity.repoIds.add(repoId)
-  for (const descriptor of source.identity.descriptors) target.identity.descriptors.add(descriptor)
-  for (const [id, operation] of source.state.operations) target.state.operations.set(id, operation)
-  if (source.state.lastSuccessfulFetchAt !== null) {
-    target.state.lastSuccessfulFetchAt = Math.max(
-      target.state.lastSuccessfulFetchAt ?? 0,
-      source.state.lastSuccessfulFetchAt,
-    )
-  }
-  const previousBarrier = target.admissionBarrier
-  const admissionBarrier = Promise.all(
-    previousBarrier ? [previousBarrier, source.queue.onIdle()] : [source.queue.onIdle()],
-  ).then(() => undefined)
-  target.admissionBarrier = admissionBarrier
-  void admissionBarrier.then(() => {
-    if (target.admissionBarrier === admissionBarrier) target.admissionBarrier = null
-  })
-  source.currentGroup = target
-  for (const repoId of target.identity.repoIds) boundaryGroupByRepoId.set(repoId, target)
-  for (const descriptor of target.identity.descriptors) boundaryGroupByDescriptor.set(descriptor, target)
-  boundaryGroups.delete(source)
-  return target
 }
 
 async function resolveRepoWriteBoundaryGroup(
@@ -145,33 +102,15 @@ async function resolveRepoWriteBoundaryGroup(
   signal?: AbortSignal,
 ): Promise<RepoWriteBoundaryGroup> {
   const descriptor = await resolveRepoWriteBoundaryKey(repoId, signal)
-  const indexedRepoGroup = boundaryGroupByRepoId.get(repoId)
-  const indexedDescriptorGroup = boundaryGroupByDescriptor.get(descriptor)
-  const repoGroup = indexedRepoGroup ? currentRepoWriteBoundaryGroup(indexedRepoGroup) : undefined
-  const descriptorGroup = indexedDescriptorGroup
-    ? currentRepoWriteBoundaryGroup(indexedDescriptorGroup)
-    : undefined
-  const fallbackDescriptor = `remote-git:${repoId}`
-  let group: RepoWriteBoundaryGroup
-  if (!repoGroup) {
-    group = descriptorGroup ?? createBoundaryGroup({ repoIds: new Set(), descriptors: new Set() })
-  } else if (repoGroup.identity.descriptors.has(descriptor)) {
-    group = repoGroup
-  } else if (descriptor === fallbackDescriptor && repoGroup.identity.descriptors.size > 0) {
-    // A transient remote-resolution failure must not downgrade a known physical boundary.
-    return repoGroup
-  } else if (repoGroup.identity.descriptors.has(fallbackDescriptor)) {
-    group = descriptorGroup ? mergeBoundaryGroups(repoGroup, descriptorGroup) : repoGroup
-  } else {
-    // The workspace now identifies a different physical repository. Existing work
-    // remains owned by the old group; future work follows the newly resolved boundary.
-    repoGroup.identity.repoIds.delete(repoId)
-    group = descriptorGroup ?? createBoundaryGroup({ repoIds: new Set(), descriptors: new Set() })
-  }
-  group.identity.repoIds.add(repoId)
-  group.identity.descriptors.add(descriptor)
+  return bindRepoWriteBoundaryGroup(repoId, descriptor)
+}
+
+function bindRepoWriteBoundaryGroup(repoId: WorkspaceId, descriptor: string): RepoWriteBoundaryGroup {
+  const previousGroup = boundaryGroupByRepoId.get(repoId)
+  const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor)
+  if (previousGroup !== group) previousGroup?.repoIds.delete(repoId)
+  group.repoIds.add(repoId)
   boundaryGroupByRepoId.set(repoId, group)
-  boundaryGroupByDescriptor.set(descriptor, group)
   return group
 }
 
@@ -204,7 +143,7 @@ function sortedOperations(states: RepoServerOperationState[]): RepoServerOperati
 function pruneSettledOperations(): void {
   const settled = [...boundaryGroups]
     .flatMap((runtime) =>
-      [...runtime.state.operations.values()]
+      [...runtime.operations.values()]
         .filter((operation) => operation.phase === 'done' || operation.phase === 'failed')
         .map((operation) => ({ runtime, operation })),
     )
@@ -215,7 +154,7 @@ function pruneSettledOperations(): void {
     })
 
   for (const { runtime, operation } of settled.slice(MAX_SETTLED_OPERATIONS)) {
-    runtime.state.operations.delete(operation.id)
+    runtime.operations.delete(operation.id)
   }
 }
 
@@ -248,7 +187,7 @@ function beginRepoWriteOperation(
     },
     canCancelUnderlying: input.canCancelUnderlying ?? true,
   }
-  runtime.state.operations.set(operation.id, operation)
+  runtime.operations.set(operation.id, operation)
   registerRepoWriteOperationBoundaryRepoId(runtime, operation.repoId)
   publishRepoRuntimeInvalidation(runtime, operation)
   return {
@@ -293,7 +232,7 @@ function publishRepoRuntimeInvalidation(
   runtime: RepoWriteBoundaryGroup,
   operation: Pick<RepoServerOperationState, 'repoId'>,
 ): void {
-  const repoIds = new Set(currentRepoWriteBoundaryGroup(runtime).identity.repoIds)
+  const repoIds = new Set(runtime.repoIds)
   if (operation.repoId) repoIds.add(operation.repoId)
   for (const repoId of repoIds) {
     publishRepoQueryInvalidation({ repoId, query: 'repo-runtime' })
@@ -304,16 +243,16 @@ function registerRepoWriteOperationBoundaryRepoId(group: RepoWriteBoundaryGroup,
   ensureRepoRuntimeCloseSubscription()
   if (repoId) {
     boundaryGroupByRepoId.set(repoId, group)
-    group.identity.repoIds.add(repoId)
+    group.repoIds.add(repoId)
   }
-  return group.identity.repoIds
+  return group.repoIds
 }
 
 function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId): void {
   const group = boundaryGroupByRepoId.get(repoId)
   if (!group) return
   boundaryGroupByRepoId.delete(repoId)
-  group.identity.repoIds.delete(repoId)
+  group.repoIds.delete(repoId)
 }
 
 function ensureRepoRuntimeCloseSubscription(): void {
@@ -328,7 +267,7 @@ function cancelledRepoWriteResult<T extends ExecResult>(): T {
 }
 
 async function runResolvedRepoWriteOperation<T extends ExecResult>(
-  initialGroup: RepoWriteBoundaryGroup,
+  group: RepoWriteBoundaryGroup,
   operation: RepoWriteOperationLifecycle,
   task: () => Promise<T>,
   callerSignal?: AbortSignal,
@@ -348,19 +287,6 @@ async function runResolvedRepoWriteOperation<T extends ExecResult>(
   else callerSignal?.addEventListener('abort', cancelQueuedOperation, { once: true })
 
   try {
-    let group = currentRepoWriteBoundaryGroup(initialGroup)
-    while (group.admissionBarrier) {
-      const barrier = group.admissionBarrier
-      let resolveAbort!: () => void
-      const aborted = new Promise<void>((resolve) => {
-        resolveAbort = resolve
-        queuedAbortCtrl?.signal.addEventListener('abort', resolveAbort, { once: true })
-      })
-      await Promise.race([barrier, aborted])
-      queuedAbortCtrl?.signal.removeEventListener('abort', resolveAbort)
-      if (queuedCancelled) return cancelledRepoWriteResult()
-      group = currentRepoWriteBoundaryGroup(group)
-    }
     return await group.queue.add(
       async () => {
         started = true
@@ -423,6 +349,7 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
 function createRepoWriteOperationContext(
   runtime: RepoWriteBoundaryGroup,
   operation: RepoWriteOperationLifecycle,
+  execution: RepoWriteExecutionCapability,
   callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
@@ -431,6 +358,14 @@ function createRepoWriteOperationContext(
     },
     async runNetworkOperation(task) {
       return await runRepoWriteNetworkOperation(runtime, operation, task, callerSignal)
+    },
+    async runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>) {
+      if (!(await validateRepoWriteExecution(execution, callerSignal))) {
+        const result = { ok: false, message: 'error.repository-target-changed' } as T
+        operation.settle(result)
+        return result
+      }
+      return await runWithCapturedRepoWriteExecution(execution, task)
     },
   }
 }
@@ -442,22 +377,26 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
 ): Promise<T> {
   if (signal?.aborted) return cancelledRepoWriteResult()
-  let group: RepoWriteBoundaryGroup
+  let execution: RepoWriteExecutionCapability
   try {
-    group = await resolveRepoWriteBoundaryGroup(repoId, signal)
+    execution =
+      operationInput.execution ??
+      (await captureRepoWriteExecution(
+        repoId,
+        operationInput.workspaceRuntimeId ? { workspaceRuntimeId: operationInput.workspaceRuntimeId } : undefined,
+        signal,
+      ))
   } catch (err) {
     if (signal?.aborted) return cancelledRepoWriteResult()
     throw err
   }
   if (signal?.aborted) return cancelledRepoWriteResult()
-  group = currentRepoWriteBoundaryGroup(group)
-
-  // Boundary admission is intentionally synchronous. Independent repositories
-  // resolve concurrently, while aliases that resolve to the same physical
-  // boundary still enter the same PQueue before the next async turn.
+  const group = bindRepoWriteBoundaryGroup(repoId, repoWriteExecutionBoundaryKey(execution))
+  // A write is admitted only after its canonical physical boundary is known.
+  // Never create a queue from a locator fallback: an unresolved boundary must fail.
   registerRepoWriteOperationBoundaryRepoId(group, repoId)
   const operation = beginRepoWriteOperation(group, operationInput)
-  const context = createRepoWriteOperationContext(group, operation, signal)
+  const context = createRepoWriteOperationContext(group, operation, execution, signal)
   let task: () => Promise<T>
   try {
     task = prepareTask(operation, context)
@@ -502,7 +441,7 @@ function listRuntimeOperations(
   const includeSettled = options.includeSettled === true
   return sortedOperations(
     runtimes.flatMap((runtime) =>
-      [...runtime.state.operations.values()].filter((operation) => {
+      [...runtime.operations.values()].filter((operation) => {
         if (
           options.workspaceRuntimeId &&
           operation.workspaceRuntimeId &&
@@ -522,7 +461,7 @@ export function listRepoWriteOperationsForBoundary(
   handle: RepoWriteBoundaryHandle,
   options: { includeSettled?: boolean; workspaceRuntimeId?: string } = {},
 ): RepoServerOperationState[] {
-  const group = currentRepoWriteBoundaryGroup(boundaryGroupForHandle(handle))
+  const group = boundaryGroupForHandle(handle)
   registerRepoWriteOperationBoundaryRepoId(group, repoId)
   return listRuntimeOperations([group], options)
 }
@@ -541,13 +480,11 @@ function boundaryGroupForHandle(handle: RepoWriteBoundaryHandle): RepoWriteBound
 }
 
 function recordRepoBoundaryFetchSuccess(group: RepoWriteBoundaryGroup): void {
-  group = currentRepoWriteBoundaryGroup(group)
-  group.state.lastSuccessfulFetchAt = Math.max(group.state.lastSuccessfulFetchAt ?? 0, Date.now())
+  group.lastSuccessfulFetchAt = Math.max(group.lastSuccessfulFetchAt ?? 0, Date.now())
 }
 
 export function getRepoBoundaryLastFetchAt(handle: RepoWriteBoundaryHandle): number | null {
-  const group = currentRepoWriteBoundaryGroup(boundaryGroupForHandle(handle))
-  return group.state.lastSuccessfulFetchAt
+  return boundaryGroupForHandle(handle).lastSuccessfulFetchAt
 }
 
 export function resetRepoWriteOperationCoordinatorForTests(): void {

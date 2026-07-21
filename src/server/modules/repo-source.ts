@@ -99,7 +99,7 @@ type ProbeAvailability = { ok: true } | { ok: false; message: string }
 type RepoWriteBoundary =
   | { kind: 'local-git'; commonDir: string }
   | { kind: 'local-path'; repoPath: string }
-  | { kind: 'remote-git'; repoId: string }
+  | { kind: 'remote-git'; executionIdentity: string }
 
 export interface RepoMutationResult extends ExecResult {
   /**
@@ -163,6 +163,26 @@ export interface RepoSourceRuntimeContext {
   workspaceRuntimeId: string
 }
 
+declare const repoWriteExecutionCapabilityBrand: unique symbol
+
+export interface RepoWriteExecutionCapability {
+  readonly [repoWriteExecutionCapabilityBrand]: true
+}
+
+interface RepoWriteExecutionState {
+  boundaryKey: string
+  source: RepoSource
+  validate(signal?: AbortSignal): Promise<boolean>
+}
+
+interface RepoWriteExecutionSnapshot {
+  boundaryKey: string
+  executionIdentity: string
+  source: RepoSource
+}
+
+const repoWriteExecutions = new WeakMap<RepoWriteExecutionCapability, RepoWriteExecutionState>()
+
 export async function resolveRemoteWorkspaceTarget(
   repoId: string,
   runtime?: RepoSourceRuntimeContext,
@@ -212,6 +232,118 @@ export async function resolveRepoSource(repoId: WorkspaceId, runtime?: RepoSourc
     : createLocalRepoSource(locator.path)
 }
 
+async function resolveRepoWriteExecutionState(
+  repoId: WorkspaceId,
+  runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
+): Promise<RepoWriteExecutionSnapshot> {
+  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
+  if (!locator) throw new Error('error.workspace-locator-malformed')
+  if (locator.transport === 'file') {
+    const boundary = await resolveLocalRepoWriteBoundary(repoId, signal)
+    signal?.throwIfAborted()
+    const boundaryKey = repoWriteBoundaryKey(boundary)
+    return {
+      boundaryKey,
+      executionIdentity: boundaryKey,
+      source: createLocalRepoSource(locator.path),
+    }
+  }
+
+  const target = await resolveRemoteWorkspaceTarget(repoId, runtime, signal)
+  const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
+  const boundaryKey = repoWriteBoundaryKey(await resolveRemoteRepoWriteBoundaryForTarget(target, signal, run))
+  return {
+    boundaryKey,
+    executionIdentity: JSON.stringify({
+      boundaryKey,
+      alias: target.alias,
+      destination: target.sshConnection?.destination,
+      host: target.host,
+      user: target.user,
+      port: target.port,
+      options: target.sshConnection?.options ?? [],
+    }),
+    source: await createRemoteRepoSource(repoId, target, null, runtime),
+  }
+}
+
+export async function captureRepoWriteExecution(
+  repoId: WorkspaceId,
+  runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
+): Promise<RepoWriteExecutionCapability> {
+  // Queue identity and execution source come from one strict capture. Validation
+  // may reject a changed target, but execution never re-resolves or falls back.
+  const captured = await resolveRepoWriteExecutionState(repoId, runtime, signal)
+  const state: RepoWriteExecutionState = {
+    ...captured,
+    async validate(validationSignal) {
+      const current = await resolveRepoWriteExecutionState(repoId, runtime, validationSignal)
+      return current.executionIdentity === captured.executionIdentity
+    },
+  }
+  const capability = Object.freeze({}) as RepoWriteExecutionCapability
+  repoWriteExecutions.set(capability, state)
+  return capability
+}
+
+export async function captureRepoWriteExecutionFromPhysicalWorktree(
+  repoId: WorkspaceId,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+  runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
+): Promise<RepoWriteExecutionCapability> {
+  const execution = physicalWorktreeExecutionBinding(physicalWorktreeCapability)
+  const source =
+    execution.kind === 'remote'
+      ? await createRemoteRepoSource(repoId, execution.target, physicalWorktreeCapability, runtime)
+      : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability)
+  const boundary =
+    execution.kind === 'remote'
+      ? await resolveRemoteRepoWriteBoundaryForTarget(
+          execution.target,
+          signal,
+          runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
+        )
+      : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, signal)
+  const state: RepoWriteExecutionState = {
+    boundaryKey: repoWriteBoundaryKey(boundary),
+    source,
+    async validate(validationSignal) {
+      await validatePhysicalWorktreeExecution(physicalWorktreeCapability, validationSignal)
+      return true
+    },
+  }
+  const capability = Object.freeze({}) as RepoWriteExecutionCapability
+  repoWriteExecutions.set(capability, state)
+  return capability
+}
+
+export function repoWriteExecutionBoundaryKey(capability: RepoWriteExecutionCapability): string {
+  return repoWriteExecutionState(capability).boundaryKey
+}
+
+export async function runWithCapturedRepoWriteExecution<T>(
+  capability: RepoWriteExecutionCapability,
+  task: (source: RepoSource) => Promise<T>,
+): Promise<T> {
+  return await task(repoWriteExecutionState(capability).source)
+}
+
+export async function validateRepoWriteExecution(
+  capability: RepoWriteExecutionCapability,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  return await repoWriteExecutionState(capability).validate(signal)
+}
+
+function repoWriteExecutionState(capability: RepoWriteExecutionCapability): RepoWriteExecutionState {
+  const state = repoWriteExecutions.get(capability)
+  if (!state) throw new Error('error.invalid-repository-write-capability')
+  return state
+}
+
 function serverWorkspaceLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }
@@ -223,7 +355,7 @@ function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
     case 'local-path':
       return `local-path:${boundary.repoPath}`
     case 'remote-git':
-      return `remote-git:${boundary.repoId}`
+      return `remote-git:${boundary.executionIdentity}`
   }
   const exhaustive: never = boundary
   return exhaustive
@@ -232,21 +364,56 @@ function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
 async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
-  const commonDir = await getRepoCommonDir(locator.path, { signal })
-  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(locator.path) }
+  return await resolveLocalRepoWriteBoundaryForPath(locator.path, signal)
+}
+
+async function resolveLocalRepoWriteBoundaryForPath(repoPath: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+  const commonDir = await getRepoCommonDir(repoPath, { signal })
+  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(repoPath) }
 }
 
 async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  try {
-    const target = await resolveRemoteWorkspaceTarget(repoId)
-    const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal })
-    signal?.throwIfAborted()
-    const writeGroupRef = writeGroupPath ? normalizeRemoteWorkspaceRef({ ...target, remotePath: writeGroupPath }) : null
-    return { kind: 'remote-git', repoId: writeGroupRef?.id ?? repoId }
-  } catch {
-    signal?.throwIfAborted()
-    return { kind: 'remote-git', repoId }
+  // Repository identity is a safety boundary. Reads and writes must fail when the
+  // canonical remote write group cannot be confirmed; a locator is not a physical identity.
+  const target = await resolveRemoteWorkspaceTarget(repoId, undefined, signal)
+  return await resolveRemoteRepoWriteBoundaryForTarget(target, signal)
+}
+
+async function resolveRemoteRepoWriteBoundaryForTarget(
+  target: RemoteWorkspaceTarget,
+  signal?: AbortSignal,
+  run?: RemoteGitRunner,
+): Promise<RepoWriteBoundary> {
+  const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal, run })
+  signal?.throwIfAborted()
+  if (!writeGroupPath) throw new Error('error.repository-boundary-unavailable')
+  const sshOptions = target.sshConnection?.options ?? []
+  return {
+    kind: 'remote-git',
+    executionIdentity: JSON.stringify({
+      host: target.host,
+      user: target.user,
+      port: target.port,
+      options: sshOptions,
+      ...(sshOptions.some(sshOptionUsesOriginalDestination)
+        ? { destination: target.sshConnection?.destination ?? target.alias }
+        : {}),
+      writeGroupPath: path.posix.resolve(writeGroupPath),
+    }),
   }
+}
+
+function sshOptionUsesOriginalDestination(option: string): boolean {
+  for (let index = 0; index < option.length - 1; index += 1) {
+    if (option[index] !== '%') continue
+    const token = option[index + 1]
+    if (token === '%') {
+      index += 1
+      continue
+    }
+    if (token === 'n') return true
+  }
+  return false
 }
 
 export async function resolveRepoWriteBoundaryKey(repoId: WorkspaceId, signal?: AbortSignal): Promise<string> {

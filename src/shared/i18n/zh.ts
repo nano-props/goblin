@@ -495,6 +495,8 @@ export const zh: Record<DictKey, string> = {
   'error.workspace-close-failed': '关闭工作区失败',
   'error.failed-read-repo': '读取仓库失败',
   'error.ssh-config-changed': 'SSH 配置已变更',
+  'error.repository-boundary-unavailable': '无法确认仓库身份',
+  'error.repository-target-changed': '操作开始前仓库目标已变更',
   'error.git-not-found': '未找到 Git',
   'error.path-not-found': '路径不存在',
   'error.path-not-directory': '路径不是文件夹',

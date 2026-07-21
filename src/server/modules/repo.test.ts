@@ -620,6 +620,51 @@ describe('fetchRepo invalidation publishing', () => {
     )
   })
 
+  test('fast-fails a queued remote write when its captured target changes', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    let host = 'host-a.example'
+    mocks.resolveRemoteTarget.mockImplementation(async () => ({
+      target: {
+        id: repoId,
+        alias: 'prod',
+        host,
+        user: 'deploy',
+        port: 22,
+        remotePath: '/srv/repo',
+        displayName: 'prod:repo',
+      },
+    }))
+    const activeFetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchRemoteRepo.mockImplementationOnce(async () => await activeFetch.promise)
+    mocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched current target' })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const active = fetchRepo(repoId, 'background')
+    await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1))
+    const stale = fetchRepo(repoId, 'user')
+    await vi.waitFor(() => expect(mocks.resolveRemoteTarget).toHaveBeenCalledTimes(3))
+
+    host = 'host-b.example'
+    const current = fetchRepo(repoId, 'user')
+    activeFetch.resolve({ ok: true, message: 'fetched original target' })
+
+    await expect(active).resolves.toEqual({ ok: true, message: 'fetched original target' })
+    await expect(stale).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
+    await expect(current).resolves.toEqual({ ok: true, message: 'fetched current target' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
+    expect(mocks.fetchRemoteRepo.mock.calls[0]?.[0]).toMatchObject({ host: 'host-a.example' })
+    expect(mocks.fetchRemoteRepo.mock.calls[1]?.[0]).toMatchObject({ host: 'host-b.example' })
+  })
+
+  test('does not admit a remote write without a confirmed canonical boundary', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue(null)
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    await expect(fetchRepo(repoId, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
+    expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
+  })
+
   test('user sync waits for an active linked remote background sync with the same alias', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
@@ -659,6 +704,76 @@ describe('fetchRepo invalidation publishing', () => {
         query: 'repo-snapshot',
       },
     )
+  })
+
+  test('serializes different SSH aliases for the same resolved repository', async () => {
+    const firstRepoId = normalizeRemoteWorkspaceId({ alias: 'prod-a', remotePath: '/srv/repo' })
+    const secondRepoId = normalizeRemoteWorkspaceId({ alias: 'prod-b', remotePath: '/srv/repo' })
+    mocks.resolveRemoteTarget.mockImplementation(async (ref: { alias: string; remotePath: string }) => ({
+      target: {
+        id: normalizeRemoteWorkspaceId(ref),
+        alias: ref.alias,
+        host: 'shared.example',
+        user: 'deploy',
+        port: 22,
+        remotePath: ref.remotePath,
+        displayName: `${ref.alias}:repo`,
+        sshConnection: {
+          destination: ref.alias,
+          options: ['hostname=shared.example', 'user=deploy', 'port=22'],
+        },
+      },
+    }))
+    const firstFetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchRemoteRepo.mockImplementationOnce(async () => await firstFetch.promise)
+    mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched second alias' })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const first = fetchRepo(firstRepoId, 'background')
+    await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1))
+    const second = fetchRepo(secondRepoId, 'user')
+    await Promise.resolve()
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+
+    firstFetch.resolve({ ok: true, message: 'fetched first alias' })
+    await expect(first).resolves.toEqual({ ok: true, message: 'fetched first alias' })
+    await expect(second).resolves.toEqual({ ok: true, message: 'fetched second alias' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
+  })
+
+  test('keeps aliases with OpenSSH percent-n semantics on distinct boundaries', async () => {
+    const firstRepoId = normalizeRemoteWorkspaceId({ alias: 'proxy-a', remotePath: '/srv/repo' })
+    const secondRepoId = normalizeRemoteWorkspaceId({ alias: 'proxy-b', remotePath: '/srv/repo' })
+    mocks.resolveRemoteTarget.mockImplementation(async (ref: { alias: string; remotePath: string }) => ({
+      target: {
+        id: normalizeRemoteWorkspaceId(ref),
+        alias: ref.alias,
+        host: 'shared.example',
+        user: 'deploy',
+        port: 22,
+        remotePath: ref.remotePath,
+        displayName: `${ref.alias}:repo`,
+        sshConnection: {
+          destination: ref.alias,
+          options: ['hostname=shared.example', 'proxycommand=connect-via %n'],
+        },
+      },
+    }))
+    const firstFetch = deferred<{ ok: true; message: string }>()
+    const secondFetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchRemoteRepo.mockImplementation(async (target: { alias: string }) =>
+      target.alias === 'proxy-a' ? await firstFetch.promise : await secondFetch.promise,
+    )
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const first = fetchRepo(firstRepoId, 'background')
+    const second = fetchRepo(secondRepoId, 'background')
+    await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2))
+
+    firstFetch.resolve({ ok: true, message: 'fetched proxy a' })
+    secondFetch.resolve({ ok: true, message: 'fetched proxy b' })
+    await expect(first).resolves.toEqual({ ok: true, message: 'fetched proxy a' })
+    await expect(second).resolves.toEqual({ ok: true, message: 'fetched proxy b' })
   })
 
   test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
@@ -1246,16 +1361,17 @@ describe('repo mutation invalidation publishing', () => {
       },
       successfulRemovalLifecycle,
     )
-    await Promise.resolve()
-    await Promise.resolve()
-
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
-    expect(
-      (await readRepoOperationsSnapshot(REPO_ID)).operations.find((operation) => operation.kind === 'remove-worktree'),
-    ).toMatchObject({
-      kind: 'remove-worktree',
-      phase: 'queued',
-      target: { branch: 'feature/b', worktreePath: '/tmp/repo-worktree' },
+    await vi.waitFor(async () => {
+      expect(
+        (await readRepoOperationsSnapshot(REPO_ID)).operations.find(
+          (operation) => operation.kind === 'remove-worktree',
+        ),
+      ).toMatchObject({
+        kind: 'remove-worktree',
+        phase: 'queued',
+        target: { branch: 'feature/b', worktreePath: '/tmp/repo-worktree' },
+      })
     })
 
     firstDelete.resolve({ ok: true, message: 'deleted' })
@@ -1315,18 +1431,17 @@ describe('repo mutation invalidation publishing', () => {
       },
       successfulRemovalLifecycle,
     )
-    await Promise.resolve()
-    await Promise.resolve()
-
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
-    expect(
-      (await readRepoOperationsSnapshot(LINKED_REPO_ID)).operations.find(
-        (operation) => operation.kind === 'remove-worktree',
-      ),
-    ).toMatchObject({
-      kind: 'remove-worktree',
-      phase: 'queued',
-      target: { branch: 'feature/b', worktreePath: '/tmp/repo-linked' },
+    await vi.waitFor(async () => {
+      expect(
+        (await readRepoOperationsSnapshot(LINKED_REPO_ID)).operations.find(
+          (operation) => operation.kind === 'remove-worktree',
+        ),
+      ).toMatchObject({
+        kind: 'remove-worktree',
+        phase: 'queued',
+        target: { branch: 'feature/b', worktreePath: '/tmp/repo-linked' },
+      })
     })
 
     firstDelete.resolve({ ok: true, message: 'deleted' })

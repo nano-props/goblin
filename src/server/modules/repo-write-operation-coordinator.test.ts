@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   enqueueRepoWriteOperation,
-  getRepoBoundaryLastFetchAt,
   listRepoWriteOperationsForRepo,
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
@@ -25,7 +24,16 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
+  captureRepoWriteExecution: async (repoId: WorkspaceId, _runtime?: unknown, signal?: AbortSignal) => ({
+    boundaryKey: await mocks.resolveRepoWriteBoundaryKey(repoId, signal),
+  }),
+  repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
+  runWithCapturedRepoWriteExecution: async (
+    _capability: unknown,
+    task: (source: object) => Promise<unknown>,
+  ) => await task({}),
+  validateRepoWriteExecution: async () => true,
 }))
 
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
@@ -140,196 +148,6 @@ describe('repo write operation coordinator', () => {
     releaseFirst.resolve()
     await Promise.all([first, second])
     expect(order).toEqual(['first-start', 'first-end', 'second'])
-  })
-
-  test('keeps one queue when a repository boundary is refined after admission', async () => {
-    const fallbackBoundary = `remote-git:${WORKSPACE_ID}`
-    mocks.resolveRepoWriteBoundaryKey
-      .mockResolvedValueOnce(fallbackBoundary)
-      .mockResolvedValueOnce(WORKSPACE_BOUNDARY_KEY)
-    const releaseFirst = Promise.withResolvers<void>()
-    const order: string[] = []
-
-    const first = enqueueRepoWriteOperation(
-      WORKSPACE_ID,
-      undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
-      (operation) => async () => {
-        operation.start()
-        order.push('first-start')
-        await releaseFirst.promise
-        order.push('first-end')
-        operation.settle({ ok: true })
-        return { ok: true, message: 'first' }
-      },
-    )
-    await vi.waitFor(() => expect(order).toEqual(['first-start']))
-
-    const second = enqueueRepoWriteOperation(
-      WORKSPACE_ID,
-      undefined,
-      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
-      (operation) => async () => {
-        operation.start()
-        order.push('second')
-        operation.settle({ ok: true })
-        return { ok: true, message: 'second' }
-      },
-    )
-    await vi.advanceTimersByTimeAsync(1)
-    expect(order).toEqual(['first-start'])
-
-    releaseFirst.resolve()
-    await Promise.all([first, second])
-    expect(order).toEqual(['first-start', 'first-end', 'second'])
-  })
-
-  test('drains both existing queues before admitting work to a merged boundary group', async () => {
-    const firstFallback = `remote-git:${WORKSPACE_ID}`
-    const secondFallback = `remote-git:${LINKED_WORKSPACE_ID}`
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId) =>
-      repoId === WORKSPACE_ID ? firstFallback : secondFallback,
-    )
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
-
-    const releaseFirst = Promise.withResolvers<void>()
-    const releaseSecond = Promise.withResolvers<void>()
-    const order: string[] = []
-    const first = enqueueRepoWriteOperation(
-      WORKSPACE_ID,
-      undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
-      (operation) => async () => {
-        operation.start()
-        order.push('first-start')
-        await releaseFirst.promise
-        order.push('first-end')
-        operation.settle({ ok: true })
-        return { ok: true, message: 'first' }
-      },
-    )
-    const second = enqueueRepoWriteOperation(
-      LINKED_WORKSPACE_ID,
-      undefined,
-      { repoId: LINKED_WORKSPACE_ID, kind: 'fetch', source: 'background' },
-      (operation) => async () => {
-        operation.start()
-        order.push('second-start')
-        await releaseSecond.promise
-        order.push('second-end')
-        operation.settle({ ok: true })
-        return { ok: true, message: 'second' }
-      },
-    )
-    await vi.waitFor(() => expect(order).toEqual(expect.arrayContaining(['first-start', 'second-start'])))
-
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(WORKSPACE_BOUNDARY_KEY)
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    const third = enqueueRepoWriteOperation(
-      LINKED_WORKSPACE_ID,
-      undefined,
-      { repoId: LINKED_WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
-      (operation) => async () => {
-        operation.start()
-        order.push('third')
-        operation.settle({ ok: true })
-        return { ok: true, message: 'third' }
-      },
-    )
-
-    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toHaveLength(3)
-    releaseFirst.resolve()
-    await first
-    await vi.advanceTimersByTimeAsync(1)
-    expect(order).not.toContain('third')
-    releaseSecond.resolve()
-    await Promise.all([second, third])
-    expect(order.at(-1)).toBe('third')
-  })
-
-  test('does not execute a write cancelled while a merged group waits for old queues', async () => {
-    const firstFallback = `remote-git:${WORKSPACE_ID}`
-    const secondFallback = `remote-git:${LINKED_WORKSPACE_ID}`
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId) =>
-      repoId === WORKSPACE_ID ? firstFallback : secondFallback,
-    )
-    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
-    const releaseFirst = Promise.withResolvers<void>()
-    const first = enqueueRepoWriteOperation(
-      WORKSPACE_ID,
-      undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
-      (operation) => async () => {
-        operation.start()
-        await releaseFirst.promise
-        operation.settle({ ok: true })
-        return { ok: true, message: 'first' }
-      },
-    )
-    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
-
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(WORKSPACE_BOUNDARY_KEY)
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    const caller = new AbortController()
-    const task = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
-    const cancelled = enqueueRepoWriteOperation(
-      LINKED_WORKSPACE_ID,
-      caller.signal,
-      { repoId: LINKED_WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
-      () => task,
-    )
-    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(0))
-    caller.abort()
-    await expect(cancelled).resolves.toEqual({ ok: false, message: 'cancelled' })
-
-    releaseFirst.resolve()
-    await first
-    await vi.advanceTimersByTimeAsync(1)
-    expect(task).not.toHaveBeenCalled()
-  })
-
-  test('routes an old handle through consecutive group merges', async () => {
-    const thirdWorkspaceId = workspaceIdForTest('goblin+file:///workspace-third')
-    const fallbackByRepo = new Map([
-      [WORKSPACE_ID, `remote-git:${WORKSPACE_ID}`],
-      [LINKED_WORKSPACE_ID, `remote-git:${LINKED_WORKSPACE_ID}`],
-      [thirdWorkspaceId, `remote-git:${thirdWorkspaceId}`],
-    ])
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId) => fallbackByRepo.get(repoId) ?? repoId)
-    const oldestHandle = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
-    await resolveRepoWriteBoundaryForRead(thirdWorkspaceId)
-
-    const releaseFetch = Promise.withResolvers<void>()
-    const fetch = enqueueRepoWriteOperation(
-      WORKSPACE_ID,
-      undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
-      (operation, context) => async () => {
-        operation.start()
-        await releaseFetch.promise
-        context.recordFetchSuccess()
-        operation.settle({ ok: true })
-        return { ok: true, message: 'fetched' }
-      },
-    )
-    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
-
-    const firstCanonical = 'remote-git:canonical-one'
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(firstCanonical)
-    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    const secondCanonical = 'remote-git:canonical-two'
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(secondCanonical)
-    const newestHandle = await resolveRepoWriteBoundaryForRead(thirdWorkspaceId)
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-
-    vi.setSystemTime(1_000)
-    releaseFetch.resolve()
-    await fetch
-    expect(getRepoBoundaryLastFetchAt(oldestHandle)).toBe(1_000)
-    expect(getRepoBoundaryLastFetchAt(newestHandle)).toBe(1_000)
   })
 
   test('settles operations when the queued task throws', async () => {

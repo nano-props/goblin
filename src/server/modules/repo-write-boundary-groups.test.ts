@@ -4,7 +4,16 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const mocks = vi.hoisted(() => ({ resolveRepoWriteBoundaryKey: vi.fn() }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
+  captureRepoWriteExecution: async (repoId: typeof REMOTE_REPO) => ({
+    boundaryKey: await mocks.resolveRepoWriteBoundaryKey(repoId),
+  }),
+  repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
+  runWithCapturedRepoWriteExecution: async (
+    _capability: unknown,
+    task: (source: object) => Promise<unknown>,
+  ) => await task({}),
+  validateRepoWriteExecution: async () => true,
 }))
 
 const REMOTE_REPO = workspaceIdForTest('goblin+ssh://example/repo')
@@ -33,41 +42,29 @@ describe('repo write boundary groups', () => {
     resetRepoWriteOperationCoordinatorForTests()
   })
 
-  test('preserves fetch metadata when a remote fallback is rebound to a resolved boundary', async () => {
+  test('does not create a boundary group when canonical resolution fails', async () => {
     const registry = await import('#/server/modules/repo-write-operation-coordinator.ts')
-    const fallbackKey = `remote-git:${REMOTE_REPO}`
-    const resolvedKey = 'remote-git:goblin+ssh://host/repo'
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValueOnce(fallbackKey).mockResolvedValue(resolvedKey)
+    mocks.resolveRepoWriteBoundaryKey.mockRejectedValue(new Error('error.repository-boundary-unavailable'))
 
-    const admittedKey = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
-    await recordSuccessfulFetch(REMOTE_REPO)
-    const recordedAt = registry.getRepoBoundaryLastFetchAt(admittedKey)
-
-    expect(await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).toBe(admittedKey)
-    expect(registry.getRepoBoundaryLastFetchAt(admittedKey)).toBe(recordedAt)
+    await expect(registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).rejects.toThrow(
+      'error.repository-boundary-unavailable',
+    )
+    expect(registry.repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+    })
   })
 
-  test('does not downgrade a resolved binding after a transient fallback', async () => {
+  test('keeps metadata on the confirmed canonical boundary', async () => {
     const registry = await import('#/server/modules/repo-write-operation-coordinator.ts')
     const resolvedKey = 'remote-git:goblin+ssh://host/repo'
-    const fallbackKey = `remote-git:${REMOTE_REPO}`
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValueOnce(resolvedKey).mockResolvedValueOnce(fallbackKey)
+    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(resolvedKey)
 
-    const initial = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
-    expect(await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).toBe(initial)
-  })
-
-  test('redirects a late success captured before fallback rebind', async () => {
-    const registry = await import('#/server/modules/repo-write-operation-coordinator.ts')
-    const fallbackKey = `remote-git:${REMOTE_REPO}`
-    const resolvedKey = 'remote-git:goblin+ssh://host/repo'
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValueOnce(fallbackKey).mockResolvedValue(resolvedKey)
-
-    const capturedKey = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
-    expect(await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).toBe(capturedKey)
+    const boundary = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
     await recordSuccessfulFetch(REMOTE_REPO)
 
-    expect(registry.getRepoBoundaryLastFetchAt(capturedKey)).toEqual(expect.any(Number))
+    expect(await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).toBe(boundary)
+    expect(registry.getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
   })
 
   test('keeps distinct repository boundaries isolated', async () => {
