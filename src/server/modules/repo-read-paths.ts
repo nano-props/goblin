@@ -5,13 +5,11 @@ import {
 } from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
+  getRepoBoundaryLastFetchAt,
   listRepoWriteOperationsForBoundary,
   listRepoWriteOperationsForRepo,
+  resolveRepoWriteBoundaryForRead,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
-import {
-  getRepoBoundaryLastFetchAt,
-  resolveRepoWriteBoundary,
-} from '#/server/modules/repo-write-boundary-registry.ts'
 import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -317,12 +315,12 @@ export async function readRepoOperationsSnapshot(
     workspaceRuntimeId: options.workspaceRuntimeId,
     includeSettled: options.includeSettled,
   })
-  const boundaryKey = cwd ? await resolveRepoWriteBoundary(cwd, options.signal) : null
+  const boundary = cwd ? await resolveRepoWriteBoundaryForRead(cwd, options.signal) : null
   const writeOperations =
-    cwd && boundaryKey
-      ? listRepoWriteOperationsForBoundary(cwd, boundaryKey, options)
+    cwd && boundary
+      ? listRepoWriteOperationsForBoundary(cwd, boundary, options)
       : await listRepoWriteOperationsForRepo(cwd, options)
-  const lastFetchAt = boundaryKey ? getRepoBoundaryLastFetchAt(boundaryKey) : null
+  const lastFetchAt = boundary ? getRepoBoundaryLastFetchAt(boundary) : null
   return {
     operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
     lastFetchAt,

@@ -3,7 +3,6 @@ import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { recordRepoBoundaryFetchSuccess } from '#/server/modules/repo-write-boundary-registry.ts'
 import {
   beginRepoServerOperation,
   requestRepoServerOperationCancel,
@@ -293,7 +292,7 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    if (result.ok) recordRepoBoundaryFetchSuccess(context.boundaryKey)
+    if (result.ok) context.recordFetchSuccess()
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
   return await enqueueRepoWriteOperation(

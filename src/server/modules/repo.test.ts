@@ -179,9 +179,6 @@ beforeEach(async () => {
     await import('#/server/modules/repo-write-operation-coordinator.ts')
   resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
-  const { resetRepoWriteBoundaryRegistryForTests } =
-    await import('#/server/modules/repo-write-boundary-registry.ts')
-  resetRepoWriteBoundaryRegistryForTests()
   vi.clearAllMocks()
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
   mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
@@ -457,17 +454,17 @@ describe('fetchRepo invalidation publishing', () => {
     const runtimeId = 'repo-runtime-sync-time'
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const { resolveRepoWriteBoundaryKey } = await import('#/server/modules/repo-source.ts')
-    const { getRepoBoundaryLastFetchAt } = await import('#/server/modules/repo-write-boundary-registry.ts')
-    const boundaryKey = await resolveRepoWriteBoundaryKey(REPO_ID)
+    const { getRepoBoundaryLastFetchAt, resolveRepoWriteBoundaryForRead } =
+      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const boundary = await resolveRepoWriteBoundaryForRead(REPO_ID)
 
-    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toBeNull()
+    expect(getRepoBoundaryLastFetchAt(boundary)).toBeNull()
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
-    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toEqual(expect.any(Number))
+    expect(getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
 
     mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
-    expect(getRepoBoundaryLastFetchAt(boundaryKey)).toEqual(expect.any(Number))
+    expect(getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
   })
 
   test('shares successful fetch time across worktrees with one write boundary', async () => {
