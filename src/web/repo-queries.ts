@@ -8,6 +8,7 @@ import {
   repoRemoteBranchesQueryOptions,
   repoWorktreeStatusReadModelQueryOptions,
 } from '#/web/repo-query-options.ts'
+import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 
 export function useRepoProjectionReadModel(
   repoRoot: WorkspaceId | null,
@@ -50,8 +51,5 @@ export function useRepoOperationsReadModel(
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
   const query = useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
-  // Query caches retain the previous payload after a refetch error. Repository
-  // operations are identity-scoped authority, so no consumer may project that
-  // payload while the current canonical read is unconfirmed.
-  return query.isError ? { ...query, data: undefined } : query
+  return { ...query, data: projectRepoOperationsQueryData(query) }
 }

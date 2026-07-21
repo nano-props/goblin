@@ -176,6 +176,25 @@ describe('repo projection query data', () => {
     expect(getRepoOperationsQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
+  test('does not project retained operations data after the canonical query enters an error state', () => {
+    const queryClient = new QueryClient()
+    const queryKey = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1')
+    const operations = repoOperationsForTest(123)
+    queryClient.setQueryData(queryKey, operations)
+
+    expect(getRepoOperationsQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBe(operations)
+    const query = queryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('Missing operations query')
+    query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
+
+    expect(queryClient.getQueryData(queryKey)).toBe(operations)
+    expect(getRepoOperationsQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
+
+    const replacement = repoOperationsForTest(456)
+    queryClient.setQueryData(queryKey, replacement)
+    expect(getRepoOperationsQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toEqual(replacement)
+  })
+
   test('keeps snapshot and operation invalidation domains independent', () => {
     const queryClient = new QueryClient()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')

@@ -78,7 +78,14 @@ export function getRepoOperationsQueryData(
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoOperationsSnapshot | undefined {
-  return queryClient.getQueryData<RepoOperationsSnapshot>(repoOperationsQueryKey(repoRoot, workspaceRuntimeId, false))
+  const queryKey = repoOperationsQueryKey(repoRoot, workspaceRuntimeId, false)
+  return projectRepoOperationsQueryData(queryClient.getQueryState<RepoOperationsSnapshot>(queryKey))
+}
+
+export function projectRepoOperationsQueryData(
+  query: { status: 'pending' | 'error' | 'success'; data: RepoOperationsSnapshot | undefined } | undefined,
+): RepoOperationsSnapshot | undefined {
+  return query?.status === 'success' ? query.data : undefined
 }
 
 export function setRepoOperationsQueryData(
