@@ -45,7 +45,7 @@ interface BeginRepoWriteOperationInput {
   target?: RepoServerOperationTarget | null
   deadlineAt?: number | null
   canCancelUnderlying?: boolean
-  execution?: RepoWriteExecutionCapability
+  captureExecution?: (signal?: AbortSignal) => Promise<RepoWriteExecutionCapability>
 }
 
 export interface RepoWriteBoundaryHandle {
@@ -75,10 +75,7 @@ const boundaryGroups = new Set<RepoWriteBoundaryGroup>()
 const boundaryGroupByRepoId = new Map<WorkspaceId, RepoWriteBoundaryGroup>()
 const boundaryGroupByDescriptor = new Map<string, RepoWriteBoundaryGroup>()
 const queueByCoordinationDescriptor = new Map<string, PQueue>()
-const workspaceRuntimeRegistrationsByRepoId = new Map<
-  WorkspaceId,
-  Map<string, WorkspaceRuntimeBoundaryRegistration>
->()
+const workspaceRuntimeRegistrationsByRepoId = new Map<WorkspaceId, Map<string, WorkspaceRuntimeBoundaryRegistration>>()
 let boundaryGroupByHandle = new WeakMap<RepoWriteBoundaryHandle, RepoWriteBoundaryGroup>()
 let workspaceRuntimeCloseSubscription: (() => void) | null = null
 
@@ -124,8 +121,7 @@ function bindRepoWriteBoundaryGroup(
 ): RepoWriteBoundaryGroup {
   ensureRepoRuntimeCloseSubscription()
   const previousGroup = boundaryGroupByRepoId.get(repoId)
-  const group =
-    boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor, coordinationDescriptor)
+  const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor, coordinationDescriptor)
   if (previousGroup !== group && previousGroup) {
     previousGroup.repoIds.delete(repoId)
     deleteBoundaryGroupIfIdle(previousGroup)
@@ -156,7 +152,14 @@ function registerWorkspaceRuntime(
 function assertWorkspaceRuntimeRegistrationActive(
   registration: WorkspaceRuntimeBoundaryRegistration | null | undefined,
 ): void {
-  if (registration && !registration.active) throw new WorkspaceRuntimeAdmissionClosedError()
+  const error = workspaceRuntimeRegistrationClosedError(registration)
+  if (error) throw error
+}
+
+function workspaceRuntimeRegistrationClosedError(
+  registration: WorkspaceRuntimeBoundaryRegistration | null | undefined,
+): WorkspaceRuntimeAdmissionClosedError | null {
+  return registration && !registration.active ? new WorkspaceRuntimeAdmissionClosedError() : null
 }
 
 function cloneOperation(state: RepoServerOperationState): RepoServerOperationState {
@@ -244,6 +247,7 @@ function beginRepoWriteOperation(
       publishRepoRuntimeInvalidation(runtime, operation)
     },
     requestCancel(reason) {
+      if (operation.cancellation.underlyingRequested) return
       operation.cancellation.underlyingRequested = true
       operation.cancellation.reason = reason
       operation.cancellation.requestedAt = Date.now()
@@ -343,6 +347,15 @@ function cancelledRepoWriteResult<T extends ExecResult>(): T {
   return { ok: false, message: 'cancelled' } as T
 }
 
+type PromiseOutcome<T> = { ok: true; value: T } | { ok: false; error: unknown }
+
+function observePromise<T>(run: () => Promise<T>): Promise<PromiseOutcome<T>> {
+  return new Promise<T>((resolve) => resolve(run())).then<PromiseOutcome<T>, PromiseOutcome<T>>(
+    (value) => ({ ok: true, value }),
+    (error: unknown) => ({ ok: false, error }),
+  )
+}
+
 async function runResolvedRepoWriteOperation<T extends ExecResult>(
   group: RepoWriteBoundaryGroup,
   operation: RepoWriteOperationLifecycle,
@@ -363,21 +376,21 @@ async function runResolvedRepoWriteOperation<T extends ExecResult>(
   if (callerSignal?.aborted) cancelQueuedOperation()
   else callerSignal?.addEventListener('abort', cancelQueuedOperation, { once: true })
 
-  try {
-    return await group.queue.add(
-      async () => {
-        started = true
-        callerSignal?.removeEventListener('abort', cancelQueuedOperation)
-        return await task()
-      },
-      queuedAbortCtrl ? { signal: queuedAbortCtrl.signal } : undefined,
-    )
-  } catch (err) {
-    if (queuedCancelled) return cancelledRepoWriteResult()
-    throw err
-  } finally {
-    callerSignal?.removeEventListener('abort', cancelQueuedOperation)
-  }
+  const outcome = await observePromise(
+    async () =>
+      await group.queue.add(
+        async () => {
+          started = true
+          callerSignal?.removeEventListener('abort', cancelQueuedOperation)
+          return await task()
+        },
+        queuedAbortCtrl ? { signal: queuedAbortCtrl.signal } : undefined,
+      ),
+  )
+  callerSignal?.removeEventListener('abort', cancelQueuedOperation)
+  if (outcome.ok) return outcome.value
+  if (queuedCancelled) return cancelledRepoWriteResult()
+  throw outcome.error
 }
 
 async function runRepoWriteNetworkOperation<T extends ExecResult>(
@@ -398,24 +411,29 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
   }
   callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
   operation.start()
-  try {
-    const result = await task(ctrl.signal)
+  const outcome = await observePromise(async () => await task(ctrl.signal))
+  callerSignal?.removeEventListener('abort', onCallerAbort)
+
+  if (outcome.ok) {
+    operation.settle(outcome.value)
+    return outcome.value
+  }
+  if (callerSignal?.aborted) {
+    const result = cancelledRepoWriteResult<T>()
     operation.settle(result)
     return result
-  } catch (err) {
-    operation.settle({
-      ok: false,
-      message: err instanceof Error ? err.message : String(err),
-    })
-    throw err
-  } finally {
-    callerSignal?.removeEventListener('abort', onCallerAbort)
   }
+  operation.settle({
+    ok: false,
+    message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+  })
+  throw outcome.error
 }
 
 function createRepoWriteOperationContext(
   operation: RepoWriteOperationLifecycle,
   execution: RepoWriteExecutionCapability,
+  runtimeRegistration: WorkspaceRuntimeBoundaryRegistration | null,
   callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
@@ -423,17 +441,20 @@ function createRepoWriteOperationContext(
       return await runRepoWriteNetworkOperation(operation, task, callerSignal)
     },
     async runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>) {
-      let valid: boolean
-      try {
-        valid = await validateRepoWriteExecution(execution, callerSignal)
-      } catch (err) {
-        if (!callerSignal?.aborted) throw err
+      const validation = await observePromise(async () => await validateRepoWriteExecution(execution, callerSignal))
+      const admissionError = workspaceRuntimeRegistrationClosedError(runtimeRegistration)
+      if (admissionError) {
+        operation.settle({ ok: false, message: admissionError.message })
+        throw admissionError
+      }
+      if (callerSignal?.aborted) {
         operation.requestCancel('caller-abort')
         const result = cancelledRepoWriteResult<T>()
         operation.settle(result)
         return result
       }
-      if (!valid) {
+      if (!validation.ok) throw validation.error
+      if (!validation.value) {
         const result = { ok: false, message: 'error.repository-target-changed' } as T
         operation.settle(result)
         return result
@@ -451,28 +472,26 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
 ): Promise<T> {
   if (signal?.aborted) return cancelledRepoWriteResult()
   const runtimeRegistration = registerWorkspaceRuntime(repoId, operationInput.workspaceRuntimeId)
-  let execution: RepoWriteExecutionCapability
-  try {
-    execution =
-      operationInput.execution ??
-      (await captureRepoWriteExecution(
-        repoId,
-        operationInput.workspaceRuntimeId ? { workspaceRuntimeId: operationInput.workspaceRuntimeId } : undefined,
-        signal,
-      ))
-    assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
-  } catch (err) {
-    if (signal?.aborted) return cancelledRepoWriteResult()
-    throw err
-  }
+  const capture = await observePromise(async () =>
+    operationInput.captureExecution
+      ? await operationInput.captureExecution(signal)
+      : await captureRepoWriteExecution(
+          repoId,
+          operationInput.workspaceRuntimeId ? { workspaceRuntimeId: operationInput.workspaceRuntimeId } : undefined,
+          signal,
+        ),
+  )
+  assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
   if (signal?.aborted) return cancelledRepoWriteResult()
+  if (!capture.ok) throw capture.error
+  const execution = capture.value
   const group = bindRepoWriteBoundaryGroup(
     repoId,
     repoWriteExecutionBoundaryKey(execution),
     repoWriteExecutionCoordinationKey(execution),
   )
   const operation = beginRepoWriteOperation(group, operationInput)
-  const context = createRepoWriteOperationContext(operation, execution, signal)
+  const context = createRepoWriteOperationContext(operation, execution, runtimeRegistration, signal)
   let task: () => Promise<T>
   try {
     task = prepareTask(operation, context)
@@ -484,8 +503,12 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
     group,
     operation,
     async () => {
+      const admissionError = workspaceRuntimeRegistrationClosedError(runtimeRegistration)
+      if (admissionError) {
+        operation.settle({ ok: false, message: admissionError.message })
+        throw admissionError
+      }
       try {
-        assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
         return await task()
       } catch (err) {
         operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })

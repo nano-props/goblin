@@ -2,6 +2,7 @@ import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
+import { RepositoryTargetChangedError } from '#/server/modules/repository-target-changed-error.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
@@ -217,20 +218,6 @@ export async function runWithRepoSource<T>(
   return await task(await resolveRepoSource(cwd, runtime))
 }
 
-export async function runWithCapturedRepoSource<T>(
-  cwd: WorkspaceId,
-  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-  task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
-  runtime?: RepoSourceRuntimeContext,
-): Promise<T> {
-  const execution = physicalWorktreeExecutionBinding(physicalWorktreeCapability)
-  return await task(
-    execution.kind === 'remote'
-      ? await createRemoteRepoSource(cwd, execution.target, physicalWorktreeCapability, runtime)
-      : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability),
-  )
-}
-
 export async function resolveRepoSource(repoId: WorkspaceId, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator) throw new Error('error.workspace-locator-malformed')
@@ -309,6 +296,7 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
   signal?: AbortSignal,
 ): Promise<RepoWriteExecutionCapability> {
   const execution = physicalWorktreeExecutionBinding(physicalWorktreeCapability)
+  const capturedLocatorBoundary = await resolveRepoWriteBoundaryForLocator(repoId, runtime, signal)
   const boundary =
     execution.kind === 'remote'
       ? await resolveRemoteRepoWriteBoundaryForTarget(
@@ -317,16 +305,20 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
           runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
         )
       : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, signal)
+  const capturedLocatorRepositoryKey = repoWriteBoundaryRepositoryKey(capturedLocatorBoundary)
+  const capturedPhysicalRepositoryKey = repoWriteBoundaryRepositoryKey(boundary)
+  if (capturedLocatorRepositoryKey !== capturedPhysicalRepositoryKey) throw new RepositoryTargetChangedError()
   const source =
     execution.kind === 'remote'
       ? await createRemoteRepoSource(repoId, execution.target, physicalWorktreeCapability, runtime)
       : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability)
   const state: RepoWriteExecutionState = {
     coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
-    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
+    repositoryKey: capturedPhysicalRepositoryKey,
     source,
     async validate(validationSignal) {
       await validatePhysicalWorktreeExecution(physicalWorktreeCapability, validationSignal)
+      const currentLocatorBoundary = await resolveRepoWriteBoundaryForLocator(repoId, runtime, validationSignal)
       const currentBoundary =
         execution.kind === 'remote'
           ? await resolveRemoteRepoWriteBoundaryForTarget(
@@ -335,7 +327,10 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
               runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
             )
           : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, validationSignal)
-      return repoWriteBoundaryRepositoryKey(currentBoundary) === repoWriteBoundaryRepositoryKey(boundary)
+      return (
+        repoWriteBoundaryRepositoryKey(currentLocatorBoundary) === capturedLocatorRepositoryKey &&
+        repoWriteBoundaryRepositoryKey(currentBoundary) === capturedPhysicalRepositoryKey
+      )
     },
   }
   const capability = Object.freeze({}) as RepoWriteExecutionCapability
@@ -387,7 +382,10 @@ function repoWriteBoundaryCoordinationKey(boundary: RepoWriteBoundary): string {
 }
 
 function repoWriteBoundaryRepositoryKey(boundary: RepoWriteBoundary): string {
-  return JSON.stringify({ coordinationKey: repoWriteBoundaryCoordinationKey(boundary), generationKey: boundary.generationKey })
+  return JSON.stringify({
+    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
+    generationKey: boundary.generationKey,
+  })
 }
 
 /**
@@ -403,14 +401,14 @@ async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: Abort
   return (await resolveLocalRepoExecution(locator.path, signal)).boundary
 }
 
-async function resolveLocalRepoWriteBoundaryForPath(repoPath: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+async function resolveLocalRepoWriteBoundaryForPath(
+  repoPath: string,
+  signal?: AbortSignal,
+): Promise<RepoWriteBoundary> {
   return (await resolveLocalRepoExecution(repoPath, signal)).boundary
 }
 
-async function resolveLocalRepoExecution(
-  repoPath: string,
-  signal?: AbortSignal,
-): Promise<LocalRepoExecutionSnapshot> {
+async function resolveLocalRepoExecution(repoPath: string, signal?: AbortSignal): Promise<LocalRepoExecutionSnapshot> {
   try {
     const canonicalRepoPath = await fs.realpath(repoPath)
     signal?.throwIfAborted()
@@ -432,8 +430,23 @@ async function resolveLocalRepoExecution(
 }
 
 async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  const target = await resolveRemoteWorkspaceTarget(repoId, undefined, signal)
-  return await resolveRemoteRepoWriteBoundaryForTarget(target, signal)
+  return await resolveRepoWriteBoundaryForLocator(repoId, undefined, signal)
+}
+
+async function resolveRepoWriteBoundaryForLocator(
+  repoId: WorkspaceId,
+  runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
+): Promise<RepoWriteBoundary> {
+  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
+  if (!locator) throw new Error('error.workspace-locator-malformed')
+  if (locator.transport === 'file') return await resolveLocalRepoWriteBoundary(repoId, signal)
+  const target = await resolveRemoteWorkspaceTarget(repoId, runtime, signal)
+  return await resolveRemoteRepoWriteBoundaryForTarget(
+    target,
+    signal,
+    runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined,
+  )
 }
 
 async function resolveRemoteRepoWriteBoundaryForTarget(

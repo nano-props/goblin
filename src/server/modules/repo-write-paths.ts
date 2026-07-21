@@ -155,8 +155,9 @@ async function runUserNetworkMutation(
         canCancelUnderlying: true,
       },
       (_operation, context) => async () =>
-        await context.runWithRepoSource(async (source) =>
-          await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
+        await context.runWithRepoSource(
+          async (source) =>
+            await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
         ),
     ),
   )
@@ -189,7 +190,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
   kind: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   signal?: AbortSignal
-  execution?: RepoWriteExecutionCapability
+  captureExecution?: (signal?: AbortSignal) => Promise<RepoWriteExecutionCapability>
   task: (context: RepoWriteOperationContext) => Promise<T>
 }): Promise<T> {
   return await enqueueRepoWriteOperation(
@@ -202,7 +203,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       source: 'user',
       target: options.target,
       canCancelUnderlying: !!options.signal,
-      execution: options.execution,
+      captureExecution: options.captureExecution,
     },
     (operation, context) => {
       const onAbort = () => {
@@ -376,19 +377,13 @@ export async function createRepoWorktree(
     target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
     signal,
     task: async (context) => {
-      return await context.runWithRepoSource(
-        async (source) => {
-          const result = await source.createWorktree(normalized, signal, {
-            worktreeBootstrap,
-          })
-          const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(
-            repoId,
-            worktreeBootstrap,
-            result,
-          )
-          return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
-        },
-      )
+      return await context.runWithRepoSource(async (source) => {
+        const result = await source.createWorktree(normalized, signal, {
+          worktreeBootstrap,
+        })
+        const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
+        return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
+      })
     },
   })
 }
@@ -444,28 +439,11 @@ export async function deleteRepoBranch(
     target: { branch },
     signal,
     task: async (context) => {
-      return await context.runWithRepoSource(
-        async (source) => {
-          return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
-        },
-      )
+      return await context.runWithRepoSource(async (source) => {
+        return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
+      })
     },
   })
-}
-
-export async function removeRepoWorktree(
-  cwd: WorkspaceId,
-  input: {
-    branch: string
-    worktreePath: string
-    deleteBranch: boolean
-    forceDeleteBranch?: boolean
-    deleteUpstream?: boolean
-  },
-  lifecycle: RepoWorktreeRemovalLifecycle,
-  signal?: AbortSignal,
-): Promise<ExecResult> {
-  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, null)
 }
 
 export async function removeCapturedRepoWorktree(
@@ -496,24 +474,22 @@ async function removeRepoWorktreeWithBinding(
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal: AbortSignal | undefined,
-  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const execution = physicalWorktreeCapability
-    ? await captureRepoWriteExecutionFromPhysicalWorktree(
-        cwd,
-        physicalWorktreeCapability,
-        options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-        signal,
-      )
-    : undefined
   return await runRepoServerWriteOperation({
     repoId: cwd,
     workspaceRuntimeId: options.workspaceRuntimeId,
     kind: 'remove-worktree',
     target: { branch: input.branch, worktreePath: input.worktreePath },
     signal,
-    execution,
+    captureExecution: async (captureSignal) =>
+      await captureRepoWriteExecutionFromPhysicalWorktree(
+        cwd,
+        physicalWorktreeCapability,
+        options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
+        captureSignal,
+      ),
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
         const mutation = await source.removeWorktree(input, signal, lifecycle)

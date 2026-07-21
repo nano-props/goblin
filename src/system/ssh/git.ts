@@ -676,15 +676,6 @@ export async function getRemoteRepoWorktreePaths(
   return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 }
 
-export async function getRemoteRepoWriteGroupPath(
-  target: RemoteWorkspaceTarget,
-  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<string | null> {
-  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
-  return worktrees.find((worktree) => worktree.isPrimary && !worktree.isBare)?.path ?? worktrees[0]?.path ?? null
-}
-
 export async function resolveRemoteRepoExecutionIdentity(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},

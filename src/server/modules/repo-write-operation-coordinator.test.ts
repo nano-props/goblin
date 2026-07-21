@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   enqueueRepoWriteOperation,
+  getRepoBoundaryLastFetchAt,
   listRepoWriteOperationsForRepo,
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
   resolveRepoWriteBoundaryForRead,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RepoWriteExecutionCapability } from '#/server/modules/repo-source.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -21,7 +23,10 @@ const mocks = vi.hoisted(() => ({
     async (workspaceId: WorkspaceId, _signal?: AbortSignal): Promise<string> => workspaceId,
   ),
   resolveRepoWriteBoundaryIdentity: vi.fn(
-    async (workspaceId: WorkspaceId, signal?: AbortSignal): Promise<{ coordinationKey: string; repositoryKey: string }> => {
+    async (
+      workspaceId: WorkspaceId,
+      signal?: AbortSignal,
+    ): Promise<{ coordinationKey: string; repositoryKey: string }> => {
       const key = await mocks.resolveRepoWriteBoundaryKey(workspaceId, signal)
       return { coordinationKey: key, repositoryKey: key }
     },
@@ -29,8 +34,7 @@ const mocks = vi.hoisted(() => ({
   publishRepoQueryInvalidation: vi.fn(),
   validateRepoWriteExecution: vi.fn(async (_execution: unknown, _signal?: AbortSignal) => true),
   workspaceRuntimeClosed: null as
-    | ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void)
-    | null,
+    ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
@@ -40,10 +44,8 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
   repoWriteExecutionBoundaryKey: (capability: { repositoryKey: string }) => capability.repositoryKey,
   repoWriteExecutionCoordinationKey: (capability: { coordinationKey: string }) => capability.coordinationKey,
   resolveRepoWriteBoundaryIdentity: mocks.resolveRepoWriteBoundaryIdentity,
-  runWithCapturedRepoWriteExecution: async (
-    _capability: unknown,
-    task: (source: object) => Promise<unknown>,
-  ) => await task({}),
+  runWithCapturedRepoWriteExecution: async (_capability: unknown, task: (source: object) => Promise<unknown>) =>
+    await task({}),
   validateRepoWriteExecution: mocks.validateRepoWriteExecution,
 }))
 
@@ -192,6 +194,94 @@ describe('repo write operation coordinator', () => {
       registeredRepoIds: 0,
       queuedOperations: 0,
       runningOperations: 0,
+    })
+  })
+
+  test('registers runtime admission before a specialized execution capture starts', async () => {
+    const capture = Promise.withResolvers<RepoWriteExecutionCapability>()
+    const task = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'remove-worktree',
+        source: 'user',
+        captureExecution: async () => await capture.promise,
+      },
+      () => task,
+    )
+
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+    capture.resolve({
+      coordinationKey: WORKSPACE_BOUNDARY_KEY,
+      repositoryKey: WORKSPACE_BOUNDARY_KEY,
+    } as unknown as RepoWriteExecutionCapability)
+
+    await expect(work).rejects.toThrow('error.workspace-runtime-stale')
+    expect(task).not.toHaveBeenCalled()
+    expect(repoWriteOperationCoordinatorStatsForTests()).toEqual({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+      registeredRepoIds: 0,
+      queuedOperations: 0,
+      runningOperations: 0,
+    })
+  })
+
+  test('keeps runtime closure authoritative when specialized execution capture also fails', async () => {
+    const capture = Promise.withResolvers<RepoWriteExecutionCapability>()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'remove-worktree',
+        source: 'user',
+        captureExecution: async () => await capture.promise,
+      },
+      () => async () => ({ ok: true, message: 'unexpected' }),
+    )
+
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+    capture.reject(new Error('capture failed'))
+
+    await expect(work).rejects.toThrow('error.workspace-runtime-stale')
+    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+      registeredRepoIds: 0,
+    })
+  })
+
+  test('keeps runtime closure authoritative when it also aborts specialized capture', async () => {
+    const captureSignal = new AbortController()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      captureSignal.signal,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'remove-worktree',
+        source: 'user',
+        captureExecution: async (signal) =>
+          await new Promise<RepoWriteExecutionCapability>((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+          }),
+      },
+      () => async () => ({ ok: true, message: 'unexpected' }),
+    )
+
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+    captureSignal.abort(new Error('error.workspace-runtime-stale'))
+
+    await expect(work).rejects.toThrow('error.workspace-runtime-stale')
+    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+      registeredRepoIds: 0,
     })
   })
 
@@ -587,6 +677,95 @@ describe('repo write operation coordinator', () => {
     ])
   })
 
+  test('returns cancellation when a running network operation rejects on abort', async () => {
+    const caller = new AbortController()
+    const taskStarted = Promise.withResolvers<void>()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
+          (signal) =>
+            new Promise<{ ok: true; message: string }>((_resolve, reject) => {
+              taskStarted.resolve()
+              signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+            }),
+        ),
+    )
+
+    await taskStarted.promise
+    caller.abort(new Error('client disconnected'))
+
+    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toMatchObject([
+      {
+        kind: 'fetch',
+        phase: 'failed',
+        cancellation: {
+          underlyingRequested: true,
+          reason: 'caller-abort',
+        },
+        error: {
+          message: 'cancelled',
+          reason: 'caller-abort',
+        },
+      },
+    ])
+  })
+
+  test('retains the write lease until an aborted network operation has drained', async () => {
+    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
+    const caller = new AbortController()
+    const firstStarted = Promise.withResolvers<void>()
+    const releaseFirst = Promise.withResolvers<void>()
+    const secondTask = vi.fn(async () => ({ ok: true, message: 'second complete' }))
+    const first = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(async () => {
+          firstStarted.resolve()
+          await releaseFirst.promise
+          return { ok: true, message: 'first drained' }
+        }),
+    )
+
+    await firstStarted.promise
+    caller.abort(new Error('client disconnected'))
+    const second = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        const result = await secondTask()
+        operation.settle(result)
+        return result
+      },
+    )
+
+    await Promise.resolve()
+    expect(secondTask).not.toHaveBeenCalled()
+
+    releaseFirst.resolve()
+    await expect(first).resolves.toEqual({ ok: true, message: 'first drained' })
+    await expect(second).resolves.toEqual({ ok: true, message: 'second complete' })
+    expect(secondTask).toHaveBeenCalledOnce()
+    expect(getRepoBoundaryLastFetchAt(boundary)).not.toBeNull()
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'fetch',
+          phase: 'done',
+          cancellation: expect.objectContaining({ underlyingRequested: true, reason: 'caller-abort' }),
+          error: null,
+        }),
+      ]),
+    )
+  })
+
   test('records caller cancellation while validating a captured execution', async () => {
     const caller = new AbortController()
     const validationStarted = Promise.withResolvers<void>()
@@ -618,6 +797,86 @@ describe('repo write operation coordinator', () => {
         error: { message: 'cancelled', reason: 'caller-abort' },
       },
     ])
+  })
+
+  test('keeps runtime closure authoritative while validating captured execution', async () => {
+    const caller = new AbortController()
+    const validationStarted = Promise.withResolvers<void>()
+    mocks.validateRepoWriteExecution.mockImplementation(
+      async (_execution: unknown, signal?: AbortSignal) =>
+        await new Promise<boolean>((_resolve, reject) => {
+          validationStarted.resolve()
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+        }),
+    )
+    const sourceTask = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'remove-worktree',
+        source: 'user',
+      },
+      (operation, context) => async () => {
+        operation.start()
+        return await context.runWithRepoSource(sourceTask)
+      },
+    )
+
+    await validationStarted.promise
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+    caller.abort(new Error('error.workspace-runtime-stale'))
+
+    await expect(work).rejects.toThrow('error.workspace-runtime-stale')
+    expect(sourceTask).not.toHaveBeenCalled()
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'remove-worktree',
+          phase: 'failed',
+          error: expect.objectContaining({ message: 'error.workspace-runtime-stale' }),
+        }),
+      ]),
+    )
+  })
+
+  test('preserves an execution failure after runtime admission has completed', async () => {
+    const taskStarted = Promise.withResolvers<void>()
+    const taskResult = Promise.withResolvers<{ ok: true; message: string }>()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'remove-worktree',
+        source: 'user',
+      },
+      (operation, context) => async () => {
+        operation.start()
+        return await context.runWithRepoSource(async () => {
+          taskStarted.resolve()
+          return await taskResult.promise
+        })
+      },
+    )
+
+    await taskStarted.promise
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+    taskResult.reject(new Error('disk failure'))
+
+    await expect(work).rejects.toThrow('disk failure')
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'remove-worktree',
+          phase: 'failed',
+          error: expect.objectContaining({ message: 'disk failure' }),
+        }),
+      ]),
+    )
   })
 
   test('rejects a queued write when its workspace runtime closes before execution', async () => {
