@@ -5,11 +5,8 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  repoWorktreeStatusQueryKey,
-  repoProjectionQueryKey,
-  setRepoProjectionQueryData,
-} from '#/web/repo-data-query.ts'
+import { repoWorktreeStatusQueryKey, repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -175,9 +172,9 @@ describe('WorkspaceDashboardPane', () => {
 
     const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
     await vi.waitFor(() =>
-      expect(primaryWindowQueryClient.getQueryCache().find({ queryKey: statusQueryKey, exact: true })?.getObserversCount()).toBe(
-        1,
-      ),
+      expect(
+        primaryWindowQueryClient.getQueryCache().find({ queryKey: statusQueryKey, exact: true })?.getObserversCount(),
+      ).toBe(1),
     )
     await primaryWindowQueryClient.invalidateQueries({
       queryKey: statusQueryKey,

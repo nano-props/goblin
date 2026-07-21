@@ -9,7 +9,7 @@ import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-u
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

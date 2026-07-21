@@ -17,7 +17,7 @@ import {
 } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { restoredWorkspaceIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { updateWorkspaceRuntimeCache } from '#/web/workspace-runtime-query.ts'
-import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { seedRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'

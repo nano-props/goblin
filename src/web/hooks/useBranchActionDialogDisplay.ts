@@ -76,7 +76,7 @@ import type { RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/ty
 import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 type BranchActionDialogRepo = Omit<BranchActionRepo, 'branchModel'> & {

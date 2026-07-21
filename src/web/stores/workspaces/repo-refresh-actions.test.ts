@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoDataQueryKey } from '#/web/repo-data-query.ts'
+import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

@@ -3,32 +3,31 @@ import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
-const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+import { repoOperationsQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   getRepoWorktreeStatusQueryData,
-  invalidateRepoOperationsQueries,
-  invalidateRepoSnapshotQueries,
-  invalidateRepoWorktreeSnapshotQueries,
-  repoOperationsQueryKey,
-  repoProjectionQueryOptions,
-  repoProjectionQueryKey,
-  repoWorktreeStatusQueryKey,
-  repoWorktreeStatusQueryOptions,
-  refreshRepoProjectionReadModel,
-  refreshRepoWorktreeStatusReadModel,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
   setRepoWorktreeStatusQueryData,
+} from '#/web/repo-query-cache.ts'
+import {
   useRepoOperationsReadModel,
   useRepoLogQuery,
   useRepoRemoteBranchesQuery,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-data-query.ts'
+} from '#/web/repo-queries.ts'
+import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
+import {
+  invalidateRepoOperationsQueries,
+  invalidateRepoSnapshotQueries,
+  invalidateRepoWorktreeSnapshotQueries,
+  refreshRepoProjectionReadModel,
+  refreshRepoWorktreeStatusReadModel,
+} from '#/web/repo-query-runtime.ts'
 import type {
   PullRequestEntry,
   RepoOperationsSnapshot,
@@ -36,6 +35,8 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
@@ -55,7 +56,7 @@ beforeEach(() => {
   repoClientMocks.getRepoWorktreeStatus.mockReset()
 })
 
-describe('repo data query keys', () => {
+describe('repo query keys', () => {
   test('separates projection branch and fetch mode', () => {
     expect(repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'summary')).not.toEqual(
       repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'full'),

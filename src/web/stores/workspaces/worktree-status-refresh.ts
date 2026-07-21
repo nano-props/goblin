@@ -1,4 +1,4 @@
-import { refreshRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import { refreshRepoWorktreeStatusReadModel } from '#/web/repo-query-runtime.ts'
 import { refreshStatusLog } from '#/web/logger.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { isExpectedRepoOperationCancellation } from '#/web/stores/workspaces/operation-cancellation.ts'

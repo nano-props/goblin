@@ -204,7 +204,11 @@ It also shows a feature where a separate source layer makes sense.
 ### Repos
 
 - boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
-- read: `src/web/stores/workspaces/refresh.ts` (read-side refresh orchestration)
+- query identity: `src/web/repo-query-keys.ts`
+- cache projection: `src/web/repo-query-cache.ts`
+- read options and React bindings: `src/web/repo-query-options.ts`, `src/web/repo-queries.ts`
+- runtime read coordination: `src/web/repo-query-runtime.ts`
+- store refresh application: `src/web/stores/workspaces/refresh.ts`
 - write: `src/web/stores/workspaces/workspace-session-write-paths.ts`, `src/web/stores/workspaces/branch-actions.ts`
 - server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
 - source: `src/server/modules/repo-source.ts`

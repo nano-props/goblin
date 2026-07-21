@@ -25,7 +25,7 @@ import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.
 import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
+import { useRepoRemoteBranchesQuery } from '#/web/repo-queries.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {

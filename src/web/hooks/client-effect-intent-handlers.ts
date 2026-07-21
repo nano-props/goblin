@@ -32,7 +32,7 @@ import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { getRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { dispatchShowWorkspacePaneTerminalRouteAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import {
@@ -74,7 +74,8 @@ export function handleTerminalBellClickIntent(
 ): void {
   const workspaceId = terminalSessionCoordinates(event.session).workspaceId
   const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
-  const branchModel = workspace && event.session.target.kind === 'git-worktree' ? readRepoBranchQueryProjection(workspace) : null
+  const branchModel =
+    workspace && event.session.target.kind === 'git-worktree' ? readRepoBranchQueryProjection(workspace) : null
   const plan = createTerminalBellIntentPlan(workspace, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()

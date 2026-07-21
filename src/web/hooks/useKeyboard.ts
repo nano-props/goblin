@@ -38,7 +38,7 @@ import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { getRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

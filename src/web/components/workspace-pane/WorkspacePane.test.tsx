@@ -41,11 +41,8 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  repoWorktreeStatusQueryKey,
-  setRepoProjectionQueryData,
-  setRepoWorktreeStatusQueryData,
-} from '#/web/repo-data-query.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-model.ts'

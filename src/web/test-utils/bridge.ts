@@ -36,7 +36,7 @@ import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
-import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import {
   readWorkspacePaneTabsForTarget,
   writeWorkspacePaneTabsSnapshotQueryData,

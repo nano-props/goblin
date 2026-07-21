@@ -31,7 +31,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

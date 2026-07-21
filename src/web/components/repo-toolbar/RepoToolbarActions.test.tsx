@@ -14,7 +14,7 @@ import {
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo')
