@@ -315,12 +315,15 @@ export async function readRepoOperationsSnapshot(
     workspaceRuntimeId: options.workspaceRuntimeId,
     includeSettled: options.includeSettled,
   })
-  const boundary = cwd ? await resolveRepoWriteBoundaryForRead(cwd, options.signal) : null
-  const writeOperations =
-    cwd && boundary
-      ? listRepoWriteOperationsForBoundary(cwd, boundary, options)
-      : await listRepoWriteOperationsForRepo(cwd, options)
-  const lastFetchAt = boundary ? getRepoBoundaryLastFetchAt(boundary) : null
+  let writeOperations: RepoServerOperationState[]
+  let lastFetchAt: number | null = null
+  if (cwd) {
+    const boundary = await resolveRepoWriteBoundaryForRead(cwd, options.signal)
+    writeOperations = listRepoWriteOperationsForBoundary(cwd, boundary, options)
+    lastFetchAt = getRepoBoundaryLastFetchAt(boundary)
+  } else {
+    writeOperations = await listRepoWriteOperationsForRepo(undefined, options)
+  }
   return {
     operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
     lastFetchAt,

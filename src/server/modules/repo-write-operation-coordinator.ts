@@ -21,8 +21,6 @@ import type {
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-type RepoWriteOperationQueue = PQueue
-
 export interface RepoWriteOperationLifecycle {
   id: string
   start(): void
@@ -56,7 +54,7 @@ export interface RepoWriteBoundaryHandle {
 interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
   readonly descriptor: string
   repoIds: Set<WorkspaceId>
-  readonly queue: RepoWriteOperationQueue
+  readonly queue: PQueue
   operations: Map<string, RepoServerOperationState>
   activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
   lastSuccessfulFetchAt: number | null
@@ -392,9 +390,6 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   }
   if (signal?.aborted) return cancelledRepoWriteResult()
   const group = bindRepoWriteBoundaryGroup(repoId, repoWriteExecutionBoundaryKey(execution))
-  // A write is admitted only after its canonical physical boundary is known.
-  // Never create a queue from a locator fallback: an unresolved boundary must fail.
-  registerRepoWriteOperationBoundaryRepoId(group, repoId)
   const operation = beginRepoWriteOperation(group, operationInput)
   const context = createRepoWriteOperationContext(group, operation, execution, signal)
   let task: () => Promise<T>

@@ -373,12 +373,17 @@ async function resolveLocalRepoWriteBoundaryForPath(repoPath: string, signal?: A
 }
 
 async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  // Repository identity is a safety boundary. Reads and writes must fail when the
-  // canonical remote write group cannot be confirmed; a locator is not a physical identity.
   const target = await resolveRemoteWorkspaceTarget(repoId, undefined, signal)
   return await resolveRemoteRepoWriteBoundaryForTarget(target, signal)
 }
 
+/**
+ * Canonical repository identity is mandatory for every boundary-scoped read
+ * and write. A workspace locator describes user intent, not a physical
+ * repository, so never substitute the locator, a cached group, or a previous
+ * identity when resolution fails. Fail before observing state or admitting an
+ * operation instead.
+ */
 async function resolveRemoteRepoWriteBoundaryForTarget(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
