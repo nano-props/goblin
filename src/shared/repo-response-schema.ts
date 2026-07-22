@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
-import { RemoteTrackingBranchSchema } from '#/shared/worktree-create.ts'
+import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 
 const StringArraySchema = v.array(v.string())
 const NullableNumberSchema = v.nullable(v.number())
@@ -23,7 +23,7 @@ export const RepoLogResponseSchema = v.union([
   v.array(LogEntrySchema),
   v.strictObject({ ok: v.literal(false), message: v.string() }),
 ])
-export const RepoRemoteBranchesResponseSchema = v.array(RemoteTrackingBranchSchema)
+export const RepoRemoteBranchesResponseSchema = v.array(RemoteTrackingBranchIdentitySchema)
 
 const PullRequestSchema = v.strictObject({
   number: v.number(),

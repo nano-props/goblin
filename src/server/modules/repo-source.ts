@@ -78,7 +78,7 @@ import {
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
 import type { GitUpstream } from '#/system/git/upstream.ts'
-import type { RemoteTrackingBranch } from '#/shared/worktree-create.ts'
+import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import {
   isRemoteWorkspaceId,
@@ -142,7 +142,7 @@ export interface RepoSource {
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
   ): Promise<PullRequestEntry[] | null>
   getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
-  getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranch[]>
+  getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]>
   fetch(signal: AbortSignal): Promise<RepoMutationResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<RepoMutationResult>
   push(branch: string, signal?: AbortSignal): Promise<RepoMutationResult>
@@ -1050,8 +1050,8 @@ function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullReque
 }
 
 function hasRemoteTrackingBranch(
-  branches: readonly RemoteTrackingBranch[],
-  candidate: RemoteTrackingBranch,
+  branches: readonly RemoteTrackingBranchIdentity[],
+  candidate: RemoteTrackingBranchIdentity,
 ): boolean {
   return branches.some(
     (branch) =>

@@ -11,7 +11,7 @@ import { isResolvableRemotePathInput, type RemoteWorkspaceTarget } from '#/share
 import {
   deriveLocalBranchFromRemoteRef,
   type CreateWorktreeInput,
-  type RemoteTrackingBranch,
+  type RemoteTrackingBranchIdentity,
 } from '#/shared/worktree-create.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -26,7 +26,7 @@ interface CreateWorktreeFormState {
   remoteSelection: string
   localBranch: string
   worktreePath: string
-  remoteBranches: RemoteTrackingBranch[]
+  remoteBranches: RemoteTrackingBranchIdentity[]
 }
 
 export interface CreateWorktreeRequest {
@@ -34,7 +34,7 @@ export interface CreateWorktreeRequest {
 }
 
 interface CreateWorktreeDerived {
-  selectedRemote: RemoteTrackingBranch | null
+  selectedRemote: RemoteTrackingBranchIdentity | null
   selectedRemoteKey: string
   derivedLocalBranch: string
   trackLocalBranch: string
@@ -170,7 +170,7 @@ export function deriveCreateWorktreeForm(
   }
 }
 
-export function remoteTrackingBranchKey(remote: RemoteTrackingBranch): string {
+export function remoteTrackingBranchKey(remote: RemoteTrackingBranchIdentity): string {
   return JSON.stringify([remote.ref, remote.remote, remote.branch])
 }
 
@@ -184,7 +184,7 @@ function localWorkspacePath(workspaceId: WorkspaceId): string {
 
 interface BuildInputContext {
   branchTrimmed: string
-  selectedRemote: RemoteTrackingBranch | null
+  selectedRemote: RemoteTrackingBranchIdentity | null
   trackLocalBranch: string
   effectivePath: string
   validPath: boolean

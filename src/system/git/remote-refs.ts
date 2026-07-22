@@ -2,7 +2,7 @@ import { git, gitLookup } from '#/system/git/git-exec.ts'
 import {
   parseRemoteTrackingRefs,
   type RemoteFetchAuthority,
-  type RemoteTrackingBranch,
+  type RemoteTrackingBranchIdentity,
 } from '#/shared/worktree-create.ts'
 import { getRemotes } from '#/system/git/remote.ts'
 
@@ -11,7 +11,7 @@ import { getRemotes } from '#/system/git/remote.ts'
  *  `refs/remotes/` includes the symbolic `origin/HEAD` plus every branch
  *  the remote has; we run the list through `parseRemoteTrackingRefs` so
  *  the local and remote (`system/ssh/git.ts`) sides agree on the shape. */
-export async function getRemoteTrackingBranches(cwd: string, signal?: AbortSignal): Promise<RemoteTrackingBranch[]> {
+export async function getRemoteTrackingBranches(cwd: string, signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]> {
   const before = await readRemoteTrackingAuthority(cwd, signal)
   const branches = parseRemoteTrackingRefs(before.refs, before.remotes)
   const after = await readRemoteTrackingAuthority(cwd, signal)

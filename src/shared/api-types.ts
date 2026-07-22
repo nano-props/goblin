@@ -42,7 +42,7 @@ import type {
 } from '#/shared/remote-workspace.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
-import type { CreateWorktreeIpcInput, RemoteTrackingBranch } from '#/shared/worktree-create.ts'
+import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type {
@@ -479,7 +479,7 @@ export interface AppIpcHandlers {
       cwd: WorkspaceId
       workspaceRuntimeId: string
     }) => Promise<WorktreeBootstrapPreviewResult>
-    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RemoteTrackingBranch[]>
+    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RemoteTrackingBranchIdentity[]>
     pull: (input: {
       cwd: WorkspaceId
       workspaceRuntimeId: string

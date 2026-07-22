@@ -122,6 +122,17 @@ describe('worktree create helpers', () => {
     }])).toEqual([{ ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' }])
   })
 
+  test.each([
+    '+refs/pull/**/head:refs/remotes/origin-pr/*',
+    'refs/notes/*:refs/notes/**',
+    'refs/tags/..',
+  ])('rejects malformed positive refspecs even when they do not produce remote branches: %s', (spec) => {
+    expect(() => parseRemoteTrackingRefs('refs/remotes/origin/main\n', [{
+      name: 'origin',
+      fetchSpecs: ['+refs/heads/*:refs/remotes/origin/*', spec],
+    }])).toThrow('Invalid remote fetch refspec')
+  })
+
   test.each(['+^refs/heads/archive/*', '^refs/heads/archive/*:refs/remotes/origin/*', '^other/**', '^refs/heads/**'])(
     'rejects malformed negative fetch refspec %s',
     (spec) => {

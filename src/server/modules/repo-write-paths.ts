@@ -17,7 +17,7 @@ import {
   type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { RemoteTrackingBranch } from '#/shared/worktree-create.ts'
+import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
   enqueueRepoWriteOperation,
   type RepoWriteOperationContext,
@@ -417,7 +417,7 @@ async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
 export async function getRepoRemoteBranches(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
-): Promise<RemoteTrackingBranch[]> {
+): Promise<RemoteTrackingBranchIdentity[]> {
   if (!isValidWorkspaceLocatorInput(cwd)) return []
   return await runWithRepoSource(
     cwd,

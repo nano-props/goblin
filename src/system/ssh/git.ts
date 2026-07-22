@@ -51,7 +51,7 @@ import {
   parseRemoteTrackingRefs,
   type CreateWorktreeInput,
   type RemoteFetchAuthority,
-  type RemoteTrackingBranch,
+  type RemoteTrackingBranchIdentity,
 } from '#/shared/worktree-create.ts'
 import {
   compactWorktreeBootstrapPaths,
@@ -646,11 +646,11 @@ function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootstrapSumm
 export async function getRemoteTrackingBranches(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<RemoteTrackingBranch[]> {
+): Promise<RemoteTrackingBranchIdentity[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const before = await readRemoteTrackingAuthority(target, { signal: options.signal, run })
   options.signal?.throwIfAborted()
-  let branches: RemoteTrackingBranch[]
+  let branches: RemoteTrackingBranchIdentity[]
   try {
     branches = parseRemoteTrackingRefs(before.refs, before.remotes)
   } catch {
