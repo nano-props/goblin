@@ -8,7 +8,7 @@ import type {
 } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import type { CreateWorktreeInput, RemoteTrackingBranch } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
@@ -94,7 +94,7 @@ export async function getRepoRemoteBranches(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<RemoteTrackingBranch[]> {
   return await postServerJson(
     '/api/repo/remote-branches',
     { cwd, workspaceRuntimeId },

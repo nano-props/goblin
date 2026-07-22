@@ -4,11 +4,8 @@ import { chmod, mkdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execa, ExecaError } from 'execa'
-import {
-  FOR_EACH_REF_FIELD_SEP,
-  PRETTY_FIELD_SEP,
-  WORKTREE_STATUS_BATCH_BOUNDARY,
-} from '#/system/git/parsers.ts'
+import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP } from '#/system/git/parsers.ts'
+import { GIT_UPSTREAM_FORMAT } from '#/system/git/upstream.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
@@ -57,7 +54,6 @@ function ensureControlDir(): Promise<void> {
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
-export const REMOTE_PANE_WORKTREES_MARKER = '__GOBLIN_REMOTE_PANE_WORKTREES__'
 
 export type RemoteCommandKind =
   | { type: 'printHome' }
@@ -72,10 +68,9 @@ export type RemoteCommandKind =
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'resolveRepoExecutionIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
-  | { type: 'gitWorkspacePaneIdentities'; path: string }
+  | { type: 'gitLocalBranches'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
-  | { type: 'gitWorktreeListAndStatus'; path: string }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
   | { type: 'gitFetchAll'; path: string }
@@ -87,6 +82,7 @@ export type RemoteCommandKind =
   | { type: 'gitPush'; path: string; remote: string; branch: string; targetBranch: string; setUpstream: boolean }
   | { type: 'gitPushDeleteBranch'; path: string; remote: string; branch: string }
   | { type: 'gitRemoteBranches'; path: string }
+  | { type: 'gitRemoteFetchSpecs'; path: string; remote: string }
   | { type: 'gitWorktreeAdd'; path: string; input: CreateWorktreeInput }
   | { type: 'gitWorktreeRemove'; path: string; worktreePath: string }
   | { type: 'trashFile'; path: string; filePath: string }
@@ -450,15 +446,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `git -C ${repo} for-each-ref --format=${shellQuote(branchFormat)} refs/heads/`,
       ].join('\n')
     }
-    case 'gitWorkspacePaneIdentities': {
-      const repo = shellQuote(command.path)
-      return [
-        'set -e',
-        `git -C ${repo} for-each-ref --format=${shellQuote('branch %(refname:short)')} refs/heads/`,
-        `printf '%s\\n' ${shellQuote(REMOTE_PANE_WORKTREES_MARKER)}`,
-        `git -C ${repo} worktree list --porcelain`,
-      ].join('\n')
-    }
+    case 'gitLocalBranches':
+      return `git -C ${shellQuote(command.path)} for-each-ref --format=${shellQuote('%(refname:short)')} refs/heads/`
     case 'gitPatch':
       return `git -C ${shellQuote(command.path)} diff HEAD --binary`
     case 'gitStatusAll':
@@ -470,180 +459,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '[ "$code" -eq 0 ] || [ "$code" -eq 1 ]',
       ].join('; ')
     case 'gitWorktreeList':
-      return `git -C ${shellQuote(command.path)} worktree list --porcelain`
-    case 'gitWorktreeListAndStatus': {
-      // One SSH call that returns BOTH:
-      //   (a) the worktree list, parsable by parseWorktrees; and
-      //   (b) per-worktree status output, NUL-batched below the
-      //       boundary marker.
-      //
-      // Output shape:
-      //   <git worktree list --porcelain, blocks separated by blank lines>
-      //   \n__GOBLIN_WT_BATCH_BOUNDARY__\n
-      //   <wt1_path>\0<status records, NUL-separated>\0
-      //   <wt2_path>\0<status records>\0
-      //   ...
-      //
-      // Each per-worktree section begins with a NUL-terminated path
-      // and ends with an extra NUL (an empty NUL record), so the
-      // parser can walk NUL-split records without needing line
-      // boundaries -- important because `git status -z` paths can
-      // contain literal newlines when paths with newlines are quoted.
-      // The boundary is on its own line in the worktree-list stream;
-      // `splitWorktreeStatusBatch` searches for `\n<marker>\n`. Every
-      // line in `git worktree list --porcelain` is prefixed by a
-      // keyword (`worktree`, `HEAD`, `branch`, `detached`, `bare`,
-      // `locked`) so the marker text can never appear as a
-      // legitimate standalone line.
-      //
-      // Bare worktrees (the bare flag in their porcelain block) are
-      // skipped in the status stream so the parser does not have to
-      // deal with `git status` failing in a bare repo. The full list
-      // above the boundary still includes bare entries, which the
-      // caller needs for `parseWorktrees` (it sets `isBare`).
-      const repo = shellQuote(command.path)
-      return [
-        // Capture the worktree list once and require that authoritative
-        // membership read to succeed. Reusing the captured file keeps the
-        // emitted list and the generated status jobs on the same projection.
-        `WT_TMPDIR=$(mktemp -d)`,
-        `export WT_TMPDIR`,
-        `trap 'rm -rf "$WT_TMPDIR"' EXIT`,
-        `if ! git -C ${repo} worktree list --porcelain > "$WT_TMPDIR/worktrees"; then exit 1; fi`,
-        `cat "$WT_TMPDIR/worktrees"`,
-        // Emit the boundary marker on its own line. printf format
-        // `\n%s\n` puts newlines around the single-quoted marker
-        // text. The marker is plain ASCII -- no RS bytes or other
-        // shell-fragile quoting required -- so the line below is
-        // exactly what the remote shell will execute.
-        `printf '\\n%s\\n' '${WORKTREE_STATUS_BATCH_BOUNDARY}'`,
-        // Parallel per-worktree `git status`, fanned out via
-        // xargs -P 8. Each worker writes its NUL section to an
-        // indexed file in a per-session tmpdir; the final loop
-        // concatenates files in the original worktree-list order
-        // so the parser walks sections deterministically. Index
-        // names are zero-padded so plain glob order is also
-        // numeric order.
-        //
-        // The previous sequential `while read -r wt; do ...; done`
-        // was a perf regression (F5): wall time scaled as N *
-        // per-status-time instead of ceil(N/8) * per-status-time.
-        // On a repo with 12 worktrees that is a ~6x slowdown.
-        // Build a jobs file. Each line is one worktree:
-        //   "<idx>\t<path>\n"
-        // (TAB-separated). The original shape used a NUL separator
-        // between idx and path with `xargs -n2`, which silently
-        // dropped the trailing single record on odd job counts
-        // under GNU xargs with `-x` (G1). Switching to a TAB-
-        // separated line keeps the protocol line-based. idx is always
-        // five digits, so the worker can split the line with POSIX
-        // parameter expansion instead of shell-specific TAB escapes.
-        //
-        // idx is a zero-padded integer (printf %05d -- five chars
-        // wide so plain glob order is also numeric order up to
-        // 99,999 worktrees).
-        //
-        // The awk splits the porcelain output on blank-line blocks
-        // (RS="") so we can inspect each worktree block as a single
-        // record and skip blocks containing a bare or prunable marker. Paths
-        // registered with relative arguments are passed through
-        // verbatim; the worker resolves them via
-        // `git rev-parse --show-toplevel`.
-        //
-        // TAB is the field separator. POSIX paths are technically
-        // allowed to contain TAB, but in practice users never
-        // register worktree paths with one; if they ever do, the
-        // script will silently produce an incorrect split --
-        // acceptable because this script runs only on hosts that
-        // already accept worktree paths, and the rest of the
-        // system treats them as opaque strings.
-        `awk -v RS= 'BEGIN { idx = 0 }`,
-        `  /(^|\\n)bare(\\n|$)/ { next }`,
-        `  /(^|\\n)prunable([ \\t]|\\n|$)/ { next }`,
-        `  match($0, /^worktree[ \\t]+/) {`,
-        `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
-        `    if (p != "") { idx++; printf "%05d\\t%s\\n", idx, p }`,
-        `  }' "$WT_TMPDIR/worktrees" > "$WT_TMPDIR/jobs"`,
-        // Fan out workers as POSIX shell background processes (F5). The
-        // previous `xargs -I {} -P 8` shape worked under GNU xargs
-        // but broke in two ways:
-        //   - `xargs -I {}` collapses runs of whitespace in the
-        //     input line (it treats the line as whitespace-separated
-        //     tokens), so the TAB inside our `<idx>\t<path>` jobs
-        //     gets replaced with a space. The worker then sees the
-        //     whole line as one field and IFS splitting is a no-op.
-        //   - `xargs -n2` against a NUL-delimited stream silently
-        //     drops the trailing single record on odd job counts
-        //     under GNU xargs with `-x` (G1).
-        // Background processes avoid both traps: `read` consumes the
-        // whole line and POSIX parameter expansion separates the fixed
-        // width idx from the path. Parallelism is bounded by a simple
-        // FIFO pid queue instead of an external tool. We also get
-        // ordered output for free by writing each section to its
-        // `<idx>.out` file -- the final concat loop reads in glob order,
-        // which is numeric order thanks to zero-padding.
-        //
-        // Semaphore: cap the in-flight count at 8 by waiting for the
-        // oldest tracked pid before launching another worker. This
-        // keeps the script compatible with the `sh -lc` invocation:
-        // no Bash-only `$'...'`, no Bash 4.3+ `wait -n`, no GNU xargs.
-        `pending=0`,
-        `max_in_flight=8`,
-        `pids=`,
-        `while IFS= read -r job; do`,
-        `  idx=\${job%%	*}`,
-        `  wt=\${job#*	}`,
-        // Wait for the oldest tracked worker when the queue reaches the
-        // concurrency cap. We intentionally wait by pid instead of using
-        // `wait -n` so the script runs under POSIX `sh`.
-        `  while [ "$pending" -ge "$max_in_flight" ]; do`,
-        `    first_pid=\${pids%% *}`,
-        `    if [ "$first_pid" = "$pids" ]; then`,
-        `      pids=`,
-        `    else`,
-        `      pids=\${pids#* }`,
-        `    fi`,
-        `    wait "$first_pid" 2>/dev/null || true`,
-        `    pending=$((pending - 1))`,
-        `  done`,
-        `  (`,
-        // Each worker builds its NUL section in <tmpdir>/<idx>.tmp and
-        // publishes <idx>.out only after `git status` succeeds.
-        // A worktree the script cannot enter also produces no published
-        // section, so the complete-read parser rejects the response.
-        `    if ! cd "$wt" 2>/dev/null; then exit 0; fi`,
-        `    abs=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0`,
-        `    tmp="$WT_TMPDIR/$idx.tmp"`,
-        `    out="$WT_TMPDIR/$idx.out"`,
-        `    printf "%s\\0" "$abs" > "$tmp"`,
-        `    if ! git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$tmp"; then rm -f "$tmp"; exit 0; fi`,
-        `    printf "\\0" >> "$tmp"`,
-        `    mv "$tmp" "$out"`,
-        `  ) &`,
-        `  pid=$!`,
-        `  if [ -n "$pids" ]; then`,
-        `    pids="$pids $pid"`,
-        `  else`,
-        `    pids="$pid"`,
-        `  fi`,
-        `  pending=$((pending + 1))`,
-        `done < "$WT_TMPDIR/jobs"`,
-        `for pid in $pids; do`,
-        `  wait "$pid" 2>/dev/null || true`,
-        `done`,
-        // Concatenate in index order. Any worker failure leaves no .out
-        // file, which the complete-read parser rejects as a missing section.
-        // A bare-only repository legitimately has no output files, so the
-        // loop must still finish successfully in that case.
-        `for f in "$WT_TMPDIR"/*.out; do`,
-        `  [ -f "$f" ] || continue`,
-        `  cat "$f" || exit 1`,
-        `done`,
-        // A terminal NUL makes even a bare-only status stream complete and
-        // prevents stdout adapters from stripping the marker's final newline.
-        `printf "\\0"`,
-      ].join('\n')
-    }
+      return `git -C ${shellQuote(command.path)} worktree list --porcelain -z`
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {
@@ -685,7 +501,13 @@ function scriptForCommand(command: RemoteCommandKind): string {
         command.branch,
       )}`
     case 'gitRemoteBranches':
-      return `git -C ${shellQuote(command.path)} for-each-ref ${shellQuote('--format=%(refname:short)')} refs/remotes/`
+      return `git -C ${shellQuote(command.path)} for-each-ref ${shellQuote('--format=%(refname)')} refs/remotes/`
+    case 'gitRemoteFetchSpecs':
+      return [
+        `git -C ${shellQuote(command.path)} config --get-all -- ${shellQuote(`remote.${command.remote}.fetch`)}`,
+        'code=$?',
+        '[ "$code" -eq 0 ] || [ "$code" -eq 1 ]',
+      ].join('; ')
     case 'gitWorktreeAdd':
       return `git -C ${shellQuote(command.path)} worktree add ${remoteWorktreeAddArgs(command.input)}`
     case 'gitWorktreeRemove':
@@ -697,7 +519,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitBranchDelete':
       return `git -C ${shellQuote(command.path)} branch ${command.force ? '-D' : '-d'} -- ${shellQuote(command.branch)}`
     case 'gitUpstream':
-      return `git -C ${shellQuote(command.path)} for-each-ref --format=${shellQuote('%(upstream:short)')} ${shellQuote(`refs/heads/${command.branch}`)}`
+      return `git -C ${shellQuote(command.path)} for-each-ref --format=${shellQuote(GIT_UPSTREAM_FORMAT)} ${shellQuote(`refs/heads/${command.branch}`)}`
     case 'gitIsAncestor':
       return [
         `git -C ${shellQuote(command.path)} merge-base --is-ancestor -- ${shellQuote(command.ancestor)} ${shellQuote(command.descendant)}`,
@@ -897,7 +719,7 @@ function remoteWorktreeAddArgs(input: CreateWorktreeInput): string {
         '--track',
         '--',
         shellQuote(input.worktreePath),
-        shellQuote(input.mode.remoteRef),
+        shellQuote(input.mode.remote.ref),
       ].join(' ')
   }
   const exhaustive: never = input.mode

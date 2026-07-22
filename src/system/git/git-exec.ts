@@ -67,6 +67,16 @@ export async function git(cwd: string, args: string[], opts?: GitOptions): Promi
   }
 }
 
+/** Git lookup commands use exit 1 to mean "no matching values". */
+export async function gitLookup(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+  try {
+    return await git(cwd, args, opts)
+  } catch (error) {
+    if (error instanceof ExecaError && error.exitCode === 1) return ''
+    throw error
+  }
+}
+
 /** Decode execa's stable cancellation field without relying on JS realm identity. */
 function isProcessCancellation(error: unknown): error is { isCanceled: true } {
   return typeof error === 'object' && error !== null && 'isCanceled' in error && error.isCanceled === true

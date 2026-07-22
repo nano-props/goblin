@@ -30,6 +30,9 @@ const mocks = vi.hoisted(() => {
     getAppPath: vi.fn(() => '/app'),
     exit: vi.fn(),
     quit: vi.fn(),
+    showErrorBox: vi.fn(),
+    startEmbeddedServer: vi.fn(() => Promise.resolve()),
+    stopEmbeddedServer: vi.fn(() => Promise.resolve()),
     whenReady: vi.fn(() => whenReadyPromise),
     activatePrimaryWindow: vi.fn(() => Promise.resolve({})),
     assertDictionaryParity: vi.fn(),
@@ -75,7 +78,7 @@ vi.mock('electron', () => ({
     whenReady: mocks.whenReady,
   },
   dialog: {
-    showErrorBox: vi.fn(),
+    showErrorBox: mocks.showErrorBox,
   },
   // wireNativeHostIpc() registers IPC handlers; the test never reads
   // from them but the calls must not throw, so we expose a no-op ipcMain.
@@ -149,8 +152,8 @@ vi.mock('#/main/settings-server-client.ts', () => ({
 }))
 
 vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
-  startEmbeddedServer: vi.fn(() => Promise.resolve()),
-  stopEmbeddedServer: vi.fn(() => Promise.resolve()),
+  startEmbeddedServer: mocks.startEmbeddedServer,
+  stopEmbeddedServer: mocks.stopEmbeddedServer,
 }))
 
 vi.mock('#/main/access-token-ipc.ts', () => ({
@@ -179,10 +182,14 @@ describe('native host startup lifecycle', () => {
     mocks.isTrustedIpcEvent.mockReturnValue(true)
     mocks.resetReady()
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
+    mocks.startEmbeddedServer.mockResolvedValue()
+    mocks.stopEmbeddedServer.mockResolvedValue()
   })
 
   test('flushes settings and shortcut cleanup before exiting', async () => {
     await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
 
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
@@ -206,6 +213,8 @@ describe('native host startup lifecycle', () => {
 
   test('does not wait for timeout when the client quit drain reports failure', async () => {
     await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
 
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
@@ -228,6 +237,8 @@ describe('native host startup lifecycle', () => {
 
   test('ignores untrusted client quit drain acknowledgements', async () => {
     await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
 
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
@@ -281,6 +292,61 @@ describe('native host startup lifecycle', () => {
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
     expect(mocks.handlers.get('activate')).toBeUndefined()
+  })
+
+  test('exits with failure and skips client drain when startup fails before activation', async () => {
+    mocks.getSettingsSnapshot.mockRejectedValueOnce(new Error('settings unavailable'))
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+
+    await vi.waitFor(() => expect(mocks.quit).toHaveBeenCalledTimes(1))
+    await emit('before-quit', { preventDefault: vi.fn() })
+
+    expect(mocks.showErrorBox).toHaveBeenCalledTimes(1)
+    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalled()
+    expect(mocks.flushWindowState).not.toHaveBeenCalled()
+    expect(mocks.timeouts.size).toBe(0)
+    expect(mocks.stopEmbeddedServer).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledWith(1)
+  })
+
+  test('cleans up once and exits with failure when embedded server startup fails', async () => {
+    mocks.startEmbeddedServer.mockRejectedValueOnce(new Error('bind failed'))
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+
+    await vi.waitFor(() => expect(mocks.quit).toHaveBeenCalledTimes(1))
+    const firstEvent = { preventDefault: vi.fn() }
+    const secondEvent = { preventDefault: vi.fn() }
+    const first = emit('before-quit', firstEvent)
+    const second = emit('before-quit', secondEvent)
+    await Promise.all([first, second])
+
+    expect(firstEvent.preventDefault).toHaveBeenCalledTimes(1)
+    expect(secondEvent.preventDefault).toHaveBeenCalledTimes(1)
+    expect(mocks.stopEmbeddedServer).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledWith(1)
+  })
+
+  test('keeps a normal exit when teardown causes pending initialization to reject', async () => {
+    let rejectSettings!: (error: Error) => void
+    mocks.getSettingsSnapshot.mockReturnValueOnce(
+      new Promise<SettingsSnapshot>((_resolve, reject) => {
+        rejectSettings = reject
+      }),
+    )
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.getSettingsSnapshot).toHaveBeenCalledTimes(1))
+
+    await emit('before-quit', { preventDefault: vi.fn() })
+    rejectSettings(new Error('server stopped during quit'))
+    await Promise.resolve()
+
+    expect(mocks.showErrorBox).not.toHaveBeenCalled()
+    expect(mocks.quit).not.toHaveBeenCalled()
+    expect(mocks.exit).toHaveBeenCalledWith(0)
   })
 
   test('initializes the current language from the server-owned preference when available', async () => {

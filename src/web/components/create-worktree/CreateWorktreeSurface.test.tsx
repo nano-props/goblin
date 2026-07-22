@@ -169,7 +169,10 @@ describe('CreateWorktreePageBody', () => {
   })
 
   test('loads remote branches and submits trackRemoteBranch with the first ref', async () => {
-    vi.mocked(getRepoRemoteBranches).mockResolvedValue(['origin/feature', 'origin/main'])
+    vi.mocked(getRepoRemoteBranches).mockResolvedValue([
+      { ref: 'refs/remotes/origin/feature', remote: 'origin', branch: 'feature' },
+      { ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' },
+    ])
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
 
@@ -188,7 +191,11 @@ describe('CreateWorktreePageBody', () => {
     expect(onCreate).toHaveBeenCalledWith({
       input: {
         worktreePath: '/srv/repo-feature',
-        mode: { kind: 'trackRemoteBranch', remoteRef: 'origin/feature', localBranch: 'feature' },
+        mode: {
+          kind: 'trackRemoteBranch',
+          remote: { ref: 'refs/remotes/origin/feature', remote: 'origin', branch: 'feature' },
+          localBranch: 'feature',
+        },
       },
     })
   })

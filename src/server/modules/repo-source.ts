@@ -15,7 +15,6 @@ import {
   getHeadHash,
   getLog as getBranchLog,
   getUpstream,
-  type BranchUpstream,
   isAncestor,
   isGitRepo,
 } from '#/system/git/branches.ts'
@@ -29,7 +28,14 @@ import {
 } from '#/system/git/remote.ts'
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
-import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
+import {
+  createWorktree,
+  getWorktrees,
+  readWorktreeMembership,
+  removeWorktree,
+  sampleWorktreeStatus,
+} from '#/system/git/worktrees.ts'
+import { haveSameWorktrees } from '#/system/git/parsers.ts'
 import {
   bootstrapWorktreeAfterCreate,
   getWorktreeBootstrapPreview as getLocalWorktreeBootstrapPreview,
@@ -71,6 +77,8 @@ import {
 } from '#/system/ssh/git.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
+import type { GitUpstream } from '#/system/git/upstream.ts'
+import type { RemoteTrackingBranch } from '#/shared/worktree-create.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import {
   isRemoteWorkspaceId,
@@ -134,7 +142,7 @@ export interface RepoSource {
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
   ): Promise<PullRequestEntry[] | null>
   getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
-  getRemoteBranches(signal?: AbortSignal): Promise<string[]>
+  getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranch[]>
   fetch(signal: AbortSignal): Promise<RepoMutationResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<RepoMutationResult>
   push(branch: string, signal?: AbortSignal): Promise<RepoMutationResult>
@@ -596,7 +604,7 @@ function createLocalRepoSource(
 
   async function validateBranchDeletion(
     branch: string,
-    upstream: BranchUpstream | null,
+    upstream: GitUpstream | null,
     options?: {
       force?: boolean
       notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
@@ -629,14 +637,19 @@ function createLocalRepoSource(
 
   async function deleteBranchAfterValidation(
     branch: string,
-    upstream: BranchUpstream | null,
+    upstream: GitUpstream | null,
     options?: { force?: boolean; deleteUpstream?: boolean },
     signal?: AbortSignal,
     gitCwd = repoId,
   ): Promise<ExecResult> {
     const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
-    if (!deleted.ok || !upstream) return deleted
-    const upstreamDeleted = await deleteUpstreamBranch(gitCwd, upstream.remote, upstream.branch, signal)
+    if (!deleted.ok || options?.deleteUpstream !== true || !upstream?.deleteTarget) return deleted
+    const upstreamDeleted = await deleteUpstreamBranch(
+      gitCwd,
+      upstream.deleteTarget.remote,
+      upstream.deleteTarget.branch,
+      signal,
+    )
     return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repositoryStateChanged: true }
   }
 
@@ -648,7 +661,13 @@ function createLocalRepoSource(
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
       signal?.throwIfAborted()
-      const worktrees = await getWorktrees(repoId, { signal })
+      const membership = await readWorktreeMembership(repoId, signal)
+      const statusSamples = await sampleWorktreeStatus(membership, signal)
+      const worktrees = statusSamples.map((sample) =>
+        sample.kind === 'status'
+          ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
+          : sample.worktree,
+      )
       signal?.throwIfAborted()
       const currentBranch = await getCurrentBranch(repoId, { signal })
       const branches = await getBranches(repoId, worktrees, currentBranch, { signal })
@@ -656,6 +675,10 @@ function createLocalRepoSource(
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
       const remote = await getRemoteInfo(repoId, signal)
       signal?.throwIfAborted()
+      const finalMembership = await readWorktreeMembership(repoId, signal)
+      if (!haveSameWorktrees(membership, finalMembership)) {
+        throw new Error('Worktree membership changed during repository snapshot read')
+      }
       return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
@@ -713,6 +736,12 @@ function createLocalRepoSource(
     },
     async createWorktree(input, signal, options) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (input.mode.kind === 'trackRemoteBranch') {
+        const branches = await getLocalRemoteTrackingBranches(repoId, signal)
+        if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+      }
       const createdWorkspaceId = localWorkspaceId(input.worktreePath)
       const affectedRepoIds = [
         ...(await readLocalAffectedRepoIds(repoId, signal)),
@@ -906,6 +935,12 @@ async function createRemoteRepoSource(
       return await getRemoteWorktreeBootstrapPreview(target, { signal, run })
     },
     async createWorktree(input, signal, options) {
+      if (input.mode.kind === 'trackRemoteBranch') {
+        const branches = await getSshRemoteTrackingBranches(target, { signal, run })
+        if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+      }
       const existingRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const created = await createRemoteWorktree(target, { ...input, signal, run })
       const affectedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, created.affectedWorktreePaths)]
@@ -1012,6 +1047,16 @@ function normalizeRequestedBranches(branches?: string[]): ReadonlySet<string> | 
 
 function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullRequestEntry[] | null {
   return prs ? Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest })) : null
+}
+
+function hasRemoteTrackingBranch(
+  branches: readonly RemoteTrackingBranch[],
+  candidate: RemoteTrackingBranch,
+): boolean {
+  return branches.some(
+    (branch) =>
+      branch.ref === candidate.ref && branch.remote === candidate.remote && branch.branch === candidate.branch,
+  )
 }
 
 async function remotePullRequestRepoRef(

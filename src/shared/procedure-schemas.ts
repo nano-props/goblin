@@ -8,6 +8,7 @@
 // live in `#/shared/api-types.ts` next to the IPC types they describe.
 
 import * as v from 'valibot'
+import { RemoteTrackingBranchSchema } from '#/shared/worktree-create.ts'
 import {
   CwdInput,
   RemoteConnectionInputSchema,
@@ -136,7 +137,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     mode: v.variant('kind', [
       v.object({ kind: v.literal('newBranch'), newBranch: v.string(), baseRef: v.string() }),
       v.object({ kind: v.literal('existingBranch'), branch: v.string() }),
-      v.object({ kind: v.literal('trackRemoteBranch'), remoteRef: v.string(), localBranch: v.string() }),
+      v.object({ kind: v.literal('trackRemoteBranch'), remote: RemoteTrackingBranchSchema, localBranch: v.string() }),
     ]),
     worktreeBootstrap: WorktreeBootstrapDecisionSchema,
   }),

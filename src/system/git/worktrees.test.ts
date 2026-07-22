@@ -45,11 +45,15 @@ describe('worktree git operations', () => {
         worktreePath: '/tmp/repo-feature',
         mode: {
           kind: 'trackRemoteBranch' as const,
-          remoteRef: 'origin/feature/branch',
+          remote: {
+            ref: 'refs/remotes/origin/feature/branch',
+            remote: 'origin',
+            branch: 'feature/branch',
+          },
           localBranch: 'feature/branch',
         },
       },
-      ['worktree', 'add', '-b', 'feature/branch', '--track', '--', '/tmp/repo-feature', 'origin/feature/branch'],
+      ['worktree', 'add', '-b', 'feature/branch', '--track', '--', '/tmp/repo-feature', 'refs/remotes/origin/feature/branch'],
     ],
   ])(
     'delegates %s createWorktree to git worktree add with the shared timeout and signal',

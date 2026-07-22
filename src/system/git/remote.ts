@@ -10,6 +10,7 @@ import {
 import { getCurrentBranch } from '#/system/git/branches.ts'
 import { isGitHubHost, isGitLabHost, parseGitRemoteUrl, remoteUrlToHttps } from '#/system/git/remote-url.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
+import { decodeGitUpstream, GIT_UPSTREAM_FORMAT } from '#/system/git/upstream.ts'
 
 export interface UpstreamParts {
   remote: string
@@ -243,17 +244,8 @@ export async function getUpstreamParts(
   signal?: AbortSignal,
 ): Promise<UpstreamParts | null> {
   if (!isSafeBranchName(branch)) return null
-  try {
-    const [remote, mergeRef] = await Promise.all([
-      git(cwd, ['config', '--get', `branch.${branch}.remote`], { signal }),
-      git(cwd, ['config', '--get', `branch.${branch}.merge`], { signal }),
-    ])
-    const remoteBranch = mergeRef.startsWith('refs/heads/') ? mergeRef.slice('refs/heads/'.length) : ''
-    if (!remote || !remoteBranch || !isSafeBranchName(remoteBranch)) return null
-    return { remote, branch: remoteBranch }
-  } catch {
-    return null
-  }
+  const output = await git(cwd, ['for-each-ref', `--format=${GIT_UPSTREAM_FORMAT}`, `refs/heads/${branch}`], { signal })
+  return decodeGitUpstream(output)?.source ?? null
 }
 
 function resolveFallbackPushRemote(remotes: GitRemoteInfo[]): string | null {

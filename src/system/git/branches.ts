@@ -12,6 +12,7 @@ import {
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
 import { gitHead, type GitHead } from '#/shared/git-head.ts'
+import { decodeGitUpstream, GIT_UPSTREAM_FORMAT, type GitUpstream } from '#/system/git/upstream.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -235,30 +236,13 @@ export async function deleteUpstreamBranch(
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '--delete', '--', remote, branch)
 }
 
-export interface BranchUpstream {
-  ref: string
-  remote: string
-  branch: string
-}
-
 /** Resolve and validate `branch`'s upstream, or null when none is configured. */
-export async function getUpstream(cwd: string, branch: string, signal?: AbortSignal): Promise<BranchUpstream | null> {
+export async function getUpstream(cwd: string, branch: string, signal?: AbortSignal): Promise<GitUpstream | null> {
   if (!isSafeBranchName(branch)) return null
   signal?.throwIfAborted()
-  const out = await git(cwd, ['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`], { signal })
+  const out = await git(cwd, ['for-each-ref', `--format=${GIT_UPSTREAM_FORMAT}`, `refs/heads/${branch}`], { signal })
   signal?.throwIfAborted()
-  if (!out) return null
-  const lines = out.split('\n')
-  if (lines.length !== 1) throw new Error('Git returned an invalid upstream')
-  const ref = lines[0]!
-  const slash = ref.indexOf('/')
-  if (slash <= 0) throw new Error('Git returned an invalid upstream')
-  const remote = ref.slice(0, slash)
-  const upstreamBranch = ref.slice(slash + 1)
-  if (!isSafeBranchName(remote) || !isSafeBranchName(upstreamBranch)) {
-    throw new Error('Git returned an invalid upstream')
-  }
-  return { ref, remote, branch: upstreamBranch }
+  return decodeGitUpstream(out)
 }
 
 /** Whether `ancestor` is reachable from `descendant` (i.e. every commit

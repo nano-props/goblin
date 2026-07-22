@@ -12,14 +12,28 @@
 // which leaves them invisible in the BranchNavigator. Reintroducing the mode
 // should be a paired change with a detached-worktree row in the list.
 
-import { isSafeBranchName } from '#/shared/refnames.ts'
+import * as v from 'valibot'
+import { isSafeBranchName, isSafeRefName, isSafeRemoteName } from '#/shared/refnames.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type CreateWorktreeMode =
   | { kind: 'newBranch'; newBranch: string; baseRef: string }
   | { kind: 'existingBranch'; branch: string }
-  | { kind: 'trackRemoteBranch'; remoteRef: string; localBranch: string }
+  | { kind: 'trackRemoteBranch'; remote: RemoteTrackingBranch; localBranch: string }
+
+export const RemoteTrackingBranchSchema = v.strictObject({
+  ref: v.pipe(v.string(), v.check(isSafeRefName)),
+  remote: v.pipe(v.string(), v.check(isSafeRemoteName)),
+  branch: v.pipe(v.string(), v.check(isSafeBranchName)),
+})
+
+export type RemoteTrackingBranch = v.InferOutput<typeof RemoteTrackingBranchSchema>
+
+export interface RemoteFetchAuthority {
+  name: string
+  fetchSpecs: readonly string[]
+}
 
 export interface CreateWorktreeInput {
   worktreePath: string
@@ -58,10 +72,10 @@ function normalizeCreateWorktreeMode(input: unknown): CreateWorktreeMode | null 
       return branch && isSafeBranchName(branch) ? { kind: 'existingBranch', branch } : null
     }
     case 'trackRemoteBranch': {
-      const remoteRef = stringField(mode.remoteRef)
+      const remote = v.safeParse(RemoteTrackingBranchSchema, mode.remote)
       const localBranch = stringField(mode.localBranch)
-      return remoteRef && localBranch && isRemoteTrackingRef(remoteRef) && isSafeBranchName(localBranch)
-        ? { kind: 'trackRemoteBranch', remoteRef, localBranch }
+      return remote.success && localBranch && isSafeBranchName(localBranch)
+        ? { kind: 'trackRemoteBranch', remote: remote.output, localBranch }
         : null
     }
     default:
@@ -73,49 +87,142 @@ function stringField(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function isRemoteTrackingRef(ref: string): boolean {
-  const slash = ref.indexOf('/')
-  if (slash <= 0) return false
-  if (ref.endsWith('/HEAD')) return false
-  const remote = ref.slice(0, slash)
-  const branch = ref.slice(slash + 1)
-  return isSafeRemoteName(remote) && isSafeBranchName(branch)
-}
-
-function isSafeRemoteName(remote: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(remote)
-}
-
 function isSafeRefInput(ref: string): boolean {
-  return isSafeBranchName(ref) || isRemoteTrackingRef(ref)
+  return isSafeBranchName(ref)
 }
 
-/** Parse the output of `git for-each-ref refs/remotes/`, dropping
- *  refs that don't fit the `<remote>/<branch>` shape and the symbolic
- *  `<remote>/HEAD` pointer. Shared by the local (system/git/remote-refs.ts)
- *  and remote (system/ssh/git.ts) callers so a malformed ref is treated
- *  the same on both sides. */
-export function parseRemoteTrackingRefs(output: string): string[] {
+/** Resolve full remote-tracking refs against the authoritative remote names. */
+export function parseRemoteTrackingRefs(
+  output: string,
+  remotes: readonly RemoteFetchAuthority[],
+): RemoteTrackingBranch[] {
+  const remoteNames = remotes.map((remote) => remote.name)
+  if (new Set(remoteNames).size !== remoteNames.length || remoteNames.some((remote) => !isSafeRemoteName(remote))) {
+    throw new Error('Invalid remote name authority')
+  }
   const refs = output
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-  if (refs.some((ref) => !isRemoteTrackingRef(ref) && !isRemoteHeadRef(ref))) {
-    throw new Error('Invalid remote-tracking ref output')
+  if (new Set(refs).size !== refs.length) throw new Error('Invalid remote-tracking ref output')
+  const authorities = remotes.map((remote) => ({
+    name: remote.name,
+    positive: remote.fetchSpecs
+      .filter((spec) => !spec.startsWith('^') && !spec.startsWith('+^'))
+      .map(parsePositiveFetchRefspec)
+      .filter((spec): spec is PositiveFetchRefspec => spec !== null),
+    negative: remote.fetchSpecs.filter((spec) => spec.startsWith('^') || spec.startsWith('+^')).map(parseNegativeFetchRefspec),
+  }))
+  const parsed: RemoteTrackingBranch[] = []
+  for (const fullRef of refs) {
+    if (!fullRef.startsWith('refs/remotes/') || !isSafeBranchName(fullRef)) {
+      throw new Error('Invalid remote-tracking ref output')
+    }
+    const matches = authorities.flatMap((remote) => {
+      const branches = remote.positive.flatMap((spec) => {
+        const sourceRef = sourceRefForDestination(fullRef, spec)
+        if (!sourceRef || remote.negative.some((negative) => matchesRefspecSource(sourceRef, negative))) return []
+        const branch = sourceRef.slice('refs/heads/'.length)
+        return [{ remote: remote.name, branch }]
+      })
+      return [...new Map(branches.map((match) => [match.branch, match])).values()]
+    })
+    const uniqueMatches = [...new Map(matches.map((match) => [`${match.remote}\0${match.branch}`, match])).values()]
+    if (uniqueMatches.length === 0) continue
+    if (uniqueMatches.length !== 1) throw new Error('Ambiguous remote-tracking ref ownership')
+    const [match] = uniqueMatches
+    if (match.branch !== 'HEAD') parsed.push({ ref: fullRef, remote: match.remote, branch: match.branch })
   }
-  return refs.filter((ref) => isRemoteTrackingRef(ref))
+  return parsed
 }
 
-function isRemoteHeadRef(ref: string): boolean {
-  if (!ref.endsWith('/HEAD')) return false
-  return isSafeRemoteName(ref.slice(0, -'/HEAD'.length))
+interface PositiveFetchRefspec {
+  source: string
+  destination: string
 }
 
-/** Derive a default local-branch name from a remote-tracking ref.
- *  Returns null when the ref isn't shaped like `origin/feature/x`. */
-export function deriveLocalBranchFromRemoteRef(remoteRef: string): string | null {
-  if (!isRemoteTrackingRef(remoteRef)) return null
-  const slash = remoteRef.indexOf('/')
-  const branch = slash >= 0 ? remoteRef.slice(slash + 1) : ''
-  return isSafeBranchName(branch) ? branch : null
+interface NegativeFetchRefspec {
+  source: string
+}
+
+function stripForce(spec: string): string {
+  return spec.startsWith('+') ? spec.slice(1) : spec
+}
+
+function parsePositiveFetchRefspec(rawSpec: string): PositiveFetchRefspec | null {
+  const spec = stripForce(rawSpec)
+  const separator = spec.indexOf(':')
+  if (spec.startsWith('^') || separator !== spec.lastIndexOf(':')) {
+    throw new Error('Invalid remote fetch refspec')
+  }
+  if (separator < 0) {
+    if (!isValidRefspecPattern(spec)) throw new Error('Invalid remote fetch refspec')
+    return null
+  }
+  const source = spec.slice(0, separator)
+  const destination = spec.slice(separator + 1)
+  const sourceStars = countStars(source)
+  const destinationStars = countStars(destination)
+  if (
+    !isValidRefspecPattern(source) ||
+    !isValidRefspecPattern(destination) ||
+    sourceStars > 1 ||
+    destinationStars !== sourceStars
+  ) {
+    throw new Error('Invalid remote fetch refspec')
+  }
+  if (!source.startsWith('refs/heads/') || !destination.startsWith('refs/remotes/')) return null
+  return { source, destination }
+}
+
+function parseNegativeFetchRefspec(rawSpec: string): NegativeFetchRefspec {
+  if (rawSpec.startsWith('+')) throw new Error('Invalid negative remote fetch refspec')
+  const spec = rawSpec
+  if (!spec.startsWith('^') || spec.includes(':')) throw new Error('Invalid negative remote fetch refspec')
+  const source = spec.slice(1)
+  if (!isValidRefspecPattern(source) || countStars(source) > 1) {
+    throw new Error('Invalid negative remote fetch refspec')
+  }
+  return { source }
+}
+
+function sourceRefForDestination(ref: string, spec: PositiveFetchRefspec): string | null {
+  if (!spec.destination.includes('*')) {
+    if (ref !== spec.destination) return null
+    const branch = spec.source.slice('refs/heads/'.length)
+    return branch === 'HEAD' || isSafeBranchName(branch) ? spec.source : null
+  }
+  const [destinationPrefix, destinationSuffix] = spec.destination.split('*') as [string, string]
+  if (
+    !ref.startsWith(destinationPrefix) ||
+    !ref.endsWith(destinationSuffix) ||
+    ref.length < destinationPrefix.length + destinationSuffix.length
+  ) {
+    return null
+  }
+  const capture = ref.slice(destinationPrefix.length, ref.length - destinationSuffix.length)
+  const [sourcePrefix, sourceSuffix] = spec.source.split('*') as [string, string]
+  const sourceRef = `${sourcePrefix}${capture}${sourceSuffix}`
+  const branch = sourceRef.slice('refs/heads/'.length)
+  return branch === 'HEAD' || isSafeBranchName(branch) ? sourceRef : null
+}
+
+function matchesRefspecSource(ref: string, spec: NegativeFetchRefspec): boolean {
+  if (!spec.source.includes('*')) return ref === spec.source
+  const [prefix, suffix] = spec.source.split('*') as [string, string]
+  return ref.startsWith(prefix) && ref.endsWith(suffix) && ref.length >= prefix.length + suffix.length
+}
+
+function countStars(value: string): number {
+  return [...value].filter((character) => character === '*').length
+}
+
+function isValidRefspecPattern(value: string): boolean {
+  if (countStars(value) > 1) return false
+  return isSafeRefName(value.replace('*', 'refspec-pattern'))
+}
+
+/** Derive the local branch from the producer's structured remote identity. */
+export function deriveLocalBranchFromRemoteRef(remote: RemoteTrackingBranch): string {
+  return remote.branch
 }

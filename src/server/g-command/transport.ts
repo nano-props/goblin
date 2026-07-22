@@ -30,14 +30,14 @@ function readAccessToken(env: NodeJS.ProcessEnv): string | null {
 
 export function createHttpTransport(
   env: NodeJS.ProcessEnv = process.env,
-  fetchImpl: typeof fetch = globalThis.fetch,
+  fetchImpl: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = globalThis.fetch,
 ): GoblinCommandTransport {
   const token = readAccessToken(env)
   if (!token) {
     throw new TransportError('GOBLIN_SERVER_ACCESS_TOKEN is not set')
   }
   const baseUrl = readServerUrl(env)
-  const headers = { [ACCESS_TOKEN_HEADER]: token }
+  const headers = { [ACCESS_TOKEN_HEADER]: token, 'content-type': 'application/json' }
 
   async function postJson<T>(pathname: string, body: unknown, decode: (value: unknown) => T): Promise<T> {
     const url = new URL(pathname, baseUrl)

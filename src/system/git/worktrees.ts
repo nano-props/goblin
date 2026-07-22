@@ -1,11 +1,14 @@
 import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
-import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import { haveSameWorktrees, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
-import { worktreePathIsMissing } from '#/system/git/worktree-path.ts'
 
 const WORKTREE_STATUS_CONCURRENCY = 16
+
+export type WorktreeStatusRead =
+  | { kind: 'bare'; worktree: WorktreeInfo }
+  | { kind: 'status'; worktree: WorktreeInfo; entries: ReturnType<typeof parseStatus> }
 
 interface GetWorktreesOptions {
   includeStatus?: boolean
@@ -13,38 +16,40 @@ interface GetWorktreesOptions {
 }
 
 export async function getWorktrees(cwd: string, options?: GetWorktreesOptions): Promise<WorktreeInfo[]> {
-  options?.signal?.throwIfAborted()
-  const output = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
-  options?.signal?.throwIfAborted()
-  const worktrees = parseWorktrees(output)
+  const worktrees = await readWorktreeMembership(cwd, options?.signal)
   if (options?.includeStatus === false) return worktrees
-
-  const sampled = await mapWithConcurrency(
-    worktrees,
-    WORKTREE_STATUS_CONCURRENCY,
-    async (wt): Promise<WorktreeInfo | null> => {
-      if (wt.isBare) return wt
-      try {
-        // -z so a filename containing a literal newline doesn't get
-        // counted as two changes. Reuse parseStatus so rename / copy
-        // pairs (R/C take TWO records under -z) collapse into one
-        // entry — matching what `git status` shows the user.
-        const out = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
-        const entries = parseStatus(out)
-        wt.isDirty = entries.length > 0
-        wt.changeCount = entries.length
-        return wt
-      } catch (error) {
-        options?.signal?.throwIfAborted()
-        if (await worktreePathIsMissing(wt.path)) return null
-        throw error
-      }
-    },
-    { signal: options?.signal, abort: 'throw' },
+  const samples = await sampleWorktreeStatus(worktrees, options?.signal)
+  const finalWorktrees = await readWorktreeMembership(cwd, options?.signal)
+  if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('Worktree membership changed during status read')
+  return samples.map((sample) =>
+    sample.kind === 'status'
+      ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
+      : sample.worktree,
   )
+}
 
-  options?.signal?.throwIfAborted()
-  return sampled.filter((worktree): worktree is WorktreeInfo => worktree !== null)
+export async function readWorktreeMembership(cwd: string, signal?: AbortSignal): Promise<WorktreeInfo[]> {
+  signal?.throwIfAborted()
+  const output = await git(cwd, ['worktree', 'list', '--porcelain', '-z'], { signal })
+  signal?.throwIfAborted()
+  return parseWorktrees(output)
+}
+
+export async function sampleWorktreeStatus(
+  worktrees: readonly WorktreeInfo[],
+  signal?: AbortSignal,
+): Promise<WorktreeStatusRead[]> {
+  return await mapWithConcurrency(
+    [...worktrees],
+    WORKTREE_STATUS_CONCURRENCY,
+    async (wt): Promise<WorktreeStatusRead> => {
+      if (wt.isBare) return { kind: 'bare', worktree: wt }
+      const out = await git(wt.path, ['status', '--porcelain', '-z'], { signal })
+      const entries = parseStatus(out)
+      return { kind: 'status', worktree: wt, entries }
+    },
+    { signal, abort: 'throw' },
+  )
 }
 
 /** Worktree create/remove can both touch tens of thousands of files
@@ -99,7 +104,7 @@ function createWorktreeArgs(input: CreateWorktreeInput): string[] {
     case 'existingBranch':
       return ['--', input.worktreePath, input.mode.branch]
     case 'trackRemoteBranch':
-      return ['-b', input.mode.localBranch, '--track', '--', input.worktreePath, input.mode.remoteRef]
+      return ['-b', input.mode.localBranch, '--track', '--', input.worktreePath, input.mode.remote.ref]
   }
   const exhaustive: never = input.mode
   return exhaustive

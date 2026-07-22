@@ -27,7 +27,7 @@ function activatePrimaryWindowFromEvent(): void {
   void activationBarrier
     .then(() => {
       if (isQuitting) return null
-      return activatePrimaryWindow()
+      return activateClient()
     })
     .catch((err) => {
       windowNodeLog.error({ err }, 'failed to activate primary window')
@@ -36,6 +36,10 @@ function activatePrimaryWindowFromEvent(): void {
 
 let activationBarrier: Promise<void> = Promise.resolve()
 let isQuitting = false
+let clientActivated = false
+let exitIntent: 'none' | 'normal' | 'fatal' = 'none'
+let finalizationPromise: Promise<void> | null = null
+let finalizationComplete = false
 const CLIENT_QUIT_DRAIN_TIMEOUT_MS = 1000
 type ClientQuitDrain = AppQuitDrainResult | { ok: false; timedOut: true }
 
@@ -71,37 +75,47 @@ async function main(): Promise<void> {
   // before-quit is not reliable across Electron quit paths, and app.exit
   // skips will-quit, so do will-quit cleanup here too.
   app.on('before-quit', async (event) => {
-    if (isQuitting) return
+    if (finalizationComplete) return
     event.preventDefault()
     isQuitting = true
-    await finalizeNativeHostExit()
+    if (exitIntent === 'none') exitIntent = 'normal'
+    finalizationPromise ??= finalizeNativeHostExit()
+    await finalizationPromise
+    finalizationComplete = true
   })
 
   await activationBarrier
   if (isQuitting) return
-  await activatePrimaryWindow()
+  await activateClient()
   if (isQuitting) return
   app.on('activate', activatePrimaryWindowFromEvent)
 }
 
 async function finalizeNativeHostExit(): Promise<void> {
   try {
-    const clientQuitDrain = waitForClientQuitDrain()
-    broadcastClientEffectIntent({ type: 'app-quitting' })
-    const clientQuitDrainResult = await clientQuitDrain
-    if ('timedOut' in clientQuitDrainResult) {
-      windowNodeLog.warn('timed out waiting for client quit persistence drain')
-    } else if (!clientQuitDrainResult.ok) {
-      windowNodeLog.warn({ err: clientQuitDrainResult.error }, 'client quit persistence drain failed')
+    if (clientActivated) {
+      const clientQuitDrain = waitForClientQuitDrain()
+      broadcastClientEffectIntent({ type: 'app-quitting' })
+      const clientQuitDrainResult = await clientQuitDrain
+      if ('timedOut' in clientQuitDrainResult) {
+        windowNodeLog.warn('timed out waiting for client quit persistence drain')
+      } else if (!clientQuitDrainResult.ok) {
+        windowNodeLog.warn({ err: clientQuitDrainResult.error }, 'client quit persistence drain failed')
+      }
+      const windowStateFlushed = await flushWindowState()
+      if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     }
-    const windowStateFlushed = await flushWindowState()
-    if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     stopNativeSettingsProjectionSync()
     await stopEmbeddedServer('app-quit')
   } finally {
     unregisterAppShortcuts()
-    app.exit(0)
+    app.exit(exitIntent === 'fatal' ? 1 : 0)
   }
+}
+
+async function activateClient(): Promise<void> {
+  await activatePrimaryWindow()
+  clientActivated = true
 }
 
 async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
@@ -172,6 +186,8 @@ async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot
 }
 
 void main().catch((err) => {
+  if (exitIntent === 'normal') return
+  exitIntent = 'fatal'
   windowNodeLog.error({ err }, 'failed to initialize native host')
   const message = err instanceof Error ? err.message : String(err)
   dialog.showErrorBox('Goblin failed to start', `Native host initialization failed.\n\n${message}`)

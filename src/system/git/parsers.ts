@@ -181,7 +181,7 @@ export function parseStatus(output: string): StatusEntry[] {
     const y = line[1]!
     if (!' MADRCUT?!'.includes(x) || !' MADRCUT?!'.includes(y)) throw new Error('Invalid status code')
     const path = line.slice(3)
-    if (x === 'R' || x === 'C') {
+    if (x === 'R' || x === 'C' || y === 'R' || y === 'C') {
       if (!records[i + 1]) throw new Error('Invalid status rename record')
       i++
     }
@@ -190,93 +190,14 @@ export function parseStatus(output: string): StatusEntry[] {
   return entries
 }
 
-/** Marker separating the worktree-list porcelain block from the
- *  per-worktree NUL-batched status stream in
- *  `gitWorktreeListAndStatus` output. The marker is emitted on its
- *  own line by the remote script (`printf '\n%s\n' '...'`), and
- *  `splitWorktreeStatusBatch` searches for it wrapped in surrounding
- *  newlines. The literal text inside is unique enough that it
- *  cannot collide with a `git worktree list --porcelain` line --
- *  every line in that output is prefixed by a keyword (`worktree`,
- *  `HEAD`, `branch`, `detached`, `bare`, or `locked`) so the bare
- *  marker text is never produced as a standalone line. */
-export const WORKTREE_STATUS_BATCH_BOUNDARY = '__GOBLIN_WT_BATCH_BOUNDARY__'
-
-/**
- * Split a `gitWorktreeListAndStatus` raw stdout into the worktree-list
- * block and the per-worktree status stream. The two are separated by
- * a literal newline + boundary marker + newline sequence. Returns
- * `{ worktreeListOutput, statusStream }`; pass each through
- * `parseWorktrees` and `parseWorktreeStatusBatch` respectively.
- */
-export function splitWorktreeStatusBatch(output: string): {
-  readonly worktreeListOutput: string
-  readonly statusStream: string
-} {
-  const initialMarker = `${WORKTREE_STATUS_BATCH_BOUNDARY}\n`
-  const followingMarker = `\n${initialMarker}`
-  const startsWithMarker = output.startsWith(initialMarker)
-  const idx = startsWithMarker ? 0 : output.indexOf(followingMarker)
-  const markerLength = startsWithMarker ? initialMarker.length : followingMarker.length
-  if (idx < 0) throw new Error('Invalid worktree status envelope')
-  return {
-    worktreeListOutput: output.slice(0, idx),
-    statusStream: output.slice(idx + markerLength),
-  }
-}
-
-/**
- * Parse the per-worktree status stream of `gitWorktreeListAndStatus`.
- * The stream is a sequence of NUL-separated records laid out as:
- *
- *   <path1>\0<status records>\0<path2>\0<status records>\0...
- *
- * Each section begins with a NUL-terminated worktree path (as emitted
- * by `git rev-parse --show-toplevel` from the script) and ends with
- * an empty NUL record. Walk NUL-split records: read a path, then
- * collect status records until the next empty record. The empty
- * record between sections is the worktree boundary.
- *
- * Returns a Map keyed by the worktree path. Empty status is encoded
- * as a path mapped to an empty array (a clean worktree).
- */
-export function parseWorktreeStatusBatch(stream: string): ReadonlyMap<string, ReadonlyArray<StatusEntry>> {
-  const result = new Map<string, ReadonlyArray<StatusEntry>>()
-  if (!stream.endsWith('\0')) throw new Error('Invalid worktree status batch')
-  const records = stream.split('\0')
-  records.pop()
-  if (records.pop() !== '') throw new Error('Invalid worktree status batch')
-  let i = 0
-  while (i < records.length) {
-    const worktreePath = records[i] ?? ''
-    i++
-    if (!path.posix.isAbsolute(worktreePath) || result.has(worktreePath)) {
-      throw new Error('Invalid worktree status path')
-    }
-    const statusRecords: string[] = []
-    let complete = false
-    while (i < records.length) {
-      const rec = records[i] ?? ''
-      i++
-      if (rec === '') {
-        complete = true
-        break
-      }
-      statusRecords.push(rec)
-    }
-    if (!complete) throw new Error('Invalid worktree status section')
-    const entries = statusRecords.length > 0 ? parseStatus(`${statusRecords.join('\0')}\0`) : []
-    result.set(worktreePath, entries)
-  }
-  return result
-}
-
-/** Parse and validate the complete porcelain protocol into usable worktrees. */
+/** Parse and validate `git worktree list --porcelain -z`. */
 export function parseWorktrees(output: string): WorktreeInfo[] {
-  if (output.trim().length === 0) return []
-  const blocks = output.split('\n\n').filter((block) => block.length > 0)
+  if (output.length === 0) throw new Error('Invalid worktree output')
+  if (!output.endsWith('\0\0')) throw new Error('Invalid worktree output')
+  const blocks = output.slice(0, -2).split('\0\0')
   for (const block of blocks) {
-    const lines = block.split('\n').filter((line) => line.length > 0)
+    const lines = block.split('\0')
+    if (lines.some((line) => line.length === 0)) throw new Error('Invalid worktree record')
     let worktreeCount = 0
     let headCount = 0
     let stateCount = 0
@@ -313,7 +234,7 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
   }
   const worktrees: WorktreeInfo[] = []
   for (const [blockIndex, block] of blocks.entries()) {
-    const lines = block.split('\n').filter((line) => line.length > 0)
+    const lines = block.split('\0')
     const worktreeLine = lines.find((line) => line.startsWith('worktree '))!
     const branchLine = lines.find((line) => line.startsWith('branch refs/heads/'))
     const isPrunable = lines.some((line) => line === 'prunable' || line.startsWith('prunable '))
@@ -327,4 +248,21 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
     })
   }
   return worktrees
+}
+
+export function haveSameWorktrees(left: readonly WorktreeInfo[], right: readonly WorktreeInfo[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((worktree, index) => {
+      const other = right[index]
+      return (
+        other !== undefined &&
+        worktree.path === other.path &&
+        worktree.branch === other.branch &&
+        worktree.isBare === other.isBare &&
+        worktree.isPrimary === other.isPrimary &&
+        worktree.isLocked === other.isLocked
+      )
+    })
+  )
 }
