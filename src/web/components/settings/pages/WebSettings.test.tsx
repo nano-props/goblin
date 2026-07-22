@@ -44,7 +44,7 @@ function seedElectronBootstrap() {
       kind: 'electron',
       bridgeVersion: 1,
       capabilities: [
-        'settings-ipc',
+        'global-shortcut',
         'open-settings-window',
         'open-external-url',
         'open-directory-dialog',

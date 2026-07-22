@@ -18,7 +18,6 @@ import {
   fetchRepoWorktreeStatusReadModel,
   isStaleRepoRuntimeReadError,
 } from '#/web/repo-query-runtime.ts'
-import { getRepoProjectionPlaceholderData } from '#/web/repo-query-cache.ts'
 import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
 
 const retryStaleRepoRuntimeRead = (_failureCount: number, error: unknown): boolean => isStaleRepoRuntimeReadError(error)
@@ -37,7 +36,6 @@ export function repoProjectionQueryOptions(
       fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
-    placeholderData: getRepoProjectionPlaceholderData(repoRoot, workspaceRuntimeId, branch, mode),
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
@@ -94,9 +92,6 @@ export function repoProjectionReadModelQueryOptions(
             fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
-    placeholderData: repoRoot
-      ? getRepoProjectionPlaceholderData(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode)
-      : undefined,
     staleTime: Number.POSITIVE_INFINITY,
     enabled: active,
     subscribed: active,

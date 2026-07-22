@@ -53,16 +53,18 @@ describe('createHttpClipboardBackend', () => {
     expect(filesField.name).toBe('clipboard.bin')
   })
 
-  test('returns [] when fetch resolves with !ok', async () => {
+  test('rejects when fetch resolves with !ok', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })),
     )
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
+    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
+      'Clipboard file request failed with status 401',
+    )
   })
 
-  test('returns [] when fetch rejects (network error)', async () => {
+  test('rejects when fetch rejects (network error)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -70,24 +72,28 @@ describe('createHttpClipboardBackend', () => {
       }),
     )
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
+    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('network')
   })
 
-  test('returns [] when response paths is not an array', async () => {
+  test('rejects when response paths is not an array', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ paths: 'not-an-array' }) })),
     )
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
+    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
+      'Invalid clipboard file response',
+    )
   })
 
-  test('filters non-string path entries defensively', async () => {
+  test('rejects the complete response when any path entry is invalid', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ paths: ['/ok', 123, null, '/also-ok'] }) })),
     )
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual(['/ok', '/also-ok'])
+    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
+      'Invalid clipboard file response',
+    )
   })
 })

@@ -8,7 +8,11 @@ const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 const persistence = vi.hoisted(() => ({
   stored: null as unknown,
   failNextWrite: false,
-  readUserSettingsJson: vi.fn(async () => persistence.stored),
+  readUserSettingsJson: vi.fn(async () =>
+    persistence.stored === null
+      ? { kind: 'missing' as const }
+      : { kind: 'loaded' as const, value: persistence.stored },
+  ),
   writeUserSettingsJson: vi.fn(async (data: unknown) => {
     if (persistence.failNextWrite) {
       persistence.failNextWrite = false
@@ -66,4 +70,14 @@ test('retries default settings initialization after a transient write failure', 
   persistence.failNextWrite = true
   await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('disk full')
   await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+})
+
+test('leaves corrupt settings in place and fails every read without writing defaults', async () => {
+  persistence.stored = { version: 1, theme: 'bogus' }
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
+  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
+  expect(persistence.writeUserSettingsJson).not.toHaveBeenCalled()
+  expect(persistence.stored).toEqual({ version: 1, theme: 'bogus' })
 })

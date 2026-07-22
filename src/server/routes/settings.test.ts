@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   handleSetGlobalShortcutRegistered: vi.fn(),
   handleAddRecentWorkspace: vi.fn(),
   handleClearRecentWorkspaces: vi.fn(),
+  handleSetWorkspaceExternalAppRecent: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
   restoreWorkspaceTabs: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
   handleAddRecentWorkspace: mocks.handleAddRecentWorkspace,
   handleClearRecentWorkspaces: mocks.handleClearRecentWorkspaces,
+  handleSetWorkspaceExternalAppRecent: mocks.handleSetWorkspaceExternalAppRecent,
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
@@ -383,5 +385,73 @@ describe('settings routes', () => {
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
     expect(mocks.getServerGitHubCliState).not.toHaveBeenCalled()
+  })
+
+  test.each([-1, 1.5, 3601])('rejects invalid fetch interval %s at command admission', async (sec) => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(settingsRouteOptions())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/fetch-interval', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sec }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.handleSetFetchInterval).not.toHaveBeenCalled()
+  })
+
+  test('rejects a reserved global shortcut at command admission', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(settingsRouteOptions())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/prefs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prefs: { globalShortcut: 'Control+O' } }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.handleUpdateUserSettings).not.toHaveBeenCalled()
+  })
+
+  test('rejects a non-canonical external-app target at command admission', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(settingsRouteOptions())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/workspace-external-app-recent', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'goblin+file:///repo',
+          targetKey: 'git-worktree\0relative/path',
+          itemId: 'editor:vscode',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.handleSetWorkspaceExternalAppRecent).not.toHaveBeenCalled()
+  })
+
+  test('rejects an unknown external-app item at command admission', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(settingsRouteOptions())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/workspace-external-app-recent', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'goblin+file:///repo',
+          targetKey: 'workspace-root',
+          itemId: 'editor:unknown',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.handleSetWorkspaceExternalAppRecent).not.toHaveBeenCalled()
   })
 })

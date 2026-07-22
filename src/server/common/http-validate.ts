@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { Hono } from 'hono'
 import { IpcError } from '#/shared/api-types.ts'
 import { serverLogger } from '#/server/logger.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { errorJson } from '#/server/common/responses.ts'
 
 /**
@@ -27,8 +28,11 @@ export function parseHttpInput<T>(schema: v.GenericSchema<unknown, T>, input: un
  */
 export async function parseHttpBody<T>(
   schema: v.GenericSchema<unknown, T>,
-  c: { req: { text(): Promise<string> } },
+  c: { req: { header(name: string): string | undefined; text(): Promise<string> } },
 ): Promise<T> {
+  if (!isJsonContentType(c.req.header('content-type'))) {
+    throw new IpcError({ code: 'UNSUPPORTED_MEDIA_TYPE', message: 'Content-Type must be application/json' })
+  }
   const raw = await c.req.text()
   if (raw.trim() === '') return parseHttpInput(schema, undefined)
   let parsedJson: unknown
@@ -38,6 +42,10 @@ export async function parseHttpBody<T>(
     throw new IpcError({ code: 'BAD_REQUEST', message: 'Request body is not valid JSON' })
   }
   return parseHttpInput(schema, parsedJson)
+}
+
+export function isJsonContentType(value: string | undefined): boolean {
+  return value?.split(';', 1)[0]?.trim().toLowerCase() === 'application/json'
 }
 
 function formatHttpValidationError(issues: ReadonlyArray<v.BaseIssue<unknown>>): string {
@@ -59,6 +67,10 @@ export function createRouteApp(): Hono {
   const app = new Hono()
   app.onError((err, c) => {
     if (err instanceof IpcError) return errorJson(c, err.code, err.message)
+    if (err instanceof OperationCancelledError || c.req.raw.signal.aborted) {
+      serverLogger.debug({ path: c.req.path }, 'request cancelled after client disconnect')
+      return new Response(null, { status: 499 })
+    }
     serverLogger.error({ err }, 'unhandled error')
     return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Internal server error')
   })

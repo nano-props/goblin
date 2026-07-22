@@ -13,6 +13,7 @@ export interface NativeSettingsProjectionPatch {
   colorTheme?: UserSettings['colorTheme']
   shortcutsDisabled?: UserSettings['shortcutsDisabled']
   globalShortcutDisabled?: UserSettings['globalShortcutDisabled']
+  globalShortcut?: UserSettings['globalShortcut']
 }
 
 export interface NativeSettingsProjectionState {
@@ -42,6 +43,7 @@ export const NATIVE_SETTINGS_PROJECTION_KEYS = [
   'colorTheme',
   'shortcutsDisabled',
   'globalShortcutDisabled',
+  'globalShortcut',
 ] as const
 
 export const NativeSettingsProjectionPatchSchema = v.object({
@@ -50,6 +52,7 @@ export const NativeSettingsProjectionPatchSchema = v.object({
   colorTheme: v.optional(v.picklist(COLOR_THEMES)),
   shortcutsDisabled: v.optional(v.boolean()),
   globalShortcutDisabled: v.optional(v.boolean()),
+  globalShortcut: v.optional(v.string()),
 })
 
 export const NativeSettingsProjectionStateSchema = v.object({
@@ -90,6 +93,7 @@ export function pickNativeSettingsProjectionPatch(
   if (settings.colorTheme !== undefined) patch.colorTheme = settings.colorTheme
   if (settings.shortcutsDisabled !== undefined) patch.shortcutsDisabled = settings.shortcutsDisabled
   if (settings.globalShortcutDisabled !== undefined) patch.globalShortcutDisabled = settings.globalShortcutDisabled
+  if (settings.globalShortcut !== undefined) patch.globalShortcut = settings.globalShortcut
   return NATIVE_SETTINGS_PROJECTION_KEYS.some((key) => patch[key] !== undefined) ? patch : null
 }
 

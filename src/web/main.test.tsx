@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 let hydrate: ReturnType<typeof vi.fn>
+let hydrateHostInfo: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -13,9 +14,15 @@ beforeEach(() => {
   vi.clearAllMocks()
   document.body.innerHTML = '<div id="root"></div>'
   hydrate = vi.fn()
+  hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
   vi.doMock('#/web/stores/i18n.ts', () => ({
     useI18nStore: {
       getState: () => ({ hydrate }),
+    },
+  }))
+  vi.doMock('#/web/stores/host-info.ts', () => ({
+    useHostInfoStore: {
+      getState: () => ({ hydrate: hydrateHostInfo }),
     },
   }))
   vi.doMock('#/web/logger.ts', () => ({
@@ -94,7 +101,7 @@ describe('client entrypoint', () => {
       await Promise.resolve()
     })
 
-    expect(document.body.textContent).toContain('Unable to load language resources.')
+    expect(document.body.textContent).toContain('Unable to load application resources.')
     expect(document.body.textContent).not.toContain('app mounted')
 
     await act(async () => {
@@ -126,7 +133,28 @@ describe('client entrypoint', () => {
     })
 
     expect(hydrate.mock.calls[0]?.[0].signal.aborted).toBe(true)
-    expect(document.body.textContent).toContain('Unable to load language resources.')
+    expect(document.body.textContent).toContain('Unable to load application resources.')
     expect(document.body.textContent).not.toContain('app mounted')
+  })
+
+  test('keeps the app unmounted and retries when host info hydration fails', async () => {
+    hydrate.mockResolvedValue(undefined)
+    hydrateHostInfo.mockRejectedValueOnce(new Error('host unavailable')).mockResolvedValueOnce(undefined)
+
+    await act(async () => {
+      await import('#/web/main.tsx')
+      await Promise.resolve()
+    })
+
+    expect(document.body.textContent).toContain('Unable to load application resources.')
+    expect(document.body.textContent).not.toContain('app mounted')
+
+    await act(async () => {
+      document.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(hydrateHostInfo).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).toContain('app mounted')
   })
 })

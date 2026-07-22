@@ -952,6 +952,21 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(mocks.cloneRepo).toHaveBeenCalledWith('https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
   })
 
+  test('does not disguise an unexpected clone failure as a successful HTTP response', async () => {
+    mocks.cloneRepo.mockRejectedValueOnce(new Error('clone boundary failed'))
+    const app = createTestRepoRoutes()
+
+    const response = await app.request(
+      new Request('http://localhost/clone', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: 'https://example.com/r.git', parentPath: '/tmp', directoryName: 'r' }),
+      }),
+    )
+
+    expect(response.status).toBe(500)
+  })
+
   test('remove-worktree delegates one composed command and passes cleanup into the repository mutation boundary', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
     const worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {

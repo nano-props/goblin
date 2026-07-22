@@ -1,6 +1,7 @@
 import type { Socket } from 'node:net'
 import { serve, type ServerType } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
+import { APP_REALTIME_WS_MESSAGE_LIMIT_BYTES } from '#/shared/app-realtime-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
 import { disconnectAllClientIntentSockets } from '#/server/modules/client-intent-broker.ts'
@@ -57,7 +58,7 @@ export async function bootstrapServer(options: BootstrapServerOptions = {}): Pro
     serverHost: hostname,
     serverPort: port,
   })
-  const websocket = new WebSocketServer({ noServer: true })
+  const websocket = new WebSocketServer({ noServer: true, maxPayload: APP_REALTIME_WS_MESSAGE_LIMIT_BYTES })
   const server = serve({
     hostname,
     port,

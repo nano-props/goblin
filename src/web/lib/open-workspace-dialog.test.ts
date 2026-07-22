@@ -3,6 +3,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
+import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))
@@ -104,10 +105,24 @@ describe('openWorkspaceFromDialog', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
-  test('falls back to the path dialog when no native directory picker exists', async () => {
+  test('opens the path dialog in the web runtime', async () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
-      value: {},
+      value: {
+        location: {
+          href: 'http://127.0.0.1:32101/',
+          origin: 'http://127.0.0.1:32101',
+          search: '',
+        },
+        __GOBLIN_BOOTSTRAP__: {
+          runtime: {
+            kind: 'web',
+            bridgeVersion: CLIENT_BRIDGE_VERSION,
+            capabilities: WEB_CLIENT_CAPABILITIES,
+          },
+          initialServer: null,
+        },
+      },
     })
     const ensureWorkspaceOpen = vi.fn()
     const activateWorkspace = vi.fn()

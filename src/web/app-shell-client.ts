@@ -5,74 +5,42 @@ import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.t
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 
 function nativeHost() {
-  try {
-    return getClientBridge().host()
-  } catch {
-    return null
-  }
+  return getClientBridge().host()
 }
 
-export function canUseNativeIpcBridge(): boolean {
-  try {
-    return getClientBridge().hasCapability('settings-ipc')
-  } catch {
-    return false
-  }
+function requiredNativeHost() {
+  const host = nativeHost()
+  if (!host) throw new Error('Native host bridge is unavailable')
+  return host
 }
 
 export function hasNativeDirectoryPicker(): boolean {
-  try {
-    return getClientBridge().hasCapability('open-directory-dialog')
-  } catch {
-    return false
-  }
+  return getClientBridge().hasCapability('open-directory-dialog')
 }
 
 export function canOpenAppSettings(): boolean {
-  try {
-    return getClientBridge().hasCapability('open-settings-window')
-  } catch {
-    return false
-  }
+  return getClientBridge().hasCapability('open-settings-window')
 }
 
 export function canUseGlobalShortcutSettings(): boolean {
-  return canUseNativeIpcBridge()
+  return getClientBridge().hasCapability('global-shortcut')
 }
 
 export function homeDirectory(): string {
-  // Host info is fetched once at boot via `useHostInfoStore.hydrate()`.
-  // The store returns `''` before the hydrate resolves, which is
-  // the same fallback the pre-refactor bootstrap carried — the
-  // directory picker and `tildifyPath` both treat an empty home as
-  // "no expansion, return the raw path."
+  // The entrypoint establishes host info before mounting the application.
   return hostInfoHomeDirectory()
 }
 
 export function pathForDroppedFile(file: File): string {
-  try {
-    return getClientBridge().pathForFile(file)
-  } catch {
-    return ''
-  }
+  return getClientBridge().pathForFile(file)
 }
 
 /**
- * Persist clipboard / drop blobs via the active client bridge.
- *
- * Returns absolute paths the PTY can read. On any failure (bridge
- * unavailable, IPC error, HTTP transport problem, server 4xx/5xx),
- * the underlying bridge collapses the error to `[]`; this wrapper
- * preserves that contract so the resolver can count backend transfer
- * failures separately from unsafe path filtering and map them to
- * `paste-file-partial` / `paste-file-failed` toasts.
+ * Persist clipboard / drop blobs through the shared server endpoint.
+ * Transport, HTTP, and response-contract failures reject.
  */
 export async function saveClipboardFiles(files: File[]): Promise<string[]> {
-  try {
-    return await getClientBridge().saveClipboardFiles(files)
-  } catch {
-    return []
-  }
+  return await getClientBridge().saveClipboardFiles(files)
 }
 
 function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
@@ -102,13 +70,13 @@ function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {
 }
 
 async function openExternalUrlWithPolicy(url: string, allowHttp: boolean): Promise<ExecResult> {
-  const host = nativeHost()
-  if (host?.openExternalUrl) return await host.openExternalUrl({ url, allowHttp })
+  const bridge = getClientBridge()
+  if (bridge.kind() === 'electron') return await requiredNativeHost().openExternalUrl({ url, allowHttp })
   return openExternalUrlInBrowser(url, allowHttp)
 }
 
 export async function openAppSettings(page: SettingsPage = 'general'): Promise<boolean> {
-  return (await nativeHost()?.openSettingsWindow?.({ page })) ?? false
+  return await requiredNativeHost().openSettingsWindow({ page })
 }
 
 export async function openProjectGitHub(): Promise<ExecResult> {
@@ -120,13 +88,15 @@ export async function openExternalUrl(url: string): Promise<ExecResult> {
 }
 
 export async function chooseLocalWorkspacePath(): Promise<string | null> {
-  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Open Workspace' })) ?? null
+  return await requiredNativeHost().openDirectoryDialog({ title: 'Open Workspace' })
 }
 
 export async function chooseCloneParentPath(): Promise<string | null> {
-  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Choose Clone Destination' })) ?? null
+  return await requiredNativeHost().openDirectoryDialog({ title: 'Choose Clone Destination' })
 }
 
 export async function consumeExternalOpenPaths(): Promise<string[]> {
-  return (await nativeHost()?.consumeExternalOpenPaths?.()) ?? []
+  const bridge = getClientBridge()
+  if (bridge.kind() === 'web') return []
+  return await requiredNativeHost().consumeExternalOpenPaths()
 }

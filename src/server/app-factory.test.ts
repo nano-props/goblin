@@ -171,6 +171,79 @@ describe('server app body limit', () => {
     )
     expect(response.status).toBe(400)
   })
+
+  test('requires JSON media type after authenticating data POST requests', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    })
+    const request = (authenticated: boolean) =>
+      app.request(
+        new Request('http://127.0.0.1:32100/api/settings/external-apps/refresh', {
+          method: 'POST',
+          headers: {
+            'content-type': 'text/plain',
+            ...(authenticated ? { 'x-goblin-access-token': 'secret' } : {}),
+          },
+          body: '{}',
+        }),
+      )
+
+    const unauthenticated = await request(false)
+    expect(unauthenticated.status).toBe(401)
+
+    const authenticated = await request(true)
+    expect(authenticated.status).toBe(415)
+    expect(await authenticated.json()).toEqual({
+      ok: false,
+      code: 'UNSUPPORTED_MEDIA_TYPE',
+      message: 'Content-Type must be application/json',
+    })
+  })
+
+  test('enforces login media type before the auth route handler', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    })
+    const response = await app.request('http://127.0.0.1:32100/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: JSON.stringify({ token: 'secret' }),
+    })
+    expect(response.status).toBe(415)
+  })
+
+  test('enforces the login body limit before the auth route handler', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
+    })
+    const response = await app.request('http://127.0.0.1:32100/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'x'.repeat(2048) }),
+    })
+    expect(response.status).toBe(413)
+  })
 })
 
 describe('server app html static', () => {
@@ -509,12 +582,11 @@ describe('per-sub-path body limits and auth ordering', () => {
         body: 'x'.repeat(8 * 1024 * 1024),
       }),
     )
-    // c.req.parseBody throws on a non-multipart body, the route
-    // returns BAD_REQUEST (400). Anything other than 413 proves
-    // the bodyLimit let the request through.
-    expect(response.status).toBe(400)
+    // The route rejects the wrong media type with 415. Anything other than
+    // 413 proves the clipboard-specific body limit let the request through.
+    expect(response.status).toBe(415)
     const json = (await response.json()) as { ok: false; code: string }
-    expect(json.code).toBe('BAD_REQUEST')
+    expect(json.code).toBe('UNSUPPORTED_MEDIA_TYPE')
   })
 
   test('/api/clipboard/* still rejects bodies larger than the 12 MiB batch cap with 413', async () => {

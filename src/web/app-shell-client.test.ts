@@ -21,7 +21,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
   return {
     kind: () => 'web',
     hasCapability: (capability) => {
-      if (capability === 'settings-ipc') return typeof overrides.invokeIpc === 'function'
+      if (capability === 'global-shortcut') return typeof overrides.invokeIpc === 'function'
       if (capability === 'open-settings-window') return nativeHost?.openSettingsWindow !== undefined
       if (capability === 'open-external-url') return nativeHost?.openExternalUrl !== undefined
       if (capability === 'open-directory-dialog') return nativeHost?.openDirectoryDialog !== undefined
@@ -68,6 +68,7 @@ describe('app shell client', () => {
     const openSettingsWindow = vi.fn(async () => true)
     bridgeModule.setClientBridgeForTests(
       testBridge({
+        kind: () => 'electron',
         host: () => ({
           openSettingsWindow,
           openExternalUrl: vi.fn(),
@@ -104,6 +105,7 @@ describe('app shell client', () => {
     const hostOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
+        kind: () => 'electron',
         host: () => ({
           openSettingsWindow: vi.fn(),
           openExternalUrl: hostOpenExternalUrl,
@@ -157,11 +159,7 @@ describe('app shell client', () => {
     await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual(['/tmp/a', '/tmp/b'])
   })
 
-  test('saveClipboardFiles collapses bridge throw to [] (resolver treats this as paste-file-failed)', async () => {
-    // The wrapper mirrors pathForDroppedFile's pattern: a bridge that
-    // throws (uninitialised, IPC channel down, etc.) must not bubble
-    // the error out of app-shell-client — the resolver reads `[]`
-    // and surfaces a single toast instead.
+  test('saveClipboardFiles propagates a synchronous bridge failure', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -171,10 +169,10 @@ describe('app shell client', () => {
       }),
     )
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
-    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([])
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('bridge unavailable')
   })
 
-  test('saveClipboardFiles collapses bridge rejection to []', async () => {
+  test('saveClipboardFiles propagates an asynchronous bridge failure', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -184,6 +182,6 @@ describe('app shell client', () => {
       }),
     )
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
-    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([])
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('async bridge failure')
   })
 })

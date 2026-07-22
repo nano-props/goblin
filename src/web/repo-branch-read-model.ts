@@ -1,6 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
 import {
-  getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   getRepoWorktreeStatusQueryData,
 } from '#/web/repo-query-cache.ts'
@@ -61,9 +60,7 @@ export function readRepoBranchQueryProjection(
   repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
-  const projection =
-    getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient) ??
-    getRepoProjectionPlaceholderData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
+  const projection = getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
   const status = getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId, queryClient)
   if (projection?.snapshot && status) return repoBranchReadModelFromSnapshot(projection.snapshot, status.status)
   return null
@@ -73,9 +70,7 @@ export function readRepoBranchSnapshotQueryProjection(
   repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData | null {
-  const projection =
-    getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient) ??
-    getRepoProjectionPlaceholderData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
+  const projection = getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
   return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
 }
 

@@ -1,4 +1,4 @@
-import { canUseGlobalShortcutSettings, canUseNativeIpcBridge } from '#/web/app-shell-client.ts'
+import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
@@ -22,10 +22,6 @@ import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceExternalAppRecentKey, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
-import {
-  nativeSettingsProjectionStateFromSettings,
-  pickNativeSettingsProjectionPatch,
-} from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 type RecentWorkspacesUpdateResponse = {
@@ -60,14 +56,6 @@ async function updateUserSettingsPatch(settings: Record<string, unknown>): Promi
     '/api/settings/prefs',
     { prefs: settings },
   )
-  const patch = pickNativeSettingsProjectionPatch(settings as Partial<UserSettings>)
-  if (!patch || !canUseNativeIpcBridge()) return result
-  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    prefs: {
-      patch,
-      settings: nativeSettingsProjectionStateFromSettings(result.prefs),
-    },
-  })
   return result
 }
 
@@ -123,19 +111,11 @@ export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Prom
     '/api/settings/recent-workspaces/add',
     { workspace },
   )
-  if (!canUseNativeIpcBridge()) return result
-  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentWorkspaces: { recentWorkspaces: result.recentWorkspaces },
-  })
   return result
 }
 
 export async function clearRecentWorkspaces(): Promise<void> {
   await postServerJson<{}, { ok: boolean }>('/api/settings/recent-workspaces/clear', {})
-  if (!canUseNativeIpcBridge()) return
-  await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentWorkspaces: { recentWorkspaces: [] },
-  })
 }
 
 /**

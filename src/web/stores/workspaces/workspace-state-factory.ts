@@ -44,7 +44,6 @@ export function emptyGitWorkspaceProjection(): GitWorkspaceProjection {
     dataLoads: emptyWorkspaceDataLoadBundle(),
     operations: emptyWorkspaceOperations(),
     ui: { branchViewMode: 'all' },
-    projection: { source: 'fresh', savedAt: null },
     remote: {
       remotes: [],
       remoteDetails: [],

@@ -10,8 +10,9 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { reactRootOptions } from '#/web/react-root-options.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 
-const INITIAL_I18N_HYDRATE_TIMEOUT_MS = 15_000
+const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('root element missing')
@@ -22,11 +23,15 @@ void boot()
 
 async function boot(): Promise<void> {
   root.render(<BootLoading />)
-  const timeout = createTimeoutController(INITIAL_I18N_HYDRATE_TIMEOUT_MS)
+  const timeout = createTimeoutController(INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS)
   try {
-    await useI18nStore.getState().hydrate({ subscribe: false, signal: timeout.signal })
+    await Promise.all([
+      useI18nStore.getState().hydrate({ subscribe: false, signal: timeout.signal }),
+      useHostInfoStore.getState().hydrate({ signal: timeout.signal }),
+    ])
   } catch (err) {
-    bootstrapLog.warn('initial i18n hydrate failed', { err })
+    timeout.abort(err)
+    bootstrapLog.warn('initial public bootstrap failed', { err })
     root.render(<BootError onRetry={() => void boot()} />)
     return
   } finally {
@@ -35,13 +40,14 @@ async function boot(): Promise<void> {
   root.render(<AppRoot />)
 }
 
-function createTimeoutController(ms: number): { signal: AbortSignal; dispose: () => void } {
+function createTimeoutController(ms: number): { signal: AbortSignal; abort: (reason: unknown) => void; dispose: () => void } {
   const controller = new AbortController()
   const id = window.setTimeout(() => {
-    controller.abort(new Error(`initial i18n hydrate timed out after ${ms}ms`))
+    controller.abort(new Error(`initial public bootstrap timed out after ${ms}ms`))
   }, ms)
   return {
     signal: controller.signal,
+    abort: (reason) => controller.abort(reason),
     dispose: () => window.clearTimeout(id),
   }
 }
@@ -69,7 +75,7 @@ function BootError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-full items-center justify-center bg-background p-4 text-foreground">
       <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-        <div className="text-sm font-medium">Unable to load language resources.</div>
+        <div className="text-sm font-medium">Unable to load application resources.</div>
         <button
           type="button"
           onClick={onRetry}

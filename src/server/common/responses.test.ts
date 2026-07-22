@@ -36,4 +36,11 @@ describe('errorJson', () => {
     expect(res.status).toBe(413)
     expect(await res.json()).toEqual({ ok: false, code: 'PAYLOAD_TOO_LARGE', message: 'too big' })
   })
+
+  test('maps unsupported media types to 415', async () => {
+    const app = new Hono()
+    app.get('/x', (c) => errorJson(c, 'UNSUPPORTED_MEDIA_TYPE', 'wrong media type'))
+    const res = await app.request('http://localhost/x')
+    expect(res.status).toBe(415)
+  })
 })

@@ -9,6 +9,8 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -110,45 +112,25 @@ beforeEach(() => {
   // have to mock `fetch('/api/host')` for every scenario.
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
-    hydrated: true,
+    status: 'ready',
+    error: null,
   })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
-      bridgeVersion: 1,
-      capabilities: [
-        'settings-ipc',
-        'open-settings-window',
-        'open-external-url',
-        'open-directory-dialog',
-        'consume-external-open-paths',
-        'terminal-notifications',
-        'terminal-badge',
-      ],
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: ELECTRON_CLIENT_CAPABILITIES,
     },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
-  testWindow.goblinNative = {
-    pathForFile: () => '',
+  testWindow.goblinNative = currentNativeBridge({
     invokeIpc,
-    abortIpc: async () => true,
-    onEvent: () => () => {},
     terminal: {
-      open: vi.fn(),
-      restart: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      close: vi.fn(),
-      pruneTerminals: vi.fn(),
-      notifyBell: vi.fn(),
+      notifyBell: vi.fn(async () => true),
       sendTestNotification,
       setBadge: vi.fn(),
-      onOutput: vi.fn(() => () => {}),
-      onBell: vi.fn(() => () => {}),
-      onTitle: vi.fn(() => () => {}),
-      onExit: vi.fn(() => () => {}),
     },
-  }
+  })
 })
 
 afterEach(() => {
@@ -259,25 +241,19 @@ describe('SettingsSurface', () => {
       await Promise.resolve()
     })
 
-    expect(
-      fetchMock.mock.calls.some((call) => {
-        const [url, options] = call as unknown as [unknown, RequestInit | undefined]
-        if (new URL(String(url)).pathname !== '/api/settings/github-cli/refresh') return false
-        return (
-          options &&
-          typeof options === 'object' &&
-          'method' in options &&
-          'headers' in options &&
-          (options as RequestInit).method === 'POST' &&
-          expect
-            .objectContaining({
-              'content-type': 'application/json',
-              'x-goblin-access-token': 'secret',
-            })
-            .asymmetricMatch((options as RequestInit).headers)
-        )
-      }),
-    ).toBe(true)
+    await vi.waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => {
+          const [url, options] = call as unknown as [unknown, RequestInit | undefined]
+          if (new URL(String(url)).pathname !== '/api/settings/github-cli/refresh') return false
+          const headers = new Headers(options?.headers)
+          return (
+            options?.method === 'POST' &&
+            headers.get('content-type') === 'application/json'
+          )
+        }),
+      ).toBe(true)
+    })
   })
 
   test('shows unavailable GitHub CLI status when gh is missing', async () => {

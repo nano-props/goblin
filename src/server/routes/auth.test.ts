@@ -8,10 +8,8 @@ import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
  * to probe auth state (whoami) and read its own token
  * (access-token). The middleware that gates /api/whoami and
  * /api/access-token is the same one used for every other authed
- * route in the server, so the channel-precedence test below is
- * the regression check that the `?t=` WS query, the
- * `x-goblin-access-token` header, and the `goblin_access_token`
- * cookie all keep working as the auth surface evolves.
+ * route in the server. HTTP accepts only the access-token header and
+ * cookie; the query channel is reserved for WebSocket upgrade routes.
  */
 
 const ACCESS_TOKEN = 'abcdefghijklmnopqrstuvwx'
@@ -182,10 +180,10 @@ describe('GET /api/whoami', () => {
     expect(res.status).toBe(200)
   })
 
-  test('returns 200 when the ?t= query matches', async () => {
+  test('returns 401 when the ?t= query matches because URL tokens are WebSocket-only', async () => {
     const app = buildApp()
     const res = await app.request(new Request(`http://localhost/whoami?t=${ACCESS_TOKEN}`))
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(401)
   })
 
   test('returns 401 when nothing is supplied', async () => {

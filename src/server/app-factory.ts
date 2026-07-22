@@ -28,6 +28,7 @@ import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import { isJsonContentType } from '#/server/common/http-validate.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -78,6 +79,16 @@ export function webStaticCacheControl(requestPath: string, response: Response): 
   const isHashedAsset =
     response.status === 200 && requestPath.startsWith('/assets/') && !contentType.toLowerCase().includes('text/html')
   return isHashedAsset ? HASHED_WEB_ASSET_CACHE_CONTROL : ENTRY_WEB_ASSET_CACHE_CONTROL
+}
+
+function requireJsonContentType(): ReturnType<typeof createAccessTokenMiddleware> {
+  return async (c, next) => {
+    if (c.req.method !== 'POST') return await next()
+    if (!isJsonContentType(c.req.header('content-type'))) {
+      return errorJson(c, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json')
+    }
+    return await next()
+  }
 }
 
 function applyWebStaticCacheHeaders(c: Context): void {
@@ -143,7 +154,6 @@ export function createApp(options: ServerAppOptions): Hono {
   // unauthenticated — they're the only way to obtain / clear the
   // cookie, and the only thing they prove is that the caller knows
   // the token (or already has a valid cookie).
-  app.route('/api', createAuthRoutes({ accessToken: options.accessToken }))
   // Body limit on the auth surface. The login route accepts an
   // unauthenticated JSON body (the only field is a 25-char base36
   // token — a few hundred bytes). Capping at 1 KiB stops a hostile
@@ -159,6 +169,7 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
+  app.use('/api/login', requireJsonContentType())
   app.use(
     '/api/logout',
     bodyLimit({
@@ -166,7 +177,9 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
+  app.route('/api', createAuthRoutes({ accessToken: options.accessToken }))
   app.use('/api/settings/*', createAccessTokenMiddleware(options.accessToken))
+  app.use('/api/settings/*', requireJsonContentType())
   app.use(
     '/api/settings/*',
     bodyLimit({
@@ -175,6 +188,7 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/remote/*', createAccessTokenMiddleware(options.accessToken))
+  app.use('/api/remote/*', requireJsonContentType())
   app.use(
     '/api/remote/*',
     bodyLimit({
@@ -183,6 +197,7 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/repo/*', createAccessTokenMiddleware(options.accessToken))
+  app.use('/api/repo/*', requireJsonContentType())
   app.use(
     '/api/repo/*',
     bodyLimit({
@@ -191,6 +206,7 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/workspace/*', createAccessTokenMiddleware(options.accessToken))
+  app.use('/api/workspace/*', requireJsonContentType())
   app.use(
     '/api/workspace/*',
     bodyLimit({

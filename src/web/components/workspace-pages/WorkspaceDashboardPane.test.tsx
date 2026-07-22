@@ -242,10 +242,16 @@ describe('WorkspaceDashboardPane', () => {
 
   test('opens a branch from dashboard branch rows', () => {
     const onSelectBranch = vi.fn()
-    seedRepoWithReadModelForTest({
+    const workspace = seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       branches: [createRepoBranch('feature/open')],
       currentBranchName: 'feature/open',
+    })
+    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
+      snapshot: { branches: [createRepoBranch('feature/open')], current: 'feature/open' },
+      pullRequests: null,
+      requested: { branch: null, pullRequestMode: 'summary' },
+      loadedAt: Date.now(),
     })
 
     const { getByTestId } = renderInJsdom(

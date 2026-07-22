@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -98,6 +99,7 @@ describe('repo-client', () => {
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
+        kind: () => 'electron',
         getBootstrap: () => ({
           ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
@@ -146,6 +148,7 @@ describe('repo-client', () => {
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
+        kind: () => 'electron',
         getBootstrap: () => ({
           ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
@@ -361,8 +364,6 @@ describe('repo-client', () => {
   })
 
   test('opens external workspace apps through embedded server routes even when a native host exists', async () => {
-    const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
-    const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))
     const fetchMock = mockFetch(
       vi
         .fn()
@@ -376,25 +377,12 @@ describe('repo-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc: vi.fn(),
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-          host: {
-            openSettingsWindow: vi.fn(),
-            openExternalUrl: vi.fn(),
-            openDirectoryDialog: vi.fn(),
-            consumeExternalOpenPaths: vi.fn(),
-            openTerminal,
-            openEditor,
-          },
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -417,8 +405,6 @@ describe('repo-client', () => {
       ok: true,
       message: 'server-finder',
     })
-    expect(openTerminal).not.toHaveBeenCalled()
-    expect(openEditor).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'http://127.0.0.1:32100/api/workspace/open-terminal',

@@ -202,7 +202,6 @@ export class WorkspacePaneRuntimeApplication {
         startupShellCommand: input.request.startupShellCommand,
         cols: input.request.cols,
         rows: input.request.rows,
-        clientId: input.request.clientId,
         target,
       },
       {
@@ -307,8 +306,6 @@ export class WorkspacePaneRuntimeApplication {
           runtime: {
             action: 'already-closed',
             terminalSessionId,
-            terminalRuntimeSessionId: null,
-            terminalRuntimeGeneration: null,
           },
         }
       }
@@ -317,10 +314,14 @@ export class WorkspacePaneRuntimeApplication {
       ok: true,
       runtimeType: 'terminal',
       runtime: {
-        action: session ? 'closed' : 'already-closed',
-        terminalSessionId,
-        terminalRuntimeSessionId: session?.terminalRuntimeSessionId ?? null,
-        terminalRuntimeGeneration: session?.terminalRuntimeGeneration ?? null,
+        ...(session
+          ? {
+              action: 'closed' as const,
+              terminalSessionId,
+              terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+              terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+            }
+          : { action: 'already-closed' as const, terminalSessionId }),
       },
     }
   }

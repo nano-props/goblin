@@ -30,6 +30,13 @@
 //      components only use the observation to anchor the portal, which is
 //      irrelevant in tests.
 //
+//   6. Component tests mount below the real entrypoint, which guarantees that
+//      host info is ready before React mounts. Seed that entrypoint invariant
+//      before each jsdom test; host-info tests replace it explicitly.
+
+import { beforeEach } from 'vitest'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
+//
 // Notes on React 18/19 act warnings:
 //   Earlier revisions of this file installed a `console.error` patch to
 //   swallow the "An update to <Component> inside a test was not wrapped
@@ -110,3 +117,12 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
   }
   ;(window as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = NoopResizeObserver
 }
+
+beforeEach(() => {
+  if (typeof window === 'undefined') return
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/test', platform: 'darwin' },
+    status: 'ready',
+    error: null,
+  })
+})

@@ -14,8 +14,7 @@ import { WorkspacePagePane } from '#/web/components/workspace-pages/WorkspacePag
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
-import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
-import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -158,7 +157,6 @@ export function WorkspaceDashboardPane({
                 workspace={workspace}
                 git={workspace.capability.git}
                 currentBranch={branchModel.currentBranch}
-                lang={lang}
               />
               <DashboardStats compact={compact} summary={summary} />
               <div
@@ -292,17 +290,12 @@ function DashboardHeader({
   workspace,
   git,
   currentBranch,
-  lang,
 }: {
   workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
   git: GitWorkspaceProjection
   currentBranch: string
-  lang: Lang
 }) {
   const t = useT()
-  const updatedAt = git.projection.savedAt
-    ? formatRelativeTimeOrNull(new Date(git.projection.savedAt).toISOString(), lang)
-    : null
   const remoteState = dashboardRemoteState(git)
   const displayLocation = formatWorkspaceDisplayLocation(
     workspace.id,
@@ -329,7 +322,6 @@ function DashboardHeader({
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant={remoteState.variant}>{t(remoteState.labelKey)}</Badge>
-        {updatedAt && <span>{t('dashboard.updated', { time: updatedAt })}</span>}
       </div>
     </div>
   )

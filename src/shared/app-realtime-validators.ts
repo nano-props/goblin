@@ -45,40 +45,40 @@ const WorkspacePaneRuntimeSocketActionSchema = v.picklist([
 ] as const)
 
 const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list),
     input: WorkspacePaneTabsListInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace),
     input: WorkspacePaneTabsReplaceInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update),
     input: WorkspacePaneTabsUpdateInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open),
     input: WorkspacePaneRuntimeOpenInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close),
     input: WorkspacePaneRuntimeCloseInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('heartbeat'),
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('ping'),
     requestId: AppRealtimeRequestIdSchema,
   }),
@@ -97,21 +97,21 @@ const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
     ok: v.literal(true),
     action: v.union([WorkspacePaneTabsSocketActionSchema, WorkspacePaneRuntimeSocketActionSchema]),
     payload: v.unknown(),
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
     ok: v.literal(false),
     action: v.union([WorkspacePaneTabsSocketActionSchema, WorkspacePaneRuntimeSocketActionSchema]),
     error: v.string(),
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('pong'),
     requestId: AppRealtimeRequestIdSchema,
   }),

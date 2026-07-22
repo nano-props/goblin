@@ -8,6 +8,7 @@ import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
@@ -28,7 +29,8 @@ beforeEach(() => {
   // mocking `fetch('/api/host')`.
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
-    hydrated: true,
+    status: 'ready',
+    error: null,
   })
   // Use `defineProperty` with `writable: true` so a previous test that
   // installed a read-only descriptor (via `defineProperty` without writable)
@@ -38,17 +40,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     writable: true,
-    value: {
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
-      pathForFile: () => '',
-      invokeIpc: async () => null,
-      abortIpc: async () => true,
-      onEvent: () => () => {},
-    },
+    value: currentNativeBridge(),
   })
 })
 

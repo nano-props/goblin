@@ -10,7 +10,6 @@ import { syncRecentWorkspaces } from '#/main/recent-workspaces.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { wireShellIpc } from '#/main/shell-ipc.ts'
-import { wireClipboardIpc } from '#/main/clipboard-ipc.ts'
 import { wireAccessTokenIpc } from '#/main/access-token-ipc.ts'
 import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
@@ -22,6 +21,7 @@ import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
+import { startNativeSettingsProjectionSync, stopNativeSettingsProjectionSync } from '#/main/native-settings-projection-sync.ts'
 
 function activatePrimaryWindowFromEvent(): void {
   void activationBarrier
@@ -96,6 +96,7 @@ async function finalizeNativeHostExit(): Promise<void> {
     }
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
+    stopNativeSettingsProjectionSync()
     await stopEmbeddedServer('app-quit')
   } finally {
     unregisterAppShortcuts()
@@ -143,9 +144,9 @@ async function initializeNativeHost(): Promise<void> {
   wireNativeHostIpc()
   wireShellIpc()
   wireTerminalIpc()
-  wireClipboardIpc()
   wireAccessTokenIpc()
   await syncInitialGlobalShortcutState(settingsSnapshot)
+  startNativeSettingsProjectionSync(settingsSnapshot)
 }
 
 async function startEmbeddedServerForNativeHost(): Promise<void> {

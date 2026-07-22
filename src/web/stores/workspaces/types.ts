@@ -18,7 +18,6 @@ import type {
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-type RepoDataSource = 'cache' | 'fresh'
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
 }
@@ -68,11 +67,6 @@ export interface WorkspaceUiState {
   preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
 }
 
-interface RepoProjectionMeta {
-  source: RepoDataSource
-  savedAt: number | null
-}
-
 export interface GitRemoteProjection {
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
@@ -102,7 +96,6 @@ export interface GitWorkspaceProjection {
   dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: { branchViewMode: BranchViewMode }
-  projection: RepoProjectionMeta
   remote: GitRemoteProjection
   events: RepoEvent[]
 }

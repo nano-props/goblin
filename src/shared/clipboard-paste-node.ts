@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises'
 import path from 'node:path'
-import { CLIPBOARD_SANITIZE_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
+import { CLIPBOARD_SANITIZED_EMPTY_FILE_NAME } from '#/shared/clipboard-paste.ts'
 
 const WINDOWS_RESERVED_FILE_STEM_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
@@ -19,7 +19,7 @@ export function sanitizeClipboardFileBaseName(name: string): string {
     .basename(name)
     .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
     .trim()
-  return base.length > 0 ? avoidWindowsReservedBaseName(base) : CLIPBOARD_SANITIZE_FALLBACK_FILE_NAME
+  return base.length > 0 ? avoidWindowsReservedBaseName(base) : CLIPBOARD_SANITIZED_EMPTY_FILE_NAME
 }
 
 export function createClipboardTimestampedFileName(): (index: number, baseName: string) => string {

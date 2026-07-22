@@ -401,14 +401,7 @@ describe('terminal-runtime-actions catalog recovery', () => {
 })
 
 describe('terminal-runtime-actions clientId gate', () => {
-  // The action layer is the single point that validates caller
-  // identity before reaching the manager. Every authority-gated
-  // action (write / resize / takeover / restart / attach) accepts a
-  // missing `input.clientId` and falls back to the outer
-  // (request-level) `clientId`. The manager sees a single string,
-  // never undefined, and the manager's tightened
-  // `clientId: string` (no longer optional) contract holds.
-  test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
+  test('write / resize / takeover / restart / attach use the authenticated connection clientId', async () => {
     const { actions, manager } = makeActions({ closeSessionForUserOutcome: () => ({ kind: 'already-closed' }) })
 
     await actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)

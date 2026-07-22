@@ -64,7 +64,7 @@ async function applyGlobalShortcutDisabledProjectionPatch(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
 }): Promise<void> {
-  if (input.patch.globalShortcutDisabled === undefined) return
+  if (input.patch.globalShortcutDisabled === undefined && input.patch.globalShortcut === undefined) return
   const registered = syncGlobalShortcuts(input.settings.globalShortcutDisabled, input.settings.globalShortcut)
   await persistNativeHostGlobalShortcutState(registered)
 }

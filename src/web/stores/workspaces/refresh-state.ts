@@ -30,8 +30,6 @@ export function applyRepoSnapshotShellState(r: WorkspaceState, snap: RepoSnapsho
       git.remote.fetchError = null
     }
   }
-  git.projection.source = 'fresh'
-  git.projection.savedAt = null
   finishDataLoadSuccess(git.dataLoads.repoReadModel, loadedAt)
 }
 

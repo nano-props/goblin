@@ -69,9 +69,12 @@ const mocks = vi.hoisted(() => ({
   fsStat: vi.fn(),
   isGitRepo: vi.fn(),
   getBranches: vi.fn(),
+  getBranchesStrict: vi.fn(),
   getBranchWorktreeIdentities: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
+  getCurrentBranchStrict: vi.fn(),
+  getHeadHashStrict: vi.fn(),
   getDefaultBranch: vi.fn(),
   resolveRepoCommonDir: vi.fn(),
   resolveRepoObjectsDir: vi.fn(),
@@ -96,6 +99,7 @@ const mocks = vi.hoisted(() => ({
   fetchRemoteRepo: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
+  getRemoteSnapshotStrict: vi.fn(),
   getRemoteWorkspacePaneTargetIdentities: vi.fn(),
   resolveRemoteRepoExecutionIdentity: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
@@ -111,8 +115,11 @@ vi.mock('#/system/git/branches.ts', () => ({
   deleteBranch: mocks.deleteBranch,
   deleteUpstreamBranch: mocks.deleteUpstreamBranch,
   getBranches: mocks.getBranches,
+  getBranchesStrict: mocks.getBranchesStrict,
   getBranchWorktreeIdentities: mocks.getBranchWorktreeIdentities,
   getCurrentBranch: mocks.getCurrentBranch,
+  getCurrentBranchStrict: mocks.getCurrentBranchStrict,
+  getHeadHashStrict: mocks.getHeadHashStrict,
   getDefaultBranch: mocks.getDefaultBranch,
   resolveRepoCommonDir: mocks.resolveRepoCommonDir,
   resolveRepoObjectsDir: mocks.resolveRepoObjectsDir,
@@ -203,6 +210,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteWorkspacePaneTargetIdentities: mocks.getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoExecutionIdentity: mocks.resolveRemoteRepoExecutionIdentity,
   getRemoteSnapshot: vi.fn(),
+  getRemoteSnapshotStrict: mocks.getRemoteSnapshotStrict,
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
   getRemoteWorktreeBootstrapPreview: mocks.getRemoteWorktreeBootstrapPreview,
@@ -291,6 +299,7 @@ beforeEach(async () => {
     generationKey: 'remote-generation-1',
   }))
   mocks.getCurrentBranch.mockResolvedValue('main')
+  mocks.getCurrentBranchStrict.mockResolvedValue('main')
   mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
   )
@@ -388,8 +397,8 @@ describe('getRepoSnapshot', () => {
   test('reads git state directly without publishing invalidation', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([])
     const snapshot = repoSnapshot('fresh')
-    mocks.getBranches.mockResolvedValueOnce(snapshot.branches)
-    mocks.getCurrentBranch.mockResolvedValueOnce(snapshot.current)
+    mocks.getBranchesStrict.mockResolvedValueOnce(snapshot.branches)
+    mocks.getCurrentBranchStrict.mockResolvedValueOnce(snapshot.current)
     mocks.getRemoteInfo.mockResolvedValueOnce(snapshot.remote)
 
     const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
@@ -397,6 +406,16 @@ describe('getRepoSnapshot', () => {
 
     expect(result).toEqual(snapshot)
     expectNoRepoSnapshotInvalidations()
+  })
+
+  test('rejects an authoritative snapshot when branch membership cannot be read', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.getBranchesStrict.mockRejectedValueOnce(new Error('git unavailable'))
+
+    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('git unavailable')
+    expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
   })
 })
 
@@ -464,6 +483,27 @@ describe('getRepoPullRequests', () => {
 })
 
 describe('fetchRepo invalidation publishing', () => {
+  test('does not execute fetch when affected-worktree discovery fails', async () => {
+    mocks.getWorktrees.mockRejectedValueOnce(new Error('worktree discovery failed'))
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('worktree discovery failed')
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
+  })
+
+  test('does not execute remote fetch when affected-worktree discovery fails', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.getRemoteRepoWorktreePaths.mockRejectedValueOnce(new Error('remote worktree discovery failed'))
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(fetchRepo(repoId, 'user')).rejects.toThrow('remote worktree discovery failed')
+    expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
+  })
+
   test.each([
     ['user', 'user'],
     ['background', 'background'],

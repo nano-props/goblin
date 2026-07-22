@@ -46,7 +46,6 @@ class TerminalSessionCreator {
 
   async create(input: {
     clientId: string
-    terminalClientId: string
     userId: string
     request: ServerTerminalCreateInput
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
@@ -73,7 +72,7 @@ class TerminalSessionCreator {
               input.userId,
               {
                 ...input.request,
-                clientId: input.terminalClientId,
+                clientId: input.clientId,
                 terminalSessionId,
               },
               input.physicalWorktreeCapability,

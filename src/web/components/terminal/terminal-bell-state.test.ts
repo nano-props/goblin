@@ -7,6 +7,8 @@ import { terminalSessionBase } from '#/shared/terminal-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const descriptor = terminalDescriptorForTest({
   terminalSessionId: 'term-111111111111111111111',
@@ -25,21 +27,22 @@ beforeEach(() => {
   )
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
-    value: {
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      invokeIpc: vi.fn(),
-      abortIpc: vi.fn(),
-      onEvent: vi.fn(() => () => {}),
-      pathForFile: vi.fn(() => ''),
+    value: currentNativeBridge({
       terminal: {
         notifyBell: vi.fn(async () => true),
-        setBadge: vi.fn(async () => {}),
+        sendTestNotification: vi.fn(async () => true),
+        setBadge: vi.fn(),
       },
-    },
+    }),
   })
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: ELECTRON_CLIENT_CAPABILITIES,
+      },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     },
   })

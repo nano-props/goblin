@@ -32,6 +32,14 @@ export interface RealtimeBrokerOptions {
  */
 export const REALTIME_HEARTBEAT_INTERVAL_MS = 30_000
 export const REALTIME_HEARTBEAT_DEADLINE_MS = 90_000
+export const MAX_APP_REALTIME_SOCKETS = 32
+
+export class AppRealtimeSocketLimitError extends Error {
+  constructor() {
+    super(`Too many app realtime subscribers (max ${MAX_APP_REALTIME_SOCKETS})`)
+    this.name = 'AppRealtimeSocketLimitError'
+  }
+}
 
 interface ClientPresenceRecord {
   socketCount: number
@@ -58,6 +66,7 @@ export class RealtimeBroker<TMessage> {
 
   registerSocket(clientId: string, userId: string, socket: RealtimeSocket): void {
     if (this.socketMetaBySocket.has(socket)) this.unregisterSocket(socket)
+    if (this.socketCount() >= MAX_APP_REALTIME_SOCKETS) throw new AppRealtimeSocketLimitError()
     let sockets = this.socketsByUserId.get(userId)
     if (!sockets) {
       sockets = new Set()

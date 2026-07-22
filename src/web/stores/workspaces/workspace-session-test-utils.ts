@@ -79,7 +79,6 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       if (index !== -1) calls.workspaceEntries.splice(index, 1)
       return undefined
     },
-    'settings.applyNativeHostProjection': async () => undefined,
   }
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'workspaceProbe') {

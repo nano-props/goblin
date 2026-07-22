@@ -139,19 +139,20 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'attach',
-      input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
+      input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
     })
 
     expect(normalizeAppRealtimeClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
       type: 'ping',
       requestId: 'health_1',
     })
+    expect(normalizeAppRealtimeClientMessage({ type: 'ping', requestId: 'health_1', clientId: 'forged' })).toBeNull()
 
     expect(
       normalizeAppRealtimeClientMessage({
@@ -319,13 +320,21 @@ describe('shared terminal validators', () => {
           kind: 'primary',
           cols: 100,
           rows: 30,
-          clientId: 'client_a',
         },
         insertAfterIdentity: 'workspace-pane:status',
       },
     }
 
     expect(normalizeAppRealtimeClientMessage(message)).toEqual(message)
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: {
+          ...message.input,
+          request: { ...message.input.request, clientId: 'client_spoofed' },
+        },
+      }),
+    ).toBeNull()
     expect(
       normalizeAppRealtimeClientMessage({
         ...message,
@@ -431,6 +440,41 @@ describe('shared terminal validators', () => {
         },
       }),
     ).toBeNull()
+  })
+
+  test('rejects client identity supplied inside terminal action payloads', () => {
+    const terminalRuntimeSessionId = 'pty_request_123456789'
+    const requests = [
+      { action: 'attach', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+      { action: 'restart', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+      { action: 'write', input: { terminalRuntimeSessionId, data: 'echo test' } },
+      { action: 'resize', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+      { action: 'takeover', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+    ] as const
+
+    for (const [index, request] of requests.entries()) {
+      expect(
+        normalizeTerminalClientMessage({
+          type: 'request',
+          requestId: `request_spoofed_${index}`,
+          action: request.action,
+          input: { ...request.input, clientId: 'client_spoofed' },
+        }),
+      ).toBeNull()
+    }
+  })
+
+  test('rejects client identity and unknown fields on terminal request envelopes', () => {
+    const request = {
+      type: 'request',
+      requestId: 'request_strict_envelope',
+      action: 'write',
+      input: { terminalRuntimeSessionId: 'pty_request_123456789', data: 'echo test' },
+    } as const
+
+    expect(normalizeTerminalClientMessage(request)).toEqual(request)
+    expect(normalizeTerminalClientMessage({ ...request, clientId: 'client_spoofed' })).toBeNull()
+    expect(normalizeTerminalClientMessage({ ...request, legacyField: true })).toBeNull()
   })
 
   test('rejects legacy and dual workspace identity on scoped terminal requests', () => {
@@ -910,8 +954,6 @@ describe('shared terminal validators', () => {
       {
         action: 'already-closed' as const,
         terminalSessionId: 'term-222222222222222222222',
-        terminalRuntimeSessionId: null,
-        terminalRuntimeGeneration: null,
       },
     ]
     for (const [index, runtime] of effects.entries()) {

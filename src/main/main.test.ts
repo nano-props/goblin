@@ -48,7 +48,6 @@ const mocks = vi.hoisted(() => {
     broadcastClientEffectIntent: vi.fn(),
     wireShellIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
-    wireClipboardIpc: vi.fn(),
     wireAccessTokenIpc: vi.fn(),
     isTrustedIpcEvent: vi.fn(() => true),
     resetReady() {
@@ -90,6 +89,11 @@ vi.mock('electron', () => ({
     }),
     removeAllListeners: vi.fn(),
   },
+}))
+
+vi.mock('#/main/native-settings-projection-sync.ts', () => ({
+  startNativeSettingsProjectionSync: vi.fn(),
+  stopNativeSettingsProjectionSync: vi.fn(),
 }))
 
 vi.mock('#/main/window.ts', () => ({
@@ -147,10 +151,6 @@ vi.mock('#/main/settings-server-client.ts', () => ({
 vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   startEmbeddedServer: vi.fn(() => Promise.resolve()),
   stopEmbeddedServer: vi.fn(() => Promise.resolve()),
-}))
-
-vi.mock('#/main/clipboard-ipc.ts', () => ({
-  wireClipboardIpc: mocks.wireClipboardIpc,
 }))
 
 vi.mock('#/main/access-token-ipc.ts', () => ({

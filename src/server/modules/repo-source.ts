@@ -8,11 +8,12 @@ import {
   deleteBranch,
   deleteUpstreamBranch,
   getBranchWorktreeIdentities,
-  getBranches,
+  getBranchesStrict,
   getCurrentBranch,
+  getCurrentBranchStrict,
   resolveRepoCommonDir,
   resolveRepoObjectsDir,
-  getHeadHash,
+  getHeadHashStrict,
   getLog as getBranchLog,
   getUpstream,
   isAncestor,
@@ -60,6 +61,7 @@ import {
   getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoExecutionIdentity,
   getRemoteSnapshot,
+  getRemoteSnapshotStrict,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
   getRemoteTrackingBranches as getSshRemoteTrackingBranches,
@@ -545,11 +547,9 @@ function remoteWorktreeRepoIds(
 }
 
 async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
-  try {
-    return localWorktreeRepoIds(await getWorktrees(repoId, { includeStatus: false, signal }))
-  } catch {
-    return []
-  }
+  const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+  signal?.throwIfAborted()
+  return localWorktreeRepoIds(worktrees)
 }
 
 async function readRemoteAffectedRepoIds(
@@ -557,11 +557,9 @@ async function readRemoteAffectedRepoIds(
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<WorkspaceId[]> {
-  try {
-    return remoteWorktreeRepoIds(target, await getRemoteRepoWorktreePaths(target, { signal, run }))
-  } catch {
-    return []
-  }
+  const worktreePaths = await getRemoteRepoWorktreePaths(target, { signal, run })
+  signal?.throwIfAborted()
+  return remoteWorktreeRepoIds(target, worktreePaths)
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -656,22 +654,16 @@ function createLocalRepoSource(
       if (!isValidCwd(repoId)) return null
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      try {
-        const worktrees = await getWorktrees(repoId, { signal })
-        if (signal?.aborted) return null
-        const branches = await getBranches(repoId, worktrees, { signal })
-        if (signal?.aborted) return null
-        const current = await getCurrentBranch(repoId, { signal })
-        if (signal?.aborted) return null
-        const currentHEAD = current ? undefined : await getHeadHash(repoId, { signal })
-        if (signal?.aborted) return null
-        const remote = await getRemoteInfo(repoId, signal)
-        if (signal?.aborted) return null
-        return { branches, current, currentHEAD, remote }
-      } catch (err) {
-        if (signal?.aborted) return null
-        throw err
-      }
+      signal?.throwIfAborted()
+      const worktrees = await getWorktrees(repoId, { signal })
+      signal?.throwIfAborted()
+      const currentBranch = await getCurrentBranchStrict(repoId, { signal })
+      const branches = await getBranchesStrict(repoId, worktrees, currentBranch, { signal })
+      const current = currentBranch ?? ''
+      const currentHEAD = currentBranch === null ? await getHeadHashStrict(repoId, { signal }) : undefined
+      const remote = await getRemoteInfo(repoId, signal)
+      signal?.throwIfAborted()
+      return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
       const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
@@ -866,8 +858,8 @@ async function createRemoteRepoSource(
     id: repoId,
     kind: 'remote',
     async getSnapshot(signal) {
-      const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
-      if (signal?.aborted || !remoteSnapshot) return null
+      const remoteSnapshot = await getRemoteSnapshotStrict(target, { signal, run })
+      signal?.throwIfAborted()
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {

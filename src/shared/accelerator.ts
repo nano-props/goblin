@@ -128,6 +128,12 @@ export function isReservedGlobalShortcut(accelerator: string): boolean {
   return parsed !== null && RESERVED_GLOBAL_SHORTCUTS.has(parsed)
 }
 
+/** Canonical command input, excluding shortcuts owned by built-in application actions. */
+export function parseAllowedGlobalShortcut(value: unknown): string | null {
+  const parsed = parseGlobalShortcut(value)
+  return parsed && !isReservedGlobalShortcut(parsed) ? parsed : null
+}
+
 export function globalShortcutFromKeyboardEvent(e: KeyboardEvent): string | null {
   const key = keyFromKeyboardEvent(e)
   if (!key) return null

@@ -5,7 +5,6 @@ import {
   getBackgroundSyncRepos,
   prepareBackgroundSync,
 } from '#/server/modules/background-sync.ts'
-import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   readRepoProjection,
   readRepoWorktreeStatus,
@@ -54,31 +53,17 @@ import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
 
-// Soft-fail envelope returned by `jsonOr` for every repo action that
-// doesn't have a more specific success shape. Keep this in one place
-// so the client sees a stable contract — `err.message` is the
-// human-readable i18n key, `err.ok === false` is the branch.
-const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
-
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   repoMutationApplication: ServerRepoMutationHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
   const app = createRouteApp()
-  async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
-    try {
-      return await run()
-    } catch (err) {
-      serverRepoNodeLog.warn({ err, label }, 'failed')
-      return fallback
-    }
-  }
   async function runtimeReadJsonOrThrow<T>(
     userId: string,
     run: () => Promise<T>,
     label: string,
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): Promise<T> {
     return await runGitWorkspaceRuntimeRequest({ userId, run, label, signal })
   }
@@ -111,6 +96,7 @@ export function createRepoRoutes(options: {
             workspaceRuntimeId,
           }),
         'log',
+        c.req.raw.signal,
       ),
     )
   })
@@ -124,6 +110,7 @@ export function createRepoRoutes(options: {
         userId,
         () => getRepoRemoteBranches(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'remote-branches',
+        c.req.raw.signal,
       ),
     )
   })
@@ -137,6 +124,7 @@ export function createRepoRoutes(options: {
         userId,
         () => getRepoWorktreeBootstrapPreview(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'worktree-bootstrap-preview',
+        c.req.raw.signal,
       ),
     )
   })
@@ -150,6 +138,7 @@ export function createRepoRoutes(options: {
         userId,
         () => getRepoPatch(cwd, worktreePath, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'patch',
+        c.req.raw.signal,
       ),
     )
   })
@@ -163,6 +152,7 @@ export function createRepoRoutes(options: {
         userId,
         () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal, workspaceRuntimeId }),
         'projection',
+        c.req.raw.signal,
       ),
     )
   })
@@ -176,6 +166,7 @@ export function createRepoRoutes(options: {
         userId,
         () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'worktree-status',
+        c.req.raw.signal,
       ),
     )
   })
@@ -212,14 +203,17 @@ export function createRepoRoutes(options: {
     assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId), 'fetch'),
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
+        'fetch',
+        c.req.raw.signal,
+      ),
     )
   })
   app.post('/clone', async (c) => {
     const { url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
-    return c.json(
-      await jsonOr(() => cloneRepo(url, parentPath, directoryName, c.req.raw.signal), READ_REPO_ERROR, 'clone'),
-    )
+    return c.json(await cloneRepo(url, parentPath, directoryName, c.req.raw.signal))
   })
   app.post('/pull', async (c) => {
     const { cwd, workspaceRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
@@ -230,6 +224,7 @@ export function createRepoRoutes(options: {
       userId,
       () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
       'pull',
+      c.req.raw.signal,
     )
     return c.json(publishPullFilesystemInvalidations(userId, cwd, workspaceRuntimeId, result))
   })
@@ -243,6 +238,7 @@ export function createRepoRoutes(options: {
         userId,
         () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
         'push',
+        c.req.raw.signal,
       ),
     )
   })
@@ -263,6 +259,7 @@ export function createRepoRoutes(options: {
             worktreeBootstrap,
           }),
         'create-worktree',
+        c.req.raw.signal,
       ),
     )
   })
@@ -287,6 +284,7 @@ export function createRepoRoutes(options: {
           })
         },
         'delete-branch',
+        c.req.raw.signal,
       ),
     )
   })
@@ -336,6 +334,7 @@ export function createRepoRoutes(options: {
         userId,
         () => openRepoUrl(cwd, target, c.req.raw.signal, { workspaceRuntimeId }),
         'open-url',
+        c.req.raw.signal,
       ),
     )
   })

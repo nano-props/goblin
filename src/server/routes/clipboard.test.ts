@@ -65,6 +65,24 @@ describe('clipboard routes', () => {
     expect(res.status).toBe(400)
   })
 
+  test('415 when the request is not multipart form data', async () => {
+    const { createClipboardRoutes } = await import('#/server/routes/clipboard.ts')
+    const app = createClipboardRoutes()
+    const res = await app.request(
+      new Request('http://x/files', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ files: [] }),
+      }),
+    )
+    expect(res.status).toBe(415)
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: 'UNSUPPORTED_MEDIA_TYPE',
+      message: 'Content-Type must be multipart/form-data',
+    })
+  })
+
   test('413 surfaces a PAYLOAD_TOO_LARGE envelope when the module throws "exceeds"', async () => {
     mocks.saveClipboardFiles.mockRejectedValue(new Error('Clipboard payload exceeds 12345 bytes'))
     const { createClipboardRoutes } = await import('#/server/routes/clipboard.ts')

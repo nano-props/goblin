@@ -14,10 +14,13 @@ import {
   RemoteDirectoryPathSuggestionsInputSchema,
   RemoteWorkspaceTargetSchema,
 } from '#/shared/api-types.ts'
-import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
-import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.ts'
+import {
+  parseWorkspaceExternalAppRecentKey,
+  WORKSPACE_EXTERNAL_APP_IDS,
+  WORKTREE_BOOTSTRAP_CONFIG_HASH_RE,
+} from '#/shared/workspace-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
@@ -25,12 +28,20 @@ import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
+import { COLOR_THEMES } from '#/shared/color-theme.ts'
+import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
+import { ClientWorkspaceStateSchema } from '#/shared/client-workspace-state-schema.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const FetchIntervalSecSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(3600))
+const GlobalShortcutSchema = v.pipe(
+  v.string(),
+  v.check((value) => parseAllowedGlobalShortcut(value) !== null, 'invalid global shortcut'),
+)
 const RepoUrlTargetSchema = v.variant('type', [
   v.object({ type: v.literal('root') }),
   // `remote` is an optional hint for which remote to resolve the URL against
@@ -214,26 +225,6 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-const FiletreeSessionViewStateSchema = v.object({
-  selectedKeys: v.array(v.string()),
-  expandedKeys: v.array(v.string()),
-  topVisibleRowIndex: v.number(),
-})
-const ClientWorkspaceStateSchema = v.object({
-  restoredWorkspaceId: v.nullable(WorkspaceIdSchema),
-  zenMode: v.boolean(),
-  workspacePaneSize: v.number(),
-  selectedTerminalSessionIdByTerminalFilesystemTarget: v.record(v.string(), v.string()),
-  preferredWorkspacePaneTabByTargetByWorkspace: v.record(
-    v.string(),
-    v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
-  ),
-  filetreeViewStateByFilesystemTargetByWorkspace: v.record(
-    v.string(),
-    v.record(v.string(), FiletreeSessionViewStateSchema),
-  ),
-})
-
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`
 // and `/api/settings/github-cli/refresh`): both accept an optional `hosts`
 // filter so the client can scope detection to specific hostnames.
@@ -242,17 +233,23 @@ export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
 })
 
 export const SETTINGS_PROCEDURE_SCHEMAS = {
-  fetchInterval: v.object({ sec: v.number() }),
+  fetchInterval: v.strictObject({ sec: FetchIntervalSecSchema }),
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentWorkspacesAdd: v.object({ workspace: WorkspaceSessionEntrySchema }),
   // Body for `POST /api/settings/workspace-external-app-recent`. The
   // The server re-validates that targetKey is canonical and belongs to
   // workspaceId before touching disk.
-  workspaceExternalAppRecentSet: v.object({
-    workspaceId: WorkspaceIdSchema,
-    targetKey: v.pipe(v.string(), v.minLength(1)),
-    itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
-  }),
+  workspaceExternalAppRecentSet: v.pipe(
+    v.strictObject({
+      workspaceId: WorkspaceIdSchema,
+      targetKey: v.pipe(v.string(), v.minLength(1)),
+      itemId: v.picklist(WORKSPACE_EXTERNAL_APP_IDS),
+    }),
+    v.check(
+      (input) => parseWorkspaceExternalAppRecentKey(input.workspaceId, input.targetKey) !== null,
+      'invalid workspace external-app target',
+    ),
+  ),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   workspaceRestore: v.object({
     clientId: ClientIdSchema,
@@ -268,12 +265,20 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   }),
 } as const
 
-// `prefs` accepts a permissive patch — the underlying
-// `updateUserSettings` does field-level validation (and
-// ignores unknown keys), so we only enforce that the body is an
-// object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
-  prefs: v.object({ prefs: v.record(v.string(), v.unknown()) }),
+  prefs: v.strictObject({
+    prefs: v.strictObject({
+      theme: v.optional(v.picklist(['auto', 'light', 'dark'])),
+      colorTheme: v.optional(v.picklist(COLOR_THEMES)),
+      lang: v.optional(v.picklist(['auto', 'en', 'zh', 'ko', 'ja'])),
+      fetchIntervalSec: v.optional(FetchIntervalSecSchema),
+      terminalNotificationsEnabled: v.optional(v.boolean()),
+      shortcutsDisabled: v.optional(v.boolean()),
+      globalShortcutDisabled: v.optional(v.boolean()),
+      globalShortcut: v.optional(GlobalShortcutSchema),
+      lanEnabled: v.optional(v.boolean()),
+    }),
+  }),
 } as const
 
 // Native host IPC procedures — Electron-only operations that bypass
@@ -284,7 +289,6 @@ export const NATIVE_HOST_IPC_PROCEDURE_SCHEMAS = {
     write: ClientWorkspaceStateSchema,
   },
   settings: {
-    setGlobalShortcut: v.object({ accelerator: v.string() }),
-    applyNativeHostProjection: NativeHostProjectionSchema,
+    setGlobalShortcut: v.strictObject({ accelerator: GlobalShortcutSchema }),
   },
 } as const

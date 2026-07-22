@@ -38,6 +38,7 @@ import {
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { IpcEvent } from '#/shared/api-types.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
@@ -48,6 +49,7 @@ import {
   gitWorktreePaneFilesystemTarget,
   type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -65,7 +67,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   }
 })
 
-const ipcEventListeners = new Set<(event: { type: string; workspaceId?: string; key?: string }) => void>()
+const ipcEventListeners = new Set<(event: IpcEvent) => void>()
 const intentListeners = new Set<(event: any) => void>()
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
@@ -137,10 +139,10 @@ beforeEach(() => {
   navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
-    value: {
+    value: currentNativeBridge({
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
-      onEvent: vi.fn((cb: (event: { type: string; workspaceId?: string; key?: string }) => void) => {
+      onEvent: vi.fn((cb: (event: IpcEvent) => void) => {
         ipcEventListeners.add(cb)
         return () => {
           ipcEventListeners.delete(cb)
@@ -152,27 +154,13 @@ beforeEach(() => {
           intentListeners.delete(cb)
         }
       }),
-      pathForFile: vi.fn(() => ''),
       host: {
+        openSettingsWindow: vi.fn(async () => true),
+        openExternalUrl: vi.fn(async () => ({ ok: true, message: '' })),
+        openDirectoryDialog: vi.fn(async () => null),
         consumeExternalOpenPaths: consumeExternalOpenPathsSpy,
       },
-      terminal: {
-        open: vi.fn(),
-        restart: vi.fn(),
-        write: vi.fn(),
-        resize: vi.fn(),
-        takeover: vi.fn(),
-        close: vi.fn(),
-        pruneTerminals: vi.fn(),
-        notifyBell: vi.fn(),
-        sendTestNotification: vi.fn(),
-        setBadge: vi.fn(),
-        onOutput: vi.fn(() => () => {}),
-        onBell: vi.fn(() => () => {}),
-        onTitle: vi.fn(() => () => {}),
-        onExit: vi.fn(() => () => {}),
-      },
-    },
+    }),
   })
 })
 

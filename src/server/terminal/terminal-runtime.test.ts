@@ -410,7 +410,6 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
     kind: 'additional',
     cols: 80,
     rows: 24,
-    ...(clientId ? { clientId } : {}),
   })
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)
@@ -418,7 +417,6 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     cols: 80,
     rows: 24,
-    ...(clientId ? { clientId } : {}),
   })
   expect(attached).toMatchObject({ ok: true, frame: 'stream' })
   return result.terminalRuntimeSessionId
@@ -437,13 +435,12 @@ async function createAdmittedTerminal(
     ...(input.startupShellCommand ? { startupShellCommand: input.startupShellCommand } : {}),
     ...(input.cols === undefined ? {} : { cols: input.cols }),
     ...(input.rows === undefined ? {} : { rows: input.rows }),
-    ...(input.clientId ? { clientId: input.clientId } : {}),
     target: input.target ?? terminalCreateTarget(input),
   }
   acquireWorkspaceRuntime(userId, request.target.workspaceId, clientId)
   const result = await application.openRuntime(clientId, userId, {
     runtimeType: 'terminal',
-    request: request.clientId ? request : { ...request, clientId },
+    request,
   })
   return result.ok ? result.runtime : { ok: false, message: result.message }
 }
@@ -519,7 +516,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
 
     expect(result.ok).toBe(true)
@@ -564,7 +560,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
 
     expect(result.ok).toBe(true)
@@ -581,7 +576,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId: result.terminalRuntimeSessionId,
         cols: 80,
         rows: 24,
-        clientId: 'client_a',
       }),
     ).resolves.toMatchObject({
       ok: true,
@@ -613,7 +607,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
@@ -623,15 +616,13 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         cols: 80,
         rows: 24,
-        clientId: 'client_a',
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream' })
 
-    const attachResult = await host.attach('client_a', USER_1, {
+    const attachResult = await host.attach('client_b', USER_1, {
       terminalRuntimeSessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_b',
     })
     expect(attachResult).toMatchObject({
       ok: true,
@@ -672,7 +663,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(attach.ok).toBe(true)
     if (!attach.ok || attach.frame !== 'snapshot') return
@@ -699,7 +689,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
@@ -710,7 +699,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         cols: 80,
         rows: 24,
-        clientId: 'client_a',
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream' })
 
@@ -722,7 +710,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 101,
       rows: 31,
-      clientId: 'client_a',
     })
     expect(reattachResult).toMatchObject({
       ok: true,
@@ -763,7 +750,6 @@ describe('server terminal runtime', () => {
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
@@ -778,7 +764,7 @@ describe('server terminal runtime', () => {
         type: 'request',
         requestId: 'req_attach_resize',
         action: 'attach',
-        input: { terminalRuntimeSessionId, cols: 101, rows: 31, clientId: 'client_a' },
+        input: { terminalRuntimeSessionId, cols: 101, rows: 31 },
       }),
     )
 
@@ -821,7 +807,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
 
@@ -933,7 +918,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
 
@@ -987,7 +971,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
         cols: 80,
         rows: 24,
-        clientId: 'client_a',
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream' })
     socket.send.mockClear()
@@ -1072,7 +1055,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
@@ -1581,7 +1563,6 @@ describe('server terminal runtime', () => {
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_browser',
     })
     expect(first.ok).toBe(true)
     if (!first.ok) return
@@ -1600,7 +1581,6 @@ describe('server terminal runtime', () => {
       kind: 'primary',
       cols: 102,
       rows: 33,
-      clientId: 'client_electron',
     })
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
@@ -1614,7 +1594,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId: reopened.terminalRuntimeSessionId,
         cols: 102,
         rows: 33,
-        clientId: 'client_electron',
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream', canonicalCols: 102, canonicalRows: 33 })
 
@@ -1660,7 +1639,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId: failed.terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(failedAttach).toEqual({ ok: false, message: 'pty spawn failed' })
 
@@ -1709,7 +1687,6 @@ describe('server terminal runtime', () => {
           terminalRuntimeSessionId: retried.terminalRuntimeSessionId,
           cols: 80,
           rows: 24,
-          clientId: 'client_a',
         }),
       ).resolves.toMatchObject({ ok: true, frame: 'stream' })
     }
@@ -1733,7 +1710,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_a',
     })
     expect(restarted.ok).toBe(false)
     if (restarted.ok) return
@@ -1769,7 +1745,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_b',
     })
     expect(restarted.ok).toBe(false)
     if (!restarted.ok) return
@@ -1786,7 +1761,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_a',
     })
     expect(retry.ok).toBe(false)
     if (retry.ok) return
@@ -1862,7 +1836,6 @@ describe('server terminal runtime', () => {
             kind: 'primary',
             cols: 80,
             rows: 24,
-            clientId: 'forged_client',
           },
         },
       }),
@@ -1968,7 +1941,6 @@ describe('server terminal runtime', () => {
       runtime: {
         action: 'already-closed',
         terminalSessionId: opened.runtime.terminalSessionId,
-        terminalRuntimeSessionId: null,
       },
     })
     await expect(
@@ -2002,11 +1974,10 @@ describe('server terminal runtime', () => {
     const terminalRuntimeSessionId = await createTerminalSession(host, 'client_1')
     host.registerSocket('client_b', USER_1, socketB)
 
-    const result = host.takeover('client_a', USER_1, {
+    const result = host.takeover('client_b', USER_1, {
       terminalRuntimeSessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_b',
     })
 
     expect(result).toEqual({
@@ -2044,7 +2015,7 @@ describe('server terminal runtime', () => {
         type: 'request',
         requestId: 'req_takeover',
         action: 'takeover',
-        input: { terminalRuntimeSessionId, cols: 120, rows: 40, clientId: 'client_b' },
+        input: { terminalRuntimeSessionId, cols: 120, rows: 40 },
       }),
     )
 
@@ -2093,7 +2064,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
 
@@ -2132,7 +2102,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(userACreate.ok).toBe(true)
     if (!userACreate.ok) return
@@ -2167,7 +2136,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 100,
       rows: 30,
-      clientId: 'client_b',
     })
     expect(userBCreate.ok).toBe(true)
     if (!userBCreate.ok) return
@@ -2220,7 +2188,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(first.ok).toBe(true)
     expect(mockPtys).toHaveLength(1)
@@ -2250,7 +2217,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId: recreatedSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_b',
     })
     expect(replacementAttach.ok).toBe(true)
     if (!first.ok || !replacementAttach.ok) return
@@ -2277,7 +2243,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
@@ -2288,11 +2253,10 @@ describe('server terminal runtime', () => {
     // B comes online and attaches — no explicit takeover needed
     // because A is no longer the effective controller.
     host.registerSocket('client_b', USER_1, socketB)
-    const viewerAttach = await host.attach('client_a', USER_1, {
+    const viewerAttach = await host.attach('client_b', USER_1, {
       terminalRuntimeSessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_b',
     })
     expect(viewerAttach).toMatchObject({
       ok: true,
@@ -2335,7 +2299,6 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
@@ -2345,7 +2308,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         cols: 80,
         rows: 24,
-        clientId: 'client_a',
       }),
     ).resolves.toMatchObject({ ok: true, frame: 'stream' })
     mockPtys[0]?.emitData('ready')
@@ -2353,11 +2315,10 @@ describe('server terminal runtime', () => {
     // A goes offline; B attaches and claims because no effective controller remains.
     host.unregisterSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
-    const bAttach = await host.attach('client_a', USER_1, {
+    const bAttach = await host.attach('client_b', USER_1, {
       terminalRuntimeSessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_b',
     })
     expect(bAttach).toMatchObject({
       ok: true,
@@ -2371,7 +2332,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(aReattach).toMatchObject({
       ok: true,
@@ -2387,15 +2347,13 @@ describe('server terminal runtime', () => {
     const aWrite = await host.write('client_a', USER_1, {
       terminalRuntimeSessionId,
       data: 'ls\n',
-      clientId: 'client_a',
     })
     expect(aWrite).toEqual({ status: 'rejected' })
 
     // B's write still works.
-    const bWrite = await host.write('client_a', USER_1, {
+    const bWrite = await host.write('client_b', USER_1, {
       terminalRuntimeSessionId,
       data: 'pwd\n',
-      clientId: 'client_b',
     })
     expect(bWrite).toEqual({ status: 'accepted' })
     await new Promise<void>((resolve) => queueMicrotask(resolve))
@@ -2440,18 +2398,16 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
     const terminalRuntimeSessionId = created.terminalRuntimeSessionId
 
     host.registerSocket('client_b', USER_1, socketB)
-    const viewerAttach = await host.attach('client_a', USER_1, {
+    const viewerAttach = await host.attach('client_b', USER_1, {
       terminalRuntimeSessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_b',
     })
     expect(viewerAttach.ok).toBe(true)
 
@@ -2489,12 +2445,11 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_a',
     })
     expect(attach.ok).toBe(true)
 
     const writes = ['c', 'l', 'e', 'a', 'r'].map((data) =>
-      host.write('client_a', USER_1, { terminalRuntimeSessionId, data, clientId: 'client_a' }),
+      host.write('client_a', USER_1, { terminalRuntimeSessionId, data }),
     )
 
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(0)
@@ -2542,7 +2497,6 @@ describe('server terminal runtime', () => {
       terminalRuntimeSessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -2935,7 +2889,6 @@ describe('server terminal runtime', () => {
           terminalRuntimeSessionId,
           cols: 100,
           rows: 30,
-          clientId: replacementClientId,
         }),
       ).resolves.toMatchObject({
         ok: true,

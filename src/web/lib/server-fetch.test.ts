@@ -69,6 +69,30 @@ describe('server-fetch', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  test('uses the explicit bootstrap server origin instead of the page origin', async () => {
+    Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
+      configurable: true,
+      value: {
+        runtime: { kind: 'web', bridgeVersion: 1, capabilities: [] },
+        initialServer: { url: 'http://127.0.0.1:32101/', accessToken: 'secret' },
+      },
+    })
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true }),
+    })
+
+    const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
+    await fetchServerJson('/api/settings')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32101/api/settings',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+      }),
+    )
+  })
+
   test('supports disabling the request watchdog', async () => {
     vi.useFakeTimers()
     let requestSignal: AbortSignal | undefined

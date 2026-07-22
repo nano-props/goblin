@@ -223,7 +223,6 @@ export class TerminalSessionRuntime {
       role: TerminalIdentityViewModel['role']
       controllerStatus: TerminalIdentityViewModel['controllerStatus']
     },
-    fallbackSize: { cols: number; rows: number },
   ): TerminalRuntimeAttemptResult {
     if (!this.isCurrentAttempt(attempt) || !this.isValidAttemptResultBinding(attempt, result)) {
       return { accepted: false, changed: false, resolution: 'superseded' }
@@ -245,11 +244,11 @@ export class TerminalSessionRuntime {
       phase: result.phase,
       message: result.message,
       processName: result.processName,
-      canonicalTitle: result.canonicalTitle ?? null,
+      canonicalTitle: result.canonicalTitle,
       role: result.role,
       controllerStatus: result.controllerStatus,
-      canonicalCols: result.canonicalCols ?? fallbackSize.cols,
-      canonicalRows: result.canonicalRows ?? fallbackSize.rows,
+      canonicalCols: result.canonicalCols,
+      canonicalRows: result.canonicalRows,
     })
     return {
       accepted: true,

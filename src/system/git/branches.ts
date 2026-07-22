@@ -64,6 +64,19 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   }
 }
 
+/** Authoritative HEAD read. `null` means a valid detached HEAD; failures throw. */
+export async function getCurrentBranchStrict(
+  cwd: string,
+  options?: { signal?: AbortSignal },
+): Promise<string | null> {
+  // Unlike `rev-parse --abbrev-ref HEAD`, `branch --show-current` also
+  // reports the configured branch for a valid repository with an unborn
+  // HEAD. Its only successful empty result is detached HEAD.
+  const branch = await git(cwd, ['branch', '--show-current'], { signal: options?.signal })
+  options?.signal?.throwIfAborted()
+  return branch || null
+}
+
 /** Read only the current worktree's HEAD presentation identity. */
 export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   if (options?.signal?.aborted) return ''
@@ -72,6 +85,14 @@ export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal 
   } catch {
     return ''
   }
+}
+
+/** Authoritative detached-HEAD identity read; failures and cancellation throw. */
+export async function getHeadHashStrict(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  const head = await git(cwd, ['rev-parse', '--short', 'HEAD'], { signal: options?.signal })
+  options?.signal?.throwIfAborted()
+  if (!head) throw new Error('Git returned an empty HEAD')
+  return head
 }
 
 export async function getDefaultBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
@@ -163,6 +184,37 @@ export async function getBranches(
   } catch {
     return []
   }
+}
+
+/** Authoritative branch projection read. Optional display enrichments may degrade, but membership may not. */
+export async function getBranchesStrict(
+  cwd: string,
+  worktrees: WorktreeInfo[] | undefined,
+  currentBranch: string | null,
+  options?: { signal?: AbortSignal },
+): Promise<BranchSnapshotInfo[]> {
+  const format = [
+    '%(refname:short)',
+    '%(objectname)',
+    '%(objectname:short)',
+    '%(subject)',
+    '%(authordate:iso-strict)',
+    '%(authorname)',
+    '%(upstream:short)',
+    '%(upstream:track)',
+  ].join(FIELD_SEP)
+  const [output, defaultBranch] = await Promise.all([
+    git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/'], { signal: options?.signal }),
+    getDefaultBranch(cwd, { signal: options?.signal }),
+  ])
+  options?.signal?.throwIfAborted()
+  const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch, options?.signal)
+  options?.signal?.throwIfAborted()
+  const branches = markDefaultBranch(parseBranches(output, currentBranch ?? '', worktrees), defaultBranch)
+  return prioritizeDefaultBranch(
+    mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
+    defaultBranch,
+  )
 }
 
 export type BranchWorktreeIdentity =

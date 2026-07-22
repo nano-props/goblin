@@ -5,7 +5,7 @@ import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { AppleTerminalIcon, GhosttyIcon, VSCodeIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
+import { selectHostPlatform, useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -141,7 +141,7 @@ export function ExternalAppSettings() {
   // during public bootstrap. The store falls back to `'web'`
   // (which hides every OS-specific terminal entry) until the hydrate
   // resolves — the settings page is gated behind login anyway.
-  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore((s) => s.snapshot?.platform ?? 'web')]
+  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore(selectHostPlatform)]
   const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
   return (
     <>

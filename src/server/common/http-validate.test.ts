@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
 import { IpcError } from '#/shared/api-types.ts'
-import { parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
+import { createRouteApp, parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 describe('parseHttpInput', () => {
   test('returns the parsed output for valid input', () => {
@@ -36,8 +37,8 @@ describe('parseHttpInput', () => {
 })
 
 describe('parseHttpBody', () => {
-  function makeContext(raw: string) {
-    return { req: { text: async () => raw } }
+  function makeContext(raw: string, contentType = 'application/json') {
+    return { req: { header: () => contentType, text: async () => raw } }
   }
   const schema = v.object({ cwd: v.string() })
 
@@ -64,5 +65,43 @@ describe('parseHttpBody', () => {
 
   test('propagates schema validation errors as BAD_REQUEST', async () => {
     await expect(parseHttpBody(schema, makeContext('{"branch":"main"}'))).rejects.toThrow(IpcError)
+  })
+
+  test('rejects a JSON-shaped body with the wrong media type', async () => {
+    await expect(parseHttpBody(schema, makeContext('{"cwd":"/tmp/repo"}', 'text/plain'))).rejects.toMatchObject({
+      code: 'UNSUPPORTED_MEDIA_TYPE',
+      message: 'Content-Type must be application/json',
+    })
+  })
+
+  test('accepts application/json parameters case-insensitively', async () => {
+    await expect(
+      parseHttpBody(schema, makeContext('{"cwd":"/tmp/repo"}', 'Application/JSON; Charset=UTF-8')),
+    ).resolves.toEqual({ cwd: '/tmp/repo' })
+  })
+})
+
+describe('createRouteApp', () => {
+  test('classifies an aborted request as client cancellation instead of an internal error', async () => {
+    const app = createRouteApp()
+    const controller = new AbortController()
+    app.get('/cancelled', () => {
+      controller.abort(new Error('client disconnected'))
+      throw new OperationCancelledError()
+    })
+
+    const response = await app.request(new Request('http://localhost/cancelled', { signal: controller.signal }))
+    expect(response.status).toBe(499)
+    expect(await response.text()).toBe('')
+  })
+
+  test('keeps a non-aborted unexpected error on the internal-error path', async () => {
+    const app = createRouteApp()
+    app.get('/failed', () => {
+      throw new Error('git failed')
+    })
+
+    const response = await app.request('http://localhost/failed')
+    expect(response.status).toBe(500)
   })
 })

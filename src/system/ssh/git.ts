@@ -101,15 +101,30 @@ export async function getRemoteSnapshot(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<RemoteRepoSnapshot | null> {
+  try {
+    return await getRemoteSnapshotStrict(target, options)
+  } catch {
+    options.signal?.throwIfAborted()
+    return null
+  }
+}
+
+/** Authoritative remote repository projection. Transport, cancellation, and malformed output are failures. */
+export async function getRemoteSnapshotStrict(
+  target: RemoteWorkspaceTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<RemoteRepoSnapshot> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const [result, worktrees] = await Promise.all([
     run({ type: 'gitSnapshot', path: target.remotePath }, target, { signal: options.signal }),
-    getRemoteWorktrees(target, { signal: options.signal, run }),
+    getRemoteWorktrees(target, { signal: options.signal, run, requireSuccess: true }),
   ])
-  if (!result.ok) return null
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const snapshot = parseRemoteSnapshot(result.stdout, worktrees)
-  if (!snapshot) return null
-  const remote = await getRemoteRepoInfo(target, { signal: options.signal, run })
+  if (!snapshot) throw new Error('error.failed-read-repo')
+  const remote = await getRemoteRepoInfoStrict(target, { signal: options.signal, run })
+  options.signal?.throwIfAborted()
   return { ...snapshot, remote }
 }
 
@@ -436,9 +451,9 @@ export async function pullRemoteBranch(
     return pulled.ok || pulled.repositoryStateChanged ? { ...pulled, affectedWorktreePaths: [worktreePath] } : pulled
   }
 
-  const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run })
+  const snapshot = await getRemoteSnapshotStrict(target, { signal: options.signal, run })
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (snapshot?.current === branch) {
+  if (snapshot.current === branch) {
     const result = await run({ type: 'gitPullCurrent', path: target.remotePath }, target, {
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
@@ -663,7 +678,8 @@ async function readRemoteWorktreeList(
   const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
     signal: options.signal,
   })
-  if (options.signal?.aborted || !result.ok) return []
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   return parseUsableWorktrees(result.stdout)
 }
 
@@ -860,7 +876,7 @@ export async function deleteRemoteBranch(
 ): Promise<ExecResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const snapshot = await getRemoteSnapshot(target, { signal: input.signal, run })
+  const snapshot = await getRemoteSnapshotStrict(target, { signal: input.signal, run })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   const shouldForce = input.force === true
   const mergeFacts = shouldForce
@@ -868,7 +884,7 @@ export async function deleteRemoteBranch(
     : await getRemoteBranchMergeFacts(target, input.branch, {
         signal: input.signal,
         run,
-        currentBranch: snapshot?.current,
+        currentBranch: snapshot.current,
       })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   const validation = validateBranchDeletionPolicy({
@@ -1110,6 +1126,18 @@ async function getRemoteRepoInfo(
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<RepoRemoteInfo> {
   return repoRemoteInfoForRemotes(await getRemoteRemotes(target, options))
+}
+
+async function getRemoteRepoInfoStrict(
+  target: RemoteWorkspaceTarget,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<RepoRemoteInfo> {
+  const result = await options.run({ type: 'gitRemoteVerbose', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
+  return repoRemoteInfoForRemotes(parseRemoteVerbose(result.stdout))
 }
 
 async function getRemoteBranchMergeFacts(

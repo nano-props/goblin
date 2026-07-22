@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 function installBridge(calls: Array<{ path: string; input?: unknown }>, result = new Promise(() => {})): void {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
-      goblinNative: {
-        runtime: {
-          kind: 'electron',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-        },
+      goblinNative: currentNativeBridge({
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           calls.push({ path, input })
           return result
@@ -20,10 +15,7 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
           calls.push({ path: 'goblin:ipc-abort', input: { requestId } })
           return Promise.resolve(false)
         },
-        onEvent: () => () => {},
-        onIntent: () => () => {},
-        pathForFile: () => '',
-      },
+      }),
       location: {
         href: 'http://127.0.0.1:32100/',
         origin: 'http://127.0.0.1:32100',

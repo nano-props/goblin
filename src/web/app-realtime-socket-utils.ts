@@ -6,7 +6,7 @@ import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 
 export function createAppRealtimeWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
   const httpUrl = new URL('/ws/app', baseUrl)
-  httpUrl.protocol = resolveWebSocketProtocol()
+  httpUrl.protocol = resolveWebSocketProtocol(baseUrl)
   // `?t=` is the WebSocket auth channel for non-browser clients. Browser
   // clients also send the auth cookie during the upgrade.
   httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)

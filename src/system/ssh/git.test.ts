@@ -6,6 +6,8 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemoteSnapshot,
+  getRemoteSnapshotStrict,
+  getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
   getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
@@ -171,6 +173,37 @@ describe('remote git helpers', () => {
     expect(run).toHaveBeenCalledWith({ type: 'gitWorkspacePaneIdentities', path: '/srv/repo' }, TARGET, {
       signal: undefined,
     })
+  })
+
+  test('does not turn a failed authoritative remote snapshot into missing data', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
+      command.type === 'gitSnapshot' ? failRemoteResult('ssh unavailable') : okRemoteResult(''),
+    )
+
+    await expect(getRemoteSnapshotStrict(TARGET, { run })).rejects.toThrow('ssh unavailable')
+  })
+
+  test.each(['gitWorktreeList', 'gitRemoteVerbose'] as const)(
+    'rejects an authoritative remote snapshot when %s fails',
+    async (failedCommand) => {
+      const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+        if (command.type === failedCommand) return failRemoteResult(`${failedCommand} failed`)
+        if (command.type === 'gitSnapshot') {
+          return okRemoteResult(
+            '__GOBLIN_REMOTE_CURRENT__\nmain\n__GOBLIN_REMOTE_DEFAULT__\nmain\n__GOBLIN_REMOTE_BRANCHES__\n',
+          )
+        }
+        return okRemoteResult('')
+      })
+
+      await expect(getRemoteSnapshotStrict(TARGET, { run })).rejects.toThrow(`${failedCommand} failed`)
+    },
+  )
+
+  test('rejects failed authoritative worktree-path discovery', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('worktree discovery failed'))
+
+    await expect(getRemoteRepoWorktreePaths(TARGET, { run })).rejects.toThrow('worktree discovery failed')
   })
 
   test('does not turn a failed remote worktree membership read into branch-only targets', async () => {

@@ -661,7 +661,7 @@ export class TerminalSession {
         // started so the boundary and captured events don't leak
         // into the next start.
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
-        const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
+        const committed = this.runtime.commitAttachResult(attempt, result)
         if (!committed.accepted) throw new StartCancelledError()
         if (committed.resolution === 'staged') {
           this.applySettledStagedHydration(committed.changed)
@@ -857,7 +857,7 @@ export class TerminalSession {
     term: XTermTerminal,
     result: TerminalStartResultWithController,
   ): boolean {
-    const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
+    const committed = this.runtime.commitAttachResult(attempt, result)
     if (!committed.accepted) throw new StartCancelledError()
     if (committed.resolution === 'staged') {
       this.applySettledStagedHydration(committed.changed)
@@ -1272,7 +1272,9 @@ export class TerminalSession {
 
   private openExternalLink(uri: string): void {
     if (!isHttpExternalUrl(uri)) return
-    void openExternalUrl(uri).catch(() => {})
+    void openExternalUrl(uri).catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : String(err))
+    })
   }
 
   private clearTerminalFocusIfOwned(): void {

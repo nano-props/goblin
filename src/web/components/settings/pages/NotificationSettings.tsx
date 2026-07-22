@@ -6,7 +6,7 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalClient } from '#/web/terminal.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { getPlatform } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
 export function NotificationSettings() {
   const t = useT()
@@ -96,7 +96,7 @@ function notificationsHintKey():
   | 'settings.terminal-notifications-test-failed-hint.mac'
   | 'settings.terminal-notifications-test-failed-hint.win'
   | 'settings.terminal-notifications-test-failed-hint' {
-  const platform = useHostInfoStore.getState().snapshot?.platform ?? 'web'
+  const platform = getPlatform()
   if (platform === 'darwin') return 'settings.terminal-notifications-test-failed-hint.mac'
   if (platform === 'win32') return 'settings.terminal-notifications-test-failed-hint.win'
   return 'settings.terminal-notifications-test-failed-hint'

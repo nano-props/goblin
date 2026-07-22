@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
@@ -61,33 +62,7 @@ describe('repo query invalidation source', () => {
         runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
-      goblinNative: {
-        runtime: {
-          kind: 'electron',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-        },
-        invokeIpc: vi.fn(),
-        abortIpc: vi.fn(),
-        onEvent: vi.fn(() => () => {}),
-        pathForFile: vi.fn(() => ''),
-        terminal: {
-          open: vi.fn(),
-          restart: vi.fn(),
-          write: vi.fn(),
-          resize: vi.fn(),
-          takeover: vi.fn(),
-          close: vi.fn(),
-          pruneTerminals: vi.fn(),
-          notifyBell: vi.fn(),
-          sendTestNotification: vi.fn(),
-          setBadge: vi.fn(),
-          onOutput: vi.fn(() => () => {}),
-          onBell: vi.fn(() => () => {}),
-          onTitle: vi.fn(() => () => {}),
-          onExit: vi.fn(() => () => {}),
-        },
-      },
+      goblinNative: currentNativeBridge(),
     })
 
     const listener = vi.fn()

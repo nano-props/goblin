@@ -34,7 +34,6 @@ import {
 } from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
 import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/terminal/terminal-geometry.ts'
 import { resolveAdjacentTerminalSelectionAfterRemoval } from '#/web/components/terminal/terminal-session-eviction.ts'
-import { syncTerminalRuntimeSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
 import type {
@@ -166,11 +165,6 @@ export class TerminalSessionProjection {
   ) => void
   private runtimeMembershipIndex: TerminalRuntimeMembershipIndex = new Map()
   private readonly sessions = new Map<string, TerminalSession>()
-  private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, Map<number, string>>()
-  private readonly terminalRuntimeBindingByTerminalSessionId = new Map<
-    string,
-    { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }
-  >()
   private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
     WorkspaceId,
     { workspaceRuntimeId: string; revision: number }
@@ -271,8 +265,6 @@ export class TerminalSessionProjection {
     this.lifecycleQueues.rejectAll(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose()
     this.sessions.clear()
-    this.terminalSessionIdByTerminalRuntimeSessionId.clear()
-    this.terminalRuntimeBindingByTerminalSessionId.clear()
     this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
     this.selectedTerminalSessionIdByTerminalFilesystemTarget.clear()
     this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.clear()
@@ -293,34 +285,16 @@ export class TerminalSessionProjection {
     if (projectionInstance === this) projectionInstance = null
   }
 
-  // Single routing entry point for every realtime event keyed by a
-  // session. `terminalSessionId` (the durable tab identity) is tried
-  // first to locate the session because it needs no client-local state
-  // to resolve. `terminalRuntimeSessionId` (the server runtime lookup id) is a
-  // secondary fallback through a client-local index that is only
-  // populated once a session has been attached/reconciled locally — a
-  // background tab that has never been selected may not have an index
-  // entry yet. A realtime event that only carries `terminalRuntimeSessionId` cannot
-  // be routed reliably for such a tab; that gap is exactly what caused
-  // a background tab's title updates to be silently dropped, so every
-  // realtime event type must carry `terminalSessionId` (see the
-  // naming-boundary note on the event types in
-  // `#/shared/terminal-types.ts`) and every dispatcher must resolve
-  // through this helper rather than reimplementing the fallback.
+  // Single routing entry point for every session realtime event.
+  // `terminalSessionId` is the canonical routing identity. Runtime identity is
+  // only checked by `classifyRuntimeBinding`; it must never select a different
+  // durable session when an emitter supplies contradictory coordinates.
   private resolveSessionForRealtimeEvent(event: {
     terminalSessionId: string
     terminalRuntimeSessionId: string
     terminalRuntimeGeneration: number
   }): TerminalSession | null {
-    return (
-      this.sessions.get(event.terminalSessionId) ??
-      this.sessions.get(
-        this.terminalSessionIdByTerminalRuntimeSessionId
-          .get(event.terminalRuntimeSessionId)
-          ?.get(event.terminalRuntimeGeneration) ?? '',
-      ) ??
-      null
-    )
+    return this.sessions.get(event.terminalSessionId) ?? null
   }
 
   private classifyRealtimeEvent(event: {
@@ -412,8 +386,8 @@ export class TerminalSessionProjection {
       // runtime's accept (rather than evicting eagerly on a session
       // match) avoids discarding a live local session during a race
       // where the session has moved to a new terminalRuntimeSessionId (e.g. after
-      // a server-side restart) but a stale index entry still maps the
-      // old terminalRuntimeSessionId to the same terminalSessionId.
+      // a server-side restart) but a stale runtime event arrives for the
+      // old binding of the same durable session.
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor, binding, true)
       return
     }
@@ -436,7 +410,7 @@ export class TerminalSessionProjection {
   }): void {
     const bindingKey = terminalRealtimeEventBindingKey(event)
     const classified = this.classifyRealtimeEvent(event)
-    if (!classified || classified.classification === 'foreign' || classified.classification === 'future') {
+    if (!classified || classified.classification !== 'active') {
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
       return
     }
@@ -567,7 +541,7 @@ export class TerminalSessionProjection {
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which filesystem targets saw any change. Side effects: ensureSession,
-  // session.hydrate, terminalSessionIdsByTerminalFilesystemTarget, syncTerminalRuntimeSessionIdIndex.
+  // session.hydrate and terminalSessionIdsByTerminalFilesystemTarget.
   private materializeServerSessions(
     scope: WorkspaceRuntimeScope,
     serverSessions: ServerTerminalSessionSummary[],
@@ -776,7 +750,6 @@ export class TerminalSessionProjection {
         ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
         cols: geometry.cols,
         rows: geometry.rows,
-        clientId,
         target: base.target,
       },
       ...request.placement,
@@ -1158,22 +1131,9 @@ export class TerminalSessionProjection {
     }
   }
 
-  private syncTerminalRuntimeSessionIdIndex(
-    terminalSessionId: string,
-    terminalRuntimeBinding: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number } | null,
-  ): void {
-    syncTerminalRuntimeSessionIdIndex({
-      terminalSessionId,
-      terminalRuntimeBinding,
-      terminalRuntimeBindingByTerminalSessionId: this.terminalRuntimeBindingByTerminalSessionId,
-      terminalSessionIdByTerminalRuntimeSessionId: this.terminalSessionIdByTerminalRuntimeSessionId,
-    })
-  }
-
   private notifySession(terminalSessionId: string): void {
     const session = this.sessions.get(terminalSessionId)
     if (session && !this.activateRuntimeBinding(session)) return
-    this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, session?.currentRuntimeBinding() ?? null)
     if (session) {
       this.snapshotCache.set(terminalSessionId, session.snapshot())
     } else {
@@ -1228,7 +1188,6 @@ export class TerminalSessionProjection {
       })
       return false
     }
-    this.syncTerminalRuntimeSessionIdIndex(session.descriptor.terminalSessionId, binding)
     const pendingBell = this.pendingServerBellByRuntimeBindingKey.get(bindingKey)
     if (pendingBell) this.applyServerBell(session, pendingBell)
     return true
@@ -1253,7 +1212,6 @@ export class TerminalSessionProjection {
       )
     }
     if (!options.preserveFutureExits) this.futureExitOrphans.removeSession(terminalSessionId)
-    this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromFilesystemTargetList(terminalFilesystemTargetKey, terminalSessionId)
@@ -1325,21 +1283,27 @@ export class TerminalSessionProjection {
   ): void {
     const session = this.sessions.get(effect.terminalSessionId)
     if (!session) return
+    if (effect.action === 'already-closed') {
+      if (!this.sessionMatchesRuntimeBinding(session, requestedBinding)) return
+      if (requestedBinding.terminalRuntimeSessionId !== null && requestedBinding.terminalRuntimeGeneration !== null) {
+        this.pendingServerBellByRuntimeBindingKey.delete(
+          terminalRealtimeEventBindingKey({
+            terminalSessionId: requestedBinding.terminalSessionId,
+            terminalRuntimeSessionId: requestedBinding.terminalRuntimeSessionId,
+            terminalRuntimeGeneration: requestedBinding.terminalRuntimeGeneration,
+          }),
+        )
+      }
+      this.removeSession(effect.terminalSessionId, { dispose: true })
+      return
+    }
     const effectBinding: TerminalRuntimeBindingIdentity = {
       workspaceId: terminalSessionCoordinates(base).workspaceId,
       workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
       executionRootId: terminalSessionCoordinates(base).executionRootId,
       terminalSessionId: effect.terminalSessionId,
-      terminalRuntimeSessionId:
-        effect.terminalRuntimeSessionId ??
-        (effect.terminalSessionId === requestedBinding.terminalSessionId
-          ? requestedBinding.terminalRuntimeSessionId
-          : null),
-      terminalRuntimeGeneration:
-        effect.terminalRuntimeGeneration ??
-        (effect.terminalSessionId === requestedBinding.terminalSessionId
-          ? requestedBinding.terminalRuntimeGeneration
-          : null),
+      terminalRuntimeSessionId: effect.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: effect.terminalRuntimeGeneration,
     }
     if (!this.sessionMatchesRuntimeBinding(session, effectBinding)) {
       const requestedBindingKey = terminalRuntimeBindingKey(requestedBinding)
@@ -1351,15 +1315,13 @@ export class TerminalSessionProjection {
         return
       }
     }
-    if (effectBinding.terminalRuntimeSessionId) {
-      this.pendingServerBellByRuntimeBindingKey.delete(
-        terminalRealtimeEventBindingKey({
-          terminalSessionId: effectBinding.terminalSessionId,
-          terminalRuntimeSessionId: effectBinding.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: effectBinding.terminalRuntimeGeneration ?? 0,
-        }),
-      )
-    }
+    this.pendingServerBellByRuntimeBindingKey.delete(
+      terminalRealtimeEventBindingKey({
+        terminalSessionId: effect.terminalSessionId,
+        terminalRuntimeSessionId: effect.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: effect.terminalRuntimeGeneration,
+      }),
+    )
     this.removeSession(effect.terminalSessionId, { dispose: true })
   }
 
@@ -1473,12 +1435,6 @@ export class TerminalSessionProjection {
     )
     if (current) {
       current.updateDescriptor(descriptor)
-      this.syncTerminalRuntimeSessionIdIndex(
-        descriptor.terminalSessionId,
-        current.currentRuntimeBinding() ??
-          this.terminalRuntimeBindingByTerminalSessionId.get(descriptor.terminalSessionId) ??
-          null,
-      )
       this.notifyFilesystemTarget(terminalDescriptorFilesystemTargetKey(descriptor))
       return current
     }
@@ -1496,7 +1452,6 @@ export class TerminalSessionProjection {
       this.writeFailureReporter,
     )
     this.sessions.set(descriptor.terminalSessionId, session)
-    this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, session.currentRuntimeBinding())
     this.snapshotCache.set(descriptor.terminalSessionId, session.snapshot())
     if (
       !this.selectedTerminalSessionIdByTerminalFilesystemTarget.has(terminalDescriptorFilesystemTargetKey(descriptor))

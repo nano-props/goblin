@@ -1,4 +1,5 @@
 import { ExternalLink, Hash, Tag } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
 import { SettingsCard, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
@@ -52,7 +53,11 @@ export function AboutSettings() {
           data-interactive
           variant="ghost"
           size="icon-lg"
-          onClick={() => void openProjectGitHub()}
+          onClick={() => {
+            void openProjectGitHub().catch((err: unknown) => {
+              toast.error(t('error.unknown'), { description: err instanceof Error ? err.message : String(err) })
+            })
+          }}
           className="shrink-0 text-muted-foreground hover:text-accent-foreground"
           aria-label={t('settings.open-github')}
         >

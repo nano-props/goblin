@@ -343,7 +343,6 @@ describe('AuthorityGate ordering contract', () => {
       terminalRuntimeSessionId: 'session-xyz',
       cols: 132,
       rows: 50,
-      clientId: 'client_local',
     })
   })
 })

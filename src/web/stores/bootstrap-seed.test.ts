@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import {
+  CLIENT_BRIDGE_VERSION,
+  ELECTRON_CLIENT_CAPABILITIES,
+  type ClientBootstrapSnapshot,
+} from '#/shared/bootstrap.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 function installBridge() {
   // The bootstrap is now just the Electron preload's IPC seed
@@ -12,15 +18,14 @@ function installBridge() {
     configurable: true,
     value: {
       __GOBLIN_BOOTSTRAP__: {
-        runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+        runtime: {
+          kind: 'electron',
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+        },
         initialServer: null,
-      },
-      goblinNative: {
-        invokeIpc: vi.fn(),
-        abortIpc: vi.fn(() => Promise.resolve(false)),
-        onEvent: vi.fn(() => () => {}),
-        pathForFile: vi.fn(() => ''),
-      },
+      } satisfies ClientBootstrapSnapshot,
+      goblinNative: currentNativeBridge(),
     },
   })
 }
