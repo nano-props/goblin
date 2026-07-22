@@ -714,7 +714,7 @@ describe('TerminalSession', () => {
     expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
   })
 
-  test('admits keyboard input after a fresh stream is revealed without waiting for first output', async () => {
+  test('admits keyboard input after presentation reveal without requiring an output event', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
