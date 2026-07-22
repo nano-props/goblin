@@ -208,6 +208,8 @@ export const en = {
   'workspace.dashboard': 'Dashboard',
   'dashboard.loading': 'Loading dashboard...',
   'dashboard.directory.files': 'Files',
+  'dashboard.directory.working-directory': 'Directory',
+  'dashboard.directory.open-files': 'Open files',
   'dashboard.directory.folders': 'Folders',
   'dashboard.directory.size': 'Folder size',
   'dashboard.directory.size-unavailable': 'Some files could not be inspected',

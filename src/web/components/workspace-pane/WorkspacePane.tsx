@@ -51,6 +51,9 @@ import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane
 import { StatusList } from '#/web/components/StatusList.tsx'
 import type { WorktreeStatus } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 
 export type WorkspacePaneRouteContext =
   | { kind: 'workspace-root'; route: ParsedWorkspacePaneRoute | null }
@@ -473,10 +476,14 @@ function WorkspaceRootPane({
   onBackToNavigator?: () => void
 }) {
   const t = useT()
+  const navigation = usePrimaryWindowNavigation()
   const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
   const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
   const model = useWorkspaceRootTabModel(workspace, requestedTab, requestedSessionId)
-  const target = { kind: 'workspace-root' as const, workspaceId: workspace.id }
+  const target = useMemo(
+    () => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }),
+    [workspace.id],
+  )
   const runtimeTarget = runtimeWorkspacePaneTarget(target, workspace.workspaceRuntimeId)
   const terminalAvailable = workspace.probe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
@@ -494,6 +501,15 @@ function WorkspaceRootPane({
     workspaceRuntimeId: workspace.workspaceRuntimeId,
     capabilities: workspace.probe.capabilities,
   })
+  const openFilesTab = useCallback(() => {
+    void dispatchOpenWorkspacePaneTargetStaticTabAction({
+      workspaceId: workspace.id,
+      paneTarget: target,
+      type: 'files',
+      workspacePaneRoute: { kind: 'static', tab: 'status' },
+      navigation,
+    })
+  }, [navigation, target, workspace.id])
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <WorkspacePaneTargetToolbar
@@ -510,7 +526,11 @@ function WorkspaceRootPane({
         <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
           <ScrollPane>
             {overviewReadModel.data ? (
-              <WorkspaceDirectoryStatus overview={overviewReadModel.data} />
+              <WorkspaceDirectoryStatus
+                overview={overviewReadModel.data}
+                workingDirectory={formatWorkspaceDisplayLocation(workspace.id)}
+                onOpenFiles={openFilesTab}
+              />
             ) : overviewReadModel.isError ? (
               <div className="p-4 text-sm text-destructive">{t('dashboard.directory.read-failed')}</div>
             ) : (

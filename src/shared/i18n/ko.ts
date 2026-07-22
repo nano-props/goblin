@@ -199,6 +199,8 @@ export const ko: Record<DictKey, string> = {
   'workspace.dashboard': '대시보드',
   'dashboard.loading': '대시보드 로딩 중...',
   'dashboard.directory.files': '파일',
+  'dashboard.directory.working-directory': '작업 폴더',
+  'dashboard.directory.open-files': '파일 열기',
   'dashboard.directory.folders': '폴더',
   'dashboard.directory.size': '폴더 크기',
   'dashboard.directory.size-unavailable': '일부 파일을 확인할 수 없습니다',

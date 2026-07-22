@@ -206,6 +206,8 @@ export const ja: Record<DictKey, string> = {
   'workspace.dashboard': 'ダッシュボード',
   'dashboard.loading': 'ダッシュボードを読み込み中...',
   'dashboard.directory.files': 'ファイル',
+  'dashboard.directory.working-directory': '作業フォルダ',
+  'dashboard.directory.open-files': 'ファイルを開く',
   'dashboard.directory.folders': 'フォルダ',
   'dashboard.directory.size': 'フォルダサイズ',
   'dashboard.directory.size-unavailable': '一部のファイルを確認できませんでした',

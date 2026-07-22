@@ -1,14 +1,39 @@
-import { File, Folder, HardDrive } from 'lucide-react'
+import { File, Folder, FolderTree, HardDrive } from 'lucide-react'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { StatusChip, StatusRow, StatusRows } from '#/web/components/workspace-pane/status-ui.tsx'
+import { StatusChip, StatusLink, StatusRow, StatusRows } from '#/web/components/workspace-pane/status-ui.tsx'
 import { formatByteSize } from '#/web/lib/format-byte-size.ts'
 import { useT } from '#/web/stores/i18n.ts'
 
-export function WorkspaceDirectoryStatus({ overview }: { overview: WorkspaceDirectoryOverview }) {
+export function WorkspaceDirectoryStatus({
+  overview,
+  workingDirectory,
+  onOpenFiles,
+}: {
+  overview: WorkspaceDirectoryOverview
+  workingDirectory: string
+  onOpenFiles: () => void
+}) {
   const t = useT()
   const size = overview.totalSizeBytes === null ? '—' : formatByteSize(overview.totalSizeBytes)
   return (
     <StatusRows>
+      <StatusRow
+        icon={<FolderTree size={14} />}
+        label={t('dashboard.directory.working-directory')}
+        value={
+          <StatusLink
+            mono
+            truncate
+            aria-label={t('dashboard.directory.open-files')}
+            title={t('dashboard.directory.open-files')}
+            onClick={onOpenFiles}
+          >
+            {workingDirectory}
+          </StatusLink>
+        }
+        valueLayout="inline"
+        tone="brand"
+      />
       <StatusRow
         icon={<File size={14} />}
         label={t('dashboard.directory.files')}
@@ -26,6 +51,7 @@ export function WorkspaceDirectoryStatus({ overview }: { overview: WorkspaceDire
         label={t('dashboard.directory.size')}
         value={<StatusChip>{size}</StatusChip>}
         valueLayout="inline"
+        tone={overview.totalSizeBytes === null ? 'attention' : 'neutral'}
       />
     </StatusRows>
   )

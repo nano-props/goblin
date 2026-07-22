@@ -193,6 +193,8 @@ export const zh: Record<DictKey, string> = {
   'workspace.dashboard': '仪表盘',
   'dashboard.loading': '正在加载仪表盘...',
   'dashboard.directory.files': '文件',
+  'dashboard.directory.working-directory': '工作目录',
+  'dashboard.directory.open-files': '打开文件',
   'dashboard.directory.folders': '文件夹',
   'dashboard.directory.size': '文件夹大小',
   'dashboard.directory.size-unavailable': '部分文件无法检查',
