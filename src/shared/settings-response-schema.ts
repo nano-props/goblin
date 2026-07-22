@@ -135,6 +135,8 @@ const SshTransportSchema = v.strictObject({
     }),
   ]),
 })
+const RestoredWorkspaceTransportSchema = v.variant('kind', [FileTransportSchema, SshTransportSchema])
+
 // Projection presence, not transport or probed Git capability, owns this
 // result union. A Git-ready workspace can legitimately have no projection
 // while startup defers its read or when a later projection read has no
@@ -142,25 +144,13 @@ const SshTransportSchema = v.strictObject({
 export const RestoredWorkspaceRuntimeSchema = v.union([
   v.strictObject({
     ...RestoredWorkspaceRuntimeBaseEntries,
-    transport: FileTransportSchema,
+    transport: RestoredWorkspaceTransportSchema,
     workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
     gitProjection: RepoProjectionResponseSchema,
   }),
   v.strictObject({
     ...RestoredWorkspaceRuntimeBaseEntries,
-    transport: FileTransportSchema,
-    workspaceProbe: WorkspaceProbeStateResponseSchema,
-    gitProjection: v.null(),
-  }),
-  v.strictObject({
-    ...RestoredWorkspaceRuntimeBaseEntries,
-    transport: SshTransportSchema,
-    workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
-    gitProjection: RepoProjectionResponseSchema,
-  }),
-  v.strictObject({
-    ...RestoredWorkspaceRuntimeBaseEntries,
-    transport: SshTransportSchema,
+    transport: RestoredWorkspaceTransportSchema,
     workspaceProbe: WorkspaceProbeStateResponseSchema,
     gitProjection: v.null(),
   }),

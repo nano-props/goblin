@@ -8,8 +8,16 @@ describe('HTTP response decoding', () => {
       v.strictObject({ runtime: v.strictObject({ workspaces: v.array(v.strictObject({ id: v.string() })) }) }),
     )
 
-    expect(() => decode({ runtime: { workspaces: [{ id: 1 }] } })).toThrow(
-      'runtime.workspaces.0.id',
-    )
+    let thrown: unknown
+    try {
+      decode({ runtime: { workspaces: [{ id: 1 }] } })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(v.isValiError(thrown)).toBe(true)
+    expect(thrown).toBeInstanceOf(v.ValiError)
+    if (!v.isValiError(thrown)) throw new Error('Expected a Valibot error')
+    expect(thrown.message).toContain('runtime.workspaces.0.id')
   })
 })

@@ -151,17 +151,15 @@ interface RestoredWorkspaceRuntimeBase {
   workspaceProbe: WorkspaceProbeState
 }
 
-type RestoredWorkspaceTransport = {
+interface RestoredWorkspaceTransport {
   entry: WorkspaceSessionEntry
-} & (
-  | { transport: { kind: 'file' } }
-  | {
-      transport: {
+  transport:
+    | { kind: 'file' }
+    | {
         kind: 'ssh'
         lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
       }
-    }
-)
+}
 
 export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
   RestoredWorkspaceTransport & {

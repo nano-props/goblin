@@ -28,8 +28,8 @@ export function decodeWith<TSchema extends v.BaseSchema<unknown, unknown, v.Base
     if (result.success) return result.output
     const issue = result.issues[0]
     const path = v.getDotPath(issue)
-    throw new Error(`Invalid server response${path ? ` at ${path}` : ''}: ${issue.message}`, {
-      cause: new v.ValiError(result.issues),
-    })
+    const error = new v.ValiError(result.issues)
+    error.message = `Invalid server response${path ? ` at ${path}` : ''}: ${issue.message}`
+    throw error
   }
 }
