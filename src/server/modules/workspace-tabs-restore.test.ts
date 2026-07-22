@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { decodeWith } from '#/shared/http-response-schema.ts'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
+import { WorkspaceTabsRestoreResponseSchema } from '#/shared/settings-response-schema.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
@@ -273,7 +275,15 @@ describe('restoreWorkspaceTabs', () => {
 
   test('restores workspace tabs for a lazy remote plain workspace', async () => {
     const entry = { id: REMOTE_WORKSPACE_ID }
-    const remoteTarget = { id: REMOTE_WORKSPACE_ID, alias: 'host', remotePath: '/repo', displayName: 'repo' }
+    const remoteTarget = {
+      id: REMOTE_WORKSPACE_ID,
+      alias: 'host',
+      remotePath: '/repo',
+      displayName: 'repo',
+      host: 'example.test',
+      user: 'tester',
+      port: 22,
+    }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [entry],
@@ -468,7 +478,15 @@ describe('restoreWorkspaceTabs', () => {
 
   test('keeps the existing membership and restores root tabs when lazy remote Git projection fails', async () => {
     const remoteEntry = { id: REMOTE_WORKSPACE_ID }
-    const remoteTarget = { id: REMOTE_WORKSPACE_ID, alias: 'host', remotePath: '/repo', displayName: 'repo' }
+    const remoteTarget = {
+      id: REMOTE_WORKSPACE_ID,
+      alias: 'host',
+      remotePath: '/repo',
+      displayName: 'repo',
+      host: 'example.test',
+      user: 'tester',
+      port: 22,
+    }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [remoteEntry],
@@ -492,6 +510,7 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
+    expect(decodeWith(WorkspaceTabsRestoreResponseSchema)(result)).toEqual(result)
     expect(result.workspace).toMatchObject({
       workspaceId: remoteEntry.id,
       transport: { kind: 'ssh', lifecycle: { kind: 'ready', attemptId: 3, target: remoteTarget } },

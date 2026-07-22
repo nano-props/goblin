@@ -2,7 +2,6 @@ import { expect, test } from 'vitest'
 import * as v from 'valibot'
 import {
   StringArrayResponseSchema,
-  WorkspaceProbeWithoutGitProjectionResponseSchema,
   WorkspaceFilesystemTreeResponseSchema,
   WorkspaceRuntimeOpenIdResponseSchema,
 } from '#/shared/workspace-http-response-schema.ts'
@@ -34,19 +33,4 @@ test('rejects partial filesystem nodes rather than accepting an incomplete autho
 
 test('requires every path suggestion to be a string', () => {
   expect(() => v.parse(StringArrayResponseSchema, ['/repo', null])).toThrow()
-})
-
-test('rejects a Git-ready probe when the authoritative projection is absent', () => {
-  expect(() =>
-    v.parse(WorkspaceProbeWithoutGitProjectionResponseSchema, {
-      status: 'ready',
-      name: 'workspace',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-      },
-      diagnostics: [],
-    }),
-  ).toThrow()
 })

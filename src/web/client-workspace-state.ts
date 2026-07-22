@@ -1,6 +1,7 @@
 import type { ClientWorkspaceState, NativeClientWorkspaceReadResult } from '#/shared/api-types.ts'
 import {
   decodeCurrentClientWorkspaceState,
+  isClientWorkspaceStateDecodeError,
   parseClientWorkspaceStateJson,
   stringifyClientWorkspaceState,
 } from '#/shared/client-workspace-state-schema.ts'
@@ -16,7 +17,6 @@ export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> 
     // A native read failure must block boot persistence. Returning an empty
     // workspace here would allow a transient IPC error to overwrite good data.
     const result = await invokeNativeIpcPath<NativeClientWorkspaceReadResult>('clientWorkspace.read', undefined)
-    if (result.kind === 'missing') return defaultClientWorkspaceState()
     if (result.kind === 'loaded') {
       if (!isRecord(result.state)) throw new Error('Corrupt native client workspace state')
       return decodeCurrentClientWorkspaceState(result.state)
@@ -26,8 +26,20 @@ export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> 
   try {
     const storage = browserClientWorkspaceStorage()
     const raw = storage.getItem(CLIENT_WORKSPACE_STORAGE_KEY)
-    if (raw === null) return defaultClientWorkspaceState()
-    return parseClientWorkspaceStateJson(raw)
+    if (raw === null) {
+      const state = defaultClientWorkspaceState()
+      storage.setItem(CLIENT_WORKSPACE_STORAGE_KEY, stringifyClientWorkspaceState(state))
+      return state
+    }
+    try {
+      return parseClientWorkspaceStateJson(raw)
+    } catch (err) {
+      if (!isClientWorkspaceStateDecodeError(err)) throw err
+      const state = defaultClientWorkspaceState()
+      sessionLog.warn('replacing invalid local workspace state with defaults', { err })
+      storage.setItem(CLIENT_WORKSPACE_STORAGE_KEY, stringifyClientWorkspaceState(state))
+      return state
+    }
   } catch (err) {
     sessionLog.warn('failed to read local workspace state', { err })
     throw err

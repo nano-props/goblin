@@ -61,6 +61,10 @@ export function parseClientWorkspaceStateJson(raw: string): ClientWorkspaceState
   return decodeCurrentClientWorkspaceState(JSON.parse(raw))
 }
 
+export function isClientWorkspaceStateDecodeError(error: unknown): boolean {
+  return error instanceof SyntaxError || v.isValiError(error)
+}
+
 export function stringifyClientWorkspaceState(state: ClientWorkspaceState): string {
   return JSON.stringify(decodeCurrentClientWorkspaceState(state))
 }

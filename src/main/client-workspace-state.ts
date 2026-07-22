@@ -6,9 +6,11 @@ import type { ClientWorkspaceState, NativeClientWorkspaceReadResult } from '#/sh
 import { hasErrorCode } from '#/shared/error-code.ts'
 import {
   decodeCurrentClientWorkspaceState,
+  isClientWorkspaceStateDecodeError,
   parseClientWorkspaceStateJson,
   stringifyClientWorkspaceState,
 } from '#/shared/client-workspace-state-schema.ts'
+import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { windowStateNodeLog } from '#/node/logger.ts'
 
 const CLIENT_WORKSPACE_FILE = 'client-workspace.json'
@@ -28,20 +30,34 @@ async function readNativeClientWorkspaceStateNow(): Promise<NativeClientWorkspac
   try {
     raw = await readFile(file, 'utf-8')
   } catch (err) {
-    if (hasErrorCode(err, 'ENOENT')) return { kind: 'missing' }
+    if (hasErrorCode(err, 'ENOENT')) {
+      const state = defaultClientWorkspaceState()
+      await writeNativeClientWorkspaceStateNow(file, state)
+      return { kind: 'loaded', state }
+    }
     windowStateNodeLog.warn({ err }, 'failed to read client workspace state')
     throw err
   }
-  return { kind: 'loaded', state: parseClientWorkspaceStateJson(raw) }
+  try {
+    return { kind: 'loaded', state: parseClientWorkspaceStateJson(raw) }
+  } catch (err) {
+    if (!isClientWorkspaceStateDecodeError(err)) throw err
+    const state = defaultClientWorkspaceState()
+    windowStateNodeLog.warn({ err }, 'replacing invalid client workspace state with defaults')
+    await writeNativeClientWorkspaceStateNow(file, state)
+    return { kind: 'loaded', state }
+  }
 }
 
 export async function writeNativeClientWorkspaceState(state: ClientWorkspaceState): Promise<void> {
   const file = clientWorkspaceFile()
   const current = decodeCurrentClientWorkspaceState(state)
-  await runPersistenceOperation(async () => {
-    await mkdir(path.dirname(file), { recursive: true })
-    await writeFileAtomic(file, stringifyClientWorkspaceState(current), { encoding: 'utf-8' })
-  })
+  await runPersistenceOperation(async () => await writeNativeClientWorkspaceStateNow(file, current))
+}
+
+async function writeNativeClientWorkspaceStateNow(file: string, state: ClientWorkspaceState): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true })
+  await writeFileAtomic(file, stringifyClientWorkspaceState(state), { encoding: 'utf-8' })
 }
 
 function runPersistenceOperation<T>(operation: () => Promise<T>): Promise<T> {

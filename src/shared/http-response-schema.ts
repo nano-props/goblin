@@ -23,5 +23,13 @@ export const ExecResultResponseSchema = v.strictObject({
 }) satisfies v.GenericSchema<ExecResult>
 
 export function decodeWith<TSchema extends v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>(schema: TSchema) {
-  return (value: unknown): v.InferOutput<TSchema> => v.parse(schema, value)
+  return (value: unknown): v.InferOutput<TSchema> => {
+    const result = v.safeParse(schema, value)
+    if (result.success) return result.output
+    const issue = result.issues[0]
+    const path = v.getDotPath(issue)
+    throw new Error(`Invalid server response${path ? ` at ${path}` : ''}: ${issue.message}`, {
+      cause: new v.ValiError(result.issues),
+    })
+  }
 }

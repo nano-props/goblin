@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { RestoredWorkspaceRuntimeSchema } from '#/shared/settings-response-schema.ts'
 
 const ACTIVE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo-active')
 const STUB_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo-stub')
@@ -146,6 +148,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const repos = result.runtime.workspaces
     const active = repos.find((r) => r.workspaceId === 'goblin+file:///repo-active')!
     const stub = repos.find((r) => r.workspaceId === 'goblin+file:///repo-stub')!
+    // Keep the deferred-stub producer and its HTTP consumer contract
+    // connected. This state is easy to omit from hand-built schema fixtures.
+    expect(decodeWith(RestoredWorkspaceRuntimeSchema)(stub)).toEqual(stub)
     expect(active.gitProjection).not.toBeNull()
     expect(stub.gitProjection).toBeNull()
     expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')

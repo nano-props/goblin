@@ -25,28 +25,21 @@ describe('client workspace persistence', () => {
     await expect(readClientWorkspaceState()).rejects.toBe(readError)
   })
 
-  test('uses defaults only for an explicit native missing result', async () => {
-    vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
-    vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockResolvedValue({ kind: 'missing' })
-
-    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
-  })
-
-  test('preserves corrupt browser state and fails closed', async () => {
+  test('replaces corrupt browser state with defaults', async () => {
     localStorage.setItem('goblin.workspace', '{broken json')
-    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
-    expect(localStorage.getItem('goblin.workspace')).toBe('{broken json')
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
   })
 
-  test('treats an empty authoritative value as corruption on every read without writing', async () => {
+  test('replaces an empty value once and reads the committed defaults thereafter', async () => {
     localStorage.setItem('goblin.workspace', '')
     const setItem = vi.spyOn(localStorage, 'setItem')
 
-    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
-    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
 
-    expect(localStorage.getItem('goblin.workspace')).toBe('')
-    expect(setItem).not.toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
+    expect(setItem).toHaveBeenCalledOnce()
   })
 
   test('rejects a structurally corrupt native root', async () => {
@@ -83,19 +76,19 @@ describe('client workspace persistence', () => {
     expect(raw).toEqual(presentation)
   })
 
-  test('preserves parseable corruption in the current browser format', async () => {
+  test('replaces parseable corruption in the current browser format', async () => {
     const corrupt = JSON.stringify({ ...currentState(), zenMode: 'yes' })
     localStorage.setItem('goblin.workspace', corrupt)
-    await expect(readClientWorkspaceState()).rejects.toThrow()
-    expect(localStorage.getItem('goblin.workspace')).toBe(corrupt)
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
   })
 
-  test('rejects an obsolete browser version envelope', async () => {
+  test('replaces an obsolete browser version envelope', async () => {
     const future = JSON.stringify({ version: 2, state: {} })
     localStorage.setItem('goblin.workspace', future)
 
-    await expect(readClientWorkspaceState()).rejects.toThrow()
-    expect(localStorage.getItem('goblin.workspace')).toBe(future)
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
   })
 
   test('fails closed when browser storage is unavailable for reads and writes', async () => {
@@ -137,14 +130,13 @@ describe('client workspace persistence', () => {
     await expect(readClientWorkspaceState()).resolves.toEqual(state)
   })
 
-  test('preserves state with unknown root data and fails closed', async () => {
+  test('replaces state with unknown root data', async () => {
     const raw = JSON.stringify({ ...currentState(), unknownRoot: 'preserve' })
     localStorage.setItem('goblin.workspace', raw)
 
-    await expect(readClientWorkspaceState()).rejects.toThrow()
-    expect(localStorage.getItem('goblin.workspace')).toBe(raw)
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+    expect(JSON.parse(localStorage.getItem('goblin.workspace') ?? '')).toEqual(currentState())
   })
-
 })
 
 function currentState(overrides: Partial<ClientWorkspaceState> = {}): ClientWorkspaceState {

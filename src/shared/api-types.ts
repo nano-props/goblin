@@ -111,7 +111,7 @@ export interface ClientWorkspaceState {
   filetreeViewStateByFilesystemTargetByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
-export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
+export type NativeClientWorkspaceReadResult = { kind: 'loaded'; state: unknown }
 
 export interface FiletreeSessionViewState {
   selectedKeys: string[]

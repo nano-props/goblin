@@ -6,7 +6,9 @@ import {
   SettingsSnapshotSchema,
   UserSettingsSchema,
   UserSettingsUpdateResponseSchema,
+  WorkspaceRestoreResponseSchema,
 } from '#/shared/settings-response-schema.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('settings response schemas', () => {
   test('accepts current settings response contracts', () => {
@@ -59,5 +61,39 @@ describe('settings response schemas', () => {
     expect(v.safeParse(GlobalShortcutStateResponseSchema, { ok: true, registered: true, legacy: true }).success).toBe(
       false,
     )
+  })
+
+  test('accepts a deferred Git workspace stub without a repo projection', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///deferred-repo')
+    const response = {
+      status: 'restored',
+      openWorkspaceEntries: [{ id: workspaceId }],
+      runtime: {
+        workspaces: [
+          {
+            workspaceId,
+            workspaceRuntimeId: 'runtime_test000000000000',
+            name: 'deferred-repo',
+            entry: { id: workspaceId },
+            transport: { kind: 'file' },
+            workspaceProbe: {
+              status: 'ready',
+              name: 'deferred-repo',
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+              },
+              diagnostics: [],
+            },
+            gitProjection: null,
+          },
+        ],
+        workspacePaneTabs: [],
+        restoredWorkspaceId: workspaceId,
+      },
+    }
+
+    expect(v.parse(WorkspaceRestoreResponseSchema, response)).toEqual(response)
   })
 })

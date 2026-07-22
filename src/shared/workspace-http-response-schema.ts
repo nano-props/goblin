@@ -65,29 +65,12 @@ export const WorkspaceGitReadyProbeResponseSchema = v.strictObject({
   diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
 })
 
-const WorkspaceReadyWithoutGitResponseSchema = v.strictObject({
-  status: v.literal('ready'),
-  name: v.string(),
-  capabilities: v.strictObject({
-    files: v.strictObject({ read: v.literal(true), write: v.boolean() }),
-    terminal: v.strictObject({ available: v.boolean() }),
-    git: v.strictObject({ status: v.literal('unavailable') }),
-  }),
-  diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
-})
-
 const WorkspaceReadyResponseSchema = v.strictObject({
   status: v.literal('ready'),
   name: v.string(),
   capabilities: WorkspaceCapabilitiesResponseSchema,
   diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
 })
-
-export const WorkspaceProbeWithoutGitProjectionResponseSchema = v.variant('status', [
-  WorkspaceProbingResponseSchema,
-  WorkspaceReadyWithoutGitResponseSchema,
-  WorkspaceUnavailableResponseSchema,
-])
 
 export const WorkspaceProbeStateResponseSchema = v.variant('status', [
   WorkspaceProbingResponseSchema,

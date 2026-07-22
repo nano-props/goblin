@@ -10,7 +10,7 @@ import { RepoProjectionResponseSchema } from '#/shared/repo-response-schema.ts'
 import {
   RemoteWorkspaceTargetResponseSchema,
   WorkspaceGitReadyProbeResponseSchema,
-  WorkspaceProbeWithoutGitProjectionResponseSchema,
+  WorkspaceProbeStateResponseSchema,
 } from '#/shared/workspace-http-response-schema.ts'
 import { REMOTE_WORKSPACE_FAILURE_REASONS } from '#/shared/remote-workspace.ts'
 import {
@@ -135,32 +135,35 @@ const SshTransportSchema = v.strictObject({
     }),
   ]),
 })
-
-const RestoredWorkspaceRuntimeSchema = v.union([
-    v.strictObject({
-      ...RestoredWorkspaceRuntimeBaseEntries,
-      transport: FileTransportSchema,
-      workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
-      gitProjection: RepoProjectionResponseSchema,
-    }),
-    v.strictObject({
-      ...RestoredWorkspaceRuntimeBaseEntries,
-      transport: FileTransportSchema,
-      workspaceProbe: WorkspaceProbeWithoutGitProjectionResponseSchema,
-      gitProjection: v.null(),
-    }),
-    v.strictObject({
-      ...RestoredWorkspaceRuntimeBaseEntries,
-      transport: SshTransportSchema,
-      workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
-      gitProjection: RepoProjectionResponseSchema,
-    }),
-    v.strictObject({
-      ...RestoredWorkspaceRuntimeBaseEntries,
-      transport: SshTransportSchema,
-      workspaceProbe: WorkspaceProbeWithoutGitProjectionResponseSchema,
-      gitProjection: v.null(),
-    }),
+// Projection presence, not transport or probed Git capability, owns this
+// result union. A Git-ready workspace can legitimately have no projection
+// while startup defers its read or when a later projection read has no
+// snapshot. Probe capability and projection lifecycle are separate state.
+export const RestoredWorkspaceRuntimeSchema = v.union([
+  v.strictObject({
+    ...RestoredWorkspaceRuntimeBaseEntries,
+    transport: FileTransportSchema,
+    workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
+    gitProjection: RepoProjectionResponseSchema,
+  }),
+  v.strictObject({
+    ...RestoredWorkspaceRuntimeBaseEntries,
+    transport: FileTransportSchema,
+    workspaceProbe: WorkspaceProbeStateResponseSchema,
+    gitProjection: v.null(),
+  }),
+  v.strictObject({
+    ...RestoredWorkspaceRuntimeBaseEntries,
+    transport: SshTransportSchema,
+    workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
+    gitProjection: RepoProjectionResponseSchema,
+  }),
+  v.strictObject({
+    ...RestoredWorkspaceRuntimeBaseEntries,
+    transport: SshTransportSchema,
+    workspaceProbe: WorkspaceProbeStateResponseSchema,
+    gitProjection: v.null(),
+  }),
 ])
 
 export const WorkspaceRestoreResponseSchema = v.strictObject({
