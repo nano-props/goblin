@@ -4,7 +4,11 @@ import { chmod, mkdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execa, ExecaError } from 'execa'
-import { FIELD_SEP, WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
+import {
+  FOR_EACH_REF_FIELD_SEP,
+  PRETTY_FIELD_SEP,
+  WORKTREE_STATUS_BATCH_BOUNDARY,
+} from '#/system/git/parsers.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
@@ -430,12 +434,18 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '%(authorname)',
         '%(upstream:short)',
         '%(upstream:track)',
-      ].join(FIELD_SEP)
+      ].join(FOR_EACH_REF_FIELD_SEP)
       return [
         `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_CURRENT_MARKER)}`,
-        `git -C ${repo} symbolic-ref --short HEAD 2>/dev/null || true`,
+        `goblin_current=$(git -C ${repo} symbolic-ref --quiet --short HEAD 2>/dev/null)`,
+        'goblin_status=$?',
+        'if [ "$goblin_status" -ne 0 ] && [ "$goblin_status" -ne 1 ]; then exit "$goblin_status"; fi',
+        'printf \'value %s\\n\' "$goblin_current"',
         `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_DEFAULT_MARKER)}`,
-        `git -C ${repo} symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##'`,
+        `goblin_default=$(git -C ${repo} symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)`,
+        'goblin_status=$?',
+        'if [ "$goblin_status" -ne 0 ] && [ "$goblin_status" -ne 1 ]; then exit "$goblin_status"; fi',
+        'printf \'value %s\\n\' "${goblin_default#origin/}"',
         `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_BRANCHES_MARKER)}`,
         `git -C ${repo} for-each-ref --format=${shellQuote(branchFormat)} refs/heads/`,
       ].join('\n')
@@ -444,8 +454,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
       const repo = shellQuote(command.path)
       return [
         'set -e',
-        `git -C ${repo} for-each-ref --format=${shellQuote('%(refname:short)')} refs/heads/`,
-        `printf '\\n%s\\n' ${shellQuote(REMOTE_PANE_WORKTREES_MARKER)}`,
+        `git -C ${repo} for-each-ref --format=${shellQuote('branch %(refname:short)')} refs/heads/`,
+        `printf '%s\\n' ${shellQuote(REMOTE_PANE_WORKTREES_MARKER)}`,
         `git -C ${repo} worktree list --porcelain`,
       ].join('\n')
     }
@@ -629,7 +639,9 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `  [ -f "$f" ] || continue`,
         `  cat "$f" || exit 1`,
         `done`,
-        `:`,
+        // A terminal NUL makes even a bare-only status stream complete and
+        // prevents stdout adapters from stripping the marker's final newline.
+        `printf "\\0"`,
       ].join('\n')
     }
     case 'gitStatus':
@@ -637,7 +649,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitLog': {
       const count = Math.max(1, Math.min(1000, Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT)))
       const skip = Math.max(0, Math.floor(command.skip ?? 0))
-      const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(FIELD_SEP)
+      const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(PRETTY_FIELD_SEP)
       return [
         `git -C ${shellQuote(command.path)} log`,
         '--decorate=short',
@@ -685,11 +697,13 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitBranchDelete':
       return `git -C ${shellQuote(command.path)} branch ${command.force ? '-D' : '-d'} -- ${shellQuote(command.branch)}`
     case 'gitUpstream':
-      return `git -C ${shellQuote(command.path)} rev-parse --abbrev-ref ${shellQuote(`${command.branch}@{u}`)}`
+      return `git -C ${shellQuote(command.path)} for-each-ref --format=${shellQuote('%(upstream:short)')} ${shellQuote(`refs/heads/${command.branch}`)}`
     case 'gitIsAncestor':
-      return `git -C ${shellQuote(command.path)} merge-base --is-ancestor -- ${shellQuote(
-        command.ancestor,
-      )} ${shellQuote(command.descendant)}`
+      return [
+        `git -C ${shellQuote(command.path)} merge-base --is-ancestor -- ${shellQuote(command.ancestor)} ${shellQuote(command.descendant)}`,
+        'goblin_status=$?',
+        `if [ "$goblin_status" -eq 0 ]; then printf 'true\\n'; elif [ "$goblin_status" -eq 1 ]; then printf 'false\\n'; else exit "$goblin_status"; fi`,
+      ].join('\n')
     case 'gitRemoteGetUrl':
       return `git -C ${shellQuote(command.path)} remote get-url origin`
     case 'gitRemoteVerbose':

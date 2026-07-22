@@ -34,6 +34,56 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  testPosix('encodes optional upstream as successful single-line output', async () => {
+    const repo = path.join(os.tmpdir(), `goblin-upstream-protocol-${process.pid}-${Date.now()}`)
+    tempDirs.push(repo)
+    mkdirSync(repo, { recursive: true })
+    await execa('git', ['init', '-q', '-b', 'main', repo])
+    await execa('git', ['-C', repo, 'config', 'user.name', 'Test User'])
+    await execa('git', ['-C', repo, 'config', 'user.email', 'test@example.test'])
+    await execa('git', ['-C', repo, 'commit', '--allow-empty', '-qm', 'initial'])
+
+    const withoutUpstream = buildRemoteCommandInvocation(targetWithPath(repo), {
+      type: 'gitUpstream',
+      path: repo,
+      branch: 'main',
+    })
+    await expect(execa('bash', ['-lc', withoutUpstream.script])).resolves.toMatchObject({ stdout: '' })
+
+    await execa('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.test/repo.git'])
+    await execa('git', ['-C', repo, 'config', 'branch.main.remote', 'origin'])
+    await execa('git', ['-C', repo, 'config', 'branch.main.merge', 'refs/heads/main'])
+    const withUpstream = await execa('bash', ['-lc', withoutUpstream.script])
+    expect(withUpstream.stdout).toBe('origin/main')
+  })
+
+  testPosix('encodes ancestor true and false while preserving Git errors', async () => {
+    const repo = path.join(os.tmpdir(), `goblin-ancestor-protocol-${process.pid}-${Date.now()}`)
+    tempDirs.push(repo)
+    mkdirSync(repo, { recursive: true })
+    await execa('git', ['init', '-q', '-b', 'main', repo])
+    await execa('git', ['-C', repo, 'config', 'user.name', 'Test User'])
+    await execa('git', ['-C', repo, 'config', 'user.email', 'test@example.test'])
+    await execa('git', ['-C', repo, 'commit', '--allow-empty', '-qm', 'first'])
+    await execa('git', ['-C', repo, 'branch', 'base'])
+    await execa('git', ['-C', repo, 'commit', '--allow-empty', '-qm', 'second'])
+
+    const invoke = async (ancestor: string, descendant: string) => {
+      const invocation = buildRemoteCommandInvocation(targetWithPath(repo), {
+        type: 'gitIsAncestor',
+        path: repo,
+        ancestor,
+        descendant,
+      })
+      return await execa('bash', ['-lc', invocation.script], { reject: false })
+    }
+
+    await expect(invoke('base', 'main')).resolves.toMatchObject({ exitCode: 0, stdout: 'true' })
+    await expect(invoke('main', 'base')).resolves.toMatchObject({ exitCode: 0, stdout: 'false' })
+    const invalid = await invoke('missing-ref', 'main')
+    expect(invalid.exitCode).not.toBe(0)
+  })
+
   testPosix('reads a directory overview with spaces and hidden entries', async () => {
     const root = path.join(os.tmpdir(), `goblin-directory-overview-${process.pid}-${Date.now()}`)
     tempDirs.push(root)
@@ -528,16 +578,12 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     })
 
     const result = await execa('sh', ['-lc', invocation.script])
-    const { parseUsableWorktrees, parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
       await import('#/system/git/parsers.ts')
     const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
 
     expect(worktreeListOutput).toContain('prunable ')
     expect(parseWorktrees(worktreeListOutput)).toEqual([
-      expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
-      expect.objectContaining({ isPrunable: true }),
-    ])
-    expect(parseUsableWorktrees(worktreeListOutput)).toEqual([
       expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
     ])
     expect([...parseWorktreeStatusBatch(statusStream).keys()]).toEqual([realpathSync(repoDir)])

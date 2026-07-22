@@ -243,6 +243,8 @@ export function createApp(options: ServerAppOptions): Hono {
       settingsState,
       workspacePaneTabsHost: options.workspacePaneTabsHost,
       workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+      serverHost,
+      serverPort,
     }),
   )
   // i18n is mounted at a separate public path so the client can

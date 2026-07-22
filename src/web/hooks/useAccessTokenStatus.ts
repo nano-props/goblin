@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 
@@ -85,7 +87,7 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
         }
         // Step 2: probe the auth state.
         try {
-          const result = await fetchServerJson<{ ok: true }>('/api/whoami', { signal: timeout.signal })
+          const result = await fetchServerJson('/api/whoami', decodeWith(OkResponseSchema), { signal: timeout.signal })
           if (cancelled) return
           setState(result.ok ? 'authenticated' : 'unauthenticated')
         } catch {
@@ -114,7 +116,7 @@ async function exchangeUrlTokenForCookie(signal: AbortSignal): Promise<'absent' 
   if (!urlToken) return 'absent'
   stripAccessTokenFromUrl()
   try {
-    await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: urlToken }, { signal })
+    await postServerJson('/api/login', { token: urlToken }, decodeWith(OkResponseSchema), { signal })
     return 'authenticated'
   } catch {
     // Bad token (401) or network error. Either way, the token is already gone

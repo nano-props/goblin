@@ -1,11 +1,9 @@
 import * as v from 'valibot'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
+import { LANG_PREF_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { UserSettings } from '#/shared/settings.ts'
-
-export const LANG_PREF_VALUES = ['auto', 'en', 'zh', 'ko', 'ja'] as const
-export const THEME_PREF_VALUES = ['auto', 'light', 'dark'] as const
 
 export interface NativeSettingsProjectionPatch {
   lang?: UserSettings['lang']
@@ -46,7 +44,7 @@ export const NATIVE_SETTINGS_PROJECTION_KEYS = [
   'globalShortcut',
 ] as const
 
-export const NativeSettingsProjectionPatchSchema = v.object({
+export const NativeSettingsProjectionPatchSchema = v.strictObject({
   lang: v.optional(v.picklist(LANG_PREF_VALUES)),
   theme: v.optional(v.picklist(THEME_PREF_VALUES)),
   colorTheme: v.optional(v.picklist(COLOR_THEMES)),
@@ -55,7 +53,7 @@ export const NativeSettingsProjectionPatchSchema = v.object({
   globalShortcut: v.optional(v.string()),
 })
 
-export const NativeSettingsProjectionStateSchema = v.object({
+export const NativeSettingsProjectionStateSchema = v.strictObject({
   lang: v.picklist(LANG_PREF_VALUES),
   theme: v.picklist(THEME_PREF_VALUES),
   colorTheme: v.picklist(COLOR_THEMES),
@@ -64,14 +62,14 @@ export const NativeSettingsProjectionStateSchema = v.object({
   globalShortcut: v.string(),
 })
 
-export const NativeRecentWorkspacesProjectionSchema = v.object({
+export const NativeRecentWorkspacesProjectionSchema = v.strictObject({
   recentWorkspaces: v.array(WorkspaceSessionEntrySchema),
 })
 
 export const NativeHostProjectionSchema = v.pipe(
-  v.object({
+  v.strictObject({
     prefs: v.optional(
-      v.object({
+      v.strictObject({
         patch: NativeSettingsProjectionPatchSchema,
         settings: NativeSettingsProjectionStateSchema,
       }),

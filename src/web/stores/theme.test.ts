@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 interface FakeMediaQueryList {
@@ -98,7 +98,7 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
 
 function settingsResponse(overrides: Record<string, unknown> = {}) {
   return {
-    ...defaultSettingsSnapshot({ globalShortcut: 'CommandOrControl+Shift+G' }),
+    ...defaultSettingsSnapshot(),
     ...overrides,
   }
 }
@@ -330,9 +330,7 @@ describe('theme store OS-appearance sync', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        prefs: {
-          ...defaultSettingsSnapshot({ theme: 'dark', colorTheme: 'github' }),
-        },
+        prefs: defaultUserSettings({ theme: 'dark', colorTheme: 'github' }),
       }),
     }))
 

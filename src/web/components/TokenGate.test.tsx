@@ -69,6 +69,7 @@ describe('TokenGate', () => {
     expect(postServerJson).toHaveBeenCalledWith(
       '/api/login',
       { token: 'bad-token' },
+      expect.any(Function),
       { signal: expect.any(AbortSignal) },
     )
   })
@@ -111,6 +112,7 @@ describe('TokenGate', () => {
       expect(postServerJson).toHaveBeenCalledWith(
         '/api/login',
         { token: 'good-token' },
+        expect.any(Function),
         { signal: expect.any(AbortSignal) },
       )
       expect(authMock.status.refresh).toHaveBeenCalledTimes(1)

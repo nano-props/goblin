@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const fetchMock = mockFetch()
+const decodeJson = (value: unknown) => value
 
 describe('server-fetch', () => {
   beforeEach(() => {
@@ -25,7 +26,7 @@ describe('server-fetch', () => {
     })
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
-    const request = fetchServerJson('/api/slow', { timeoutMs: 1_000 })
+    const request = fetchServerJson('/api/slow', decodeJson, { timeoutMs: 1_000 })
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await vi.advanceTimersByTimeAsync(1_000)
@@ -45,7 +46,7 @@ describe('server-fetch', () => {
     })
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
-    const request = fetchServerJson('/api/slow', { signal: caller.signal, timeoutMs: 1_000 })
+    const request = fetchServerJson('/api/slow', decodeJson, { signal: caller.signal, timeoutMs: 1_000 })
     const assertion = expect(request).rejects.toThrow('caller cancelled')
 
     await Promise.resolve()
@@ -65,7 +66,7 @@ describe('server-fetch', () => {
     })
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
-    await expect(fetchServerJson('/api/ok', { timeoutMs: 1_000 })).resolves.toEqual({ ok: true })
+    await expect(fetchServerJson('/api/ok', decodeJson, { timeoutMs: 1_000 })).resolves.toEqual({ ok: true })
     expect(vi.getTimerCount()).toBe(0)
   })
 
@@ -83,7 +84,7 @@ describe('server-fetch', () => {
     })
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
-    await fetchServerJson('/api/settings')
+    await fetchServerJson('/api/settings', decodeJson)
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32101/api/settings',
@@ -102,7 +103,7 @@ describe('server-fetch', () => {
     })
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
-    void fetchServerJson('/api/slow', { timeoutMs: 0 })
+    void fetchServerJson('/api/slow', decodeJson, { timeoutMs: 0 })
 
     await Promise.resolve()
     expect(requestSignal).toBeUndefined()
@@ -114,11 +115,11 @@ describe('server-fetch', () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 400,
-      json: async () => ({ code: 'BAD_REQUEST', message: 'error.repository-boundary-unavailable' }),
+      json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.repository-boundary-unavailable' }),
     })
 
     const { fetchServerJson, ServerRequestError } = await import('#/web/lib/server-fetch.ts')
-    await expect(fetchServerJson('/api/repo/fetch')).rejects.toMatchObject({
+    await expect(fetchServerJson('/api/repo/fetch', decodeJson)).rejects.toMatchObject({
       name: 'ServerRequestError',
       message: 'error.repository-boundary-unavailable',
       status: 400,

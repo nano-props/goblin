@@ -18,7 +18,7 @@ export interface GoblinCommandIo {
 // read endpoint, command-line websocket, file fallback) can extend
 // the interface without re-shaping every existing command.
 export interface GoblinCommandTransport {
-  postJson<T>(pathname: string, body: unknown): Promise<T>
+  postJson<T>(pathname: string, body: unknown, decode: (value: unknown) => T): Promise<T>
 }
 
 export interface GoblinCommandContext {

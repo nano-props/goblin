@@ -8,14 +8,14 @@ import {
   deleteBranch,
   deleteUpstreamBranch,
   getBranchWorktreeIdentities,
-  getBranchesStrict,
+  getBranches,
   getCurrentBranch,
-  getCurrentBranchStrict,
   resolveRepoCommonDir,
   resolveRepoObjectsDir,
-  getHeadHashStrict,
+  getHeadHash,
   getLog as getBranchLog,
   getUpstream,
+  type BranchUpstream,
   isAncestor,
   isGitRepo,
 } from '#/system/git/branches.ts'
@@ -61,7 +61,6 @@ import {
   getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoExecutionIdentity,
   getRemoteSnapshot,
-  getRemoteSnapshotStrict,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
   getRemoteTrackingBranches as getSshRemoteTrackingBranches,
@@ -597,6 +596,7 @@ function createLocalRepoSource(
 
   async function validateBranchDeletion(
     branch: string,
+    upstream: BranchUpstream | null,
     options?: {
       force?: boolean
       notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
@@ -614,11 +614,11 @@ function createLocalRepoSource(
       return ignoredPath ? path.resolve(wt.path) !== ignoredPath : true
     })
     const mergedToCurrent = !options?.force && current ? await isAncestor(gitCwd, branch, current, signal) : false
-    const upstream = !options?.force ? await getUpstream(gitCwd, branch, signal) : null
-    const mergedToUpstream = !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream, signal) : false
+    const mergedToUpstream =
+      !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream.ref, signal) : false
     return validateBranchDeletionPolicy({
       branch,
-      currentBranch: current,
+      currentBranch: current ?? undefined,
       isCheckedOutElsewhere,
       force: options?.force,
       mergedToCurrent,
@@ -629,21 +629,14 @@ function createLocalRepoSource(
 
   async function deleteBranchAfterValidation(
     branch: string,
+    upstream: BranchUpstream | null,
     options?: { force?: boolean; deleteUpstream?: boolean },
     signal?: AbortSignal,
     gitCwd = repoId,
   ): Promise<ExecResult> {
-    const upstream = options?.deleteUpstream ? await getUpstream(gitCwd, branch, signal) : null
     const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
     if (!deleted.ok || !upstream) return deleted
-    const slash = upstream.indexOf('/')
-    if (slash <= 0) return deleted
-    const upstreamDeleted = await deleteUpstreamBranch(
-      gitCwd,
-      upstream.slice(0, slash),
-      upstream.slice(slash + 1),
-      signal,
-    )
+    const upstreamDeleted = await deleteUpstreamBranch(gitCwd, upstream.remote, upstream.branch, signal)
     return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repositoryStateChanged: true }
   }
 
@@ -657,10 +650,10 @@ function createLocalRepoSource(
       signal?.throwIfAborted()
       const worktrees = await getWorktrees(repoId, { signal })
       signal?.throwIfAborted()
-      const currentBranch = await getCurrentBranchStrict(repoId, { signal })
-      const branches = await getBranchesStrict(repoId, worktrees, currentBranch, { signal })
+      const currentBranch = await getCurrentBranch(repoId, { signal })
+      const branches = await getBranches(repoId, worktrees, currentBranch, { signal })
       const current = currentBranch ?? ''
-      const currentHEAD = currentBranch === null ? await getHeadHashStrict(repoId, { signal }) : undefined
+      const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
       const remote = await getRemoteInfo(repoId, signal)
       signal?.throwIfAborted()
       return { branches, current, currentHEAD, remote }
@@ -744,8 +737,10 @@ function createLocalRepoSource(
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const upstream = !options?.force || options?.deleteUpstream ? await getUpstream(repoId, branch, signal) : null
       const validation = await validateBranchDeletion(
         branch,
+        upstream,
         { force: options?.force },
         signal,
         undefined,
@@ -754,7 +749,7 @@ function createLocalRepoSource(
       )
       if (validation) return validation
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
-      const deleted = await deleteBranchAfterValidation(branch, options, signal)
+      const deleted = await deleteBranchAfterValidation(branch, upstream, options, signal)
       return deleted.ok || deleted.repositoryStateChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
     async removeWorktree(input, signal, lifecycle) {
@@ -772,9 +767,14 @@ function createLocalRepoSource(
         path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
       const invalid = validateRemovableWorktreeState(removable.target)
       if (invalid) return invalid
+      const upstream =
+        input.deleteBranch && (!input.forceDeleteBranch || input.deleteUpstream)
+          ? await getUpstream(mutationCwd, input.branch, signal)
+          : null
       if (input.deleteBranch) {
         const validation = await validateBranchDeletion(
           input.branch,
+          upstream,
           { force: input.forceDeleteBranch, notMergedMessage: 'error.cannot-remove-unpushed-worktree' },
           signal,
           removable.target.path,
@@ -822,6 +822,7 @@ function createLocalRepoSource(
       if (!input.deleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
       const deleted = await deleteBranchAfterValidation(
         input.branch,
+        upstream,
         { force: input.forceDeleteBranch, deleteUpstream: input.deleteUpstream },
         signal,
         mutationCwd,
@@ -858,7 +859,7 @@ async function createRemoteRepoSource(
     id: repoId,
     kind: 'remote',
     async getSnapshot(signal) {
-      const remoteSnapshot = await getRemoteSnapshotStrict(target, { signal, run })
+      const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
       signal?.throwIfAborted()
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },

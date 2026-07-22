@@ -31,13 +31,14 @@ import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.t
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { ClientWorkspaceStateSchema } from '#/shared/client-workspace-state-schema.ts'
+import { LANG_PREF_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
+import { FetchIntervalSecSchema } from '#/shared/settings-response-schema.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const FetchIntervalSecSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(3600))
 const GlobalShortcutSchema = v.pipe(
   v.string(),
   v.check((value) => parseAllowedGlobalShortcut(value) !== null, 'invalid global shortcut'),
@@ -268,9 +269,9 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.strictObject({
     prefs: v.strictObject({
-      theme: v.optional(v.picklist(['auto', 'light', 'dark'])),
+      theme: v.optional(v.picklist(THEME_PREF_VALUES)),
       colorTheme: v.optional(v.picklist(COLOR_THEMES)),
-      lang: v.optional(v.picklist(['auto', 'en', 'zh', 'ko', 'ja'])),
+      lang: v.optional(v.picklist(LANG_PREF_VALUES)),
       fetchIntervalSec: v.optional(FetchIntervalSecSchema),
       terminalNotificationsEnabled: v.optional(v.boolean()),
       shortcutsDisabled: v.optional(v.boolean()),

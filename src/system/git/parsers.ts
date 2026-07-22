@@ -6,11 +6,15 @@
 // JSDoc comment; if a callsite changes the command (different format
 // string, removed flag), the parser must be updated in lockstep.
 
+import path from 'node:path'
 import type { BranchSnapshotInfo, LogEntry, StatusEntry, WorktreeInfo } from '#/shared/git-types.ts'
+import { GIT_HASH_RE } from '#/shared/git-types.ts'
+import { isSafeBranchName } from '#/shared/refnames.ts'
 
-/** ASCII Unit Separator. Safe against subjects / author names / paths
- *  containing it. Used by both the branch and log format strings. */
-export const FIELD_SEP = '\x1f'
+/** NUL cannot occur in Git's formatted ref/log fields. */
+export const FIELD_SEP = '\0'
+export const FOR_EACH_REF_FIELD_SEP = '%00'
+export const PRETTY_FIELD_SEP = '%x00'
 
 /**
  * Parse `git for-each-ref --format=<fields joined by FIELD_SEP> refs/heads/`.
@@ -23,6 +27,27 @@ export function parseBranches(
   worktrees: WorktreeInfo[] = [],
 ): BranchSnapshotInfo[] {
   if (!output) return []
+
+  const lines = output.split('\n').filter((line) => line.length > 0)
+  for (const line of lines) {
+    const parts = line.split(FIELD_SEP)
+    if (parts.length !== 8) throw new Error('Invalid branch snapshot row')
+    const [name, hash, shortHash, , date, , upstream, track] = parts
+    if (!name || !isSafeBranchName(name) || !hash || !GIT_HASH_RE.test(hash)) {
+      throw new Error('Invalid branch snapshot identity')
+    }
+    if (
+      !shortHash ||
+      !GIT_HASH_RE.test(shortHash) ||
+      !date ||
+      Number.isNaN(Date.parse(date)) ||
+      (upstream !== '' && (!upstream || !isSafeBranchName(upstream))) ||
+      !/^(?:|\[(?:gone|ahead \d+|behind \d+|ahead \d+, behind \d+)\])$/.test(track ?? '') ||
+      (!upstream && track !== '')
+    ) {
+      throw new Error('Invalid branch snapshot metadata')
+    }
+  }
 
   const worktreeMap = new Map<
     string,
@@ -40,7 +65,6 @@ export function parseBranches(
     }
   }
 
-  const lines = output.split('\n').filter(Boolean)
   const branches: BranchSnapshotInfo[] = []
 
   for (const line of lines) {
@@ -109,16 +133,28 @@ export function parseLog(output: string): LogEntry[] {
   if (!output) return []
   return output
     .split('\n')
-    .filter(Boolean)
+    .filter((line) => line.length > 0)
     .map((line) => {
       const parts = line.split(FIELD_SEP)
+      if (parts.length !== 6) throw new Error('Invalid log row')
+      const [hash, shortHash, refs, message, author, date] = parts
+      if (
+        !hash ||
+        !GIT_HASH_RE.test(hash) ||
+        !shortHash ||
+        !GIT_HASH_RE.test(shortHash) ||
+        !date ||
+        Number.isNaN(Date.parse(date))
+      ) {
+        throw new Error('Invalid log metadata')
+      }
       return {
-        hash: parts[0] ?? '',
-        shortHash: parts[1] ?? '',
-        refs: parts[2] ?? '',
-        message: parts[3] ?? '',
-        author: parts[4] ?? '',
-        date: parts[5] ?? '',
+        hash,
+        shortHash,
+        refs: refs ?? '',
+        message: message ?? '',
+        author: author ?? '',
+        date,
       }
     })
 }
@@ -134,15 +170,21 @@ export function parseLog(output: string): LogEntry[] {
  */
 export function parseStatus(output: string): StatusEntry[] {
   if (!output) return []
-  const records = output.split('\0').filter((s) => s.length > 0)
+  if (!output.endsWith('\0')) throw new Error('Invalid status output')
+  const records = output.split('\0')
+  records.pop()
   const entries: StatusEntry[] = []
   for (let i = 0; i < records.length; i++) {
     const line = records[i]!
-    if (line.length < 3) continue
-    const x = line[0] ?? ' '
-    const y = line[1] ?? ' '
+    if (line.length < 4 || line[2] !== ' ' || line.slice(3).length === 0) throw new Error('Invalid status record')
+    const x = line[0]!
+    const y = line[1]!
+    if (!' MADRCUT?!'.includes(x) || !' MADRCUT?!'.includes(y)) throw new Error('Invalid status code')
     const path = line.slice(3)
-    if (x === 'R' || x === 'C') i++
+    if (x === 'R' || x === 'C') {
+      if (!records[i + 1]) throw new Error('Invalid status rename record')
+      i++
+    }
     entries.push({ x, y, path })
   }
   return entries
@@ -171,18 +213,15 @@ export function splitWorktreeStatusBatch(output: string): {
   readonly worktreeListOutput: string
   readonly statusStream: string
 } {
-  const marker = `\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n`
-  const idx = output.indexOf(marker)
-  if (idx < 0) {
-    // Defensive: if the remote shell could not produce the batch
-    // (e.g. a very old bash) we fall back to an empty status stream
-    // and treat the whole output as the worktree list, so the
-    // caller can still produce a worktree list from it.
-    return { worktreeListOutput: output, statusStream: '' }
-  }
+  const initialMarker = `${WORKTREE_STATUS_BATCH_BOUNDARY}\n`
+  const followingMarker = `\n${initialMarker}`
+  const startsWithMarker = output.startsWith(initialMarker)
+  const idx = startsWithMarker ? 0 : output.indexOf(followingMarker)
+  const markerLength = startsWithMarker ? initialMarker.length : followingMarker.length
+  if (idx < 0) throw new Error('Invalid worktree status envelope')
   return {
     worktreeListOutput: output.slice(0, idx),
-    statusStream: output.slice(idx + marker.length),
+    statusStream: output.slice(idx + markerLength),
   }
 }
 
@@ -203,87 +242,89 @@ export function splitWorktreeStatusBatch(output: string): {
  */
 export function parseWorktreeStatusBatch(stream: string): ReadonlyMap<string, ReadonlyArray<StatusEntry>> {
   const result = new Map<string, ReadonlyArray<StatusEntry>>()
-  if (!stream) return result
+  if (!stream.endsWith('\0')) throw new Error('Invalid worktree status batch')
   const records = stream.split('\0')
+  records.pop()
+  if (records.pop() !== '') throw new Error('Invalid worktree status batch')
   let i = 0
   while (i < records.length) {
-    const path = records[i] ?? ''
+    const worktreePath = records[i] ?? ''
     i++
-    if (path === '') break // trailing empty record (or end-of-stream)
-    const entries: StatusEntry[] = []
+    if (!path.posix.isAbsolute(worktreePath) || result.has(worktreePath)) {
+      throw new Error('Invalid worktree status path')
+    }
+    const statusRecords: string[] = []
+    let complete = false
     while (i < records.length) {
       const rec = records[i] ?? ''
       i++
-      if (rec === '') break // worktree boundary
-      if (rec.length < 3) continue
-      const x = rec[0] ?? ' '
-      const y = rec[1] ?? ' '
-      const filePath = rec.slice(3)
-      if (x === 'R' || x === 'C') {
-        // Skip the second NUL-terminated record holding the original
-        // path. We surface only the new path to match `parseStatus`.
-        i++
+      if (rec === '') {
+        complete = true
+        break
       }
-      entries.push({ x, y, path: filePath })
+      statusRecords.push(rec)
     }
-    result.set(path, entries)
+    if (!complete) throw new Error('Invalid worktree status section')
+    const entries = statusRecords.length > 0 ? parseStatus(`${statusRecords.join('\0')}\0`) : []
+    result.set(worktreePath, entries)
   }
   return result
 }
 
-/**
- * Parse `git worktree list --porcelain`. Blocks are separated by a
- * blank line; each block contains `worktree <path>` and either a
- * `branch refs/heads/<name>` line, a `detached` marker, or a `bare`
- * marker. Dirtiness is filled in later by `getWorktrees` because it
- * requires running another git command per worktree.
- */
+/** Parse and validate the complete porcelain protocol into usable worktrees. */
 export function parseWorktrees(output: string): WorktreeInfo[] {
-  if (!output) return []
-  const worktrees: WorktreeInfo[] = []
-  const blocks = output.split('\n\n').filter(Boolean)
-
-  for (const [blockIndex, block] of blocks.entries()) {
-    const lines = block.split('\n').filter(Boolean)
-    let path = ''
-    let branch: string | undefined
-    let isBare = false
-    let isLocked = false
-    let isPrunable = false
-
+  if (output.trim().length === 0) return []
+  const blocks = output.split('\n\n').filter((block) => block.length > 0)
+  for (const block of blocks) {
+    const lines = block.split('\n').filter((line) => line.length > 0)
+    let worktreeCount = 0
+    let headCount = 0
+    let stateCount = 0
     for (const line of lines) {
       if (line.startsWith('worktree ')) {
-        path = line.slice('worktree '.length)
-      } else if (line.startsWith('branch ')) {
-        const ref = line.slice('branch '.length)
-        branch = ref.replace(/^refs\/heads\//, '')
-      } else if (line === 'bare') {
-        isBare = true
-      } else if (line === 'locked' || line.startsWith('locked ')) {
-        isLocked = true
-      } else if (line === 'prunable' || line.startsWith('prunable ')) {
-        isPrunable = true
+        worktreeCount += 1
+        const worktreePath = line.slice('worktree '.length)
+        if (!path.posix.isAbsolute(worktreePath) && !path.win32.isAbsolute(worktreePath)) {
+          throw new Error('Invalid worktree path')
+        }
+      } else if (line.startsWith('HEAD ')) {
+        headCount += 1
+        if (!GIT_HASH_RE.test(line.slice('HEAD '.length))) throw new Error('Invalid worktree HEAD')
+      } else if (line.startsWith('branch refs/heads/')) {
+        stateCount += 1
+        if (!isSafeBranchName(line.slice('branch refs/heads/'.length))) throw new Error('Invalid worktree branch')
+      } else if (line === 'detached' || line === 'bare') {
+        stateCount += 1
+      } else if (
+        line === 'locked' ||
+        line.startsWith('locked ') ||
+        line === 'prunable' ||
+        line.startsWith('prunable ')
+      ) {
+        continue
+      } else {
+        throw new Error('Invalid worktree record')
       }
     }
-
-    if (path) {
-      worktrees.push({
-        path,
-        branch,
-        isBare,
-        isPrimary: blockIndex === 0,
-        isLocked,
-        ...(isPrunable ? { isPrunable: true } : {}),
-      })
+    const bare = lines.includes('bare')
+    if (worktreeCount !== 1 || stateCount !== 1 || (bare ? headCount !== 0 : headCount !== 1)) {
+      throw new Error('Invalid worktree block')
     }
   }
-
+  const worktrees: WorktreeInfo[] = []
+  for (const [blockIndex, block] of blocks.entries()) {
+    const lines = block.split('\n').filter((line) => line.length > 0)
+    const worktreeLine = lines.find((line) => line.startsWith('worktree '))!
+    const branchLine = lines.find((line) => line.startsWith('branch refs/heads/'))
+    const isPrunable = lines.some((line) => line === 'prunable' || line.startsWith('prunable '))
+    if (isPrunable) continue
+    worktrees.push({
+      path: worktreeLine.slice('worktree '.length),
+      ...(branchLine ? { branch: branchLine.slice('branch refs/heads/'.length) } : {}),
+      isBare: lines.includes('bare'),
+      isPrimary: blockIndex === 0,
+      isLocked: lines.some((line) => line === 'locked' || line.startsWith('locked ')),
+    })
+  }
   return worktrees
-}
-
-/** Physical worktree projection used by every execution consumer. The raw
- * parser deliberately retains prunable Git metadata for diagnostics and
- * future cleanup, while this single boundary defines usable membership. */
-export function parseUsableWorktrees(output: string): WorktreeInfo[] {
-  return parseWorktrees(output).filter((worktree) => worktree.isPrunable !== true)
 }

@@ -78,9 +78,27 @@ async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Pro
 }
 
 export function parseRemoteVerbose(output: string): GitRemoteInfo[] {
+  const lines = output.split('\n').filter((line) => line.trim().length > 0)
+  const rolesByRemote = new Map<string, Set<'fetch' | 'push'>>()
+  for (const line of lines) {
+    const match = line.match(REMOTE_VERBOSE_LINE_RE)
+    if (!match) throw new Error('Invalid remote output')
+    const roles = rolesByRemote.get(match[1]!) ?? new Set<'fetch' | 'push'>()
+    roles.add(match[3] as 'fetch' | 'push')
+    rolesByRemote.set(match[1]!, roles)
+  }
+  if (Array.from(rolesByRemote.values()).some((roles) => !roles.has('fetch') || !roles.has('push'))) {
+    throw new Error('Incomplete remote output')
+  }
+  return parseRemoteVerboseLines(lines)
+}
+
+const REMOTE_VERBOSE_LINE_RE = /^(\S+)\s+(.+?)\s+\((fetch|push)\)$/
+
+function parseRemoteVerboseLines(lines: readonly string[]): GitRemoteInfo[] {
   const remotes = new Map<string, { name: string; fetchUrl?: string; pushUrl?: string }>()
-  for (const line of output.split('\n')) {
-    const match = line.match(/^(\S+)\s+(.+?)\s+\((fetch|push)\)$/)
+  for (const line of lines) {
+    const match = line.match(REMOTE_VERBOSE_LINE_RE)
     if (!match) continue
     const name = match[1]!
     const remote = remotes.get(name) ?? { name }

@@ -1,8 +1,11 @@
 import type { ColorTheme } from '#/shared/color-theme.ts'
 
-export type ThemePref = 'auto' | 'light' | 'dark'
+export const THEME_PREF_VALUES = ['auto', 'light', 'dark'] as const
+export const LANG_PREF_VALUES = ['auto', 'en', 'zh', 'ko', 'ja'] as const
+
+export type ThemePref = (typeof THEME_PREF_VALUES)[number]
 export type ResolvedTheme = 'light' | 'dark'
-export type LangPref = 'auto' | 'en' | 'zh' | 'ko' | 'ja'
+export type LangPref = (typeof LANG_PREF_VALUES)[number]
 export type Lang = 'en' | 'zh' | 'ko' | 'ja'
 export type TerminalApp = 'ghostty' | 'terminal' | 'windowsTerminal'
 export type EditorApp = 'vscode'

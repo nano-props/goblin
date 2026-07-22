@@ -33,6 +33,8 @@ export function createSettingsRoutes(options: {
   settingsState: NativeShortcutRegistrationState
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
+  serverHost: string
+  serverPort: number
 }) {
   const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()
@@ -49,8 +51,8 @@ export function createSettingsRoutes(options: {
   app.post('/external-apps/refresh', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
   app.get('/prefs', async (c) => c.json(await getUserSettings()))
   app.get('/lan', async (c) => {
-    const host = process.env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
-    const port = Number(process.env.GOBLIN_SERVER_PORT) || 32100
+    const host = options.serverHost
+    const port = options.serverPort
     const lanUrls = host === '0.0.0.0' ? getLanUrls(port) : isLanAddress(host) ? [`http://${host}:${port}`] : []
     return c.json({ host, port, lanUrls } satisfies LanInfo)
   })

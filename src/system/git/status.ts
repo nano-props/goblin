@@ -1,5 +1,5 @@
 import { git } from '#/system/git/git-exec.ts'
-import { parseStatus, parseUsableWorktrees } from '#/system/git/parsers.ts'
+import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { worktreePathIsMissing } from '#/system/git/worktree-path.ts'
@@ -18,7 +18,7 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
   options?.signal?.throwIfAborted()
   const out = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
   options?.signal?.throwIfAborted()
-  const worktrees = parseUsableWorktrees(out)
+  const worktrees = parseWorktrees(out)
 
   const results = await mapWithConcurrency(
     worktrees,

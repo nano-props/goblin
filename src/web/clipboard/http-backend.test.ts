@@ -96,4 +96,15 @@ describe('createHttpClipboardBackend', () => {
       'Invalid clipboard file response',
     )
   })
+
+  test('rejects unknown response fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ paths: ['/ok'], legacyPaths: [] }) })),
+    )
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
+    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
+      'Invalid clipboard file response',
+    )
+  })
 })

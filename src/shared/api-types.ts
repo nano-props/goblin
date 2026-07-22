@@ -261,7 +261,6 @@ export interface UserSettingsUpdateResponse {
   ok: true
   prefs: UserSettings
   i18n?: I18nSnapshot
-  externalApps?: ExternalAppsSnapshot
 }
 
 export interface RepoSnapshot {

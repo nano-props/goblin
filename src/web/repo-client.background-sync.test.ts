@@ -17,7 +17,10 @@ describe('background sync client registration', () => {
       'fetch',
       vi.fn(async (_url: string, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)) as { clientId: string; revision: number })
-        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
+        return new Response(JSON.stringify({ ok: true, repoIds: [WORKSPACE_ID], intervalSec: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
       }),
     )
     const targets = [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-background-sync-client' }]

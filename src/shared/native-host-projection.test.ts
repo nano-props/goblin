@@ -54,4 +54,23 @@ describe('native host projection helpers', () => {
   test('rejects an empty native host projection payload', () => {
     expect(v.safeParse(NativeHostProjectionSchema, {}).success).toBe(false)
   })
+
+  test('rejects unknown native host projection fields', () => {
+    expect(
+      v.safeParse(NativeHostProjectionSchema, {
+        prefs: {
+          patch: { lang: 'ja' },
+          settings: {
+            lang: 'ja',
+            theme: 'dark',
+            colorTheme: 'github',
+            shortcutsDisabled: false,
+            globalShortcutDisabled: false,
+            globalShortcut: 'Alt+K',
+            legacyTheme: 'dark',
+          },
+        },
+      }).success,
+    ).toBe(false)
+  })
 })

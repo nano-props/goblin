@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import { realpath } from 'node:fs/promises'
 import {
-  getBranchesStrict,
+  getBranches,
   getBranchWorktreeIdentities,
-  getCurrentBranchStrict,
+  getCurrentBranch,
   resolveRepoCommonDir,
   resolveRepoObjectsDir,
 } from '#/system/git/branches.ts'
@@ -58,12 +58,12 @@ describe('getBranchWorktreeIdentities', () => {
 describe('authoritative snapshot reads', () => {
   test('represents detached HEAD explicitly', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
-    await expect(getCurrentBranchStrict('/repo')).resolves.toBeNull()
+    await expect(getCurrentBranch('/repo')).resolves.toBeNull()
   })
 
   test('preserves an unborn branch as authoritative current state', async () => {
     vi.mocked(git).mockResolvedValueOnce('main')
-    await expect(getCurrentBranchStrict('/repo')).resolves.toBe('main')
+    await expect(getCurrentBranch('/repo')).resolves.toBe('main')
     expect(git).toHaveBeenCalledWith('/repo', ['branch', '--show-current'], { signal: undefined })
   })
 
@@ -73,7 +73,7 @@ describe('authoritative snapshot reads', () => {
       return ''
     })
 
-    await expect(getBranchesStrict('/repo', [], 'main')).rejects.toThrow('branch read failed')
+    await expect(getBranches('/repo', [], 'main')).rejects.toThrow('branch read failed')
   })
 })
 

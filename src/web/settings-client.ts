@@ -23,6 +23,23 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceExternalAppRecentKey, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
+import * as v from 'valibot'
+import { decodeWith } from '#/shared/http-response-schema.ts'
+import {
+  ExternalAppsSnapshotSchema,
+  FetchIntervalSecSchema,
+  GitHubCliStateSchema,
+  I18nSnapshotSchema,
+  LanInfoSchema,
+  OkResponseSchema,
+  ServerWorkspaceStateSchema,
+  SettingsSnapshotSchema,
+  UserSettingsUpdateResponseSchema,
+  WorkspaceSettingsStateSchema,
+  WorkspaceRestoreResponseSchema,
+  WorkspaceTabsRestoreResponseSchema,
+} from '#/shared/settings-response-schema.ts'
+import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
 
 type RecentWorkspacesUpdateResponse = {
   ok: boolean
@@ -30,7 +47,7 @@ type RecentWorkspacesUpdateResponse = {
 } & RuntimeRecentWorkspacesState
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
-  return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
+  return await fetchServerJson('/api/settings', decodeWith(SettingsSnapshotSchema), { signal: options?.signal })
 }
 
 function resolveThemeStateFromUserSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
@@ -52,9 +69,10 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateUserSettingsPatch(settings: Record<string, unknown>): Promise<UserSettingsUpdateResponse> {
-  const result = await postServerJson<{ prefs: Record<string, unknown> }, UserSettingsUpdateResponse>(
+  const result = await postServerJson(
     '/api/settings/prefs',
     { prefs: settings },
+    decodeWith(UserSettingsUpdateResponseSchema),
   )
   return result
 }
@@ -72,7 +90,7 @@ export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promi
   // authenticated, otherwise the token gate would render with raw
   // i18n keys (the client never has a bootstrap on the web path
   // and the server is not inlining anything into HTML anymore).
-  return await fetchServerJson<I18nSnapshot>('/api/i18n', { signal: options?.signal })
+  return await fetchServerJson('/api/i18n', decodeWith(I18nSnapshotSchema), { signal: options?.signal })
 }
 
 export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
@@ -83,15 +101,23 @@ export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
   const filtered = hosts?.filter((host) => host.trim().length > 0)
-  return await postServerJson('/api/settings/github-cli', filtered && filtered.length > 0 ? { hosts: filtered } : {})
+  return await postServerJson(
+    '/api/settings/github-cli',
+    filtered && filtered.length > 0 ? { hosts: filtered } : {},
+    decodeWith(GitHubCliStateSchema),
+  )
 }
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
-  return await postServerJson('/api/settings/github-cli/refresh', hosts && hosts.length > 0 ? { hosts } : {})
+  return await postServerJson(
+    '/api/settings/github-cli/refresh',
+    hosts && hosts.length > 0 ? { hosts } : {},
+    decodeWith(GitHubCliStateSchema),
+  )
 }
 
 export async function getLanInfo(): Promise<LanInfo> {
-  return await fetchServerJson('/api/settings/lan')
+  return await fetchServerJson('/api/settings/lan', decodeWith(LanInfoSchema))
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<boolean> {
@@ -99,23 +125,32 @@ export async function setLanEnabled(enabled: boolean): Promise<boolean> {
 }
 
 export async function getExternalAppsSnapshot(options?: { signal?: AbortSignal }): Promise<ExternalAppsSnapshot> {
-  return await fetchServerJson<ExternalAppsSnapshot>('/api/settings/external-apps', { signal: options?.signal })
+  return await fetchServerJson('/api/settings/external-apps', decodeWith(ExternalAppsSnapshotSchema), {
+    signal: options?.signal,
+  })
 }
 
 export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
-  return await postServerJson('/api/settings/external-apps/refresh', {})
+  return await postServerJson('/api/settings/external-apps/refresh', {}, decodeWith(ExternalAppsSnapshotSchema))
 }
 
 export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<RecentWorkspacesUpdateResponse> {
-  const result = await postServerJson<{ workspace: WorkspaceSessionEntry }, RecentWorkspacesUpdateResponse>(
+  const result = await postServerJson(
     '/api/settings/recent-workspaces/add',
     { workspace },
+    decodeWith(
+      v.strictObject({
+        ok: v.literal(true),
+        recentWorkspaces: v.array(WorkspaceSessionEntrySchema),
+        addedWorkspace: v.nullable(WorkspaceSessionEntrySchema),
+      }),
+    ),
   )
   return result
 }
 
 export async function clearRecentWorkspaces(): Promise<void> {
-  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-workspaces/clear', {})
+  await postServerJson('/api/settings/recent-workspaces/clear', {}, decodeWith(OkResponseSchema))
 }
 
 /**
@@ -129,14 +164,15 @@ export async function setRecentWorkspaceExternalApp(input: {
   target: WorkspaceExternalAppTarget
   itemId: string
 }): Promise<WorkspaceSettingsState> {
-  return await postServerJson<
-    { workspaceId: WorkspaceId; targetKey: string; itemId: string },
-    { ok: true } & WorkspaceSettingsState
-  >('/api/settings/workspace-external-app-recent', {
-    workspaceId: input.workspaceId,
-    targetKey: workspaceExternalAppRecentKey(input.target),
-    itemId: input.itemId,
-  })
+  return await postServerJson(
+    '/api/settings/workspace-external-app-recent',
+    {
+      workspaceId: input.workspaceId,
+      targetKey: workspaceExternalAppRecentKey(input.target),
+      itemId: input.itemId,
+    },
+    decodeWith(v.strictObject({ ok: v.literal(true), ...WorkspaceSettingsStateSchema.entries })),
+  )
 }
 
 export async function restoreServerWorkspace(
@@ -149,16 +185,17 @@ export async function restoreServerWorkspace(
       clientId,
       ...(options && 'activeWorkspaceId' in options ? { activeWorkspaceId: options.activeWorkspaceId } : {}),
     },
+    decodeWith(WorkspaceRestoreResponseSchema),
     { signal: options?.signal },
   )
 }
 
 export async function addWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<void> {
-  await postServerJson('/api/settings/workspace/entries/add', { entry })
+  await postServerJson('/api/settings/workspace/entries/add', { entry }, decodeWith(ServerWorkspaceStateSchema))
 }
 
 export async function removeWorkspaceEntry(workspaceId: WorkspaceId): Promise<void> {
-  await postServerJson('/api/settings/workspace/entries/remove', { workspaceId })
+  await postServerJson('/api/settings/workspace/entries/remove', { workspaceId }, decodeWith(ServerWorkspaceStateSchema))
 }
 
 export async function restoreWorkspaceTabs(
@@ -170,14 +207,16 @@ export async function restoreWorkspaceTabs(
   return await postServerJson(
     '/api/settings/workspace/tabs/restore',
     { clientId, workspaceId, workspaceRuntimeId },
+    decodeWith(WorkspaceTabsRestoreResponseSchema),
     { signal: options?.signal },
   )
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {
-  const result = await postServerJson<{ sec: number }, { ok: boolean; fetchIntervalSec: number }>(
+  const result = await postServerJson(
     '/api/settings/fetch-interval',
     { sec },
+    decodeWith(v.strictObject({ ok: v.literal(true), fetchIntervalSec: FetchIntervalSecSchema })),
   )
   return result.fetchIntervalSec
 }

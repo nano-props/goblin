@@ -96,10 +96,19 @@ function isSafeRefInput(ref: string): boolean {
  *  and remote (system/ssh/git.ts) callers so a malformed ref is treated
  *  the same on both sides. */
 export function parseRemoteTrackingRefs(output: string): string[] {
-  return output
+  const refs = output
     .split('\n')
     .map((line) => line.trim())
-    .filter((ref) => isRemoteTrackingRef(ref))
+    .filter(Boolean)
+  if (refs.some((ref) => !isRemoteTrackingRef(ref) && !isRemoteHeadRef(ref))) {
+    throw new Error('Invalid remote-tracking ref output')
+  }
+  return refs.filter((ref) => isRemoteTrackingRef(ref))
+}
+
+function isRemoteHeadRef(ref: string): boolean {
+  if (!ref.endsWith('/HEAD')) return false
+  return isSafeRemoteName(ref.slice(0, -'/HEAD'.length))
 }
 
 /** Derive a default local-branch name from a remote-tracking ref.

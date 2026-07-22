@@ -237,7 +237,7 @@ describe('repo-client', () => {
     mockFetch(async () => ({
       ok: false,
       status: 400,
-      json: async () => ({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' }),
+      json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.failed-read-repo' }),
     }))
     const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
 
@@ -263,6 +263,17 @@ describe('repo-client', () => {
 
     await vi.advanceTimersByTimeAsync(240_000)
     await assertion
+  })
+
+  test('rejects malformed repository responses at the client boundary', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'ok', unexpected: true }),
+    }))
+
+    const { fetchRepo } = await import('#/web/repo-client.ts')
+    await expect(fetchRepo(workspaceId, workspaceRuntimeId)).rejects.toThrow()
   })
 
   test('aborts the clone request after the clone request watchdog fires', async () => {

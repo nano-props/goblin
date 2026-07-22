@@ -11,6 +11,7 @@ import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -35,22 +36,7 @@ function defaultIpcResult(path: string, input?: unknown) {
     return { available: true, version: 'gh version 2.93.0', detectedAt: 0, hosts }
   }
   if (path === 'settings.get') {
-    return {
-      fetchIntervalSec: 60,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      globalShortcutRegistered: true,
-      lanEnabled: false,
-      session: {
-        openWorkspaceEntries: [],
-        restoredWorkspaceId: null,
-        zenMode: true,
-        workspacePaneSize: 50,
-      },
-      recentWorkspaces: [],
-    }
+    return defaultSettingsSnapshot({ fetchIntervalSec: 60, globalShortcutRegistered: true })
   }
   if (path === 'externalApps.get' || path === 'externalApps.refresh') {
     return {

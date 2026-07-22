@@ -44,7 +44,7 @@ export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
     kind: v.literal('git-worktree'),
     workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    root: v.string(),
+    root: WorkspaceIdSchema,
   }),
 ])
 
@@ -127,9 +127,12 @@ export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePan
   return entries.length === parsed.output.entries.length ? { revision: parsed.output.revision, entries } : null
 }
 
-export function canonicalRuntimeWorkspacePaneTarget(
-  target: v.InferOutput<typeof RuntimeWorkspacePaneTargetSchema>,
-): RuntimeWorkspacePaneTarget | null {
+type RuntimeWorkspacePaneTargetInput =
+  | { kind: 'workspace-root'; workspaceId: string; workspaceRuntimeId: string }
+  | { kind: 'git-branch'; workspaceId: string; workspaceRuntimeId: string; branch: string }
+  | { kind: 'git-worktree'; workspaceId: string; workspaceRuntimeId: string; root: string }
+
+export function canonicalRuntimeWorkspacePaneTarget(target: RuntimeWorkspacePaneTargetInput): RuntimeWorkspacePaneTarget | null {
   const workspaceId = canonicalLocator(target.workspaceId)
   if (!workspaceId) return null
   if (target.kind === 'workspace-root') return { ...target, workspaceId }

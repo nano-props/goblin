@@ -22,9 +22,9 @@ describe('getRemoteTrackingBranches', () => {
     })
   })
 
-  test('returns an empty list when the underlying git call fails', async () => {
+  test('propagates failure from the authoritative git read', async () => {
     gitMock.mockRejectedValue(new Error('boom'))
 
-    await expect(getRemoteTrackingBranches('/repo')).resolves.toEqual([])
+    await expect(getRemoteTrackingBranches('/repo')).rejects.toThrow('boom')
   })
 })

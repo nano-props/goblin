@@ -76,12 +76,35 @@ function settingsRouteOptions() {
     settingsState: createNativeShortcutRegistrationState(),
     workspacePaneTabsHost: workspacePaneTabsHostStub,
     workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+    serverHost: '127.0.0.1',
+    serverPort: 32100,
   }
 }
 
 describe('settings routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  test('reports the injected runtime endpoint instead of re-reading environment configuration', async () => {
+    const previousHost = process.env.GOBLIN_SERVER_HOST
+    const previousPort = process.env.GOBLIN_SERVER_PORT
+    process.env.GOBLIN_SERVER_HOST = '0.0.0.0'
+    process.env.GOBLIN_SERVER_PORT = '70000'
+    try {
+      const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+      const app = createSettingsRoutes({ ...settingsRouteOptions(), serverHost: '127.0.0.1', serverPort: 33241 })
+
+      const response = await app.request('/lan')
+
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({ host: '127.0.0.1', port: 33241, lanUrls: [] })
+    } finally {
+      if (previousHost === undefined) delete process.env.GOBLIN_SERVER_HOST
+      else process.env.GOBLIN_SERVER_HOST = previousHost
+      if (previousPort === undefined) delete process.env.GOBLIN_SERVER_PORT
+      else process.env.GOBLIN_SERVER_PORT = previousPort
+    }
   })
 
   test('delegates prefs writes to the settings command handler layer', async () => {

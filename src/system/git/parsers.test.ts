@@ -11,7 +11,6 @@ import {
   parseBranches,
   parseLog,
   parseStatus,
-  parseUsableWorktrees,
   parseWorktreeStatusBatch,
   parseWorktrees,
   splitWorktreeStatusBatch,
@@ -24,6 +23,18 @@ const NUL = String.fromCharCode(0)
 describe('parseBranches', () => {
   test('returns empty array for empty input', () => {
     expect(parseBranches('', '')).toEqual([])
+  })
+
+  test('strict parsing rejects incomplete and invalid authoritative rows', () => {
+    expect(() => parseBranches(`main${SEP}abc1234`, 'main')).toThrow('Invalid branch snapshot row')
+    expect(
+      () => parseBranches(
+        ['invalid branch name', 'abc1234000000000000000000000000000000000', 'abc1234', '', '2026-05-20', '', '', ''].join(
+          SEP,
+        ),
+        'main',
+      ),
+    ).toThrow('Invalid branch snapshot identity')
   })
 
   test('parses a single branch with no upstream', () => {
@@ -92,8 +103,8 @@ describe('parseBranches', () => {
 
   test('marks isCurrent only for the matching branch', () => {
     const out = [
-      ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'a', 's', 'd', 'a1', '', ''].join(SEP),
-      ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'b', 's', 'd', 'a1', '', ''].join(SEP),
+      ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a1', '', ''].join(SEP),
+      ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'bbbbbbb', 's', '2026-05-20', 'a1', '', ''].join(SEP),
     ].join('\n')
     const result = parseBranches(out, 'dev')
     expect(result.find((b) => b.name === 'main')?.isCurrent).toBe(false)
@@ -101,7 +112,7 @@ describe('parseBranches', () => {
   })
 
   test('attaches worktree info when branch matches', () => {
-    const line = ['feat', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', 'h', 's', 'd', 'a', '', ''].join(SEP)
+    const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(SEP)
     const result = parseBranches(line, 'main', [
       { path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false, isDirty: true, changeCount: 3 },
     ])
@@ -112,7 +123,7 @@ describe('parseBranches', () => {
   })
 
   test('attaches primary worktree marker when branch matches the main worktree', () => {
-    const line = ['main', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', 'h', 's', 'd', 'a', '', ''].join(SEP)
+    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(SEP)
     const [branch] = parseBranches(line, 'feature', [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
     expect(branch?.worktree?.path).toBe('/repo')
     expect(branch?.worktree?.isPrimary).toBe(true)
@@ -121,7 +132,7 @@ describe('parseBranches', () => {
 
   test('preserves SEP-free subjects with spaces and unicode', () => {
     const subject = 'feat: 添加 i18n 🎉'
-    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'a', subject, 'd', 'Z', '', ''].join(SEP)
+    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', subject, '2026-05-20', 'Z', '', ''].join(SEP)
     const [b] = parseBranches(line, 'main')
     expect(b?.lastCommitMessage).toBe(subject)
   })
@@ -134,14 +145,14 @@ describe('parseLog', () => {
 
   test('parses multiple entries', () => {
     const out = [
-      ['fullsha1', 'sha1', 'HEAD -> main, origin/main', 'first', 'Alice', '2026-05-20T10:00:00+08:00'].join(SEP),
-      ['fullsha2', 'sha2', '', 'second', 'Bob', '2026-05-19T10:00:00+08:00'].join(SEP),
+      ['aaaaaaaa', 'aaaaaaa', 'HEAD -> main, origin/main', 'first', 'Alice', '2026-05-20T10:00:00+08:00'].join(SEP),
+      ['bbbbbbbb', 'bbbbbbb', '', 'second', 'Bob', '2026-05-19T10:00:00+08:00'].join(SEP),
     ].join('\n')
     const result = parseLog(out)
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
-      hash: 'fullsha1',
-      shortHash: 'sha1',
+      hash: 'aaaaaaaa',
+      shortHash: 'aaaaaaa',
       refs: 'HEAD -> main, origin/main',
       message: 'first',
       author: 'Alice',
@@ -151,8 +162,18 @@ describe('parseLog', () => {
   })
 
   test('subjects with embedded spaces survive', () => {
-    const out = ['h', 'sh', '', 'feat(scope): hello world', 'a', 'd'].join(SEP)
+    const out = ['aaaaaaaa', 'aaaaaaa', '', 'feat(scope): hello world', 'a', '2026-05-20T10:00:00Z'].join(SEP)
     expect(parseLog(out)[0]?.message).toBe('feat(scope): hello world')
+  })
+
+  test.each([
+    ['missing field', ['aaaaaaaa', 'aaaaaaa', '', 'message', 'author'].join(SEP)],
+    ['extra field', ['aaaaaaaa', 'aaaaaaa', '', 'message', 'author', '2026-05-20T10:00:00Z', 'extra'].join(SEP)],
+    ['invalid full hash', ['not-a-hash', 'aaaaaaa', '', 'message', 'author', '2026-05-20T10:00:00Z'].join(SEP)],
+    ['invalid short hash', ['aaaaaaaa', 'short', '', 'message', 'author', '2026-05-20T10:00:00Z'].join(SEP)],
+    ['invalid date', ['aaaaaaaa', 'aaaaaaa', '', 'message', 'author', 'not-a-date'].join(SEP)],
+  ])('rejects %s', (_name, output) => {
+    expect(() => parseLog(output)).toThrow()
   })
 })
 
@@ -190,11 +211,9 @@ describe('parseStatus', () => {
     expect(parseStatus(out)[0]?.path).toBe('中文/файл.txt')
   })
 
-  test('skips records too short to be valid status lines', () => {
+  test('rejects records too short to be valid status lines', () => {
     const out = 'M\0 M valid.ts\0'
-    const result = parseStatus(out)
-    expect(result).toHaveLength(1)
-    expect(result[0]?.path).toBe('valid.ts')
+    expect(() => parseStatus(out)).toThrow('Invalid status record')
   })
 
   test('tolerates trailing NUL with no further data', () => {
@@ -205,14 +224,9 @@ describe('parseStatus', () => {
     expect(parseStatus(out)).toEqual([{ x: ' ', y: 'M', path: 'only.ts' }])
   })
 
-  test('handles consecutive NULs without crashing', () => {
-    // Defensive: should never come from real git, but a malformed
-    // output shouldn't crash the parser. Empty records are skipped by
-    // the length filter.
+  test('rejects an empty record between consecutive NULs', () => {
     const out = ' M a.ts\0\0 M b.ts\0'
-    const result = parseStatus(out)
-    expect(result).toHaveLength(2)
-    expect(result.map((e) => e.path)).toEqual(['a.ts', 'b.ts'])
+    expect(() => parseStatus(out)).toThrow('Invalid status record')
   })
 })
 
@@ -222,7 +236,7 @@ describe('parseWorktrees', () => {
   })
 
   test('parses a single non-bare worktree on a branch', () => {
-    const out = ['worktree /repo', 'HEAD abc123', 'branch refs/heads/main'].join('\n')
+    const out = ['worktree /repo', 'HEAD abc1234', 'branch refs/heads/main'].join('\n')
     const result = parseWorktrees(out)
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false })
@@ -231,47 +245,42 @@ describe('parseWorktrees', () => {
   test('flags locked worktrees (with or without reason)', () => {
     // `git worktree list --porcelain` emits either a bare `locked` line
     // or `locked <reason>` when the user passed `--reason` to lock.
-    const out = ['worktree /repo/wt', 'HEAD a', 'branch refs/heads/feat', 'locked needed for release'].join('\n')
+    const out = ['worktree /repo/wt', 'HEAD aaaaaaa', 'branch refs/heads/feat', 'locked needed for release'].join('\n')
     const [w] = parseWorktrees(out)
     expect(w?.isLocked).toBe(true)
 
-    const bare = ['worktree /repo/wt2', 'HEAD a', 'branch refs/heads/x', 'locked'].join('\n')
+    const bare = ['worktree /repo/wt2', 'HEAD aaaaaaa', 'branch refs/heads/x', 'locked'].join('\n')
     expect(parseWorktrees(bare)[0]?.isLocked).toBe(true)
   })
 
   test('models prunable metadata while excluding it from the usable projection', () => {
     const out = [
       'worktree /repo',
-      'HEAD a',
+      'HEAD aaaaaaa',
       'branch refs/heads/main',
       '',
       'worktree /repo/missing',
-      'HEAD b',
+      'HEAD bbbbbbb',
       'branch refs/heads/stale',
       'prunable gitdir file points to non-existent location',
       '',
       'worktree /repo/live',
-      'HEAD c',
+      'HEAD ccccccc',
       'branch refs/heads/live',
     ].join('\n')
 
+    expect(parseWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
+  })
+
+  test('accepts an absolute Windows path in authoritative porcelain output', () => {
+    const out = ['worktree C:/repo', 'HEAD aaaaaaa', 'branch refs/heads/main'].join('\n')
     expect(parseWorktrees(out)).toEqual([
-      { path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
-      {
-        path: '/repo/missing',
-        branch: 'stale',
-        isBare: false,
-        isPrimary: false,
-        isLocked: false,
-        isPrunable: true,
-      },
-      { path: '/repo/live', branch: 'live', isBare: false, isPrimary: false, isLocked: false },
+      { path: 'C:/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
     ])
-    expect(parseUsableWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
   })
 
   test('detached HEAD has no branch line — branch left undefined', () => {
-    const out = ['worktree /repo/wt-detached', 'HEAD abc123', 'detached'].join('\n')
+    const out = ['worktree /repo/wt-detached', 'HEAD abc1234', 'detached'].join('\n')
     const [w] = parseWorktrees(out)
     expect(w?.path).toBe('/repo/wt-detached')
     expect(w?.branch).toBeUndefined()
@@ -280,7 +289,7 @@ describe('parseWorktrees', () => {
   })
 
   test('flags bare worktrees', () => {
-    const out = ['worktree /repo/bare', 'HEAD 0000000', 'bare'].join('\n')
+    const out = ['worktree /repo/bare', 'bare'].join('\n')
     const [w] = parseWorktrees(out)
     expect(w?.isBare).toBe(true)
     expect(w?.isPrimary).toBe(true)
@@ -290,11 +299,11 @@ describe('parseWorktrees', () => {
   test('parses multiple blocks separated by blank lines', () => {
     const out = [
       'worktree /repo',
-      'HEAD a',
+      'HEAD aaaaaaa',
       'branch refs/heads/main',
       '',
       'worktree /repo/wt',
-      'HEAD b',
+      'HEAD bbbbbbb',
       'branch refs/heads/feat',
     ].join('\n')
     const result = parseWorktrees(out)
@@ -304,14 +313,14 @@ describe('parseWorktrees', () => {
   })
 
   test('strips refs/heads/ prefix from branch ref', () => {
-    const out = ['worktree /repo', 'HEAD a', 'branch refs/heads/feature/nested/name'].join('\n')
+    const out = ['worktree /repo', 'HEAD aaaaaaa', 'branch refs/heads/feature/nested/name'].join('\n')
     expect(parseWorktrees(out)[0]?.branch).toBe('feature/nested/name')
   })
 })
 
 describe('splitWorktreeStatusBatch', () => {
   test('returns the worktree list and status stream on either side of the marker', () => {
-    const worktreeList = ['worktree /repo', 'HEAD abc', 'branch refs/heads/main'].join('\n')
+    const worktreeList = ['worktree /repo', 'HEAD abc1234', 'branch refs/heads/main'].join('\n')
     const stream = `/repo${NUL}M README.md${NUL}? new.ts${NUL}`
     const output = `${worktreeList}\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n${stream}`
 
@@ -322,23 +331,15 @@ describe('splitWorktreeStatusBatch', () => {
     expect(parseWorktrees(worktreeListOutput)).toHaveLength(1)
   })
 
-  test('falls back to treating the whole output as the worktree list when the marker is missing', () => {
-    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(
-      'worktree /repo\nHEAD a\nbranch refs/heads/main',
+  test('rejects output when the marker is missing', () => {
+    expect(() => splitWorktreeStatusBatch('worktree /repo\nHEAD a\nbranch refs/heads/main')).toThrow(
+      'Invalid worktree status envelope',
     )
-    expect(worktreeListOutput).toBe('worktree /repo\nHEAD a\nbranch refs/heads/main')
-    expect(statusStream).toBe('')
   })
 
-  test('returns an empty status stream when the marker is not on its own line', () => {
-    // Defensive: the marker must be its own line, not embedded in a
-    // longer line (the parser searches for `\n<marker>\n`, so any
-    // marker surrounded by something other than `\n` on either side
-    // is treated as missing).
+  test('rejects a marker that is not on its own line', () => {
     const output = `worktree /repo${NUL}__GOBLIN_WT_BATCH_BOUNDARY__${NUL}`
-    const { statusStream } = splitWorktreeStatusBatch(output)
-    expect(typeof statusStream).toBe('string')
-    expect(statusStream).toBe('')
+    expect(() => splitWorktreeStatusBatch(output)).toThrow('Invalid worktree status envelope')
   })
 
   test('the marker is plain ASCII text so it round-trips through single-quoted bash', () => {
@@ -362,19 +363,19 @@ describe('splitWorktreeStatusBatch', () => {
 })
 
 describe('parseWorktreeStatusBatch', () => {
-  test('returns an empty map for an empty stream', () => {
-    expect(parseWorktreeStatusBatch('').size).toBe(0)
+  test('parses a complete empty batch', () => {
+    expect(parseWorktreeStatusBatch(NUL).size).toBe(0)
   })
 
   test('parses one clean worktree (empty status) as an empty entries array', () => {
-    const stream = `/repo${NUL}${NUL}`
+    const stream = `/repo${NUL}${NUL}${NUL}`
     const result = parseWorktreeStatusBatch(stream)
     expect(result.size).toBe(1)
     expect(result.get('/repo')).toEqual([])
   })
 
   test('parses one dirty worktree with multiple status entries', () => {
-    const stream = [`/repo`, NUL, `M  README.md`, NUL, `?? new.ts`, NUL, `M  src/foo.ts`, NUL].join('')
+    const stream = [`/repo`, NUL, `M  README.md`, NUL, `?? new.ts`, NUL, `M  src/foo.ts`, NUL, NUL, NUL].join('')
     const result = parseWorktreeStatusBatch(stream)
     const entries = result.get('/repo')
     expect(entries).toHaveLength(3)
@@ -384,7 +385,7 @@ describe('parseWorktreeStatusBatch', () => {
   })
 
   test('segments multiple worktrees via the empty-record boundary', () => {
-    const stream = [`/wt1${NUL}M  a.ts${NUL}${NUL}`, `/wt2${NUL}?? new.txt${NUL}${NUL}`, `/wt3${NUL}${NUL}`].join('')
+    const stream = [`/wt1${NUL}M  a.ts${NUL}${NUL}`, `/wt2${NUL}?? new.txt${NUL}${NUL}`, `/wt3${NUL}${NUL}${NUL}`].join('')
     const result = parseWorktreeStatusBatch(stream)
     expect(result.size).toBe(3)
     expect(result.get('/wt1')?.map((e) => e.path)).toEqual(['a.ts'])
@@ -396,7 +397,7 @@ describe('parseWorktreeStatusBatch', () => {
     // `git status -z` emits the new path then the original path as
     // two consecutive NUL-separated records for R/C entries. Our
     // parser drops the original, mirroring parseStatus.
-    const stream = [`/repo`, NUL, `R  newname.ts`, NUL, `oldname.ts`, NUL].join('')
+    const stream = [`/repo`, NUL, `R  newname.ts`, NUL, `oldname.ts`, NUL, NUL, NUL].join('')
     const result = parseWorktreeStatusBatch(stream)
     expect(result.get('/repo')).toEqual([{ x: 'R', y: ' ', path: 'newname.ts' }])
   })
@@ -407,7 +408,7 @@ describe('parseWorktreeStatusBatch', () => {
     // record only. Porcelain format is "XY <path>" where X and Y
     // are each one byte -- so `?? "weird\nname.ts"` is 21 chars
     // forming one NUL-terminated record.
-    const stream = [`/repo`, NUL, `?? "weird`, `\n`, `name.ts"`, NUL, `${NUL}`].join('')
+    const stream = [`/repo`, NUL, `?? "weird`, `\n`, `name.ts"`, NUL, NUL, NUL].join('')
     const result = parseWorktreeStatusBatch(stream)
     const entries = result.get('/repo')
     expect(entries).toHaveLength(1)
@@ -419,9 +420,8 @@ describe('parseWorktreeStatusBatch', () => {
     expect(entries?.[0]?.path).toContain('name.ts')
   })
 
-  test('an unterminated stream does not throw and reports the last section cleanly', () => {
+  test('rejects an unterminated stream', () => {
     const stream = `/repo${NUL}M  a.ts${NUL}` // no trailing boundary NUL
-    const result = parseWorktreeStatusBatch(stream)
-    expect(result.get('/repo')?.map((e) => e.path)).toEqual(['a.ts'])
+    expect(() => parseWorktreeStatusBatch(stream)).toThrow('Invalid worktree status batch')
   })
 })

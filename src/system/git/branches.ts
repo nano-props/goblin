@@ -2,7 +2,7 @@ import path from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { omit } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
-import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
+import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -53,19 +53,8 @@ export async function getRepoName(cwd: string): Promise<string> {
   return idx >= 0 ? root.slice(idx + 1) : root
 }
 
-export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
-  if (options?.signal?.aborted) return ''
-  // `symbolic-ref` fails on detached HEAD — exactly what we want.
-  // `rev-parse --abbrev-ref HEAD` would return literal "HEAD" there.
-  try {
-    return await git(cwd, ['symbolic-ref', '--short', 'HEAD'], { signal: options?.signal })
-  } catch {
-    return ''
-  }
-}
-
 /** Authoritative HEAD read. `null` means a valid detached HEAD; failures throw. */
-export async function getCurrentBranchStrict(
+export async function getCurrentBranch(
   cwd: string,
   options?: { signal?: AbortSignal },
 ): Promise<string | null> {
@@ -77,18 +66,8 @@ export async function getCurrentBranchStrict(
   return branch || null
 }
 
-/** Read only the current worktree's HEAD presentation identity. */
-export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
-  if (options?.signal?.aborted) return ''
-  try {
-    return await git(cwd, ['rev-parse', '--short', 'HEAD'], { signal: options?.signal })
-  } catch {
-    return ''
-  }
-}
-
 /** Authoritative detached-HEAD identity read; failures and cancellation throw. */
-export async function getHeadHashStrict(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   const head = await git(cwd, ['rev-parse', '--short', 'HEAD'], { signal: options?.signal })
   options?.signal?.throwIfAborted()
   if (!head) throw new Error('Git returned an empty HEAD')
@@ -96,12 +75,10 @@ export async function getHeadHashStrict(cwd: string, options?: { signal?: AbortS
 }
 
 export async function getDefaultBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
-  try {
-    const ref = await git(cwd, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { signal: options?.signal })
-    return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref
-  } catch {
-    return ''
-  }
+  const ref = await git(cwd, ['for-each-ref', '--format=%(symref:short)', 'refs/remotes/origin/HEAD'], {
+    signal: options?.signal,
+  })
+  return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref
 }
 
 export function prioritizeDefaultBranch(branches: BranchSnapshotInfo[], defaultBranch: string): BranchSnapshotInfo[] {
@@ -138,56 +115,17 @@ async function getMergedBranchNames(
   signal?: AbortSignal,
 ): Promise<Set<string> | null> {
   if (!isSafeBranchName(defaultBranch)) return null
-  try {
-    const output = await git(cwd, ['branch', '--format=%(refname:short)', '--merged', defaultBranch], { signal })
-    return new Set(
-      output
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean),
-    )
-  } catch {
-    return null
-  }
-}
-
-export async function getBranches(
-  cwd: string,
-  worktrees?: WorktreeInfo[],
-  options?: { signal?: AbortSignal },
-): Promise<BranchSnapshotInfo[]> {
-  try {
-    const format = [
-      '%(refname:short)',
-      '%(objectname)',
-      '%(objectname:short)',
-      '%(subject)',
-      '%(authordate:iso-strict)',
-      '%(authorname)',
-      '%(upstream:short)',
-      '%(upstream:track)',
-    ].join(FIELD_SEP)
-
-    const [output, currentBranch, defaultBranch] = await Promise.all([
-      git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/'], { signal: options?.signal }),
-      getCurrentBranch(cwd, { signal: options?.signal }),
-      getDefaultBranch(cwd, { signal: options?.signal }),
-    ])
-    if (options?.signal?.aborted) return []
-    const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch, options?.signal)
-    if (options?.signal?.aborted) return []
-    const branches = markDefaultBranch(parseBranches(output, currentBranch, worktrees), defaultBranch)
-    return prioritizeDefaultBranch(
-      mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
-      defaultBranch,
-    )
-  } catch {
-    return []
-  }
+  const output = await git(cwd, ['branch', '--format=%(refname:short)', '--merged', defaultBranch], { signal })
+  return new Set(
+    output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+  )
 }
 
 /** Authoritative branch projection read. Optional display enrichments may degrade, but membership may not. */
-export async function getBranchesStrict(
+export async function getBranches(
   cwd: string,
   worktrees: WorktreeInfo[] | undefined,
   currentBranch: string | null,
@@ -202,7 +140,7 @@ export async function getBranchesStrict(
     '%(authorname)',
     '%(upstream:short)',
     '%(upstream:track)',
-  ].join(FIELD_SEP)
+  ].join(FOR_EACH_REF_FIELD_SEP)
   const [output, defaultBranch] = await Promise.all([
     git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/'], { signal: options?.signal }),
     getDefaultBranch(cwd, { signal: options?.signal }),
@@ -258,7 +196,7 @@ export async function getLog(
   if (options?.signal?.aborted) return []
   if (!isSafeBranchName(branch)) return []
   try {
-    const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(FIELD_SEP)
+    const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(PRETTY_FIELD_SEP)
     const args = [
       'log',
       '--decorate=short',
@@ -297,17 +235,30 @@ export async function deleteUpstreamBranch(
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '--delete', '--', remote, branch)
 }
 
-/** Resolve `branch`'s upstream short ref (e.g. "origin/feat") or null
- *  when the branch has no upstream configured. */
-export async function getUpstream(cwd: string, branch: string, signal?: AbortSignal): Promise<string | null> {
+export interface BranchUpstream {
+  ref: string
+  remote: string
+  branch: string
+}
+
+/** Resolve and validate `branch`'s upstream, or null when none is configured. */
+export async function getUpstream(cwd: string, branch: string, signal?: AbortSignal): Promise<BranchUpstream | null> {
   if (!isSafeBranchName(branch)) return null
-  if (signal?.aborted) return null
-  try {
-    const out = await git(cwd, ['rev-parse', '--abbrev-ref', `${branch}@{u}`], { signal })
-    return out.trim() || null
-  } catch {
-    return null
+  signal?.throwIfAborted()
+  const out = await git(cwd, ['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`], { signal })
+  signal?.throwIfAborted()
+  if (!out) return null
+  const lines = out.split('\n')
+  if (lines.length !== 1) throw new Error('Git returned an invalid upstream')
+  const ref = lines[0]!
+  const slash = ref.indexOf('/')
+  if (slash <= 0) throw new Error('Git returned an invalid upstream')
+  const remote = ref.slice(0, slash)
+  const upstreamBranch = ref.slice(slash + 1)
+  if (!isSafeBranchName(remote) || !isSafeBranchName(upstreamBranch)) {
+    throw new Error('Git returned an invalid upstream')
   }
+  return { ref, remote, branch: upstreamBranch }
 }
 
 /** Whether `ancestor` is reachable from `descendant` (i.e. every commit
@@ -315,7 +266,7 @@ export async function getUpstream(cwd: string, branch: string, signal?: AbortSig
  *  `git branch -d` uses to decide if a branch is "fully merged".
  *  `descendant` may be 'HEAD', a branch name, or 'origin/foo'; we don't
  *  re-validate it because callers in this codebase pass either a fixed
- *  literal or a value just produced by git itself (getUpstream). The
+ *  literal or a validated ref just produced by getUpstream. The
  *  trailing `--` keeps either argument from being interpreted as a flag
  *  if a future caller passes user input. */
 export async function isAncestor(
@@ -325,11 +276,16 @@ export async function isAncestor(
   signal?: AbortSignal,
 ): Promise<boolean> {
   if (!isSafeBranchName(ancestor)) return false
-  if (signal?.aborted) return false
+  signal?.throwIfAborted()
   try {
     await git(cwd, ['merge-base', '--is-ancestor', '--', ancestor, descendant], { signal })
     return true
-  } catch {
-    return false
+  } catch (error) {
+    if (hasExitCode(error, 1)) return false
+    throw error
   }
+}
+
+function hasExitCode(error: unknown, exitCode: number): boolean {
+  return typeof error === 'object' && error !== null && 'exitCode' in error && error.exitCode === exitCode
 }

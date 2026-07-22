@@ -9,6 +9,9 @@
  */
 import { CLIPBOARD_UNNAMED_FILE_NAME } from '#/shared/clipboard-paste.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
+import * as v from 'valibot'
+
+const ClipboardFilesResponseSchema = v.strictObject({ paths: v.array(v.string()) })
 
 export interface HttpClipboardBackendConfig {
   /** Bootstrap-derived server origin, e.g. `http://127.0.0.1:32100/`. */
@@ -50,11 +53,9 @@ export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): 
           credentials: 'include',
       })
       if (!res.ok) throw new Error(`Clipboard file request failed with status ${res.status}`)
-      const json = (await res.json()) as { paths?: unknown }
-      if (!Array.isArray(json.paths) || !json.paths.every((path) => typeof path === 'string')) {
-        throw new Error('Invalid clipboard file response')
-      }
-      return json.paths
+      const json = v.safeParse(ClipboardFilesResponseSchema, await res.json())
+      if (!json.success) throw new Error('Invalid clipboard file response')
+      return json.output.paths
     },
   }
 }

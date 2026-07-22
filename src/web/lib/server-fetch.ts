@@ -1,6 +1,13 @@
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { requireClientServerConfig } from '#/web/lib/server-config.ts'
+import * as v from 'valibot'
+
+const ServerErrorResponseSchema = v.strictObject({
+  ok: v.literal(false),
+  message: v.optional(v.string()),
+  code: v.optional(v.string()),
+})
 
 export const DEFAULT_SERVER_REQUEST_TIMEOUT_MS = 120_000
 export const SERVER_REQUEST_TIMEOUT_ERROR = 'error.request-timeout'
@@ -51,7 +58,11 @@ function composeRequestSignal(
   }
 }
 
-export async function fetchServerJson<T>(path: string | URL, init?: ServerFetchOptions): Promise<T> {
+export async function fetchServerJson<T>(
+  path: string | URL,
+  decode: (value: unknown) => T,
+  init?: ServerFetchOptions,
+): Promise<T> {
   const server = requireClientServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, timeoutMs = DEFAULT_SERVER_REQUEST_TIMEOUT_MS, signal, ...rest } = init ?? {}
@@ -75,13 +86,14 @@ export async function fetchServerJson<T>(path: string | URL, init?: ServerFetchO
   try {
     const response = await fetch(url, { ...rest, signal: requestSignal.signal, headers, credentials: 'include' })
     if (!response.ok) {
-      let body: { message?: string; code?: string } | undefined
+      let body: v.InferOutput<typeof ServerErrorResponseSchema> | undefined
       try {
-        body = (await response.json()) as { message?: string; code?: string } | undefined
+        const parsed = v.safeParse(ServerErrorResponseSchema, await response.json())
+        if (parsed.success) body = parsed.output
       } catch {}
       throw new ServerRequestError({ status: response.status, code: body?.code, message: body?.message })
     }
-    return (await response.json()) as T
+    return decode(await response.json())
   } catch (err) {
     if (requestSignal.timedOut()) throw new Error(SERVER_REQUEST_TIMEOUT_ERROR)
     throw err
@@ -93,9 +105,10 @@ export async function fetchServerJson<T>(path: string | URL, init?: ServerFetchO
 export async function postServerJson<TInput extends object, TOutput>(
   path: string,
   input: TInput,
+  decode: (value: unknown) => TOutput,
   options?: { signal?: AbortSignal; keepalive?: boolean; timeoutMs?: number },
 ): Promise<TOutput> {
-  return await fetchServerJson<TOutput>(path, {
+  return await fetchServerJson(path, decode, {
     method: 'POST',
     signal: options?.signal,
     keepalive: options?.keepalive,

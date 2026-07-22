@@ -20,7 +20,7 @@ test('clears projection fetch bookkeeping when its query is removed', async () =
   const queryClient = new QueryClient()
   installGoblinTestBridge({
     'repo.projection': async () => ({
-      snapshot: { branches: [], current: null },
+      snapshot: { branches: [], current: '' },
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,

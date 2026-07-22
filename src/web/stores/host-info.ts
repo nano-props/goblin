@@ -20,6 +20,8 @@
 
 import { create } from 'zustand'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
+import { HostInfoSnapshotSchema } from '#/shared/web-bootstrap-response-schema.ts'
 
 /**
  * Platform identifier the client can branch on. The server
@@ -61,7 +63,9 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
     const version = ++hydrateVersion
     set({ status: 'pending', error: null })
     try {
-      const snapshot = await fetchServerJson<HostInfoSnapshot>('/api/host', { signal: options?.signal })
+      const snapshot = await fetchServerJson('/api/host', decodeWith(HostInfoSnapshotSchema), {
+        signal: options?.signal,
+      })
       if (version !== hydrateVersion) return
       set({ snapshot, status: 'ready', error: null })
     } catch (error) {

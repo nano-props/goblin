@@ -38,6 +38,7 @@ describe('main settings server client', () => {
     expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings',
+      expect.any(Function),
       undefined,
     )
   })
@@ -51,13 +52,14 @@ describe('main settings server client', () => {
     expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
+      expect.any(Function),
       undefined,
     )
   })
 
   test('persists settings prefs patches through the embedded server runtime', async () => {
     const prefs = defaultUserSettings({ theme: 'dark', colorTheme: 'github', globalShortcut: 'Alt+K' })
-    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ prefs })
+    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ ok: true, prefs })
 
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.updateUserSettings({ theme: 'dark' })).resolves.toBe(prefs)
@@ -65,11 +67,12 @@ describe('main settings server client', () => {
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/prefs',
       { prefs: { theme: 'dark' } },
+      expect.any(Function),
     )
   })
 
   test('persists global shortcut registration state through the embedded server runtime', async () => {
-    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ registered: true })
+    mocks.postEmbeddedServerJson.mockResolvedValueOnce({ ok: true, registered: true })
 
     const mod = await import('#/main/settings-server-client.ts')
     await expect(mod.setGlobalShortcutState(true)).resolves.toBe(true)
@@ -77,6 +80,38 @@ describe('main settings server client', () => {
       { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       '/api/settings/global-shortcut-state',
       { registered: true },
+      expect.any(Function),
+    )
+  })
+
+  test.each([
+    ['missing required field', { ...defaultUserSettings(), lang: undefined }],
+    ['wrong field type', { ...defaultUserSettings(), shortcutsDisabled: 'false' }],
+    ['unknown field', { ...defaultUserSettings(), legacyTheme: 'dark' }],
+  ])('rejects a settings prefs response with %s', async (_name, payload) => {
+    mocks.requestEmbeddedServerJson.mockImplementationOnce((_runtime, _path, decode) => decode(payload))
+
+    const mod = await import('#/main/settings-server-client.ts')
+    await expect(mod.getUserSettings()).rejects.toThrow('Embedded server rejected settings prefs request')
+  })
+
+  test('rejects a malformed settings update response', async () => {
+    mocks.postEmbeddedServerJson.mockImplementationOnce(async (_runtime, _path, _body, decode) =>
+      decode({ ok: true, prefs: defaultUserSettings(), legacy: true }),
+    )
+
+    const mod = await import('#/main/settings-server-client.ts')
+    await expect(mod.updateUserSettings({ theme: 'dark' })).rejects.toThrow('Embedded server rejected settings update')
+  })
+
+  test('rejects a malformed global shortcut response', async () => {
+    mocks.postEmbeddedServerJson.mockImplementationOnce(async (_runtime, _path, _body, decode) =>
+      decode({ ok: true, registered: 'true' }),
+    )
+
+    const mod = await import('#/main/settings-server-client.ts')
+    await expect(mod.setGlobalShortcutState(true)).rejects.toThrow(
+      'Embedded server rejected global shortcut state update',
     )
   })
 

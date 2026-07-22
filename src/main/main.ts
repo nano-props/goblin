@@ -11,7 +11,7 @@ import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { wireShellIpc } from '#/main/shell-ipc.ts'
 import { wireAccessTokenIpc } from '#/main/access-token-ipc.ts'
-import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.ts'
+import { windowNodeLog, windowStateNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
@@ -137,7 +137,7 @@ function handleTrustedClientQuitDrainBoundary(
 
 async function initializeNativeHost(): Promise<void> {
   await app.whenReady()
-  await startEmbeddedServerForNativeHost()
+  await startEmbeddedServer()
   const settingsSnapshot = await getSettingsSnapshot()
   await initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
   await initializeRuntimeState(settingsSnapshot)
@@ -147,17 +147,6 @@ async function initializeNativeHost(): Promise<void> {
   wireAccessTokenIpc()
   await syncInitialGlobalShortcutState(settingsSnapshot)
   startNativeSettingsProjectionSync(settingsSnapshot)
-}
-
-async function startEmbeddedServerForNativeHost(): Promise<void> {
-  try {
-    await startEmbeddedServer()
-  } catch (err) {
-    serverNodeLog.warn({ err }, 'failed to start embedded server')
-    const message = err instanceof Error ? err.message : String(err)
-    dialog.showErrorBox('Goblin failed to start', `Embedded web server failed to start.\n\n${message}`)
-    throw err
-  }
 }
 
 async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promise<void> {
@@ -182,4 +171,9 @@ async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot
   await setGlobalShortcutState(globalShortcutRegistered)
 }
 
-void main()
+void main().catch((err) => {
+  windowNodeLog.error({ err }, 'failed to initialize native host')
+  const message = err instanceof Error ? err.message : String(err)
+  dialog.showErrorBox('Goblin failed to start', `Native host initialization failed.\n\n${message}`)
+  app.quit()
+})
