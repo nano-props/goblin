@@ -15,6 +15,12 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { WorkspaceFileViewerResult, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import { ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
+import {
+  WorkspaceFilesystemTreeResponseSchema,
+  WorkspaceFileViewerResponseSchema,
+} from '#/shared/workspace-http-response-schema.ts'
 
 export interface GetWorkspaceFilesystemTreeOptions {
   readonly prefix?: string
@@ -31,6 +37,7 @@ export async function getWorkspaceFilesystemTree(
       target,
       ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
     },
+    decodeWith(WorkspaceFilesystemTreeResponseSchema),
     { signal: options.signal },
   )
 }
@@ -40,12 +47,12 @@ export async function trashWorkspaceFile(
   path: string,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<ExecResult> {
-  return await postServerJson('/api/workspace/trash-file', { target, path }, { signal: options.signal })
+  return await postServerJson('/api/workspace/trash-file', { target, path }, decodeWith(ExecResultResponseSchema), { signal: options.signal })
 }
 
 export async function getWorkspaceFileViewer(
   target: WorkspacePaneFilesystemExecutionTarget,
   options: { readonly signal?: AbortSignal },
 ): Promise<WorkspaceFileViewerResult> {
-  return await postServerJson('/api/workspace/file-viewer', { target }, { signal: options.signal })
+  return await postServerJson('/api/workspace/file-viewer', { target }, decodeWith(WorkspaceFileViewerResponseSchema), { signal: options.signal })
 }

@@ -10,11 +10,12 @@ import {
   registerClientIntentSocket,
   unregisterClientIntentSocket,
 } from '#/server/modules/client-intent-broker.ts'
-import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { createWebSocketAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { isAppRealtimeWsMessageWithinLimit } from '#/shared/app-realtime-validators.ts'
 import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
+import { AppRealtimeSocketLimitError } from '#/server/realtime/realtime-broker.ts'
 
 interface RealtimeRouteOptions {
   accessToken: string
@@ -43,7 +44,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
   // stashes an `userId` derived from the access token on the
   // Hono context; the WS upgrade reads it and threads it into the
   // host calls. See `identity.ts` for the model.
-  const auth = createAccessTokenMiddleware(accessToken)
+  const auth = createWebSocketAccessTokenMiddleware(accessToken)
 
   const app = new Hono()
   app.use('/invalidation', auth)
@@ -140,10 +141,25 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
           } catch {}
           return
         }
-        appRealtimeHost.registerSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+        try {
+          appRealtimeHost.registerSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+        } catch (err) {
+          if (err instanceof AppRealtimeSocketLimitError) {
+            try {
+              ws.close(1013, 'subscriber limit reached')
+            } catch {}
+            return
+          }
+          throw err
+        }
       },
       onMessage(event, ws) {
-        if (typeof event.data !== 'string') return
+        if (typeof event.data !== 'string') {
+          try {
+            ws.close(1003, 'text messages required')
+          } catch {}
+          return
+        }
         if (!isAppRealtimeWsMessageWithinLimit(event.data)) {
           try {
             ws.close(1009, 'message too large')

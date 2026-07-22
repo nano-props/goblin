@@ -4,10 +4,9 @@ import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-sessi
 function applyAttachResult(
   runtime: TerminalSessionRuntime,
   result: Parameters<TerminalSessionRuntime['commitAttachResult']>[1],
-  fallbackSize: Parameters<TerminalSessionRuntime['commitAttachResult']>[2],
 ): boolean {
   const attempt = runtime.currentAttemptToken() ?? runtime.startAttaching().attempt
-  const committed = runtime.commitAttachResult(attempt, result, fallbackSize)
+  const committed = runtime.commitAttachResult(attempt, result)
   if (!committed.accepted) throw new Error('test attach result was not accepted')
   return committed.changed
 }
@@ -36,7 +35,6 @@ describe('TerminalSessionRuntime', () => {
         role: 'controller',
         controllerStatus: 'connected',
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(runtime.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
@@ -73,7 +71,6 @@ describe('TerminalSessionRuntime', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(runtime.snapshot().attachment).toMatchObject({ active: false, canTakeover: true })
@@ -143,7 +140,6 @@ describe('TerminalSessionRuntime', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(
@@ -192,7 +188,6 @@ describe('TerminalSessionRuntime', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(
@@ -279,7 +274,6 @@ describe('TerminalSessionRuntime', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
-      { cols: 100, rows: 30 },
     )
 
     runtime.beginReplay({ outputEra: 0, seq: 2 })
@@ -327,7 +321,6 @@ describe('TerminalSessionRuntime', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
-      { cols: 100, rows: 30 },
     )
 
     // Preload window: events arrive during the server-snapshot write.
@@ -395,7 +388,6 @@ describe('TerminalSessionRuntime', () => {
         role: 'viewer',
         controllerStatus: 'connected',
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(runtime.snapshot()).toMatchObject({
@@ -574,7 +566,6 @@ describe('TerminalSessionRuntime restart generation activation', () => {
         role: 'controller',
         controllerStatus: 'connected',
       },
-      { cols: 100, rows: 30 },
     )
 
     expect(runtime.currentRuntimeBinding()).toEqual({
@@ -609,11 +600,11 @@ describe('TerminalSessionRuntime exact start attempts', () => {
 
   test('ignores attempt A late success and failure after restart attempt B begins', () => {
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime, attachResult(1), { cols: 80, rows: 24 })
+    applyAttachResult(runtime, attachResult(1))
     const attemptA = runtime.prepareRestart().attempt
     const attemptB = runtime.prepareRestart().attempt
 
-    expect(runtime.commitAttachResult(attemptA, attachResult(2), { cols: 80, rows: 24 })).toEqual({
+    expect(runtime.commitAttachResult(attemptA, attachResult(2))).toEqual({
       accepted: false,
       changed: false,
       resolution: 'superseded',
@@ -628,7 +619,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
       terminalRuntimeGeneration: 1,
     })
 
-    expect(runtime.commitAttachResult(attemptB, attachResult(2), { cols: 80, rows: 24 }).accepted).toBe(true)
+    expect(runtime.commitAttachResult(attemptB, attachResult(2)).accepted).toBe(true)
     expect(runtime.currentRuntimeBinding()).toEqual({
       terminalRuntimeSessionId: 'pty_exact_attempt_aaaa',
       terminalRuntimeGeneration: 2,
@@ -637,7 +628,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
 
   test('accepts failure only for the current restart attempt', () => {
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime, attachResult(1), { cols: 80, rows: 24 })
+    applyAttachResult(runtime, attachResult(1))
     const attemptA = runtime.prepareRestart().attempt
     const attemptB = runtime.prepareRestart().attempt
 
@@ -685,7 +676,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
       activationPending: false,
     })
     expect(runtime.currentAttemptToken()).toEqual(attempt)
-    expect(runtime.commitAttachResult(attempt, attachResult(2), { cols: 80, rows: 24 })).toMatchObject({
+    expect(runtime.commitAttachResult(attempt, attachResult(2))).toMatchObject({
       accepted: true,
       resolution: 'response',
     })
@@ -725,7 +716,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     const attempt = runtime.prepareRestart().attempt
     runtime.hydrateRepoSession(hydration(3))
 
-    expect(runtime.commitAttachResult(attempt, attachResult(2), { cols: 80, rows: 24 })).toMatchObject({
+    expect(runtime.commitAttachResult(attempt, attachResult(2))).toMatchObject({
       accepted: true,
       resolution: 'staged',
     })

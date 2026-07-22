@@ -1,7 +1,6 @@
 import type { NativeHostIpcHandlers } from '#/shared/api-types.ts'
-import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
+import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { getUserSettings, setGlobalShortcutState, updateUserSettings } from '#/main/settings-server-client.ts'
-import { applyNativeHostProjection } from '#/main/native-host-settings-effects.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
 
 // Native-host settings IPC handlers: read/write server-owned settings, then
@@ -17,14 +16,12 @@ async function getRuntimeUserSettings() {
 export function createNativeHostSettingsIpcHandlers(): Pick<NativeHostIpcHandlers, 'settings'> {
   return {
     settings: {
-      applyNativeHostProjection: async (input) => await applyNativeHostProjection(input),
       setGlobalShortcut: async ({ accelerator }) => {
-        const parsed = parseGlobalShortcut(accelerator)
+        const parsed = parseAllowedGlobalShortcut(accelerator)
+        if (!parsed) throw new TypeError('invalid global shortcut')
         const serverSettings = await getRuntimeUserSettings()
         const currentGlobalShortcut = serverSettings.globalShortcut
         const currentGlobalShortcutDisabled = serverSettings.globalShortcutDisabled
-        if (!parsed) return globalShortcutPayload(currentGlobalShortcut)
-        if (isReservedGlobalShortcut(parsed)) return globalShortcutPayload(currentGlobalShortcut)
         const registered = currentGlobalShortcutDisabled || replaceGlobalShortcut(false, currentGlobalShortcut, parsed)
         if (!registered && !currentGlobalShortcutDisabled) return globalShortcutPayload(currentGlobalShortcut)
         const saved = (await updateUserSettings({ globalShortcut: parsed })).globalShortcut

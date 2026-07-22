@@ -13,7 +13,6 @@ import type { TerminalDescriptor, TerminalSnapshot } from '#/web/components/term
 
 interface TerminalSessionProjectionTestAccess {
   readonly sessions: Map<string, TerminalSession>
-  readonly terminalSessionIdByTerminalRuntimeSessionId: Map<string, Map<number, string>>
   readonly lifecycleQueues: { hasCreate(terminalFilesystemTargetKey: string): boolean }
   readonly snapshotCache: Map<string, TerminalSnapshot>
   readonly pendingServerBellByRuntimeBindingKey: Map<string, TerminalBellRealtimeEvent>

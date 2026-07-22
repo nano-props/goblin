@@ -1,5 +1,11 @@
+import * as v from 'valibot'
 import type { GoblinCommandTransport } from '#/server/g-command/context.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
+
+const ErrorResponseSchema = v.union([
+  v.strictObject({ message: v.string() }),
+  v.strictObject({ ok: v.literal(false), code: v.string(), message: v.string() }),
+])
 
 // HTTP transport that talks to the parent Goblin server over
 // `127.0.0.1:<port>` (or wherever `$GOBLIN_SERVER_URL` points).
@@ -24,16 +30,16 @@ function readAccessToken(env: NodeJS.ProcessEnv): string | null {
 
 export function createHttpTransport(
   env: NodeJS.ProcessEnv = process.env,
-  fetchImpl: typeof fetch = globalThis.fetch,
+  fetchImpl: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = globalThis.fetch,
 ): GoblinCommandTransport {
   const token = readAccessToken(env)
   if (!token) {
     throw new TransportError('GOBLIN_SERVER_ACCESS_TOKEN is not set')
   }
   const baseUrl = readServerUrl(env)
-  const headers = { [ACCESS_TOKEN_HEADER]: token }
+  const headers = { [ACCESS_TOKEN_HEADER]: token, 'content-type': 'application/json' }
 
-  async function postJson<T>(pathname: string, body: unknown): Promise<T> {
+  async function postJson<T>(pathname: string, body: unknown, decode: (value: unknown) => T): Promise<T> {
     const url = new URL(pathname, baseUrl)
     let response: Response
     try {
@@ -48,12 +54,22 @@ export function createHttpTransport(
     if (!response.ok) {
       let detail = ''
       try {
-        const payload = (await response.json()) as { message?: string }
-        if (payload && typeof payload.message === 'string') detail = `: ${payload.message}`
+        const parsed = v.safeParse(ErrorResponseSchema, await response.json())
+        if (parsed.success) detail = `: ${parsed.output.message}`
       } catch {}
       throw new TransportError(`request failed (${response.status})${detail}`)
     }
-    return (await response.json()) as T
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new TransportError('server returned invalid JSON')
+    }
+    try {
+      return decode(payload)
+    } catch {
+      throw new TransportError('server returned an invalid response')
+    }
   }
 
   return { postJson }

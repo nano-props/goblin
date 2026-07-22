@@ -74,6 +74,14 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
+beforeEach(() => {
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
+    status: 'ready',
+    error: null,
+  })
+})
+
 const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 
@@ -241,6 +249,8 @@ describe('WorkspacePane', () => {
     })
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
+      status: 'ready',
+      error: null,
     })
 
     const { container } = render(
@@ -630,10 +640,16 @@ describe('WorkspacePane', () => {
 
   test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
     responsiveMocks.compact = true
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
       currentBranchName: null,
+    })
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, 'feature/removed', 'full', {
+      snapshot: { branches: [], current: '' },
+      pullRequests: null,
+      requested: { branch: 'feature/removed', pullRequestMode: 'full' },
+      loadedAt: Date.now(),
     })
     const onBackToBranchNavigator = vi.fn()
 
@@ -730,6 +746,12 @@ describe('WorkspacePane', () => {
         'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
       },
+    })
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, 'feature/b', 'full', {
+      snapshot: { branches: [branchA, branchB], current: 'feature/a' },
+      pullRequests: null,
+      requested: { branch: 'feature/b', pullRequestMode: 'full' },
+      loadedAt: Date.now(),
     })
     const { container, rerender } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>

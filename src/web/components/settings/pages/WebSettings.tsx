@@ -10,6 +10,8 @@ import { useLanInfoQuery } from '#/web/settings-queries.ts'
 import { useLanSettingsController, useLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
+import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schema.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
@@ -58,7 +60,7 @@ export function WebSettings() {
     let cancelled = false
     void (async () => {
       try {
-        const { accessToken } = await fetchServerJson<{ accessToken: string }>('/api/access-token')
+        const { accessToken } = await fetchServerJson('/api/access-token', decodeWith(AccessTokenResponseSchema))
         if (!cancelled) setFetchedToken(accessToken)
       } catch {
         if (!cancelled) setFetchedToken(null)

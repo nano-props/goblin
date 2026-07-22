@@ -9,69 +9,9 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   repoOperationsQueryKey,
-  repoProjectionQueryPrefix,
   repoProjectionQueryKey,
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
-
-export function getRepoProjectionPlaceholderData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch?: string | null,
-  mode?: PullRequestFetchMode,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const requestedBranch = branch || null
-  const requestedMode = mode ?? 'full'
-  const cached = findRepoProjectionPlaceholderSource(
-    repoRoot,
-    workspaceRuntimeId,
-    requestedBranch,
-    requestedMode,
-    queryClient,
-  )
-  if (!cached?.snapshot) return undefined
-  return {
-    snapshot: cached.snapshot,
-    pullRequests: null,
-    requested: { branch: requestedBranch, pullRequestMode: requestedMode },
-    loadedAt: 0,
-  }
-}
-
-function findRepoProjectionPlaceholderSource(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string | null,
-  mode: PullRequestFetchMode,
-  queryClient: QueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const candidates = queryClient
-    .getQueriesData<GitWorkspaceRuntimeProjection>({
-      queryKey: repoProjectionQueryPrefix(repoRoot, workspaceRuntimeId),
-    })
-    .map(([, projection]) => projection)
-    .filter((projection): projection is GitWorkspaceRuntimeProjection => !!projection?.snapshot)
-  candidates.sort(
-    (left, right) =>
-      repoProjectionPlaceholderRank(left, branch, mode) - repoProjectionPlaceholderRank(right, branch, mode),
-  )
-  return candidates[0]
-}
-
-function repoProjectionPlaceholderRank(
-  projection: GitWorkspaceRuntimeProjection,
-  branch: string | null,
-  mode: PullRequestFetchMode,
-): number {
-  const requested = projection.requested
-  if (requested.branch === branch && requested.pullRequestMode === mode) return 0
-  if (requested.branch === null && requested.pullRequestMode === mode) return 1
-  if (requested.branch === null && requested.pullRequestMode === 'full') return 2
-  if (requested.branch === null) return 3
-  if (requested.pullRequestMode === mode) return 4
-  return 5
-}
 
 export function getRepoOperationsQueryData(
   repoRoot: WorkspaceId,
@@ -105,9 +45,10 @@ export function getRepoProjectionQueryData(
   mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): GitWorkspaceRuntimeProjection | undefined {
-  return queryClient.getQueryData<GitWorkspaceRuntimeProjection>(
+  const projection = queryClient.getQueryData<GitWorkspaceRuntimeProjection>(
     repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
   )
+  return projection && projection.loadedAt > 0 ? projection : undefined
 }
 
 export function getRepoWorktreeStatusQueryData(

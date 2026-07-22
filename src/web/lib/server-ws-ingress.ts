@@ -75,7 +75,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
 
   function createSocketUrl(baseUrl: string, accessToken: string | null): string {
     const httpUrl = new URL(path, baseUrl)
-    httpUrl.protocol = resolveWebSocketProtocol()
+    httpUrl.protocol = resolveWebSocketProtocol(baseUrl)
     // Browser path: cookie handles auth — don't pass `?t=`.
     // Embedded / dev path: WebSocket constructor can't set custom
     // headers, so the access token rides in the query string. The

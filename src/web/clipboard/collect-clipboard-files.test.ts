@@ -69,7 +69,7 @@ describe('collectClipboardFiles', () => {
     expect(collectClipboardFiles(dt)).toEqual([real])
   })
 
-  test('ignores string items in the items fallback', () => {
+  test('ignores string items when reading clipboard items', () => {
     const dt = mockDataTransfer({ files: [], items: [stringItem('hello'), stringItem('world')] })
     expect(collectClipboardFiles(dt)).toEqual([])
   })

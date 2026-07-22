@@ -66,20 +66,25 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     },
     'settings.addRecentWorkspace': ({ workspace }: { workspace: WorkspaceSessionEntry }) => {
       calls.recent.push(workspace)
-      return calls.recent
+      return { ok: true, addedWorkspace: workspace, recentWorkspaces: [...calls.recent] }
     },
     'settings.addWorkspaceEntry': ({ entry }: { entry: WorkspaceSessionEntry }) => {
       const existingIndex = calls.workspaceEntries.findIndex((candidate) => candidate.id === entry.id)
       if (existingIndex === -1) calls.workspaceEntries.push(entry)
       else calls.workspaceEntries[existingIndex] = entry
-      return undefined
+      return {
+        openWorkspaceEntries: [...calls.workspaceEntries],
+        workspacePaneTabsByTargetByWorkspace: {},
+      }
     },
     'settings.removeWorkspaceEntry': ({ workspaceId }: { workspaceId: string }) => {
       const index = calls.workspaceEntries.findIndex((entry) => entry.id === workspaceId)
       if (index !== -1) calls.workspaceEntries.splice(index, 1)
-      return undefined
+      return {
+        openWorkspaceEntries: [...calls.workspaceEntries],
+        workspacePaneTabsByTargetByWorkspace: {},
+      }
     },
-    'settings.applyNativeHostProjection': async () => undefined,
   }
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'workspaceProbe') {

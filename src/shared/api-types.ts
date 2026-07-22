@@ -41,9 +41,8 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import { type NativeHostProjection } from '#/shared/native-host-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
-import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
+import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type {
@@ -112,6 +111,7 @@ export interface ClientWorkspaceState {
   filetreeViewStateByFilesystemTargetByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
+export const CLIENT_WORKSPACE_STATE_VERSION = 1
 export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
 
 export interface FiletreeSessionViewState {
@@ -261,7 +261,6 @@ export interface UserSettingsUpdateResponse {
   ok: true
   prefs: UserSettings
   i18n?: I18nSnapshot
-  externalApps?: ExternalAppsSnapshot
 }
 
 export interface RepoSnapshot {
@@ -480,7 +479,7 @@ export interface AppIpcHandlers {
       cwd: WorkspaceId
       workspaceRuntimeId: string
     }) => Promise<WorktreeBootstrapPreviewResult>
-    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<string[]>
+    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RemoteTrackingBranchIdentity[]>
     pull: (input: {
       cwd: WorkspaceId
       workspaceRuntimeId: string
@@ -518,7 +517,6 @@ export interface AppIpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
     addRecentWorkspace: (input: { workspace: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
     clearRecentWorkspaces: () => Promise<void>
   }
@@ -543,7 +541,6 @@ export interface NativeHostIpcHandlers {
   }
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
   }
 }
 
@@ -643,10 +640,6 @@ export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: Native
         setGlobalShortcut: createValidatedProcedure(
           schemas.settings.setGlobalShortcut,
           handlers.settings.setGlobalShortcut,
-        ),
-        applyNativeHostProjection: createValidatedProcedure(
-          schemas.settings.applyNativeHostProjection,
-          handlers.settings.applyNativeHostProjection,
         ),
       },
     }),

@@ -9,7 +9,7 @@ const fetchMock = mockFetch()
 describe('useHostInfoStore', () => {
   beforeEach(() => {
     fetchMock.mockReset()
-    useHostInfoStore.setState({ snapshot: null, hydrated: false })
+    useHostInfoStore.setState({ snapshot: null, status: 'pending', error: null })
   })
 
   test('hydrates from the public /api/host endpoint', async () => {
@@ -32,7 +32,8 @@ describe('useHostInfoStore', () => {
       hostname: 'tester-host',
       pid: 1,
     })
-    expect(useHostInfoStore.getState().hydrated).toBe(true)
+    expect(useHostInfoStore.getState().status).toBe('ready')
+    expect(useHostInfoStore.getState().error).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const url = fetchMock.mock.calls[0]?.[0]
     const urlString = typeof url === 'string' ? url : (url as URL).toString()
@@ -42,13 +43,25 @@ describe('useHostInfoStore', () => {
     expect(urlString).toContain('/api/host')
   })
 
-  test('marks the store hydrated on network failure (callers fall back to defaults)', async () => {
-    fetchMock.mockRejectedValueOnce(new Error('network down'))
+  test('preserves network failure as an error until a successful retry', async () => {
+    const failure = new Error('network down')
+    fetchMock.mockRejectedValueOnce(failure).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ homeDir: '/Users/recovered', platform: 'darwin', hostname: 'host', pid: 2 }),
+    })
 
-    await useHostInfoStore.getState().hydrate()
+    await expect(useHostInfoStore.getState().hydrate()).rejects.toBe(failure)
 
     expect(useHostInfoStore.getState().snapshot).toBeNull()
-    expect(useHostInfoStore.getState().hydrated).toBe(true)
+    expect(useHostInfoStore.getState().status).toBe('error')
+    expect(useHostInfoStore.getState().error).toBe(failure)
+
+    await expect(useHostInfoStore.getState().hydrate()).resolves.toBeUndefined()
+    expect(useHostInfoStore.getState()).toMatchObject({
+      status: 'ready',
+      error: null,
+      snapshot: { homeDir: '/Users/recovered', platform: 'darwin' },
+    })
   })
 
   test('does not mark the store hydrated when hydrate is aborted', async () => {
@@ -64,16 +77,18 @@ describe('useHostInfoStore', () => {
 
     const hydrate = useHostInfoStore.getState().hydrate({ signal: controller.signal })
     controller.abort(new Error('cancelled'))
-    await hydrate
+    await expect(hydrate).rejects.toBe(controller.signal.reason)
 
     expect(useHostInfoStore.getState().snapshot).toBeNull()
-    expect(useHostInfoStore.getState().hydrated).toBe(false)
+    expect(useHostInfoStore.getState().status).toBe('error')
+    expect(useHostInfoStore.getState().error).toBe(controller.signal.reason)
   })
 
   test('returns the cached snapshot via the homeDirectory / getPlatform helpers', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/cached', platform: 'linux', hostname: 'cache', pid: 7 },
-      hydrated: true,
+      status: 'ready',
+      error: null,
     })
 
     // Re-import after the manual setState to get a fresh module
@@ -84,13 +99,9 @@ describe('useHostInfoStore', () => {
     expect(getPlatform()).toBe('linux')
   })
 
-  test('returns safe defaults before the hydrate resolves', async () => {
-    // No hydrate called yet — `homeDirectory()` should be `''` and
-    // `getPlatform()` should be `'web'`, matching the pre-refactor
-    // bootstrap defaults. This is the contract the client's
-    // first-paint consumers depend on.
+  test('rejects authority reads before bootstrap succeeds', async () => {
     const { homeDirectory, getPlatform } = await import('#/web/stores/host-info.ts')
-    expect(homeDirectory()).toBe('')
-    expect(getPlatform()).toBe('web')
+    expect(() => homeDirectory()).toThrow('Host info is unavailable before successful bootstrap')
+    expect(() => getPlatform()).toThrow('Host info is unavailable before successful bootstrap')
   })
 })

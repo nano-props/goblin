@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const runtimeShutdown = vi.fn()
   const disconnectAllInvalidationSockets = vi.fn()
   const websocketClose = vi.fn()
+  const websocketConstructor = vi.fn()
   const websocketClients = new Set<{ close(): void }>()
   const createServerRuntime = vi.fn(() => ({
     app: { fetch: vi.fn() },
@@ -16,7 +17,9 @@ const mocks = vi.hoisted(() => {
   class MockWebSocketServer {
     clients = websocketClients
     close = websocketClose
-    constructor(_options: unknown) {}
+    constructor(options: unknown) {
+      websocketConstructor(options)
+    }
   }
 
   return {
@@ -25,6 +28,7 @@ const mocks = vi.hoisted(() => {
     runtimeShutdown,
     disconnectAllInvalidationSockets,
     websocketClose,
+    websocketConstructor,
     websocketClients,
     createServerRuntime,
     MockWebSocketServer,
@@ -81,6 +85,7 @@ describe('bootstrap server shutdown', () => {
     const server = await bootstrapServer({
       exit,
     })
+    expect(mocks.websocketConstructor).toHaveBeenCalledWith({ noServer: true, maxPayload: 1024 * 1024 })
     const stopPromise = server.stop()
 
     await vi.advanceTimersByTimeAsync(1_000)

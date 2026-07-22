@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   readUserSettingsJson,
@@ -51,14 +52,10 @@ import type {
   WorkspacePaneLayoutRestoreTransaction,
   WorkspacePaneLayoutRestoreTransactionOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
+import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import { closeWorkspaceRuntimesForDurableRemoval } from '#/server/modules/workspace-runtimes.ts'
 import {
-  DEFAULT_COLOR_THEME,
-  DEFAULT_FETCH_INTERVAL_SEC,
-  DEFAULT_LANG_PREF,
-  DEFAULT_THEME_PREF,
   MAX_RECENT_WORKSPACES,
   defaultUserSettings,
   defaultServerWorkspaceState,
@@ -80,6 +77,13 @@ interface UserSettingsData {
   workspaceSettings: WorkspaceSettingsEntry[]
 }
 
+const USER_SETTINGS_VERSION = 1
+type UserSettingsReadOutcome =
+  | { kind: 'missing' }
+  | { kind: 'current'; data: UserSettingsData }
+  | { kind: 'corrupt'; error: Error }
+  | { kind: 'unsupported'; error: Error }
+
 export type UserSettingsPatch = Partial<UserSettings>
 
 let settingsData: UserSettingsData | null = null
@@ -91,32 +95,25 @@ function notifyFetchIntervalListeners(sec: number): void {
   for (const listener of listeners) listener(sec)
 }
 
-function normalizeFetchInterval(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(0, Math.min(3600, Math.round(value)))
-    : DEFAULT_FETCH_INTERVAL_SEC
+function isFetchInterval(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0 && value <= 3600
 }
 
-function normalizeThemePref(value: unknown): ThemePref {
-  return value === 'auto' || value === 'light' || value === 'dark' ? value : DEFAULT_THEME_PREF
+function isThemePref(value: unknown): value is ThemePref {
+  return value === 'auto' || value === 'light' || value === 'dark'
 }
 
-function normalizeLangPref(value: unknown): LangPref {
+function isLangPref(value: unknown): value is LangPref {
   return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
-    ? value
-    : DEFAULT_LANG_PREF
 }
 
-function normalizeColorTheme(value: unknown): ColorTheme {
-  return isColorTheme(value) ? value : DEFAULT_COLOR_THEME
+function requireCommandValue<T>(value: unknown, valid: (candidate: unknown) => candidate is T, name: string): T {
+  if (!valid(value)) throw new TypeError(`invalid ${name}`)
+  return value
 }
 
-function normalizeTerminalNotificationsEnabled(value: unknown): boolean {
-  return value === true
-}
-
-function normalizeLanEnabled(value: unknown): boolean {
-  return value === true
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
 }
 
 function userSettingsFromData(data: UserSettingsData): UserSettings {
@@ -288,38 +285,71 @@ function cloneWorkspace(workspace: ServerWorkspaceState): ServerWorkspaceState {
   return normalizeWorkspace(workspace)
 }
 
-async function readUserSettingsFile(): Promise<UserSettingsData | null> {
-  const raw = await readUserSettingsJson()
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const parsed = raw as Partial<UserSettingsData>
-  return {
-    lang: normalizeLangPref(parsed.lang),
-    theme: normalizeThemePref(parsed.theme),
-    colorTheme: normalizeColorTheme(parsed.colorTheme),
-    fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
-    terminalNotificationsEnabled: normalizeTerminalNotificationsEnabled(parsed.terminalNotificationsEnabled),
-    shortcutsDisabled: parsed.shortcutsDisabled === true,
-    globalShortcutDisabled: parsed.globalShortcutDisabled === true,
-    globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
-    lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
-    workspace: normalizeWorkspace(parsed.workspace),
-    recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces),
-    workspaceSettings: normalizeWorkspaceSettings(parsed.workspaceSettings),
+function currentSettingsData(raw: Record<string, unknown>): UserSettingsData | null {
+  if (
+    !isLangPref(raw.lang) ||
+    !isThemePref(raw.theme) ||
+    !isColorTheme(raw.colorTheme) ||
+    !isFetchInterval(raw.fetchIntervalSec) ||
+    !isBoolean(raw.terminalNotificationsEnabled) ||
+    !isBoolean(raw.shortcutsDisabled) ||
+    !isBoolean(raw.globalShortcutDisabled) ||
+    !isBoolean(raw.lanEnabled)
+  )
+    return null
+  const globalShortcut = parseAllowedGlobalShortcut(raw.globalShortcut)
+  if (!globalShortcut || globalShortcut !== raw.globalShortcut) return null
+  const decoded: UserSettingsData = {
+    lang: raw.lang,
+    theme: raw.theme,
+    colorTheme: raw.colorTheme,
+    fetchIntervalSec: raw.fetchIntervalSec,
+    terminalNotificationsEnabled: raw.terminalNotificationsEnabled,
+    shortcutsDisabled: raw.shortcutsDisabled,
+    globalShortcutDisabled: raw.globalShortcutDisabled,
+    globalShortcut,
+    lanEnabled: raw.lanEnabled,
+    workspace: normalizeWorkspace(raw.workspace),
+    recentWorkspaces: normalizeRecentWorkspaces(raw.recentWorkspaces),
+    workspaceSettings: normalizeWorkspaceSettings(raw.workspaceSettings),
   }
+  return isDeepStrictEqual({ version: USER_SETTINGS_VERSION, ...decoded }, raw) ? decoded : null
+}
+
+async function readUserSettingsFile(): Promise<UserSettingsReadOutcome> {
+  const persisted = await readUserSettingsJson()
+  if (persisted.kind === 'missing') return { kind: 'missing' }
+  const raw = persisted.value
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { kind: 'corrupt', error: new Error('settings root must be an object') }
+  }
+  const version = (raw as Record<string, unknown>).version
+  if (version !== USER_SETTINGS_VERSION) {
+    return { kind: 'unsupported', error: new Error(`unsupported settings version: ${String(version)}`) }
+  }
+  const current = currentSettingsData(raw as Record<string, unknown>)
+  if (!current) {
+    return { kind: 'corrupt', error: new Error('invalid current settings shape') }
+  }
+  return { kind: 'current', data: current }
 }
 
 async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
-  await writeUserSettingsJson(data)
+  await writeUserSettingsJson({ version: USER_SETTINGS_VERSION, ...data })
 }
 
 async function loadUserSettings(): Promise<UserSettingsData> {
   if (settingsData) return settingsData
   settingsLoadPromise ??= (async () => {
     const persisted = await readUserSettingsFile()
+    if (persisted.kind === 'unsupported') throw persisted.error
     let data: UserSettingsData
-    if (persisted) {
-      data = persisted
+    if (persisted.kind === 'current') {
+      data = persisted.data
     } else {
+      if (persisted.kind === 'corrupt') {
+        throw persisted.error
+      }
       data = {
         ...defaultUserSettings(),
         workspace: defaultWorkspace(),
@@ -418,8 +448,8 @@ export function subscribeServerFetchInterval(listener: FetchIntervalListener): (
 }
 
 export async function setServerFetchIntervalSec(sec: number): Promise<number> {
+  const next = requireCommandValue(sec, isFetchInterval, 'fetch interval')
   return await mutateUserSettings(async (data) => {
-    const next = normalizeFetchInterval(sec)
     const changed = data.fetchIntervalSec !== next
     return {
       next: changed ? { ...data, fetchIntervalSec: next } : data,
@@ -431,53 +461,71 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
 }
 
 export async function updateUserSettings(patch: UserSettingsPatch): Promise<UserSettings> {
+  const nextLang = patch.lang === undefined ? undefined : requireCommandValue(patch.lang, isLangPref, 'language')
+  const nextTheme = patch.theme === undefined ? undefined : requireCommandValue(patch.theme, isThemePref, 'theme')
+  const nextColorTheme =
+    patch.colorTheme === undefined ? undefined : requireCommandValue(patch.colorTheme, isColorTheme, 'color theme')
+  const nextFetchIntervalSec =
+    patch.fetchIntervalSec === undefined
+      ? undefined
+      : requireCommandValue(patch.fetchIntervalSec, isFetchInterval, 'fetch interval')
+  const nextTerminalNotificationsEnabled =
+    patch.terminalNotificationsEnabled === undefined
+      ? undefined
+      : requireCommandValue(patch.terminalNotificationsEnabled, isBoolean, 'terminal notifications setting')
+  const nextShortcutsDisabled =
+    patch.shortcutsDisabled === undefined
+      ? undefined
+      : requireCommandValue(patch.shortcutsDisabled, isBoolean, 'shortcuts setting')
+  const nextGlobalShortcutDisabled =
+    patch.globalShortcutDisabled === undefined
+      ? undefined
+      : requireCommandValue(patch.globalShortcutDisabled, isBoolean, 'global shortcut disabled setting')
+  const nextGlobalShortcut =
+    patch.globalShortcut === undefined ? undefined : parseAllowedGlobalShortcut(patch.globalShortcut)
+  if (patch.globalShortcut !== undefined && nextGlobalShortcut === null) throw new TypeError('invalid global shortcut')
+  const nextLanEnabled =
+    patch.lanEnabled === undefined ? undefined : requireCommandValue(patch.lanEnabled, isBoolean, 'LAN setting')
   return await mutateUserSettings(async (data) => {
-    const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
-    const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
-    const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
-    const nextFetchIntervalSec =
-      patch.fetchIntervalSec === undefined ? data.fetchIntervalSec : normalizeFetchInterval(patch.fetchIntervalSec)
-    const fetchIntervalChanged = data.fetchIntervalSec !== nextFetchIntervalSec
-    const nextTerminalNotificationsEnabled =
-      patch.terminalNotificationsEnabled === undefined
-        ? data.terminalNotificationsEnabled
-        : normalizeTerminalNotificationsEnabled(patch.terminalNotificationsEnabled)
-    const nextShortcutsDisabled =
-      patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
-    const nextGlobalShortcutDisabled =
-      patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
-    const nextGlobalShortcut =
-      patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
-    const nextLanEnabled = patch.lanEnabled === undefined ? data.lanEnabled : normalizeLanEnabled(patch.lanEnabled)
+    const resolvedLang = nextLang ?? data.lang
+    const resolvedTheme = nextTheme ?? data.theme
+    const resolvedColorTheme = nextColorTheme ?? data.colorTheme
+    const resolvedFetchIntervalSec = nextFetchIntervalSec ?? data.fetchIntervalSec
+    const resolvedTerminalNotificationsEnabled = nextTerminalNotificationsEnabled ?? data.terminalNotificationsEnabled
+    const resolvedShortcutsDisabled = nextShortcutsDisabled ?? data.shortcutsDisabled
+    const resolvedGlobalShortcutDisabled = nextGlobalShortcutDisabled ?? data.globalShortcutDisabled
+    const resolvedGlobalShortcut = nextGlobalShortcut ?? data.globalShortcut
+    const resolvedLanEnabled = nextLanEnabled ?? data.lanEnabled
+    const fetchIntervalChanged = data.fetchIntervalSec !== resolvedFetchIntervalSec
     const changed =
-      data.lang !== nextLang ||
-      data.theme !== nextTheme ||
-      data.colorTheme !== nextColorTheme ||
-      data.fetchIntervalSec !== nextFetchIntervalSec ||
-      data.terminalNotificationsEnabled !== nextTerminalNotificationsEnabled ||
-      data.shortcutsDisabled !== nextShortcutsDisabled ||
-      data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
-      data.globalShortcut !== nextGlobalShortcut ||
-      data.lanEnabled !== nextLanEnabled
+      data.lang !== resolvedLang ||
+      data.theme !== resolvedTheme ||
+      data.colorTheme !== resolvedColorTheme ||
+      data.fetchIntervalSec !== resolvedFetchIntervalSec ||
+      data.terminalNotificationsEnabled !== resolvedTerminalNotificationsEnabled ||
+      data.shortcutsDisabled !== resolvedShortcutsDisabled ||
+      data.globalShortcutDisabled !== resolvedGlobalShortcutDisabled ||
+      data.globalShortcut !== resolvedGlobalShortcut ||
+      data.lanEnabled !== resolvedLanEnabled
     const nextData: UserSettingsData = changed
       ? {
           ...data,
-          lang: nextLang,
-          theme: nextTheme,
-          colorTheme: nextColorTheme,
-          fetchIntervalSec: nextFetchIntervalSec,
-          terminalNotificationsEnabled: nextTerminalNotificationsEnabled,
-          shortcutsDisabled: nextShortcutsDisabled,
-          globalShortcutDisabled: nextGlobalShortcutDisabled,
-          globalShortcut: nextGlobalShortcut,
-          lanEnabled: nextLanEnabled,
+          lang: resolvedLang,
+          theme: resolvedTheme,
+          colorTheme: resolvedColorTheme,
+          fetchIntervalSec: resolvedFetchIntervalSec,
+          terminalNotificationsEnabled: resolvedTerminalNotificationsEnabled,
+          shortcutsDisabled: resolvedShortcutsDisabled,
+          globalShortcutDisabled: resolvedGlobalShortcutDisabled,
+          globalShortcut: resolvedGlobalShortcut,
+          lanEnabled: resolvedLanEnabled,
         }
       : data
     return {
       next: nextData,
       result: userSettingsFromData(nextData),
       changed,
-      afterCommit: fetchIntervalChanged ? () => notifyFetchIntervalListeners(nextFetchIntervalSec) : undefined,
+      afterCommit: fetchIntervalChanged ? () => notifyFetchIntervalListeners(resolvedFetchIntervalSec) : undefined,
     }
   })
 }
@@ -725,12 +773,11 @@ export async function setServerWorkspaceExternalAppRecent(input: {
   targetKey: string
   itemId: string
 }): Promise<WorkspaceSettingsEntry[]> {
+  const target = parseWorkspaceExternalAppRecentKey(input.workspaceId, input.targetKey)
+  if (!target) throw new TypeError('invalid workspace external-app target')
+  if (!isKnownWorkspaceExternalAppItemId(input.itemId)) throw new TypeError('invalid workspace external-app item')
+  const targetKey = workspaceExternalAppRecentKey(target)
   return await mutateUserSettings(async (data) => {
-    const target = parseWorkspaceExternalAppRecentKey(input.workspaceId, input.targetKey)
-    if (!target || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
-      return unchangedUserSettings(data, cloneWorkspaceSettings(data.workspaceSettings))
-    }
-    const targetKey = workspaceExternalAppRecentKey(target)
     // No-op when the value hasn't changed — keeps a no-op click from
     // triggering a full user-settings.json rewrite.
     const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (existing) => {

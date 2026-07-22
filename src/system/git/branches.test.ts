@@ -1,6 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
 import { realpath } from 'node:fs/promises'
-import { getBranchWorktreeIdentities, resolveRepoCommonDir, resolveRepoObjectsDir } from '#/system/git/branches.ts'
+import {
+  getBranches,
+  getBranchWorktreeIdentities,
+  getCurrentBranch,
+  resolveRepoCommonDir,
+  resolveRepoObjectsDir,
+} from '#/system/git/branches.ts'
 import { git } from '#/system/git/git-exec.ts'
 
 vi.mock('#/system/git/git-exec.ts', () => ({
@@ -46,6 +52,28 @@ describe('getBranchWorktreeIdentities', () => {
     await expect(
       getBranchWorktreeIdentities('/repo', [{ path: '/repo', isBare: false, isPrimary: true }]),
     ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }])
+  })
+})
+
+describe('authoritative snapshot reads', () => {
+  test('represents detached HEAD explicitly', async () => {
+    vi.mocked(git).mockResolvedValueOnce('')
+    await expect(getCurrentBranch('/repo')).resolves.toBeNull()
+  })
+
+  test('preserves an unborn branch as authoritative current state', async () => {
+    vi.mocked(git).mockResolvedValueOnce('main')
+    await expect(getCurrentBranch('/repo')).resolves.toBe('main')
+    expect(git).toHaveBeenCalledWith('/repo', ['branch', '--show-current'], { signal: undefined })
+  })
+
+  test('does not turn a failed branch projection into an empty branch list', async () => {
+    vi.mocked(git).mockImplementation(async (_cwd, args) => {
+      if (args[0] === 'for-each-ref') throw new Error('branch read failed')
+      return ''
+    })
+
+    await expect(getBranches('/repo', [], 'main')).rejects.toThrow('branch read failed')
   })
 })
 

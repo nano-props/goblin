@@ -33,6 +33,7 @@ import type { TerminalSessionCommandBridge } from '#/web/components/terminal/ter
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
@@ -755,15 +756,18 @@ function workspaceRuntimeIdForTest(): string {
 }
 
 function installNativeBridgeStub() {
-  testWindow.goblinNative = {
+  testWindow.goblinNative = currentNativeBridge({
     invokeIpc: vi.fn(async () => null),
     abortIpc: vi.fn(async () => false),
     onEvent: vi.fn(() => () => {}),
     onIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
-    terminal: {},
-    saveClipboardFiles: vi.fn(async () => []),
-  }
+    terminal: {
+      notifyBell: async () => true,
+      sendTestNotification: async () => true,
+      setBadge: () => {},
+    },
+  })
 }
 
 function terminalFilesystemTargetSnapshot(): TerminalFilesystemTargetSnapshot {

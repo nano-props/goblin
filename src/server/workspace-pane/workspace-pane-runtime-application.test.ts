@@ -230,7 +230,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         startupShellCommand: undefined,
         cols: request.cols,
         rows: request.rows,
-        clientId: request.clientId,
         target: request.target,
       },
       { physicalWorktreeCapability, permit: expect.any(Object) },
@@ -567,8 +566,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtime: {
         action: 'already-closed',
         terminalSessionId: 'term-closedclosedclosed001',
-        terminalRuntimeSessionId: null,
-        terminalRuntimeGeneration: null,
       },
     })
     expect(close).not.toHaveBeenCalled()
@@ -709,8 +706,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtime: {
         action: 'already-closed',
         terminalSessionId: session.terminalSessionId,
-        terminalRuntimeSessionId: null,
-        terminalRuntimeGeneration: null,
       },
     })
   })

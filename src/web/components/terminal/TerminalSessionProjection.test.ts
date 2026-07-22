@@ -106,12 +106,15 @@ function successfulRuntimeCloseSnapshot(
   return {
     ok: true as const,
     runtimeType: 'terminal' as const,
-    runtime: {
-      action: terminalRuntimeSessionId === null ? ('already-closed' as const) : ('closed' as const),
-      terminalSessionId,
-      terminalRuntimeSessionId,
-      terminalRuntimeGeneration: terminalRuntimeSessionId === null ? null : 1,
-    },
+    runtime:
+      terminalRuntimeSessionId === null
+        ? { action: 'already-closed' as const, terminalSessionId }
+        : {
+            action: 'closed' as const,
+            terminalSessionId,
+            terminalRuntimeSessionId,
+            terminalRuntimeGeneration: 1,
+          },
   }
 }
 
@@ -363,7 +366,74 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('event dispatch', () => {
-    test('dispatches output to the correct session by terminalRuntimeSessionId index', () => {
+    test('does not route realtime events through another session runtime binding', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessions(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+      )
+
+      const session = requiredTerminalSession(projection, 'term-111111111111111111111')
+      const handleOutputSpy = vi.spyOn(session, 'handleOutput')
+      const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
+      const handleExitSpy = vi.spyOn(session, 'handleExit')
+      const handleIdentitySpy = vi.spyOn(session, 'handleIdentity')
+      const handleLifecycleSpy = vi.spyOn(session, 'handleLifecycle')
+      const contradictoryIdentity = {
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-222222222222222222222',
+      }
+
+      projection.handleOutput({
+        ...contradictoryIdentity,
+        data: 'must not be routed',
+        seq: 1,
+        outputEra: 0,
+        processName: 'bash',
+      })
+      projection.handleServerBell({
+        ...contradictoryIdentity,
+        workspaceId: REPO_ROOT,
+        processName: 'bash',
+        canonicalTitle: null,
+      })
+      projection.handleServerTitle({
+        ...contradictoryIdentity,
+        workspaceId: REPO_ROOT,
+        canonicalTitle: 'must not be routed',
+      })
+      projection.handleExit({
+        ...contradictoryIdentity,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      })
+      projection.handleIdentity({
+        ...contradictoryIdentity,
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalCols: 100,
+        canonicalRows: 30,
+      })
+      projection.handleLifecycle({
+        ...contradictoryIdentity,
+        phase: 'open',
+        message: null,
+        takeoverPending: false,
+      })
+      projection.handleSessionClosed(contradictoryIdentity)
+
+      expect(handleOutputSpy).not.toHaveBeenCalled()
+      expect(handleServerTitleSpy).not.toHaveBeenCalled()
+      expect(handleExitSpy).not.toHaveBeenCalled()
+      expect(handleIdentitySpy).not.toHaveBeenCalled()
+      expect(handleLifecycleSpy).not.toHaveBeenCalled()
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions).toHaveLength(1)
+    })
+
+    test('dispatches output by canonical terminalSessionId and validates its runtime binding', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -379,7 +449,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-unroutedunroutedroute',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
         outputEra: 0,
@@ -390,7 +460,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-unroutedunroutedroute',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
         outputEra: 0,
@@ -416,7 +486,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-unroutedunroutedroute',
+        terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 1,
         outputEra: 0,
@@ -426,7 +496,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-unroutedunroutedroute',
+        terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 2,
         outputEra: 0,
@@ -463,7 +533,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
     })
 
-    test('dispatches title changes by terminalRuntimeSessionId index', () => {
+    test('rejects title changes whose canonical terminalSessionId does not resolve', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -482,7 +552,7 @@ describe('TerminalSessionProjection', () => {
         workspaceId: REPO_ROOT,
         canonicalTitle: 'new title',
       })
-      expect(handleServerTitleSpy).toHaveBeenCalledWith('new title')
+      expect(handleServerTitleSpy).not.toHaveBeenCalled()
 
       handleServerTitleSpy.mockClear()
       projection.handleServerTitle({
@@ -495,12 +565,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleServerTitleSpy).not.toHaveBeenCalled()
     })
 
-    // Regression: a background tab may see a `title` event before its
-    // terminalRuntimeSessionId->terminalSessionId index entry exists locally (e.g. it
-    // has never been attached/reconciled). `terminalSessionId` must be
-    // used as the primary routing key, same as bell events, so title
-    // updates for such tabs are not silently dropped.
-    test('dispatches title changes by terminalSessionId even without a terminalRuntimeSessionId index entry', () => {
+    test('dispatches title changes by canonical terminalSessionId', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -511,10 +576,6 @@ describe('TerminalSessionProjection', () => {
       const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = requiredTerminalSession(projection, terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
-      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.delete(
-        'pty_session_a_aaaaaaaaa',
-      )
-
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -547,7 +608,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleServerTitleSpy).not.toHaveBeenCalled()
     })
 
-    test('dispatches exit by terminalRuntimeSessionId index', () => {
+    test('rejects exit whose canonical terminalSessionId does not resolve', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -566,7 +627,7 @@ describe('TerminalSessionProjection', () => {
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       })
-      expect(handleExitSpy).toHaveBeenCalledTimes(1)
+      expect(handleExitSpy).not.toHaveBeenCalled()
 
       handleExitSpy.mockClear()
       projection.handleExit({
@@ -579,13 +640,7 @@ describe('TerminalSessionProjection', () => {
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
 
-    // Regression coverage for every realtime event type: a background tab
-    // that has never been attached/reconciled locally may not yet have a
-    // terminalRuntimeSessionId->terminalSessionId index entry. `terminalSessionId`
-    // must be tried first for every dispatcher (mirroring the title-event
-    // fix) so no realtime event type can silently drop updates for such a
-    // tab. See `resolveSessionForRealtimeEvent`.
-    test('routes output, exit, identity, and lifecycle by terminalSessionId even without a terminalRuntimeSessionId index entry', () => {
+    test('routes output, exit, identity, and lifecycle by canonical terminalSessionId', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -599,10 +654,6 @@ describe('TerminalSessionProjection', () => {
       const handleIdentitySpy = vi.spyOn(session, 'handleIdentity')
       const handleLifecycleSpy = vi.spyOn(session, 'handleLifecycle')
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
-      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.delete(
-        'pty_session_a_aaaaaaaaa',
-      )
-
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -830,15 +881,13 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('uses the durable candidate for an exact close when the runtime reverse index is missing', () => {
+    test('uses the canonical durable session for an exact close', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
-
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -1371,6 +1420,60 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
     })
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+    localProjection.destroy()
+  })
+
+  test('does not delete a durable session when its retiring runtime closes during restart', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    localProjection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [
+        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 1,
+        }),
+      ],
+      'client_local',
+    )
+    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
+    session.restart()
+
+    localProjection.handleSessionClosed({
+      terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+    })
+
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+    localProjection.destroy()
+  })
+
+  test('does not apply or retain a bell from the retiring runtime during restart', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    localProjection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [
+        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 1,
+        }),
+      ],
+      'client_local',
+    )
+    const session = requiredTerminalSession(localProjection, 'term-111111111111111111111')
+    session.restart()
+
+    localProjection.handleServerBell({
+      terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      workspaceId: REPO_ROOT,
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
+
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(0)
+    expect(terminalSessionProjectionAccess(localProjection).pendingServerBellByRuntimeBindingKey.size).toBe(0)
     localProjection.destroy()
   })
 

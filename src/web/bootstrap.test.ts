@@ -59,22 +59,13 @@ describe('client bootstrap', () => {
     })
   })
 
-  test('replaces a partial web bootstrap once the bridge populates fully', async () => {
-    // Regression for the "all-defaults lock" gate: the previous
-    // version only re-read on a fully-empty snapshot, so a partial
-    // read (e.g. initialServer still null) would lock the cache
-    // and never pick up the populated version. The new gate
-    // re-reads while the snapshot is "all default" (no initial
-    // server handoff yet).
+  test('keeps the strict initial bootstrap snapshot stable', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
     })
 
-    // A later read returns a fully populated snapshot. The next
-    // call must converge on it, even though the cached value is
-    // the "all default" snapshot above.
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -88,58 +79,6 @@ describe('client bootstrap', () => {
 
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-      initialServer: null,
-    })
-  })
-
-  test('re-detects the Electron bridge after an early web-host bootstrap', async () => {
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
-    expect(getInitialBootstrap()).toEqual({
-      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-      initialServer: null,
-    })
-
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
-          initialServer: null,
-        },
-        goblinNative: {
-          invokeIpc: async () => null,
-          abortIpc: async () => false,
-          onEvent: () => () => {},
-          pathForFile: () => '',
-          terminal: {
-            attach: async () => ({ ok: false, message: 'unavailable' }),
-            restart: async () => ({ ok: false, message: 'unavailable' }),
-            write: async () => false,
-            resize: async () => false,
-            close: async () => false,
-            pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-            notifyBell: async () => false,
-            sendTestNotification: async () => false,
-            setBadge: () => {},
-            onOutput: () => () => {},
-            onBell: () => () => {},
-            onTitle: () => () => {},
-            onExit: () => () => {},
-          },
-        },
-      },
-    })
-
-    expect(getInitialBootstrap()).toEqual({
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
       initialServer: null,
     })
   })
@@ -246,6 +185,83 @@ describe('client bootstrap', () => {
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
+  test('rejects a present but invalid injected bootstrap', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: { initialServer: null },
+        location: { href: 'http://localhost/', origin: 'http://localhost', search: '' },
+      },
+    })
+
+    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    expect(() => readInjectedWebBootstrap()).toThrow('Invalid injected client bootstrap')
+  })
+
+  test.each([
+    ['a future bridge version', { runtime: { kind: 'web', bridgeVersion: 2, capabilities: [] }, initialServer: null }],
+    [
+      'an incomplete Electron capability set',
+      { runtime: { kind: 'electron', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] }, initialServer: null },
+    ],
+    [
+      'an invalid initial server',
+      {
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
+        initialServer: { url: 'not-a-url' },
+      },
+    ],
+    [
+      'unknown root data',
+      {
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
+        initialServer: null,
+        legacy: true,
+      },
+    ],
+  ])('rejects %s in an injected bootstrap', async (_label, bootstrap) => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: bootstrap,
+        location: { href: 'http://localhost/', origin: 'http://localhost', protocol: 'http:', search: '' },
+      },
+    })
+
+    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    expect(() => readInjectedWebBootstrap()).toThrow('Invalid injected client bootstrap')
+  })
+
+  test('rejects an empty bootstrap script instead of treating it as absent', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { location: { href: 'http://localhost/', origin: 'http://localhost', search: '' } },
+    })
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { getElementById: () => ({ textContent: '' }) },
+    })
+
+    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    expect(() => readInjectedWebBootstrap()).toThrow('Empty client bootstrap element')
+  })
+
+  test('rejects an invalid server URL when an access token requests query bootstrap', async () => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        location: {
+          href: 'http://localhost/',
+          origin: 'http://localhost',
+          search: '?accessToken=secret&goblinServerUrl=http://[invalid',
+        },
+      },
+    })
+
+    const { readQueryBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    expect(() => readQueryBootstrap()).toThrow('Invalid client bootstrap server URL')
+  })
+
   test('builds a minimal web bootstrap from URL query parameters', async () => {
     // The dev-mode escape hatch: `?accessToken=...` in the URL
     // populates the bootstrap so a Vite-served browser can attach
@@ -263,8 +279,8 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
-    expect(getInitialBootstrap()).toEqual({
+    const { readQueryBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    expect(readQueryBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: {
         url: 'http://127.0.0.1:32100/',

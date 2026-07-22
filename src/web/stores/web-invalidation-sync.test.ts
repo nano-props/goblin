@@ -104,8 +104,7 @@ async function waitUntil(assertion: () => void, attempts = 20): Promise<void> {
 
 function settingsSnapshotResponse(overrides: Record<string, unknown> & { colorTheme?: string } = {}) {
   return {
-    ...defaultSettingsSnapshot({ globalShortcut: 'CommandOrControl+Shift+G' }),
-    colorTheme: 'default',
+    ...defaultSettingsSnapshot(),
     ...overrides,
   }
 }
@@ -133,7 +132,7 @@ describe('web invalidation sync', () => {
           settingsReadCount++
           return settingsSnapshotResponse({
             theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'default',
+            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
           })
         },
       })),
@@ -160,7 +159,7 @@ describe('web invalidation sync', () => {
           settingsReadCount++
           return settingsSnapshotResponse({
             theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'default',
+            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
           })
         },
       })),
@@ -188,7 +187,7 @@ describe('web invalidation sync', () => {
           settingsReadCount++
           return settingsSnapshotResponse({
             theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'default',
+            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
           })
         },
       })),
@@ -202,7 +201,7 @@ describe('web invalidation sync', () => {
     await flushAsyncWork()
 
     expect(settingsReadCount).toBe(beforeInvalidationReadCount)
-    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
+    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
   })
 
   test('unknown settings invalidation scopes are ignored', async () => {
@@ -219,7 +218,7 @@ describe('web invalidation sync', () => {
     await flushAsyncWork()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
-    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
+    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
   })
 
   test('i18n store refetches payload only on i18n invalidation', async () => {

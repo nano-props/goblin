@@ -15,13 +15,6 @@
 // only visible in DevTools where the client-side `web/logger.ts` will
 // already be emitting its own (more detailed) records.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
-// Mirrors `src/shared/clipboard-paste.ts:CLIPBOARD_FALLBACK_FILE_NAME`.
-// CommonJS preloads can't import from the Vite-resolved `src/` tree at
-// runtime, so we duplicate the literal here. If the constant ever
-// changes, update both copies (a unit test in
-// `src/shared/clipboard-paste.test.ts` could lock this if it became
-// worth the friction).
-const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'
 const IPC = {
   ipc: {
     call: 'goblin:ipc',
@@ -40,9 +33,6 @@ const IPC = {
     notifyBell: 'goblin:terminal-notify-bell',
     sendTestNotification: 'goblin:terminal-send-test-notification',
     setBadge: 'goblin:terminal-set-badge',
-  },
-  clipboard: {
-    saveFiles: 'goblin:clipboard-save-files',
   },
   accessToken: {
     rotate: 'goblin:rotate-access-token',
@@ -131,23 +121,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
   notifyAppQuitDrained: (result) => safeInvoke(IPC.ipc.appQuitDrained, result),
-  pathForFile: (file) => {
-    // `webUtils` itself is destructured at the top of this file, so
-    // a missing symbol there would already have crashed the preload
-    // load — by the time we get here it's the call that can throw.
-    // That happens when a non-`File` object reaches us (synthetic
-    // `File` from older test mocks, IPC proxies that lost the
-    // prototype, etc.) or when an internal Electron check fails.
-    // Returning `''` matches the client's contract: an empty
-    // path-attempt result falls through to the blob-save tier, and
-    // a `paste-file-failed` toast surfaces the loss to the user.
-    try {
-      return webUtils.getPathForFile(file)
-    } catch (err) {
-      console.warn('[preload] pathForFile failed', err)
-      return ''
-    }
-  },
+  pathForFile: (file) => webUtils.getPathForFile(file),
   host: {
     openSettingsWindow: (input) => safeInvoke(IPC.host.openSettingsWindow, input),
     openExternalUrl: (input) => safeInvoke(IPC.host.openExternalUrl, input),
@@ -160,36 +134,6 @@ contextBridge.exposeInMainWorld('goblinNative', {
     setBadge: (count) => {
       ipcRenderer.send(IPC.terminal.setBadge, count)
     },
-  },
-  // Clipboard paste / drop blob backstop. `File` is not structured-clonable
-  // across the contextBridge, so we materialise each blob to a plain
-  // `{name, bytes: ArrayBuffer}` here in the preload before invoking IPC.
-  // (Electron's IPC has no `transfer` list — `ArrayBuffer` and
-  // `Uint8Array` both copy — so the choice is a typing/contract one.)
-  // Errors are swallowed to `[]` because the client-side resolver
-  // treats `[]` as "blob save failed for everything" and counts it
-  // separately from unsafe path filtering.
-  saveClipboardFiles: async (files) => {
-    if (!Array.isArray(files) || files.length === 0) return []
-    try {
-      const payload = await Promise.all(
-        files.map(async (file) => ({
-          // Mirrors the web HTTP backend: the empty-name fallback
-          // (CLIPBOARD_FALLBACK_FILE_NAME) is the literal duplicated
-          // there as well, and the server-side `sanitizeBaseName`
-          // preserves it. Keeping the names identical across repoOperationSchedulers
-          // avoids a class of debugging where Electron and web leave
-          // different temp filenames for the same paste payload.
-          name: typeof file?.name === 'string' && file.name.length > 0 ? file.name : CLIPBOARD_FALLBACK_FILE_NAME,
-          bytes: await file.arrayBuffer(),
-        })),
-      )
-      const result = await safeInvoke(IPC.clipboard.saveFiles, payload)
-      return Array.isArray(result) ? result.filter((p) => typeof p === 'string') : []
-    } catch (err) {
-      console.warn('[preload] saveClipboardFiles failed', err)
-      return []
-    }
   },
   onEvent: (cb) => {
     ipcEventSubscribers.add(cb)

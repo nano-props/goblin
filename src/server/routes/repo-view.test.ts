@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import * as v from 'valibot'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { createHttpTransport } from '#/server/g-command/transport.ts'
+import { RepoViewResultSchema } from '#/shared/repo-view.ts'
 
 // Minimal app realtime host stub for the auth-integration `createApp()`
 // tests. Mirrors the one in `app-factory.test.ts`; a future refactor
@@ -190,5 +193,29 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
         intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
+  })
+
+  test('accepts the real g-command JSON transport through assembled middleware', async () => {
+    const subscriber = { send: vi.fn(), close: vi.fn() }
+    registerClientIntentSocket(subscriber)
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: 0,
+      accessToken: 'secret',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      appRealtimeHost: makeAppRealtimeHost(),
+      workspacePaneTabsHost,
+      worktreeRemovalApplication,
+    })
+    const fetchImpl = async (input: string | URL | Request, init?: RequestInit) => app.fetch(new Request(input, init))
+    const transport = createHttpTransport(
+      { GOBLIN_SERVER_URL: 'http://127.0.0.1:32099', GOBLIN_SERVER_ACCESS_TOKEN: 'secret' },
+      fetchImpl,
+    )
+
+    await expect(
+      transport.postJson('/api/repo/view', { tab: 'changes' }, (value) => v.parse(RepoViewResultSchema, value)),
+    ).resolves.toEqual({ ok: true })
+    expect(subscriber.send).toHaveBeenCalledTimes(1)
   })
 })

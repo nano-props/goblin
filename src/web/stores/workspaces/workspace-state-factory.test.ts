@@ -55,7 +55,6 @@ describe('deriveWorkspaceConnectivity', () => {
     expect(workspace.capability.git.dataLoads.repoReadModel.phase).toBe('idle')
     expect(workspace.capability.git.operations.repoReadModel.phase).toBe('idle')
     expect(workspace.capability.git.ui).toEqual({ branchViewMode: 'all' })
-    expect(workspace.capability.git.projection).toEqual({ source: 'fresh', savedAt: null })
     expect(workspace.capability.git.remote.fetchFailed).toBe(false)
     expect(workspace.capability.git.events).toEqual([])
 

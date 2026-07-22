@@ -45,9 +45,6 @@ vi.mock('#/web/components/TokenGate.tsx', () => ({
   TokenGate: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
 
-vi.mock('#/web/hooks/usePublicAppBootstrap.ts', () => ({
-  usePublicAppBootstrap: () => undefined,
-}))
 
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
   useAuthenticatedAppBootstrap: () => ({ state: { status: 'ready' }, retry: vi.fn() }),

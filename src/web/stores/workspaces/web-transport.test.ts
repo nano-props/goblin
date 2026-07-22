@@ -73,7 +73,15 @@ describe('repo web transport helpers', () => {
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
-        target: { id: 'goblin+ssh://example/srv/repo', displayName: 'repo', alias: 'example', remotePath: '/srv/repo' },
+        target: {
+          id: 'goblin+ssh://example/srv/repo',
+          displayName: 'repo',
+          alias: 'example',
+          host: 'example.test',
+          user: 'developer',
+          port: 22,
+          remotePath: '/srv/repo',
+        },
       }),
     }))
     const { resolveRemoteWorkspaceTarget } = await import('#/web/remote-workspace-client.ts')

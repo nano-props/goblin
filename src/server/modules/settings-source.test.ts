@@ -88,7 +88,7 @@ test('persists updates and notifies subscribers from the server settings store',
     terminalNotificationsEnabled: true,
     shortcutsDisabled: true,
     globalShortcutDisabled: true,
-    globalShortcut: 'CommandOrControl+Alt+G',
+    globalShortcut: 'Alt+K',
     lanEnabled: false,
   })
   await writeWorkspacePaneLayout(mod, REPO_B, {
@@ -115,7 +115,7 @@ test('persists updates and notifies subscribers from the server settings store',
     terminalNotificationsEnabled: true,
     shortcutsDisabled: true,
     globalShortcutDisabled: true,
-    globalShortcut: 'Alt+G',
+    globalShortcut: 'Alt+K',
     lanEnabled: false,
   })
   expect(await reloaded.getServerWorkspaceState()).toMatchObject({
@@ -137,7 +137,50 @@ test('persists updates and notifies subscribers from the server settings store',
   ])
 })
 
-test('quarantines corrupt settings JSON before rebuilding defaults', async () => {
+test('rejects an invalid global shortcut without resetting persisted settings', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await mod.updateUserSettings({ globalShortcut: 'Alt+K' })
+  await expect(mod.updateUserSettings({ globalShortcut: 'Control+O' })).rejects.toThrow('invalid global shortcut')
+  expect((await mod.getUserSettings()).globalShortcut).toBe('Alt+K')
+})
+
+test.each([
+  [{ lang: 'fr' }, 'invalid language'],
+  [{ theme: 'sepia' }, 'invalid theme'],
+  [{ colorTheme: 'unknown' }, 'invalid color theme'],
+  [{ fetchIntervalSec: 1.5 }, 'invalid fetch interval'],
+  [{ fetchIntervalSec: 3601 }, 'invalid fetch interval'],
+  [{ terminalNotificationsEnabled: 'yes' }, 'invalid terminal notifications setting'],
+  [{ shortcutsDisabled: 1 }, 'invalid shortcuts setting'],
+  [{ globalShortcutDisabled: null }, 'invalid global shortcut disabled setting'],
+  [{ lanEnabled: 'true' }, 'invalid LAN setting'],
+] as const)('rejects invalid direct settings patch %j without mutation', async (patch, message) => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const before = await mod.getUserSettings()
+
+  await expect(Reflect.apply(mod.updateUserSettings, undefined, [patch])).rejects.toThrow(message)
+  expect(await mod.getUserSettings()).toEqual(before)
+})
+
+test.each([-1, 1.5, 3601, Number.NaN])('rejects invalid direct fetch interval %s without mutation', async (sec) => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const before = await mod.getServerFetchIntervalSec()
+
+  await expect(Reflect.apply(mod.setServerFetchIntervalSec, undefined, [sec])).rejects.toThrow('invalid fetch interval')
+  expect(await mod.getServerFetchIntervalSec()).toBe(before)
+})
+
+test('leaves corrupt settings JSON in place and fails every read', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -145,15 +188,85 @@ test('quarantines corrupt settings JSON before rebuilding defaults', async () =>
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
-  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
-    lang: 'auto',
-    fetchIntervalSec: 120,
-  })
-  expect(readdirSync(tmp).some((name) => name.startsWith('user-settings.json.corrupt-'))).toBe(true)
+  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow()
+  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow()
+  expect(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8')).toBe('{bad json')
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
-test('rejects oversized workspace identities while decoding durable settings', async () => {
+test('leaves a structurally corrupt settings root in place and fails every read', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify([]), 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('settings root must be an object')
+  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('settings root must be an object')
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual([])
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
+})
+
+test('does not confuse a persisted JSON null with missing settings', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const file = path.join(tmp, 'user-settings.json')
+  await writeFile(file, 'null', 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getUserSettings()).rejects.toThrow('settings root must be an object')
+  await expect(mod.getUserSettings()).rejects.toThrow('settings root must be an object')
+  expect(await readFile(file, 'utf-8')).toBe('null')
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
+})
+
+test('leaves invalid current-version settings fields in place and fails every read', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify({ version: 1, theme: 'bogus' }), 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
+  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual({
+    version: 1,
+    theme: 'bogus',
+  })
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
+})
+
+test('fails closed without moving or overwriting settings from a newer version', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const newer = { version: 2, theme: 'dark', futureSetting: true }
+  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify(newer), 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getUserSettings()).rejects.toThrow('unsupported settings version: 2')
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual(newer)
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
+})
+
+test('fails closed without moving or overwriting unversioned settings', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify({ theme: 'bogus' }), 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getUserSettings()).rejects.toThrow('unsupported settings version: undefined')
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual({ theme: 'bogus' })
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
+})
+
+test('does not decode unversioned durable settings', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -168,8 +281,7 @@ test('rejects oversized workspace identities while decoding durable settings', a
   )
 
   const mod = await import('#/server/modules/settings-source.ts')
-  expect((await mod.getServerWorkspaceState()).openWorkspaceEntries).toEqual([])
-  expect(await mod.getServerRecentWorkspaces()).toEqual([])
+  await expect(mod.getServerWorkspaceState()).rejects.toThrow('unsupported settings version: undefined')
 })
 
 test('fails fast when the settings file cannot be read', async () => {
@@ -753,21 +865,21 @@ test('rejects invalid workspace external app target and item without touching di
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.setServerWorkspaceExternalAppRecent({
+  await expect(mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
     targetKey: 'git-worktree\0relative/path',
     itemId: 'editor:vscode',
-  })
-  await mod.setServerWorkspaceExternalAppRecent({
+  })).rejects.toThrow('invalid workspace external-app target')
+  await expect(mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
     targetKey: externalAppTargetKey('/repo-a'),
     itemId: '',
-  })
-  await mod.setServerWorkspaceExternalAppRecent({
+  })).rejects.toThrow('invalid workspace external-app item')
+  await expect(mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
     targetKey: externalAppTargetKey('/repo-a'),
     itemId: 'editor:vscode\0with-nul',
-  })
+  })).rejects.toThrow('invalid workspace external-app item')
 
   expect(await mod.getServerWorkspaceSettings()).toEqual([])
 })
@@ -791,27 +903,28 @@ function requiredFileWorkspaceLocator(worktreePath: string) {
   return root
 }
 
-test('normalizer drops malformed workspace external app recent entries on load', async () => {
+test('leaves malformed workspace external app recent entries in place and fails every read', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-  const fs = await import('node:fs/promises')
-  await fs.writeFile(
-    `${tmp}/user-settings.json`,
+  const initial = await import('#/server/modules/settings-source.ts')
+  await initial.getUserSettings()
+  initial.resetServerSettingsSourceForTests()
+  vi.resetModules()
+  const settingsFile = `${tmp}/user-settings.json`
+  const persisted = JSON.parse(await readFile(settingsFile, 'utf-8'))
+  await writeFile(
+    settingsFile,
     JSON.stringify({
+      ...persisted,
       workspaceSettings: [
         {
           workspaceId: REPO_A,
           workspaceExternalAppRecent: {
-            byFilesystemTarget: { '/legacy/native/path': 'terminal:ghostty' },
             byTarget: {
               [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
-              // Unknown item id (not in WORKSPACE_EXTERNAL_APP_IDS) —
-              // the normalizer must drop the entry.
               [externalAppTargetKey('/repo-a/worktree-y')]: 'editor:webstorm',
-              // Target-invalid entries (relative locator, NUL byte) must
-              // also be dropped.
               'relative/path': 'editor:vscode',
               '/repo-a/nul\0key': 'editor:vscode',
               'workspace-root': 'finder',
@@ -825,20 +938,13 @@ test('normalizer drops malformed workspace external app recent entries on load',
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  expect(await mod.getServerWorkspaceSettings()).toEqual([
-    {
-      workspaceId: REPO_A,
-      workspaceExternalAppRecent: {
-        byTarget: {
-          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
-          'workspace-root': 'finder',
-        },
-      },
-    },
-  ])
+  await expect(mod.getServerWorkspaceSettings()).rejects.toThrow('invalid current settings shape')
+  await expect(mod.getServerWorkspaceSettings()).rejects.toThrow('invalid current settings shape')
+  expect(existsSync(settingsFile)).toBe(true)
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
-test('setServerWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
+test('setServerWorkspaceExternalAppRecent rejects unknown item ids without overwriting valid entries', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -852,11 +958,11 @@ test('setServerWorkspaceExternalAppRecent silently drops unknown item ids withou
     itemId: 'editor:vscode',
   })
 
-  await mod.setServerWorkspaceExternalAppRecent({
+  await expect(mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
     targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'editor:webstorm',
-  })
+  })).rejects.toThrow('invalid workspace external-app item')
 
   const persisted = await mod.getServerWorkspaceSettings()
   expect(persisted).toEqual([

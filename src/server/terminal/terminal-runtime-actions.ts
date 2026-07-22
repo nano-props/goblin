@@ -82,13 +82,12 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const terminalClientId = input.clientId ?? clientId
       const result = await manager.attachSession(
         userId,
         input.terminalRuntimeSessionId,
         input.cols,
         input.rows,
-        terminalClientId,
+        clientId,
       )
       return result
     },
@@ -107,7 +106,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         terminalRuntimeSessionId,
       )
       if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
-      const terminalClientId = input.clientId ?? clientId
       const operation = await worktreeOperations.runOperation(
         physicalWorktreeCapability,
         async (_permit, context) =>
@@ -116,7 +114,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
             terminalRuntimeSessionId,
             input.cols,
             input.rows,
-            terminalClientId,
+            clientId,
             context.signal,
           ),
       )
@@ -154,8 +152,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalWriteData(input?.data)) {
         return { status: 'rejected' }
       }
-      const terminalClientId = input.clientId ?? clientId
-      return await manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, terminalClientId)
+      return await manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, clientId)
     },
 
     resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
@@ -166,8 +163,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return false
       }
-      const terminalClientId = input.clientId ?? clientId
-      return manager.resizeSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
+      return manager.resizeSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {
@@ -191,8 +187,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const terminalClientId = input.clientId ?? clientId
-      return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
+      return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
     },
 
     async recoverSessions(

@@ -38,4 +38,16 @@ describe('client app realtime', () => {
     expect(onRecovered).toHaveBeenCalledWith('client_realtime')
     dispose()
   })
+
+  test('surfaces server configuration failures when opening realtime', () => {
+    const failure = new Error('invalid server configuration')
+    const client = createClientAppRealtime({
+      getServerConfig: () => {
+        throw failure
+      },
+    })
+
+    expect(() => client.onMessage(() => {})).toThrow(failure)
+    expect(wsMock.instances).toHaveLength(0)
+  })
 })

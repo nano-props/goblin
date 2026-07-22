@@ -28,7 +28,14 @@ import {
 } from '#/system/git/remote.ts'
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
-import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
+import {
+  createWorktree,
+  getWorktrees,
+  readWorktreeMembership,
+  removeWorktree,
+  sampleWorktreeStatus,
+} from '#/system/git/worktrees.ts'
+import { haveSameWorktrees } from '#/system/git/parsers.ts'
 import {
   bootstrapWorktreeAfterCreate,
   getWorktreeBootstrapPreview as getLocalWorktreeBootstrapPreview,
@@ -70,6 +77,8 @@ import {
 } from '#/system/ssh/git.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
+import type { GitUpstream } from '#/system/git/upstream.ts'
+import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import {
   isRemoteWorkspaceId,
@@ -133,7 +142,7 @@ export interface RepoSource {
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
   ): Promise<PullRequestEntry[] | null>
   getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
-  getRemoteBranches(signal?: AbortSignal): Promise<string[]>
+  getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]>
   fetch(signal: AbortSignal): Promise<RepoMutationResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<RepoMutationResult>
   push(branch: string, signal?: AbortSignal): Promise<RepoMutationResult>
@@ -545,11 +554,9 @@ function remoteWorktreeRepoIds(
 }
 
 async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
-  try {
-    return localWorktreeRepoIds(await getWorktrees(repoId, { includeStatus: false, signal }))
-  } catch {
-    return []
-  }
+  const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+  signal?.throwIfAborted()
+  return localWorktreeRepoIds(worktrees)
 }
 
 async function readRemoteAffectedRepoIds(
@@ -557,11 +564,9 @@ async function readRemoteAffectedRepoIds(
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<WorkspaceId[]> {
-  try {
-    return remoteWorktreeRepoIds(target, await getRemoteRepoWorktreePaths(target, { signal, run }))
-  } catch {
-    return []
-  }
+  const worktreePaths = await getRemoteRepoWorktreePaths(target, { signal, run })
+  signal?.throwIfAborted()
+  return remoteWorktreeRepoIds(target, worktreePaths)
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -599,6 +604,7 @@ function createLocalRepoSource(
 
   async function validateBranchDeletion(
     branch: string,
+    upstream: GitUpstream | null,
     options?: {
       force?: boolean
       notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
@@ -616,11 +622,11 @@ function createLocalRepoSource(
       return ignoredPath ? path.resolve(wt.path) !== ignoredPath : true
     })
     const mergedToCurrent = !options?.force && current ? await isAncestor(gitCwd, branch, current, signal) : false
-    const upstream = !options?.force ? await getUpstream(gitCwd, branch, signal) : null
-    const mergedToUpstream = !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream, signal) : false
+    const mergedToUpstream =
+      !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream.ref, signal) : false
     return validateBranchDeletionPolicy({
       branch,
-      currentBranch: current,
+      currentBranch: current ?? undefined,
       isCheckedOutElsewhere,
       force: options?.force,
       mergedToCurrent,
@@ -631,19 +637,17 @@ function createLocalRepoSource(
 
   async function deleteBranchAfterValidation(
     branch: string,
+    upstream: GitUpstream | null,
     options?: { force?: boolean; deleteUpstream?: boolean },
     signal?: AbortSignal,
     gitCwd = repoId,
   ): Promise<ExecResult> {
-    const upstream = options?.deleteUpstream ? await getUpstream(gitCwd, branch, signal) : null
     const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
-    if (!deleted.ok || !upstream) return deleted
-    const slash = upstream.indexOf('/')
-    if (slash <= 0) return deleted
+    if (!deleted.ok || options?.deleteUpstream !== true || !upstream?.deleteTarget) return deleted
     const upstreamDeleted = await deleteUpstreamBranch(
       gitCwd,
-      upstream.slice(0, slash),
-      upstream.slice(slash + 1),
+      upstream.deleteTarget.remote,
+      upstream.deleteTarget.branch,
       signal,
     )
     return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repositoryStateChanged: true }
@@ -656,22 +660,26 @@ function createLocalRepoSource(
       if (!isValidCwd(repoId)) return null
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      try {
-        const worktrees = await getWorktrees(repoId, { signal })
-        if (signal?.aborted) return null
-        const branches = await getBranches(repoId, worktrees, { signal })
-        if (signal?.aborted) return null
-        const current = await getCurrentBranch(repoId, { signal })
-        if (signal?.aborted) return null
-        const currentHEAD = current ? undefined : await getHeadHash(repoId, { signal })
-        if (signal?.aborted) return null
-        const remote = await getRemoteInfo(repoId, signal)
-        if (signal?.aborted) return null
-        return { branches, current, currentHEAD, remote }
-      } catch (err) {
-        if (signal?.aborted) return null
-        throw err
+      signal?.throwIfAborted()
+      const membership = await readWorktreeMembership(repoId, signal)
+      const statusSamples = await sampleWorktreeStatus(membership, signal)
+      const worktrees = statusSamples.map((sample) =>
+        sample.kind === 'status'
+          ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
+          : sample.worktree,
+      )
+      signal?.throwIfAborted()
+      const currentBranch = await getCurrentBranch(repoId, { signal })
+      const branches = await getBranches(repoId, worktrees, currentBranch, { signal })
+      const current = currentBranch ?? ''
+      const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
+      const remote = await getRemoteInfo(repoId, signal)
+      signal?.throwIfAborted()
+      const finalMembership = await readWorktreeMembership(repoId, signal)
+      if (!haveSameWorktrees(membership, finalMembership)) {
+        throw new Error('Worktree membership changed during repository snapshot read')
       }
+      return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
       const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
@@ -728,6 +736,12 @@ function createLocalRepoSource(
     },
     async createWorktree(input, signal, options) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (input.mode.kind === 'trackRemoteBranch') {
+        const branches = await getLocalRemoteTrackingBranches(repoId, signal)
+        if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+      }
       const createdWorkspaceId = localWorkspaceId(input.worktreePath)
       const affectedRepoIds = [
         ...(await readLocalAffectedRepoIds(repoId, signal)),
@@ -752,8 +766,10 @@ function createLocalRepoSource(
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const upstream = !options?.force || options?.deleteUpstream ? await getUpstream(repoId, branch, signal) : null
       const validation = await validateBranchDeletion(
         branch,
+        upstream,
         { force: options?.force },
         signal,
         undefined,
@@ -762,7 +778,7 @@ function createLocalRepoSource(
       )
       if (validation) return validation
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
-      const deleted = await deleteBranchAfterValidation(branch, options, signal)
+      const deleted = await deleteBranchAfterValidation(branch, upstream, options, signal)
       return deleted.ok || deleted.repositoryStateChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
     async removeWorktree(input, signal, lifecycle) {
@@ -780,9 +796,14 @@ function createLocalRepoSource(
         path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
       const invalid = validateRemovableWorktreeState(removable.target)
       if (invalid) return invalid
+      const upstream =
+        input.deleteBranch && (!input.forceDeleteBranch || input.deleteUpstream)
+          ? await getUpstream(mutationCwd, input.branch, signal)
+          : null
       if (input.deleteBranch) {
         const validation = await validateBranchDeletion(
           input.branch,
+          upstream,
           { force: input.forceDeleteBranch, notMergedMessage: 'error.cannot-remove-unpushed-worktree' },
           signal,
           removable.target.path,
@@ -830,6 +851,7 @@ function createLocalRepoSource(
       if (!input.deleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
       const deleted = await deleteBranchAfterValidation(
         input.branch,
+        upstream,
         { force: input.forceDeleteBranch, deleteUpstream: input.deleteUpstream },
         signal,
         mutationCwd,
@@ -867,7 +889,7 @@ async function createRemoteRepoSource(
     kind: 'remote',
     async getSnapshot(signal) {
       const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
-      if (signal?.aborted || !remoteSnapshot) return null
+      signal?.throwIfAborted()
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
@@ -913,6 +935,12 @@ async function createRemoteRepoSource(
       return await getRemoteWorktreeBootstrapPreview(target, { signal, run })
     },
     async createWorktree(input, signal, options) {
+      if (input.mode.kind === 'trackRemoteBranch') {
+        const branches = await getSshRemoteTrackingBranches(target, { signal, run })
+        if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+      }
       const existingRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const created = await createRemoteWorktree(target, { ...input, signal, run })
       const affectedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, created.affectedWorktreePaths)]
@@ -1019,6 +1047,16 @@ function normalizeRequestedBranches(branches?: string[]): ReadonlySet<string> | 
 
 function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullRequestEntry[] | null {
   return prs ? Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest })) : null
+}
+
+function hasRemoteTrackingBranch(
+  branches: readonly RemoteTrackingBranchIdentity[],
+  candidate: RemoteTrackingBranchIdentity,
+): boolean {
+  return branches.some(
+    (branch) =>
+      branch.ref === candidate.ref && branch.remote === candidate.remote && branch.branch === candidate.branch,
+  )
 }
 
 async function remotePullRequestRepoRef(

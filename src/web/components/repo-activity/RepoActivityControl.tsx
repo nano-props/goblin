@@ -31,7 +31,7 @@ interface Props {
 const COMPLETION_VISIBLE_MS = 1500
 
 type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
-  Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
+  Pick<GitWorkspaceProjection, 'dataLoads' | 'remote'> &
   RepoActivityProjectionRepo
 
 function useRepoActivityControlPresentation(
@@ -58,7 +58,6 @@ function repoActivityControlRepoEqual(
       a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.dataLoads === b.dataLoads &&
       a.branchAction === b.branchAction &&
-      a.projection === b.projection &&
       a.remote === b.remote)
   )
 }
@@ -74,7 +73,6 @@ export function RepoActivityControl({ repoId }: Props) {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             dataLoads: repo.capability.git.dataLoads,
             branchAction: repo.capability.git.operations.branchAction,
-            projection: repo.capability.git.projection,
             remote: repo.capability.git.remote,
           }
         : undefined
@@ -109,7 +107,6 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
             manualSyncBusy={view.manualSyncBusy}
             lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
           />
-          <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />
         </div>
       )
@@ -263,22 +260,6 @@ function RepoCompletionIndicator({ completion }: { completion: RepoCompletion })
         {label}
       </span>
     </div>
-  )
-}
-
-function RepoCacheIndicator({ repo }: { repo: RepoActivityControlRepo }) {
-  const t = useT()
-
-  if (repo.projection.source !== 'cache') return null
-
-  const time = repo.projection.savedAt ? new Date(repo.projection.savedAt).toLocaleString() : ''
-  const title = time ? t('tab.cached-title', { time }) : t('tab.cached')
-
-  return (
-    <span className="flex items-center gap-1 text-xs text-muted-foreground" title={title} aria-label={title}>
-      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
-      {t('tab.cached')}
-    </span>
   )
 }
 

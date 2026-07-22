@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
 import { serverDataFile } from '#/shared/data-dir.ts'
@@ -19,38 +19,20 @@ export class SettingsPersistenceWriteError extends Error {
 }
 
 let writeQueue: Promise<void> = Promise.resolve()
-let corruptFileCounter = 0
+
+export type UserSettingsJsonReadResult = { kind: 'missing' } | { kind: 'loaded'; value: unknown }
 
 function userSettingsPath(): string {
   return serverDataFile(USER_SETTINGS_FILE)
 }
 
-function corruptSettingsPath(file: string): string {
-  corruptFileCounter += 1
-  return `${file}.corrupt-${Date.now()}-${process.pid}-${corruptFileCounter}`
-}
-
-async function quarantineCorruptSettingsFile(file: string, err: unknown): Promise<void> {
-  const target = corruptSettingsPath(file)
-  try {
-    await rename(file, target)
-    serverNodeLog.warn({ err, file, target }, 'quarantined corrupt settings file')
-  } catch (renameErr) {
-    serverNodeLog.warn({ err, renameErr, file }, 'failed to quarantine corrupt settings file')
-  }
-}
-
-export async function readUserSettingsJson(): Promise<unknown | null> {
+export async function readUserSettingsJson(): Promise<UserSettingsJsonReadResult> {
   const file = userSettingsPath()
   try {
     const raw = await readFile(file, 'utf-8')
-    return JSON.parse(raw)
+    return { kind: 'loaded', value: JSON.parse(raw) }
   } catch (err) {
-    if (err instanceof SyntaxError) {
-      await quarantineCorruptSettingsFile(file, err)
-      return null
-    }
-    if (hasErrorCode(err, 'ENOENT')) return null
+    if (hasErrorCode(err, 'ENOENT')) return { kind: 'missing' }
     serverNodeLog.warn({ err, file }, 'failed to read settings file')
     throw err
   }
@@ -74,5 +56,4 @@ export async function writeUserSettingsJson(data: unknown): Promise<void> {
 
 export function resetUserSettingsPersistenceForTests(): void {
   writeQueue = Promise.resolve()
-  corruptFileCounter = 0
 }

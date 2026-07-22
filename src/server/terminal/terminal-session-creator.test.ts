@@ -15,7 +15,6 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
-const TERMINAL_CLIENT_ID = 'client_terminal_controller'
 const REPO_ROOT = 'goblin+file:///repo'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-terminal-creator'
 const WORKTREE_PATH = '/repo/worktree'
@@ -50,7 +49,6 @@ describe('terminal session creator', () => {
 
     const result = await creator.create({
       clientId: CLIENT_ID,
-      terminalClientId: TERMINAL_CLIENT_ID,
       userId: USER_ID,
       request: createRequest(),
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
@@ -63,7 +61,7 @@ describe('terminal session creator', () => {
       CLIENT_ID,
       USER_ID,
       expect.objectContaining({
-        clientId: TERMINAL_CLIENT_ID,
+        clientId: CLIENT_ID,
         terminalSessionId: 'term-createdcreatedcreated',
       }),
       testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
@@ -94,7 +92,6 @@ describe('terminal session creator', () => {
     await expect(
       creator.create({
         clientId: CLIENT_ID,
-        terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
         physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
@@ -125,7 +122,6 @@ describe('terminal session creator', () => {
     await expect(
       creator.create({
         clientId: CLIENT_ID,
-        terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
         physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),

@@ -54,14 +54,18 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
   v.strictObject({
     ok: v.literal(true),
     runtimeType: v.literal('terminal'),
-    runtime: v.strictObject({
-      action: v.picklist(['closed', 'already-closed']),
-      terminalSessionId: v.pipe(v.string(), v.minLength(1)),
-      terminalRuntimeSessionId: v.nullable(v.string()),
-      terminalRuntimeGeneration: v.nullable(
-        v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
-      ),
-    }),
+    runtime: v.variant('action', [
+      v.strictObject({
+        action: v.literal('closed'),
+        terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+        terminalRuntimeSessionId: v.string(),
+        terminalRuntimeGeneration: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
+      }),
+      v.strictObject({
+        action: v.literal('already-closed'),
+        terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+      }),
+    ]),
   }),
   v.strictObject({
     ok: v.literal(false),

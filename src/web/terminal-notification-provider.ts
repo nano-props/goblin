@@ -47,10 +47,12 @@ function createFallbackTerminalNotificationProvider(
 function createNativeTerminalNotificationProvider(): MaybeTerminalNotificationProvider {
   return {
     notifyBell(input) {
-      return readNativeBridge()?.terminal?.notifyBell?.(input)
+      const bridge = readNativeBridge()
+      return bridge ? bridge.terminal.notifyBell(input) : undefined
     },
     sendTestNotification(input) {
-      return readNativeBridge()?.terminal?.sendTestNotification?.(input)
+      const bridge = readNativeBridge()
+      return bridge ? bridge.terminal.sendTestNotification(input) : undefined
     },
   }
 }

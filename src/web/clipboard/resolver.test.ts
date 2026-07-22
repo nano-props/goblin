@@ -49,7 +49,7 @@ describe('resolvePastedFiles', () => {
     expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([file])
   })
 
-  test('reports backend failure when unsafe path-attempt fallback cannot be persisted', async () => {
+  test('reports backend failure when an unsafe native path blob cannot be persisted', async () => {
     mocks.pathForDroppedFile.mockReturnValue('/abs/bad\u001bname')
     mocks.saveClipboardFiles.mockResolvedValue([])
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
@@ -61,7 +61,7 @@ describe('resolvePastedFiles', () => {
     })
   })
 
-  test('concatenates safe path-attempt successes and unsafe-path blob-save fallbacks', async () => {
+  test('concatenates safe native paths and server-persisted unsafe-path blobs', async () => {
     mocks.pathForDroppedFile.mockImplementation((f) => (f.name === 'ok' ? '/abs/ok' : '/abs/bad\u001bname'))
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/bad'])
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')

@@ -54,12 +54,14 @@ export type TerminalWorkspacePaneRuntimeOpenResult =
 
 export type WorkspacePaneRuntimeOpenResult = TerminalWorkspacePaneRuntimeOpenResult
 
-export interface TerminalWorkspacePaneRuntimeCloseEffect {
-  action: 'closed' | 'already-closed'
-  terminalSessionId: string
-  terminalRuntimeSessionId: string | null
-  terminalRuntimeGeneration: number | null
-}
+export type TerminalWorkspacePaneRuntimeCloseEffect =
+  | {
+      action: 'closed'
+      terminalSessionId: string
+      terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
+    }
+  | { action: 'already-closed'; terminalSessionId: string }
 
 interface TerminalWorkspacePaneRuntimeCloseSuccess {
   ok: true

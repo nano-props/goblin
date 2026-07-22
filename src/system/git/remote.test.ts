@@ -34,10 +34,7 @@ describe('getBrowserRepoUrl', () => {
       if (args[0] === 'remote' && args[1] === '-v') {
         return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
       }
-      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.remote') return 'origin'
-      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.merge') {
-        return 'refs/heads/feature/test'
-      }
+      if (args[0] === 'for-each-ref') return 'refs/remotes/origin/feature/test\0origin\0refs/heads/feature/test'
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
@@ -75,10 +72,7 @@ describe('getBrowserRepoUrl', () => {
       if (args[0] === 'remote' && args[1] === '-v') {
         return 'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)'
       }
-      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.remote') return 'origin'
-      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.merge') {
-        return 'refs/heads/feature/test'
-      }
+      if (args[0] === 'for-each-ref') return 'refs/remotes/origin/feature/test\0origin\0refs/heads/feature/test'
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
@@ -282,7 +276,7 @@ describe('resolveFetchRemoteForRemotes', () => {
 describe('fetchAll', () => {
   test('returns an error when remote metadata cannot be read', async () => {
     gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
-      if (args[0] === 'symbolic-ref') return 'main'
+      if (args[0] === 'branch' && args[1] === '--show-current') return 'main'
       if (args[0] === 'remote' && args[1] === '-v') throw new Error('failed to read remotes')
       if (args[0] === 'config') throw new Error('no upstream')
       throw new Error(`Unexpected git call: ${args.join(' ')}`)

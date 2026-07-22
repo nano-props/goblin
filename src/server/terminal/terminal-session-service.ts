@@ -136,12 +136,8 @@ class TerminalSessionService {
     const coordinates = terminalExecutionCoordinates(input.target)
     if (!isValidWorkspaceLocatorInput(coordinates.workspaceId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidCwd(terminalExecutionPath(input.target))) return { ok: false, message: 'error.invalid-arguments' }
-    const terminalClientId = input.clientId ?? clientId
-    if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
-
     return await this.creator.create({
       clientId,
-      terminalClientId,
       userId,
       request: input,
       physicalWorktreeCapability,

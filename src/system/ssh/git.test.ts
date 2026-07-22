@@ -6,6 +6,7 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemoteSnapshot,
+  getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
   getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
@@ -26,7 +27,6 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
-import { WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 
 const TARGET = normalizeRemoteTarget({
   alias: 'prod',
@@ -42,6 +42,25 @@ const LINKED_TARGET = normalizeRemoteTarget({
   port: 22,
   remotePath: '/srv/repo-feature',
 })!
+
+const NUL = String.fromCharCode(0)
+
+function worktreePorcelain(lines: string): string {
+  return `${lines
+    .trim()
+    .split('\n')
+    .map((line) => line.replace(/^HEAD ([0-9a-f]{7})$/u, 'HEAD $100000000000000000000000000000000'))
+    .join(NUL)}${NUL}${NUL}`
+}
+
+function upstreamOutput(remote: string, branch: string): string {
+  const ref = remote === '.' ? `refs/heads/${branch}` : `refs/remotes/${remote}/${branch}`
+  return [ref, remote, `refs/heads/${branch}`].join(NUL)
+}
+
+const PRIMARY_WORKTREE_OUTPUT = worktreePorcelain(
+  'worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main',
+)
 
 describe('remote git helpers', () => {
   test('parses a canonical repository execution identity with its object generation', () => {
@@ -87,7 +106,7 @@ describe('remote git helpers', () => {
             'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
           )
         case 'gitUpstream':
-          return okRemoteResult('origin/feature/test')
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
         default:
           return okRemoteResult('')
       }
@@ -122,15 +141,15 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
-              'main\x1ff00ba4\x1fInitial commit\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/main\x1f',
+              'main\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Initial commit\x002024-01-01T00:00:00Z\x00Alice\x00origin/main\x00',
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n')
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
         case 'gitStatus':
           return okRemoteResult('')
         case 'gitRemoteVerbose':
@@ -153,29 +172,110 @@ describe('remote git helpers', () => {
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
-      command.type === 'gitWorkspacePaneIdentities'
-        ? okRemoteResult(
-            'main\nfeature/no-worktree\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n',
-          )
-        : (() => {
-            throw new Error(`unexpected command: ${command.type}`)
-          })(),
-    )
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/no-worktree')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
       { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
-    expect(run).toHaveBeenCalledTimes(1)
-    expect(run).toHaveBeenCalledWith({ type: 'gitWorkspacePaneIdentities', path: '/srv/repo' }, TARGET, {
+    expect(run).toHaveBeenCalledTimes(3)
+    expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
     })
   })
 
+  test('does not turn a failed authoritative remote snapshot into missing data', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+      if (command.type === 'gitSnapshot') return failRemoteResult('ssh unavailable')
+      return command.type === 'gitWorktreeList' ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT) : okRemoteResult('')
+    })
+
+    await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('ssh unavailable')
+  })
+
+  test.each([
+    '__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\nunexpected\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\nmain\x00abc1234',
+  ])('rejects malformed authoritative snapshot envelopes', async (stdout) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitSnapshot' ? okRemoteResult(stdout) : okRemoteResult(''),
+    )
+
+    await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('accepts an authoritative snapshot with three empty sections and no remotes', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitSnapshot'
+        ? okRemoteResult('__GOBLIN_REMOTE_CURRENT__\nvalue \n__GOBLIN_REMOTE_DEFAULT__\nvalue \n__GOBLIN_REMOTE_BRANCHES__\n')
+        : command.type === 'gitWorktreeList'
+          ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+          : okRemoteResult(''),
+    )
+
+    await expect(getRemoteSnapshot(TARGET, { run })).resolves.toMatchObject({
+      current: '',
+      branches: [],
+      remote: { hasRemotes: false, remotes: [] },
+    })
+  })
+
+  test.each([
+    'truncated remote output',
+    'origin\tgit@example.test:project.git (fetch)',
+    'origin\tgit@example.test:project.git (fetch)\ntruncated remote output',
+  ])(
+    'rejects malformed authoritative remote output',
+    async (remoteOutput) => {
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === 'gitSnapshot') {
+          return okRemoteResult('__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n')
+        }
+        return command.type === 'gitRemoteVerbose' ? okRemoteResult(remoteOutput) : okRemoteResult('')
+      })
+
+      await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    },
+  )
+
+  test.each(['gitWorktreeList', 'gitRemoteVerbose'] as const)(
+    'rejects an authoritative remote snapshot when %s fails',
+    async (failedCommand) => {
+      const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+        if (command.type === failedCommand) return failRemoteResult(`${failedCommand} failed`)
+        if (command.type === 'gitSnapshot') {
+          return okRemoteResult(
+            '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+          )
+        }
+        return command.type === 'gitWorktreeList' ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT) : okRemoteResult('')
+      })
+
+      await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow(`${failedCommand} failed`)
+    },
+  )
+
+  test('rejects failed authoritative worktree-path discovery', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('worktree discovery failed'))
+
+    await expect(getRemoteRepoWorktreePaths(TARGET, { run })).rejects.toThrow('worktree discovery failed')
+  })
+
   test('does not turn a failed remote worktree membership read into branch-only targets', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
-      command.type === 'gitWorkspacePaneIdentities'
+      command.type === 'gitWorktreeList'
         ? ({ ok: false, stdout: '', stderr: '', message: 'worktree list failed' } as RemoteCommandResult)
         : okRemoteResult(''),
     )
@@ -184,14 +284,16 @@ describe('remote git helpers', () => {
   })
 
   test('returns detached worktree identity for an unborn repository', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () =>
-      okRemoteResult('\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n'),
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitWorktreeList'
+        ? okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        : okRemoteResult(''),
     )
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
     ])
-    expect(run).toHaveBeenCalledOnce()
+    expect(run).toHaveBeenCalledTimes(3)
   })
 
   test('prefers stderr when converting remote exec failures', () => {
@@ -213,24 +315,24 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 '__GOBLIN_REMOTE_CURRENT__',
-                'release/1.0',
+                'value release/1.0',
                 '__GOBLIN_REMOTE_DEFAULT__',
-                'main',
+                'value main',
                 '__GOBLIN_REMOTE_BRANCHES__',
-                'release/1.0\x1ff00ba4\x1fRelease\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/release/1.0\x1f',
-                'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1f\x1f',
+                'release/1.0\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
+                'feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00\x00',
               ].join('\n'),
             )
           case 'gitWorktreeList':
-            return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+            return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
           case 'gitStatus':
             return okRemoteResult('')
           case 'gitRemoteVerbose':
             return okRemoteResult('')
           case 'gitIsAncestor':
-            return command.descendant === 'release/1.0' ? okRemoteResult('') : failRemoteResult('not merged')
+            return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
           case 'gitUpstream':
-            return failRemoteResult('no upstream')
+            return okRemoteResult(NUL + NUL)
           case 'gitBranchDelete':
             return okRemoteResult('Deleted branch feature/test')
           default:
@@ -256,22 +358,22 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'release/1.0',
+              'value release/1.0',
               '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
-              'release/1.0\x1ff00ba4\x1fRelease\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/release/1.0\x1f',
-              'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1ffork/topic/feature-test\x1f',
+              'release/1.0\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
+              'feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00fork/topic/feature-test\x00',
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
         case 'gitStatus':
           return okRemoteResult('')
         case 'gitIsAncestor':
-          return okRemoteResult('')
+          return okRemoteResult('true')
         case 'gitUpstream':
-          return okRemoteResult('fork/topic/feature-test')
+          return okRemoteResult(upstreamOutput('fork', 'topic/feature-test'))
         case 'gitBranchDelete':
           return okRemoteResult('Deleted branch feature/test')
         case 'gitPushDeleteBranch':
@@ -293,6 +395,7 @@ describe('remote git helpers', () => {
       TARGET,
       { signal: undefined, timeoutMs: 180_000 },
     )
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitUpstream')).toHaveLength(1)
   })
 
   test('deleteRemoteBranch reports upstream delete failure after deleting the local branch', async () => {
@@ -302,21 +405,21 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'release/1.0',
+              'value release/1.0',
               '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
-              'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1forigin/feature/test\x1f',
+              'feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00origin/feature/test\x00',
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
         case 'gitStatus':
           return okRemoteResult('')
         case 'gitIsAncestor':
-          return okRemoteResult('')
+          return okRemoteResult('true')
         case 'gitUpstream':
-          return okRemoteResult('origin/feature/test')
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
         case 'gitBranchDelete':
           return okRemoteResult('Deleted branch feature/test')
         case 'gitPushDeleteBranch':
@@ -349,13 +452,13 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba4',
+                'HEAD f00ba40',
                 'branch refs/heads/release/1.0',
                 '',
                 'worktree /srv/repo-feature',
                 'HEAD ba5eba1',
                 'branch refs/heads/feature/test',
-              ].join('\n'),
+              ].join(NUL) + NUL + NUL,
             )
           case 'gitStatus':
             return okRemoteResult('')
@@ -363,23 +466,23 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 '__GOBLIN_REMOTE_CURRENT__',
-                'release/1.0',
+                'value release/1.0',
                 '__GOBLIN_REMOTE_DEFAULT__',
-                'main',
+                'value main',
                 '__GOBLIN_REMOTE_BRANCHES__',
                 '',
               ].join('\n'),
             )
           case 'gitIsAncestor':
-            return command.descendant === 'release/1.0' ? okRemoteResult('') : failRemoteResult('not merged')
+            return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
           case 'gitUpstream':
-            return failRemoteResult('no upstream')
+            return okRemoteResult(NUL + NUL)
           case 'gitWorktreeRemove':
             return okRemoteResult('Removed worktree')
           case 'gitBranchDelete':
             return okRemoteResult('Deleted branch feature/test')
           default:
-            return okRemoteResult('')
+            return okRemoteResult('true')
         }
       },
     )
@@ -418,13 +521,13 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               'worktree /srv/repo',
-              'HEAD f00ba4',
+              'HEAD f00ba40',
               'branch refs/heads/main',
               '',
               'worktree /srv/repo-feature',
               'HEAD ba5eba1',
               'branch refs/heads/feature/test',
-            ].join('\n'),
+            ].join(NUL) + NUL + NUL,
           )
         case 'gitStatus':
           return okRemoteResult('')
@@ -474,10 +577,35 @@ describe('remote git helpers', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
+  test('removeRemoteWorktree preserves status read failure at destructive admission', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(worktreePorcelain(
+          'worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main\n\nworktree /srv/repo-feature\nHEAD ba5eba1\nbranch refs/heads/feature/test',
+        ))
+      }
+      if (command.type === 'gitStatus') return failRemoteResult('status unavailable')
+      return failRemoteResult('unexpected mutation')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'status unavailable' })
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitWorktreeRemove' }), TARGET, expect.anything())
+  })
+
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n')
+        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
       }
       return okRemoteResult('')
     })
@@ -510,13 +638,13 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba4',
+                'HEAD f00ba40',
                 'branch refs/heads/main',
                 '',
                 'worktree /srv/repo-feature',
                 'HEAD ba5eba1',
                 'branch refs/heads/feature/test',
-              ].join('\n'),
+              ].join(NUL) + NUL + NUL,
             )
           case 'gitStatus':
             return okRemoteResult('')
@@ -524,17 +652,17 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 '__GOBLIN_REMOTE_CURRENT__',
-                'main',
+                'value main',
                 '__GOBLIN_REMOTE_DEFAULT__',
-                'main',
+                'value main',
                 '__GOBLIN_REMOTE_BRANCHES__',
                 '',
               ].join('\n'),
             )
           case 'gitIsAncestor':
-            return okRemoteResult('')
+            return okRemoteResult('true')
           case 'gitUpstream':
-            return okRemoteResult('fork/topic/feature-test')
+            return okRemoteResult(upstreamOutput('fork', 'topic/feature-test'))
           case 'gitWorktreeRemove':
             return okRemoteResult('Removed worktree')
           case 'gitBranchDelete':
@@ -568,6 +696,36 @@ describe('remote git helpers', () => {
       TARGET,
       { signal: undefined, timeoutMs: 180_000 },
     )
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitUpstream')).toHaveLength(1)
+  })
+
+  test('removeRemoteWorktree resolves the upstream before any mutation', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true, message: '' }))
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba400\nbranch refs/heads/main\n\nworktree /srv/repo-feature\nHEAD ba5eba1\nbranch refs/heads/feature/test'),
+        )
+      }
+      if (command.type === 'gitStatus') return okRemoteResult('')
+      if (command.type === 'gitUpstream') return failRemoteResult('upstream read failed')
+      return okRemoteResult('')
+    })
+
+    await expect(
+      removeRemoteWorktree(TARGET, {
+        beforeRemove,
+        afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+        afterRemoveFailed: async () => {},
+        branch: 'feature/test',
+        worktreePath: '/srv/repo-feature',
+        deleteBranch: true,
+        deleteUpstream: true,
+        run,
+      }),
+    ).rejects.toThrow('upstream read failed')
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitWorktreeRemove' }), TARGET, expect.anything())
   })
 
   test('removeRemoteWorktree rejects unsafe branch names before running remote commands', async () => {
@@ -602,13 +760,13 @@ describe('remote git helpers', () => {
             return okRemoteResult(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba4',
+                'HEAD f00ba40',
                 'branch refs/heads/main',
                 '',
                 'worktree /srv/repo-feature',
                 'HEAD ba5eba1',
                 'branch refs/heads/feature/test',
-              ].join('\n'),
+              ].join(NUL) + NUL + NUL,
             )
           case 'gitStatus':
             return okRemoteResult('')
@@ -617,9 +775,9 @@ describe('remote git helpers', () => {
               ? okRemoteResult(
                   [
                     '__GOBLIN_REMOTE_CURRENT__',
-                    'main',
+                    'value main',
                     '__GOBLIN_REMOTE_DEFAULT__',
-                    'main',
+                    'value main',
                     '__GOBLIN_REMOTE_BRANCHES__',
                     '',
                   ].join('\n'),
@@ -627,10 +785,10 @@ describe('remote git helpers', () => {
               : failRemoteResult('removed cwd should not be used')
           case 'gitIsAncestor':
             return command.path === '/srv/repo' && command.descendant === 'main'
-              ? okRemoteResult('')
-              : failRemoteResult('not merged')
+              ? okRemoteResult('true')
+              : okRemoteResult('false')
           case 'gitUpstream':
-            return failRemoteResult('no upstream')
+            return okRemoteResult(NUL + NUL)
           case 'gitWorktreeRemove':
             return okRemoteResult('Removed worktree')
           case 'gitBranchDelete':
@@ -689,19 +847,23 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
               '',
             ].join('\n'),
           )
         case 'gitUpstream':
-          return okRemoteResult('fork/feature/test')
+          return okRemoteResult(upstreamOutput('fork', 'feature/test'))
         case 'gitRemoteVerbose':
           return okRemoteResult(
             'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
           )
+        case 'gitWorktreeList':
+          return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        case 'gitStatus':
+          return okRemoteResult('')
         default:
           return okRemoteResult('')
       }
@@ -725,7 +887,7 @@ describe('remote git helpers', () => {
             ].join('\n'),
           )
         case 'gitUpstream':
-          return okRemoteResult('fork/topic/feature-test')
+          return okRemoteResult(upstreamOutput('fork', 'topic/feature-test'))
         case 'gitPush':
           return okRemoteResult('pushed')
         default:
@@ -758,7 +920,7 @@ describe('remote git helpers', () => {
             'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
           )
         case 'gitUpstream':
-          return failRemoteResult('no upstream')
+          return okRemoteResult(NUL + NUL)
         case 'gitPush':
           return okRemoteResult('pushed')
         default:
@@ -783,6 +945,34 @@ describe('remote git helpers', () => {
     )
   })
 
+  test.each(['pullRemoteBranch', 'pushRemoteBranch'] as const)(
+    '%s rejects remote discovery failure before mutation',
+    async (operationName) => {
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === 'gitSnapshot') {
+          return okRemoteResult(
+            '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+          )
+        }
+        if (command.type === 'gitUpstream') return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+        if (command.type === 'gitRemoteVerbose') return failRemoteResult('remote discovery failed')
+        if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        return okRemoteResult('')
+      })
+      const operation =
+        operationName === 'pullRemoteBranch'
+          ? pullRemoteBranch(TARGET, 'feature/test', undefined, { run })
+          : pushRemoteBranch(TARGET, 'feature/test', { run })
+
+      await expect(operation).rejects.toThrow('remote discovery failed')
+      expect(run).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: expect.stringMatching(/^git(?:FetchBranch|Push)$/) }),
+        TARGET,
+        expect.anything(),
+      )
+    },
+  )
+
   test('fetchRemoteRepo prefers the current branch upstream remote over fetch --all', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string; remote?: string; branch?: string }) => {
       switch (command.type) {
@@ -790,9 +980,9 @@ describe('remote git helpers', () => {
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'feature/test',
+              'value feature/test',
               '__GOBLIN_REMOTE_DEFAULT__',
-              'main',
+              'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
               '',
             ].join('\n'),
@@ -807,7 +997,7 @@ describe('remote git helpers', () => {
             ].join('\n'),
           )
         case 'gitUpstream':
-          return okRemoteResult('fork/feature/test')
+          return okRemoteResult(upstreamOutput('fork', 'feature/test'))
         case 'gitFetchRemote':
           return okRemoteResult(`fetched ${command.remote}`)
         default:
@@ -825,21 +1015,136 @@ describe('remote git helpers', () => {
     expect(run).not.toHaveBeenCalledWith({ type: 'gitFetchAll', path: '/srv/repo' }, TARGET, expect.anything())
   })
 
-  test('getRemoteTrackingBranches filters */HEAD and malformed refs', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () =>
-      okRemoteResult(
-        ['origin/HEAD', 'origin/main', 'origin/feature/auth', 'origin/feature/ui', 'not-a-valid-ref-line'].join('\n'),
-      ),
+  test.each(['gitSnapshot', 'gitRemoteVerbose', 'gitUpstream'] as const)(
+    'fetchRemoteRepo rejects when authoritative %s discovery fails',
+    async (failedCommand) => {
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === failedCommand) return failRemoteResult(`${failedCommand} failed`)
+        if (command.type === 'gitSnapshot') {
+          return okRemoteResult(
+            '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+          )
+        }
+        if (command.type === 'gitRemoteVerbose') {
+          return okRemoteResult(
+            'origin\tgit@example.test:project.git (fetch)\norigin\tgit@example.test:project.git (push)',
+          )
+        }
+        return okRemoteResult('')
+      })
+
+      await expect(fetchRemoteRepo(TARGET, { run })).rejects.toThrow(`${failedCommand} failed`)
+      expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitFetchRemote' }), TARGET, expect.anything())
+    },
+  )
+
+  test.each([
+    '__GOBLIN_REMOTE_CURRENT__\nvalue main\nunexpected\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+    '__GOBLIN_REMOTE_CURRENT__\nvalue invalid branch\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+  ])('fetchRemoteRepo rejects malformed current-branch authority', async (snapshotOutput) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitSnapshot' ? okRemoteResult(snapshotOutput) : okRemoteResult(''),
     )
-    const refs = await getRemoteTrackingBranches(TARGET, { run })
-    expect(run).toHaveBeenCalledWith({ type: 'gitRemoteBranches', path: '/srv/repo' }, TARGET, { signal: undefined })
-    expect(refs).toEqual(['origin/main', 'origin/feature/auth', 'origin/feature/ui'])
+
+    await expect(fetchRemoteRepo(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
-  test('getRemoteTrackingBranches returns [] when the remote command fails', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => ({ ok: false, stdout: '', stderr: 'ssh: connection refused' }))
+  test.each(['origin/main\nunexpected/branch', 'invalid remote/main', 'origin/invalid branch'])(
+    'pushRemoteBranch rejects malformed upstream authority',
+    async (upstreamOutput) => {
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === 'gitRemoteVerbose') {
+          return okRemoteResult(
+            'origin\tgit@example.test:project.git (fetch)\norigin\tgit@example.test:project.git (push)',
+          )
+        }
+        return command.type === 'gitUpstream' ? okRemoteResult(upstreamOutput) : okRemoteResult('')
+      })
+
+      await expect(pushRemoteBranch(TARGET, 'feature/test', { run })).rejects.toThrow('error.failed-read-repo')
+      expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitPush' }), TARGET, expect.anything())
+    },
+  )
+
+  test('deleteRemoteBranch rejects merge-fact failure before deleting', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitSnapshot') {
+        return okRemoteResult(
+          '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+        )
+      }
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
+      }
+      if (command.type === 'gitUpstream') return okRemoteResult(NUL + NUL)
+      if (command.type === 'gitIsAncestor') return failRemoteResult('merge read failed')
+      return okRemoteResult('')
+    })
+
+    await expect(deleteRemoteBranch(TARGET, { branch: 'feature/test', run })).rejects.toThrow('merge read failed')
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitBranchDelete' }), TARGET, expect.anything())
+  })
+
+  test('deleteRemoteBranch rejects malformed merge-fact output before deleting', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitSnapshot') {
+        return okRemoteResult(
+          '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+        )
+      }
+      if (command.type === 'gitIsAncestor') return okRemoteResult('unknown')
+      return okRemoteResult('')
+    })
+
+    await expect(deleteRemoteBranch(TARGET, { branch: 'feature/test', run })).rejects.toThrow(
+      'error.failed-read-repo',
+    )
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitBranchDelete' }), TARGET, expect.anything())
+  })
+
+  test('getRemoteTrackingBranches filters */HEAD from valid refs', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitRemoteVerbose':
+          return okRemoteResult(
+            'origin\thttps://example.test/repo.git (fetch)\norigin\thttps://example.test/repo.git (push)',
+          )
+        case 'gitRemoteFetchSpecs':
+          return okRemoteResult('+refs/heads/*:refs/remotes/origin/*')
+        case 'gitRemoteBranches':
+          return okRemoteResult(
+            [
+              'refs/remotes/origin/HEAD',
+              'refs/remotes/origin/main',
+              'refs/remotes/origin/feature/auth',
+              'refs/remotes/origin/feature/ui',
+            ].join('\n'),
+          )
+        default:
+          throw new Error(`unexpected command: ${command.type}`)
+      }
+    })
     const refs = await getRemoteTrackingBranches(TARGET, { run })
-    expect(refs).toEqual([])
+    expect(run).toHaveBeenCalledWith({ type: 'gitRemoteBranches', path: '/srv/repo' }, TARGET, { signal: undefined })
+    expect(refs).toEqual([
+      { ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' },
+      { ref: 'refs/remotes/origin/feature/auth', remote: 'origin', branch: 'feature/auth' },
+      { ref: 'refs/remotes/origin/feature/ui', remote: 'origin', branch: 'feature/ui' },
+    ])
+  })
+
+  test('getRemoteTrackingBranches rejects malformed authoritative output', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitRemoteVerbose'
+        ? okRemoteResult('origin\thttps://example.test/repo.git (fetch)\norigin\thttps://example.test/repo.git (push)')
+        : okRemoteResult('refs/remotes/origin/main\ntruncated-ref'),
+    )
+    await expect(getRemoteTrackingBranches(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('getRemoteTrackingBranches rejects when the remote command fails', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({ ok: false, stdout: '', stderr: 'ssh: connection refused' }))
+    await expect(getRemoteTrackingBranches(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('getRemoteWorktreeBootstrapPreview reads config without running bootstrap', async () => {
@@ -1058,33 +1363,30 @@ describe('remote git helpers', () => {
 
 describe('getRemoteStatusAndWorktrees', () => {
   const NUL = String.fromCharCode(0)
+  const worktreeListOutput = [
+    'worktree /srv/repo',
+    'HEAD f00ba40',
+    'branch refs/heads/main',
+    '',
+    'worktree /srv/repo-feature',
+    'HEAD ba5eba1',
+    'branch refs/heads/feature/test',
+  ].join(NUL) + NUL + NUL
 
-  function buildBatchedOutput(worktreeListOutput: string, statusStream: string): string {
-    return `${worktreeListOutput}\n${WORKTREE_STATUS_BATCH_BOUNDARY}\n${statusStream}`
-  }
-
-  test('parses the batched command output into statuses + worktrees in one SSH call', async () => {
-    const worktreeListOutput = [
-      'worktree /srv/repo',
-      'HEAD f00ba4',
-      'branch refs/heads/main',
-      '',
-      'worktree /srv/repo-feature',
-      'HEAD ba5eba1',
-      'branch refs/heads/feature/test',
-    ].join('\n')
-    const statusStream = [
-      `/srv/repo${NUL}M  README.md${NUL}${NUL}`,
-      `/srv/repo-feature${NUL}?? new.ts${NUL}${NUL}`,
-    ].join('')
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+  test('publishes statuses only when before and after membership match', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(worktreeListOutput)
+      if (command.type === 'gitStatus' && command.path === '/srv/repo') return okRemoteResult(`M  README.md${NUL}`)
+      if (command.type === 'gitStatus' && command.path === '/srv/repo-feature') return okRemoteResult(`?? new.ts${NUL}`)
+      return failRemoteResult('unexpected command')
+    })
 
     const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
 
-    expect(run).toHaveBeenCalledTimes(1)
-    expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeListAndStatus', path: '/srv/repo' }, TARGET, {
-      signal: undefined,
-    })
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitWorktreeList')).toHaveLength(2)
+    expect(new Set(run.mock.calls.flatMap(([command]) => command.type === 'gitStatus' ? [command.path] : []))).toEqual(
+      new Set(['/srv/repo', '/srv/repo-feature']),
+    )
     expect(result.worktrees).toHaveLength(2)
     expect(result.worktrees[0]).toMatchObject({ path: '/srv/repo', branch: 'main', isPrimary: true, isBare: false })
     expect(result.worktrees[1]).toMatchObject({ path: '/srv/repo-feature', branch: 'feature/test', isPrimary: false })
@@ -1106,9 +1408,10 @@ describe('getRemoteStatusAndWorktrees', () => {
       'worktree /srv/repo-feature',
       'HEAD ba5eba1',
       'branch refs/heads/feature/test',
-    ].join('\n')
-    const statusStream = `/srv/repo-feature${NUL}${NUL}`
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, statusStream)))
+    ].join(NUL) + NUL + NUL
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitWorktreeList' ? okRemoteResult(worktreeListOutput) : okRemoteResult(''),
+    )
 
     const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
 
@@ -1120,14 +1423,20 @@ describe('getRemoteStatusAndWorktrees', () => {
     expect(result.statuses[0]?.path).toBe('/srv/repo-feature')
   })
 
-  test('rejects when the remote command fails', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('boom'))
+  test('rejects when a status command fails', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitWorktreeList' ? okRemoteResult(worktreeListOutput) : failRemoteResult('boom'),
+    )
     await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('boom')
   })
 
-  test('rejects when a non-bare worktree is missing from the status stream', async () => {
-    const worktreeListOutput = ['worktree /srv/repo', 'HEAD f00ba4', 'branch refs/heads/main'].join('\n')
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, '')))
+  test('rejects when membership changes during status sampling', async () => {
+    let listReads = 0
+    const changed = ['worktree /srv/repo', 'HEAD f00ba40', 'detached'].join(NUL) + NUL + NUL
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(listReads++ === 0 ? worktreeListOutput : changed)
+      return okRemoteResult('')
+    })
 
     await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('error.failed-read-repo')
   })
@@ -1167,11 +1476,13 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     )
   })
 
-  test('still falls back to gitWorktreeList when knownWorktrees is omitted', async () => {
+  test('reads the authoritative worktree list when no prefetched list is supplied', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitWorktreeList':
-          return okRemoteResult(['worktree /srv/repo-feature', 'HEAD a', 'branch refs/heads/feat'].join('\n'))
+          return okRemoteResult(
+            ['worktree /srv/repo-feature', 'HEAD aaaaaaa', 'branch refs/heads/feat'].join(NUL) + NUL + NUL,
+          )
         case 'gitDirectoryChildren':
           return okRemoteResult('')
         default:

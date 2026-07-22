@@ -571,7 +571,7 @@ beforeEach(() => {
   setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
-      capability === 'settings-ipc' ||
+      capability === 'global-shortcut' ||
       capability === 'open-settings-window' ||
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
@@ -1849,7 +1849,6 @@ describe('TerminalSession', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 101,
       rows: 31,
-      clientId: 'client_local',
     })
     // The takeover response itself is now the authority — without
     // any `handleIdentity` call, role already flipped to controller
@@ -1919,7 +1918,6 @@ describe('TerminalSession', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 120,
       rows: 40,
-      clientId: 'client_local',
     })
     expect(terminalCalls.attach).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -2050,7 +2048,6 @@ describe('TerminalSession', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       cols: 120,
       rows: 40,
-      clientId: 'client_local',
     })
   })
 

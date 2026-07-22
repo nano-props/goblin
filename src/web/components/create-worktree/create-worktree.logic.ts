@@ -8,7 +8,11 @@
 import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import {
+  deriveLocalBranchFromRemoteRef,
+  type CreateWorktreeInput,
+  type RemoteTrackingBranchIdentity,
+} from '#/shared/worktree-create.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -19,10 +23,10 @@ interface CreateWorktreeFormState {
   base: string
   branch: string
   existingBranch: string
-  remoteRef: string
+  remoteSelection: string
   localBranch: string
   worktreePath: string
-  remoteBranches: string[]
+  remoteBranches: RemoteTrackingBranchIdentity[]
 }
 
 export interface CreateWorktreeRequest {
@@ -30,7 +34,8 @@ export interface CreateWorktreeRequest {
 }
 
 interface CreateWorktreeDerived {
-  selectedRemoteRef: string
+  selectedRemote: RemoteTrackingBranchIdentity | null
+  selectedRemoteKey: string
   derivedLocalBranch: string
   trackLocalBranch: string
   pathName: string
@@ -65,8 +70,11 @@ export function deriveCreateWorktreeForm(
   const branchWorktree = (name: string) => repo.branchModel.branches.find((b) => b.name === name)?.worktree
 
   const branchTrimmed = state.branch.trim()
-  const selectedRemoteRef = state.remoteRef || state.remoteBranches[0] || ''
-  const derivedLocalBranch = deriveLocalBranchFromRemoteRef(selectedRemoteRef) ?? ''
+  const selectedRemoteBranch =
+    state.remoteBranches.find((remote) => remoteTrackingBranchKey(remote) === state.remoteSelection) ??
+    state.remoteBranches[0]
+  const selectedRemoteKey = selectedRemoteBranch ? remoteTrackingBranchKey(selectedRemoteBranch) : ''
+  const derivedLocalBranch = selectedRemoteBranch ? deriveLocalBranchFromRemoteRef(selectedRemoteBranch) : ''
   const trackLocalBranch = state.localBranch.trim() || derivedLocalBranch
   const pathName = worktreePathName({
     mode: state.mode,
@@ -131,7 +139,7 @@ export function deriveCreateWorktreeForm(
   const validPath = remoteTarget ? isResolvableRemotePathInput(effectivePath) : effectivePath.length > 0
   const input = buildCreateWorktreeInput(state, {
     branchTrimmed,
-    selectedRemoteRef,
+    selectedRemote: selectedRemoteBranch ?? null,
     trackLocalBranch,
     effectivePath,
     validPath,
@@ -143,7 +151,8 @@ export function deriveCreateWorktreeForm(
   })
 
   return {
-    selectedRemoteRef,
+    selectedRemote: selectedRemoteBranch ?? null,
+    selectedRemoteKey,
     derivedLocalBranch,
     trackLocalBranch,
     pathName,
@@ -161,6 +170,10 @@ export function deriveCreateWorktreeForm(
   }
 }
 
+export function remoteTrackingBranchKey(remote: RemoteTrackingBranchIdentity): string {
+  return JSON.stringify([remote.ref, remote.remote, remote.branch])
+}
+
 function localWorkspacePath(workspaceId: WorkspaceId): string {
   const locator = parseCanonicalWorkspaceLocator(workspaceId)
   if (!locator || locator.transport !== 'file') {
@@ -171,7 +184,7 @@ function localWorkspacePath(workspaceId: WorkspaceId): string {
 
 interface BuildInputContext {
   branchTrimmed: string
-  selectedRemoteRef: string
+  selectedRemote: RemoteTrackingBranchIdentity | null
   trackLocalBranch: string
   effectivePath: string
   validPath: boolean
@@ -200,12 +213,12 @@ function buildCreateWorktreeInput(state: CreateWorktreeFormState, ctx: BuildInpu
           }
         : null
     case 'trackRemoteBranch':
-      return ctx.selectedRemoteRef && ctx.trackLocalBranch && !ctx.localBranchError
+      return ctx.selectedRemote && ctx.trackLocalBranch && !ctx.localBranchError
         ? {
             worktreePath: ctx.effectivePath,
             mode: {
               kind: 'trackRemoteBranch',
-              remoteRef: ctx.selectedRemoteRef,
+              remote: ctx.selectedRemote,
               localBranch: ctx.trackLocalBranch,
             },
           }

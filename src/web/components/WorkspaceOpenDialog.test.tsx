@@ -13,6 +13,8 @@ import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const testWindow = window as unknown as {
   goblinNative?: unknown
@@ -32,22 +34,22 @@ beforeEach(() => {
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: CLIENT_BRIDGE_VERSION,
+        capabilities: ELECTRON_CLIENT_CAPABILITIES,
+      },
       initialServer: null,
     },
   })
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
-    value: {
-      pathForFile: () => '',
-      invokeIpc: async (_request: { path: string; input?: unknown }) => null,
-      abortIpc: async () => true,
-      onEvent: () => () => {},
-    },
+    value: currentNativeBridge(),
   })
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
-    hydrated: true,
+    status: 'ready',
+    error: null,
   })
 })
 

@@ -2,25 +2,21 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  normalizeClientWorkspaceState,
   readClientWorkspaceState,
   writeClientWorkspaceState,
 } from '#/web/client-workspace-state.ts'
+import type { ClientWorkspaceState } from '#/shared/api-types.ts'
+import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import * as nativeBridge from '#/web/native-bridge.ts'
 import * as nativeHostClient from '#/web/native-host-client.ts'
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+})
 afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
-  test('accepts canonical workspace IDs without Node path APIs', () => {
-    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'goblin+file:///repo' }).restoredWorkspaceId).toBe(
-      'goblin+file:///repo',
-    )
-    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'C:\\repo' }).restoredWorkspaceId).toBeNull()
-    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'relative/repo' }).restoredWorkspaceId).toBeNull()
-  })
-
   test('fails fast when native workspace state cannot be read', async () => {
     const readError = new Error('native workspace unavailable')
     vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
@@ -33,12 +29,38 @@ describe('client workspace persistence', () => {
     vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
     vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockResolvedValue({ kind: 'missing' })
 
-    await expect(readClientWorkspaceState()).resolves.toEqual(normalizeClientWorkspaceState(null))
+    await expect(readClientWorkspaceState()).resolves.toEqual(currentState())
+  })
+
+  test('preserves corrupt browser state and fails closed', async () => {
+    localStorage.setItem('goblin.workspace', '{broken json')
+    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
+    expect(localStorage.getItem('goblin.workspace')).toBe('{broken json')
+  })
+
+  test('treats an empty authoritative value as corruption on every read without writing', async () => {
+    localStorage.setItem('goblin.workspace', '')
+    const setItem = vi.spyOn(localStorage, 'setItem')
+
+    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
+    await expect(readClientWorkspaceState()).rejects.toBeInstanceOf(SyntaxError)
+
+    expect(localStorage.getItem('goblin.workspace')).toBe('')
+    expect(setItem).not.toHaveBeenCalled()
+  })
+
+  test('rejects a structurally corrupt native root', async () => {
+    vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
+    vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockResolvedValue({
+      kind: 'loaded',
+      state: [],
+    })
+    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt native client workspace state')
   })
 
   test('round-trips client-owned presentation without server workspace fields', async () => {
-    const presentation = normalizeClientWorkspaceState({
-      restoredWorkspaceId: 'goblin+file:///repo-a',
+    const presentation = currentState({
+      restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-a'),
       zenMode: true,
       workspacePaneSize: 52,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
@@ -52,125 +74,87 @@ describe('client workspace persistence', () => {
           'goblin+file:///worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
-      workspacePaneTabsByTargetByWorkspace: { '/must-not-persist': {} },
     })
 
     await writeClientWorkspaceState(presentation)
 
     expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
-    expect(raw).not.toHaveProperty('openWorkspaceEntries')
-    expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
+    expect(raw).toMatchObject({ version: 1, state: presentation })
   })
 
-  test('preserves Windows workspace identities throughout nested presentation state on a non-Windows host', () => {
-    const workspaceId = 'goblin+file:///C:/workspace'
-    const worktreeId = 'goblin+file:///C:/workspace-feature'
-    const terminalKey = `${workspaceId}\0${worktreeId}`
-    const rootTargetKey = `${workspaceId}\0workspace-root`
-
-    expect(
-      normalizeClientWorkspaceState({
-        restoredWorkspaceId: workspaceId,
-        selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
-        preferredWorkspacePaneTabByTargetByWorkspace: {
-          [workspaceId]: { [rootTargetKey]: 'files' },
-        },
-        filetreeViewStateByFilesystemTargetByWorkspace: {
-          [workspaceId]: {
-            [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
-          },
-        },
-      }),
-    ).toMatchObject({
-      restoredWorkspaceId: workspaceId,
-      selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
-      preferredWorkspacePaneTabByTargetByWorkspace: { [workspaceId]: { [rootTargetKey]: 'files' } },
-      filetreeViewStateByFilesystemTargetByWorkspace: {
-        [workspaceId]: {
-          [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
-        },
-      },
-    })
+  test('preserves parseable corruption in the current browser format', async () => {
+    const corrupt = JSON.stringify({ version: 1, state: { zenMode: 'yes' } })
+    localStorage.setItem('goblin.workspace', corrupt)
+    await expect(readClientWorkspaceState()).rejects.toThrow()
+    expect(localStorage.getItem('goblin.workspace')).toBe(corrupt)
   })
 
-  test('normalizes malformed local presentation to safe defaults', async () => {
-    localStorage.setItem(
-      'goblin.workspace',
-      JSON.stringify({
-        restoredWorkspaceId: '',
-        zenMode: 'yes',
-        workspacePaneSize: Number.NaN,
-        selectedTerminalSessionIdByTerminalFilesystemTarget: { broken: 12 },
-        preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
-        filetreeViewStateByFilesystemTargetByWorkspace: [],
-      }),
-    )
+  test('preserves an unsupported future browser version and fails closed', async () => {
+    const future = JSON.stringify({ version: 2, state: {} })
+    localStorage.setItem('goblin.workspace', future)
 
-    expect(await readClientWorkspaceState()).toEqual({
-      restoredWorkspaceId: null,
-      zenMode: false,
-      workspacePaneSize: 70,
-      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
-      preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByFilesystemTargetByWorkspace: {},
-    })
+    await expect(readClientWorkspaceState()).rejects.toThrow('Unsupported browser client workspace state version: 2')
+    expect(localStorage.getItem('goblin.workspace')).toBe(future)
   })
 
-  test('drops legacy raw-path and cross-transport persisted identities', () => {
-    expect(
-      normalizeClientWorkspaceState({
-        selectedTerminalSessionIdByTerminalFilesystemTarget: {
-          'goblin+file:///repo-a\0/worktree': 'term-legacy',
-          'goblin+file:///repo-a\0goblin+ssh://dev/worktree': 'term-cross-transport',
-        },
-        preferredWorkspacePaneTabByTargetByWorkspace: {
-          'goblin+file:///repo-a': {
-            target: 'history',
-            'goblin+file:///repo-a\0worktree\0/worktree': 'files',
-          },
-        },
-        filetreeViewStateByFilesystemTargetByWorkspace: {
-          'goblin+file:///repo-a': {
-            '/worktree': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
-            'goblin+ssh://dev/worktree': {
-              selectedKeys: ['README.md'],
-              expandedKeys: [],
-              topVisibleRowIndex: 0,
-            },
-          },
-        },
-      }),
-    ).toMatchObject({
-      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
-      preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByFilesystemTargetByWorkspace: {},
-    })
+  test('fails closed when browser storage is unavailable for reads and writes', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined })
+    try {
+      await expect(readClientWorkspaceState()).rejects.toThrow('Browser storage unavailable')
+      await expect(writeClientWorkspaceState(currentState())).rejects.toThrow(
+        'Browser storage unavailable',
+      )
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor)
+    }
   })
 
-  test('does not restore the retired worktree-only terminal selection field', () => {
-    expect(
-      normalizeClientWorkspaceState({
-        selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///workspace\0goblin+file:///workspace': 'term-legacy',
-        },
-      }),
-    ).toMatchObject({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
+  test('uses the atomic single-key storage boundary without Web Locks', async () => {
+    const request = vi.fn(() => Promise.reject(new Error('lock must not be used')))
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } })
+    const state = currentState({ zenMode: true })
+
+    await writeClientWorkspaceState(state)
+
+    await expect(readClientWorkspaceState()).resolves.toEqual(state)
+    expect(request).not.toHaveBeenCalled()
   })
 
-  test('does not restore the retired worktree-only file tree state field', () => {
-    expect(
-      normalizeClientWorkspaceState({
-        filetreeViewStateByWorktreeByWorkspace: {
-          'goblin+file:///workspace': {
-            'goblin+file:///workspace': {
-              selectedKeys: ['README.md'],
-              expandedKeys: [],
-              topVisibleRowIndex: 0,
-            },
-          },
-        },
-      }),
-    ).toMatchObject({ filetreeViewStateByFilesystemTargetByWorkspace: {} })
+  test('accepts a valid current state independently of object property order', async () => {
+    const state = currentState({ zenMode: true, workspacePaneSize: 52 })
+    const reordered = {
+      filetreeViewStateByFilesystemTargetByWorkspace: state.filetreeViewStateByFilesystemTargetByWorkspace,
+      preferredWorkspacePaneTabByTargetByWorkspace: state.preferredWorkspacePaneTabByTargetByWorkspace,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
+      workspacePaneSize: state.workspacePaneSize,
+      zenMode: state.zenMode,
+      restoredWorkspaceId: state.restoredWorkspaceId,
+    }
+    localStorage.setItem('goblin.workspace', JSON.stringify({ version: 1, state: reordered }))
+
+    await expect(readClientWorkspaceState()).resolves.toEqual(state)
   })
+
+  test('preserves a current envelope with unknown root data and fails closed', async () => {
+    const raw = JSON.stringify({ version: 1, state: currentState(), unknownRoot: 'preserve' })
+    localStorage.setItem('goblin.workspace', raw)
+
+    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt browser client workspace state envelope')
+    expect(localStorage.getItem('goblin.workspace')).toBe(raw)
+  })
+
+  test('preserves unversioned state with unknown root data and fails closed', async () => {
+    const raw = JSON.stringify({ ...currentState(), unknownLegacyRoot: 'preserve' })
+    localStorage.setItem('goblin.workspace', raw)
+
+    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt browser client workspace state envelope')
+    expect(localStorage.getItem('goblin.workspace')).toBe(raw)
+  })
+
 })
+
+function currentState(overrides: Partial<ClientWorkspaceState> = {}): ClientWorkspaceState {
+  return { ...defaultClientWorkspaceState(), ...overrides }
+}

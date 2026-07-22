@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import os from 'node:os'
 import path from 'node:path'
 import { git } from '#/system/git/git-exec.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 let tmp: string | null = null
 
@@ -12,6 +13,14 @@ afterEach(() => {
 })
 
 describe('git', () => {
+  test('normalizes process cancellation at the git boundary', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    await expect(git(process.cwd(), ['status'], { signal: controller.signal })).rejects.toBeInstanceOf(
+      OperationCancelledError,
+    )
+  })
+
   test('times out promptly when git ignores SIGTERM', async () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-helper-test-'))
     const bin = path.join(tmp, 'bin')

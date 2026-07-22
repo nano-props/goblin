@@ -41,10 +41,7 @@ describe('workspace pane runtime realtime', () => {
       runtimeType: 'terminal',
       message: 'unavailable',
     })
-    expect(openRuntime).toHaveBeenCalledWith('client_a', 'user_a', {
-      ...input,
-      request: { ...input.request, clientId: 'client_a' },
-    })
+    expect(openRuntime).toHaveBeenCalledWith('client_a', 'user_a', input)
   })
 
   test('serializes handler failures into the application response envelope', async () => {

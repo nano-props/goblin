@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { IpcEvent } from '#/shared/api-types.ts'
-import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 describe('client ingress', () => {
   beforeEach(() => {
@@ -20,17 +21,7 @@ describe('client ingress', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
-          invokeIpc: vi.fn(),
-          abortIpc: vi.fn(async () => false),
-          onEvent,
-          pathForFile: () => '',
-        },
+        goblinNative: currentNativeBridge({ onEvent }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -51,26 +42,15 @@ describe('client ingress', () => {
 
   test('subscribes to client effect intents without forwarding non-intent payloads', async () => {
     const off = vi.fn()
-    const onIntent = vi.fn((cb: (event: unknown) => void) => {
+    const onIntent = vi.fn((cb: (event: ClientEffectIntent) => void) => {
       cb({ type: 'external-open-enqueued' })
-      cb({ type: 'settings-write-error', message: 'failed' })
+      Reflect.apply(cb, undefined, [{ type: 'settings-write-error', message: 'failed' }])
       return off
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
-          invokeIpc: vi.fn(),
-          abortIpc: vi.fn(async () => false),
-          onEvent: vi.fn(() => () => {}),
-          onIntent,
-          pathForFile: () => '',
-        },
+        goblinNative: currentNativeBridge({ onIntent }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',

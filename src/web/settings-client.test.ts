@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -55,31 +56,12 @@ describe('settings-client', () => {
       'fetch',
       vi.fn(async () => ({
         ok: true,
-        json: async () => ({
-          theme: 'auto',
-          colorTheme: 'default',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          globalShortcutRegistered: false,
-          lanEnabled: false,
-          session: {
-            openWorkspaceEntries: [],
-            restoredWorkspaceId: null,
-            zenMode: true,
-            workspacePaneSize: 50,
-            selectedTerminalSessionIdByTerminalFilesystemTarget: {},
-            workspacePaneTabsByTargetByWorkspace: {},
-          },
-          recentWorkspaces: [],
-        }),
+        json: async () => defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'github' }),
       })),
     )
 
     const { getThemeState } = await import('#/web/settings-client.ts')
-    await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'default' })
+    await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'github' })
   })
 
   test('returns authoritative theme state directly from the settings write response', async () => {
@@ -88,17 +70,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        prefs: {
-          lang: 'auto',
-          theme: 'dark',
-          colorTheme: 'github',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          lanEnabled: false,
-        },
+        prefs: defaultUserSettings({ theme: 'dark', colorTheme: 'github' }),
       }),
     }))
     const { setThemePref } = await import('#/web/settings-client.ts')
@@ -148,13 +120,11 @@ describe('settings-client', () => {
 
   test('posts the active repo root when restoring the workspace session', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const workspace = defaultServerWorkspaceState()
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         status: 'restored',
         openWorkspaceEntries: [],
-        workspace,
         runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
       }),
     }))
@@ -167,7 +137,6 @@ describe('settings-client', () => {
     ).resolves.toEqual({
       status: 'restored',
       openWorkspaceEntries: [],
-      workspace,
       runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
     })
 
@@ -181,17 +150,14 @@ describe('settings-client', () => {
   test('posts repo root and runtime id when lazily restoring repo tabs', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const restored = {
-      repo: {
+      workspace: {
+        workspaceId: 'goblin+file:///tmp/routed-repo',
         entry: { id: 'goblin+file:///tmp/routed-repo' },
-        repoRoot: 'goblin+file:///tmp/routed-repo',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'routed-repo',
-        gitProjection: {
-          snapshot: { current: 'main', branches: [] },
-          pullRequests: null,
-          requested: { branch: null, pullRequestMode: 'full' as const },
-          loadedAt: 1,
-        },
+        workspaceProbe: { status: 'unavailable', reason: 'error.workspace-path-not-found' },
+        transport: { kind: 'file' },
+        gitProjection: null,
       },
       snapshot: null,
     }
@@ -225,17 +191,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -267,17 +228,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -290,41 +246,14 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        prefs: {
-          lang: 'ja',
-          theme: 'auto',
-          colorTheme: 'macos',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          lanEnabled: false,
-        },
+        prefs: defaultUserSettings({ lang: 'ja' }),
         i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
       }),
     })
     const { setI18nPref } = await import('#/web/settings-client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(invokeIpc).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: 'settings.applyNativeHostProjection',
-        input: {
-          prefs: {
-            patch: { lang: 'ja' },
-            settings: {
-              lang: 'ja',
-              theme: 'auto',
-              colorTheme: 'macos',
-              shortcutsDisabled: false,
-              globalShortcutDisabled: false,
-              globalShortcut: 'CommandOrControl+Shift+G',
-            },
-          },
-        },
-      }),
-    )
+    expect(invokeIpc).not.toHaveBeenCalled()
   })
 
   test('rejects language updates that do not return an authoritative i18n snapshot', async () => {
@@ -333,17 +262,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        prefs: {
-          lang: 'ja',
-          theme: 'auto',
-          colorTheme: 'macos',
-          fetchIntervalSec: 120,
-          terminalNotificationsEnabled: false,
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+G',
-          lanEnabled: false,
-        },
+        prefs: defaultUserSettings({ lang: 'ja' }),
       }),
     }))
 
@@ -360,17 +279,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -400,16 +314,7 @@ describe('settings-client', () => {
         body: JSON.stringify({ workspace: { id: 'goblin+file:///tmp/repo' } }),
       }),
     )
-    expect(invokeIpc).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: 'settings.applyNativeHostProjection',
-        input: {
-          recentWorkspaces: {
-            recentWorkspaces: [{ id: 'goblin+file:///tmp/repo' }],
-          },
-        },
-      }),
-    )
+    expect(invokeIpc).not.toHaveBeenCalled()
   })
 
   test('clears recent repos through the embedded server and syncs native state', async () => {
@@ -420,18 +325,13 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           onIntent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -453,13 +353,7 @@ describe('settings-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
-    expect(invokeIpc).toHaveBeenCalledTimes(1)
-    expect(invokeIpc).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: 'settings.applyNativeHostProjection',
-        input: { recentWorkspaces: { recentWorkspaces: [] } },
-      }),
-    )
+    expect(invokeIpc).not.toHaveBeenCalled()
   })
 
   test('does not project an added recent repo when the embedded server rejects the candidate', async () => {
@@ -470,17 +364,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -502,16 +391,7 @@ describe('settings-client', () => {
       recentWorkspaces: [{ id: 'goblin+file:///existing' }],
       addedWorkspace: null,
     })
-    expect(invokeIpc).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: 'settings.applyNativeHostProjection',
-        input: {
-          recentWorkspaces: {
-            recentWorkspaces: [{ id: 'goblin+file:///existing' }],
-          },
-        },
-      }),
-    )
+    expect(invokeIpc).not.toHaveBeenCalled()
   })
 
   test('rejects when a committed setting cannot be projected to the native host', async () => {
@@ -524,17 +404,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -547,17 +422,12 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        prefs: {
-          theme: 'dark',
-          colorTheme: 'macos',
-          shortcutsDisabled: false,
-          globalShortcutDisabled: false,
-        },
+        prefs: defaultUserSettings({ theme: 'dark' }),
       }),
     }))
     const { setThemePref } = await import('#/web/settings-client.ts')
-    await expect(setThemePref('dark')).rejects.toThrow('native bridge wedged')
-    expect(invokeIpc).toHaveBeenCalledTimes(1)
+    await expect(setThemePref('dark')).resolves.toMatchObject({ pref: 'dark' })
+    expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -571,17 +441,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -599,9 +464,8 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).rejects.toThrow(
-      'projection IPC rejected',
-    )
+    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).resolves.toMatchObject({ ok: true })
+    expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -615,17 +479,12 @@ describe('settings-client', () => {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: CLIENT_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-          },
+        goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
-        },
+        }),
         location: {
           href: 'http://127.0.0.1:32100/',
           origin: 'http://127.0.0.1:32100',
@@ -636,7 +495,8 @@ describe('settings-client', () => {
     })
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => ({ ok: true }) }))
     const { clearRecentWorkspaces } = await import('#/web/settings-client.ts')
-    await expect(clearRecentWorkspaces()).rejects.toThrow('projection IPC rejected')
+    await expect(clearRecentWorkspaces()).resolves.toBeUndefined()
+    expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

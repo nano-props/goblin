@@ -67,25 +67,22 @@ const TerminalWriteDataSchema = v.pipe(
   v.maxLength(MAX_TERMINAL_WRITE_CHARS),
   v.check((value) => !value.includes('\0'), 'Invalid terminal input'),
 )
-const TerminalOptionalClientIdSchema = v.optional(TerminalClientIdSchema)
 const TerminalControllerSchema = v.object({
   clientId: v.string(),
   status: v.picklist(TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES),
 })
-const TerminalAttachInputSchema = v.object({
+const TerminalAttachInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   cols: TerminalColsSchema,
   rows: TerminalRowsSchema,
-  clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalRestartInputSchema = TerminalAttachInputSchema
-const TerminalWriteInputSchema = v.object({
+const TerminalWriteInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   data: TerminalWriteDataSchema,
-  clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalResizeInputSchema = TerminalAttachInputSchema
-const TerminalSessionInputSchema = v.object({
+const TerminalSessionInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
@@ -98,7 +95,6 @@ export const TerminalCreateInputSchema = v.strictObject({
   startupShellCommand: v.optional(TerminalWriteDataSchema),
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
-  clientId: TerminalOptionalClientIdSchema,
   target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
 const TerminalPruneInputSchema = v.strictObject({
@@ -345,31 +341,31 @@ const TerminalSocketServerMessageSchema = v.variant('type', [
   }),
 ])
 const TerminalClientMessageSchema = v.variant('type', [
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('attach'),
     input: TerminalAttachInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('restart'),
     input: TerminalRestartInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('write'),
     input: TerminalWriteInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('resize'),
     input: TerminalResizeInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('takeover'),

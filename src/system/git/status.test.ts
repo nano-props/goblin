@@ -23,13 +23,13 @@ describe('getWorkingStatus', () => {
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4',
+          'HEAD f00ba4a',
           'branch refs/heads/main',
           '',
           'worktree /tmp/worktree-a',
           'HEAD ba5eba1',
           'branch refs/heads/feature/a',
-        ].join('\n'),
+        ].join('\0') + '\0\0',
       )
       .mockResolvedValueOnce('')
       .mockRejectedValueOnce(new Error('status failed'))
@@ -39,27 +39,24 @@ describe('getWorkingStatus', () => {
     await expect(getWorkingStatus('/tmp/repo')).rejects.toThrow('status failed')
   })
 
-  test('drops a worktree that disappears after the list read', async () => {
+  test('rejects when a listed worktree disappears during status sampling', async () => {
     mocks.git
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4',
+          'HEAD f00ba4a',
           'branch refs/heads/main',
           '',
           'worktree /tmp/worktree-a',
           'HEAD ba5eba1',
           'branch refs/heads/feature/a',
-        ].join('\n'),
+        ].join('\0') + '\0\0',
       )
       .mockResolvedValueOnce('')
       .mockRejectedValueOnce(new Error('cwd disappeared'))
-    mocks.stat.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 
-    await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([
-      { path: '/tmp/repo', branch: 'main', isMain: true, entries: [] },
-    ])
+    await expect(getWorkingStatus('/tmp/repo')).rejects.toThrow('cwd disappeared')
   })
 
   test('does not run status for a prunable worktree with a missing path', async () => {
@@ -67,29 +64,41 @@ describe('getWorkingStatus', () => {
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4',
+          'HEAD f00ba4a',
           'branch refs/heads/main',
           '',
           'worktree /tmp/missing-worktree',
           'HEAD ba5eba1',
           'branch refs/heads/stale',
           'prunable gitdir file points to non-existent location',
-        ].join('\n'),
+        ].join('\0') + '\0\0',
       )
       .mockResolvedValueOnce('')
+      .mockResolvedValueOnce(
+        [
+          'worktree /tmp/repo',
+          'HEAD f00ba4a',
+          'branch refs/heads/main',
+          '',
+          'worktree /tmp/missing-worktree',
+          'HEAD ba5eba1',
+          'branch refs/heads/stale',
+          'prunable gitdir file points to non-existent location',
+        ].join('\0') + '\0\0',
+      )
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 
     await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([
       { path: '/tmp/repo', branch: 'main', isMain: true, entries: [] },
     ])
-    expect(mocks.git).toHaveBeenCalledTimes(2)
+    expect(mocks.git).toHaveBeenCalledTimes(3)
   })
 
   test('rejects when the signal aborts before a command result is accepted', async () => {
     const controller = new AbortController()
     mocks.git.mockImplementationOnce(async () => {
       controller.abort(new Error('status deadline'))
-      return 'worktree /tmp/repo\nHEAD f00ba4\nbranch refs/heads/main'
+      return 'worktree /tmp/repo\nHEAD f00ba4a\nbranch refs/heads/main'
     })
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 

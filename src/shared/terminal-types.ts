@@ -101,7 +101,6 @@ export interface TerminalAttachInput {
   terminalRuntimeSessionId: string
   cols: number
   rows: number
-  clientId?: string
 }
 
 export interface TerminalCreateInput {
@@ -114,7 +113,6 @@ export interface TerminalCreateInput {
   startupShellCommand?: string
   cols?: number
   rows?: number
-  clientId?: string
   target: TerminalExecutionTarget
 }
 
@@ -127,7 +125,6 @@ export interface TerminalRestartInput {
   terminalRuntimeSessionId: string
   cols: number
   rows: number
-  clientId?: string
 }
 
 /**
@@ -249,14 +246,12 @@ export type TerminalCreateResult =
 export interface TerminalWriteInput {
   terminalRuntimeSessionId: string
   data: string
-  clientId?: string
 }
 
 export interface TerminalResizeInput {
   terminalRuntimeSessionId: string
   cols: number
   rows: number
-  clientId?: string
 }
 
 export type TerminalTakeoverInput = TerminalResizeInput
@@ -335,11 +330,10 @@ export type TerminalWriteResult = { status: 'accepted' } | { status: 'rejected' 
 // (it may be replaced when the runtime binding is replaced, and it is
 // *not* the durable terminal-tab identity), while `terminalSessionId` is
 // the durable client-facing tab identity. Clients must route realtime
-// events by `terminalSessionId` first and fall back to a `terminalRuntimeSessionId`
-// index only as a secondary lookup — that index is a client-local cache
-// populated from attach/reconcile and is not guaranteed to be populated
-// yet for a session the client has not attached to locally (e.g. a
-// background tab). Do not add a realtime event that carries
+// events only by `terminalSessionId`, then validate the runtime id and generation
+// against that session's current binding. Contradictory coordinates are an
+// emitter defect and must not be repaired through a second identity index.
+// Do not add a realtime event that carries
 // `terminalRuntimeSessionId` alone; see the dropped-title-update regression this
 // pattern caused.
 export interface TerminalOutputEvent {

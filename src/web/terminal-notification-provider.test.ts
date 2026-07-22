@@ -5,6 +5,7 @@ import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/lo
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 let wsMock: WebSocketMockHandle
 
@@ -39,11 +40,13 @@ describe('terminal notification provider', () => {
     const notifyBell = vi.fn(async () => true)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
-      value: {
+      value: currentNativeBridge({
         terminal: {
           notifyBell,
+          sendTestNotification: async () => true,
+          setBadge: () => {},
         },
-      },
+      }),
     })
 
     await expect(createTerminalNotificationProvider().notifyBell(bellInput)).resolves.toBe(true)
@@ -56,11 +59,13 @@ describe('terminal notification provider', () => {
     const notifyBell = vi.fn(async () => false)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
-      value: {
+      value: currentNativeBridge({
         terminal: {
           notifyBell,
+          sendTestNotification: async () => true,
+          setBadge: () => {},
         },
-      },
+      }),
     })
 
     await expect(createTerminalNotificationProvider().notifyBell(bellInput)).resolves.toBe(false)
@@ -89,11 +94,13 @@ describe('terminal notification provider', () => {
     const sendTestNotification = vi.fn(async () => true)
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
-      value: {
+      value: currentNativeBridge({
         terminal: {
+          notifyBell: async () => true,
           sendTestNotification,
+          setBadge: () => {},
         },
-      },
+      }),
     })
 
     await expect(createTerminalNotificationProvider().sendTestNotification(testNotificationInput)).resolves.toBe(true)

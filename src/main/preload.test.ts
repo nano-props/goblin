@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
-import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
 import type { GoblinNativeBridge } from '#/shared/goblin-native-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -50,7 +49,6 @@ import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
   TERMINAL_SET_BADGE_CHANNEL,
-  CLIPBOARD_SAVE_FILES_CHANNEL,
   ROTATE_ACCESS_TOKEN_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
@@ -66,7 +64,9 @@ function loadPreload(
   const ipcRenderer = {
     invoke: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
-      return options.invoke?.(channel, ...args) ?? Promise.resolve({ ok: true, data: 'ok' })
+      return (
+        options.invoke?.(channel, ...args) ?? Promise.resolve({ ok: true, data: 'ok' })
+      )
     }),
     sendSync: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
@@ -135,7 +135,6 @@ describe('preload goblinNative bridge', () => {
     expect(goblinNative).toHaveProperty('pathForFile')
     expect(goblinNative).toHaveProperty('host')
     expect(goblinNative).toHaveProperty('terminal')
-    expect(goblinNative).toHaveProperty('saveClipboardFiles')
     expect(goblinNative).toHaveProperty('onEvent')
     expect(goblinNative).toHaveProperty('onIntent')
   })
@@ -291,33 +290,13 @@ describe('preload goblinNative bridge', () => {
     expect(ipcRenderer.off).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, intentListener)
   })
 
-  test('forwards clipboard blob save and access-token rotation to their IPC channels', async () => {
-    // These are the last two standalone channels on the preload
-    // surface. They round out the "browser-missing only" invariant:
-    // every `safeInvoke` / `ipcRenderer.send` call below is a
-    // capability that the browser can't provide. The client
-    // either falls through to its HTTP backend (clipboard) or
-    // gets a typed "unavailable in this runtime" rejection
-    // (rotateAccessToken — only the embedded Electron build can
-    // restart its own server).
+  test('forwards access-token rotation to its native IPC channel', async () => {
+    // Token rotation exists only in the embedded Electron build because
+    // only main owns the embedded server lifecycle.
     const { goblinNative, invocations } = loadPreload()
-    const blob = new Uint8Array([1, 2, 3])
-    const unnamed = new Uint8Array([4])
-    const files = [
-      { name: 'a.png', bytes: blob.buffer },
-      { name: CLIPBOARD_FALLBACK_FILE_NAME, bytes: unnamed.buffer },
-    ]
-    await goblinNative.saveClipboardFiles([
-      { name: 'a.png', arrayBuffer: async () => blob.buffer } as unknown as File,
-      { name: '', arrayBuffer: async () => unnamed.buffer } as unknown as File,
-    ])
     await goblinNative.rotateAccessToken()
 
-    expect(invocations.map((entry) => entry.channel)).toEqual([
-      CLIPBOARD_SAVE_FILES_CHANNEL,
-      ROTATE_ACCESS_TOKEN_CHANNEL,
-    ])
-    expect(invocations[0]?.args).toEqual([files])
+    expect(invocations.map((entry) => entry.channel)).toEqual([ROTATE_ACCESS_TOKEN_CHANNEL])
   })
 
   test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
@@ -351,8 +330,6 @@ describe('preload goblinNative bridge', () => {
       [TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL]:
         'paired with TERMINAL_NOTIFY_BELL_CHANNEL for the settings-page "test" button',
       [TERMINAL_SET_BADGE_CHANNEL]: 'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
-      [CLIPBOARD_SAVE_FILES_CHANNEL]:
-        'native host writes blob to <os.tmpdir>/goblin-clipboard-<pid>/ so the PTY can read it as a real file',
       [ROTATE_ACCESS_TOKEN_CHANNEL]: 'embedded-server restart — only Electron main owns the server lifecycle',
     }
 

@@ -41,7 +41,9 @@ describe('useAccessTokenStatus', () => {
 
     expect(screen.getByRole('button', { name: 'checking' })).toBeTruthy()
     expect(fetchServerJson).toHaveBeenCalledTimes(2)
-    expect(fetchServerJson).toHaveBeenLastCalledWith('/api/whoami', { signal: expect.any(AbortSignal) })
+    expect(fetchServerJson).toHaveBeenLastCalledWith('/api/whoami', expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
 
     await act(async () => {
       refreshProbe.resolve({ ok: true })
@@ -55,7 +57,7 @@ describe('useAccessTokenStatus', () => {
 
   test('aborts a hanging whoami probe after the auth status timeout', async () => {
     vi.useFakeTimers()
-    vi.mocked(fetchServerJson).mockImplementation((_path, init) => {
+    vi.mocked(fetchServerJson).mockImplementation((_path, _decode, init) => {
       const signal = init?.signal
       return new Promise((_, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
@@ -68,7 +70,9 @@ describe('useAccessTokenStatus', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(fetchServerJson).toHaveBeenCalledWith('/api/whoami', { signal: expect.any(AbortSignal) })
+    expect(fetchServerJson).toHaveBeenCalledWith('/api/whoami', expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000)
@@ -76,7 +80,7 @@ describe('useAccessTokenStatus', () => {
     })
 
     expect(screen.getByRole('button', { name: 'unauthenticated' })).toBeTruthy()
-    expect(vi.mocked(fetchServerJson).mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    expect(vi.mocked(fetchServerJson).mock.calls[0]?.[2]?.signal?.aborted).toBe(true)
   })
 
   test('strips a URL token before the login request settles', async () => {
@@ -89,6 +93,7 @@ describe('useAccessTokenStatus', () => {
     expect(postServerJson).toHaveBeenCalledWith(
       '/api/login',
       { token: 'url-token' },
+      expect.any(Function),
       { signal: expect.any(AbortSignal) },
     )
     expect(window.location.search).toBe('?x=1')

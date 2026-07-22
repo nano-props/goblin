@@ -518,13 +518,13 @@ beforeEach(() => {
         canonicalRows: reused?.rows ?? 24,
       }
     }
-    const controller = input.clientId ? { clientId: input.clientId, status: 'connected' as const } : null
+    const controller = { clientId: 'client_local', status: 'connected' as const }
     serverSessions = [
       ...currentSessions
         .filter((session) => session.terminalSessionId !== terminalSessionId)
         .map((session) => ({
           ...session,
-          controller: session.controller?.clientId === input.clientId ? null : session.controller,
+          controller: session.controller?.clientId === 'client_local' ? null : session.controller,
         })),
       {
         terminalRuntimeSessionId: terminalSessionId,
@@ -702,7 +702,7 @@ beforeEach(() => {
   setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
-      capability === 'settings-ipc' ||
+      capability === 'global-shortcut' ||
       capability === 'open-settings-window' ||
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
@@ -859,14 +859,12 @@ describe('TerminalSessionProvider', () => {
       expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
         target: base.target,
         kind: 'primary',
-        clientId: 'client_sharedterminal',
         cols: 100,
         rows: 30,
       })
       expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
         target: base.target,
         kind: 'additional',
-        clientId: 'client_sharedterminal',
         cols: 100,
         rows: 30,
       })

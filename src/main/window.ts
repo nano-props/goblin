@@ -115,6 +115,10 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
     webPreferences: await createBrowserWindowWebPreferences(),
   })
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    if (errorCode === -3) {
+      clientNodeLog.debug({ validatedURL }, 'navigation cancelled')
+      return
+    }
     clientNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
   })
   win.webContents.on('render-process-gone', (_event, details) => {

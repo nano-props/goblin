@@ -40,14 +40,10 @@ export function createClientAppRealtime(options: {
     AppRealtimeMessage
   >({
     resolveConnection() {
-      try {
-        const server = options.getServerConfig()
-        return {
-          url: createAppRealtimeWebSocketUrl(server.url, server.accessToken, server.clientId),
-          clientId: server.clientId,
-        }
-      } catch {
-        return null
+      const server = options.getServerConfig()
+      return {
+        url: createAppRealtimeWebSocketUrl(server.url, server.accessToken, server.clientId),
+        clientId: server.clientId,
       }
     },
     hasRealtimeSubscribers() {

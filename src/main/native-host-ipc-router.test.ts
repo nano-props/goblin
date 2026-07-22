@@ -448,90 +448,6 @@ describe('main repo ipc cancellation', () => {
     expect(aborted).toBe(false)
   })
 
-  test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
-    const repo = { id: 'goblin+file:///repo' }
-
-    const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentWorkspaces: { recentWorkspaces: [repo] },
-    })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
-  })
-
-  test('skips remote repos when syncing Dock recent documents', async () => {
-    const localRepo = { id: 'goblin+file:///repo' }
-    const remoteRepo = { id: 'goblin+ssh://gh/owner/repo' }
-
-    const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentWorkspaces: { recentWorkspaces: [localRepo, remoteRepo] },
-    })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
-    expect(app.addRecentDocument).toHaveBeenCalledTimes(1)
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
-  })
-
-  test('projects server-owned prefs into native host state when the client updates them', async () => {
-    const result = await invokeIpc('settings.applyNativeHostProjection', {
-      prefs: {
-        patch: {
-          lang: 'ja',
-          theme: 'dark',
-          colorTheme: 'github',
-          shortcutsDisabled: true,
-          globalShortcutDisabled: true,
-        },
-        settings: {
-          lang: 'ja',
-          theme: 'dark',
-          colorTheme: 'github',
-          shortcutsDisabled: true,
-          globalShortcutDisabled: true,
-          globalShortcut: 'Alt+K',
-        },
-      },
-    })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect((await import('#/main/i18n/index.ts')).resolveLang).toHaveBeenCalledWith('ja')
-    expect((await import('#/main/i18n/index.ts')).setCurrentLang).toHaveBeenCalledWith('ja')
-    expect((await import('#/main/theme.ts')).applyThemeSettingsProjection).toHaveBeenCalledWith({
-      theme: 'dark',
-      colorTheme: 'github',
-    })
-    expect((await import('#/main/menu-state.ts')).applyMenuRuntimeState).toHaveBeenCalledWith({
-      langPref: 'ja',
-      shortcutsDisabled: true,
-    })
-    expect((await import('#/main/shortcuts.ts')).syncGlobalShortcuts).toHaveBeenCalledWith(true, 'Alt+K')
-    expect((await import('#/main/menu.ts')).buildAppMenu).toHaveBeenCalled()
-  })
-
-  test('rejects an empty native host projection payload', async () => {
-    const result = await invokeIpc('settings.applyNativeHostProjection', {})
-
-    expect(result).toEqual({
-      ok: false,
-      error: { name: 'IpcError', code: 'BAD_REQUEST', message: 'Invalid IPC input' },
-    })
-  })
-
-  test('rejects recent workspace projections with invalid canonical IDs', async () => {
-    const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentWorkspaces: {
-        recentWorkspaces: [{ id: 'goblin+ssh://prodrepo' }],
-      },
-    })
-
-    expect(result).toEqual({
-      ok: false,
-      error: { name: 'IpcError', code: 'BAD_REQUEST', message: 'Invalid IPC input' },
-    })
-  })
-
   test('prefers embedded server prefs when validating a global shortcut change', async () => {
     vi.mocked(getUserSettings).mockResolvedValueOnce(
       userSettings({
@@ -547,6 +463,16 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       data: { accelerator: 'Alt+G', registered: false },
     })
+  })
+
+  test.each(['not-a-shortcut', 'Control+O'])('rejects invalid global shortcut command %s', async (accelerator) => {
+    const result = await invokeIpc('settings.setGlobalShortcut', { accelerator })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'IpcError', code: 'BAD_REQUEST', message: 'Invalid IPC input' },
+    })
+    expect(getUserSettings).not.toHaveBeenCalled()
   })
 
   test('returns NOT_FOUND for removed native namespaces like externalApps', async () => {

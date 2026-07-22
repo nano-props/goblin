@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  restoreRepoProjectionFromCacheEntry,
   normalizeRepoSnapshotCache,
   persistRepoSnapshotCacheEntry,
-  seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/workspaces/persistence.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { requireGitWorkspaceProjection } from '#/web/stores/workspaces/git-workspace-projection.ts'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -18,7 +13,6 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/workspaces/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -149,68 +143,5 @@ describe('persistRepoSnapshotCacheEntry', () => {
     const cached = useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]
     expect(cached?.data.currentBranch).toBe('feature/query')
     expect(cached?.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
-  })
-})
-
-describe('restoreRepoProjectionFromCacheEntry', () => {
-  test('restores only shell metadata from cache', () => {
-    const now = Date.now()
-    const cached = cachedRepo(now)
-    cached.name = 'cached-name'
-    cached.data.branches = [
-      createBranchSnapshot('feature/a', {
-        worktree: { path: '/tmp/worktree-a' },
-        pullRequest: {
-          number: 2,
-          title: 'PR 2',
-          url: 'https://github.com/acme/repo/pull/2',
-          state: 'open',
-          mergeable: 'UNKNOWN',
-        },
-      }),
-    ]
-
-    const workspace = emptyWorkspace(WORKSPACE_ID, 'repo', 'repo-runtime-test')
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      name: 'repo',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-      },
-      diagnostics: [],
-    })
-    const repo = restoreRepoProjectionFromCacheEntry(workspace, cached)
-
-    expect(repo.name).toBe('cached-name')
-    expect(requireGitWorkspaceProjection(repo).projection).toEqual({ source: 'cache', savedAt: now })
-  })
-
-  test('seeds cached branch references as runtime projections', () => {
-    const now = Date.now()
-    const cached = cachedRepo(now)
-    cached.data.currentBranch = 'feature/a'
-    cached.data.branches = [
-      createBranchSnapshot('feature/a', {
-        worktree: { path: '/tmp/worktree-a' },
-        pullRequest: {
-          number: 2,
-          title: 'PR 2',
-          url: 'https://github.com/acme/repo/pull/2',
-          state: 'open',
-          mergeable: 'UNKNOWN',
-        },
-      }),
-    ]
-
-    seedRepoProjectionQueryFromCacheEntry(WORKSPACE_ID, 'repo-runtime-test', cached)
-
-    const fullProjection = getRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-test', null, 'full')
-    const summaryProjection = getRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-test', null, 'summary')
-    expect(fullProjection?.snapshot?.current).toBe('feature/a')
-    expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()
-    expect(summaryProjection?.snapshot).toEqual(fullProjection?.snapshot)
   })
 })

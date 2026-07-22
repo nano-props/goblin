@@ -33,9 +33,8 @@ export async function getRepoSnapshot(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<RepoSnapshot | null> {
-  return options.signal?.aborted
-    ? null
-    : await runWithRepoSource(cwd, async (source) => await source.getSnapshot(options.signal), repoReadRuntime(options))
+  options.signal?.throwIfAborted()
+  return await runWithRepoSource(cwd, async (source) => await source.getSnapshot(options.signal), repoReadRuntime(options))
 }
 
 export async function getWorkspacePaneTargetIdentities(

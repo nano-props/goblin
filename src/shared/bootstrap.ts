@@ -1,6 +1,6 @@
 export type ClientRuntimeKind = 'electron' | 'web'
 export type ClientNativeCapability =
-  | 'settings-ipc'
+  | 'global-shortcut'
   | 'open-settings-window'
   | 'open-external-url'
   | 'open-directory-dialog'
@@ -10,7 +10,7 @@ export type ClientNativeCapability =
 
 export const CLIENT_BRIDGE_VERSION = 1
 export const ELECTRON_CLIENT_CAPABILITIES = [
-  'settings-ipc',
+  'global-shortcut',
   'open-settings-window',
   'open-external-url',
   'open-directory-dialog',

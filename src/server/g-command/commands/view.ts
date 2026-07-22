@@ -1,5 +1,6 @@
+import * as v from 'valibot'
 import type { GoblinCommand, GoblinCommandContext } from '#/server/g-command/context.ts'
-import type { RepoViewResult } from '#/shared/repo-view.ts'
+import { RepoViewResultSchema } from '#/shared/repo-view.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 // Build a `g <name>` command that opens a workspace pane tab. All
@@ -25,7 +26,9 @@ function createViewCommand(name: string, tab: WorkspacePaneStaticTabType): Gobli
         return 2
       }
       try {
-        const result = await ctx.transport.postJson<RepoViewResult>('/api/repo/view', { tab })
+        const result = await ctx.transport.postJson('/api/repo/view', { tab }, (value) =>
+          v.parse(RepoViewResultSchema, value),
+        )
         if (!result.ok) {
           ctx.io.stderr(`g: ${result.message}`)
           return 1

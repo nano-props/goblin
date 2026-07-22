@@ -6,7 +6,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { repoOperationsQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import {
   getRepoOperationsQueryData,
-  getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   getRepoWorktreeStatusQueryData,
   seedRepoProjectionQueryData,
@@ -74,62 +73,6 @@ describe('repo query keys', () => {
 })
 
 describe('repo projection query data', () => {
-  test('builds projection placeholder data from cached runtime projection', () => {
-    const queryClient = new QueryClient()
-    const cachedProjection: GitWorkspaceRuntimeProjection = {
-      snapshot: { branches: [], current: 'main' },
-      pullRequests: [
-        {
-          branch: 'feature/a',
-          pullRequest: {
-            number: 229,
-            title: 'Converge repo data authority',
-            url: 'https://github.com/acme/repo/pull/229',
-            state: 'open',
-          },
-        },
-      ],
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: 123,
-    }
-
-    seedRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-1', cachedProjection, queryClient)
-
-    expect(getRepoProjectionPlaceholderData(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual({
-      snapshot: cachedProjection.snapshot,
-      pullRequests: null,
-      requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      loadedAt: 0,
-    })
-  })
-
-  test('prefers the null-branch runtime projection as branch workspace placeholder', () => {
-    const queryClient = new QueryClient()
-    const branchProjection: GitWorkspaceRuntimeProjection = {
-      snapshot: { branches: [], current: 'feature/other' },
-      pullRequests: null,
-      requested: { branch: 'feature/other', pullRequestMode: 'summary' },
-      loadedAt: 101,
-    }
-    const repoProjection: GitWorkspaceRuntimeProjection = {
-      snapshot: { branches: [], current: 'main' },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: 202,
-    }
-
-    seedRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-1', branchProjection, queryClient)
-    seedRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-1', repoProjection, queryClient)
-
-    expect(
-      getRepoProjectionPlaceholderData(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'full', queryClient),
-    ).toMatchObject({
-      snapshot: repoProjection.snapshot,
-      requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      loadedAt: 0,
-    })
-  })
-
   test('writes server projection cache', () => {
     const queryClient = new QueryClient()
     const snapshot = { branches: [], current: 'main' }

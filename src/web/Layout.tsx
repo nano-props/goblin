@@ -19,7 +19,6 @@ import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogH
 import { WorkspaceDropOverlay } from '#/web/components/WorkspaceDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
@@ -91,7 +90,6 @@ export function authenticatedAppShellMode(
 }
 
 export function Layout() {
-  usePublicAppBootstrap()
   useSettingsWriteErrorToast()
   usePrimaryWindowHistoryPresentationObserver()
 

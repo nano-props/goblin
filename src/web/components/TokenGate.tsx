@@ -2,6 +2,8 @@ import { useActionState, useState, type ReactNode } from 'react'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
+import { decodeWith } from '#/shared/http-response-schema.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 
@@ -52,9 +54,10 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       if (trimmed.length === 0) return { error: t('auth.gate.error-empty') }
       const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
       try {
-        await postServerJson<{ token: string }, { ok: true }>(
+        await postServerJson(
           '/api/login',
           { token: trimmed },
+          decodeWith(OkResponseSchema),
           { signal: timeout.signal },
         )
         onSuccess()

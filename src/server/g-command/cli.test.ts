@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { runGoblinCommand } from '#/server/g-command/cli.ts'
 import type { GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
 
-type PostJsonFn = (pathname: string, body: unknown) => Promise<unknown>
+type PostJsonFn = (pathname: string, body: unknown, decode: (value: unknown) => unknown) => Promise<unknown>
 type StdoutFn = (message: string) => void
 type StderrFn = (message: string) => void
 
@@ -79,7 +79,7 @@ describe('g command cli', () => {
     const code = await runGoblinCommand(['delta'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' })
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'changes' }, expect.any(Function))
   })
 
   test('g info posts a view intent for the status tab', async () => {
@@ -90,7 +90,7 @@ describe('g command cli', () => {
     const code = await runGoblinCommand(['info'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' })
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'status' }, expect.any(Function))
   })
 
   test('g log posts a view intent for the history tab', async () => {
@@ -101,7 +101,7 @@ describe('g command cli', () => {
     const code = await runGoblinCommand(['log'], {}, io, transport)
 
     expect(code).toBe(0)
-    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' })
+    expect(postJson).toHaveBeenCalledWith('/api/repo/view', { tab: 'history' }, expect.any(Function))
   })
 
   test('g init creates an empty commented goblin.toml in the current directory', async () => {

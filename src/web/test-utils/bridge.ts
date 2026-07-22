@@ -517,7 +517,7 @@ export function installWorkspacePaneTabsTestBridge(
             canonicalTitle: null,
             phase: 'open',
             message: null,
-            controller: { clientId: input.request.clientId ?? 'attachment_local', status: 'connected' },
+            controller: { clientId: 'attachment_local', status: 'connected' },
             canonicalCols: input.request.cols ?? 80,
             canonicalRows: input.request.rows ?? 24,
           },
@@ -538,12 +538,14 @@ export function installWorkspacePaneTabsTestBridge(
         return {
           ok: true,
           runtimeType: input.runtimeType,
-          runtime: {
-            action: wasOpen ? ('closed' as const) : ('already-closed' as const),
-            terminalSessionId: input.sessionId,
-            terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
-            terminalRuntimeGeneration: wasOpen ? 1 : null,
-          },
+          runtime: wasOpen
+            ? {
+                action: 'closed' as const,
+                terminalSessionId: input.sessionId,
+                terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+                terminalRuntimeGeneration: 1,
+              }
+            : { action: 'already-closed' as const, terminalSessionId: input.sessionId },
         }
       },
     }),
@@ -679,21 +681,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     configurable: true,
     value: {
       __GOBLIN_BOOTSTRAP__: {
-        homeDir: '/Users/test',
-        platform: 'web',
+        runtime: {
+          kind: 'electron',
+          bridgeVersion: CLIENT_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
+        },
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       goblinNative: {
-        homeDir: '/Users/test',
-        platform: 'web',
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           const handler = handlers[path]
           if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
           return handler(input)
         },
         abortIpc: () => Promise.resolve(false),
+        notifyAppQuitDrained: () => Promise.resolve(true),
         onEvent: () => () => {},
+        onIntent: () => () => {},
         pathForFile: () => '',
         host: {
           openSettingsWindow: (input: unknown) =>
@@ -746,10 +750,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           onSessionsChanged: () => () => {},
           onSessionClosed: () => () => {},
         },
+        saveClipboardFiles: () => Promise.resolve([]),
+        rotateAccessToken: () => Promise.resolve({ accessToken: 'test-access-token' }),
       },
       location: {
         href: 'http://127.0.0.1:32100/',
         origin: 'http://127.0.0.1:32100',
+        protocol: 'http:',
         search: '',
       },
       sessionStorage: {
@@ -1383,6 +1390,7 @@ export function seedRepoReadModelQueryData(
     status?: WorktreeStatus[]
   },
 ): void {
+  const loadedAt = Date.now()
   const projection: GitWorkspaceRuntimeProjection = {
     snapshot: {
       branches: readModel.branches,
@@ -1393,13 +1401,13 @@ export function seedRepoReadModelQueryData(
       branch: null,
       pullRequestMode: 'full',
     },
-    loadedAt: 0,
+    loadedAt,
   }
   setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', projection)
   setRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId, {
     workspaceRuntimeId: repo.workspaceRuntimeId,
     status: readModel.status ?? [],
-    loadedAt: 0,
+    loadedAt,
   })
   if (readModel.currentBranch) {
     setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, readModel.currentBranch, 'full', {

@@ -9,7 +9,7 @@ const repoRoot = path.resolve(import.meta.dirname, '..')
 const DOUBLE_ASSERTION_ALLOWLIST = new Map([
   ['src/server/terminal/terminal-render-state.ts', ['serializer as unknown as ITerminalAddon']],
   [
-    'src/web/components/terminal/terminal-session-view.ts',
+    'src/web/components/terminal/xterm-user-input-attribution.ts',
     ['term as unknown as { _core?: { coreService?: { onUserInput?: unknown } } }'],
   ],
 ])

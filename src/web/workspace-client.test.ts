@@ -18,6 +18,7 @@ describe('workspace client', () => {
     expect(mocks.postServerJson).toHaveBeenCalledWith(
       '/api/workspace/path-suggestions',
       { prefix: '/srv/re' },
+      expect.any(Function),
       { signal },
     )
   })

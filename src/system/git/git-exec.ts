@@ -1,6 +1,7 @@
 import { execa, ExecaError } from 'execa'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 /** Default per-call timeout. Network ops (push/pull/fetch) override via opts. */
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -41,16 +42,44 @@ async function probeGitAvailable(): Promise<GitAvailability> {
  * or abort. Wraps execa so all git invocations share timeout, buffering
  * and cancellation behavior.
  */
-export function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+export async function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  return execa('git', args, {
-    cwd,
-    timeout: timeoutMs,
-    cancelSignal: opts?.signal,
-    forceKillAfterDelay: 500,
-    // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
-    maxBuffer: 10 * 1024 * 1024,
-  }).then(({ stdout }) => stdout.trimEnd())
+  let cancellationObserved = opts?.signal?.aborted ?? false
+  const observeCancellation = () => {
+    cancellationObserved = true
+  }
+  opts?.signal?.addEventListener('abort', observeCancellation, { once: true })
+  try {
+    const { stdout } = await execa('git', args, {
+      cwd,
+      timeout: timeoutMs,
+      cancelSignal: opts?.signal,
+      forceKillAfterDelay: 500,
+      // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    return stdout.trimEnd()
+  } catch (error) {
+    if (cancellationObserved || isProcessCancellation(error)) throw new OperationCancelledError()
+    throw error
+  } finally {
+    opts?.signal?.removeEventListener('abort', observeCancellation)
+  }
+}
+
+/** Git lookup commands use exit 1 to mean "no matching values". */
+export async function gitLookup(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
+  try {
+    return await git(cwd, args, opts)
+  } catch (error) {
+    if (error instanceof ExecaError && error.exitCode === 1) return ''
+    throw error
+  }
+}
+
+/** Decode execa's stable cancellation field without relying on JS realm identity. */
+function isProcessCancellation(error: unknown): error is { isCanceled: true } {
+  return typeof error === 'object' && error !== null && 'isCanceled' in error && error.isCanceled === true
 }
 
 export async function gitResult(cwd: string, ...args: string[]): Promise<ExecResult> {
@@ -70,8 +99,8 @@ export async function gitResultWithOptions(
     // Distinguish three "we ended the process" reasons. The user-visible
     // copy is short on purpose — the client surfaces these via toast
     // and the kbps user is rarely interested in the underlying signal.
+    if (err instanceof OperationCancelledError || opts?.signal?.aborted) return { ok: false, message: 'cancelled' }
     if (err instanceof ExecaError) {
-      if (opts?.signal?.aborted || err.isCanceled) return { ok: false, message: 'cancelled' }
       if (err.timedOut) {
         // No auto-clean of stray .lock files on timeout — we can't tell
         // ours from a concurrent tool's, and a stale-clean is worse than

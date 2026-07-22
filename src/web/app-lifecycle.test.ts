@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 describe('app lifecycle', () => {
   beforeEach(() => {
     vi.resetModules()
     Object.defineProperty(window, 'goblinNative', {
       configurable: true,
-      value: {
+      value: currentNativeBridge({
         onIntent: vi.fn(),
         notifyAppQuitDrained: vi.fn(async () => true),
-      },
+      }),
     })
   })
 

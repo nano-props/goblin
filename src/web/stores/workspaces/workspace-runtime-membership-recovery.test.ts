@@ -19,7 +19,13 @@ describe('workspace runtime membership recovery', () => {
     resetWorkspacesStore()
     installGoblinTestBridge({
       'workspace.runtimeReconcile': async () => ({
-        runtimes: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-123456789012345678901' }],
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: 'repo-runtime-123456789012345678901',
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
       }),
     })
   })
@@ -51,7 +57,11 @@ describe('workspace runtime membership recovery', () => {
   test('redeclares the latest window membership when a repo closes during recovery', async () => {
     resetWorkspacesStore()
     const firstResponse = Promise.withResolvers<{
-      runtimes: Array<{ workspaceId: string; workspaceRuntimeId: string }>
+      runtimes: Array<{
+        workspaceId: string
+        workspaceRuntimeId: string
+        workspaceProbe: { status: 'probing' }
+      }>
     }>()
     const reconcile = vi.fn().mockReturnValueOnce(firstResponse.promise).mockResolvedValueOnce({ runtimes: [] })
     installGoblinTestBridge({ 'workspace.runtimeReconcile': reconcile })
@@ -61,7 +71,13 @@ describe('workspace runtime membership recovery', () => {
     await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce())
     useWorkspacesStore.setState({ workspaces: {}, workspaceOrder: [] })
     firstResponse.resolve({
-      runtimes: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-123456789012345678901' }],
+      runtimes: [
+        {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: 'repo-runtime-123456789012345678901',
+          workspaceProbe: { status: 'probing' },
+        },
+      ],
     })
 
     await expect(recovery).resolves.toEqual({ kind: 'settled', targets: [], changedTargets: [] })
@@ -93,7 +109,11 @@ describe('workspace runtime membership recovery', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     const reconcileResponse = Promise.withResolvers<{
-      runtimes: Array<{ workspaceId: string; workspaceRuntimeId: string }>
+      runtimes: Array<{
+        workspaceId: string
+        workspaceRuntimeId: string
+        workspaceProbe: { status: 'probing' }
+      }>
     }>()
     const runtimeClose = vi.fn(async () => ({ ok: true, released: true, runtimeClosed: true }))
     installGoblinTestBridge({
@@ -106,7 +126,15 @@ describe('workspace runtime membership recovery', () => {
     await Promise.resolve()
     expect(runtimeClose).not.toHaveBeenCalled()
 
-    reconcileResponse.resolve({ runtimes: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: repo.workspaceRuntimeId }] })
+    reconcileResponse.resolve({
+      runtimes: [
+        {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          workspaceProbe: { status: 'probing' },
+        },
+      ],
+    })
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
     await close
     expect(runtimeClose).toHaveBeenCalledOnce()
@@ -142,7 +170,13 @@ describe('workspace runtime membership recovery', () => {
   test('keeps production local open acquire and shell commit inside one shared lease', async () => {
     resetWorkspacesStore()
     const reconcile = vi.fn(async () => ({
-      runtimes: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-123456789012345678901' }],
+      runtimes: [
+        {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: 'repo-runtime-123456789012345678901',
+          workspaceProbe: { status: 'probing' as const },
+        },
+      ],
     }))
     installGoblinTestBridge({
       'workspace.runtimeOpen': async () => ({
@@ -182,6 +216,7 @@ describe('workspace runtime membership recovery', () => {
           {
             workspaceId: REMOTE_REPO_ROOT,
             workspaceRuntimeId: nextRemoteRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
             remoteLifecycle: { kind: 'connecting', attemptId: 1 },
           },
         ],

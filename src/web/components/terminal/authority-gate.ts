@@ -1,4 +1,3 @@
-import { readClientPageId } from '#/web/client-page-id.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
@@ -124,10 +123,6 @@ interface XtermAuthorityGateOptions {
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
   let role: 'controller' | 'viewer' | 'unowned' = 'unowned'
 
-  function readClientId(): string {
-    return readClientPageId()
-  }
-
   return {
     isController: () => role === 'controller',
     canWrite: () => role === 'controller' || role === 'viewer',
@@ -197,7 +192,6 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         terminalRuntimeSessionId,
         cols: size.cols,
         rows: size.rows,
-        clientId: readClientId(),
       })
     } catch (err) {
       return deny('no-client', 'client', { terminalRuntimeSessionId, err })

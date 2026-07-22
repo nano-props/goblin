@@ -1,14 +1,17 @@
 /**
- * Web-only backend for `saveClipboardFiles`. Posts a multipart body to
+ * Server backend for `saveClipboardFiles` in both browser and Electron clients. Posts a multipart body to
  * the server's `/api/clipboard/files` route; the server writes blobs
  * under `<serverDataDir()>/clipboard-tmp-<pid>/` and returns absolute
  * paths the PTY can read.
  *
- * Returns `[]` on any failure (network, non-2xx, malformed JSON). The
- * resolver counts those as backend transfer failures for the terminal toast.
+ * Transport and response-contract failures reject so the caller can surface
+ * the failed paste. An empty array is reserved for an empty input list.
  */
-import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
+import { CLIPBOARD_UNNAMED_FILE_NAME } from '#/shared/clipboard-paste.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
+import * as v from 'valibot'
+
+const ClipboardFilesResponseSchema = v.strictObject({ paths: v.array(v.string()) })
 
 export interface HttpClipboardBackendConfig {
   /** Bootstrap-derived server origin, e.g. `http://127.0.0.1:32100/`. */
@@ -35,28 +38,24 @@ export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): 
         // parts, so fall back to the runtime-shared placeholder — the
         // server's sanitiser preserves this literal (it contains no
         // Windows-reserved characters).
-        const filename = file.name.length > 0 ? file.name : CLIPBOARD_FALLBACK_FILE_NAME
+        const filename = file.name.length > 0 ? file.name : CLIPBOARD_UNNAMED_FILE_NAME
         form.append('files', file, filename)
       }
-      try {
-        const endpoint = new URL('api/clipboard/files', config.url)
-        const headers: Record<string, string> = {}
-        if (config.accessToken) headers[ACCESS_TOKEN_HEADER] = config.accessToken
-        const res = await fetch(endpoint, {
+      const endpoint = new URL('api/clipboard/files', config.url)
+      const headers: Record<string, string> = {}
+      if (config.accessToken) headers[ACCESS_TOKEN_HEADER] = config.accessToken
+      const res = await fetch(endpoint, {
           method: 'POST',
           headers,
           body: form,
           // `credentials: 'include'` carries the cookie on cross-origin
           // LAN requests; for same-origin it's a no-op.
           credentials: 'include',
-        })
-        if (!res.ok) return []
-        const json = (await res.json()) as { paths?: unknown }
-        if (!Array.isArray(json.paths)) return []
-        return json.paths.filter((p): p is string => typeof p === 'string')
-      } catch {
-        return []
-      }
+      })
+      if (!res.ok) throw new Error(`Clipboard file request failed with status ${res.status}`)
+      const json = v.safeParse(ClipboardFilesResponseSchema, await res.json())
+      if (!json.success) throw new Error('Invalid clipboard file response')
+      return json.output.paths
     },
   }
 }

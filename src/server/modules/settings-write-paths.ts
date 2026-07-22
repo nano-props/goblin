@@ -8,7 +8,7 @@ import {
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import type { WorkspaceSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
+import type { WorkspaceSettingsState, UserSettings, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceSessionEntryId } from '#/shared/remote-workspace.ts'
@@ -27,7 +27,7 @@ export interface SetFetchIntervalInput {
   sec: number
 }
 export interface UpdateUserSettingsInput {
-  prefs: Record<string, unknown>
+  prefs: Partial<UserSettings>
 }
 export interface SetGlobalShortcutRegisteredInput {
   registered: boolean

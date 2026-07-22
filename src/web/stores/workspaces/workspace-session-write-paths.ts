@@ -3,10 +3,6 @@ import { recordWithoutKey } from '#/shared/record.ts'
 import PQueue from 'p-queue'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import {
-  restoreRepoProjectionFromCacheEntry,
-  seedRepoProjectionQueryFromCacheEntry,
-} from '#/web/stores/workspaces/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
@@ -545,7 +541,6 @@ function buildNewWorkspace(
   const cached = s.repoSnapshotCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
-  seedRepoProjectionQueryFromCacheEntry(id, workspaceRuntimeId, cached)
   return emptyWorkspace(id, name, workspaceRuntimeId)
 }
 
@@ -649,14 +644,11 @@ export function addResolvedWorkspace(
       if (resolvedWorkspace.workspaceProbe) {
         acceptWorkspaceProbeState(workspace, resolvedWorkspace.workspaceProbe)
       }
-      const restored = restoreRepoProjectionFromCacheEntry(workspace, s.repoSnapshotCache[resolvedWorkspace.id])
-      if (resolvedWorkspace.target) markRemoteLifecycleReady(restored, resolvedWorkspace.target)
-      return restored
+      if (resolvedWorkspace.target) markRemoteLifecycleReady(workspace, resolvedWorkspace.target)
+      return workspace
     },
     update: (existing) => {
-      const hadGitProjection = existing.capability.kind === 'git'
       const runtimeChanged = existing.workspaceRuntimeId !== workspaceRuntimeId
-      const preserveGitProjection = !runtimeChanged && hadGitProjection
       const nameChanged = resolvedWorkspace.name.length > 0 && existing.name !== resolvedWorkspace.name
       const sessionEntry = sessionEntryForResolvedWorkspace(resolvedWorkspace)
       const sessionProjectionState = sessionProjectionStateForResolvedWorkspace(resolvedWorkspace)
@@ -679,9 +671,7 @@ export function addResolvedWorkspace(
           capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
         }
         if (resolvedWorkspace.workspaceProbe) acceptWorkspaceProbeState(next, resolvedWorkspace.workspaceProbe)
-        return preserveGitProjection
-          ? next
-          : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedWorkspace.id])
+        return next
       }
       const lifecycleReady = existing.admission.kind === 'remote' && existing.admission.lifecycle?.kind === 'ready'
       const targetChanged = !remoteTargetsEqual(
@@ -721,11 +711,8 @@ export function addResolvedWorkspace(
             : existing.admission,
       }
       if (resolvedWorkspace.workspaceProbe) acceptWorkspaceProbeState(next, resolvedWorkspace.workspaceProbe)
-      const restored = preserveGitProjection
-        ? next
-        : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedWorkspace.id])
-      markRemoteLifecycleReady(restored, resolvedWorkspace.target)
-      return restored
+      markRemoteLifecycleReady(next, resolvedWorkspace.target)
+      return next
     },
   })
 }

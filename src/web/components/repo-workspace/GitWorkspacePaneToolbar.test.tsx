@@ -192,7 +192,8 @@ beforeEach(() => {
   workspaceExternalAppMocks.openWorkspaceInFinder.mockImplementation(async () => ({ ok: true, message: '' }))
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
-    hydrated: true,
+    status: 'ready',
+    error: null,
   })
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
@@ -207,7 +208,11 @@ afterEach(() => {
   toastMocks.error.mockClear()
   appShellMocks.openExternalUrl.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
-  useHostInfoStore.setState({ snapshot: null, hydrated: false })
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
+    status: 'ready',
+    error: null,
+  })
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
@@ -464,6 +469,8 @@ describe('GitWorkspacePaneToolbar', () => {
   test('hides the open-externally menu when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
+      status: 'ready',
+      error: null,
     })
     runtimeExternalAppSettings.value = {
       terminalAvailable: false,

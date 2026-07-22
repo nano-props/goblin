@@ -14,7 +14,6 @@ import { cn } from '#/web/lib/cn.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
 interface Props {
   open: boolean
   onClose: () => void
@@ -33,9 +32,8 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const canSubmit = path.trim().length > 0 && !pending
   const canChoosePath = hasNativeDirectoryPicker()
   const statusText = error ?? ''
-  const hostInfoHydrated = useHostInfoStore((state) => state.hydrated && state.snapshot !== null)
   const pathSuggestions = useDirectoryPathSuggestions({
-    enabled: open && !pending && hostInfoHydrated,
+    enabled: open && !pending,
     source: { kind: 'local' },
     prefix: path,
   })

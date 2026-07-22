@@ -7,6 +7,7 @@ import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-wor
 import { isRepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import { isRepositoryTargetChangedError } from '#/server/modules/repository-target-changed-error.ts'
 import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 const workspaceRuntimeRequestLogger = serverLogger.child({ module: 'workspace-runtime-request' })
 
@@ -50,6 +51,7 @@ async function runRuntimeRequest<T>(
     if (isWorkspaceRuntimeAdmissionClosedError(error)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
     }
+    if (error instanceof OperationCancelledError) throw error
     if (input.signal?.aborted) throw error
     if (isRemoteWorkspaceRuntimeFailure(error)) {
       await settleRemoteWorkspaceRuntimeFailure(input.userId, error)

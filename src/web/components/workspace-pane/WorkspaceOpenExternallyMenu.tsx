@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/pop
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { selectHostPlatform, useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   WORKSPACE_EXTERNAL_APPS,
   workspaceExternalAppAvailable,
@@ -32,7 +32,7 @@ export function useWorkspaceOpenExternallyItems(
   target: WorkspacePaneFilesystemTarget,
 ): readonly WorkspaceExternalAppItem[] {
   const externalApps = useExternalAppSettings()
-  const hostPlatform = useHostInfoStore((state) => state.snapshot?.platform ?? 'web')
+  const hostPlatform = useHostInfoStore(selectHostPlatform)
   return useMemo(() => {
     const capabilities = workspaceFilesystemExternalCapabilities(target)
     const isRemoteWorkspace = isRemoteWorkspaceId(target.workspaceId)

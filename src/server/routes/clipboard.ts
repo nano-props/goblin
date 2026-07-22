@@ -21,6 +21,9 @@ export function createClipboardRoutes() {
   // `Record<string, string | File | (string | File)[]>` to a `File[]`
   // and hand it to the write-paths module.
   app.post('/files', async (c) => {
+    if (!c.req.header('content-type')?.toLowerCase().startsWith('multipart/form-data;')) {
+      return errorJson(c, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be multipart/form-data')
+    }
     let body: Record<string, string | File | (string | File)[]>
     try {
       body = await c.req.parseBody({ all: true })

@@ -25,19 +25,19 @@ export function createTerminalRealtimeHandlers(
 ): RealtimeRpcHandlers<TerminalSocketRequestInputs, TerminalSocketResponseOutputs> {
   return {
     attach(clientId, userId, input) {
-      return host.attach(clientId, userId, { ...input, clientId })
+      return host.attach(clientId, userId, input)
     },
     restart(clientId, userId, input) {
-      return host.restart(clientId, userId, { ...input, clientId })
+      return host.restart(clientId, userId, input)
     },
     write(clientId, userId, input) {
-      return host.write(clientId, userId, { ...input, clientId })
+      return host.write(clientId, userId, input)
     },
     resize(clientId, userId, input) {
-      return host.resize(clientId, userId, { ...input, clientId })
+      return host.resize(clientId, userId, input)
     },
     takeover(clientId, userId, input) {
-      return host.takeover(clientId, userId, { ...input, clientId })
+      return host.takeover(clientId, userId, input)
     },
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)

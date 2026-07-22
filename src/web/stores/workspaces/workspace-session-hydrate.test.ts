@@ -236,7 +236,7 @@ describe('repo session hydration', () => {
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
   })
 
-  test('hydrateRestoredWorkspaceRuntime keeps stub state explicit when warm cache seeds loadedAt', async () => {
+  test('hydrateRestoredWorkspaceRuntime does not promote warm cache to authoritative loaded state', async () => {
     const savedAt = Date.now()
     useWorkspacesStore.setState({
       repoSnapshotCache: {
@@ -273,7 +273,7 @@ describe('repo session hydration', () => {
       entry: localWorkspaceSessionEntry(REPO_A),
       projectionState: 'stub',
     })
-    expect(repo?.capability.kind === 'git' ? repo.capability.git.dataLoads.repoReadModel.loadedAt : null).toBe(savedAt)
+    expect(repo?.capability.kind === 'git' ? repo.capability.git.dataLoads.repoReadModel.loadedAt : null).toBeNull()
   })
 
   test('promotes only the matching existing stub without changing workspace membership', async () => {

@@ -18,21 +18,11 @@ export function createWorkspacePaneRuntimeRealtimeHandlers(
 ): RealtimeRpcHandlers<WorkspacePaneRuntimeSocketRequestInputs, WorkspacePaneRuntimeSocketResponseOutputs> {
   return {
     [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open](clientId, userId, input) {
-      return host.openRuntime(clientId, userId, bindRuntimeProviderClientId(input, clientId))
+      return host.openRuntime(clientId, userId, input)
     },
     [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close](clientId, userId, input) {
       return host.closeRuntime(clientId, userId, input)
     },
-  }
-}
-
-function bindRuntimeProviderClientId(
-  input: WorkspacePaneRuntimeSocketRequestInputs['workspace-pane-runtime.open'],
-  clientId: string,
-): WorkspacePaneRuntimeSocketRequestInputs['workspace-pane-runtime.open'] {
-  switch (input.runtimeType) {
-    case 'terminal':
-      return { ...input, request: { ...input.request, clientId } }
   }
 }
 

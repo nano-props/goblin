@@ -30,6 +30,7 @@ import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
+  remoteTrackingBranchKey,
   type CreateWorktreeMode,
   type CreateWorktreeRequest,
 } from '#/web/components/create-worktree/create-worktree.logic.ts'
@@ -89,7 +90,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
   const [existingBranch, setExistingBranch] = useState(initialBase)
-  const [remoteRef, setRemoteRef] = useState('')
+  const [remoteSelection, setRemoteSelection] = useState('')
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
   const [formPhase, setFormPhase] = useState<CreateWorktreeFormPhase>('editing')
@@ -102,7 +103,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
 
   const remoteTarget = remoteWorkspaceTarget(repo.id, repo.remoteLifecycle)
   const derived = deriveCreateWorktreeForm(
-    { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
+    { mode, base, branch, existingBranch, remoteSelection, localBranch, worktreePath, remoteBranches },
     repo,
     remoteTarget,
     t,
@@ -260,9 +261,9 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                 <Field className="gap-2">
                   <FieldLabel htmlFor="cwt-remote-ref">{t('action.create-worktree-remote-label')}</FieldLabel>
                   <Select
-                    value={derived.selectedRemoteRef}
+                    value={derived.selectedRemoteKey}
                     onValueChange={(next) => {
-                      setRemoteRef(next)
+                      setRemoteSelection(next)
                       setLocalBranch('')
                     }}
                     disabled={creating || remoteBranches.length === 0}
@@ -271,9 +272,13 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                       <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {remoteBranches.map((ref) => (
-                        <SelectItem key={ref} value={ref} textValue={ref}>
-                          <span className="truncate">{ref}</span>
+                      {remoteBranches.map((remote) => (
+                        <SelectItem
+                          key={remoteTrackingBranchKey(remote)}
+                          value={remoteTrackingBranchKey(remote)}
+                          textValue={`${remote.remote}/${remote.branch}`}
+                        >
+                          <span className="truncate">{remote.remote}/{remote.branch}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

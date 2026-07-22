@@ -327,7 +327,6 @@ describe('TerminalSessionProjection create flow', () => {
       kind: 'primary',
       cols: 101,
       rows: 31,
-      clientId: 'client_local',
     })
   })
 
@@ -387,7 +386,6 @@ describe('TerminalSessionProjection create flow', () => {
         kind: 'primary',
         cols: 80,
         rows: 24,
-        clientId: 'client_local',
       },
       insertAfterIdentity: 'workspace-pane:status',
     })
@@ -409,7 +407,6 @@ describe('TerminalSessionProjection create flow', () => {
       startupShellCommand: "bat '/repo/README.md'\r",
       cols: 101,
       rows: 31,
-      clientId: 'client_local',
     })
   })
 
@@ -434,7 +431,6 @@ describe('TerminalSessionProjection create flow', () => {
       startupShellCommand: "bat '/repo/README.md'\r",
       cols: 80,
       rows: 24,
-      clientId: 'client_local',
     })
   })
 
@@ -560,7 +556,6 @@ describe('TerminalSessionProjection create flow', () => {
       startupShellCommand: "bat '/repo/b.ts'\r",
       cols: 80,
       rows: 24,
-      clientId: 'client_local',
     })
   })
 
@@ -634,7 +629,6 @@ describe('TerminalSessionProjection create flow', () => {
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_local',
     })
   })
 
@@ -688,7 +682,6 @@ describe('TerminalSessionProjection create flow', () => {
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_local',
     })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
     await expect(pending).resolves.toBe('term-111111111111111111111')
@@ -713,7 +706,6 @@ describe('TerminalSessionProjection create flow', () => {
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_local',
     })
   })
 
@@ -739,15 +731,13 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('durable close: exact runtime matching does not require the pty reverse index', async () => {
+  test('durable close: exact canonical and runtime identity removes the session', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
-    terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
-
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -762,8 +752,6 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
-    terminalSessionProjectionAccess(projection).terminalSessionIdByTerminalRuntimeSessionId.clear()
-
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
       terminalRuntimeGeneration: 1,

@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
   getBranchWorktreeIdentities: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
+  getHeadHash: vi.fn(),
   getDefaultBranch: vi.fn(),
   resolveRepoCommonDir: vi.fn(),
   resolveRepoObjectsDir: vi.fn(),
@@ -81,6 +82,8 @@ const mocks = vi.hoisted(() => ({
   getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
   getWorktrees: vi.fn(),
+  readWorktreeMembership: vi.fn(),
+  sampleWorktreeStatus: vi.fn(),
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
   cloneGitRepo: vi.fn(),
@@ -96,6 +99,7 @@ const mocks = vi.hoisted(() => ({
   fetchRemoteRepo: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
+  getRemoteSnapshot: vi.fn(),
   getRemoteWorkspacePaneTargetIdentities: vi.fn(),
   resolveRemoteRepoExecutionIdentity: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
@@ -113,6 +117,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getBranches: mocks.getBranches,
   getBranchWorktreeIdentities: mocks.getBranchWorktreeIdentities,
   getCurrentBranch: mocks.getCurrentBranch,
+  getHeadHash: mocks.getHeadHash,
   getDefaultBranch: mocks.getDefaultBranch,
   resolveRepoCommonDir: mocks.resolveRepoCommonDir,
   resolveRepoObjectsDir: mocks.resolveRepoObjectsDir,
@@ -152,7 +157,10 @@ vi.mock('#/system/git/remote.ts', () => ({
 }))
 
 vi.mock('#/system/git/remote-refs.ts', () => ({
-  getRemoteTrackingBranches: vi.fn(async () => ['origin/main', 'origin/feature/a']),
+  getRemoteTrackingBranches: vi.fn(async () => [
+    { ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' },
+    { ref: 'refs/remotes/origin/feature/a', remote: 'origin', branch: 'feature/a' },
+  ]),
 }))
 
 vi.mock('#/system/git/status.ts', () => ({
@@ -162,6 +170,8 @@ vi.mock('#/system/git/status.ts', () => ({
 vi.mock('#/system/git/worktrees.ts', () => ({
   createWorktree: mocks.createWorktree,
   getWorktrees: mocks.getWorktrees,
+  readWorktreeMembership: mocks.readWorktreeMembership,
+  sampleWorktreeStatus: mocks.sampleWorktreeStatus,
   removeWorktree: mocks.removeWorktree,
 }))
 
@@ -202,7 +212,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities: mocks.getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoExecutionIdentity: mocks.resolveRemoteRepoExecutionIdentity,
-  getRemoteSnapshot: vi.fn(),
+  getRemoteSnapshot: mocks.getRemoteSnapshot,
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
   getRemoteWorktreeBootstrapPreview: mocks.getRemoteWorktreeBootstrapPreview,
@@ -291,6 +301,7 @@ beforeEach(async () => {
     generationKey: 'remote-generation-1',
   }))
   mocks.getCurrentBranch.mockResolvedValue('main')
+  mocks.getCurrentBranch.mockResolvedValue('main')
   mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
   )
@@ -300,6 +311,8 @@ beforeEach(async () => {
   mocks.getRepoName.mockResolvedValue('repo')
   mocks.getRepoRoot.mockResolvedValue('/tmp/repo')
   mocks.getWorktrees.mockResolvedValue([])
+  mocks.readWorktreeMembership.mockResolvedValue([])
+  mocks.sampleWorktreeStatus.mockResolvedValue([])
   mocks.getDefaultBranch.mockResolvedValue('main')
   mocks.getUpstream.mockResolvedValue(null)
   mocks.isAncestor.mockResolvedValue(true)
@@ -398,6 +411,16 @@ describe('getRepoSnapshot', () => {
     expect(result).toEqual(snapshot)
     expectNoRepoSnapshotInvalidations()
   })
+
+  test('rejects an authoritative snapshot when branch membership cannot be read', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.getBranches.mockRejectedValueOnce(new Error('git unavailable'))
+
+    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('git unavailable')
+    expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
+  })
 })
 
 describe('getWorkspacePaneTargetIdentities', () => {
@@ -464,6 +487,27 @@ describe('getRepoPullRequests', () => {
 })
 
 describe('fetchRepo invalidation publishing', () => {
+  test('does not execute fetch when affected-worktree discovery fails', async () => {
+    mocks.getWorktrees.mockRejectedValueOnce(new Error('worktree discovery failed'))
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('worktree discovery failed')
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
+  })
+
+  test('does not execute remote fetch when affected-worktree discovery fails', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.getRemoteRepoWorktreePaths.mockRejectedValueOnce(new Error('remote worktree discovery failed'))
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(fetchRepo(repoId, 'user')).rejects.toThrow('remote worktree discovery failed')
+    expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
+  })
+
   test.each([
     ['user', 'user'],
     ['background', 'background'],
@@ -2287,6 +2331,50 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
   })
 
+  test('deleteRepoBranch freezes one upstream read across validation and deletion', async () => {
+    mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
+    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream
+      .mockResolvedValueOnce({
+        ref: 'refs/remotes/origin/feature/a',
+        source: { remote: 'origin', branch: 'feature/a' },
+        deleteTarget: { remote: 'origin', branch: 'feature/a' },
+      })
+      .mockResolvedValueOnce({
+        ref: 'refs/remotes/fork/other',
+        source: { remote: 'fork', branch: 'other' },
+        deleteTarget: { remote: 'fork', branch: 'other' },
+      })
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
+    expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
+    expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
+  })
+
+  test('uses a local upstream for merge safety without attempting remote deletion', async () => {
+    mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
+    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream.mockResolvedValueOnce({
+      ref: 'refs/heads/main',
+      source: { remote: '.', branch: 'main' },
+      deleteTarget: null,
+    })
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })).resolves.toEqual({
+      ok: true,
+      message: 'ok',
+    })
+    expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/heads/main', undefined)
+    expect(mocks.deleteUpstreamBranch).not.toHaveBeenCalled()
+  })
+
   test('deleteRepoBranch does not publish snapshot invalidation after failure', async () => {
     mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
@@ -2452,6 +2540,49 @@ describe('repo mutation invalidation publishing', () => {
         query: 'repo-snapshot',
       },
     )
+  })
+
+  test('removeRepoWorktree freezes one upstream read before worktree removal', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream
+      .mockResolvedValueOnce({
+        ref: 'refs/remotes/origin/feature/a',
+        source: { remote: 'origin', branch: 'feature/a' },
+        deleteTarget: { remote: 'origin', branch: 'feature/a' },
+      })
+      .mockResolvedValueOnce({
+        ref: 'refs/remotes/fork/other',
+        source: { remote: 'fork', branch: 'other' },
+        deleteTarget: { remote: 'fork', branch: 'other' },
+      })
+
+    const result = await removeRepoWorktreeForTest(
+      REPO_ID,
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        deleteBranch: true,
+        deleteUpstream: true,
+      },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
+    expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
+    expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
+    expect(mocks.getUpstream.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
   })
 
   test('removeRepoWorktree publishes affected invalidations after branch deletion fails post-removal', async () => {

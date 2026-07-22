@@ -18,33 +18,18 @@ import type {
   ClientWorkspacePaneTabs,
 } from '#/web/client-bridge-types.ts'
 
-/**
- * Compute the client's capability set from the live `goblinNative`
- * bridge. The capability list is intentionally a *projection* of the
- * preload's exposed methods, not a hard-coded constant — a partial
- * preload (e.g. an older Electron build that hasn't added
- * `openDirectoryDialog` yet) will simply not advertise the missing
- * capabilities, and the client's UI gates (`canOpenAppSettings`,
- * `hasNativeDirectoryPicker`, …) will quietly hide themselves.
- *
- * This collapses the previous "static Electron capability list + a
- * separate `electronBridge` factory" into a single source of truth:
- * what the bridge is *capable* of is what the bridge *has*.
- */
+/** The complete native preload contract exposes this fixed capability set. */
 function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<ClientNativeCapability> {
-  const caps = new Set<ClientNativeCapability>()
-  if (typeof bridge.invokeIpc === 'function') caps.add('settings-ipc')
-  if (bridge.host?.openSettingsWindow) caps.add('open-settings-window')
-  if (bridge.host?.openExternalUrl) caps.add('open-external-url')
-  if (bridge.host?.openDirectoryDialog) caps.add('open-directory-dialog')
-  if (bridge.host?.consumeExternalOpenPaths) caps.add('consume-external-open-paths')
-  // `terminal` is typed as required on `GoblinNativeBridge` but a
-  // test or older preload may omit it; the `?.` keeps the runtime
-  // safe without forcing every mock to declare a stub.
-  const terminal = bridge.terminal
-  if (terminal?.notifyBell || terminal?.sendTestNotification) caps.add('terminal-notifications')
-  if (terminal?.setBadge) caps.add('terminal-badge')
-  return caps
+  void bridge
+  return new Set<ClientNativeCapability>([
+    'global-shortcut',
+    'open-settings-window',
+    'open-external-url',
+    'open-directory-dialog',
+    'consume-external-open-paths',
+    'terminal-notifications',
+    'terminal-badge',
+  ])
 }
 
 /**
@@ -70,7 +55,8 @@ function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
   // query token so cookie auth remains the effective channel.
   const fromBootstrap = readWebBootstrap().initialServer
   if (fromBootstrap?.url) {
-    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '', clientId: readClientPageId() }
+    if (fromBootstrap.accessToken === undefined) throw new Error('Initial server access token is missing')
+    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken, clientId: readClientPageId() }
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return { url: window.location.origin, accessToken: '', clientId: readClientPageId() }
@@ -104,7 +90,8 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
       realtime: appRealtime,
       notificationProvider: createTerminalNotificationProvider(),
       setBadge: (count: number) => {
-        readNativeBridge()?.terminal?.setBadge?.(count)
+        const bridge = readNativeBridge()
+        if (bridge) bridge.terminal.setBadge(count)
       },
     }),
     workspacePaneTabs: createServerWorkspacePaneTabsClient(appRealtime),
@@ -117,9 +104,7 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
  * The single client bridge. Replaces the previous
  * `electronBridge()` / `webBridge()` pair: there is no longer a
  * runtime-specific factory, just one bridge whose every method
- * reads `window.goblinNative` lazily and falls through to a safe
- * default (throw for IPC, return false for abort, return null for
- * shell, etc.) when the native bridge is absent.
+ * reads `window.goblinNative` lazily for genuinely native capabilities.
  *
  * Why this is the right shape:
  *
@@ -141,7 +126,7 @@ function createClientBridge(): ClientBridge {
     if (!server) return null
     return createHttpClipboardBackend({
       url: server.url,
-      accessToken: server.accessToken ?? '',
+      accessToken: server.accessToken,
     })
   })()
 
@@ -156,13 +141,8 @@ function createClientBridge(): ClientBridge {
       return bridge ? capabilitiesFromBridge(bridge).has(capability) : false
     },
     getBootstrap() {
-      // Read the bootstrap lazily on every call. The web-runtime
-      // bootstrap is composed from `window.__GOBLIN_BOOTSTRAP__`,
-      // the `<script id="goblin-bootstrap">` tag, and the URL query
-      // — all of which can be populated at different times during
-      // boot. Eager capture here would lock the first read (often
-      // empty) into the bridge and prevent later, more populated
-      // reads from being observed by `bootstrap.ts`'s re-read loop.
+      // The bridge exposes the current bootstrap source; bootstrap.ts owns
+      // the single authoritative capture used by the application.
       return readWebBootstrap()
     },
     invokeIpc(request: IpcRequest) {
@@ -182,7 +162,7 @@ function createClientBridge(): ClientBridge {
     },
     onEffectIntent(cb: (event: ClientEffectIntent) => void) {
       const bridge = readNativeBridge()
-      return bridge?.onIntent?.(cb) ?? (() => {})
+      return bridge ? bridge.onIntent(cb) : () => {}
     },
     pathForFile(file: File) {
       const bridge = readNativeBridge()
@@ -190,23 +170,12 @@ function createClientBridge(): ClientBridge {
       return bridge.pathForFile(file)
     },
     saveClipboardFiles(files: File[]) {
-      // Native bridge takes precedence (Electron writes under
-      // `<os.tmpdir>/goblin-clipboard-<pid>/`). The HTTP backend is
-      // the web fallback. A native preload that hasn't been
-      // upgraded to expose `saveClipboardFiles` (older versions)
-      // collapses to the HTTP backend instead of throwing.
-      const bridge = readNativeBridge()
-      if (bridge && typeof bridge.saveClipboardFiles === 'function') {
-        return bridge.saveClipboardFiles(files)
-      }
-      if (!clipboardBackend) return Promise.resolve([])
+      if (!clipboardBackend) throw new Error('Clipboard file persistence is unavailable')
       return clipboardBackend.saveClipboardFiles(files)
     },
     async rotateAccessToken() {
       const bridge = readNativeBridge()
-      if (!bridge?.rotateAccessToken) {
-        throw new Error('Token rotation is unavailable in this runtime')
-      }
+      if (!bridge) throw new Error('Token rotation is unavailable in this runtime')
       return await bridge.rotateAccessToken()
     },
     host(): ClientHostBridge | null {

@@ -1,4 +1,3 @@
-import { getEmbeddedServerIpcRoute, type EmbeddedServerIpcPath } from '#/shared/embedded-server-ipc-routes.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 
 export interface EmbeddedServerRuntime {
@@ -9,6 +8,7 @@ export interface EmbeddedServerRuntime {
 export async function requestEmbeddedServerJson<T>(
   runtime: EmbeddedServerRuntime,
   path: string,
+  decode: (value: unknown) => T,
   init?: RequestInit,
 ): Promise<T> {
   const response = await fetch(new URL(path, runtime.url).toString(), {
@@ -19,16 +19,17 @@ export async function requestEmbeddedServerJson<T>(
     },
   })
   if (!response.ok) throw new Error(`Embedded server request failed (${response.status})`)
-  return (await response.json()) as T
+  return decode(await response.json())
 }
 
 export async function postEmbeddedServerJson<T>(
   runtime: EmbeddedServerRuntime,
   path: string,
   body: object,
+  decode: (value: unknown) => T,
   options?: { signal?: AbortSignal },
 ): Promise<T> {
-  return await requestEmbeddedServerJson<T>(runtime, path, {
+  return await requestEmbeddedServerJson(runtime, path, decode, {
     method: 'POST',
     signal: options?.signal,
     headers: {
@@ -36,17 +37,4 @@ export async function postEmbeddedServerJson<T>(
     },
     body: JSON.stringify(body),
   })
-}
-
-export async function invokeEmbeddedServerIpc<T>(
-  runtime: EmbeddedServerRuntime,
-  path: EmbeddedServerIpcPath,
-  input?: object,
-  options?: { signal?: AbortSignal },
-): Promise<T> {
-  const route = getEmbeddedServerIpcRoute(path)
-  if (!route) throw new Error(`Unsupported embedded server route: ${path}`)
-  if (route.method === 'GET')
-    return await requestEmbeddedServerJson<T>(runtime, route.route, { method: 'GET', signal: options?.signal })
-  return await postEmbeddedServerJson<T>(runtime, route.route, input ?? {}, options)
 }

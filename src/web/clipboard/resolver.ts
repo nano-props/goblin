@@ -29,10 +29,9 @@ export interface PasteResolution {
  *    files copied from the OS filesystem (`webUtils.getPathForFile`).
  *    The web bridge always returns `''`, so this tier is effectively
  *    skipped on web.
- * 2. **Blob save** — persist remaining blobs via the runtime backend.
- *    Electron writes through `goblin:clipboard-save-binary-files` IPC;
- *    web POSTs multipart to `/api/clipboard/files`. The backend either
- *    returns one path per input or `[]` on transport failure.
+ * 2. **Blob save** — persist remaining blobs through the shared server endpoint.
+ *    Both browser and Electron clients POST multipart to `/api/clipboard/files`. Backend failures reject
+ *    and are surfaced by the caller.
  *
  * Caller surfaces:
  * - `paths.length === 0` and backend failures → `paste-file-failed` toast.

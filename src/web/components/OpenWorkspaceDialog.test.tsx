@@ -10,6 +10,8 @@ import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
 const mocks = vi.hoisted(() => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
@@ -31,7 +33,11 @@ beforeEach(() => {
   mocks.getLocalDirectoryPathSuggestions.mockResolvedValue([])
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
-    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    runtime: {
+      kind: 'electron',
+      bridgeVersion: CLIENT_BRIDGE_VERSION,
+      capabilities: ELECTRON_CLIENT_CAPABILITIES,
+    },
     initialServer: null,
   }
   // Host info used to live in the bootstrap payload; it now lives
@@ -41,20 +47,21 @@ beforeEach(() => {
   // mocking `fetch`.
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
-    hydrated: true,
+    status: 'ready',
+    error: null,
   })
-  testWindow.goblinNative = {
-    pathForFile: () => '',
+  testWindow.goblinNative = currentNativeBridge({
     host: {
+      openSettingsWindow: async () => true,
+      openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
       openDirectoryDialog: async () => '/Users/tester/Developer/repo',
+      consumeExternalOpenPaths: async () => [],
     },
     invokeIpc: async (request: { path: string; input?: unknown }) => {
       ipcCalls.push(request)
       return null
     },
-    abortIpc: async () => true,
-    onEvent: () => () => {},
-  }
+  })
 })
 
 afterEach(() => {
