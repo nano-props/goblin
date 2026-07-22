@@ -15,6 +15,9 @@ const viteArgs = [localBin('vite'), '--host', webDevHost, '--port', String(webDe
 const electronArgs = [
   localBin('electron'),
   '.',
+  ...(process.env.GOBLIN_ELECTRON_USER_DATA_DIR?.trim()
+    ? [`--user-data-dir=${process.env.GOBLIN_ELECTRON_USER_DATA_DIR.trim()}`]
+    : []),
   // Optional Chrome DevTools Protocol port for agent-browser. Off
   // by default; `AGENT_BROWSER_CDP_PORT=9222 bun run dev` enables
   // it. Only used for end-to-end testing.

@@ -1567,7 +1567,20 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(processSnapshot.sessions[0]).toMatchObject({ processName: 'node' })
 
     const beforeResize = processSnapshot.revision
-    expect(manager.resizeSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)).toBe(true)
+    expect(
+      manager.resizeSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration + 1,
+        100,
+        30,
+        CLIENT_ID,
+      ),
+    ).toBe(false)
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, scope).sessions[0]).toMatchObject({ cols: 80, rows: 24 })
+    expect(
+      manager.resizeSession(USER_ID, created.terminalRuntimeSessionId, created.terminalRuntimeGeneration, 100, 30, CLIENT_ID),
+    ).toBe(true)
     const resizedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
     expect(resizedSnapshot.revision).toBe(beforeResize)
     expect(resizedSnapshot.sessions[0]).toMatchObject({ cols: 100, rows: 30 })

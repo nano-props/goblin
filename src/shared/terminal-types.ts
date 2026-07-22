@@ -250,11 +250,16 @@ export interface TerminalWriteInput {
 
 export interface TerminalResizeInput {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   cols: number
   rows: number
 }
 
-export type TerminalTakeoverInput = TerminalResizeInput
+export interface TerminalTakeoverInput {
+  terminalRuntimeSessionId: string
+  cols: number
+  rows: number
+}
 
 export interface TerminalSessionInput {
   terminalRuntimeSessionId: string

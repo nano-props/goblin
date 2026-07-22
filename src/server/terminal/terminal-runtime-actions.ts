@@ -159,11 +159,20 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId)) return false
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !Number.isSafeInteger(input?.terminalRuntimeGeneration) ||
+        input.terminalRuntimeGeneration < 0 ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return false
       }
-      return manager.resizeSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
+      return manager.resizeSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.cols,
+        input.rows,
+        clientId,
+      )
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {

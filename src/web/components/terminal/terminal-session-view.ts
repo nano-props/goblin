@@ -103,6 +103,16 @@ export class TerminalSessionView {
     return !!this.host?.isConnected
   }
 
+  private beginPendingLayout(): void {
+    this.frame.style.visibility = 'hidden'
+  }
+
+  reveal(term: XTermTerminal): boolean {
+    if (this.term !== term || !this.host?.isConnected) return false
+    this.frame.style.visibility = ''
+    return true
+  }
+
   blurIfFocused(): void {
     blurElementIfFocused(this.frame)
   }
@@ -121,6 +131,7 @@ export class TerminalSessionView {
     geometry: { cols: number; rows: number },
     onMacOptionInput: (input: TerminalInput) => void,
   ): XTermTerminal {
+    this.beginPendingLayout()
     const theme = terminalThemeForCurrentDocument()
     const term = new Terminal({
       ...createTerminalSizingOptions(geometry),
@@ -197,9 +208,11 @@ export class TerminalSessionView {
     }, RESIZE_DEBOUNCE_MS)
   }
 
-  fitNow(): void {
-    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
+  fitNow(): boolean {
+    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return false
     this.fitAddon.fit()
+    this.refreshVisibleBuffer(this.term)
+    return true
   }
 
   private needsRefit(): boolean {
@@ -223,6 +236,7 @@ export class TerminalSessionView {
     this.searchAddon = null
     this.term?.dispose()
     this.term = null
+    this.frame.style.visibility = ''
     this.xtermHost.replaceChildren()
     if (!this.frame.contains(this.xtermHost)) this.frame.appendChild(this.xtermHost)
   }
@@ -393,6 +407,11 @@ export class TerminalSessionView {
   private fitForFontLoad(term: XTermTerminal): void {
     if (this.term !== term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
+    this.refreshVisibleBuffer(term)
+  }
+
+  private refreshVisibleBuffer(term: XTermTerminal): void {
+    term.refresh(0, Math.max(0, term.rows - 1))
   }
 
   private cancelFitFlush(): void {

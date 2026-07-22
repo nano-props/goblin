@@ -464,6 +464,17 @@ describe('shared terminal validators', () => {
     }
   })
 
+  test('accepts takeover requests without a runtime generation', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_takeover',
+        action: 'takeover',
+        input: { terminalRuntimeSessionId: 'pty_request_123456789', cols: 100, rows: 30 },
+      }),
+    ).toMatchObject({ action: 'takeover' })
+  })
+
   test('rejects client identity and unknown fields on terminal request envelopes', () => {
     const request = {
       type: 'request',

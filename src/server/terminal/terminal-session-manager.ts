@@ -431,6 +431,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   resizeSession(
     userId: TUser,
     terminalRuntimeSessionId: string,
+    terminalRuntimeGeneration: number,
     cols: number,
     rows: number,
     clientId: string,
@@ -440,6 +441,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!size) return false
     const session = this.getSession(userId, terminalRuntimeSessionId)
     if (!session) return false
+    if (session.terminalRuntimeGeneration !== terminalRuntimeGeneration) return false
     if (this.isSessionClosing(terminalRuntimeSessionId)) return false
     registerTerminalClient(session, clientId, size.cols, size.rows)
     if (!isAuthoritative(session, clientId, 'resize', this.sessionPresence(session))) return false

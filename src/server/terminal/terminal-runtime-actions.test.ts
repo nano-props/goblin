@@ -405,7 +405,12 @@ describe('terminal-runtime-actions clientId gate', () => {
     const { actions, manager } = makeActions({ closeSessionForUserOutcome: () => ({ kind: 'already-closed' }) })
 
     await actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
-    actions.resize(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, cols: 80, rows: 24 } as never)
+    actions.resize(CLIENT_ID, USER_ID, {
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 0,
+      cols: 80,
+      rows: 24,
+    })
     actions.takeover(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       cols: 80,
@@ -425,7 +430,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the session-level clientId.
     expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 0, 80, 24, CLIENT_ID)
     expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
     expect(manager.restartSessionWithProjectionOutcome).toHaveBeenCalledWith(
       USER_ID,

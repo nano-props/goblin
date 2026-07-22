@@ -81,7 +81,13 @@ const TerminalWriteInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   data: TerminalWriteDataSchema,
 })
-const TerminalResizeInputSchema = TerminalAttachInputSchema
+const TerminalResizeInputSchema = v.strictObject({
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  cols: TerminalColsSchema,
+  rows: TerminalRowsSchema,
+})
+const TerminalTakeoverInputSchema = TerminalAttachInputSchema
 const TerminalSessionInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
@@ -369,7 +375,7 @@ const TerminalClientMessageSchema = v.variant('type', [
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('takeover'),
-    input: TerminalResizeInputSchema,
+    input: TerminalTakeoverInputSchema,
   }),
   v.strictObject({
     type: v.literal('request'),

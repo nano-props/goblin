@@ -703,6 +703,11 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(session.snapshot().phase).toBe('opening')
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(terminalCalls.resize).not.toHaveBeenCalled()
+    expect(xtermMocks.terminals[0]!.refresh.mock.invocationCallOrder[0]).toBeLessThan(
+      terminalCalls.attach.mock.invocationCallOrder[0]!,
+    )
     xtermMocks.terminals[0]!.emitData('typed-before-attach')
     await flushTerminalStart()
     expect(terminalCalls.write).not.toHaveBeenCalled()
@@ -711,7 +716,42 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     expect(session.snapshot().phase).toBe('open')
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(notify).not.toHaveBeenCalledWith('projection-delta-revision', expect.any(Number))
+  })
+
+  test('holds xterm resize mutations until snapshot replay has committed', async () => {
+    xtermMocks.deferWriteCallbacks(true)
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'screen' }))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    const term = xtermMocks.terminals[0]!
+    term.resize(90, 25)
+    term.emitUserData('typed-during-replay')
+    await flushTerminalStart()
+
+    expect(terminalCalls.resize).not.toHaveBeenCalled()
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+
+    xtermMocks.flushDeferredWriteCallbacks()
+    xtermMocks.deferWriteCallbacks(false)
+    await flushUntil(
+      () => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '',
+    )
+    await flushTerminalStart()
+
+    expect(terminalCalls.resize).toHaveBeenCalledTimes(1)
+    expect(terminalCalls.resize).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      cols: 90,
+      rows: 25,
+    })
   })
 
   test('does not treat an existing error snapshot attach as an operation-owned delta', async () => {
@@ -728,6 +768,57 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'error')
 
     expect(notify).not.toHaveBeenCalledWith('projection-delta-revision', expect.any(Number))
+  })
+
+  test('does not attach or reveal when the host becomes unmeasurable before fit', async () => {
+    const measurableRect = {
+      width: 800,
+      height: 400,
+      top: 0,
+      left: 0,
+      bottom: 400,
+      right: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect
+    const hiddenRect = { ...measurableRect, width: 0, height: 0, right: 0, bottom: 0 } as DOMRect
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect)
+      .mockImplementationOnce(() => measurableRect)
+      .mockReturnValue(hiddenRect)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).not.toHaveBeenCalled()
+    expect(host.querySelector('.goblin-managed-terminal-frame .xterm')).toBeNull()
+  })
+
+  test('drops a resize authorization that belongs to a superseded start epoch', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    terminalCalls.resize.mockClear()
+
+    xtermMocks.terminals[0]!.resize(90, 25)
+    await Promise.resolve()
+    session.restart()
+    await flushTerminalStart()
+
+    expect(terminalCalls.resize).not.toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      cols: 90,
+      rows: 25,
+    })
   })
 
   test('does not close the server session when deselected while attach is in flight', async () => {
@@ -807,7 +898,7 @@ describe('TerminalSession', () => {
     await flushFontRefit()
 
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
-    expect(term.refresh).not.toHaveBeenCalled()
+    expect(term.refresh).toHaveBeenCalledWith(0, 29)
 
     term.refresh.mockClear()
     fitAddon.fit.mockClear()
@@ -816,7 +907,7 @@ describe('TerminalSession', () => {
     await flushFontRefit()
 
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
-    expect(term.refresh).not.toHaveBeenCalled()
+    expect(term.refresh).toHaveBeenCalledWith(0, 29)
   })
 
   test('does not force scroll position across font refits', async () => {
@@ -1149,6 +1240,29 @@ describe('TerminalSession', () => {
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
   })
 
+  test('keeps a replacement xterm hidden until restart and replay commit', async () => {
+    const restart = deferred<TerminalRestartResult>()
+    terminalCalls.restart.mockReturnValueOnce(restart.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+
+    session.restart()
+    await flushUntil(() => terminalCalls.restart.mock.calls.length === 1)
+
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+
+    restart.resolve(restartResult('pty_session_2_aaaaaaaaa'))
+    await flushUntil(
+      () => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '',
+    )
+
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
+  })
+
   test('keeps the server session addressable when restart fails', async () => {
     terminalCalls.restart.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
     const host = document.createElement('div')
@@ -1293,11 +1407,13 @@ describe('TerminalSession', () => {
     expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(1, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
       cols: 101,
       rows: 31,
     })
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
       cols: 101,
       rows: 31,
     })
@@ -2276,7 +2392,7 @@ describe('TerminalSession', () => {
     expect(terminalCalls.write).not.toHaveBeenCalled()
   })
 
-  test('forwards xterm core-attributed user input while replay is being written', async () => {
+  test('drops xterm core-attributed user input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1, outputEra: 0 }),
     )
@@ -2294,13 +2410,10 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      data: 'input during replay',
-    })
+    expect(terminalCalls.write).not.toHaveBeenCalled()
   })
 
-  test('forwards xterm binary mouse input while replay is being written', async () => {
+  test('drops xterm binary mouse input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1, outputEra: 0 }),
     )
@@ -2318,10 +2431,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      data: '\x1b[M ##',
-    })
+    expect(terminalCalls.write).not.toHaveBeenCalled()
   })
 
   test('resets the terminal before replaying the snapshot', async () => {

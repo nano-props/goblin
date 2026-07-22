@@ -69,6 +69,16 @@ interface PendingOutputWrite {
   checkpoint: RenderedOutputCheckpoint
 }
 
+interface PendingResize {
+  cols: number
+  rows: number
+  startEpoch: number
+  terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
+}
+
+type GeometryMutationPhase = 'idle' | 'awaiting-attach' | 'awaiting-replay' | 'attached'
+
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: TerminalNotify
@@ -84,10 +94,11 @@ export class TerminalSession {
   private startEpoch = 0
   private geometryAbortController: AbortController | null = null
   private resizeFlushScheduled = false
+  private geometryMutationPhase: GeometryMutationPhase = 'idle'
   private outputFlushFrame: number | null = null
   private readonly renderQueue: TerminalRenderQueue
 
-  private pendingResize: { cols: number; rows: number } | null = null
+  private pendingResize: PendingResize | null = null
   private pendingOutput: PendingOutputWrite[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
@@ -204,6 +215,9 @@ export class TerminalSession {
   }
 
   writeInput(input: TerminalInput): void {
+    if (this.geometryMutationPhase === 'awaiting-attach' || this.geometryMutationPhase === 'awaiting-replay') {
+      return
+    }
     const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     if (!terminalRuntimeSessionId || !this.runtime.canSendInput()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
@@ -273,8 +287,18 @@ export class TerminalSession {
 
   private flushResize(): void {
     const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    const terminalRuntimeGeneration = this.runtime.currentTerminalRuntimeGeneration()
     const resize = this.pendingResize
-    if (!terminalRuntimeSessionId || !resize) return
+    if (!terminalRuntimeSessionId || terminalRuntimeGeneration === null || !resize) return
+    if (
+      resize.startEpoch !== this.startEpoch ||
+      resize.terminalRuntimeSessionId !== terminalRuntimeSessionId ||
+      resize.terminalRuntimeGeneration !== terminalRuntimeGeneration ||
+      this.geometryMutationPhase !== 'attached'
+    ) {
+      this.pendingResize = null
+      return
+    }
     if (!this.runtime.canSendInput()) return
     this.pendingResize = null
     const { cols, rows } = resize
@@ -294,13 +318,30 @@ export class TerminalSession {
         // could land on a torn-down session's terminalRuntimeSessionId and the
         // server would echo the resize back to whichever sibling
         // tab is now the controller.
-        if (this.disposed || this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId) return
+        if (
+          this.disposed ||
+          this.startEpoch !== resize.startEpoch ||
+          this.geometryMutationPhase !== 'attached' ||
+          this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId
+        )
+          return
         if (result.kind === 'denied') {
           this.reportGateDenial('resize', result.reason, terminalRuntimeSessionId)
           return
         }
-        return terminalClient.resize({ terminalRuntimeSessionId, cols, rows }).then((ok) => {
-          if (ok && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId)
+        return terminalClient.resize({
+          terminalRuntimeSessionId,
+          terminalRuntimeGeneration,
+          cols,
+          rows,
+        }).then((ok) => {
+          if (
+            ok &&
+            this.startEpoch === resize.startEpoch &&
+            this.geometryMutationPhase === 'attached' &&
+            this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId &&
+            this.runtime.currentTerminalRuntimeGeneration() === terminalRuntimeGeneration
+          )
             this.runtime.acknowledgeResize(cols, rows)
         })
       })
@@ -678,6 +719,7 @@ export class TerminalSession {
         this.notifyAttachProjectionRevision(result)
         return
       }
+      this.geometryMutationPhase = 'awaiting-replay'
       if (result.frame === 'stream' && preloadReplayGeneration !== null) {
         // This is a protocol invariant failure, not a state to reconcile:
         // stream means no history existed, while a non-empty preload means
@@ -691,6 +733,9 @@ export class TerminalSession {
           ? await this.replayPhase(epoch, attempt, term, result)
           : this.streamPhase(epoch, attempt, term, result)
       this.finalizePhase(epoch, term, metadataChanged)
+      if (!this.view.reveal(term)) throw new StartCancelledError()
+      this.geometryMutationPhase = 'attached'
+      this.queueResize(term.cols, term.rows)
     } catch (err) {
       if (err instanceof StartCancelledError) {
         // A newer start has superseded this one. Drop the replay
@@ -757,22 +802,14 @@ export class TerminalSession {
         throw err
       }
       if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
+      this.geometryMutationPhase = 'awaiting-attach'
       const term = this.view.openTerminal({ cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }, (input) =>
         this.writeInput(input),
       )
       await waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
-      this.view.fitNow()
+      if (!this.view.fitNow()) throw new TerminalHostNotMeasurableError('terminal host became unmeasurable')
       preloadReplayGeneration = await this.preloadHydratedSnapshot(epoch, term)
-      // The post-fitNow rAF barrier is intentionally concurrent with the
-      // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
-      // term.cols/term.rows are correct the moment we return from openPhase,
-      // and the attach IPC reads them synchronously when ipcPhase runs.
-      // The rAF settles the *layout paint* for measurement accuracy in
-      // later operations, but the attach roundtrip doesn't need that
-      // paint to have completed. A future local geometry optimization
-      // MUST restore the blocking wait before trusting local geometry.
-      void waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
       return { term, preloadReplayGeneration }
     } catch (err) {
@@ -1053,10 +1090,19 @@ export class TerminalSession {
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.runtime.currentTerminalRuntimeSessionId() || !this.runtime.canSendInput()) return
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    const terminalRuntimeGeneration = this.runtime.currentTerminalRuntimeGeneration()
+    if (!terminalRuntimeSessionId || terminalRuntimeGeneration === null || !this.runtime.canSendInput()) return
+    if (this.geometryMutationPhase !== 'attached') return
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
-    this.pendingResize = { cols, rows }
+    this.pendingResize = {
+      cols,
+      rows,
+      startEpoch: this.startEpoch,
+      terminalRuntimeSessionId,
+      terminalRuntimeGeneration,
+    }
     if (this.resizeFlushScheduled) return
     this.resizeFlushScheduled = true
     queueMicrotask(() => {
@@ -1227,6 +1273,7 @@ export class TerminalSession {
     this.cancelResizeFlush()
     this.clearPendingOutput()
     this.pendingResize = null
+    this.geometryMutationPhase = 'idle'
     this.pendingWriteBuffer = ''
     this.inputFlushScheduled = false
     this.clearExternalCommandGate()
