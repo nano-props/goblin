@@ -80,21 +80,21 @@ describe('client workspace persistence', () => {
 
     expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
-    expect(raw).toMatchObject({ version: 1, state: presentation })
+    expect(raw).toEqual(presentation)
   })
 
   test('preserves parseable corruption in the current browser format', async () => {
-    const corrupt = JSON.stringify({ version: 1, state: { zenMode: 'yes' } })
+    const corrupt = JSON.stringify({ ...currentState(), zenMode: 'yes' })
     localStorage.setItem('goblin.workspace', corrupt)
     await expect(readClientWorkspaceState()).rejects.toThrow()
     expect(localStorage.getItem('goblin.workspace')).toBe(corrupt)
   })
 
-  test('preserves an unsupported future browser version and fails closed', async () => {
+  test('rejects an obsolete browser version envelope', async () => {
     const future = JSON.stringify({ version: 2, state: {} })
     localStorage.setItem('goblin.workspace', future)
 
-    await expect(readClientWorkspaceState()).rejects.toThrow('Unsupported browser client workspace state version: 2')
+    await expect(readClientWorkspaceState()).rejects.toThrow()
     expect(localStorage.getItem('goblin.workspace')).toBe(future)
   })
 
@@ -132,24 +132,16 @@ describe('client workspace persistence', () => {
       zenMode: state.zenMode,
       restoredWorkspaceId: state.restoredWorkspaceId,
     }
-    localStorage.setItem('goblin.workspace', JSON.stringify({ version: 1, state: reordered }))
+    localStorage.setItem('goblin.workspace', JSON.stringify(reordered))
 
     await expect(readClientWorkspaceState()).resolves.toEqual(state)
   })
 
-  test('preserves a current envelope with unknown root data and fails closed', async () => {
-    const raw = JSON.stringify({ version: 1, state: currentState(), unknownRoot: 'preserve' })
+  test('preserves state with unknown root data and fails closed', async () => {
+    const raw = JSON.stringify({ ...currentState(), unknownRoot: 'preserve' })
     localStorage.setItem('goblin.workspace', raw)
 
-    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt browser client workspace state envelope')
-    expect(localStorage.getItem('goblin.workspace')).toBe(raw)
-  })
-
-  test('preserves unversioned state with unknown root data and fails closed', async () => {
-    const raw = JSON.stringify({ ...currentState(), unknownLegacyRoot: 'preserve' })
-    localStorage.setItem('goblin.workspace', raw)
-
-    await expect(readClientWorkspaceState()).rejects.toThrow('Corrupt browser client workspace state envelope')
+    await expect(readClientWorkspaceState()).rejects.toThrow()
     expect(localStorage.getItem('goblin.workspace')).toBe(raw)
   })
 

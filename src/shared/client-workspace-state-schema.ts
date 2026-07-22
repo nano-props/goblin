@@ -50,6 +50,21 @@ export function decodeCurrentClientWorkspaceState(value: unknown): ClientWorkspa
   return v.parse(ClientWorkspaceStateSchema, value)
 }
 
+/**
+ * Client workspace persistence is the current state object itself. Keep this
+ * codec shared by Electron and Web: do not add a version/envelope at either
+ * storage adapter, because that turns an application update into a boot gate.
+ * Evolve the state schema directly and let the startup owner decide how an
+ * invalid snapshot recovers.
+ */
+export function parseClientWorkspaceStateJson(raw: string): ClientWorkspaceState {
+  return decodeCurrentClientWorkspaceState(JSON.parse(raw))
+}
+
+export function stringifyClientWorkspaceState(state: ClientWorkspaceState): string {
+  return JSON.stringify(decodeCurrentClientWorkspaceState(state))
+}
+
 function hasCanonicalClientWorkspaceIdentities(state: ClientWorkspaceState): boolean {
   for (const [key, sessionId] of Object.entries(state.selectedTerminalSessionIdByTerminalFilesystemTarget)) {
     if (!parseTerminalFilesystemTargetKey(key) || !sessionId) return false

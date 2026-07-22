@@ -66,6 +66,9 @@ Code that needs the combined state should use `workspaceRestoreStatusFromStore` 
   in `ServerWorkspaceState`; live runtime tabs remain projection-only.
 - The client persists only `ClientWorkspaceState`: in native `userData` for
   Electron, and in local storage for Web.
+- Native and Web use the shared client-workspace JSON codec. The persisted
+  payload is the state object itself: do not add a storage version or envelope.
+  A persisted UI snapshot must not become an application-update boot gate.
 - The server reads the shared `ServerWorkspaceState.openRepoEntries` membership at boot;
   the server returns canonical entries and runtime identities.
 - Do not compose client and server workspace persistence into a whole-session payload.
