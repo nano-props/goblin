@@ -439,10 +439,94 @@ describe('WorkspacePane', () => {
 
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('list')).toBeTruthy()
-    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+    expect(screen.getByText('dashboard.directory.working-directory')).toBeTruthy()
+    expect(screen.queryByText('branch-status.signal.worktree')).toBeNull()
+    const workingDirectoryLink = screen.getByText('/tmp/plain-status-workspace')
+    expect(workingDirectoryLink).toBeTruthy()
+    expect(
+      workingDirectoryLink.closest('[role="listitem"]')?.querySelector('svg')?.parentElement?.className,
+    ).toContain('text-brand-text')
     expect(screen.getByText('7')).toBeTruthy()
     expect(screen.getByText('3')).toBeTruthy()
     expect(screen.getByText('2.0 KB')).toBeTruthy()
+  })
+
+  test('marks an unavailable directory size for attention while leaving ordinary counts neutral', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-unavailable-size')
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-status-unavailable-size'),
+    })
+    useWorkspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
+      topLevelFileCount: 1,
+      topLevelDirectoryCount: 2,
+      totalSizeBytes: null,
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    const unavailableSize = screen.getByText('—').closest('[role="listitem"]')
+    expect(unavailableSize?.querySelector('svg')?.parentElement?.className).toContain('text-attention')
+    expect(screen.getByText('1').closest('[role="listitem"]')?.querySelector('svg')?.parentElement?.className).toContain(
+      'text-muted-foreground',
+    )
+  })
+
+  test('opens Files from the working-directory row in a non-Git Status tab', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-files-workspace')
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-status-files-workspace'),
+    })
+    useWorkspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
+      topLevelFileCount: 1,
+      topLevelDirectoryCount: 2,
+      totalSizeBytes: 3,
+    })
+    const showWorkspaceRootPaneTab = vi.fn(() => true)
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={{ ...navigation, showWorkspaceRootPaneTab }}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    screen.getByRole('button', { name: 'dashboard.directory.open-files' }).click()
+
+    await waitFor(() =>
+      expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+        workspaceId,
+        { kind: 'static', tab: 'files' },
+        presentationOptions(),
+      ),
+    )
   })
 
   test('uses the workspace-root route as presentation authority over the saved preference', () => {
