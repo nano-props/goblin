@@ -32,6 +32,10 @@ export interface RealtimeBrokerOptions {
  */
 export const REALTIME_HEARTBEAT_INTERVAL_MS = 30_000
 export const REALTIME_HEARTBEAT_DEADLINE_MS = 90_000
+// This is a process resource limit, not an identity quota. The embedded
+// server currently derives one user from its single access token, so a
+// per-user limit would be equivalent while failing to cap total descriptors
+// if the identity model expands later.
 export const MAX_APP_REALTIME_SOCKETS = 32
 
 export class AppRealtimeSocketLimitError extends Error {

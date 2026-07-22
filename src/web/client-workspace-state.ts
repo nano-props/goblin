@@ -7,7 +7,6 @@ import { readNativeBridge } from '#/web/native-bridge.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
-const CLIENT_WORKSPACE_STORAGE_LOCK = 'goblin.client-workspace-state'
 
 export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> {
   if (readNativeBridge()) {
@@ -21,7 +20,7 @@ export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> 
     }
     throw new Error('Invalid native client workspace read result')
   }
-  return await withBrowserClientWorkspaceLock(async () => {
+  try {
     const storage = browserClientWorkspaceStorage()
     const raw = storage.getItem(CLIENT_WORKSPACE_STORAGE_KEY)
     if (raw === null) return defaultClientWorkspaceState()
@@ -34,10 +33,10 @@ export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> 
     if (!hasExactKeys(parsed, ['version', 'state'])) throw new Error('Corrupt browser client workspace state envelope')
     if (!isRecord(parsed.state)) throw new Error('Corrupt browser client workspace state')
     return decodeCurrentClientWorkspaceState(parsed.state)
-  }).catch((err: unknown) => {
+  } catch (err) {
     sessionLog.warn('failed to read local workspace state', { err })
     throw err
-  })
+  }
 }
 
 export async function writeClientWorkspaceState(state: ClientWorkspaceState): Promise<void> {
@@ -50,12 +49,10 @@ export async function writeClientWorkspaceState(state: ClientWorkspaceState): Pr
       await invokeNativeIpcPath('clientWorkspace.write', current)
       return
     }
-    await withBrowserClientWorkspaceLock(async () => {
-      browserClientWorkspaceStorage().setItem(
-        CLIENT_WORKSPACE_STORAGE_KEY,
-        JSON.stringify({ version: CLIENT_WORKSPACE_STATE_VERSION, state: current }),
-      )
-    })
+    browserClientWorkspaceStorage().setItem(
+      CLIENT_WORKSPACE_STORAGE_KEY,
+      JSON.stringify({ version: CLIENT_WORKSPACE_STATE_VERSION, state: current }),
+    )
   } catch (err) {
     sessionLog.warn('failed to persist local workspace state', { err })
     throw err
@@ -66,12 +63,6 @@ function browserClientWorkspaceStorage(): Storage {
   const storage = globalThis.localStorage
   if (!storage) throw new Error('Browser storage unavailable for client workspace state')
   return storage
-}
-
-async function withBrowserClientWorkspaceLock<T>(operation: () => Promise<T>): Promise<T> {
-  const locks = globalThis.navigator?.locks
-  if (!locks) throw new Error('Web Locks unavailable for client workspace state')
-  return await locks.request(CLIENT_WORKSPACE_STORAGE_LOCK, { mode: 'exclusive' }, operation)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

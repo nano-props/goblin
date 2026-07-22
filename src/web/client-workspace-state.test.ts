@@ -13,14 +13,6 @@ import * as nativeHostClient from '#/web/native-host-client.ts'
 
 beforeEach(() => {
   localStorage.clear()
-  Object.defineProperty(navigator, 'locks', {
-    configurable: true,
-    value: {
-      request: vi.fn(async (_name: string, _options: LockOptions, callback: LockGrantedCallback<unknown>) =>
-        await callback({ name: 'goblin.client-workspace-state', mode: 'exclusive' }),
-      ),
-    },
-  })
 })
 afterEach(() => vi.restoreAllMocks())
 
@@ -119,39 +111,15 @@ describe('client workspace persistence', () => {
     }
   })
 
-  test('fails closed when the cross-context workspace lock owner is unavailable', async () => {
-    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined })
+  test('uses the atomic single-key storage boundary without Web Locks', async () => {
+    const request = vi.fn(() => Promise.reject(new Error('lock must not be used')))
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } })
+    const state = currentState({ zenMode: true })
 
-    await expect(readClientWorkspaceState()).rejects.toThrow('Web Locks unavailable')
-    await expect(writeClientWorkspaceState(currentState())).rejects.toThrow(
-      'Web Locks unavailable',
-    )
-  })
+    await writeClientWorkspaceState(state)
 
-  test('serializes browser reads and writes through the same exclusive cross-context lock', async () => {
-    localStorage.setItem(
-      'goblin.workspace',
-      JSON.stringify({ version: 1, state: currentState() }),
-    )
-
-    await Promise.all([
-      readClientWorkspaceState(),
-      writeClientWorkspaceState(currentState({ zenMode: true })),
-    ])
-
-    expect(navigator.locks.request).toHaveBeenCalledTimes(2)
-    expect(navigator.locks.request).toHaveBeenNthCalledWith(
-      1,
-      'goblin.client-workspace-state',
-      { mode: 'exclusive' },
-      expect.any(Function),
-    )
-    expect(navigator.locks.request).toHaveBeenNthCalledWith(
-      2,
-      'goblin.client-workspace-state',
-      { mode: 'exclusive' },
-      expect.any(Function),
-    )
+    await expect(readClientWorkspaceState()).resolves.toEqual(state)
+    expect(request).not.toHaveBeenCalled()
   })
 
   test('accepts a valid current state independently of object property order', async () => {
