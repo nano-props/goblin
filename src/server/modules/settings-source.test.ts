@@ -180,7 +180,7 @@ test.each([-1, 1.5, 3601, Number.NaN])('rejects invalid direct fetch interval %s
   expect(await mod.getServerFetchIntervalSec()).toBe(before)
 })
 
-test('leaves corrupt settings JSON in place and fails every read', async () => {
+test('replaces malformed settings JSON with defaults', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -188,100 +188,67 @@ test('leaves corrupt settings JSON in place and fails every read', async () => {
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow()
-  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow()
-  expect(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8')).toBe('{bad json')
-  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
-})
-
-test('leaves a structurally corrupt settings root in place and fails every read', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify([]), 'utf-8')
-
-  const mod = await import('#/server/modules/settings-source.ts')
-
-  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('settings root must be an object')
-  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('settings root must be an object')
-  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual([])
-  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
-})
-
-test('does not confuse a persisted JSON null with missing settings', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const file = path.join(tmp, 'user-settings.json')
-  await writeFile(file, 'null', 'utf-8')
-
-  const mod = await import('#/server/modules/settings-source.ts')
-
-  await expect(mod.getUserSettings()).rejects.toThrow('settings root must be an object')
-  await expect(mod.getUserSettings()).rejects.toThrow('settings root must be an object')
-  expect(await readFile(file, 'utf-8')).toBe('null')
-  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
-})
-
-test('leaves invalid current-version settings fields in place and fails every read', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify({ version: 1, theme: 'bogus' }), 'utf-8')
-
-  const mod = await import('#/server/modules/settings-source.ts')
-  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
-  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
-  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual({
-    version: 1,
-    theme: 'bogus',
+  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
+    lang: 'auto',
+    theme: 'auto',
+    workspace: defaultServerWorkspaceState(),
   })
   expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
-test('fails closed without moving or overwriting settings from a newer version', async () => {
+test.each([[], null])('replaces an invalid settings root %j with defaults', async (root) => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const newer = { version: 2, theme: 'dark', futureSetting: true }
-  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify(newer), 'utf-8')
+  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify(root), 'utf-8')
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getUserSettings()).rejects.toThrow('unsupported settings version: 2')
-  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual(newer)
+  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
+    lang: 'auto',
+    theme: 'auto',
+    workspace: defaultServerWorkspaceState(),
+  })
   expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
-test('fails closed without moving or overwriting unversioned settings', async () => {
+test('replaces settings containing invalid known values with defaults', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify({ theme: 'bogus' }), 'utf-8')
+  const file = path.join(tmp, 'user-settings.json')
+  await writeFile(file, JSON.stringify({ theme: 'bogus' }), 'utf-8')
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getUserSettings()).rejects.toThrow('unsupported settings version: undefined')
-  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toEqual({ theme: 'bogus' })
+  await expect(mod.getUserSettings()).resolves.toMatchObject({ lang: 'auto', theme: 'auto', fetchIntervalSec: 120 })
+  expect(JSON.parse(await readFile(file, 'utf-8'))).toMatchObject({
+    lang: 'auto',
+    theme: 'auto',
+    workspace: defaultServerWorkspaceState(),
+  })
   expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
-test('does not decode unversioned durable settings', async () => {
+test('removes unknown settings fields while preserving recognized values', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const oversizedEntry = { id: `goblin+file:///${'a'.repeat(4096)}` }
-  await writeFile(
-    path.join(tmp, 'user-settings.json'),
-    JSON.stringify({
-      workspace: { openWorkspaceEntries: [oversizedEntry] },
-      recentWorkspaces: [oversizedEntry],
-    }),
-    'utf-8',
-  )
+  const initial = await import('#/server/modules/settings-source.ts')
+  await initial.updateUserSettings({ theme: 'dark' })
+  initial.resetServerSettingsSourceForTests()
+  vi.resetModules()
+  const file = path.join(tmp, 'user-settings.json')
+  const persisted = JSON.parse(await readFile(file, 'utf-8'))
+  await writeFile(file, JSON.stringify({ ...persisted, version: 2, futureSetting: true }), 'utf-8')
 
   const mod = await import('#/server/modules/settings-source.ts')
-  await expect(mod.getServerWorkspaceState()).rejects.toThrow('unsupported settings version: undefined')
+  await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'dark' })
+  const rewritten = JSON.parse(await readFile(file, 'utf-8'))
+  expect(rewritten).not.toHaveProperty('version')
+  expect(rewritten).not.toHaveProperty('futureSetting')
 })
 
 test('fails fast when the settings file cannot be read', async () => {
@@ -903,7 +870,7 @@ function requiredFileWorkspaceLocator(worktreePath: string) {
   return root
 }
 
-test('leaves malformed workspace external app recent entries in place and fails every read', async () => {
+test('replaces settings containing malformed workspace entries with defaults', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -938,8 +905,11 @@ test('leaves malformed workspace external app recent entries in place and fails 
 
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getServerWorkspaceSettings()).rejects.toThrow('invalid current settings shape')
-  await expect(mod.getServerWorkspaceSettings()).rejects.toThrow('invalid current settings shape')
+  await expect(mod.getServerWorkspaceSettings()).resolves.toEqual([])
+  expect(JSON.parse(await readFile(settingsFile, 'utf-8'))).toMatchObject({
+    workspaceSettings: [],
+    workspace: defaultServerWorkspaceState(),
+  })
   expect(existsSync(settingsFile)).toBe(true)
   expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })

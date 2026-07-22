@@ -72,12 +72,12 @@ test('retries default settings initialization after a transient write failure', 
   await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
 })
 
-test('leaves corrupt settings in place and fails every read without writing defaults', async () => {
-  persistence.stored = { version: 1, theme: 'bogus' }
+test('replaces invalid persisted settings with defaults', async () => {
+  persistence.stored = { theme: 'bogus' }
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
-  await expect(mod.getUserSettings()).rejects.toThrow('invalid current settings shape')
-  expect(persistence.writeUserSettingsJson).not.toHaveBeenCalled()
-  expect(persistence.stored).toEqual({ version: 1, theme: 'bogus' })
+  await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
+  expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(1)
+  expect(persistence.stored).toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
+  expect(persistence.stored).not.toHaveProperty('version')
 })

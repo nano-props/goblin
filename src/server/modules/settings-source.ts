@@ -77,12 +77,10 @@ interface UserSettingsData {
   workspaceSettings: WorkspaceSettingsEntry[]
 }
 
-const USER_SETTINGS_VERSION = 1
 type UserSettingsReadOutcome =
   | { kind: 'missing' }
-  | { kind: 'current'; data: UserSettingsData }
-  | { kind: 'corrupt'; error: Error }
-  | { kind: 'unsupported'; error: Error }
+  | { kind: 'current'; data: UserSettingsData; needsRewrite: boolean }
+  | { kind: 'invalid' }
 
 export type UserSettingsPatch = Partial<UserSettings>
 
@@ -313,49 +311,62 @@ function currentSettingsData(raw: Record<string, unknown>): UserSettingsData | n
     recentWorkspaces: normalizeRecentWorkspaces(raw.recentWorkspaces),
     workspaceSettings: normalizeWorkspaceSettings(raw.workspaceSettings),
   }
-  return isDeepStrictEqual({ version: USER_SETTINGS_VERSION, ...decoded }, raw) ? decoded : null
+  const recognizedRaw = {
+    lang: raw.lang,
+    theme: raw.theme,
+    colorTheme: raw.colorTheme,
+    fetchIntervalSec: raw.fetchIntervalSec,
+    terminalNotificationsEnabled: raw.terminalNotificationsEnabled,
+    shortcutsDisabled: raw.shortcutsDisabled,
+    globalShortcutDisabled: raw.globalShortcutDisabled,
+    globalShortcut: raw.globalShortcut,
+    lanEnabled: raw.lanEnabled,
+    workspace: raw.workspace,
+    recentWorkspaces: raw.recentWorkspaces,
+    workspaceSettings: raw.workspaceSettings,
+  }
+  return isDeepStrictEqual(decoded, recognizedRaw) ? decoded : null
 }
 
 async function readUserSettingsFile(): Promise<UserSettingsReadOutcome> {
-  const persisted = await readUserSettingsJson()
+  let persisted: Awaited<ReturnType<typeof readUserSettingsJson>>
+  try {
+    persisted = await readUserSettingsJson()
+  } catch (error) {
+    if (error instanceof SyntaxError) return { kind: 'invalid' }
+    throw error
+  }
   if (persisted.kind === 'missing') return { kind: 'missing' }
   const raw = persisted.value
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { kind: 'corrupt', error: new Error('settings root must be an object') }
-  }
-  const version = (raw as Record<string, unknown>).version
-  if (version !== USER_SETTINGS_VERSION) {
-    return { kind: 'unsupported', error: new Error(`unsupported settings version: ${String(version)}`) }
-  }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { kind: 'invalid' }
   const current = currentSettingsData(raw as Record<string, unknown>)
-  if (!current) {
-    return { kind: 'corrupt', error: new Error('invalid current settings shape') }
-  }
-  return { kind: 'current', data: current }
+  if (!current) return { kind: 'invalid' }
+  return { kind: 'current', data: current, needsRewrite: !isDeepStrictEqual(current, raw) }
 }
 
 async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
-  await writeUserSettingsJson({ version: USER_SETTINGS_VERSION, ...data })
+  await writeUserSettingsJson(data)
+}
+
+function defaultUserSettingsData(): UserSettingsData {
+  return {
+    ...defaultUserSettings(),
+    workspace: defaultWorkspace(),
+    recentWorkspaces: [],
+    workspaceSettings: [],
+  }
 }
 
 async function loadUserSettings(): Promise<UserSettingsData> {
   if (settingsData) return settingsData
   settingsLoadPromise ??= (async () => {
     const persisted = await readUserSettingsFile()
-    if (persisted.kind === 'unsupported') throw persisted.error
     let data: UserSettingsData
     if (persisted.kind === 'current') {
       data = persisted.data
+      if (persisted.needsRewrite) await writeUserSettingsFile(data)
     } else {
-      if (persisted.kind === 'corrupt') {
-        throw persisted.error
-      }
-      data = {
-        ...defaultUserSettings(),
-        workspace: defaultWorkspace(),
-        recentWorkspaces: [],
-        workspaceSettings: [],
-      }
+      data = defaultUserSettingsData()
       await writeUserSettingsFile(data)
     }
     settingsData = data
