@@ -658,6 +658,32 @@ describe('TerminalSession', () => {
     expect(session.snapshot().phase).toBe('open')
   })
 
+  test('does not attach until the fitted xterm render callback has completed', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => xtermMocks.terminals.length === 1)
+    const term = xtermMocks.terminals[0]!
+    let renderComplete = false
+    term.refresh.mockImplementationOnce(() => {
+      requestAnimationFrame(() => {
+        renderComplete = true
+      })
+    })
+    terminalCalls.attach.mockImplementationOnce(async () => {
+      expect(renderComplete).toBe(true)
+      return attachResult('pty_session_1_aaaaaaaaa')
+    })
+
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+  })
+
   test('keeps the fresh xterm intact and renders realtime output from sequence 1', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
@@ -686,6 +712,27 @@ describe('TerminalSession', () => {
 
     expect(term.reset).not.toHaveBeenCalled()
     expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
+  })
+
+  test('admits keyboard input after a fresh stream is revealed without waiting for first output', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => xtermMocks.terminals.length === 1)
+    await flushUntil(
+      () => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '',
+    )
+    xtermMocks.terminals[0]!.emitUserData('l')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'l',
+    })
   })
 
   test('marks an already-open server session as opening while the local xterm attach is pending', async () => {
@@ -3214,6 +3261,14 @@ async function flushTerminalStart(): Promise<void> {
 async function flushResizeDispatch(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
+}
+
+async function flushMicrotasksUntil(predicate: () => boolean): Promise<void> {
+  for (let i = 0; i < 20; i += 1) {
+    if (predicate()) return
+    await Promise.resolve()
+  }
+  throw new Error('microtask condition was not met')
 }
 
 async function flushFontRefit(): Promise<void> {

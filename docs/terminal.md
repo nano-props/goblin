@@ -466,7 +466,20 @@ The client input pipeline therefore uses an internal envelope:
 - **user intent**: keyboard input, text paste, file paste/drop resolution, mobile toolbar helpers, and explicit UI command writes
 - **terminal-emulator input**: data emitted by xterm as terminal protocol traffic
 
-Replay boundaries suppress terminal-emulator input while replay is in progress, but still allow attributed user intent. This keeps replay a rendering operation instead of a hidden stdin writer.
+Input admission also depends on presentation lifecycle. While a newly created
+xterm is hidden behind the startup layout barrier (`awaiting-attach` or
+`awaiting-replay`), the client discards all input, including attributed user
+intent. It does not buffer and later flush startup keystrokes: doing so could
+deliver stale commands after a different authoritative snapshot has committed,
+and an unbounded queue would become a second input authority. Input becomes
+admissible only after attach and replay have committed and the fitted xterm has
+been revealed.
+
+Outside that hidden startup boundary, replay attribution still distinguishes
+the source of input. A replay boundary suppresses terminal-emulator protocol
+replies while allowing attributed user intent when the attached terminal is
+already presentation-ready. This keeps replay a rendering operation instead of
+a hidden stdin writer without weakening startup admission.
 
 ### Fresh stream and recovery frame contract
 

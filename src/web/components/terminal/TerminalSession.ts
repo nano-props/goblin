@@ -733,6 +733,11 @@ export class TerminalSession {
           ? await this.replayPhase(epoch, attempt, term, result)
           : this.streamPhase(epoch, attempt, term, result)
       this.finalizePhase(epoch, term, metadataChanged)
+      // xterm batches refreshes from fit and replay through its own rAF
+      // debouncer. Keep the frame hidden until that render has run and a
+      // browser paint opportunity has passed.
+      await waitForTerminalLayout()
+      this.assertCurrentStart(epoch, term)
       if (!this.view.reveal(term)) throw new StartCancelledError()
       this.geometryMutationPhase = 'attached'
       this.queueResize(term.cols, term.rows)
@@ -809,6 +814,10 @@ export class TerminalSession {
       await waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
       if (!this.view.fitNow()) throw new TerminalHostNotMeasurableError('terminal host became unmeasurable')
+      // fitNow queues a full xterm refresh. Its renderer is asynchronous, so
+      // attach must not overtake the fitted frame's render callback.
+      await waitForTerminalLayout()
+      this.assertCurrentStart(epoch, term)
       preloadReplayGeneration = await this.preloadHydratedSnapshot(epoch, term)
       this.assertCurrentStart(epoch, term)
       return { term, preloadReplayGeneration }

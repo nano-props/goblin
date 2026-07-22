@@ -448,7 +448,10 @@ describe('shared terminal validators', () => {
       { action: 'attach', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
       { action: 'restart', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
       { action: 'write', input: { terminalRuntimeSessionId, data: 'echo test' } },
-      { action: 'resize', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+      {
+        action: 'resize',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
       { action: 'takeover', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
     ] as const
 
@@ -473,6 +476,28 @@ describe('shared terminal validators', () => {
         input: { terminalRuntimeSessionId: 'pty_request_123456789', cols: 100, rows: 30 },
       }),
     ).toMatchObject({ action: 'takeover' })
+  })
+
+  test('requires a valid runtime generation on resize requests', () => {
+    const request = {
+      type: 'request',
+      requestId: 'request_resize',
+      action: 'resize',
+      input: {
+        terminalRuntimeSessionId: 'pty_request_123456789',
+        terminalRuntimeGeneration: 1,
+        cols: 100,
+        rows: 30,
+      },
+    } as const
+
+    expect(normalizeTerminalClientMessage(request)).toMatchObject({ action: 'resize' })
+    expect(
+      normalizeTerminalClientMessage({
+        ...request,
+        input: { ...request.input, terminalRuntimeGeneration: -1 },
+      }),
+    ).toBeNull()
   })
 
   test('rejects client identity and unknown fields on terminal request envelopes', () => {
