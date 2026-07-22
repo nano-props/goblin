@@ -165,22 +165,7 @@ const NON_CHILD_NODE_KEYS = new Set([
 ])
 
 function parserPlugins(filePath: string): ParserPlugin[] {
-  return [
-    ['typescript', { dts: filePath.endsWith('.d.ts') }],
-    'jsx',
-    'importMeta',
-    'dynamicImport',
-    'exportNamespaceFrom',
-    'topLevelAwait',
-    'importAttributes',
-    'importAssertions',
-    'decorators-legacy',
-    'classProperties',
-    'classPrivateProperties',
-    'classPrivateMethods',
-    'classStaticBlock',
-    'explicitResourceManagement',
-  ]
+  return [['typescript', { dts: filePath.endsWith('.d.ts') }], 'jsx', 'importMeta', 'decorators-legacy']
 }
 
 function isNode(value: unknown): value is BabelNode {

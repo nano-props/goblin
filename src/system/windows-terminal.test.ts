@@ -149,7 +149,7 @@ describe('openInWindowsTerminal', () => {
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
       const unref = vi.fn()
-      execaMock.mockReturnValue({ unref })
+      execaMock.mockReturnValue({ nodeChildProcess: { unref } })
 
       // Open the temp dir we already set up — absolute + isDirectory()
       // are guaranteed, and the assertion below checks the exact string

@@ -49,7 +49,7 @@ export async function openInWindowsTerminal(p: string): Promise<{ ok: boolean; m
       timeout: OPEN_TIMEOUT_MS,
       forceKillAfterDelay: 500,
     })
-    child.unref()
+    child.nodeChildProcess.unref()
     await child
     return { ok: true, message: p }
   } catch (err) {

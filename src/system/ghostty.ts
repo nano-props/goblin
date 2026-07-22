@@ -98,7 +98,7 @@ async function launchOrActivateGhostty(args: string[]): Promise<void> {
     timeout: OPEN_TIMEOUT_MS,
     forceKillAfterDelay: 500,
   })
-  child.unref()
+  child.nodeChildProcess.unref()
   await child
 }
 

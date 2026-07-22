@@ -25,7 +25,8 @@ function makeTempDir(): string {
 
 /** Route the mocked `execa` by command: osascript calls resolve/reject a
  *  promise (the warm path awaits `.then` directly), `open` calls return an
- *  object with `.unref()` (the cold path calls that before awaiting). */
+ *  object exposing the underlying child process (the cold path unrefs it
+ *  before awaiting). */
 function mockOsascriptOnce(result: { stdout: string } | Error) {
   execaMock.mockImplementationOnce(() => (result instanceof Error ? Promise.reject(result) : Promise.resolve(result)))
 }
@@ -33,7 +34,7 @@ function mockOsascriptOnce(result: { stdout: string } | Error) {
 function mockOpenOnce(result: 'ok' | Error) {
   execaMock.mockImplementationOnce(() => {
     if (result instanceof Error) throw result
-    return { unref: vi.fn() }
+    return { nodeChildProcess: { unref: vi.fn() } }
   })
 }
 
