@@ -53,9 +53,9 @@ function worktreePorcelain(lines: string): string {
     .join(NUL)}${NUL}${NUL}`
 }
 
-function upstreamOutput(remote: string, branch: string): string {
+function upstreamOutput(remote: string, branch: string, trackState = '='): string {
   const ref = remote === '.' ? `refs/heads/${branch}` : `refs/remotes/${remote}/${branch}`
-  return [ref, remote, `refs/heads/${branch}`].join(NUL)
+  return [ref, remote, `refs/heads/${branch}`, trackState].join(NUL)
 }
 
 const PRIMARY_WORKTREE_OUTPUT = worktreePorcelain(
@@ -332,7 +332,7 @@ describe('remote git helpers', () => {
           case 'gitIsAncestor':
             return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
           case 'gitUpstream':
-            return okRemoteResult(NUL + NUL)
+            return okRemoteResult(NUL.repeat(3))
           case 'gitBranchDelete':
             return okRemoteResult('Deleted branch feature/test')
           default:
@@ -348,6 +348,44 @@ describe('remote git helpers', () => {
       { type: 'gitIsAncestor', path: '/srv/repo', ancestor: 'feature/test', descendant: 'release/1.0' },
       TARGET,
       { signal: undefined },
+    )
+  })
+
+  test('deleteRemoteBranch does not query ancestry against a missing tracking ref', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'value release/1.0',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'value main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              '',
+            ].join('\n'),
+          )
+        case 'gitWorktreeList':
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test', ''))
+        case 'gitIsAncestor':
+          return command.descendant === 'release/1.0'
+            ? okRemoteResult('false')
+            : failRemoteResult('missing tracking ref reached ancestry check')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run })
+
+    expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged' })
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitIsAncestor')).toHaveLength(1)
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitBranchDelete' }),
+      TARGET,
+      expect.anything(),
     )
   })
 
@@ -476,7 +514,7 @@ describe('remote git helpers', () => {
           case 'gitIsAncestor':
             return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
           case 'gitUpstream':
-            return okRemoteResult(NUL + NUL)
+            return okRemoteResult(NUL.repeat(3))
           case 'gitWorktreeRemove':
             return okRemoteResult('Removed worktree')
           case 'gitBranchDelete':
@@ -511,6 +549,53 @@ describe('remote git helpers', () => {
       { type: 'gitBranchDelete', path: '/srv/repo', branch: 'feature/test', force: false },
       TARGET,
       { signal: undefined, timeoutMs: 180_000 },
+    )
+  })
+
+  test('removeRemoteWorktree refuses safely without querying a missing tracking ref', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(
+              'worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main\n\nworktree /srv/repo-feature\nHEAD ba5eba1\nbranch refs/heads/feature/test',
+            ),
+          )
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitSnapshot':
+          return okRemoteResult(
+            '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+          )
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test', ''))
+        case 'gitIsAncestor':
+          return command.descendant === 'main'
+            ? okRemoteResult('false')
+            : failRemoteResult('missing tracking ref reached ancestry check')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove,
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: true,
+      run,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitIsAncestor')).toHaveLength(1)
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeRemove' }),
+      TARGET,
+      expect.anything(),
     )
   })
 
@@ -788,7 +873,7 @@ describe('remote git helpers', () => {
               ? okRemoteResult('true')
               : okRemoteResult('false')
           case 'gitUpstream':
-            return okRemoteResult(NUL + NUL)
+            return okRemoteResult(NUL.repeat(3))
           case 'gitWorktreeRemove':
             return okRemoteResult('Removed worktree')
           case 'gitBranchDelete':
@@ -920,7 +1005,7 @@ describe('remote git helpers', () => {
             'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
           )
         case 'gitUpstream':
-          return okRemoteResult(NUL + NUL)
+          return okRemoteResult(NUL.repeat(3))
         case 'gitPush':
           return okRemoteResult('pushed')
         default:
@@ -1076,7 +1161,7 @@ describe('remote git helpers', () => {
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
       }
-      if (command.type === 'gitUpstream') return okRemoteResult(NUL + NUL)
+      if (command.type === 'gitUpstream') return okRemoteResult(NUL.repeat(3))
       if (command.type === 'gitIsAncestor') return failRemoteResult('merge read failed')
       return okRemoteResult('')
     })

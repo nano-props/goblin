@@ -623,7 +623,7 @@ function createLocalRepoSource(
     })
     const mergedToCurrent = !options?.force && current ? await isAncestor(gitCwd, branch, current, signal) : false
     const mergedToUpstream =
-      !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream.ref, signal) : false
+      !options?.force && upstream?.ancestryRef ? await isAncestor(gitCwd, branch, upstream.ancestryRef, signal) : false
     return validateBranchDeletionPolicy({
       branch,
       currentBranch: current ?? undefined,

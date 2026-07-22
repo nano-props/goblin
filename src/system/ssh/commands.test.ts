@@ -48,13 +48,17 @@ describe('remote ssh command builders', () => {
       path: repo,
       branch: 'main',
     })
-    await expect(execa('bash', ['-lc', withoutUpstream.script])).resolves.toMatchObject({ stdout: '\0\0' })
+    await expect(execa('bash', ['-lc', withoutUpstream.script])).resolves.toMatchObject({ stdout: '\0\0\0' })
 
     await execa('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.test/repo.git'])
     await execa('git', ['-C', repo, 'config', 'branch.main.remote', 'origin'])
     await execa('git', ['-C', repo, 'config', 'branch.main.merge', 'refs/heads/main'])
-    const withUpstream = await execa('bash', ['-lc', withoutUpstream.script])
-    expect(withUpstream.stdout).toBe('refs/remotes/origin/main\0origin\0refs/heads/main')
+    const withMissingTrackingRef = await execa('bash', ['-lc', withoutUpstream.script])
+    expect(withMissingTrackingRef.stdout).toBe('refs/remotes/origin/main\0origin\0refs/heads/main\0')
+
+    await execa('git', ['-C', repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD'])
+    const withResolvableTrackingRef = await execa('bash', ['-lc', withoutUpstream.script])
+    expect(withResolvableTrackingRef.stdout).toBe('refs/remotes/origin/main\0origin\0refs/heads/main\0=')
   })
 
   testPosix('encodes ancestor true and false while preserving Git errors', async () => {

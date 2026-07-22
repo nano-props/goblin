@@ -1,6 +1,9 @@
 import { isSafeBranchName, isSafeRefName, isSafeRemoteName } from '#/shared/refnames.ts'
 
-export const GIT_UPSTREAM_FORMAT = '%(upstream)%00%(upstream:remotename)%00%(upstream:remoteref)'
+export const GIT_UPSTREAM_FORMAT =
+  '%(upstream)%00%(upstream:remotename)%00%(upstream:remoteref)%00%(upstream:trackshort)'
+
+const RESOLVABLE_TRACK_STATES = new Set(['=', '>', '<', '<>'])
 
 export interface GitUpstreamSource {
   remote: string
@@ -8,17 +11,25 @@ export interface GitUpstreamSource {
 }
 
 export interface GitUpstream {
-  ref: string
+  /** A locally resolvable ref that is safe to pass to ancestry checks. */
+  ancestryRef: string | null
   source: GitUpstreamSource
   deleteTarget: GitUpstreamSource | null
 }
 
 export function decodeGitUpstream(output: string): GitUpstream | null {
   const fields = output.split('\0')
-  if (fields.length !== 3) throw new Error('Git returned an invalid upstream')
-  const [ref, remote, remoteRef] = fields
-  if (!ref && !remote && !remoteRef) return null
-  if (!ref || !remote || !remoteRef || !isSafeRefName(ref) || (remote !== '.' && !isSafeRemoteName(remote))) {
+  if (fields.length !== 4) throw new Error('Git returned an invalid upstream')
+  const [configuredRef, remote, remoteRef, trackState] = fields
+  if (!configuredRef && !remote && !remoteRef && !trackState) return null
+  if (
+    !configuredRef ||
+    !remote ||
+    !remoteRef ||
+    !isSafeRefName(configuredRef) ||
+    (remote !== '.' && !isSafeRemoteName(remote)) ||
+    (trackState !== '' && !RESOLVABLE_TRACK_STATES.has(trackState))
+  ) {
     throw new Error('Git returned an invalid upstream')
   }
   const branchPrefix = 'refs/heads/'
@@ -26,5 +37,9 @@ export function decodeGitUpstream(output: string): GitUpstream | null {
   const branch = remoteRef.slice(branchPrefix.length)
   if (!isSafeBranchName(branch)) throw new Error('Git returned an invalid upstream')
   const source = { remote, branch }
-  return { ref, source, deleteTarget: remote === '.' ? null : source }
+  return {
+    ancestryRef: trackState === '' ? null : configuredRef,
+    source,
+    deleteTarget: remote === '.' ? null : source,
+  }
 }

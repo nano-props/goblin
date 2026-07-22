@@ -1190,8 +1190,8 @@ async function getRemoteBranchMergeFacts(
     })
   }
   let mergedToUpstream = false
-  if (options.upstream) {
-    mergedToUpstream = await getRemoteIsAncestor(target, branch, options.upstream.ref, {
+  if (options.upstream?.ancestryRef) {
+    mergedToUpstream = await getRemoteIsAncestor(target, branch, options.upstream.ancestryRef, {
       signal: options.signal,
       run: options.run,
       path: gitPath,
