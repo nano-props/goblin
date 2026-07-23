@@ -16,8 +16,6 @@ describe('terminalCreateErrorKey', () => {
     [new Error('App realtime socket closed before open (1006)'), 'error.terminal-connection-unavailable'],
     [new Error('Terminal socket error before open'), 'error.terminal-connection-unavailable'],
     [new Error('App realtime socket error before open'), 'error.terminal-connection-unavailable'],
-    [new Error('terminal create geometry wait timed out after 5000ms'), 'error.terminal-host-not-measurable'],
-    [new Error('host is inside a display:none subtree'), 'error.terminal-host-not-measurable'],
     [new Error('boom'), 'error.terminal-create-failed'],
   ])('maps %s to %s', (error, expectedKey) => {
     expect(terminalCreateErrorKey(error)).toBe(expectedKey)

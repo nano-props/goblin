@@ -1,17 +1,23 @@
-import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import {
+  spawnTerminalPtyRuntime,
+  type TerminalPtyRuntime,
+  type TerminalPtyRuntimeEventOwnership,
+} from '#/server/terminal/terminal-pty-runtime.ts'
 import {
   createPtyHandle,
   type PtySpawnInput,
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
+import { createPtyEventChannel, type PtyEventChannel } from '#/server/terminal/pty-event-lease.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { StickyCompletion } from '#/server/terminal/sticky-completion.ts'
 
 interface PtyEntry {
   runtime: TerminalPtyRuntime
+  events: PtyEventChannel
+  nativeEvents: TerminalPtyRuntimeEventOwnership
   exitCompletion: StickyCompletion
-  exitDisposable: { dispose(): void } | null
   killRequested: boolean
   killOperation: Promise<void> | null
 }
@@ -50,35 +56,56 @@ export function createInProcessPtySupervisor(): PtySupervisor {
   return {
     mode: 'in-process',
     async spawn(input: PtySpawnInput): Promise<PtySpawnResult> {
-      const result = spawnTerminalPtyRuntime(input)
-      if (!result.ok) return { ok: false, message: result.message }
+      if (shuttingDown) return { ok: false, message: 'PTY supervisor stopped' }
       const handle = createPtyHandle(createPtySessionId())
-      const entry: PtyEntry = {
+      const events = createPtyEventChannel()
+      const exitCompletion = new StickyCompletion()
+      let entry: PtyEntry | null = null
+      const result = spawnTerminalPtyRuntime(input, {
+        onData(data, processName) {
+          events.sink.data({ data, processName })
+        },
+        onExit() {
+          if (!exitCompletion.complete()) return
+          if (entry && entries.get(handle.ptySessionId) === entry) entries.delete(handle.ptySessionId)
+          events.sink.exit(null, null)
+        },
+      })
+      if (!result.ok) {
+        events.lease.dispose()
+        exitCompletion.complete()
+        return { ok: false, message: result.message }
+      }
+      entry = {
         runtime: result.runtime,
-        exitCompletion: new StickyCompletion(),
-        exitDisposable: null,
+        events,
+        nativeEvents: result.events,
+        exitCompletion,
         killRequested: false,
         killOperation: null,
       }
-      entries.set(handle.ptySessionId, entry)
-      try {
-        const exitDisposable = entry.runtime.onExit(() => {
-          if (entry.exitCompletion.completed) return
-          entry.exitDisposable?.dispose()
-          entry.exitDisposable = null
-          if (entries.get(handle.ptySessionId) === entry) entries.delete(handle.ptySessionId)
-          entry.exitCompletion.complete()
-        })
-        if (entry.exitCompletion.completed) exitDisposable.dispose()
-        else entry.exitDisposable = exitDisposable
-      } catch (error) {
-        entries.delete(handle.ptySessionId)
-        try {
-          entry.runtime.kill()
-        } catch {}
-        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      if (!exitCompletion.completed) entries.set(handle.ptySessionId, entry)
+      return {
+        ok: true,
+        handle,
+        processName: safeProcessName(entry.runtime),
+        events: {
+          claim(observer) {
+            const claim = entry.events.lease.claim(observer)
+            return {
+              activate: () => claim.activate(),
+              dispose: () => {
+                claim.dispose()
+                entry.nativeEvents.disposeData()
+              },
+            }
+          },
+          dispose() {
+            entry.events.lease.dispose()
+            entry.nativeEvents.disposeData()
+          },
+        },
       }
-      return { ok: true, handle, processName: entry.runtime.processName() || 'terminal' }
     },
     async write(handle, data) {
       const entry = entries.get(handle.ptySessionId)
@@ -90,54 +117,29 @@ export function createInProcessPtySupervisor(): PtySupervisor {
         return { status: 'indeterminate' }
       }
     },
-    resize(handle, cols, rows) {
-      entries.get(handle.ptySessionId)?.runtime.resize(cols, rows)
+    async resize(handle, cols, rows) {
+      const entry = entries.get(handle.ptySessionId)
+      if (!entry) return false
+      try {
+        entry.runtime.resize(cols, rows)
+        return true
+      } catch {
+        return false
+      }
     },
     kill(handle) {
       const entry = entries.get(handle.ptySessionId)
       if (entry) requestKill(entry)
     },
+    async waitForExit(handle) {
+      const entry = entries.get(handle.ptySessionId)
+      if (!entry) return
+      await entry.exitCompletion.waitUntilCompleted()
+    },
     async killAndWait(handle) {
       const entry = entries.get(handle.ptySessionId)
       if (!entry) return
       await sharedKillOperation(entry)
-    },
-    onData(handle, listener) {
-      const entry = entries.get(handle.ptySessionId)
-      if (!entry) return { dispose: () => {} }
-      return entry.runtime.onData((data) => {
-        listener(data)
-      })
-    },
-    onExit(handle, listener) {
-      const entry = entries.get(handle.ptySessionId)
-      let disposed = false
-      if (!entry) {
-        queueMicrotask(() => {
-          if (!disposed) listener(null, null)
-        })
-        return {
-          dispose: () => {
-            disposed = true
-          },
-        }
-      }
-      // node-pty's onExit only signals "exited" without (code, signal).
-      // The supervisor contract carries both; we pass nulls because the
-      // worker is the source of truth for exit metadata and the in-process
-      // variant cannot recover it after the fact.
-      return entry.exitCompletion.subscribe(() => {
-        if (!disposed) listener(null, null)
-      })
-    },
-    processName(handle) {
-      const entry = entries.get(handle.ptySessionId)
-      if (!entry) return 'terminal'
-      try {
-        return entry.runtime.processName() || 'terminal'
-      } catch {
-        return 'terminal'
-      }
     },
     getDiagnostics() {
       return {
@@ -161,9 +163,12 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       if (shuttingDown) return
       shuttingDown = true
       for (const entry of Array.from(entries.values())) {
+        entry.events.lease.dispose()
+        entry.nativeEvents.dispose()
         try {
           entry.runtime.kill()
         } catch {}
+        entry.exitCompletion.complete()
       }
       entries.clear()
     },
@@ -172,4 +177,12 @@ export function createInProcessPtySupervisor(): PtySupervisor {
 
 function createPtySessionId(): string {
   return createOpaqueId('pty')
+}
+
+function safeProcessName(runtime: TerminalPtyRuntime): string {
+  try {
+    return runtime.processName() || 'terminal'
+  } catch {
+    return 'terminal'
+  }
 }

@@ -89,22 +89,30 @@ export function useGitWorkspacePaneTabModelInput(
     if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
     if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
     if (workspacePaneRoute?.kind === 'invalid-static') return null
-    return preferredWorkspacePaneTabForTarget(
-      gitWorkspace.ui,
-      branchName ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath) : null,
-    ) ?? workspacePaneTabEntries[0]?.type ?? null
+    if (workspacePaneRoute === null) return null
+    return (
+      preferredWorkspacePaneTabForTarget(
+        gitWorkspace.ui,
+        branchName ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath) : null,
+      ) ??
+      workspacePaneTabEntries[0]?.type ??
+      null
+    )
   }, [gitWorkspace.ui, gitWorkspace.id, branchName, worktreePath, workspacePaneRoute, workspacePaneTabEntries])
 
   const input = useMemo<WorkspacePaneTabModelInput>(
     () => ({
       workspaceId: gitWorkspace.id,
       workspaceRuntimeId: gitWorkspace.workspaceRuntimeId,
+      routeTarget: branchName
+        ? { kind: 'git-branch', workspaceId: gitWorkspace.id, branchName }
+        : { kind: 'inactive', workspaceId: gitWorkspace.id },
       paneTarget: branchName
         ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath)
         : { kind: 'inactive', workspaceId: gitWorkspace.id },
       worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
       preferredTab,
-      allowPreferredTabFallback: workspacePaneRoute === null || workspacePaneRoute === undefined,
+      allowPreferredTabFallback: workspacePaneRoute === undefined,
       tabEntries: workspacePaneTabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
@@ -131,8 +139,7 @@ export function useGitWorkspacePaneTabModelInput(
 
 export function useWorkspaceRootTabModel(
   workspace: WorkspacePaneModelWorkspace,
-  requestedTab: WorkspacePaneTabType | null = null,
-  requestedSessionId: string | null = null,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null,
 ): WorkspacePaneTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
@@ -145,7 +152,14 @@ export function useWorkspaceRootTabModel(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
   )
-  const preferredTab = requestedTab
+  const requestedTab =
+    workspacePaneRoute?.kind === 'terminal'
+      ? 'terminal'
+      : workspacePaneRoute?.kind === 'static'
+        ? workspacePaneRoute.tab
+        : null
+  const requestedSessionId = workspacePaneRoute?.kind === 'terminal' ? workspacePaneRoute.terminalSessionId : null
+  const preferredTab = workspacePaneRoute
     ? requestedTab
     : tabEntries.length > 0
       ? (preferredWorkspacePaneTabForTarget(workspace.ui, target) ?? tabEntries[0]!.type)
@@ -154,8 +168,10 @@ export function useWorkspaceRootTabModel(
     () => ({
       workspaceId: workspace.id,
       workspaceRuntimeId: workspace.workspaceRuntimeId,
+      routeTarget: target,
       paneTarget: target,
       preferredTab,
+      allowPreferredTabFallback: workspacePaneRoute === null,
       tabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
@@ -171,19 +187,17 @@ export function useWorkspaceRootTabModel(
       runtimeProjection.runtimeTabViews,
       tabEntries,
       tabsQuery.status,
+      workspacePaneRoute,
     ],
   )
-  const model = useMemo(() => createWorkspacePaneTabModel(input), [input])
-  useSyncWorkspacePaneRuntimeTabSelection(model, { enabled: true })
-  return model
+  return useMemo(() => createWorkspacePaneTabModel(input), [input])
 }
 
 export function useGitWorktreeWorkspacePaneTabModel(
   workspaceRuntime: WorkspacePaneRuntimeContext,
   target: GitWorktreeWorkspacePaneTabsTarget,
   worktreeHead: GitHead,
-  requestedTab: WorkspacePaneTabType | null,
-  requestedSessionId: string | null,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null,
 ): WorkspacePaneTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: target.workspaceId,
@@ -199,7 +213,14 @@ export function useGitWorktreeWorkspacePaneTabModel(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
   )
-  const preferredTab = requestedTab
+  const requestedTab =
+    workspacePaneRoute?.kind === 'terminal'
+      ? 'terminal'
+      : workspacePaneRoute?.kind === 'static'
+        ? workspacePaneRoute.tab
+        : null
+  const requestedSessionId = workspacePaneRoute?.kind === 'terminal' ? workspacePaneRoute.terminalSessionId : null
+  const preferredTab = workspacePaneRoute
     ? requestedTab
     : tabEntries.length > 0
       ? (preferredWorkspacePaneTabForTarget(workspaceRuntime.ui, target) ?? tabEntries[0]!.type)
@@ -208,9 +229,11 @@ export function useGitWorktreeWorkspacePaneTabModel(
     () => ({
       workspaceId: target.workspaceId,
       workspaceRuntimeId: workspaceRuntime.workspaceRuntimeId,
+      routeTarget: target,
       paneTarget: target,
       worktreeHead,
       preferredTab,
+      allowPreferredTabFallback: workspacePaneRoute === null,
       tabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
@@ -227,11 +250,10 @@ export function useGitWorktreeWorkspacePaneTabModel(
       tabsQuery.status,
       target,
       worktreeHead,
+      workspacePaneRoute,
     ],
   )
-  const model = useMemo(() => createWorkspacePaneTabModel(input), [input])
-  useSyncWorkspacePaneRuntimeTabSelection(model, { enabled: true })
-  return model
+  return useMemo(() => createWorkspacePaneTabModel(input), [input])
 }
 
 function workspacePaneTabsProjectionPhase(

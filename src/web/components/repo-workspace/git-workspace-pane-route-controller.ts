@@ -9,14 +9,22 @@ import { usePrimaryWindowNavigation, type PrimaryWindowNavigationActions } from 
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  workspacePaneModelTargetIdentityKey,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useSyncWorkspacePaneRuntimeTabSelection } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import {
-  reconcileGitWorkspacePaneRoute,
-  gitWorkspacePaneRouteHistoryResolution,
-  type GitWorkspacePaneRouteReconciliation,
-} from '#/web/components/repo-workspace/git-workspace-pane-route-reconciliation.ts'
-import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+  reconcileWorkspacePaneRoute,
+  workspacePaneRouteHistoryResolution,
+  type WorkspacePaneRouteReconciliation,
+} from '#/web/workspace-pane/workspace-pane-route-reconciliation.ts'
+import {
+  commitWorkspacePaneExactTargetRoute,
+  workspacePaneRouteKey,
+  workspacePaneTabControllerTargetIsCurrent,
+  type WorkspacePaneControllerTarget,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
@@ -25,7 +33,14 @@ import {
   subscribeWorkspacePaneRouteIntents,
   workspacePaneRouteIntentPending,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { workspacePaneRouteKey } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import {
+  beginPrimaryWindowPresentation,
+  currentPrimaryWindowPresentationToken,
+  admitPrimaryWindowNavigationWhenUncontested,
+  primaryWindowNavigationIsUncontested,
+  primaryWindowPresentationIsCurrent,
+} from '#/web/primary-window-presentation.ts'
+import { navigationLog } from '#/web/logger.ts'
 
 export interface GitWorkspacePaneRouteControllerInput {
   enabled?: boolean
@@ -48,36 +63,51 @@ export function useGitWorkspacePaneRouteController({
   worktreePath,
   route,
   model,
-}: GitWorkspacePaneRouteControllerInput): GitWorkspacePaneRouteReconciliation {
+}: GitWorkspacePaneRouteControllerInput): WorkspacePaneRouteReconciliation {
   const navigation = usePrimaryWindowNavigation()
   const reconciliation = useMemo(
-    () => (enabled ? reconcileGitWorkspacePaneRoute(route, model) : { kind: 'none' as const }),
+    () => (enabled ? reconcileWorkspacePaneRoute(route, model) : { kind: 'none' as const }),
     [enabled, route, model],
   )
+  const actionTarget = useMemo(
+    () =>
+      workspacePaneActionTargetFromCoordinates({
+        workspaceId,
+        workspaceRuntimeId: model.workspaceRuntimeId,
+        branchName,
+        worktreePath,
+      }),
+    [branchName, model.workspaceRuntimeId, workspaceId, worktreePath],
+  )
+  const routeKey = route?.kind === 'invalid-static' ? null : workspacePaneRouteKey(route)
+  const stableRoute = useStableParsedWorkspacePaneRoute(route)
   const routeIntentPending = useSyncExternalStore(
     subscribeWorkspacePaneRouteIntents,
-    () =>
-      route?.kind !== 'invalid-static' &&
-      workspacePaneRouteIntentPending(
-        workspacePaneActionTargetFromCoordinates({
-          workspaceId,
-          workspaceRuntimeId: model.workspaceRuntimeId,
-          branchName,
-          worktreePath,
-        }),
-        workspacePaneRouteKey(route),
-      ),
+    () => routeKey !== null && workspacePaneRouteIntentPending(actionTarget, routeKey),
     () => false,
   )
   const effectiveReconciliation =
-    routeIntentPending && reconciliation.kind === 'replace-empty-pane' ? ({ kind: 'pending' } as const) : reconciliation
+    routeIntentPending && reconciliation.kind === 'missing' ? ({ kind: 'pending' } as const) : reconciliation
+  const routeTargetKey = workspacePaneModelTargetIdentityKey(model.routeTarget)
+  const paneTargetKey = workspacePaneModelTargetIdentityKey(model.paneTarget)
+  const controllerTarget = useMemo<WorkspacePaneControllerTarget>(
+    () => ({
+      workspaceId: model.workspaceId,
+      workspaceRuntimeId: model.workspaceRuntimeId,
+      routeTarget: model.routeTarget,
+      branchName: model.branchName,
+      worktreePath: model.worktreePath,
+      paneTarget: model.paneTarget,
+    }),
+    [model.branchName, model.workspaceId, model.workspaceRuntimeId, model.worktreePath, paneTargetKey, routeTargetKey],
+  )
 
   useWorkspacePaneNavigationHistory({
     enabled,
     workspaceId,
     branchName,
     worktreePath,
-    route,
+    route: stableRoute,
     reconciliation: effectiveReconciliation,
   })
   useSyncRoutedWorkspacePaneSelection({
@@ -91,65 +121,78 @@ export function useGitWorkspacePaneRouteController({
   useSyncWorkspacePaneRuntimeTabSelection(model, { enabled: enabled && reconciliation.kind === 'none' })
   useReconcileWorkspacePaneRoute({
     enabled,
-    workspaceId,
-    workspaceRuntimeId: model.workspaceRuntimeId,
     branchName,
-    worktreePath,
-    route,
-    reconciliation,
+    actionTarget,
+    target: controllerTarget,
+    route: stableRoute,
+    routeKey,
+    reconciliationKind: reconciliation.kind,
     routeIntentPending,
     navigation,
   })
 
-  return reconciliation
+  return effectiveReconciliation
 }
 
 function useReconcileWorkspacePaneRoute({
   enabled,
-  workspaceId,
-  workspaceRuntimeId,
   branchName,
-  worktreePath,
+  actionTarget,
+  target,
   route,
-  reconciliation,
+  routeKey,
+  reconciliationKind,
   routeIntentPending,
   navigation,
 }: {
   enabled: boolean
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
   branchName: string | null
-  worktreePath: string | null
+  actionTarget: ReturnType<typeof workspacePaneActionTargetFromCoordinates>
+  target: WorkspacePaneControllerTarget
   route: ParsedWorkspacePaneRouteTarget
-  reconciliation: GitWorkspacePaneRouteReconciliation
+  routeKey: string | null
+  reconciliationKind: WorkspacePaneRouteReconciliation['kind']
   routeIntentPending: boolean
   navigation: PrimaryWindowNavigationActions
 }): void {
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || reconciliationKind !== 'missing' || !branchName) return
     let cancelled = false
-    void runWorkspacePaneAction(
-      workspacePaneActionTargetFromCoordinates({ workspaceId, workspaceRuntimeId, branchName, worktreePath }),
-      () => {
+    const observedPresentationToken = currentPrimaryWindowPresentationToken()
+    let cancelIdleAdmission = () => {}
+    const enqueueWhenIdle = () => {
+      cancelIdleAdmission()
+      cancelIdleAdmission = admitPrimaryWindowNavigationWhenUncontested(() => {
         if (cancelled) return
-        if (!branchName) return
-        if (routeIntentPending && reconciliation.kind === 'replace-empty-pane') return
-        applyGitWorkspacePaneRouteReconciliation({ workspaceId, branchName, reconciliation, navigation })
-      },
-    )
+        void runWorkspacePaneAction(actionTarget, async () => {
+          if (cancelled || !workspacePaneTabControllerTargetIsCurrent(target)) return
+          if (!primaryWindowNavigationIsUncontested()) {
+            enqueueWhenIdle()
+            return
+          }
+          if (routeIntentPending || (routeKey !== null && workspacePaneRouteIntentPending(actionTarget, routeKey)))
+            return
+          if (!primaryWindowPresentationIsCurrent(observedPresentationToken)) return
+          const presentationToken = beginPrimaryWindowPresentation()
+          await commitWorkspacePaneExactTargetRoute(
+            target,
+            route,
+            null,
+            navigation,
+            { replace: true },
+            presentationToken,
+          )
+        }).catch((error: unknown) => {
+          navigationLog.error('git workspace pane route reconciliation failed', { error })
+        })
+      })
+    }
+    enqueueWhenIdle()
     return () => {
       cancelled = true
+      cancelIdleAdmission()
     }
-  }, [
-    branchName,
-    enabled,
-    navigation,
-    reconciliation,
-    workspaceId,
-    workspaceRuntimeId,
-    routeIntentPending,
-    worktreePath,
-  ])
+  }, [actionTarget, branchName, enabled, navigation, reconciliationKind, route, routeKey, routeIntentPending, target])
 }
 
 function useWorkspacePaneNavigationHistory({
@@ -165,12 +208,12 @@ function useWorkspacePaneNavigationHistory({
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
-  reconciliation: GitWorkspacePaneRouteReconciliation
+  reconciliation: WorkspacePaneRouteReconciliation
 }): void {
-  const historyRoute = gitWorkspacePaneRouteHistoryResolution(route ?? null, reconciliation)
+  const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
   const replaceCurrentRoute = workspacePaneValidRouteTarget(route)
   const replaceCurrentRouteContext =
-    branchName && reconciliation.kind === 'replace-empty-pane'
+    branchName && reconciliation.kind === 'missing'
       ? workspacePaneHistoryRouteContext({
           workspaceId,
           branchName,
@@ -179,13 +222,25 @@ function useWorkspacePaneNavigationHistory({
         })
       : null
   useWorkspaceNavigationHistory({
-    replaceCurrent: reconciliation.kind === 'replace-empty-pane',
+    replaceCurrent: reconciliation.kind === 'missing',
     replaceCurrentRouteContext,
     routeContext:
       enabled && branchName && historyRoute.kind === 'record'
         ? workspacePaneHistoryRouteContext({ workspaceId, branchName, worktreePath, route: historyRoute.route })
         : null,
   })
+}
+
+function useStableParsedWorkspacePaneRoute(route: ParsedWorkspacePaneRouteTarget): ParsedWorkspacePaneRouteTarget {
+  const staticTab = route?.kind === 'static' ? route.tab : null
+  const terminalSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
+  const invalidStaticTabKey = route?.kind === 'invalid-static' ? route.tabKey : null
+  return useMemo(() => {
+    if (staticTab !== null) return { kind: 'static', tab: staticTab }
+    if (terminalSessionId !== null) return { kind: 'terminal', terminalSessionId }
+    if (invalidStaticTabKey !== null) return { kind: 'invalid-static', tabKey: invalidStaticTabKey }
+    return null
+  }, [invalidStaticTabKey, staticTab, terminalSessionId])
 }
 
 function workspacePaneValidRouteTarget(route: ParsedWorkspacePaneRouteTarget): WorkspacePaneRouteTarget {
@@ -213,23 +268,6 @@ function workspacePaneHistoryRouteContext({
   }
 }
 
-function applyGitWorkspacePaneRouteReconciliation({
-  workspaceId,
-  branchName,
-  reconciliation,
-  navigation,
-}: {
-  workspaceId: WorkspaceId
-  branchName: string
-  reconciliation: GitWorkspacePaneRouteReconciliation
-  navigation: PrimaryWindowNavigationActions
-}): void {
-  if (reconciliation.kind === 'none' || reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') {
-    return
-  }
-  void commitWorkspacePaneControllerRoute(workspaceId, branchName, null, navigation, { replace: true })
-}
-
 function useSyncRoutedWorkspacePaneSelection({
   enabled,
   workspaceId,
@@ -243,7 +281,7 @@ function useSyncRoutedWorkspacePaneSelection({
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
-  reconciliation: GitWorkspacePaneRouteReconciliation
+  reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const setWorkspacePaneTab = useWorkspacesStore((s) => s.setWorkspacePaneTab)
   useEffect(() => {

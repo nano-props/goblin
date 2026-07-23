@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  constrainTerminalSize,
   isValidTerminalClientId,
   isValidTerminalNotifyBellInput,
   isValidTerminalTestNotificationInput,
@@ -26,6 +27,14 @@ import {
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 describe('shared terminal validators', () => {
+  test('constrains trusted terminal measurements to protocol bounds', () => {
+    expect(constrainTerminalSize(700, 400)).toEqual({ cols: 500, rows: 300 })
+    expect(constrainTerminalSize(0, -10)).toEqual({ cols: 1, rows: 1 })
+    expect(constrainTerminalSize(80.9, 24.2)).toEqual({ cols: 80, rows: 24 })
+    expect(constrainTerminalSize(Number.POSITIVE_INFINITY, 24)).toBeNull()
+    expect(constrainTerminalSize(80, Number.NaN)).toBeNull()
+  })
+
   test('normalizes terminal sizes within supported bounds', () => {
     expect(normalizeTerminalSize(80, 24)).toEqual({ cols: 80, rows: 24 })
     expect(normalizeTerminalSize(80.9, 24.2)).toEqual({ cols: 80, rows: 24 })
@@ -139,13 +148,23 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
+        input: {
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          terminalRuntimeGeneration: 0,
+          cols: 80,
+          rows: 24,
+        },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'attach',
-      input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
+      input: {
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 0,
+        cols: 80,
+        rows: 24,
+      },
     })
 
     expect(normalizeAppRealtimeClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
@@ -159,7 +178,12 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'bad id',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24 },
+        input: {
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          terminalRuntimeGeneration: 0,
+          cols: 80,
+          rows: 24,
+        },
       }),
     ).toBeNull()
   })
@@ -172,6 +196,7 @@ describe('shared terminal validators', () => {
         action: 'write',
         input: {
           terminalRuntimeSessionId: 'pty_session_123456',
+          terminalRuntimeGeneration: 1,
           data: 'echo\0bad',
         },
       }),
@@ -318,8 +343,6 @@ describe('shared terminal validators', () => {
             root: 'goblin+file:///repo/worktree',
           },
           kind: 'primary',
-          cols: 100,
-          rows: 30,
         },
         insertAfterIdentity: 'workspace-pane:status',
       },
@@ -445,14 +468,23 @@ describe('shared terminal validators', () => {
   test('rejects client identity supplied inside terminal action payloads', () => {
     const terminalRuntimeSessionId = 'pty_request_123456789'
     const requests = [
-      { action: 'attach', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
-      { action: 'restart', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
-      { action: 'write', input: { terminalRuntimeSessionId, data: 'echo test' } },
+      {
+        action: 'attach',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
+      {
+        action: 'restart',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
+      { action: 'write', input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, data: 'echo test' } },
       {
         action: 'resize',
         input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
       },
-      { action: 'takeover', input: { terminalRuntimeSessionId, cols: 100, rows: 30 } },
+      {
+        action: 'takeover',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
     ] as const
 
     for (const [index, request] of requests.entries()) {
@@ -467,37 +499,42 @@ describe('shared terminal validators', () => {
     }
   })
 
-  test('accepts takeover requests without a runtime generation', () => {
-    expect(
-      normalizeTerminalClientMessage({
+  test('requires a bound safe-integer generation on PTY mutation requests', () => {
+    const terminalRuntimeSessionId = 'pty_request_123456789'
+    const requests = [
+      {
         type: 'request',
-        requestId: 'request_takeover',
-        action: 'takeover',
-        input: { terminalRuntimeSessionId: 'pty_request_123456789', cols: 100, rows: 30 },
-      }),
-    ).toMatchObject({ action: 'takeover' })
-  })
-
-  test('requires a valid runtime generation on resize requests', () => {
-    const request = {
-      type: 'request',
-      requestId: 'request_resize',
-      action: 'resize',
-      input: {
-        terminalRuntimeSessionId: 'pty_request_123456789',
-        terminalRuntimeGeneration: 1,
-        cols: 100,
-        rows: 30,
+        requestId: 'request_write_generation',
+        action: 'write',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, data: 'echo test' },
       },
-    } as const
+      {
+        type: 'request',
+        requestId: 'request_resize_generation',
+        action: 'resize',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
+      {
+        type: 'request',
+        requestId: 'request_takeover_generation',
+        action: 'takeover',
+        input: { terminalRuntimeSessionId, terminalRuntimeGeneration: 1, cols: 100, rows: 30 },
+      },
+    ] as const
 
-    expect(normalizeTerminalClientMessage(request)).toMatchObject({ action: 'resize' })
-    expect(
-      normalizeTerminalClientMessage({
-        ...request,
-        input: { ...request.input, terminalRuntimeGeneration: -1 },
-      }),
-    ).toBeNull()
+    for (const request of requests) {
+      expect(normalizeTerminalClientMessage(request)).toMatchObject({ action: request.action })
+      const { terminalRuntimeGeneration: _, ...inputWithoutGeneration } = request.input
+      expect(normalizeTerminalClientMessage({ ...request, input: inputWithoutGeneration })).toBeNull()
+      for (const terminalRuntimeGeneration of [0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+        expect(
+          normalizeTerminalClientMessage({
+            ...request,
+            input: { ...inputWithoutGeneration, terminalRuntimeGeneration },
+          }),
+        ).toBeNull()
+      }
+    }
   })
 
   test('rejects client identity and unknown fields on terminal request envelopes', () => {
@@ -505,7 +542,11 @@ describe('shared terminal validators', () => {
       type: 'request',
       requestId: 'request_strict_envelope',
       action: 'write',
-      input: { terminalRuntimeSessionId: 'pty_request_123456789', data: 'echo test' },
+      input: {
+        terminalRuntimeSessionId: 'pty_request_123456789',
+        terminalRuntimeGeneration: 1,
+        data: 'echo test',
+      },
     } as const
 
     expect(normalizeTerminalClientMessage(request)).toEqual(request)
@@ -634,14 +675,13 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      processName: 'zsh',
+      terminalRuntimeGeneration: 0,
+      processName: '',
       canonicalTitle: null,
-      phase: 'open',
+      phase: 'opening',
       message: null,
-      controller: { clientId: 'client_a', status: 'connected' },
-      canonicalCols: 120,
-      canonicalRows: 40,
+      controller: null,
+      canonicalSize: null,
     })
     expect(normalizedCreateResult).not.toHaveProperty('sessions')
     expect(normalizedCreateResult).toMatchObject({
@@ -649,7 +689,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
     })
     expect(normalizedCreateResult).not.toHaveProperty('tabs')
 
@@ -675,14 +715,13 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      processName: 'zsh',
+      terminalRuntimeGeneration: 0,
+      processName: '',
       canonicalTitle: null,
-      phase: 'open',
+      phase: 'opening',
       message: null,
       controller: null,
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: null,
     }
     expect(
       normalizeTerminalCreateResult({
@@ -722,8 +761,7 @@ describe('shared terminal validators', () => {
       canonicalTitle: null,
       phase: 'open',
       message: null,
-      cols: 120,
-      rows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
       target: {
         kind: 'git-worktree',
         workspaceId: 'goblin+file:///repo',
@@ -811,7 +849,6 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-111111111111111111111',
           data: 'hi',
           seq: 1,
-          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -823,7 +860,6 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         seq: 1,
-        outputEra: 0,
         processName: 'zsh',
       },
     })
@@ -898,14 +934,13 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 11 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
-        terminalRuntimeGeneration: 1,
-        processName: 'zsh',
+        terminalRuntimeGeneration: 0,
+        processName: '',
         canonicalTitle: null,
-        phase: 'open',
+        phase: 'opening',
         message: null,
-        controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
+        controller: null,
+        canonicalSize: null,
       },
     }
 
@@ -1028,6 +1063,31 @@ describe('shared terminal validators', () => {
   })
 
   test('validates terminal socket success response payloads by action', () => {
+    const resizeResponse = {
+      type: 'response',
+      requestId: 'req_resize',
+      ok: true,
+      action: 'resize',
+      payload: {
+        ok: true,
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 3,
+        canonicalSize: { cols: 120, rows: 40 },
+      },
+    } as const
+    expect(normalizeAppRealtimeSocketServerMessage(resizeResponse)).toEqual(resizeResponse)
+    for (const payload of [
+      true,
+      { ...resizeResponse.payload, terminalRuntimeGeneration: 0 },
+      { ...resizeResponse.payload, canonicalSize: null },
+    ]) {
+      expect(normalizeAppRealtimeSocketServerMessage({ ...resizeResponse, payload })).toMatchObject({
+        ok: false,
+        action: 'resize',
+        error: 'Invalid terminal socket response payload',
+      })
+    }
+
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'response',
@@ -1041,8 +1101,7 @@ describe('shared terminal validators', () => {
           role: 'controller',
           controllerStatus: 'connected',
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
           phase: 'open',
         },
       }),
@@ -1051,6 +1110,25 @@ describe('shared terminal validators', () => {
       action: 'takeover',
       payload: { ok: true, terminalRuntimeGeneration: 3 },
     })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'req_takeover_unbound',
+        ok: true,
+        action: 'takeover',
+        payload: {
+          ok: true,
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          terminalRuntimeGeneration: 0,
+          role: 'controller',
+          controllerStatus: 'connected',
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalSize: { cols: 120, rows: 40 },
+          phase: 'open',
+        },
+      }),
+    ).toMatchObject({ ok: false, error: 'Invalid terminal socket response payload' })
 
     expect(
       normalizeAppRealtimeSocketServerMessage({
@@ -1064,8 +1142,7 @@ describe('shared terminal validators', () => {
           role: 'controller',
           controllerStatus: 'connected',
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
           phase: 'open',
         },
       }),
@@ -1093,16 +1170,14 @@ describe('shared terminal validators', () => {
           message: null,
           snapshot: 'prompt',
           snapshotSeq: 1,
-          outputEra: 0,
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
         },
       }),
     ).toMatchObject({
       type: 'response',
       action: 'attach',
-      payload: { ok: true, frame: 'snapshot', outputEra: 0 },
+      payload: { ok: true, frame: 'snapshot' },
     })
 
     expect(
@@ -1122,8 +1197,7 @@ describe('shared terminal validators', () => {
           phase: 'open',
           message: null,
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
         },
       }),
     ).toMatchObject({
@@ -1148,8 +1222,7 @@ describe('shared terminal validators', () => {
           phase: 'opening',
           message: null,
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
         },
       }),
     ).toMatchObject({
@@ -1176,8 +1249,7 @@ describe('shared terminal validators', () => {
           phase: 'opening',
           message: null,
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
         },
       }),
     ).toMatchObject({
@@ -1206,8 +1278,7 @@ describe('shared terminal validators', () => {
           snapshot: 'prompt',
           snapshotSeq: 1,
           controller: { clientId: 'client_a', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
+          canonicalSize: { cols: 120, rows: 40 },
         },
       }),
     ).toMatchObject({
@@ -1266,8 +1337,7 @@ describe('shared terminal validators', () => {
       phase: 'open',
       message: null,
       controller: { clientId: 'client_a', status: 'connected' },
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
     }
     const invalidResponses = [
       {
@@ -1282,7 +1352,6 @@ describe('shared terminal validators', () => {
           terminalProjectionEffect: { kind: 'delta', revision: 2 },
           snapshot: '',
           snapshotSeq: 0,
-          outputEra: 0,
           ...metadata,
         },
       },
@@ -1294,7 +1363,6 @@ describe('shared terminal validators', () => {
           terminalProjectionEffect: { kind: 'none' },
           snapshot: '',
           snapshotSeq: 0,
-          outputEra: 0,
           ...metadata,
         },
       },
@@ -1314,6 +1382,42 @@ describe('shared terminal validators', () => {
         ok: false,
         error: 'Invalid terminal socket response payload',
       })
+    }
+  })
+
+  test('rejects invalid snapshot sequence checkpoints', () => {
+    const payload = {
+      ok: true,
+      frame: 'snapshot',
+      terminalProjectionEffect: { kind: 'none' },
+      terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      terminalRuntimeGeneration: 1,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      snapshot: 'prompt',
+      snapshotSeq: 1,
+      controller: { clientId: 'client_a', status: 'connected' },
+      canonicalSize: { cols: 120, rows: 40 },
+    } as const
+
+    for (const field of ['snapshotSeq'] as const) {
+      for (const [index, value] of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1].entries()) {
+        expect(
+          normalizeAppRealtimeSocketServerMessage({
+            type: 'response',
+            requestId: `invalid_${field}_${index}`,
+            ok: true,
+            action: 'attach',
+            payload: { ...payload, [field]: value },
+          }),
+        ).toMatchObject({
+          ok: false,
+          action: 'attach',
+          error: 'Invalid terminal socket response payload',
+        })
+      }
     }
   })
 
@@ -1349,13 +1453,13 @@ describe('shared terminal validators', () => {
 })
 
 describe('terminal runtime generation validation', () => {
-  test('requires a non-negative safe integer on realtime bindings', () => {
+  test('requires a bound safe-integer generation on PTY realtime events', () => {
     const message = {
       type: 'exit' as const,
       event: {
         terminalRuntimeSessionId: 'pty_generation_validation',
         terminalSessionId: 'term-generation-validation',
-        terminalRuntimeGeneration: 0,
+        terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
       },
@@ -1365,11 +1469,17 @@ describe('terminal runtime generation validation', () => {
       event: {
         terminalRuntimeSessionId: 'pty_generation_validation',
         terminalSessionId: 'term-generation-validation',
-        terminalRuntimeGeneration: 0,
+        terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
       },
     })
+    expect(
+      normalizeTerminalRealtimeMessage({
+        ...message,
+        event: { ...message.event, terminalRuntimeGeneration: 0 },
+      }),
+    ).toBeNull()
     expect(
       normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, workspaceId: undefined } }),
     ).toBeNull()
@@ -1389,6 +1499,24 @@ describe('terminal runtime generation validation', () => {
           event: { ...message.event, terminalRuntimeGeneration },
         }),
       ).toBeNull()
+    }
+  })
+
+  test('requires non-negative safe-integer output checkpoints', () => {
+    const message = {
+      type: 'output' as const,
+      event: {
+        terminalRuntimeSessionId: 'pty_generation_validation',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-generation-validation',
+        data: 'output',
+        seq: 1,
+        processName: 'shell',
+      },
+    }
+    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+    for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, seq: value } })).toBeNull()
     }
   })
 })

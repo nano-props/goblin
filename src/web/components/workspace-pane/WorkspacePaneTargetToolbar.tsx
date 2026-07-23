@@ -3,6 +3,7 @@ import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import {
@@ -12,7 +13,7 @@ import {
 import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
@@ -23,7 +24,10 @@ import {
   workspacePaneTabEntryForItem,
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
-import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import {
+  showCreatedTerminalWorkspacePaneRuntimeTab,
+  type CreatedTerminalRouteRequest,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type {
   WorkspacePaneFilesystemTarget,
   WorkspacePaneSurfaceTarget,
@@ -32,9 +36,7 @@ import {
   workspacePaneFilesystemRootPath,
   workspacePaneFilesystemTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import {
   WorkspaceOpenExternallyMenuContent,
   useWorkspaceOpenExternallyItems,
@@ -82,33 +84,12 @@ function WorkspacePaneTargetToolbarContent({
 }: WorkspacePaneTargetToolbarProps & { externalItems: readonly WorkspaceExternalAppItem[] }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const branchName =
-    target.kind === 'workspace-root'
-      ? null
-      : target.kind === 'git-branch'
-        ? target.branchName
-        : gitHeadBranch(target.head)
-  const rootPath = target.kind === 'git-branch' ? null : workspacePaneFilesystemRootPath(target)
+  const { scrollToBottom } = useTerminalSessionContext()
+  const branchName = model.branchName
   const filesystemTarget = target.kind === 'git-branch' ? null : target
-  const commandTarget: WorkspacePaneCommandTarget =
-    target.kind === 'workspace-root'
-      ? { kind: 'workspace-root', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
-      : target.kind === 'git-branch'
-        ? { kind: 'git-branch', branchName: target.branchName, workspacePaneRoute: workspacePaneRoute ?? null }
-        : { kind: 'git-worktree', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
-  const persistenceTarget = useMemo(
-    () =>
-      target.kind === 'workspace-root'
-        ? { kind: 'workspace-root' as const, workspaceId: target.workspaceId }
-        : target.kind === 'git-branch'
-          ? { kind: 'git-branch' as const, workspaceId: target.workspaceId, branchName: target.branchName }
-          : {
-              kind: 'git-worktree' as const,
-              workspaceId: target.workspaceId,
-              worktreePath: workspacePaneFilesystemRootPath(target),
-            },
-    [branchName, rootPath, target.kind, target.workspaceId],
-  )
+  const routeTarget = requiredWorkspacePaneModelTarget(model.routeTarget, 'route')
+  const persistenceTarget = requiredWorkspacePaneModelTarget(model.paneTarget, 'persistence')
+  const commandTarget = workspacePaneCommandTargetForSurface(routeTarget, target, workspacePaneRoute)
   const worktreeHead = useMemo(
     () => (target.kind === 'git-worktree' ? target.head : undefined),
     [branchName, target.kind],
@@ -120,7 +101,7 @@ function WorkspacePaneTargetToolbarContent({
       sessionId: string,
       presentation: TerminalPresentation,
       runtimeTarget: RuntimeWorkspacePaneTarget,
-      presentationToken: PrimaryWindowPresentationToken,
+      routeRequest: CreatedTerminalRouteRequest,
     ) => {
       if (type !== 'terminal') return false
       if (target.kind === 'git-branch') return false
@@ -129,7 +110,7 @@ function WorkspacePaneTargetToolbarContent({
           { target: runtimeTarget, presentation },
           sessionId,
           navigation,
-          presentationToken,
+          routeRequest,
         )
       }
       if (runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
@@ -137,38 +118,15 @@ function WorkspacePaneTargetToolbarContent({
           { target: runtimeTarget, presentation },
           sessionId,
           navigation,
-          presentationToken,
+          routeRequest,
         )
       }
       return false
     },
     [navigation, target],
   )
-  const showRuntimeTab = useCallback(
-    (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
-      if (type !== 'terminal') return false
-      if (target.kind === 'workspace-root') {
-        return (
-          navigation.showWorkspaceRootPaneTab?.(target.workspaceId, {
-            kind: 'terminal',
-            terminalSessionId: sessionId,
-          }) ?? false
-        )
-      }
-      if (target.kind !== 'git-worktree') return false
-      const targetBranch = gitHeadBranch(target.head)
-      return targetBranch
-        ? navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
-        : (navigation.showRepoWorktreeTerminalSession?.(
-            target.workspaceId,
-            workspacePaneFilesystemRootPath(target),
-            sessionId,
-          ) ?? false)
-    },
-    [navigation, rootPath, target],
-  )
-  const runtimeActionContext = useWorkspacePaneRuntimeTabActionContext({ showRuntimeTab })
   const createAction = useWorkspacePaneRuntimeTabCreateAction({
+    routeTarget,
     base: target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(target),
     runtimeTabStateByType: model.runtimeTabStateByType,
     workspacePaneRoute,
@@ -184,7 +142,6 @@ function WorkspacePaneTargetToolbarContent({
         statusCount,
         t,
         staticTabAvailable,
-        runtimeTabAvailable: (type) => type !== 'terminal' || target.capabilities.terminal.available,
       }),
     [branchName, model.runtimeTabStateByType, model.tabs, staticTabAvailable, statusCount, t, target, workspacePaneId],
   )
@@ -208,16 +165,17 @@ function WorkspacePaneTargetToolbarContent({
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         workspaceId: target.workspaceId,
+        routeTarget,
         paneTarget: persistenceTarget,
         worktreeHead,
         workspacePaneRoute,
         identity: item.identity,
         navigation,
-        runtimeActionContext,
+        onTerminalReselect: scrollToBottom,
         reselect,
       })
     },
-    [navigation, persistenceTarget, runtimeActionContext, target.workspaceId, workspacePaneRoute, worktreeHead],
+    [navigation, persistenceTarget, routeTarget, scrollToBottom, target.workspaceId, workspacePaneRoute, worktreeHead],
   )
   const activeTabIdentity = model.activeTab?.identity ?? activePendingTabIdentity(model)
 
@@ -254,6 +212,35 @@ function WorkspacePaneTargetToolbarContent({
       }}
     />
   )
+}
+
+function requiredWorkspacePaneModelTarget(
+  target: WorkspacePaneTabModel['routeTarget'],
+  role: 'route' | 'persistence',
+): WorkspacePaneTabsTarget {
+  if (target.kind === 'inactive') throw new Error(`inactive workspace pane has no ${role} target`)
+  return target
+}
+
+function workspacePaneCommandTargetForSurface(
+  target: WorkspacePaneTabsTarget,
+  surface: WorkspacePaneSurfaceTarget,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
+): WorkspacePaneCommandTarget {
+  if (target.kind === 'workspace-root') {
+    if (surface.kind !== 'workspace-root') throw new Error('workspace-root route requires a workspace-root surface')
+    return { routeTarget: target, workspacePaneRoute, filesystemTarget: surface }
+  }
+  if (target.kind === 'git-worktree') {
+    if (surface.kind !== 'git-worktree') throw new Error('git-worktree route requires a git-worktree surface')
+    return { routeTarget: target, workspacePaneRoute, filesystemTarget: surface }
+  }
+  if (surface.kind === 'workspace-root') throw new Error('git-branch route cannot use a workspace-root surface')
+  return {
+    routeTarget: target,
+    workspacePaneRoute,
+    filesystemTarget: surface.kind === 'git-worktree' ? surface : null,
+  }
 }
 
 function activePendingTabIdentity(model: WorkspacePaneTabModel): string | null {

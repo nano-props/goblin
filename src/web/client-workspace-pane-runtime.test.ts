@@ -44,8 +44,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         phase: 'open' as const,
         message: null,
         controller: null,
-        canonicalCols: 80,
-        canonicalRows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     }))
     const client = createServerWorkspacePaneRuntimeClient(realtimeWithRequest(request))

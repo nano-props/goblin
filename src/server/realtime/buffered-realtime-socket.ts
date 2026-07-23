@@ -2,6 +2,12 @@ import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 
 type BufferedEntry = { type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }
 
+export const MAX_BUFFERED_REALTIME_BYTES = 16 * 1024 * 1024
+export const MAX_BUFFERED_REALTIME_ENTRIES = 65_536
+
+const BUFFER_CAPACITY_CLOSE_CODE = 1013
+const BUFFER_CAPACITY_CLOSE_REASON = 'realtime buffer capacity exceeded'
+
 // Per-socket buffer used to pause realtime messages during authoritative
 // request/response transitions so live events do not race ahead of the
 // mutation response that owns the state boundary.
@@ -9,6 +15,7 @@ export class BufferedRealtimeSocket<TResumeContext = void> implements RealtimeSo
   private paused = 0
   private active = true
   private readonly buffer: BufferedEntry[] = []
+  private bufferedBytes = 0
   private readonly socket: RealtimeSocket
   private readonly onDeactivate?: () => void
 
@@ -20,7 +27,13 @@ export class BufferedRealtimeSocket<TResumeContext = void> implements RealtimeSo
   send(payload: string): void {
     if (!this.active) return
     if (this.paused > 0) {
+      const bytes = Buffer.byteLength(payload, 'utf8')
+      if (!this.hasBufferCapacity(bytes)) {
+        this.forceClose(BUFFER_CAPACITY_CLOSE_CODE, BUFFER_CAPACITY_CLOSE_REASON)
+        return
+      }
       this.buffer.push({ type: 'send', payload })
+      this.bufferedBytes += bytes
       return
     }
     this.sendNow(payload)
@@ -29,6 +42,10 @@ export class BufferedRealtimeSocket<TResumeContext = void> implements RealtimeSo
   close(code?: number, reason?: string): void {
     if (!this.active) return
     if (this.paused > 0) {
+      if (!this.hasBufferCapacity(0)) {
+        this.forceClose(BUFFER_CAPACITY_CLOSE_CODE, BUFFER_CAPACITY_CLOSE_REASON)
+        return
+      }
       this.buffer.push({ type: 'close', code, reason })
       return
     }
@@ -88,7 +105,9 @@ export class BufferedRealtimeSocket<TResumeContext = void> implements RealtimeSo
   }
 
   private flushBuffer(): void {
-    for (const entry of this.buffer.splice(0)) {
+    const entries = this.buffer.splice(0)
+    this.bufferedBytes = 0
+    for (const entry of entries) {
       if (!this.active) break
       if (entry.type === 'send') {
         if (this.shouldDropBufferedSend(entry.payload)) continue
@@ -102,6 +121,14 @@ export class BufferedRealtimeSocket<TResumeContext = void> implements RealtimeSo
 
   private clearBuffer(): void {
     this.buffer.length = 0
+    this.bufferedBytes = 0
     this.onBufferCleared()
+  }
+
+  private hasBufferCapacity(additionalBytes: number): boolean {
+    return (
+      this.buffer.length < MAX_BUFFERED_REALTIME_ENTRIES &&
+      additionalBytes <= MAX_BUFFERED_REALTIME_BYTES - this.bufferedBytes
+    )
   }
 }

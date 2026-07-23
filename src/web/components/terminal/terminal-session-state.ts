@@ -1,5 +1,4 @@
 import type { TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
-import { createTerminalClientSnapshot } from '#/web/components/terminal/types.ts'
 import type {
   TerminalProgressState,
   TerminalSearchResult,
@@ -18,8 +17,7 @@ export class TerminalSessionState {
     processName: string
     canonicalTitle: string | null
     clientController: TerminalControllerViewModel
-    canonicalSize: { cols: number; rows: number }
-    takeoverPending: boolean
+    canonicalSize: { cols: number; rows: number } | null
   } = {
     phase: 'opening',
     message: null,
@@ -29,8 +27,7 @@ export class TerminalSessionState {
       role: 'controller',
       controllerStatus: 'connected',
     },
-    canonicalSize: { cols: 0, rows: 0 },
-    takeoverPending: false,
+    canonicalSize: null,
   }
   /** Client-only replay buffering used to merge output around
    *  attaches/replays. This is transient buffering, not server runtime
@@ -99,7 +96,7 @@ export class TerminalSessionState {
     return this.runtimeState.clientController
   }
 
-  getCanonicalSize(): { cols: number; rows: number } {
+  getCanonicalSize(): { cols: number; rows: number } | null {
     return this.runtimeState.canonicalSize
   }
 
@@ -110,29 +107,16 @@ export class TerminalSessionState {
       processName: this.runtimeState.processName,
       canonicalTitle: this.runtimeState.canonicalTitle,
     }
-    // The `attachment` session is only populated when the session is
-    // open AND we have a terminalRuntimeSessionId, matching the previous
-    // behaviour. The fields are identity-only — phase is at the
-    // top level of the snapshot already.
-    if (this.runtimeState.phase === 'open' && terminalRuntimeSessionId) {
-      snapshot.attachment = createTerminalClientSnapshot({
-        ...this.runtimeState.clientController,
-        canonicalCols: this.runtimeState.canonicalSize.cols,
-        canonicalRows: this.runtimeState.canonicalSize.rows,
-      })
+    // Control identity is orthogonal to lifecycle. In particular, a failed
+    // restart keeps its retained generation addressable so its controller can
+    // retry; hiding attachment identity in `error` would turn that controller
+    // into a viewer only in the UI.
+    if (terminalRuntimeSessionId) {
+      snapshot.attachment = { role: this.runtimeState.clientController.role }
     }
     if (this.transientViewState.searchResult) snapshot.search = this.transientViewState.searchResult
     if (this.transientViewState.progressState) snapshot.progress = this.transientViewState.progressState
-    if (this.runtimeState.takeoverPending) snapshot.takeoverPending = true
     return snapshot
-  }
-
-  setOpening(): boolean {
-    return this.setPhaseAndMessage('opening', null)
-  }
-
-  setRestarting(): boolean {
-    return this.setPhaseAndMessage('restarting', null)
   }
 
   setError(message: string | null): boolean {
@@ -160,72 +144,53 @@ export class TerminalSessionState {
     canonicalTitle?: string | null
     role: TerminalControllerViewModel['role']
     controllerStatus: TerminalControllerViewModel['controllerStatus']
-    canonicalCols: number
-    canonicalRows: number
+    canonicalSize: { cols: number; rows: number } | null
   }): boolean {
-    // Attach/restart metadata carries both identity and lifecycle
-    // in one shape. Apply them through their respective boundaries
-    // so the `applyIdentity` / `applyLifecycle` separation is
-    // preserved even on synchronous create/attach/takeover
-    // path. Identity first, then lifecycle — order is irrelevant
-    // because they touch disjoint state.
     let changed = false
-    changed =
-      this.applyIdentity({
-        terminalRuntimeSessionId: '', // The runtime stamps the actual terminalRuntimeSessionId itself; the response path carries it via `currentTerminalRuntimeSessionId` set by the caller.
-        terminalRuntimeGeneration: 0,
-        role: input.role,
-        controllerStatus: input.controllerStatus,
-        canonicalCols: input.canonicalCols,
-        canonicalRows: input.canonicalRows,
-      }) || changed
-    changed =
-      this.applyLifecycle({
-        terminalRuntimeSessionId: '',
-        terminalRuntimeGeneration: 0,
-        phase: input.phase ?? 'open',
-        message: input.message ?? null,
-        takeoverPending: false,
-      }) || changed
+    changed = this.setClientController(input.role, input.controllerStatus) || changed
+    changed = this.setCanonicalSize(input.canonicalSize) || changed
+    changed = this.setPhaseAndMessage(input.phase ?? 'open', input.message ?? null) || changed
     changed = this.setProcessName(input.processName) || changed
     changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
     return changed
   }
 
   applyIdentity(event: TerminalIdentityViewModel): boolean {
-    let changed = false
-    if (
-      this.runtimeState.clientController.role !== event.role ||
-      this.runtimeState.clientController.controllerStatus !== event.controllerStatus
-    ) {
-      this.runtimeState.clientController = { role: event.role, controllerStatus: event.controllerStatus }
-      changed = true
-    }
-    changed = this.setCanonicalSize(event.canonicalCols, event.canonicalRows) || changed
+    let changed = this.setClientController(event.role, event.controllerStatus)
+    changed = this.setCanonicalSize(event.canonicalSize) || changed
     return changed
   }
 
   applyLifecycle(event: TerminalLifecycleViewModel): boolean {
-    let changed = false
-    changed = this.setPhaseAndMessage(event.phase, event.message) || changed
-    if (this.runtimeState.takeoverPending !== event.takeoverPending) {
-      this.runtimeState.takeoverPending = event.takeoverPending
-      changed = true
-    }
-    return changed
+    return this.setPhaseAndMessage(event.phase, event.message)
   }
 
-  setCanonicalSize(cols: number, rows: number): boolean {
-    if (this.runtimeState.canonicalSize.cols === cols && this.runtimeState.canonicalSize.rows === rows) return false
-    this.runtimeState.canonicalSize = { cols, rows }
+  setCanonicalSize(next: { cols: number; rows: number } | null): boolean {
+    const current = this.runtimeState.canonicalSize
+    if (current === null && next === null) return false
+    if (current !== null && next !== null && current.cols === next.cols && current.rows === next.rows) return false
+    this.runtimeState.canonicalSize = next
     return true
   }
 
-  // Updates the replay boundary. The pending-output buffer is
-  // preserved across calls, so a preload window (server snapshot's
-  // seq) followed by a post-attach window (new server snapshot's seq)
-  // shares the same buffer; the post-attach `finishReplay` filters
-  // by the new boundary.
+  private setClientController(
+    role: TerminalControllerViewModel['role'],
+    controllerStatus: TerminalControllerViewModel['controllerStatus'],
+  ): boolean {
+    if (
+      this.runtimeState.clientController.role === role &&
+      this.runtimeState.clientController.controllerStatus === controllerStatus
+    ) {
+      return false
+    }
+    this.runtimeState.clientController = { role, controllerStatus }
+    return true
+  }
+
+  // Updates the replay boundary. Pending output is preserved when a newer
+  // recovery snapshot supersedes an in-flight replay; the newest checkpoint
+  // filters the shared buffer and the outer render queue still fences by
+  // runtime binding.
   beginReplay(replayBoundary: TerminalOutputCheckpoint): number {
     this.outputSequencingState.replayBoundary = normalizeOutputCheckpoint(replayBoundary)
     this.outputSequencingState.replayGeneration += 1
@@ -236,10 +201,6 @@ export class TerminalSessionState {
     if (this.outputSequencingState.replayBoundary === null) return false
     this.outputSequencingState.replayPendingOutput.push(event)
     return true
-  }
-
-  isReplaying(): boolean {
-    return this.outputSequencingState.replayBoundary !== null
   }
 
   finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
@@ -295,20 +256,6 @@ export class TerminalSessionState {
     return true
   }
 
-  setTakeoverPending(value: boolean): boolean {
-    if (this.runtimeState.takeoverPending === value) return false
-    this.runtimeState.takeoverPending = value
-    return true
-  }
-
-  clearTakeoverPending(): boolean {
-    return this.setTakeoverPending(false)
-  }
-
-  isTakeoverPending(): boolean {
-    return this.runtimeState.takeoverPending
-  }
-
   private setPhaseAndMessage(phase: TerminalSessionPhase, message: string | null): boolean {
     if (this.runtimeState.phase === phase && this.runtimeState.message === message) return false
     this.runtimeState.phase = phase
@@ -334,19 +281,16 @@ function normalizeTerminalTitle(title: string | null | undefined): string | null
 }
 
 export interface TerminalOutputCheckpoint {
-  outputEra: number
   seq: number
 }
 
 function normalizeOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
   return {
-    outputEra: normalizeOutputSeq(checkpoint.outputEra),
     seq: normalizeOutputSeq(checkpoint.seq),
   }
 }
 
 function isOutputAfterCheckpoint(event: TerminalOutputEvent, checkpoint: TerminalOutputCheckpoint): boolean {
-  if (event.outputEra !== checkpoint.outputEra) return event.outputEra > checkpoint.outputEra
   return event.seq > checkpoint.seq
 }
 

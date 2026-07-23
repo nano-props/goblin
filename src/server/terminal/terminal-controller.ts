@@ -1,20 +1,29 @@
 import type { TerminalController } from '#/shared/terminal-types.ts'
 
 /**
- * Per-action authority decisions.
- *
- * The terminal session stores attachment metadata and controller intent.
- * Client liveness is deliberately not copied into the session; callers
- * provide the current presence snapshot so effective controller state is
- * derived from one source of truth.
+ * Server-side attachment membership and controller intent. Geometry belongs
+ * to the current bound PTY state, never to an attachment or create request.
  */
-export type TerminalAuthorityAction = 'write' | 'resize' | 'restart' | 'takeover'
+export type TerminalAuthorityAction = 'write' | 'resize' | 'restart'
 
 export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-client'
 
 type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
 
 export type TerminalClientPresence = (clientId: string) => boolean
+
+export interface TerminalControllerState {
+  attachments: Set<string>
+  /** Controller intent. Effective controller is derived with live presence. */
+  controllerClientId: string | null
+}
+
+export type TerminalAttachmentDecision = 'controller' | 'viewer' | 'unavailable'
+
+export interface TerminalClientAdmission {
+  commit(): void
+  rollback(): void
+}
 
 export function isAuthoritative(
   state: TerminalControllerState,
@@ -41,39 +50,13 @@ function decideTerminalActionAuthority(
   action: TerminalAuthorityAction,
   isClientOnline: TerminalClientPresence,
 ): TerminalAuthorityDecision {
-  const attachment = state.attachments.get(clientId)
-  if (!attachment) return { kind: 'deny', reason: 'unknown-client' }
-  if (action === 'takeover') return { kind: 'allow' }
+  if (!state.attachments.has(clientId) || !isClientOnline(clientId)) {
+    return { kind: 'deny', reason: 'unknown-client' }
+  }
   const controller = effectiveTerminalController(state, isClientOnline)
   if (controller === null) return { kind: 'deny', reason: 'session-unowned' }
   if (controller.clientId !== clientId) return { kind: 'deny', reason: 'not-controller' }
   return { kind: 'allow' }
-}
-
-/** Per-client attachment metadata owned by the terminal session. */
-export interface TerminalClientControllerState {
-  cols: number
-  rows: number
-}
-
-export interface TerminalControllerState {
-  attachments: Map<string, TerminalClientControllerState>
-  /** Controller intent. Effective controller is derived with presence. */
-  controllerClientId: string | null
-  /**
-   * Sticky user-level claim. Set on the first successful attach or
-   * explicit takeover for the session. Persists for the lifetime of
-   * the session so a subsequent attachment can auto-claim when no
-   * effective controller is present.
-   */
-  userSticky: boolean
-  cols: number
-  rows: number
-}
-
-export interface TerminalControllerEffect {
-  resizeTo?: { cols: number; rows: number }
-  emitIdentity: boolean
 }
 
 export function effectiveTerminalController(
@@ -81,75 +64,75 @@ export function effectiveTerminalController(
   isClientOnline: TerminalClientPresence,
 ): TerminalController | null {
   const clientId = state.controllerClientId
-  if (!clientId) return null
-  if (!state.attachments.has(clientId)) return null
-  if (!isClientOnline(clientId)) return null
+  if (!clientId || !state.attachments.has(clientId) || !isClientOnline(clientId)) return null
   return { clientId, status: 'connected' }
 }
 
-export function registerTerminalClient(
-  state: TerminalControllerState,
-  clientId: string,
-  cols: number,
-  rows: number,
-): void {
-  state.attachments.set(clientId, { cols, rows })
-}
-
-/** Removes transient authority owned by an expired page instance. */
-export function expireTerminalClient(state: TerminalControllerState, clientId: string): boolean {
-  const attachmentRemoved = state.attachments.delete(clientId)
-  const controlled = state.controllerClientId === clientId
-  if (controlled) state.controllerClientId = null
-  return attachmentRemoved || controlled
-}
-
-export function attachTerminalClient(
+export function decideTerminalClientAttachment(
   state: TerminalControllerState,
   clientId: string,
   isClientOnline: TerminalClientPresence,
-): TerminalControllerEffect {
-  const attachment = state.attachments.get(clientId)
-  if (!attachment || !isClientOnline(clientId)) return { emitIdentity: false }
-
+): TerminalAttachmentDecision {
+  if (!isClientOnline(clientId)) return 'unavailable'
   const controller = effectiveTerminalController(state, isClientOnline)
-  if (controller?.clientId === clientId) {
-    const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
-    state.controllerClientId = clientId
-    state.userSticky = true
-    return {
-      resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
-      emitIdentity: !sizeChanged,
-    }
-  }
+  return controller === null || controller.clientId === clientId ? 'controller' : 'viewer'
+}
 
-  if (controller === null) return claimTerminalClientControl(state, clientId, isClientOnline)
-  return { emitIdentity: false }
+export function commitTerminalClientAttachment(
+  state: TerminalControllerState,
+  clientId: string,
+  decision: Exclude<TerminalAttachmentDecision, 'unavailable'>,
+): void {
+  state.attachments.add(clientId)
+  if (decision === 'controller') state.controllerClientId = clientId
+}
+
+/**
+ * Stages first-attach membership so it commits in the same synchronous adopt
+ * boundary as the native PTY handle and bound render state.
+ */
+export function prepareTerminalClientAdmission(
+  state: TerminalControllerState,
+  clientId: string,
+  decision: Exclude<TerminalAttachmentDecision, 'unavailable'>,
+  isClientOnline: TerminalClientPresence,
+  canCommit: () => boolean,
+): TerminalClientAdmission {
+  const wasAttached = state.attachments.has(clientId)
+  const previousControllerClientId = state.controllerClientId
+  return {
+    commit(): void {
+      if (!canCommit() || !isClientOnline(clientId)) throw new Error('error.unavailable')
+      commitTerminalClientAttachment(state, clientId, decision)
+    },
+    rollback(): void {
+      if (wasAttached) state.attachments.add(clientId)
+      else state.attachments.delete(clientId)
+      state.controllerClientId = previousControllerClientId
+    },
+  }
 }
 
 export function claimTerminalClientControl(
   state: TerminalControllerState,
   clientId: string,
   isClientOnline: TerminalClientPresence,
-): TerminalControllerEffect {
-  const attachment = state.attachments.get(clientId)
-  if (!attachment || !isClientOnline(clientId)) return { emitIdentity: false }
-  const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
+): boolean {
+  if (!isClientOnline(clientId)) return false
+  // Explicit takeover is also the page's attachment admission. Viewers are
+  // discovered from the user-scoped session projection and intentionally do
+  // not perform a snapshot attach until after they win control.
+  state.attachments.add(clientId)
   state.controllerClientId = clientId
-  state.userSticky = true
-  return {
-    resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
-    emitIdentity: !sizeChanged,
-  }
+  return true
 }
 
-export function restartTerminalClientControl(
-  state: TerminalControllerState,
-  clientId: string,
-  isClientOnline: TerminalClientPresence,
-): void {
-  state.controllerClientId = state.attachments.has(clientId) && isClientOnline(clientId) ? clientId : null
-  if (state.controllerClientId) state.userSticky = true
+/** Removes page-scoped attachment membership and any controller intent it owns. */
+export function expireTerminalClient(state: TerminalControllerState, clientId: string): boolean {
+  const attachmentRemoved = state.attachments.delete(clientId)
+  const controlled = state.controllerClientId === clientId
+  if (controlled) state.controllerClientId = null
+  return attachmentRemoved || controlled
 }
 
 export function terminalIdentityChanged(

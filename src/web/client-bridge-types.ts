@@ -12,6 +12,7 @@ import type {
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalResizeInput,
+  TerminalResizeResult,
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionInput,
@@ -44,9 +45,12 @@ export interface ClientTerminal {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
   restart: (input: TerminalRestartInput) => Promise<TerminalRestartResult>
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
-  resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
+  resize: (input: TerminalResizeInput) => Promise<TerminalResizeResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  pruneTerminals: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
+  pruneTerminals: (
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ) => Promise<{ pruned: number; remaining: number }>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsSnapshot>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>

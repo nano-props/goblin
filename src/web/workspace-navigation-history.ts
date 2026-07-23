@@ -16,6 +16,7 @@ import {
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { navigationLog } from '#/web/logger.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -75,6 +76,7 @@ export function useWorkspaceNavigationHistory({
     const currentHistoryEntry =
       useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
     const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(routeHref)
+    const browserHistoryReplace = workspaceNavigationBrowserHistoryReplacement(routeHref)
     const replaceCurrentMatches =
       replaceCurrent &&
       !!replaceCurrentEntry &&
@@ -95,7 +97,11 @@ export function useWorkspaceNavigationHistory({
     }
     recordWorkspaceNavigation(
       entry,
-      replaceCurrentMatches ? { replace: true } : browserHistoryTraversal ? { browserHistoryTraversal } : undefined,
+      replaceCurrentMatches || browserHistoryReplace
+        ? { replace: true }
+        : browserHistoryTraversal
+          ? { browserHistoryTraversal }
+          : undefined,
     )
     clearBrowserHistoryAction(routeHref)
   }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
@@ -107,7 +113,10 @@ export function usePrimaryWindowHistoryPresentationObserver(): void {
   useEffect(() => {
     if (!router) return
     return router.history.subscribe(({ location, action }) => {
-      observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
+      const observation = observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
+      if (!observation.ok) {
+        navigationLog.error('primary-window history presentation cleanup failed', { error: observation.error })
+      }
       browserHistoryAction =
         action.type === 'GO'
           ? { href: location.href, type: 'GO', index: action.index }
@@ -324,7 +333,7 @@ export function restoreWorkspaceNavigationEntry(
       return { kind: 'accepted' }
     case 'worktree':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        const accepted = routeNavigation.openRepoWorktreeTerminal?.(
+        const accepted = routeNavigation.openRepoWorktreeTerminal(
           entry.workspaceId,
           entry.route.worktreePath,
           entry.route.terminalSessionId,
@@ -333,7 +342,7 @@ export function restoreWorkspaceNavigationEntry(
         return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
       if (entry.route.workspacePaneTab && entry.route.workspacePaneTab !== 'terminal') {
-        const accepted = routeNavigation.openRepoWorktreeTab?.(
+        const accepted = routeNavigation.openRepoWorktreeTab(
           entry.workspaceId,
           entry.route.worktreePath,
           entry.route.workspacePaneTab,
@@ -414,6 +423,11 @@ function workspaceNavigationBrowserHistoryTraversal(
     if (action.index > 0) return 'forward'
   }
   return null
+}
+
+function workspaceNavigationBrowserHistoryReplacement(routeHref: string): boolean {
+  const action = browserHistoryAction
+  return !!action && action.href === routeHref && action.type === 'REPLACE'
 }
 
 function clearBrowserHistoryAction(routeHref: string): void {

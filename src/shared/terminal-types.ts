@@ -19,6 +19,11 @@ export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' |
 /** Monotonic PTY binding generation owned by the server runtime session. */
 export type TerminalRuntimeGeneration = number
 
+export interface TerminalSize {
+  cols: number
+  rows: number
+}
+
 export interface TerminalResolvedController {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
@@ -99,20 +104,15 @@ export interface TerminalAttachInput {
    * session is currently interactive.
    */
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   cols: number
   rows: number
 }
 
 export interface TerminalCreateInput {
   kind: 'primary' | 'additional'
-  /**
-   * Shell text to run as the terminal starts, before returning to an interactive shell.
-   * The initial cols/rows are a best-effort client hint; width-sensitive output may render
-   * before the attached xterm reports its first authoritative fit/resize.
-   */
+  /** Shell text to run as the terminal starts, before returning to an interactive shell. */
   startupShellCommand?: string
-  cols?: number
-  rows?: number
   target: TerminalExecutionTarget
 }
 
@@ -123,6 +123,7 @@ export interface TerminalRestartInput {
    * changing the durable `terminalSessionId`.
    */
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   cols: number
   rows: number
 }
@@ -153,8 +154,7 @@ export type TerminalTakeoverResult =
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
-      canonicalCols: number
-      canonicalRows: number
+      canonicalSize: TerminalSize
       phase: TerminalSessionPhase
     }
   | { ok: false; message: string }
@@ -168,8 +168,12 @@ export interface TerminalRuntimeMetadata {
   phase: TerminalSessionPhase
   message: string | null
   controller: TerminalController | null
-  canonicalCols: number
-  canonicalRows: number
+  /** Null until the first fitted xterm atomically establishes a PTY binding. */
+  canonicalSize: TerminalSize | null
+}
+
+export interface TerminalBoundRuntimeMetadata extends Omit<TerminalRuntimeMetadata, 'canonicalSize'> {
+  canonicalSize: TerminalSize
 }
 
 /**
@@ -192,7 +196,6 @@ export interface TerminalSnapshotFrame {
   frame: 'snapshot'
   snapshot: string
   snapshotSeq: number
-  outputEra: number
 }
 
 export type TerminalProjectionNoneEffect = { kind: 'none' }
@@ -206,16 +209,16 @@ export type TerminalProjectionEffect = TerminalProjectionNoneEffect | TerminalPr
  * startup from being represented as a recovery replay.
  */
 export type TerminalAttachResult =
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalBoundRuntimeMetadata &
       TerminalStreamFrame)
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalRuntimeMetadata &
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalBoundRuntimeMetadata &
       TerminalSnapshotFrame)
   | { ok: false; message: string }
 
-/** Restart always replaces an existing binding and commits a reset snapshot. */
+/** Restart establishes a fresh generation whose output resumes from sequence 1. */
 export type TerminalRestartResult =
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
-      TerminalSnapshotFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalBoundRuntimeMetadata &
+      TerminalStreamFrame)
   | { ok: false; message: string }
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
@@ -245,6 +248,7 @@ export type TerminalCreateResult =
 
 export interface TerminalWriteInput {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   data: string
 }
 
@@ -255,8 +259,19 @@ export interface TerminalResizeInput {
   rows: number
 }
 
+/** Canonical geometry committed by the server to the current PTY binding. */
+export interface TerminalResizeCommit {
+  ok: true
+  terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
+  canonicalSize: TerminalSize
+}
+
+export type TerminalResizeResult = TerminalResizeCommit | { ok: false; message: string }
+
 export interface TerminalTakeoverInput {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   cols: number
   rows: number
 }
@@ -292,8 +307,7 @@ interface TerminalSessionSummaryFields {
   canonicalTitle: string | null
   phase: TerminalSessionPhase
   message: string | null
-  cols: number
-  rows: number
+  canonicalSize: TerminalSize | null
 }
 
 type TerminalSessionSummaryFor<Session extends TerminalSessionBase> = Session extends TerminalSessionBase
@@ -341,13 +355,15 @@ export type TerminalWriteResult = { status: 'accepted' } | { status: 'rejected' 
 // Do not add a realtime event that carries
 // `terminalRuntimeSessionId` alone; see the dropped-title-update regression this
 // pattern caused.
-export interface TerminalOutputEvent {
+export interface TerminalOutputCheckpoint {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
+  seq: number
+}
+
+export interface TerminalOutputEvent extends TerminalOutputCheckpoint {
   terminalSessionId: string
   data: string
-  outputEra: number
-  seq: number
   processName: string
 }
 
@@ -396,13 +412,12 @@ export interface TerminalIdentityEvent {
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   controller: TerminalController | null
-  canonicalCols: number
-  canonicalRows: number
+  canonicalSize: TerminalSize
 }
 
 /**
- * Realtime lifecycle-change event (phase transitions, takeover-pending
- * toggles). Carries only the transient lifecycle fields — no role,
+ * Realtime lifecycle-change event (phase transitions and errors). Carries
+ * only the transient lifecycle fields — no role,
  * no controller, no geometry. The client's `applyLifecycle` boundary
  * never sees a role change, so a transitional phase (e.g. `'opening'`
  * during a pre-spawn identity broadcast) cannot trigger a
@@ -414,5 +429,4 @@ export interface TerminalLifecycleEvent {
   terminalSessionId: string
   phase: TerminalSessionPhase
   message: string | null
-  takeoverPending: boolean
 }

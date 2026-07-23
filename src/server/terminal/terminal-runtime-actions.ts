@@ -9,6 +9,7 @@ import type {
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalResizeInput,
+  TerminalResizeResult,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalSessionsSnapshot,
@@ -85,6 +86,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const result = await manager.attachSession(
         userId,
         input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
         input.cols,
         input.rows,
         clientId,
@@ -112,6 +114,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           await manager.restartSessionWithProjectionOutcome(
             userId,
             terminalRuntimeSessionId,
+            input.terminalRuntimeGeneration,
             input.cols,
             input.rows,
             clientId,
@@ -149,23 +152,32 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
       if (!isValidTerminalClientId(clientId)) return { status: 'rejected' }
-      if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalWriteData(input?.data)) {
-        return { status: 'rejected' }
-      }
-      return await manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, clientId)
-    },
-
-    resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
-      if (!isValidTerminalClientId(clientId)) return false
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
-        !Number.isSafeInteger(input?.terminalRuntimeGeneration) ||
-        input.terminalRuntimeGeneration < 0 ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
+        !isValidTerminalWriteData(input?.data)
+      ) {
+        return { status: 'rejected' }
+      }
+      return await manager.writeSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.data,
+        clientId,
+      )
+    },
+
+    async resize(clientId: string, userId: string, input: TerminalResizeInput): Promise<TerminalResizeResult> {
+      if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (
+        !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
-        return false
+        return { ok: false, message: 'error.invalid-arguments' }
       }
-      return manager.resizeSession(
+      return await manager.resizeSession(
         userId,
         input.terminalRuntimeSessionId,
         input.terminalRuntimeGeneration,
@@ -188,15 +200,23 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return { kind: outcome.kind }
     },
 
-    takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
+    async takeover(clientId: string, userId: string, input: TerminalTakeoverInput): Promise<TerminalTakeoverResult> {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
+      return await manager.takeoverSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.cols,
+        input.rows,
+        clientId,
+      )
     },
 
     async recoverSessions(
@@ -262,4 +282,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       }
     }
   }
+}
+
+function isBoundTerminalRuntimeGeneration(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }

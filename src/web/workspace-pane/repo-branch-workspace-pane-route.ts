@@ -57,6 +57,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const model = createWorkspacePaneTabModel({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
+    routeTarget: { kind: 'git-branch', workspaceId: repo.id, branchName },
     worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
     paneTarget: target,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),

@@ -200,8 +200,6 @@ export class WorkspacePaneRuntimeApplication {
       {
         kind: input.request.kind,
         startupShellCommand: input.request.startupShellCommand,
-        cols: input.request.cols,
-        rows: input.request.rows,
         target,
       },
       {

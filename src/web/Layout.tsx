@@ -57,12 +57,14 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
+import { TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -115,6 +117,11 @@ function AuthenticatedAppShell() {
   return (
     <AuthenticatedWorkspaceRestoreContext value={bootstrap}>
       <TerminalSessionProvider>
+        <div
+          id={TERMINAL_INPUT_FOCUS_SINK_ID}
+          className="pointer-events-none fixed size-px overflow-hidden opacity-0 outline-none"
+          tabIndex={-1}
+        />
         {shellMode === 'settings' ? (
           <AuthenticatedSettingsShell />
         ) : shellMode === 'workspace-restore' ? (
@@ -167,6 +174,15 @@ function AuthenticatedWorkspaceShell() {
       ? commandWorkspace.capability.probe.capabilities
       : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
+  const commandWorktreeStatus = useRepoWorktreeStatusReadModel(
+    commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
+    commandWorkspace?.workspaceRuntimeId ?? '',
+    routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git',
+  )
+  const commandWorktree =
+    routeContext?.kind === 'worktree' && commandWorktreePath
+      ? (commandWorktreeStatus.data?.status.find((worktree) => worktree.path === commandWorktreePath) ?? null)
+      : null
   const commandBranch =
     commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
       ? (readRepoBranchSnapshotQueryProjection(commandWorkspace)?.branches.find(
@@ -174,10 +190,14 @@ function AuthenticatedWorkspaceShell() {
         ) ?? null)
       : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
-    routeContext?.kind === 'branch' && routeContext.branchName
+    routeContext?.kind === 'branch' && routeContext.branchName && commandWorkspace
       ? commandWorkspace?.capability.kind === 'git' && commandBranch?.worktree?.path
         ? {
-            kind: 'git-worktree',
+            routeTarget: {
+              kind: 'git-branch',
+              workspaceId: commandWorkspace.id,
+              branchName: routeContext.branchName,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
@@ -188,25 +208,36 @@ function AuthenticatedWorkspaceShell() {
             }),
           }
         : {
-            kind: 'git-branch',
-            branchName: routeContext.branchName,
+            routeTarget: {
+              kind: 'git-branch',
+              workspaceId: commandWorkspace.id,
+              branchName: routeContext.branchName,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: null,
           }
-      : routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git' && commandWorktreePath
+      : routeContext?.kind === 'worktree' &&
+          commandWorkspace?.capability.kind === 'git' &&
+          commandWorktreePath &&
+          commandWorktree
         ? {
-            kind: 'git-worktree',
+            routeTarget: {
+              kind: 'git-worktree',
+              workspaceId: commandWorkspace.id,
+              worktreePath: commandWorktreePath,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
               worktreePath: commandWorktreePath,
-              head: { kind: 'detached' },
+              head: gitHead(commandWorktree.branch ?? null),
               capabilities: commandWorkspace.capability.probe.capabilities,
             }),
           }
         : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities
           ? {
-              kind: 'workspace-root',
+              routeTarget: { kind: 'workspace-root', workspaceId: commandWorkspace.id },
               workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
               filesystemTarget: workspaceRootPaneFilesystemTarget({
                 workspaceId: commandWorkspace.id,
@@ -535,28 +566,11 @@ function workspaceNavigationRouteContext(
   if (!routeContext) return null
   const workspaceId = workspaceIdFromSlug(routeContext.workspaceSlug)
   if (!workspaceId) return null
-  if (routeContext.kind === 'branch') {
+  if (routeContext.kind === 'branch' || routeContext.kind === 'workspace-root' || routeContext.kind === 'worktree') {
     return null
-  }
-  if (routeContext.kind === 'worktree') {
-    return {
-      kind: 'worktree',
-      workspaceId,
-      worktreePath: routeContext.worktreePath,
-      workspacePaneRoute:
-        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
-    }
   }
   if (routeContext.kind === 'newWorktree') {
     return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
-  }
-  if (routeContext.kind === 'workspace-root') {
-    return {
-      kind: 'workspace-root',
-      workspaceId,
-      workspacePaneRoute:
-        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
-    }
   }
   return { kind: routeContext.kind, workspaceId }
 }

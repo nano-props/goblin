@@ -16,8 +16,24 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     const coordinator = new TerminalProjectionRecoveryCoordinator()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    coordinator.request({ scope, complete, minimumRevision: 0, recover, accept, reject: vi.fn() })
-    coordinator.request({ scope, complete, minimumRevision: 4, recover, accept, reject: vi.fn() })
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject: vi.fn(),
+    })
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 4,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject: vi.fn(),
+    })
     deferred.resolve({ revision: 4, sessions: [] })
 
     await vi.waitFor(() => expect(accept).toHaveBeenCalledOnce())
@@ -33,7 +49,15 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     const coordinator = new TerminalProjectionRecoveryCoordinator()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    coordinator.request({ scope, complete, minimumRevision: 3, recover, accept, reject: vi.fn() })
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 3,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject: vi.fn(),
+    })
 
     await vi.waitFor(() => expect(accept).toHaveBeenCalledWith({ revision: 3, sessions: [] }))
     expect(recover).toHaveBeenCalledTimes(2)
@@ -46,7 +70,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     const coordinator = new TerminalProjectionRecoveryCoordinator()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    coordinator.request({ scope, complete, minimumRevision: 3, recover, accept, reject })
+    coordinator.request({ scope, complete, minimumRevision: 3, freshness: 'join-current', recover, accept, reject })
 
     await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(2))
     expect(accept).not.toHaveBeenCalled()
@@ -54,6 +78,107 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     expect(reject).toHaveBeenCalledWith(
       new Error('Terminal sessions recovery did not reach required revision 3; received 1'),
     )
+  })
+
+  test('gives a newer minimum revision its own follow-up read', async () => {
+    const firstRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const secondRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const thirdRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const recover = vi
+      .fn<() => Promise<{ revision: number; sessions: [] }>>()
+      .mockReturnValueOnce(firstRead.promise)
+      .mockReturnValueOnce(secondRead.promise)
+      .mockReturnValueOnce(thirdRead.promise)
+    const accept = vi.fn(() => ({ kind: 'accepted' as const }))
+    const reject = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 3,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject,
+    })
+    firstRead.resolve({ revision: 2, sessions: [] })
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(2))
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 4,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject,
+    })
+    secondRead.resolve({ revision: 3, sessions: [] })
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(3))
+    thirdRead.resolve({ revision: 4, sessions: [] })
+
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledWith({ revision: 4, sessions: [] }))
+    expect(reject).not.toHaveBeenCalled()
+  })
+
+  test('gives a newer minimum revision its first read when the older in-flight read fails', async () => {
+    const firstRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const recoverInitial = vi.fn(async () => await firstRead.promise)
+    const recoverNewerRevision = vi.fn(async () => ({ revision: 4, sessions: [] as [] }))
+    const accept = vi.fn(() => ({ kind: 'accepted' as const }))
+    const reject = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'join-current',
+      recover: recoverInitial,
+      accept,
+      reject,
+    })
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 4,
+      freshness: 'join-current',
+      recover: recoverNewerRevision,
+      accept,
+      reject,
+    })
+    firstRead.reject(new Error('initial recovery failed'))
+
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledWith({ revision: 4, sessions: [] }))
+    expect(recoverInitial).toHaveBeenCalledOnce()
+    expect(recoverNewerRevision).toHaveBeenCalledOnce()
+    expect(reject).not.toHaveBeenCalled()
+  })
+
+  test('fails fast when an in-flight read fails without a newer minimum revision', async () => {
+    const failure = new Error('recovery failed')
+    const recover = vi.fn(async () => await Promise.reject(failure))
+    const accept = vi.fn(() => ({ kind: 'accepted' as const }))
+    const reject = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 4,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject,
+    })
+
+    await vi.waitFor(() => expect(reject).toHaveBeenCalledWith(failure))
+    expect(recover).toHaveBeenCalledOnce()
+    expect(accept).not.toHaveBeenCalled()
   })
 
   test('rejects an active membership refusal without consuming resynchronization', async () => {
@@ -66,6 +191,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
+      freshness: 'join-current',
       recover: async () => ({ revision: 1, sessions: [] }),
       accept: () => ({ kind: 'membership-rejected' }),
       afterAccept: resynchronize,
@@ -90,6 +216,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
+      freshness: 'join-current',
       recover: async () => ({ revision: 1, sessions: [] }),
       accept: () => {
         active = false
@@ -122,7 +249,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'after-current',
       recover,
       accept,
       afterAccept: resynchronize,
@@ -148,7 +275,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'join-current',
       recover: recoverCold,
       accept,
       reject: vi.fn(),
@@ -157,7 +284,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'after-current',
       recover: recoverAfterReconnect,
       accept,
       afterAccept: resynchronize,
@@ -168,8 +295,8 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     await vi.waitFor(() => expect(resynchronize).toHaveBeenCalledOnce())
     expect(recoverCold).toHaveBeenCalledOnce()
     expect(recoverAfterReconnect).toHaveBeenCalledOnce()
-    expect(accept).toHaveBeenCalledTimes(2)
-    expect(accept).toHaveBeenLastCalledWith({ revision: 5, sessions: [] })
+    expect(accept).toHaveBeenCalledOnce()
+    expect(accept).toHaveBeenCalledWith({ revision: 5, sessions: [] })
   })
 
   test('preserves reconnect resynchronization through a newer sessions event', async () => {
@@ -186,7 +313,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'join-current',
       recover: recoverCold,
       accept,
       reject: vi.fn(),
@@ -195,7 +322,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'after-current',
       recover: recoverAfterReconnect,
       accept,
       afterAccept: resynchronize,
@@ -205,6 +332,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete,
       minimumRevision: 6,
+      freshness: 'join-current',
       recover: recoverAfterSessionsEvent,
       accept,
       reject: vi.fn(),
@@ -217,6 +345,111 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     expect(recoverAfterSessionsEvent).toHaveBeenCalledOnce()
     expect(accept).toHaveBeenCalledOnce()
     expect(accept).toHaveBeenCalledWith({ revision: 6, sessions: [] })
+  })
+
+  test('waits for a read started after the latest reconnect', async () => {
+    const coldRecovery = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const firstReconnectRecovery = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const recoverCold = vi.fn(async () => await coldRecovery.promise)
+    const recoverAfterFirstReconnect = vi.fn(async () => await firstReconnectRecovery.promise)
+    const recoverAfterSecondReconnect = vi.fn(async () => ({ revision: 3, sessions: [] as [] }))
+    const accept = vi.fn(() => ({ kind: 'accepted' as const }))
+    const resynchronize = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'join-current',
+      recover: recoverCold,
+      accept,
+      reject: vi.fn(),
+    })
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'after-current',
+      recover: recoverAfterFirstReconnect,
+      accept,
+      afterAccept: resynchronize,
+      reject: vi.fn(),
+    })
+    coldRecovery.resolve({ revision: 1, sessions: [] })
+    await vi.waitFor(() => expect(recoverAfterFirstReconnect).toHaveBeenCalledOnce())
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'after-current',
+      recover: recoverAfterSecondReconnect,
+      accept,
+      afterAccept: resynchronize,
+      reject: vi.fn(),
+    })
+    firstReconnectRecovery.resolve({ revision: 2, sessions: [] })
+
+    await vi.waitFor(() => expect(resynchronize).toHaveBeenCalledOnce())
+    expect(recoverAfterSecondReconnect).toHaveBeenCalledOnce()
+    expect(accept).toHaveBeenCalledOnce()
+    expect(accept).toHaveBeenCalledWith({ revision: 3, sessions: [] })
+  })
+
+  test('resets superseded retry state when an old read fails across reconnect', async () => {
+    const firstRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const oldConnectionRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const freshRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const finalRead = Promise.withResolvers<{ revision: number; sessions: [] }>()
+    const recover = vi
+      .fn<() => Promise<{ revision: number; sessions: [] }>>()
+      .mockReturnValueOnce(firstRead.promise)
+      .mockReturnValueOnce(oldConnectionRead.promise)
+      .mockReturnValueOnce(freshRead.promise)
+      .mockReturnValueOnce(finalRead.promise)
+    const accept = vi
+      .fn()
+      .mockReturnValueOnce({ kind: 'superseded' as const, localRevision: 2 })
+      .mockReturnValueOnce({ kind: 'superseded' as const, localRevision: 3 })
+      .mockReturnValueOnce({ kind: 'accepted' as const })
+    const reject = vi.fn()
+    const resynchronize = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'join-current',
+      recover,
+      accept,
+      reject,
+    })
+    firstRead.resolve({ revision: 1, sessions: [] })
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(2))
+
+    coordinator.request({
+      scope,
+      complete,
+      minimumRevision: 0,
+      freshness: 'after-current',
+      recover,
+      accept,
+      afterAccept: resynchronize,
+      reject,
+    })
+    oldConnectionRead.reject(new Error('disconnected'))
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(3))
+    freshRead.resolve({ revision: 2, sessions: [] })
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(4))
+    finalRead.resolve({ revision: 3, sessions: [] })
+
+    await vi.waitFor(() => expect(resynchronize).toHaveBeenCalledOnce())
+    expect(accept).toHaveBeenCalledTimes(3)
+    expect(reject).not.toHaveBeenCalled()
   })
 
   test('keeps a failed reconnect follow-up dormant until the next accepted trigger', async () => {
@@ -235,7 +468,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete: completeRecovery,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'join-current',
       recover: recoverCold,
       accept,
       reject,
@@ -244,7 +477,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete: completeRecovery,
       minimumRevision: 0,
-      refresh: true,
+      freshness: 'after-current',
       recover: recoverFailedFresh,
       accept,
       afterAccept: resynchronize,
@@ -261,6 +494,7 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
       scope,
       complete: completeRecovery,
       minimumRevision: 2,
+      freshness: 'join-current',
       recover: recoverNextTrigger,
       accept,
       reject,

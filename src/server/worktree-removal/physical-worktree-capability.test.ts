@@ -49,8 +49,6 @@ describe('physical worktree capability boundaries', () => {
       },
       {
         terminalSessionId: 'term-capabilitycapability01',
-        cols: 80,
-        rows: 24,
         physicalWorktreeCapability: capability,
         signal: new AbortController().signal,
       },

@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { SerializeAddon } from '@xterm/addon-serialize'
 import {
   terminalExecutionPath,
   type TerminalAttachResult,
@@ -10,6 +11,7 @@ import {
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
+import { createPtyEventChannel, type PtyEventSink } from '#/server/terminal/pty-event-lease.ts'
 import {
   TerminalSessionManager,
   type TerminalEnsureSessionInput,
@@ -32,6 +34,7 @@ const WORKTREE_TARGET = {
   workspaceRuntimeId: 'repo-runtime-test',
   root: WORKSPACE_ID,
 }
+const ptyEventSinkById = new Map<string, PtyEventSink>()
 const LINKED_WORKTREE_TARGET = {
   ...WORKTREE_TARGET,
   workspaceRuntimeId: 'repo-runtime-linked',
@@ -51,17 +54,17 @@ function requiredWorkspaceLocator(input: string) {
   return locator
 }
 
-function createDeferredPtySupervisor(): PtySupervisor & {
+interface DeferredPtySupervisor extends PtySupervisor {
   spawns: Array<(result: PtySpawnResult) => void>
   killed: string[]
   emitData(terminalRuntimeSessionId: string, data: string): void
   emitExit(terminalRuntimeSessionId: string): void
   setProcessName(processName: string): void
-} {
+}
+
+function createDeferredPtySupervisor(): DeferredPtySupervisor {
   const spawns: Array<(result: PtySpawnResult) => void> = []
   const killed: string[] = []
-  const dataListenersByPtySessionId = new Map<string, Set<(data: string) => void>>()
-  const exitListenersByPtySessionId = new Map<string, Set<() => void>>()
   let currentProcessName = 'zsh'
 
   return {
@@ -74,33 +77,13 @@ function createDeferredPtySupervisor(): PtySupervisor & {
       })
     }),
     write: vi.fn(async () => ({ status: 'accepted' as const })),
-    resize: vi.fn(),
+    resize: vi.fn(async () => true),
     kill(handle) {
       killed.push(handle.ptySessionId)
     },
+    waitForExit: vi.fn(() => new Promise<void>(() => {})),
     async killAndWait(handle) {
       killed.push(handle.ptySessionId)
-    },
-    onData(handle, listener) {
-      const listeners = dataListenersByPtySessionId.get(handle.ptySessionId) ?? new Set()
-      listeners.add(listener)
-      dataListenersByPtySessionId.set(handle.ptySessionId, listeners)
-      return {
-        // Keep callbacks callable after dispose so stale-event guards are exercised.
-        dispose: vi.fn(),
-      }
-    },
-    onExit(handle, listener) {
-      const listeners = exitListenersByPtySessionId.get(handle.ptySessionId) ?? new Set()
-      listeners.add(() => listener(null, null))
-      exitListenersByPtySessionId.set(handle.ptySessionId, listeners)
-      return {
-        // Keep callbacks callable after dispose so stale-event guards are exercised.
-        dispose: vi.fn(),
-      }
-    },
-    processName() {
-      return currentProcessName
     },
     getDiagnostics() {
       return {
@@ -122,10 +105,10 @@ function createDeferredPtySupervisor(): PtySupervisor & {
     },
     shutdown: vi.fn(),
     emitData(ptySessionId, data) {
-      for (const listener of Array.from(dataListenersByPtySessionId.get(ptySessionId) ?? [])) listener(data)
+      ptyEventSinkById.get(ptySessionId)?.data({ data, processName: currentProcessName })
     },
     emitExit(ptySessionId) {
-      for (const listener of Array.from(exitListenersByPtySessionId.get(ptySessionId) ?? [])) listener()
+      ptyEventSinkById.get(ptySessionId)?.exit(null, null)
     },
     setProcessName(processName) {
       currentProcessName = processName
@@ -133,7 +116,11 @@ function createDeferredPtySupervisor(): PtySupervisor & {
   }
 }
 
-function createManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSink<string>> = {}) {
+function createManagerWithPresence(
+  supervisor: PtySupervisor,
+  sink: Partial<TerminalEventSink<string>>,
+  isClientOnline: (clientId: string) => boolean,
+) {
   return new TerminalSessionManager<string>(
     supervisor,
     {
@@ -141,18 +128,24 @@ function createManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSin
       onExit: vi.fn(),
       ...sink,
     },
-    () => true,
+    (_userId, clientId) => isClientOnline(clientId),
     createWorkspaceRuntimeRetentionHost(),
   )
 }
 
-function ptySpawnSuccess(id: string): { ok: true; handle: PtyHandle; processName: string } {
-  return { ok: true, handle: createPtyHandle(id), processName: 'zsh' }
+function createAlwaysOnlineManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSink<string>> = {}) {
+  return createManagerWithPresence(supervisor, sink, () => true)
+}
+
+function ptySpawnSuccess(id: string): Extract<PtySpawnResult, { ok: true }> {
+  const events = createPtyEventChannel()
+  ptyEventSinkById.set(id, events.sink)
+  return { ok: true, handle: createPtyHandle(id), processName: 'zsh', events: events.lease }
 }
 
 async function createSession(
   manager: TerminalSessionManager<string>,
-  supervisor: ReturnType<typeof createDeferredPtySupervisor>,
+  supervisor: DeferredPtySupervisor,
 ): Promise<Extract<TerminalAttachResult, { ok: true }>> {
   const pending = ensureSession(manager, {
     userId: USER_ID,
@@ -172,39 +165,42 @@ async function createSession(
 
 function ensureSession(
   manager: TerminalSessionManager<string>,
-  input: Omit<TerminalEnsureSessionInput<string>, 'physicalWorktreeCapability'>,
+  input: Omit<TerminalEnsureSessionInput<string>, 'physicalWorktreeCapability'> & {
+    cols: number
+    rows: number
+    clientId?: string
+  },
 ): Promise<TerminalAttachResult> {
+  const { cols, rows, clientId = CLIENT_ID, ...prepareInput } = input
   const prepared = manager.prepareSession({
-    ...input,
-    physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(terminalExecutionPath(input.target)),
+    ...prepareInput,
+    physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(terminalExecutionPath(prepareInput.target)),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
-  prepared.admission.commit({
+  const committed = prepared.admission.commit({
     presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
   })
   prepared.admission.publishCommittedEffects()
   return manager.attachSession(
     input.userId,
     prepared.terminalRuntimeSessionId,
-    input.cols,
-    input.rows,
-    input.clientId ?? CLIENT_ID,
+    committed.terminalRuntimeGeneration,
+    cols,
+    rows,
+    clientId,
     input.signal,
   )
 }
 
 describe('TerminalSessionManager fresh stream boundary', () => {
   test('rejects target-incompatible presentation before committing prepared or existing sessions', () => {
-    const manager = createManager(createDeferredPtySupervisor())
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     }
     const prepared = manager.prepareSession(input)
     if (!prepared.ok) throw new Error(prepared.message)
@@ -225,7 +221,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toEqual(baseline)
   })
 
-  test('keeps a prepared admission unpublished when presence sampling fails', () => {
+  test('prepares a session without sampling client presence', () => {
     let presenceFails = true
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
@@ -242,25 +238,11 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     }
     const prepared = manager.prepareSession(input)
     if (!prepared.ok) throw new Error(prepared.message)
-    expect(() =>
-      prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
-      }),
-    ).toThrow('presence unavailable')
-    prepared.admission.abort()
-    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toEqual({ revision: 0, sessions: [] })
-
-    presenceFails = false
-    const retry = manager.prepareSession(input)
-    if (!retry.ok) throw new Error(retry.message)
     expect(
-      retry.admission.commit({
+      prepared.admission.commit({
         presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
       }),
     ).toMatchObject({
@@ -269,7 +251,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
   })
 
-  test('keeps an existing admission unchanged when presence sampling fails', () => {
+  test('updates an existing presentation without sampling client presence', () => {
     let presenceFails = false
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
@@ -286,8 +268,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
     }
     const created = manager.prepareSession(baseInput)
     if (!created.ok) throw new Error(created.message)
@@ -297,21 +277,10 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     const before = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
 
     presenceFails = true
-    const existing = manager.prepareSession({ ...baseInput, clientId: CLIENT_ID })
+    const existing = manager.prepareSession(baseInput)
     if (!existing.ok) throw new Error(existing.message)
-    expect(() =>
-      existing.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'renamed-branch' } },
-      }),
-    ).toThrow('presence unavailable')
-    existing.admission.abort()
-    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toEqual(before)
-
-    presenceFails = false
-    const retry = manager.prepareSession({ ...baseInput, clientId: CLIENT_ID })
-    if (!retry.ok) throw new Error(retry.message)
     expect(
-      retry.admission.commit({
+      existing.admission.commit({
         presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'renamed-branch' } },
       }),
     ).toMatchObject({
@@ -321,15 +290,13 @@ describe('TerminalSessionManager fresh stream boundary', () => {
   })
 
   test('retires a prepared opening session before attach without leaving catalog membership', () => {
-    const manager = createManager(createDeferredPtySupervisor())
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const prepared = manager.prepareSession({
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
     })
     if (!prepared.ok) throw new Error(prepared.message)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(0)
@@ -338,18 +305,19 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
   })
 
-  test('defers an existing session attachment until placement admission commits', () => {
+  test('defers an existing presentation mutation until placement admission commits', () => {
     const onIdentity = vi.fn()
     const onSessionsProjectionChanged = vi.fn()
-    const manager = createManager(createDeferredPtySupervisor(), { onIdentity, onSessionsProjectionChanged })
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor(), {
+      onIdentity,
+      onSessionsProjectionChanged,
+    })
     const input = {
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
     }
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
@@ -359,13 +327,13 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     created.admission.publishCommittedEffects()
     onSessionsProjectionChanged.mockClear()
 
-    const aborted = manager.prepareSession({ ...input, clientId: 'client-aborted' })
+    const aborted = manager.prepareSession(input)
     if (!aborted.ok) throw new Error(aborted.message)
     expect(aborted).toMatchObject({ ok: true })
     aborted.admission.abort()
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.controller).toBeNull()
 
-    const admitted = manager.prepareSession({ ...input, clientId: CLIENT_ID })
+    const admitted = manager.prepareSession(input)
     if (!admitted.ok) throw new Error(admitted.message)
     const beforeRenameRevision = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision
     const committed = admitted.admission.commit({
@@ -373,18 +341,15 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     expect(committed).toMatchObject({
       action: 'reused',
-      controller: { clientId: CLIENT_ID },
+      controller: null,
       terminalProjectionEffect: { kind: 'delta', revision: beforeRenameRevision + 1 },
     })
     const renamedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
     expect(committed.terminalProjectionEffect).toEqual({ kind: 'delta', revision: renamedSnapshot.revision })
-    expect(renamedSnapshot.sessions[0]?.controller).toEqual({
-      clientId: CLIENT_ID,
-      status: 'connected',
-    })
+    expect(renamedSnapshot.sessions[0]?.controller).toBeNull()
     expect(onIdentity).not.toHaveBeenCalled()
     admitted.admission.publishCommittedEffects()
-    expect(onIdentity).toHaveBeenCalledOnce()
+    expect(onIdentity).not.toHaveBeenCalled()
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(renamedSnapshot.sessions[0]?.presentation).toEqual({
       kind: 'git-worktree',
@@ -393,15 +358,13 @@ describe('TerminalSessionManager fresh stream boundary', () => {
   })
 
   test('reports no catalog effect when reuse leaves presentation unchanged', () => {
-    const manager = createManager(createDeferredPtySupervisor())
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
     }
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
@@ -410,7 +373,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     const beforeReuse = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision
 
-    const reused = manager.prepareSession({ ...input, clientId: CLIENT_ID })
+    const reused = manager.prepareSession(input)
     if (!reused.ok) throw new Error(reused.message)
     expect(
       reused.admission.commit({
@@ -424,7 +387,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
   })
 
   test('rejects reuse under a different worktree path even with the same physical identity', () => {
-    const manager = createManager(createDeferredPtySupervisor())
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)
     const input = {
       userId: USER_ID,
@@ -432,9 +395,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability,
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     }
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
@@ -453,7 +413,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
   })
 
-  test('publishes committed controller identity when its PTY resize fails', async () => {
+  test('does not commit a replacement controller when its PTY resize fails', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onIdentity = vi.fn()
     const onlineClients = new Set([CLIENT_ID])
@@ -471,40 +431,440 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       throw new Error('resize failed')
     })
 
-    const admission = manager.prepareSession({
-      userId: USER_ID,
-      target: WORKTREE_TARGET,
-      terminalSessionId: TERMINAL_SESSION_ID,
-      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
-      cwd: '/tmp',
-      cols: 100,
-      rows: 30,
-      clientId: 'client-replacement',
-    })
     onlineClients.add('client-replacement')
-    if (!admission.ok) throw new Error(admission.message)
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        100,
+        30,
+        'client-replacement',
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.unavailable' })
 
-    expect(
-      admission.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
-      }),
-    ).toMatchObject({
-      action: 'reused',
-      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      controller: { clientId: 'client-replacement', status: 'connected' },
-      canonicalCols: 80,
-      canonicalRows: 24,
+    expect(onIdentity).not.toHaveBeenCalled()
+    expect(manager.getSessionSummaryForUser(USER_ID, created.terminalRuntimeSessionId)).toMatchObject({
+      controller: null,
+      canonicalSize: { cols: 80, rows: 24 },
     })
-    admission.admission.publishCommittedEffects()
+  })
 
-    expect(onIdentity).toHaveBeenCalledOnce()
+  test('serializes concurrent recovery attachments into one controller decision', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onlineClients = new Set([CLIENT_ID, 'client-b', 'client-c'])
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity: vi.fn() },
+      (_userId, clientId) => onlineClients.has(clientId),
+      createWorkspaceRuntimeRetentionHost(),
+    )
+    const created = await createSession(manager, supervisor)
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        80,
+        24,
+        'client-b',
+      ),
+    ).resolves.toMatchObject({ ok: true, frame: 'snapshot', controller: { clientId: CLIENT_ID } })
+    manager.expireClientAttachments(USER_ID, CLIENT_ID)
+
+    const nativeResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await nativeResize.promise)
+    const controllerAttach = manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      'client-b',
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledTimes(1))
+    const viewerAttach = manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      'client-c',
+    )
+
+    nativeResize.resolve(true)
+    await expect(controllerAttach).resolves.toMatchObject({
+      ok: true,
+      frame: 'snapshot',
+      controller: { clientId: 'client-b' },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await expect(viewerAttach).resolves.toMatchObject({
+      ok: true,
+      frame: 'snapshot',
+      controller: { clientId: 'client-b' },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    expect(supervisor.resize).toHaveBeenCalledTimes(1)
+  })
+
+  test('rejects an old controller resize queued behind a committed takeover', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      'client-b',
+    )
+
+    const nativeResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await nativeResize.promise)
+    const takeover = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      'client-b',
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledTimes(1))
+    const staleResize = manager.resizeSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+
+    nativeResize.resolve(true)
+    await expect(takeover).resolves.toMatchObject({
+      ok: true,
+      controller: { clientId: 'client-b' },
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    await expect(staleResize).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(supervisor.resize).toHaveBeenCalledTimes(1)
+    expect(manager.getSessionSummaryForUser(USER_ID, created.terminalRuntimeSessionId)).toMatchObject({
+      controller: { clientId: 'client-b' },
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+  })
+
+  test('does not let a stale takeover acknowledgement mutate a replacement binding', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
+    const created = await createSession(manager, supervisor)
+    const viewerClientId = 'client-stale-takeover'
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      viewerClientId,
+    )
+    onIdentity.mockClear()
+
+    const oldResizeAcknowledged = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await oldResizeAcknowledged.promise)
+    const takeover = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      viewerClientId,
+    )
+    await vi.waitFor(() =>
+      expect(supervisor.resize).toHaveBeenCalledWith({ ptySessionId: 'pty_initial_123456' }, 120, 40),
+    )
+
+    const restart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_after_stale_takeover_123456'))
+    await expect(restart).resolves.toMatchObject({
+      ok: true,
+      frame: 'stream',
+      terminalRuntimeGeneration: created.terminalRuntimeGeneration + 1,
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+
+    oldResizeAcknowledged.resolve(true)
+    await expect(takeover).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.getSessionSummaryForUser(USER_ID, created.terminalRuntimeSessionId)).toMatchObject({
+      terminalRuntimeGeneration: created.terminalRuntimeGeneration + 1,
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    expect(onIdentity).not.toHaveBeenCalled()
+  })
+
+  test('publishes acknowledged native geometry when controller presence expires during resize', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onlineClients = new Set([CLIENT_ID])
+    const onIdentity = vi.fn()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      (_userId, clientId) => onlineClients.has(clientId),
+      createWorkspaceRuntimeRetentionHost(),
+    )
+    const created = await createSession(manager, supervisor)
+    const nativeResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await nativeResize.promise)
+
+    const resize = manager.resizeSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+    onlineClients.delete(CLIENT_ID)
+    manager.handleClientPresenceChanged(USER_ID, CLIENT_ID, true)
+    nativeResize.resolve(true)
+
+    await expect(resize).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.getSessionSummaryForUser(USER_ID, created.terminalRuntimeSessionId)).toMatchObject({
+      controller: null,
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    expect(onIdentity).toHaveBeenLastCalledWith(
+      USER_ID,
+      expect.objectContaining({ controller: null, canonicalSize: { cols: 100, rows: 30 } }),
+    )
+  })
+
+  test('publishes acknowledged geometry and rejects only the unavailable recovery snapshot', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
+    const created = await createSession(manager, supervisor)
+    onIdentity.mockClear()
+    vi.spyOn(SerializeAddon.prototype, 'serialize').mockImplementationOnce(() => {
+      throw new Error('serializer unavailable')
+    })
+
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        112,
+        37,
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     expect(onIdentity).toHaveBeenCalledWith(
       USER_ID,
+      expect.objectContaining({ canonicalSize: { cols: 112, rows: 37 } }),
+    )
+
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        112,
+        37,
+        CLIENT_ID,
+      ),
+    ).resolves.toMatchObject({ ok: true, frame: 'snapshot', canonicalSize: { cols: 112, rows: 37 } })
+  })
+
+  test('rejects an acknowledged resize after close admission while retaining the physical geometry fact', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
+    const created = await createSession(manager, supervisor)
+    onIdentity.mockClear()
+    const resizeAcknowledged = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockReturnValueOnce(resizeAcknowledged.promise)
+    const killAcknowledged = Promise.withResolvers<void>()
+    supervisor.killAndWait = vi.fn(async () => await killAcknowledged.promise)
+
+    const resize = manager.resizeSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      112,
+      37,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+    resizeAcknowledged.resolve(true)
+    const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+
+    await expect(resize).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(onIdentity).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ canonicalSize: { cols: 112, rows: 37 } }),
+    )
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]).toMatchObject({
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 112, rows: 37 },
+    })
+
+    killAcknowledged.resolve()
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
+  })
+
+  test('does not commit takeover control after close admission', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+    const viewerClientId = 'client-takeover-closing'
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        80,
+        24,
+        viewerClientId,
+      ),
+    ).resolves.toMatchObject({ ok: true, frame: 'snapshot' })
+    const resizeAcknowledged = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockReturnValueOnce(resizeAcknowledged.promise)
+    const killAcknowledged = Promise.withResolvers<void>()
+    supervisor.killAndWait = vi.fn(async () => await killAcknowledged.promise)
+
+    const takeover = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      viewerClientId,
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+    resizeAcknowledged.resolve(true)
+    const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+
+    await expect(takeover).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]).toMatchObject({
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+
+    killAcknowledged.resolve()
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
+  })
+
+  test('does not resurrect a client that expires while takeover geometry is committing', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const viewerClientId = 'client-takeover-expiring'
+    const onlineClients = new Set([CLIENT_ID, viewerClientId])
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn() },
+      (_userId, clientId) => onlineClients.has(clientId),
+      createWorkspaceRuntimeRetentionHost(),
+    )
+    const created = await createSession(manager, supervisor)
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      viewerClientId,
+    )
+    const resizeAcknowledged = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockReturnValueOnce(resizeAcknowledged.promise)
+
+    const takeover = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      viewerClientId,
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+    onlineClients.delete(viewerClientId)
+    manager.expireClientAttachments(USER_ID, viewerClientId)
+    resizeAcknowledged.resolve(true)
+
+    await expect(takeover).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]).toMatchObject({
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await expect(
+      manager.takeoverSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        100,
+        30,
+        viewerClientId,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+  })
+
+  test('publishes acknowledged native geometry without granting takeover after the requester goes offline', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onlineClients = new Set([CLIENT_ID, 'client-b'])
+    const onIdentity = vi.fn()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      (_userId, clientId) => onlineClients.has(clientId),
+      createWorkspaceRuntimeRetentionHost(),
+    )
+    const created = await createSession(manager, supervisor)
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      'client-b',
+    )
+    const nativeResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await nativeResize.promise)
+    onIdentity.mockClear()
+
+    const takeover = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      'client-b',
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+    onlineClients.delete('client-b')
+    manager.handleClientPresenceChanged(USER_ID, 'client-b', true)
+    nativeResize.resolve(true)
+
+    await expect(takeover).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.getSessionSummaryForUser(USER_ID, created.terminalRuntimeSessionId)).toMatchObject({
+      controller: { clientId: CLIENT_ID },
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    expect(onIdentity).toHaveBeenLastCalledWith(
+      USER_ID,
       expect.objectContaining({
-        terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-        controller: { clientId: 'client-replacement', status: 'connected' },
-        canonicalCols: 80,
-        canonicalRows: 24,
+        controller: expect.objectContaining({ clientId: CLIENT_ID }),
+        canonicalSize: { cols: 120, rows: 40 },
       }),
     )
   })
@@ -512,7 +872,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
   test('rejects an existing admission after the PTY exits during placement preparation', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onIdentity = vi.fn()
-    const manager = createManager(supervisor, { onIdentity })
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
     await createSession(manager, supervisor)
 
     const admission = manager.prepareSession({
@@ -521,9 +881,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: 'client-after-exit',
     })
     if (!admission.ok) throw new Error(admission.message)
     onIdentity.mockClear()
@@ -540,6 +897,30 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
   })
 
+  test('detaches and disposes a naturally exited session when lifecycle publication throws', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onLifecycle = vi.fn()
+    const onSessionClosed = vi.fn()
+    const onOutput = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onLifecycle, onSessionClosed, onOutput })
+    const created = await createSession(manager, supervisor)
+    onLifecycle.mockImplementation(() => {
+      throw new Error('publication failed')
+    })
+    onOutput.mockClear()
+
+    expect(() => supervisor.emitExit('pty_initial_123456')).not.toThrow()
+
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(onSessionClosed).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId, phase: 'closed' }),
+      'session',
+    )
+    supervisor.emitData('pty_initial_123456', 'late output')
+    expect(onOutput).not.toHaveBeenCalled()
+  })
+
   test('rejects an existing admission while retirement is in progress', async () => {
     let finishRetirement: (() => void) | undefined
     const supervisor = createDeferredPtySupervisor()
@@ -550,7 +931,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
         }),
     )
     const onIdentity = vi.fn()
-    const manager = createManager(supervisor, { onIdentity })
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
     const created = await createSession(manager, supervisor)
     const admission = manager.prepareSession({
       userId: USER_ID,
@@ -558,9 +939,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: 'client-during-close',
     })
     if (!admission.ok) throw new Error(admission.message)
     onIdentity.mockClear()
@@ -611,25 +989,17 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
   test('releases the admission reservation when runtime retention rejects a stale generation', () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = new TerminalSessionManager<string>(
-      supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn() },
-      () => true,
-      {
-        retain: vi.fn(() => {
-          throw new Error('error.workspace-runtime-stale')
-        }),
-      },
-    )
+    const manager = new TerminalSessionManager<string>(supervisor, { onOutput: vi.fn(), onExit: vi.fn() }, () => true, {
+      retain: vi.fn(() => {
+        throw new Error('error.workspace-runtime-stale')
+      }),
+    })
     const input = {
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     }
     const prepared = manager.prepareSession(input)
     if (!prepared.ok || prepared.admission.kind !== 'prepared') throw new Error('expected prepared admission')
@@ -650,7 +1020,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     const supervisor = createDeferredPtySupervisor()
     const onOutput = vi.fn()
     const onSessionsProjectionChanged = vi.fn()
-    const manager = createManager(supervisor, { onOutput, onSessionsProjectionChanged })
+    const manager = createAlwaysOnlineManager(supervisor, { onOutput, onSessionsProjectionChanged })
     const siblingSnapshots: TerminalSessionsSnapshot[] = []
     onSessionsProjectionChanged.mockImplementation(() => {
       siblingSnapshots.push(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE))
@@ -661,9 +1031,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
       command: '/bin/zsh',
       args: ['-l'],
       startupShellCommand: 'echo ready\r',
@@ -689,7 +1056,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       { revision: 1, sessions: [{ terminalRuntimeGeneration: 0, phase: 'opening' }] },
     ])
 
-    const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
+    const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 123, 41, CLIENT_ID)
     expect(supervisor.spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         command: '/bin/zsh',
@@ -701,14 +1068,15 @@ describe('TerminalSessionManager fresh stream boundary', () => {
         env: { GOBLIN_TEST: '1' },
       }),
     )
-    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_fresh_stream_123456'))
+    const freshSpawn = ptySpawnSuccess('pty_fresh_stream_123456')
+    supervisor.emitData('pty_fresh_stream_123456', 'early prompt')
+    supervisor.spawns.shift()?.(freshSpawn)
     await expect(freshAttach).resolves.toMatchObject({
       ok: true,
       frame: 'stream',
       terminalRuntimeGeneration: 1,
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
-      canonicalCols: 123,
-      canonicalRows: 41,
+      canonicalSize: { cols: 123, rows: 41 },
     })
     expect(onSessionsProjectionChanged).toHaveBeenCalledTimes(2)
     expect(onSessionsProjectionChanged).toHaveBeenLastCalledWith(USER_ID, {
@@ -724,35 +1092,50 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       { revision: 1, sessions: [{ terminalRuntimeGeneration: 0, phase: 'opening' }] },
       { revision: 2, sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }] },
     ])
+    expect(onOutput).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        terminalRuntimeGeneration: 1,
+        data: 'early prompt',
+        seq: 1,
+      }),
+    )
 
     await expect(
-      manager.writeSession(USER_ID, prepared.terminalRuntimeSessionId, 'input before output', CLIENT_ID),
+      manager.writeSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 'stale input', CLIENT_ID),
+    ).resolves.toEqual({ status: 'rejected' })
+    await expect(
+      manager.writeSession(USER_ID, prepared.terminalRuntimeSessionId, 1, 'input before output', CLIENT_ID),
     ).resolves.toEqual({ status: 'accepted' })
 
     supervisor.emitData('pty_fresh_stream_123456', 'prompt')
-    expect(onOutput).toHaveBeenCalledWith(USER_ID, expect.objectContaining({ data: 'prompt', seq: 1, outputEra: 0 }))
-    const recoveryAttach = await manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
+    expect(onOutput).toHaveBeenCalledWith(USER_ID, expect.objectContaining({ data: 'prompt', seq: 2 }))
+    const recoveryAttach = await manager.attachSession(
+      USER_ID,
+      prepared.terminalRuntimeSessionId,
+      1,
+      123,
+      41,
+      CLIENT_ID,
+    )
     expect(recoveryAttach).toMatchObject({
       ok: true,
       frame: 'snapshot',
-      snapshot: 'prompt',
-      snapshotSeq: 1,
-      outputEra: 0,
+      snapshot: 'early promptprompt',
+      snapshotSeq: 2,
     })
   })
 
-  test('gives a concurrent later attach a snapshot after the fresh spawn completes', async () => {
+  test('does not commit a fresh binding whose native spawn resolves after close admission', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const onIdentity = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
     const prepared = manager.prepareSession({
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
     prepared.admission.commit({
@@ -760,8 +1143,85 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     prepared.admission.publishCommittedEffects()
 
-    const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
-    const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 120, 40, 'client-test-2')
+    const attach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 100, 30, CLIENT_ID)
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_fresh_close_race_123'))
+    const close = manager.closeSessionForUserOutcome(USER_ID, prepared.terminalRuntimeSessionId)
+
+    await expect(attach).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(onIdentity).not.toHaveBeenCalled()
+  })
+
+  test('publishes a failed candidate retirement as a fresh attach error and drains it before retry', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const retryKillAcknowledged = Promise.withResolvers<void>()
+    const offlineClients = new Set<string>()
+    supervisor.killAndWait = vi
+      .fn<(handle: PtyHandle) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('PTY close timed out'))
+      .mockImplementationOnce(async () => await retryKillAcknowledged.promise)
+    const manager = createManagerWithPresence(supervisor, {}, (clientId) => !offlineClients.has(clientId))
+    const prepared = manager.prepareSession({
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+    })
+    if (!prepared.ok) throw new Error(prepared.message)
+    prepared.admission.commit({
+      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    })
+    prepared.admission.publishCommittedEffects()
+
+    const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 100, 30, CLIENT_ID)
+    offlineClients.add(CLIENT_ID)
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_rejected_fresh_candidate_123'))
+
+    await expect(first).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
+      expect.objectContaining({
+        terminalRuntimeGeneration: 0,
+        phase: 'error',
+        message: 'PTY close timed out',
+        canonicalSize: null,
+      }),
+    ])
+
+    const retry = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 120, 40, 'client-retry')
+    await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledTimes(2))
+    expect(supervisor.spawn).toHaveBeenCalledOnce()
+
+    retryKillAcknowledged.resolve()
+    await vi.waitFor(() => expect(supervisor.spawn).toHaveBeenCalledTimes(2))
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_fresh_after_retirement_123'))
+    await expect(retry).resolves.toMatchObject({
+      ok: true,
+      frame: 'stream',
+      terminalRuntimeGeneration: 1,
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+  })
+
+  test('gives a concurrent later attach a snapshot after the fresh spawn completes', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createAlwaysOnlineManager(supervisor)
+    const prepared = manager.prepareSession({
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+    })
+    if (!prepared.ok) throw new Error(prepared.message)
+    prepared.admission.commit({
+      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    })
+    prepared.admission.publishCommittedEffects()
+
+    const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 100, 30, CLIENT_ID)
+    const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 120, 40, 'client-test-2')
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_concurrent_attach_123'))
 
     await expect(first).resolves.toMatchObject({ ok: true, frame: 'stream' })
@@ -776,16 +1236,13 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
   test('closes a prepared session without ever allocating a PTY', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const prepared = manager.prepareSession({
       userId: USER_ID,
       target: WORKTREE_TARGET,
       terminalSessionId: TERMINAL_SESSION_ID,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
 
@@ -805,7 +1262,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
   test('waits for an in-flight fresh attach before reusing the same terminalSessionId', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionsProjectionChanged = vi.fn()
-    const manager = createManager(supervisor, { onSessionsProjectionChanged })
+    const manager = createAlwaysOnlineManager(supervisor, { onSessionsProjectionChanged })
 
     const first = ensureSession(manager, {
       userId: USER_ID,
@@ -844,7 +1301,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 
   test('kills a PTY that resolves after its session was closed before binding', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
 
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -872,7 +1329,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
   test('reports scope close reason for repo cleanup', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionClosed = vi.fn()
-    const manager = createManager(supervisor, { onSessionClosed })
+    const manager = createAlwaysOnlineManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
     expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
 
@@ -887,7 +1344,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     )
   })
 
-  test('invalidates a workspace runtime session before failed PTY cleanup settles', async () => {
+  test('invalidates a workspace runtime session and disposes its binding at the same authority boundary', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionClosed = vi.fn()
     const release = vi.fn()
@@ -898,12 +1355,6 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       { retain: vi.fn(() => ({ release })) },
     )
     const created = await createSession(manager, supervisor)
-    supervisor.killAndWait = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('worker unavailable'))
-      .mockRejectedValueOnce(new Error('worker unavailable'))
-      .mockResolvedValue(undefined)
-
     const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
 
     expect(invalidation.removedSessions).toEqual([
@@ -911,6 +1362,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     ])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
     expect(onSessionClosed).not.toHaveBeenCalled()
+    expect(supervisor.killed).toEqual(['pty_initial_123456'])
+    expect(release).toHaveBeenCalledOnce()
 
     invalidation.publishEffects()
     invalidation.publishEffects()
@@ -920,14 +1373,47 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
       'scope',
     )
-    await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledTimes(3))
     manager.forceShutdown()
     expect(release).toHaveBeenCalledOnce()
   })
 
+  test('revokes PTY mutation and output ownership at the authoritative invalidation boundary', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const onOutput = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity, onOutput })
+    const created = await createSession(manager, supervisor)
+    const nativeResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await nativeResize.promise)
+    onIdentity.mockClear()
+    onOutput.mockClear()
+
+    const resize = manager.resizeSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
+
+    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    supervisor.emitData('pty_initial_123456', 'late output')
+    nativeResize.resolve(true)
+
+    await expect(resize).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(onIdentity).not.toHaveBeenCalled()
+    expect(onOutput).not.toHaveBeenCalled()
+
+    expect(supervisor.killed).toContain('pty_initial_123456')
+    invalidation.publishEffects()
+  })
+
   test('keeps a committed invalidation when publication effects fail', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor, {
+    const manager = createAlwaysOnlineManager(supervisor, {
       onSessionClosed: vi.fn(() => {
         throw new Error('publication failed')
       }),
@@ -940,44 +1426,90 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
   })
 
-  test('detaches every session even when summary process metadata throws', async () => {
+  test('retires an invalidated PTY through the acknowledged boundary and releases its shutdown owner', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const kill = vi.fn()
+    const killAndWait = vi.fn(async () => undefined)
+    supervisor.kill = kill
+    supervisor.killAndWait = killAndWait
+    const manager = createAlwaysOnlineManager(supervisor)
     await createSession(manager, supervisor)
-    await createSession(manager, supervisor)
-    supervisor.processName = vi.fn(() => {
-      throw new Error('process disappeared')
-    })
 
     const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
-
-    expect(invalidation.removedSessions).toEqual([])
     invalidation.publishEffects()
-    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
+    await Promise.resolve()
+    await Promise.resolve()
+    manager.forceShutdown()
+
+    expect(killAndWait).toHaveBeenCalledWith(createPtyHandle('pty_initial_123456'))
+    expect(kill).not.toHaveBeenCalled()
   })
 
-  test('does not reschedule an invalidated PTY retirement after shutdown', async () => {
-    vi.useFakeTimers()
+  test('transfers a failed invalidation retirement to supervisor shutdown without retrying', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
-    await createSession(manager, supervisor)
-    supervisor.killAndWait = vi.fn(async () => {
-      throw new Error('worker unavailable')
+    const eventualExit = Promise.withResolvers<void>()
+    const killAndWait = vi.fn(async () => {
+      throw new Error('PTY close timed out')
     })
+    const kill = vi.fn()
+    supervisor.waitForExit = vi.fn(async () => await eventualExit.promise)
+    supervisor.killAndWait = killAndWait
+    supervisor.kill = kill
+    const manager = createAlwaysOnlineManager(supervisor)
+    await createSession(manager, supervisor)
 
-    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
-    invalidation.publishEffects()
+    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
+    await Promise.resolve()
     manager.forceShutdown()
-    await vi.runOnlyPendingTimersAsync()
 
-    expect(supervisor.killAndWait).toHaveBeenCalledOnce()
-    vi.useRealTimers()
+    expect(kill).not.toHaveBeenCalled()
+    eventualExit.resolve()
+  })
+
+  test('keeps invalidation retirement ownership until a late native spawn exits', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const termination = Promise.withResolvers<void>()
+    const killAndWait = vi.fn(async () => await termination.promise)
+    const kill = vi.fn()
+    supervisor.waitForExit = vi.fn(async () => await termination.promise)
+    supervisor.killAndWait = killAndWait
+    supervisor.kill = kill
+    const manager = createAlwaysOnlineManager(supervisor)
+    const prepared = manager.prepareSession({
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: WORKTREE_PATH,
+    })
+    if (!prepared.ok) throw new Error(prepared.message)
+    prepared.admission.commit({
+      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    })
+    prepared.admission.publishCommittedEffects()
+    const attach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 100, 30, CLIENT_ID)
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+
+    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_invalidated_late_spawn_123'))
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
+    expect(kill).not.toHaveBeenCalled()
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+
+    termination.resolve()
+    await expect(attach).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await Promise.resolve()
+    manager.forceShutdown()
+    expect(killAndWait).toHaveBeenCalledOnce()
+    expect(kill).not.toHaveBeenCalled()
   })
 
   test('reports detached-user close reason for detached TTL cleanup', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionClosed = vi.fn()
-    const manager = createManager(supervisor, { onSessionClosed })
+    const manager = createAlwaysOnlineManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
 
     await manager.closeSessionsForUser(USER_ID)
@@ -991,11 +1523,25 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 
   test('supersedes an older restart before spawning the latest replacement', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
+    const firstRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    const secondRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      CLIENT_ID,
+    )
 
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_123'))
@@ -1003,9 +1549,9 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(secondRestart).resolves.toMatchObject({
       ok: true,
+      frame: 'stream',
       terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
     })
 
     expect(supervisor.killed).toEqual(['pty_initial_123456'])
@@ -1021,11 +1567,25 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 
   test('publishes only the latest restart failure when an older restart is superseded', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
+    const firstRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    const secondRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      CLIENT_ID,
+    )
 
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.({ ok: false, message: 'new restart failed' })
@@ -1036,21 +1596,95 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 3,
+        terminalRuntimeGeneration: created.terminalRuntimeGeneration,
         phase: 'error',
         message: 'new restart failed',
+        canonicalSize: { cols: 80, rows: 24 },
       }),
     ])
   })
 
-  test('attach waits past a stale restart failure for the active restart generation', async () => {
+  test('does not publish a replacement after the requesting controller expires during spawn', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const created = await createSession(manager, supervisor)
 
-    const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
-    const attach = manager.attachSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
-    const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
+    const restart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+
+    manager.expireClientAttachments(USER_ID, CLIENT_ID)
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_expired_restart_123'))
+
+    await expect(restart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
+      expect.objectContaining({
+        terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: created.terminalRuntimeGeneration,
+        canonicalSize: { cols: 80, rows: 24 },
+      }),
+    ])
+    expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_expired_restart_123'])
+  })
+
+  test('does not adopt a replacement PTY whose spawn resolves after close admission', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    const restart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      CLIENT_ID,
+    )
+    await vi.waitFor(() => expect(supervisor.spawn).toHaveBeenCalledTimes(2))
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_close_race_123'))
+    const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+
+    await expect(restart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    await expect(close).resolves.toMatchObject({ kind: 'closed' })
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(supervisor.killed).toContain('pty_restart_close_race_123')
+  })
+
+  test('rejects an attach fenced to the retired generation after a superseding restart', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    const firstRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    const attach = manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
+    const secondRestart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      CLIENT_ID,
+    )
 
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_789'))
@@ -1058,16 +1692,11 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(secondRestart).resolves.toMatchObject({
       ok: true,
+      frame: 'stream',
       terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
     })
-    await expect(attach).resolves.toMatchObject({
-      ok: true,
-      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      canonicalCols: 120,
-      canonicalRows: 40,
-    })
+    await expect(attach).resolves.toEqual({ ok: false, message: 'error.unavailable' })
   })
 })
 
@@ -1087,7 +1716,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
         .mockImplementationOnce(async () => await directCloseDisposal)
         .mockResolvedValue(undefined)
       const onLifecycle = vi.fn()
-      const manager = createManager(supervisor, { onLifecycle })
+      const manager = createAlwaysOnlineManager(supervisor, { onLifecycle })
       const pending = ensureSession(manager, {
         userId: USER_ID,
         target: WORKTREE_TARGET,
@@ -1119,21 +1748,16 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 
   test('keeps the session authoritative when PTY exit re-enters close before kill acknowledgement', async () => {
     const supervisor = createDeferredPtySupervisor()
-    let exitListener: (() => void) | null = null
-    supervisor.onExit = vi.fn((_handle, listener) => {
-      exitListener = listener
-      return { dispose: vi.fn() }
-    })
     let acknowledgeKill!: () => void
     const killAcknowledged = new Promise<void>((resolve) => {
       acknowledgeKill = resolve
     })
-    supervisor.killAndWait = vi.fn(async () => {
-      exitListener?.()
+    supervisor.killAndWait = vi.fn(async (handle) => {
+      supervisor.emitExit(handle.ptySessionId)
       await killAcknowledged
     })
     const onSessionClosed = vi.fn()
-    const manager = createManager(supervisor, { onSessionClosed })
+    const manager = createAlwaysOnlineManager(supervisor, { onSessionClosed })
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1168,7 +1792,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAndWait = vi.fn(async () => await killAcknowledged)
     supervisor.killAndWait = killAndWait
     const onSessionClosed = vi.fn()
-    const manager = createManager(supervisor, { onSessionClosed })
+    const manager = createAlwaysOnlineManager(supervisor, { onSessionClosed })
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pending = ensureSession(manager, {
@@ -1214,7 +1838,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
   test('quiesces a physical worktree opened through a different repository entry', async () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(async () => {})
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const linkedRepoRoot = requiredWorkspaceLocator('goblin+file:///repo-linked')
     const physicalWorktreePath = '/repo-linked/worktree'
     const scope = terminalSessionRuntimeScope(linkedRepoRoot, 'repo-runtime-linked')
@@ -1247,7 +1871,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       acknowledgeKill = resolve
     })
     supervisor.killAndWait = vi.fn(async () => await killAcknowledged)
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pendingCreate = ensureSession(manager, {
@@ -1285,7 +1909,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       throw new Error('PTY close timed out')
     })
     supervisor.killAndWait = killAndWait
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pending = ensureSession(manager, {
@@ -1327,7 +1951,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAcknowledged = Promise.withResolvers<void>()
     const killAndWait = vi.fn(async () => await killAcknowledged.promise)
     supervisor.killAndWait = killAndWait
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const controller = new AbortController()
@@ -1369,7 +1993,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAndWait = vi.fn(async () => {})
     killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
     supervisor.killAndWait = killAndWait
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const controller = new AbortController()
@@ -1418,7 +2042,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const supervisor = createDeferredPtySupervisor()
     const termination = Promise.withResolvers<void>()
     supervisor.killAndWait = vi.fn(async () => await termination.promise)
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1433,7 +2057,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    const restart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID)
+    const restart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      CLIENT_ID,
+    )
     await Promise.resolve()
     await Promise.resolve()
     expect(supervisor.spawns).toEqual([])
@@ -1455,7 +2086,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       }
     })
     supervisor.killAndWait = killAndWait
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1470,15 +2101,29 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    await expect(manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID)).resolves.toEqual(
-      { ok: false, message: 'PTY close timed out' },
-    )
+    await expect(
+      manager.restartSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        80,
+        24,
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
     expect(supervisor.spawns).toEqual([])
     expect(killAndWait.mock.calls.map(([handle]) => handle.ptySessionId)).toEqual([retiredPtySessionId])
 
     retiredExited = true
     supervisor.emitExit(retiredPtySessionId)
-    const retry = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID)
+    const retry = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      CLIENT_ID,
+    )
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess(replacementPtySessionId))
     await expect(retry).resolves.toMatchObject({ ok: true })
@@ -1496,8 +2141,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 describe('TerminalSessionManager membership catalog', () => {
   test('advances the projection revision when a fresh binding outcome settles', async () => {
     const supervisor = createDeferredPtySupervisor()
-    supervisor.processName = vi.fn(() => 'terminal')
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1509,7 +2153,11 @@ describe('TerminalSessionManager membership catalog', () => {
       clientId: CLIENT_ID,
     })
     const beforeBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-    expect(beforeBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 1, processName: 'terminal' })
+    expect(beforeBinding.sessions[0]).toMatchObject({
+      terminalRuntimeGeneration: 0,
+      processName: 'terminal',
+      canonicalSize: null,
+    })
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_default_process_123'))
     const created = await pending
@@ -1519,14 +2167,14 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(afterBinding.revision).toBe(beforeBinding.revision + 1)
     expect(afterBinding.sessions[0]).toMatchObject({
       terminalRuntimeGeneration: 1,
-      processName: 'terminal',
+      processName: 'zsh',
       phase: 'open',
     })
   })
 
   test('does not advance the projection revision for incremental runtime details', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const manager = createAlwaysOnlineManager(supervisor)
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1547,8 +2195,7 @@ describe('TerminalSessionManager membership catalog', () => {
         terminalSessionId: TERMINAL_SESSION_ID,
         processName: 'zsh',
         phase: 'open',
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       }),
     ])
 
@@ -1567,7 +2214,7 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(processSnapshot.sessions[0]).toMatchObject({ processName: 'node' })
 
     const beforeResize = processSnapshot.revision
-    expect(
+    await expect(
       manager.resizeSession(
         USER_ID,
         created.terminalRuntimeSessionId,
@@ -1576,14 +2223,28 @@ describe('TerminalSessionManager membership catalog', () => {
         30,
         CLIENT_ID,
       ),
-    ).toBe(false)
-    expect(manager.terminalSessionsSnapshotForUser(USER_ID, scope).sessions[0]).toMatchObject({ cols: 80, rows: 24 })
-    expect(
-      manager.resizeSession(USER_ID, created.terminalRuntimeSessionId, created.terminalRuntimeGeneration, 100, 30, CLIENT_ID),
-    ).toBe(true)
+    ).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, scope).sessions[0]).toMatchObject({
+      canonicalSize: { cols: 80, rows: 24 },
+    })
+    await expect(
+      manager.resizeSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        100,
+        30,
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: created.terminalRuntimeGeneration,
+      canonicalSize: { cols: 100, rows: 30 },
+    })
     const resizedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
     expect(resizedSnapshot.revision).toBe(beforeResize)
-    expect(resizedSnapshot.sessions[0]).toMatchObject({ cols: 100, rows: 30 })
+    expect(resizedSnapshot.sessions[0]).toMatchObject({ canonicalSize: { cols: 100, rows: 30 } })
 
     await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
       kind: 'closed',
@@ -1598,17 +2259,24 @@ describe('TerminalSessionManager runtime binding generations', () => {
   test('publishes the PTY binding generation on response frames and realtime events', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onOutput = vi.fn()
-    const manager = createManager(supervisor, { onOutput })
+    const manager = createAlwaysOnlineManager(supervisor, { onOutput })
     const created = await createSession(manager, supervisor)
     expect(created.terminalRuntimeGeneration).toBe(1)
 
     supervisor.emitData('pty_initial_123456', 'first')
     expect(onOutput).toHaveBeenLastCalledWith(USER_ID, expect.objectContaining({ terminalRuntimeGeneration: 1 }))
 
-    const restart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    const restart = manager.restartSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      CLIENT_ID,
+    )
     await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_generation_two_123'))
-    await expect(restart).resolves.toMatchObject({ ok: true, terminalRuntimeGeneration: 2 })
+    await expect(restart).resolves.toMatchObject({ ok: true, frame: 'stream', terminalRuntimeGeneration: 2 })
 
     supervisor.emitData('pty_generation_two_123', 'second')
     expect(onOutput).toHaveBeenLastCalledWith(USER_ID, expect.objectContaining({ terminalRuntimeGeneration: 2 }))

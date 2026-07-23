@@ -25,10 +25,14 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetFromRuntime,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneCommandCoordinates,
   workspacePaneCommandPaneTarget,
+  workspacePaneCommandRouteTarget,
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
@@ -75,6 +79,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: WorkspacePaneCommandRoute
+  routeTarget: WorkspacePaneTabsTarget
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
   selectedIdentity: string | null
@@ -127,6 +132,7 @@ async function showWorkspacePaneTabCommand({
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const outcome = await dispatchOpenWorkspacePaneTargetStaticTabAction({
       workspaceId,
+      routeTarget: workspacePaneCommandRouteTarget(target),
       paneTarget: workspacePaneCommandPaneTarget(workspaceId, target),
       worktreeHead: workspacePaneCommandWorktreeHead(target),
       type: provider.type,
@@ -194,6 +200,7 @@ export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePan
   return await dispatchCloseWorkspacePaneTabAction({
     ...options,
     ...workspacePaneCommandCoordinates(options.target),
+    routeTarget: workspacePaneCommandRouteTarget(options.target),
     paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
   })
@@ -243,6 +250,7 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   if (!options.workspaceId) return false
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
+    routeTarget: workspacePaneCommandRouteTarget(options.target),
     paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
     workspacePaneRoute: options.target.workspacePaneRoute,
@@ -253,6 +261,7 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
   if (!options.workspaceId) return false
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
+    routeTarget: workspacePaneCommandRouteTarget(options.target),
     paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
     workspacePaneRoute: options.target.workspacePaneRoute,
@@ -276,13 +285,14 @@ function resolveCloseWorkspaceSurfaceIntent(
     ? branchResolution.kind === 'ready'
       ? branchResolution.target
       : null
-    : commandTarget.kind === 'workspace-root'
+    : commandTarget.routeTarget.kind === 'workspace-root'
       ? workspacePaneTabTargetForWorkspace(workspaceId)
-      : workspacePaneTabTargetForPaneTarget(
-          workspacePaneCommandPaneTarget(workspaceId, commandTarget),
-          commandTarget.workspacePaneRoute,
-          workspacePaneCommandWorktreeHead(commandTarget),
-        )
+      : workspacePaneTabTargetForPaneTarget({
+          paneTarget: workspacePaneCommandPaneTarget(workspaceId, commandTarget),
+          routeTarget: workspacePaneCommandRouteTarget(commandTarget),
+          workspacePaneRoute: commandTarget.workspacePaneRoute,
+          worktreeHead: workspacePaneCommandWorktreeHead(commandTarget),
+        })
   if (!target) return { kind: 'close-window' }
   if (targetIdentity) {
     return target.tabEntries.some((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity)

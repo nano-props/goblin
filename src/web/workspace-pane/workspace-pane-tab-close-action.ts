@@ -61,6 +61,7 @@ import { terminalLog } from '#/web/logger.ts'
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   runtimeView?: WorkspacePaneRuntimeTabSummary
@@ -126,12 +127,18 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
     if (!start.wasActive) return true
     if (!workspacePaneTabControllerTargetIsCurrent(start.target)) return true
     if (!start.presentationLease) {
-      if (start.nextEntry) {
-        await selectWorkspacePaneControllerTabEntry(start.target, start.nextEntry, options.navigation)
+      const nextEntry = start.nextEntry
+      if (nextEntry) {
+        await reconcilePresentationAfterCommittedWorkspacePaneClose(() =>
+          selectWorkspacePaneControllerTabEntry(start.target, nextEntry, options.navigation),
+        )
       }
       return true
     }
-    await commitWorkspacePaneControllerCloseBackTarget(start.presentationLease, options.navigation)
+    const presentationLease = start.presentationLease
+    await reconcilePresentationAfterCommittedWorkspacePaneClose(() =>
+      commitWorkspacePaneControllerCloseBackTarget(presentationLease, options.navigation),
+    )
     return true
   })
 }
@@ -186,12 +193,18 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     if (!transition?.wasActive || !closeTarget) return true
     if (!workspacePaneTabControllerTargetIsCurrent(closeTarget)) return true
     if (!transition.presentationLease) {
-      if (transition.nextEntry) {
-        await selectWorkspacePaneControllerTabEntry(closeTarget, transition.nextEntry, navigation)
+      const nextEntry = transition.nextEntry
+      if (nextEntry) {
+        await reconcilePresentationAfterCommittedWorkspacePaneClose(() =>
+          selectWorkspacePaneControllerTabEntry(closeTarget, nextEntry, navigation),
+        )
       }
       return true
     }
-    await commitWorkspacePaneControllerCloseBackTarget(transition.presentationLease, navigation)
+    const presentationLease = transition.presentationLease
+    await reconcilePresentationAfterCommittedWorkspacePaneClose(() =>
+      commitWorkspacePaneControllerCloseBackTarget(presentationLease, navigation),
+    )
     return true
   })
 }
@@ -224,6 +237,7 @@ function beginCloseWorkspacePaneTabAction(
     if (
       openWorkspacePaneRuntimeCloseConfirm(
         target.workspaceId,
+        workspacePaneRouteTargetForModel(target),
         closeConfirm,
         options.workspacePaneRoute,
         options.selectedIdentity ?? target.selectedIdentity,
@@ -245,11 +259,11 @@ function beginCloseWorkspacePaneTabAction(
     close = beginWorkspacePaneTabEntryClose(target, tabEntry)
   } catch (err) {
     terminalLog.warn('workspace pane tab close could not start', { err })
-    finishWorkspacePaneRouteIntent(transition.presentationLease?.routeIntentId)
+    abandonWorkspacePaneCloseTransition(transition.presentationLease)
     return { kind: 'done', result: false }
   }
   if (!close.accepted) {
-    finishWorkspacePaneRouteIntent(transition.presentationLease?.routeIntentId)
+    abandonWorkspacePaneCloseTransition(transition.presentationLease)
     return { kind: 'done', result: false }
   }
   return {
@@ -284,15 +298,12 @@ function workspacePaneCloseTransition(
     closingIdentity,
   )
   const nextEntry = nextWorkspacePaneTabEntryAfterClose(target.tabEntries, closingIdentity, openerIdentity)
-  const closingTab = target.tabs.find((candidate) => candidate.identity === closingIdentity) ?? null
-  const nextTab = nextEntry
-    ? (target.tabs.find((candidate) => candidate.identity === workspacePaneTabEntryIdentity(nextEntry)) ?? null)
-    : null
-  const presentationLease = closingTab
+  const closingEntry = target.tabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === closingIdentity)
+  const presentationLease = closingEntry
     ? beginWorkspacePaneCloseActiveTabPresentationLease({
         target,
-        closingTab,
-        nextTab,
+        closingEntry,
+        nextEntry,
         workspacePaneRoute,
         presentationToken,
       })
@@ -312,6 +323,7 @@ function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessio
 
 function openWorkspacePaneRuntimeCloseConfirm(
   workspaceId: WorkspaceId,
+  routeTarget: WorkspacePaneTabsTarget,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null,
@@ -321,6 +333,7 @@ function openWorkspacePaneRuntimeCloseConfirm(
   if (request.type === 'terminal' && terminalBase && request.processName) {
     useTerminalActionDialogsStore.getState().openCloseConfirm({
       workspaceId,
+      routeTarget,
       targetIdentity: request.identity,
       selectedIdentity,
       workspacePaneRoute,
@@ -342,11 +355,24 @@ function workspacePaneTabsTargetForModel(target: WorkspacePaneTabModel): Workspa
   return target.paneTarget
 }
 
+function workspacePaneRouteTargetForModel(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {
+  if (target.routeTarget.kind === 'inactive') throw new Error('inactive workspace pane has no route target')
+  return target.routeTarget
+}
+
 function resolveCloseWorkspacePaneTarget(
-  input: Pick<CloseWorkspacePaneTabActionOptions, 'workspaceId' | 'workspacePaneRoute' | 'paneTarget' | 'worktreeHead'>,
+  input: Pick<
+    CloseWorkspacePaneTabActionOptions,
+    'workspaceId' | 'workspacePaneRoute' | 'routeTarget' | 'paneTarget' | 'worktreeHead'
+  >,
 ): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
-  return workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)
+  return workspacePaneTabTargetForPaneTarget({
+    paneTarget: input.paneTarget,
+    routeTarget: input.routeTarget,
+    workspacePaneRoute: input.workspacePaneRoute,
+    worktreeHead: input.worktreeHead,
+  })
 }
 
 async function runWorkspacePaneCloseTransition(
@@ -356,8 +382,13 @@ async function runWorkspacePaneCloseTransition(
   try {
     return await operation()
   } finally {
-    finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
+    abandonWorkspacePaneCloseTransition(presentationLease)
   }
+}
+
+function abandonWorkspacePaneCloseTransition(presentationLease: WorkspacePaneControllerPresentationLease | null): void {
+  presentationLease?.focusEffects?.onAbandon()
+  finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
 }
 
 async function completeWorkspacePaneTabLifecycle(completion: Promise<boolean>): Promise<boolean> {
@@ -366,5 +397,15 @@ async function completeWorkspacePaneTabLifecycle(completion: Promise<boolean>): 
   } catch (err) {
     terminalLog.warn('workspace pane tab close failed', { err })
     return false
+  }
+}
+
+async function reconcilePresentationAfterCommittedWorkspacePaneClose(operation: () => Promise<boolean>): Promise<void> {
+  try {
+    await operation()
+  } catch (err) {
+    // The tab close is already authoritative. Route reconciliation is a
+    // separate presentation effect and cannot roll that data mutation back.
+    terminalLog.warn('workspace pane tab closed but its next presentation failed', { err })
   }
 }

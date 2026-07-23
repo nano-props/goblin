@@ -151,6 +151,24 @@ describe('client realtime socket connection', () => {
     } satisfies Partial<ClientRealtimeRequestError>)
   })
 
+  test('fails encoding before opening a socket or creating an outage', async () => {
+    const connection = createTestConnection({
+      onRealtimeMessage: vi.fn(),
+      encodeClientMessage: () => {
+        throw new Error('message too large')
+      },
+    })
+
+    await expect(connection.request('echo', { value: 'oversized' })).rejects.toMatchObject({
+      name: 'ClientRealtimeRequestError',
+      message: 'message too large',
+      kind: 'send-failed',
+      delivery: 'not-sent',
+      outageId: null,
+    } satisfies Partial<ClientRealtimeRequestError>)
+    expect(wsMock.instances).toHaveLength(0)
+  })
+
   test('keeps one outage id across reconnect attempts and advances it after recovery', async () => {
     vi.useFakeTimers()
     const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
@@ -249,6 +267,7 @@ function createTestConnection(options: {
   onRealtimeMessage: (message: TestRealtimeMessage, currentClientId: string) => void
   hasRealtimeSubscribers?: () => boolean
   onOpen?: (currentClientId: string) => void
+  encodeClientMessage?: (message: unknown) => string
 }) {
   return createClientRealtimeSocketConnection<TestInputs, TestOutputs, TestRealtimeMessage>({
     resolveConnection: () => ({ url: 'ws://example.test/ws/realtime', clientId: 'client_realtime' }),
@@ -259,9 +278,7 @@ function createTestConnection(options: {
       if (typeof data !== 'string') return null
       return JSON.parse(data) as TestServerMessage
     },
-    encodeClientMessage(message) {
-      return JSON.stringify(message)
-    },
+    encodeClientMessage: options.encodeClientMessage ?? JSON.stringify,
     createRequestId: () => 'req_test',
     errorPrefix: 'Test',
   })

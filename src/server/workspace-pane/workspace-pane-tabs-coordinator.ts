@@ -67,7 +67,11 @@ export interface WorkspacePaneRuntimeTabsProvider {
 }
 
 export interface WorkspacePaneTargetProjectionProvider {
-  captureTargets(userId: string, workspaceId: WorkspaceId, scope: string): Promise<readonly WorkspacePaneTargetProjection[]>
+  captureTargets(
+    userId: string,
+    workspaceId: WorkspaceId,
+    scope: string,
+  ): Promise<readonly WorkspacePaneTargetProjection[]>
 }
 
 export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommitResult {
@@ -390,7 +394,11 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     return await this.reconcileWorkspaceTabsProjectionBoundary(input)
   }
 
-  async snapshot(input: { userId: string; workspaceId: WorkspaceId; scope: string }): Promise<WorkspacePaneTabsSnapshot> {
+  async snapshot(input: {
+    userId: string
+    workspaceId: WorkspaceId
+    scope: string
+  }): Promise<WorkspacePaneTabsSnapshot> {
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
@@ -407,10 +415,6 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     await this.runWorkspaceTabsOperation(workspaceId, (layout) => {
       layout.closeEpoch(aggregateScope(input.userId, workspaceId, input.scope))
     })
-  }
-
-  async closeInvalidatedScope(input: { userId: string; scope: string }): Promise<void> {
-    await this.closeScope(input)
   }
 
   physicalWorktreeTargets(target: PhysicalWorktreeExecutionCapability | PhysicalWorktreeIdentity) {
@@ -514,7 +518,11 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
           await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
             input.assertCurrent()
             const currentProviders = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-            const currentTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
+            const currentTargets = await this.targetProjection.captureTargets(
+              input.userId,
+              input.workspaceId,
+              input.scope,
+            )
             const currentEntries = await layout.projectEntriesForAdmission({
               scope: aggregateScope(input.userId, input.workspaceId, input.scope),
               validTargets: currentTargets,

@@ -15,7 +15,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import {
   observeWorkspacePaneRouteForTest,
-  observedWorkspacePaneRouteCommitForTest,
+  observedPrimaryWindowNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
@@ -182,6 +182,11 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           workspacePaneId: 'workspace',
           panelLabel: { label: 'Terminal' },
           target: {
+            routeTarget: {
+              kind: 'git-branch',
+              workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+              branchName: 'main',
+            },
             runtimeTarget: {
               kind: 'git-worktree' as const,
               workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
@@ -203,7 +208,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 }
 
 function navigationWith(): PrimaryWindowNavigationActions {
-  const navigation: PrimaryWindowNavigationActions = {
+  return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),
@@ -212,21 +217,16 @@ function navigationWith(): PrimaryWindowNavigationActions {
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
-  }
-  navigation.commitWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
-  return navigation
+  })
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
@@ -235,11 +235,9 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput: vi.fn(),
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
     ...overrides,

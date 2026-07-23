@@ -54,8 +54,6 @@ const appRealtimeHostStub = {
         lastFailure: null,
       },
       liveSessionCount: 0,
-      totalRingBufferChars: 0,
-      maxRingBufferChars: 0,
     },
   })),
   registerSocket: vi.fn(),

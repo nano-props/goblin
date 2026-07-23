@@ -161,8 +161,7 @@ function terminalSession(
     canonicalTitle: null,
     phase: 'open',
     message: null,
-    cols: 80,
-    rows: 24,
+    canonicalSize: { cols: 80, rows: 24 },
   }
 }
 

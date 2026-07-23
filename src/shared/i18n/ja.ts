@@ -384,15 +384,10 @@ export const ja: Record<DictKey, string> = {
   'terminal.takeover': 'ターミナルを引き継ぐ',
   'terminal.takeover-failed':
     'ターミナルを引き継げませんでした。閉じられたか、接続の準備ができていない可能性があります。もう一度お試しください。',
-  'terminal.takeover-failed-generic': 'ターミナルの引き継ぎに失敗しました。',
-  'terminal.takeover-session-gone': 'ターミナルは既に利用できません。',
-  'terminal.write-blocked-reconnecting': '再接続中です。しばらく経ってからお試しください。',
   'terminal.write-not-sent': '接続できません。入力は送信されませんでした。しばらく経ってから再試行してください。',
   'terminal.write-delivery-uncertain':
     '接続が中断されました。直前の入力が届いていない可能性があります。確認してから再試行してください。',
-  'terminal.write-blocked-session-gone': 'ターミナルはもう利用できません。',
   'terminal.write-blocked-rejected': 'ターミナルがリクエストを拒否しました。',
-  'terminal.write-blocked-client-unavailable': 'ターミナルクライアントが利用できません。',
   'terminal.index-title': 'ターミナル {index}',
   'terminal.bell-unread': '未読のターミナルベル',
   'terminal.bell-unread-count': '未読ベル {count} 件',
@@ -558,7 +553,6 @@ export const ja: Record<DictKey, string> = {
   'error.terminal-connection-timeout': 'ターミナルサービスへの接続がタイムアウトしました。もう一度お試しください。',
   'error.terminal-create-timeout': 'ターミナルの作成がタイムアウトしました。もう一度お試しください。',
   'error.terminal-connection-unavailable': 'ターミナルサービスを利用できません。もう一度お試しください。',
-  'error.terminal-host-not-measurable': 'ターミナルパネルが見えません',
   'error.vscode-not-installed': 'VS Code がインストールされていません',
   'error.editor-not-installed': 'エディタが見つかりません',
   'error.finder-not-available': 'Finder は macOS でのみ利用できます',

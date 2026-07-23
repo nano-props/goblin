@@ -5,8 +5,8 @@ import type {
   TerminalOutputEvent,
   TerminalSessionBase,
   TerminalSessionPhase,
+  TerminalSize,
 } from '#/shared/terminal-types.ts'
-import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -41,11 +41,8 @@ export interface TerminalControllerViewModel {
   controllerStatus: TerminalControllerStatus
 }
 
-export interface TerminalClientSnapshot extends TerminalControllerViewModel {
-  active: boolean
-  canTakeover: boolean
-  canonicalCols: number | null
-  canonicalRows: number | null
+export interface TerminalAttachmentSnapshot {
+  role: TerminalClientRole
 }
 
 /**
@@ -58,8 +55,7 @@ export interface TerminalClientSnapshot extends TerminalControllerViewModel {
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
-  canonicalCols: number
-  canonicalRows: number
+  canonicalSize: TerminalSize
 }
 
 // Wire-level identity event: the routing-only `terminalSessionId` layered
@@ -74,8 +70,7 @@ export interface TerminalIdentityRealtimeEvent extends TerminalIdentityViewModel
 }
 
 /**
- * Lifecycle view-model: the transient phase + message +
- * takeover-pending flag. No role — role lives on the identity
+ * Lifecycle view-model: the transient phase + message. No role — role lives on the identity
  * channel so the teardown decision can never be triggered by a
  * transitional phase update alone.
  */
@@ -84,7 +79,6 @@ export interface TerminalLifecycleViewModel {
   terminalRuntimeGeneration: number
   phase: TerminalSessionPhase
   message: string | null
-  takeoverPending: boolean
 }
 
 // Wire-level lifecycle event — see `TerminalIdentityRealtimeEvent` above
@@ -94,16 +88,21 @@ export interface TerminalLifecycleRealtimeEvent extends TerminalLifecycleViewMod
   terminalSessionId: string
 }
 
-export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel {
+export interface TerminalSessionHydrationInput extends Omit<TerminalIdentityViewModel, 'canonicalSize'> {
+  canonicalSize: TerminalSize | null
   phase: TerminalSessionPhase
   message: string | null
   processName: string
   canonicalTitle?: string | null
-  /** `null` means no snapshot was supplied; `''` is an authoritative blank screen. */
-  snapshot: string | null
-  snapshotSeq: number
-  outputEra: number
 }
+
+export interface TerminalFocusRequest {
+  isCurrent: () => boolean
+  onSettled?: () => void
+}
+
+/** A narrow input capability bound to one presented runtime generation. */
+export type TerminalInputWriter = (data: string) => void
 
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase
@@ -111,7 +110,7 @@ export interface TerminalSnapshot {
   processName: string
   /** Server-canonical terminal title from attach hydration or realtime title events. */
   canonicalTitle?: string | null
-  attachment?: TerminalClientSnapshot | null
+  attachment?: TerminalAttachmentSnapshot | null
   search?: TerminalSearchResult | null
   progress?: TerminalProgressState | null
   /** True while a takeover request has been sent but control has not yet been confirmed. */
@@ -181,8 +180,6 @@ export interface TerminalSessionContextValue {
     options?: TerminalCreateOptions,
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateAdmissionResult>
-  registerHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
-  unregisterHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
   selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
   scrollToBottom: (terminalSessionId: string) => void
   scrollLines: (terminalSessionId: string, amount: number) => void
@@ -191,12 +188,12 @@ export interface TerminalSessionContextValue {
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (terminalSessionId: string, host: HTMLElement) => void
   restart: (terminalSessionId: string) => void
-  focusTerminal: (terminalSessionId: string) => void
-  isTerminalFocusTarget: (terminalSessionId: string, target: EventTarget | null) => boolean
+  /** Returns whether the session exists and accepted the focus request. */
+  focusTerminal: (terminalSessionId: string, request?: TerminalFocusRequest) => boolean
   findNext: (terminalSessionId: string, term: string, incremental?: boolean) => TerminalSearchResult
   findPrevious: (terminalSessionId: string, term: string) => TerminalSearchResult
   clearSearch: (terminalSessionId: string) => void
-  writeInput: (terminalSessionId: string, data: string, source?: TerminalUserInputSource) => void
+  captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
   takeover: (terminalSessionId: string) => Promise<boolean>
 }
 
@@ -207,46 +204,4 @@ export interface TerminalSessionReadContextValue {
   subscribeWorkspaceBellCount: (workspaceId: WorkspaceId, listener: () => void) => () => void
   snapshot: (terminalSessionId: string) => TerminalSnapshot
   subscribeSnapshot: (terminalSessionId: string, listener: () => void) => () => void
-}
-
-export interface TerminalSessionLike {
-  descriptor: TerminalDescriptor
-  updateDescriptor: (descriptor: TerminalDescriptor) => void
-  attach: (host: HTMLElement) => void
-  detach: (host: HTMLElement) => void
-  restart: () => void
-  focus: () => void
-  dispose: () => void
-  disposeAndWait: () => Promise<void>
-  snapshot: () => TerminalSnapshot
-  isTerminalFocusTarget: (target: EventTarget | null) => boolean
-  findNext: (term: string, incremental?: boolean) => TerminalSearchResult
-  findPrevious: (term: string) => TerminalSearchResult
-  clearSearch: () => void
-  scrollToBottom: () => void
-  scrollLines: (amount: number) => void
-  writeInput: (input: TerminalInput) => void
-  takeover: () => void
-  handleIdentity: (event: TerminalIdentityViewModel) => void
-  handleLifecycle: (event: TerminalLifecycleViewModel) => void
-  handleOutput: (event: TerminalOutputEvent) => void
-  handleServerTitle: (canonicalTitle: string | null) => void
-  handleExit: (event: TerminalExitEvent) => boolean
-}
-
-export function createTerminalClientSnapshot(input: {
-  role: TerminalClientRole
-  controllerStatus: TerminalControllerStatus
-  canonicalCols: number | null
-  canonicalRows: number | null
-}): TerminalClientSnapshot {
-  const active = input.role === 'controller'
-  return {
-    role: input.role,
-    controllerStatus: input.controllerStatus,
-    active,
-    canTakeover: !active,
-    canonicalCols: input.canonicalCols || null,
-    canonicalRows: input.canonicalRows || null,
-  }
 }

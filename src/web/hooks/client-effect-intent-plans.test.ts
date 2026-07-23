@@ -27,6 +27,11 @@ const CURRENT_GIT_REPO = {
 }
 const GIT_WORKSPACE_ID = CURRENT_GIT_REPO.id
 const DETACHED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/example-repo')
+const MAIN_COMMAND_TARGET = {
+  routeTarget: { kind: 'git-branch' as const, workspaceId: GIT_WORKSPACE_ID, branchName: 'main' },
+  workspacePaneRoute: null,
+  filesystemTarget: null,
+}
 
 const CURRENT_DIRECTORY_REPO = {
   ...CURRENT_GIT_REPO,
@@ -290,7 +295,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -309,7 +314,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -328,7 +333,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -366,14 +371,14 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
     expect(plan).toEqual({
       kind: 'new-terminal-tab',
       workspaceId: 'goblin+file:///tmp/repo',
-      target: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+      target: MAIN_COMMAND_TARGET,
     })
   })
 
@@ -390,7 +395,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
-          kind: 'workspace-root',
+          routeTarget: { kind: 'workspace-root', workspaceId: CURRENT_DIRECTORY_REPO.id },
           workspacePaneRoute: null,
           filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,
@@ -415,7 +420,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: false,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -434,7 +439,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -479,7 +484,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -498,7 +503,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -517,7 +522,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -536,7 +541,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 
@@ -556,7 +561,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
-          kind: 'workspace-root',
+          routeTarget: { kind: 'workspace-root', workspaceId: CURRENT_DIRECTORY_REPO.id },
           workspacePaneRoute: null,
           filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,
@@ -601,7 +606,7 @@ describe('client effect intent plans', () => {
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
-        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+        currentWorkspacePaneCommandTarget: MAIN_COMMAND_TARGET,
       },
     )
 

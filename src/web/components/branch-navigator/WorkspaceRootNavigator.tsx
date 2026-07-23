@@ -53,7 +53,11 @@ export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: Work
         })
       : null
   const commandTarget = filesystemTarget
-    ? { kind: 'workspace-root' as const, workspacePaneRoute: null, filesystemTarget }
+    ? {
+        routeTarget: { kind: 'workspace-root' as const, workspaceId },
+        workspacePaneRoute: null,
+        filesystemTarget,
+      }
     : null
 
   const showStaticTab = (tab: 'status' | 'files') => {

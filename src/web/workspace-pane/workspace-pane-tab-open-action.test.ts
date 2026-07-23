@@ -36,6 +36,7 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -776,18 +777,24 @@ function navigationWithStoreActions(
     state.setWorkspacePaneTab(workspaceId, branch, tab)
     return true
   },
-): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'commitWorkspacePaneRoute'> {
+): WorkspacePaneTabControllerCommitNavigation {
   seedInitialObservedWorkspacePaneRouteForTest()
   const navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> = {
     showRepoBranchWorkspacePaneTab,
   }
   return {
-    ...navigation,
     commitWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({
       showRepoBranchEmptyWorkspacePane: () => false,
       showRepoBranchWorkspacePaneTab: navigation.showRepoBranchWorkspacePaneTab,
       showRepoBranchTerminalSession: () => false,
     }),
+    commitFilesystemWorkspacePaneRoute: unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute'),
+  }
+}
+
+function unexpectedNavigationAction(name: string): () => never {
+  return () => {
+    throw new Error(`Unexpected workspace pane navigation action in test: ${name}`)
   }
 }
 

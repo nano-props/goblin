@@ -109,15 +109,13 @@ describe('terminal session ensurer', () => {
   })
 
   test('ensures local terminal sessions with resolved worktree metadata', async () => {
-    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
     })
 
     const context = ensureContext({
       terminalSessionId: 'term-locallocallocallocal1',
-      cols: 100,
-      rows: 40,
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
     })
     const result = await ensurer.ensure(
@@ -125,7 +123,6 @@ describe('terminal session ensurer', () => {
       {
         target: LOCAL_TARGET,
         startupShellCommand: 'echo ready',
-        clientId: 'client_terminal_ensurer',
       },
       context,
     )
@@ -142,9 +139,6 @@ describe('terminal session ensurer', () => {
       terminalSessionId: 'term-locallocallocallocal1',
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: path.resolve(WORKTREE_PATH),
-      cols: 100,
-      rows: 40,
-      clientId: 'client_terminal_ensurer',
       startupShellCommand: 'echo ready',
       target: LOCAL_TARGET,
       env: undefined,
@@ -153,7 +147,7 @@ describe('terminal session ensurer', () => {
   })
 
   test('stores the logical workspace path while executing in its physical realpath', async () => {
-    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({ manager: { prepareSession } })
     const logicalPath = '/tmp/workspace'
     const physicalPath = '/private/tmp/workspace'
@@ -169,12 +163,9 @@ describe('terminal session ensurer', () => {
           workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         },
-        clientId: 'client_terminal_ensurer',
       },
       ensureContext({
         terminalSessionId: 'term-logicalphysical001',
-        cols: 80,
-        rows: 24,
         physicalWorktreeCapability: capability,
       }),
     )
@@ -188,7 +179,7 @@ describe('terminal session ensurer', () => {
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
-    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
     })
@@ -201,8 +192,6 @@ describe('terminal session ensurer', () => {
       },
       ensureContext({
         terminalSessionId: 'term-remoteremoteremote001',
-        cols: 120,
-        rows: 32,
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
       }),
     )
@@ -220,8 +209,6 @@ describe('terminal session ensurer', () => {
         terminalSessionId: 'term-remoteremoteremote001',
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         cwd: process.cwd(),
-        cols: 120,
-        rows: 32,
       }),
     )
     expect(input?.command).toBeTruthy()
@@ -234,7 +221,7 @@ describe('terminal session ensurer', () => {
 
   test('uses the captured remote target after SSH config changes', async () => {
     vi.mocked(resolveRemoteTarget).mockRejectedValueOnce(new Error('error.ssh-config-changed'))
-    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId))
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
     })
@@ -247,8 +234,6 @@ describe('terminal session ensurer', () => {
         },
         ensureContext({
           terminalSessionId: 'term-remoteremoteremote001',
-          cols: 80,
-          rows: 24,
           physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         }),
       ),
@@ -258,11 +243,7 @@ describe('terminal session ensurer', () => {
   })
 })
 
-function preparedResult(
-  terminalSessionId: string,
-  cols: number,
-  rows: number,
-): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
+function preparedResult(terminalSessionId: string): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
   return {
     ok: true,
     admission: {
@@ -272,14 +253,13 @@ function preparedResult(
         presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
         terminalProjectionEffect: { kind: 'delta', revision: 7 },
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
-        processName: 'zsh',
+        terminalRuntimeGeneration: 0,
+        processName: '',
         canonicalTitle: null,
-        phase: 'open',
+        phase: 'opening',
         message: null,
         controller: null,
-        canonicalCols: cols,
-        canonicalRows: rows,
+        canonicalSize: null,
       }),
       publishCommittedEffects: () => {},
       abort: () => {},

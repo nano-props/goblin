@@ -13,15 +13,14 @@ startup did not have distinct ownership boundaries.
 - The first frame first depended on a race between `create`, realtime output,
   a follow-up snapshot, and session-list reconciliation. A later fix made the
   create snapshot atomic by sequence number, but still exposed transient shell
-  redraw state as a visible frame. Result: blank panels, torn prompts, isolated
-  `%` inverse-video glyphs, and false create failures.
+  redraw state as a visible frame. Result: blank panels, torn prompts, visible
+  transient erase/repaint markers, and false create failures.
 - `dispose()` closed the local view state but only fire-and-forget the
   server-side close. The PTY could stay alive. The next create in the
   same window then re-attached to the orphan PTY and the session service
   happily returned `action: 'restored'` for it. Result: opening a new
-  terminal could surface two identical `Restored session: …` lines from
-  macOS zsh's session-restore mechanism, because two zsh processes were
-  reading the same `~/.zsh_sessions/*.session` file at the same time.
+  terminal could surface duplicate shell session-restore output because two
+  shell processes were restoring the same persisted session concurrently.
 - An empty terminal session rendered nothing — no CTA, no affordance. The
   `terminal.empty` i18n key was defined but never wired.
 
@@ -61,8 +60,8 @@ Out of scope:
 The combined symptom list across the root causes:
 
 - **First terminal opened blank** (R0).
-- **Torn / partially replayed first prompt**, including an isolated
-  inverse-video `%` (R0).
+- **Torn / partially replayed first prompt**, including a visible transient
+  end-of-line marker (R0).
 - **Visible terminal but a `failed to create terminal` toast** on top
   (R0 — false failure).
 - **Two identical `Restored session: …` lines** on opening a new
@@ -120,14 +119,19 @@ The protocol now has three explicit outcomes:
    PTY with no missed history. The client has already mounted and fitted its one
    xterm, so the PTY starts at that geometry and realtime output begins at
    sequence 1 without reset/replay.
-3. `attach` returns `frame: 'snapshot'` for an existing PTY. Restart also always
-   returns a snapshot frame. Those responses carry `snapshot`, `snapshotSeq`,
-   and `outputEra`, and the client uses them as a recovery boundary.
+3. `attach` returns `frame: 'snapshot'` for an existing PTY. Those responses
+   carry `snapshot` and `snapshotSeq`, and the client uses them as
+   a recovery boundary. Restart creates a fresh generation and returns
+   `frame: 'stream'`.
 
 `open` means the spawned PTY handle is bound to its data and exit listeners. It
 does not mean that a first output chunk has arrived. Quiet processes that wait
 for stdin are therefore writable immediately; output acceptance is tracked
 separately by the server render sequence and snapshot checkpoint.
+
+The client applies any stream output already available at its presentation
+cutoff, then commits a full-viewport render even when that output set is empty.
+It must not use first output as a presentation or shell-readiness signal.
 
 The server, not the client, chooses the attach frame from PTY state. A second
 attach waiting on an in-flight fresh spawn is a recovery attach and receives a
@@ -139,14 +143,23 @@ and broadcasts `sessions-changed`. Other clients may still hold the prepared
 generation 0 binding; generation 1 identity, lifecycle, and output events are
 intentionally insufficient to activate them because they may have missed
 history. They reconcile the complete projection and recover through a snapshot.
-The invalidation applies equally when fresh spawn fails: generation 1 plus its
-error lifecycle is still a new authoritative projection that generation 0
-siblings cannot reconstruct from incremental events.
+If the first spawn fails before binding activation, no PTY identity is
+published: the logical session remains prepared at generation 0 and a later
+attach may retry. Generation 1 becomes authoritative only at the successful
+binding linearization point.
 
 Snapshot presence is explicit in the client projection. `null` means recovery
 did not supply a snapshot; an empty string is a supplied authoritative blank
 screen and must reset any previous binding's xterm. String length is never used
 to decide whether a recovery frame exists.
+
+Snapshot bytes and `snapshotSeq` are captured by one step in the headless
+terminal's render chain. Output queued before that step is both rendered and
+included in the checkpoint; output accepted afterwards is ordered behind the
+serialization step and remains realtime data. A headless write or resize
+failure makes recovery unavailable for that generation instead of emitting a
+snapshot whose bytes and checkpoint may disagree. The live PTY remains an open
+stream; an explicit restart creates a new recoverable generation.
 
 ### Transport ordering
 
@@ -165,18 +178,20 @@ cannot emit PTY output during create because their process does not exist yet.
 ### Why an atomic snapshot was insufficient
 
 `snapshotSeq` proves which PTY chunks the server headless xterm has parsed. It
-does not prove the shell has completed a prompt redraw. In the recorded failure,
-zsh's inverse-video `PROMPT_EOL_MARK` was present in one serialized screen and
-cleared by the next output chunk. Both states were sequence-consistent; only the
-first was an undesirable visible startup frame. Fixed waits and prompt-specific
+does not prove the process has completed a redraw. In the recorded failure, a
+transient erase/repaint marker was present in one serialized screen and cleared
+by the next output chunk. Both states were sequence-consistent; only the first
+was an undesirable visible startup frame. Fixed waits and shell/prompt-specific
 detection would create a second readiness protocol with no general terminal
 meaning.
 
-The current design follows the VS Code boundary instead: create and size xterm
-before a fresh process, stream fresh data directly, and reserve serializer
-replay for persistent/revived processes. Our server-side headless xterm remains
-active from sequence 1 so later reconnect, switch, and recovery behavior stays
-Server First.
+The current design follows the useful part of the VS Code boundary: construct
+xterm before fresh process creation, stream fresh data directly, and reserve
+serializer replay for persistent/revived processes. The geometry contract is
+deliberately stricter than VS Code's `AutoOpenBarrier` plus last-known/default
+fallback: Goblin waits for a measurable mounted xterm because that first size
+becomes server PTY state. Our server-side headless xterm remains active from
+sequence 1 so later reconnect, switch, and recovery behavior stays Server First.
 
 ### Type-level separation
 
@@ -186,7 +201,7 @@ The shared protocol prevents the paths from collapsing again:
    snapshot.
 2. `TerminalAttachResult` is discriminated by `frame: 'stream' | 'snapshot'`;
    snapshot fields exist only on the snapshot branch.
-3. `TerminalRestartResult` permits only `frame: 'snapshot'`.
+3. `TerminalRestartResult` permits only `frame: 'stream'`.
 4. Geometry and controller metadata remain required on every successful frame.
 
 ### `terminalRuntimeSessionId` is an addressable runtime id, not a live-handle proof
@@ -401,10 +416,10 @@ response.
 ### What changed
 
 1. `TerminalTakeoverResult` carries an authoritative control-frame payload on
-   the success branch — `role`, `controllerStatus`, `canonicalCols`,
-   `canonicalRows`, `phase`, alongside the existing `controller`. The
+   the success branch — `role`, `controllerStatus`, `canonicalSize`, `phase`,
+   alongside the existing `controller`. The
    shape intentionally excludes the snapshot fields (`snapshot`,
-   `snapshotSeq`, `outputEra`) — takeover changes control ownership, not
+   `snapshotSeq`) — takeover changes control ownership, not
    render ownership. A viewer is a readonly metadata projection; after
    takeover, the controller paints xterm from the server snapshot path
    instead of trusting a viewer-owned render buffer.
@@ -574,12 +589,11 @@ any individual implementation:
 
 ## Suggested follow-ups
 
-1. **Done** — split `TerminalCreateResult`, stream attach, snapshot attach, and
-   snapshot-only restart at the type and validator boundaries.
-2. **Done** — decide explicitly that same-session snapshot reapply is
-   not a supported repair path. The long-term rule now lives in
-   `docs/terminal.md`: replay side effects are local rendering
-   artifacts and must not be forwarded as user stdin.
+1. **Done** — split `TerminalCreateResult`, prepared/restart stream frames, and
+   recovery attach snapshots at the type and validator boundaries.
+2. **Done** — decide explicitly that same-session snapshot reapply is not a
+   supported repair path. Recovery replay occurs only inside a hidden
+   presentation with local input admission closed.
 3. **Done** — move `TerminalSessionProjection` to a client-level singleton
    lifetime. The projection is now created on first access and lives
    for the client's entire lifetime; the provider is only a wiring

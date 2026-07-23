@@ -75,8 +75,6 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // a normal socket reconnect without retaining an expired page's memberships,
 // background targets, or terminal authority for the terminal session TTL.
 const CLIENT_STATE_DISCONNECT_GRACE_MS = 30_000
-const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
-const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 const serverWorkspacePaneTargetProjection = new WorkspacePaneTargetCatalog()
@@ -147,12 +145,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     (userId, clientId) => broker.isClientOnline(userId, clientId),
     {
       retain(userId, workspaceId, workspaceRuntimeId, terminalRuntimeSessionId) {
-        return retainWorkspaceRuntimeResource(
-          userId,
-          workspaceId,
-          workspaceRuntimeId,
-          terminalRuntimeSessionId,
-        )
+        return retainWorkspaceRuntimeResource(userId, workspaceId, workspaceRuntimeId, terminalRuntimeSessionId)
       },
     },
   )
@@ -181,18 +174,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     gCommand: options.gCommand,
   })
-  const invalidatedScopeRetirements = new Map<
-    string,
-    {
-      userId: string
-      workspaceId: WorkspaceId
-      workspaceRuntimeId: string
-      scope: string
-      attempts: number
-      running: boolean
-      timer: ReturnType<typeof setTimeout> | null
-    }
-  >()
   const unsubscribeWorkspaceRuntimeClosed = onWorkspaceRuntimeClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.workspaceId, event.workspaceRuntimeId)
     const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(event.userId, scope)
@@ -202,7 +183,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       event.workspaceRuntimeId,
     )
     manager.releaseProjectionRevisionForScope(event.userId, scope)
-    scheduleInvalidatedScopeRetirement({
+    retireInvalidatedScopeProjection({
       userId: event.userId,
       workspaceId: event.workspaceId,
       workspaceRuntimeId: event.workspaceRuntimeId,
@@ -224,85 +205,28 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     }
   })
 
-  function scheduleInvalidatedScopeRetirement(input: {
+  function retireInvalidatedScopeProjection(input: {
     userId: string
     workspaceId: WorkspaceId
     workspaceRuntimeId: string
     scope: string
   }): void {
-    if (shuttingDown) return
-    const key = JSON.stringify([input.userId, input.scope])
-    if (invalidatedScopeRetirements.has(key)) return
-    const retirement = { ...input, attempts: 0, running: false, timer: null }
-    invalidatedScopeRetirements.set(key, retirement)
-    queueMicrotask(() => void runInvalidatedScopeRetirement(key, retirement))
-  }
-
-  async function runInvalidatedScopeRetirement(
-    key: string,
-    retirement: {
-      userId: string
-      workspaceId: WorkspaceId
-      workspaceRuntimeId: string
-      scope: string
-      attempts: number
-      running: boolean
-      timer: ReturnType<typeof setTimeout> | null
-    },
-  ): Promise<void> {
-    if (shuttingDown) {
-      invalidatedScopeRetirements.delete(key)
-      return
-    }
-    if (invalidatedScopeRetirements.get(key) !== retirement || retirement.running) return
-    retirement.running = true
-    retirement.timer = null
-    try {
-      await workspaceTabsCoordinator.closeInvalidatedScope({ userId: retirement.userId, scope: retirement.scope })
-      if (invalidatedScopeRetirements.get(key) !== retirement) return
-      invalidatedScopeRetirements.delete(key)
-      try {
-        publishWorkspaceTabsChanged(retirement.userId, retirement.workspaceId)
-      } catch (error) {
+    void workspaceTabsCoordinator
+      .closeScope({ userId: input.userId, scope: input.scope })
+      .then(() => {
+        publishWorkspaceTabsChanged(input.userId, input.workspaceId)
+      })
+      .catch((error) => {
         terminalRuntimeLogger.warn(
           {
-            userId: retirement.userId,
-            workspaceId: retirement.workspaceId,
-            workspaceRuntimeId: retirement.workspaceRuntimeId,
+            userId: input.userId,
+            workspaceId: input.workspaceId,
+            workspaceRuntimeId: input.workspaceRuntimeId,
             err: error,
           },
-          'failed to publish retired workspace runtime workspace tabs',
+          'failed to retire invalidated workspace runtime workspace tabs',
         )
-      }
-    } catch (error) {
-      retirement.attempts += 1
-      terminalRuntimeLogger.warn(
-        {
-          userId: retirement.userId,
-          workspaceId: retirement.workspaceId,
-          workspaceRuntimeId: retirement.workspaceRuntimeId,
-          attempt: retirement.attempts,
-          err: error,
-        },
-        'failed to retire invalidated workspace runtime workspace tabs; retrying',
-      )
-      if (invalidatedScopeRetirements.get(key) !== retirement) return
-      if (shuttingDown) {
-        invalidatedScopeRetirements.delete(key)
-        return
-      }
-      const delay = Math.min(
-        INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS * 2 ** Math.min(retirement.attempts - 1, 6),
-        INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS,
-      )
-      retirement.timer = setTimeout(() => {
-        retirement.timer = null
-        void runInvalidatedScopeRetirement(key, retirement)
-      }, delay)
-      retirement.timer.unref?.()
-    } finally {
-      retirement.running = false
-    }
+      })
   }
 
   let shuttingDown = false
@@ -406,7 +330,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     isValidClientId: isValidTerminalClientId,
     getDiagnostics() {
-      const bufferStats = manager.getSessionBufferStats()
       return {
         terminal: {
           mode: ptySupervisor.getDiagnostics().mode,
@@ -414,9 +337,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           registeredSockets: broker.socketCount(),
           shuttingDown,
           pty: ptySupervisor.getDiagnostics(),
-          liveSessionCount: bufferStats.count,
-          totalRingBufferChars: bufferStats.totalBufferChars,
-          maxRingBufferChars: bufferStats.maxBufferChars,
+          liveSessionCount: manager.getSessionCount(),
         },
       }
     },
@@ -427,10 +348,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (shuttingDown) return
       shuttingDown = true
       unsubscribeWorkspaceRuntimeClosed()
-      for (const retirement of invalidatedScopeRetirements.values()) {
-        if (retirement.timer) clearTimeout(retirement.timer)
-      }
-      invalidatedScopeRetirements.clear()
       physicalWorktrees.dispose()
       coordinator.shutdown()
       manager.forceShutdown()
@@ -462,7 +379,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // The accepted durable CAS is the capability-removal commit point.
       // Register overlay retirement before detaching terminal authority; the
       // queued effect cannot run until this synchronous commit returns.
-      scheduleInvalidatedScopeRetirement({
+      retireInvalidatedScopeProjection({
         userId,
         workspaceId,
         workspaceRuntimeId: workspaceRuntimeId,

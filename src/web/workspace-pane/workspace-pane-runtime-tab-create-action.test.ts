@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   commitCreatedTerminalWorkspacePaneRuntimeTab,
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
   showCreatedTerminalWorkspacePaneRuntimeTab,
+  type CreatedTerminalRouteRequest,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
@@ -18,6 +20,11 @@ import {
   primaryWindowPresentationIsCurrent,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
+import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import type {
+  TerminalCreateCommandResult,
+  TerminalCreatedTabCommitResult,
+} from '#/web/commands/terminal-create-command.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -34,6 +41,17 @@ const BASE: TerminalSessionBase = {
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
 }
 const PANE_TARGET = workspacePaneTabsTargetFromRuntime(BASE.target)!
+const BRANCH_ROUTE_TARGET = {
+  kind: 'git-branch' as const,
+  workspaceId: BASE.target.workspaceId,
+  branchName: BRANCH_NAME,
+}
+const WORKTREE_ROUTE_TARGET = {
+  kind: 'git-worktree' as const,
+  workspaceId: BASE.target.workspaceId,
+  worktreePath: WORKTREE_PATH,
+}
+const WORKSPACE_ROOT_ROUTE_TARGET = { kind: 'workspace-root' as const, workspaceId: BASE.target.workspaceId }
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
@@ -56,38 +74,49 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
   resetWorkspacesStore()
 })
 
 describe('workspace pane runtime tab create action', () => {
-  test('navigates a detached worktree create to its real filesystem surface', () => {
-    const showRepoWorktreeTerminalSession = vi.fn(() => true)
+  test('navigates a detached worktree create to its real filesystem surface', async () => {
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const routeRequest = createdTerminalRouteRequest(WORKTREE_ROUTE_TARGET)
     const detachedBase: TerminalSessionBase = {
       ...BASE,
       presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
     }
 
-    expect(
+    await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
         detachedBase,
         TERMINAL_SESSION_ID,
         {
-          commitWorkspacePaneRoute: vi.fn(async () => false),
-          showRepoWorktreeTerminalSession,
+          commitWorkspacePaneRoute: vi.fn(async () => {
+            throw new Error('Unexpected branch route commit in detached-worktree test')
+          }),
+          commitFilesystemWorkspacePaneRoute,
+          commitWorkspaceRootTerminalSession: vi.fn(async () => {
+            throw new Error('Unexpected workspace-root commit in detached-worktree test')
+          }),
         },
-        beginPrimaryWindowPresentation(),
+        routeRequest,
       ),
-    ).toBe(true)
-    expect(showRepoWorktreeTerminalSession).toHaveBeenCalledWith(
-      REPO_ROOT,
-      WORKTREE_PATH,
-      TERMINAL_SESSION_ID,
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    ).resolves.toBe(true)
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      {
+        routeTarget: WORKTREE_ROUTE_TARGET,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        authority: { kind: 'detached-worktree' },
+      },
+      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
+      routeRequest,
     )
   })
 
-  test('commits a workspace root terminal route through navigation authority', () => {
-    const showWorkspaceRootPaneTab = vi.fn(() => true)
+  test('commits a workspace root terminal route through navigation authority', async () => {
+    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
+    const routeRequest = createdTerminalRouteRequest(WORKSPACE_ROOT_ROUTE_TARGET)
     const workspaceRootBase: TerminalSessionBase = {
       target: {
         kind: 'workspace-root',
@@ -97,21 +126,27 @@ describe('workspace pane runtime tab create action', () => {
       presentation: { kind: 'workspace-root' },
     }
 
-    expect(
+    await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
         workspaceRootBase,
         TERMINAL_SESSION_ID,
         {
-          commitWorkspacePaneRoute: vi.fn(async () => false),
-          showWorkspaceRootPaneTab,
+          commitWorkspacePaneRoute: vi.fn(async () => {
+            throw new Error('Unexpected branch route commit in workspace-root test')
+          }),
+          commitFilesystemWorkspacePaneRoute: vi.fn(async () => {
+            throw new Error('Unexpected worktree commit in workspace-root test')
+          }),
+          commitWorkspaceRootTerminalSession,
         },
-        beginPrimaryWindowPresentation(),
+        routeRequest,
       ),
-    ).toBe(true)
-    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+    ).resolves.toBe(true)
+    expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
       REPO_ROOT,
-      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+      WORKSPACE_RUNTIME_ID,
+      TERMINAL_SESSION_ID,
+      routeRequest,
     )
   })
 
@@ -121,9 +156,11 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
+        routeTarget: BRANCH_ROUTE_TARGET,
         base: null,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
+        focusTerminal: vi.fn(),
       },
     })
 
@@ -138,7 +175,13 @@ describe('workspace pane runtime tab create action', () => {
       runtimeTabStateByType: runtimeTabState(),
       showCreatedRuntimeTab,
       t: translate,
-      terminal: { base: BASE, createTerminal, captureOpenerIdentity },
+      terminal: {
+        routeTarget: BRANCH_ROUTE_TARGET,
+        base: BASE,
+        createTerminal,
+        captureOpenerIdentity,
+        focusTerminal: vi.fn(),
+      },
     })
 
     action?.onCreate()
@@ -164,22 +207,26 @@ describe('workspace pane runtime tab create action', () => {
         kind: 'git-worktree' as const,
         head: { kind: 'branch', branchName: BRANCH_NAME },
       },
-      expect.objectContaining({ generation: expect.any(Number) }),
+      expect.objectContaining({
+        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+      }),
     )
   })
 
   test('captures presentation authority before create and does not revive it after later navigation', async () => {
-    const showCreatedRuntimeTab = vi.fn((_type, _sessionId, _presentation, token) =>
-      primaryWindowPresentationIsCurrent(token),
+    const showCreatedRuntimeTab = vi.fn((_type, _sessionId, _presentation, routeRequest) =>
+      primaryWindowPresentationIsCurrent(routeRequest.presentationToken),
     )
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState(),
       showCreatedRuntimeTab,
       t: translate,
       terminal: {
+        routeTarget: BRANCH_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
+        focusTerminal: vi.fn(),
       },
     })
 
@@ -196,13 +243,163 @@ describe('workspace pane runtime tab create action', () => {
     expect(showCreatedRuntimeTab).toHaveReturnedWith(false)
   })
 
+  test('claims one presentation before dispatch and transfers focus only after route commit', async () => {
+    installTerminalFocusSink()
+    const previousPresentation = beginPrimaryWindowPresentation()
+    const heldCommand = holdTerminalCreateCommand()
+    const navigation = Promise.withResolvers<boolean>()
+    const routeStarted = Promise.withResolvers<CreatedTerminalRouteRequest>()
+    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
+
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: BRANCH_ROUTE_TARGET,
+      base: BASE,
+      createTerminal: vi.fn(async () => createAdmission()),
+      openerIdentity: null,
+      showCreatedTerminalTab: async (_terminalSessionId, _presentation, routeRequest) => {
+        routeStarted.resolve(routeRequest)
+        return await navigation.promise
+      },
+      focusTerminal,
+    })
+
+    expect(primaryWindowPresentationIsCurrent(previousPresentation)).toBe(false)
+    expect(terminalOwnsKeyboardInput()).toBe(true)
+    const commandInput = await heldCommand.input.promise
+    const commit = commandInput.commitCreatedTerminalTab(createAdmission())
+    const routeRequest = await routeStarted.promise
+
+    expect(primaryWindowPresentationIsCurrent(routeRequest.presentationToken)).toBe(true)
+    expect(focusTerminal).not.toHaveBeenCalled()
+    navigation.resolve(true)
+    await expect(commit).resolves.toEqual({ status: 'committed' })
+    expect(focusTerminal).toHaveBeenCalledWith(
+      TERMINAL_SESSION_ID,
+      expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+    )
+    const focusRequest = focusTerminal.mock.calls[0]![1]
+    if (!focusRequest) throw new Error('missing focus request')
+    expect(focusRequest.isCurrent()).toBe(true)
+
+    heldCommand.result.resolve(committedCreateCommandResult())
+    await expect(dispatch).resolves.toEqual(committedCreateCommandResult())
+
+    focusRequest.onSettled?.()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+  })
+
+  test('releases focus ownership when terminal creation fails', async () => {
+    installTerminalFocusSink()
+    terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValueOnce({
+      ok: false,
+      error: new Error('create failed'),
+      messageKey: 'error.terminal-create-failed',
+    })
+    const focusTerminal = vi.fn()
+
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: BRANCH_ROUTE_TARGET,
+      base: BASE,
+      createTerminal: vi.fn(async () => createAdmission()),
+      openerIdentity: null,
+      showCreatedTerminalTab: vi.fn(() => true),
+      focusTerminal,
+    })
+
+    expect(terminalOwnsKeyboardInput()).toBe(true)
+    await expect(dispatch).resolves.toMatchObject({ ok: false })
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+    expect(focusTerminal).not.toHaveBeenCalled()
+  })
+
+  test('releases focus ownership when the create target is superseded', async () => {
+    installTerminalFocusSink()
+    const heldCommand = holdTerminalCreateCommand()
+    const showCreatedTerminalTab = vi.fn(() => true)
+    const focusTerminal = vi.fn()
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: BRANCH_ROUTE_TARGET,
+      base: BASE,
+      createTerminal: vi.fn(async () => createAdmission()),
+      openerIdentity: null,
+      showCreatedTerminalTab,
+      focusTerminal,
+    })
+    const commandInput = await heldCommand.input.promise
+
+    seedCurrentWorkspaceRuntime('repo-runtime-replacement')
+    await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({ status: 'superseded' })
+    heldCommand.result.resolve({
+      ok: true,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      presentationStatus: 'superseded',
+    })
+    await dispatch
+
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(focusTerminal).not.toHaveBeenCalled()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+  })
+
+  test('releases focus ownership when navigation rejects the created route', async () => {
+    installTerminalFocusSink()
+    const heldCommand = holdTerminalCreateCommand()
+    const focusTerminal = vi.fn()
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: BRANCH_ROUTE_TARGET,
+      base: BASE,
+      createTerminal: vi.fn(async () => createAdmission()),
+      openerIdentity: null,
+      showCreatedTerminalTab: vi.fn(() => false),
+      focusTerminal,
+    })
+    const commandInput = await heldCommand.input.promise
+
+    await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({
+      status: 'navigation-rejected',
+    })
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+    heldCommand.result.resolve({
+      ok: true,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      presentationStatus: 'navigation-rejected',
+    })
+    await dispatch
+    expect(focusTerminal).not.toHaveBeenCalled()
+  })
+
+  test('does not focus when an older create commits after a newer presentation', async () => {
+    installTerminalFocusSink()
+    const heldCommand = holdTerminalCreateCommand()
+    const focusTerminal = vi.fn()
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: BRANCH_ROUTE_TARGET,
+      base: BASE,
+      createTerminal: vi.fn(async () => createAdmission()),
+      openerIdentity: null,
+      showCreatedTerminalTab: vi.fn(() => true),
+      focusTerminal,
+    })
+    const commandInput = await heldCommand.input.promise
+
+    beginPrimaryWindowPresentation()
+    await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({ status: 'committed' })
+    heldCommand.result.resolve(committedCreateCommandResult())
+    await dispatch
+
+    expect(focusTerminal).not.toHaveBeenCalled()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+  })
+
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
     await expect(
       dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        routeTarget: BRANCH_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         openerIdentity: null,
         showCreatedTerminalTab: vi.fn(() => true),
+        focusTerminal: vi.fn(),
         t: translate,
       }),
     ).resolves.toEqual({ ok: true, terminalSessionId: TERMINAL_SESSION_ID, presentationStatus: 'committed' })
@@ -292,9 +489,11 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
+        routeTarget: BRANCH_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
+        focusTerminal: vi.fn(),
       },
     })
     expect(pendingAction?.busy).toBe(true)
@@ -306,6 +505,47 @@ describe('workspace pane runtime tab create action', () => {
 
 function translate(key: string): string {
   return key
+}
+
+function createdTerminalRouteRequest(
+  routeTarget: CreatedTerminalRouteRequest['routeTarget'] = BRANCH_ROUTE_TARGET,
+): CreatedTerminalRouteRequest {
+  return { presentationToken: beginPrimaryWindowPresentation(), routeTarget }
+}
+
+function installTerminalFocusSink(): HTMLElement {
+  const sink = document.createElement('div')
+  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+  sink.tabIndex = -1
+  document.body.append(sink)
+  return sink
+}
+
+interface HeldTerminalCreateCommandInput {
+  commitCreatedTerminalTab: (
+    admission: TerminalCreateLeaderAdmissionResult,
+  ) => TerminalCreatedTabCommitResult | Promise<TerminalCreatedTabCommitResult>
+}
+
+function holdTerminalCreateCommand(): {
+  input: PromiseWithResolvers<HeldTerminalCreateCommandInput>
+  result: PromiseWithResolvers<TerminalCreateCommandResult>
+} {
+  const input = Promise.withResolvers<HeldTerminalCreateCommandInput>()
+  const result = Promise.withResolvers<TerminalCreateCommandResult>()
+  terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementationOnce(async (commandInput) => {
+    input.resolve(commandInput)
+    return await result.promise
+  })
+  return { input, result }
+}
+
+function committedCreateCommandResult(): TerminalCreateCommandResult {
+  return {
+    ok: true,
+    terminalSessionId: TERMINAL_SESSION_ID,
+    presentationStatus: 'committed',
+  }
 }
 
 function createAdmission(): TerminalCreateLeaderAdmissionResult {

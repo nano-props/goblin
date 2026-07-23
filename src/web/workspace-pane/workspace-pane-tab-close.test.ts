@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
@@ -22,7 +24,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
-  observedWorkspacePaneRouteCommitForTest,
+  observedPrimaryWindowNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -33,6 +35,21 @@ import {
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import {
+  claimTerminalInputFocus,
+  fulfillTerminalPresentationFocus,
+  TERMINAL_INPUT_FOCUS_SINK_ID,
+  terminalOwnsKeyboardInput,
+} from '#/web/terminal-focus.ts'
+import {
+  beginPrimaryWindowPresentation,
+  resetPrimaryWindowPresentationForTest,
+} from '#/web/primary-window-presentation.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  workspacePaneRouteIntentPending,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-close-repo')
 const BRANCH_NAME = 'feature/worktree-close'
@@ -44,15 +61,22 @@ const WORKTREE_PANE_TARGET = {
 }
 
 beforeEach(() => {
+  resetPrimaryWindowPresentationForTest()
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   setTerminalSessionCommandBridgeForTest(null)
   installWorkspacePaneTabsTestBridge()
+  const focusSink = document.createElement('div')
+  focusSink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+  focusSink.tabIndex = -1
+  document.body.appendChild(focusSink)
 })
 
 afterEach(() => {
   setTerminalSessionCommandBridgeForTest(null)
+  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetPrimaryWindowPresentationForTest()
 })
 
 test('commits active close-back route through command-owned navigation', async () => {
@@ -72,6 +96,7 @@ test('commits active close-back route through command-owned navigation', async (
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
       paneTarget: WORKTREE_PANE_TARGET,
       worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
       workspaceId: REPO_ID,
@@ -87,6 +112,50 @@ test('commits active close-back route through command-owned navigation', async (
     expect.objectContaining({ presentationToken: expect.any(Object) }),
   )
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
+})
+
+test('keeps a branch-headed worktree close in the worktree route family', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    status: [{ path: WORKTREE_PATH, branch: BRANCH_NAME, isMain: false, entries: [] }],
+    currentBranchName: BRANCH_NAME,
+    preferredWorkspacePaneTab: 'files',
+    workspacePaneTabsByBranch: {
+      [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
+    },
+  })
+  const commitWorkspacePaneRoute = vi.fn(async () => true)
+  const commitFilesystemWorkspacePaneRoute = vi.fn<
+    PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
+  >(async (_target, _route, options) => {
+    options?.onCommit?.()
+    return true
+  })
+
+  await expect(
+    dispatchCloseWorkspacePaneTabAction({
+      routeTarget: WORKTREE_PANE_TARGET,
+      paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+      workspaceId: REPO_ID,
+      workspacePaneRoute: { kind: 'static', tab: 'files' },
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute, commitWorkspacePaneRoute }),
+    }),
+  ).resolves.toBe(true)
+
+  expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
+  expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    {
+      routeTarget: WORKTREE_PANE_TARGET,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      authority: { kind: 'branch', branchName: BRANCH_NAME },
+    },
+    { kind: 'static', tab: 'status' },
+    expect.objectContaining({
+      routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
+    }),
+  )
 })
 
 test('closes a workspace-root static tab through the shared tab transaction', async () => {
@@ -106,6 +175,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
+      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       workspaceId: REPO_ID,
       workspacePaneRoute: undefined,
@@ -125,6 +195,126 @@ test('closes a workspace-root static tab through the shared tab transaction', as
   })
 })
 
+test('holds terminal keyboard ownership from active close through route commit and mount transfer', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const target = {
+    kind: 'workspace-root' as const,
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  }
+  setWorkspacePaneTabsForTargetQueryData({
+    ...target,
+    tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+  })
+  useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+  const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
+  const bridgeFocus = installPendingTerminalFocusBridge()
+  const routeCommit = Promise.withResolvers<void>()
+  const commitFilesystemWorkspacePaneRoute = vi.fn<
+    PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
+  >(async (_target, _route, options) => {
+    await routeCommit.promise
+    options?.onCommit?.()
+    return true
+  })
+  const close = dispatchCloseWorkspacePaneTabAction({
+    routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+    paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+    workspaceId: REPO_ID,
+    workspacePaneRoute: { kind: 'static', tab: 'files' },
+    navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+  })
+
+  expect(terminalOwnsKeyboardInput()).toBe(true)
+  lifecycle.resolve([workspacePaneRuntimeTabEntry('terminal', terminalSessionId)])
+  await vi.waitFor(() => expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce())
+  expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    {
+      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      authority: { kind: 'workspace-runtime' },
+    },
+    { kind: 'terminal', terminalSessionId },
+    expect.objectContaining({
+      routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
+    }),
+  )
+  expect(terminalOwnsKeyboardInput()).toBe(true)
+
+  routeCommit.resolve()
+  await expect(close).resolves.toBe(true)
+  expect(bridgeFocus).toHaveBeenCalledWith(
+    terminalSessionId,
+    expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+  )
+  expect(terminalOwnsKeyboardInput()).toBe(true)
+
+  const mountedFocus = vi.fn(
+    (_terminalSessionId: string, _request: { isCurrent: () => boolean; onSettled: () => void }) => true,
+  )
+  fulfillTerminalPresentationFocus(terminalSessionId, mountedFocus)
+  expect(mountedFocus).toHaveBeenCalledOnce()
+  const mountedRequest = mountedFocus.mock.calls[0]![1]
+  expect(mountedRequest.isCurrent()).toBe(true)
+  mountedRequest.onSettled()
+  expect(terminalOwnsKeyboardInput()).toBe(false)
+})
+
+test('releases terminal focus and route intent when active close lifecycle fails', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const target = {
+    kind: 'workspace-root' as const,
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  }
+  setWorkspacePaneTabsForTargetQueryData({
+    ...target,
+    tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+  })
+  useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+  const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
+  installPendingTerminalFocusBridge()
+  const commitFilesystemWorkspacePaneRoute = vi.fn<
+    PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
+  >(async () => true)
+  const actionTarget = workspacePaneActionTargetFromCoordinates({
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    branchName: null,
+    worktreePath: '/tmp/workspace-pane-tab-close-repo',
+  })
+
+  const close = dispatchCloseWorkspacePaneTabAction({
+    routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+    paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+    workspaceId: REPO_ID,
+    workspacePaneRoute: { kind: 'static', tab: 'files' },
+    navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+  })
+
+  await vi.waitFor(() => expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(true))
+  expect(terminalOwnsKeyboardInput()).toBe(true)
+  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+
+  lifecycle.reject(new Error('simulated close failure'))
+  await expect(close).resolves.toBe(false)
+
+  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  expect(terminalOwnsKeyboardInput()).toBe(false)
+  expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(false)
+
+  const nextPresentation = beginPrimaryWindowPresentation()
+  const nextFocusLease = claimTerminalInputFocus(nextPresentation)
+  expect(nextFocusLease).not.toBeNull()
+  nextFocusLease?.release()
+})
+
 test('reports lifecycle success and clears the transition when close-back navigation rejects', async () => {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -138,6 +328,7 @@ test('reports lifecycle success and clears the transition when close-back naviga
   const routeCommit = Promise.withResolvers<boolean>()
   const commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
   const close = dispatchCloseWorkspacePaneTabAction({
+    routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
     paneTarget: WORKTREE_PANE_TARGET,
     worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     workspaceId: REPO_ID,
@@ -210,6 +401,7 @@ test('sends a detached worktree close to the server without requiring a branch',
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      routeTarget: WORKTREE_PANE_TARGET,
       paneTarget: WORKTREE_PANE_TARGET,
       worktreeHead: { kind: 'detached' },
       workspaceId: REPO_ID,
@@ -289,9 +481,9 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     ],
   ).toBe(terminalSessionId)
   const navigation = navigationWith({
-    showWorkspaceRootPaneTab: vi.fn((_repoId, presentation, options) => {
-      if (presentation.kind === 'static') {
-        useWorkspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, presentation.tab)
+    commitFilesystemWorkspacePaneRoute: vi.fn(async (_target, route, options) => {
+      if (route?.kind === 'static') {
+        useWorkspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, route.tab)
       }
       options?.onCommit?.()
       return true
@@ -300,6 +492,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       workspaceId: REPO_ID,
       workspacePaneRoute: undefined,
@@ -351,6 +544,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   })
   const navigation = navigationWith()
   const close = dispatchCloseWorkspacePaneTabAction({
+    routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
     paneTarget: WORKTREE_PANE_TARGET,
     worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     workspaceId: REPO_ID,
@@ -404,7 +598,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
-  const navigation: PrimaryWindowNavigationActions = {
+  return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),
     cycleWorkspace: vi.fn(),
@@ -416,16 +610,29 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
       options?.onCommit?.()
       return true
     }),
-    commitWorkspacePaneRoute: vi.fn(() => false),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
     ...overrides,
-    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
-  }
-  if (!overrides.commitWorkspacePaneRoute) {
-    navigation.commitWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
-  }
-  return navigation
+  })
+}
+
+function installPendingTerminalFocusBridge() {
+  const focusTerminal = vi.fn(() => false)
+  setTerminalSessionCommandBridgeForTest({
+    terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey) => ({
+      terminalFilesystemTargetKey,
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }),
+    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+    selectTerminal: vi.fn(),
+    focusTerminal,
+  })
+  return focusTerminal
 }

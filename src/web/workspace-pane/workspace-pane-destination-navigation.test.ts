@@ -205,11 +205,11 @@ describe('workspace pane destination navigation', () => {
         const token = options?.presentationToken
         if (!token) return false
         const href = '/workspace/destination/tab/status'
-        const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
-        if (!navigationId) return false
+        const registration = registerPrimaryWindowNavigation(token, href, options.onCommit)
+        if (!registration) return false
         observePrimaryWindowHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, navigationId),
+          state: primaryWindowNavigationState({}, registration.navigationId),
           action: { type: 'PUSH' },
         })
         return true

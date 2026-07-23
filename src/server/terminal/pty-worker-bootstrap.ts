@@ -5,16 +5,26 @@
 import { PtyWorkerRuntime } from '#/server/terminal/pty-worker-runtime.ts'
 import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
 
-export function bootstrapPtyWorker(): void {
+export interface PtyWorkerParentProcess {
+  send?(message: PtyWorkerMessage): boolean
+  on(event: 'message', listener: (raw: unknown) => void): unknown
+  once(event: 'disconnect', listener: () => void): unknown
+}
+
+export function bootstrapPtyWorker(parent: PtyWorkerParentProcess = process): PtyWorkerRuntime {
   const runtime = new PtyWorkerRuntime({
     emit(message: PtyWorkerMessage) {
-      if (typeof process.send === 'function') {
-        process.send(message)
+      if (typeof parent.send === 'function') {
+        parent.send(message)
       }
     },
   })
 
-  process.on('message', (raw) => {
+  parent.on('message', (raw) => {
     runtime.handleMessage(raw as PtyWorkerRequest)
   })
+  parent.once('disconnect', () => {
+    runtime.shutdown()
+  })
+  return runtime
 }

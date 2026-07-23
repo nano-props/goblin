@@ -6,9 +6,9 @@ import type {
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
   TerminalPruneInput,
-  TerminalMutationResult,
   TerminalOutputEvent,
   TerminalResizeInput,
+  TerminalResizeResult,
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionsSnapshot,
@@ -64,7 +64,7 @@ export interface TerminalSocketResponseOutputs {
   attach: TerminalAttachResult
   restart: TerminalRestartResult
   write: TerminalWriteResult
-  resize: TerminalMutationResult
+  resize: TerminalResizeResult
   takeover: TerminalTakeoverResult
   'recover-sessions': TerminalSessionsSnapshot
   prune: { pruned: number; remaining: number }

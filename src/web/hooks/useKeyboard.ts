@@ -19,7 +19,7 @@ import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
-import { isTerminalFocused } from '#/web/terminal-focus.ts'
+import { terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -193,6 +193,7 @@ export function useKeyboard({
       }
 
       if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
+        if (e.repeat) return
         const workspaceId = currentWorkspaceIdRef.current
         const paneTarget = currentWorkspacePaneCommandTargetRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
@@ -256,7 +257,7 @@ export function useKeyboard({
         }
       }
 
-      if (isTerminalFocused()) return
+      if (terminalOwnsKeyboardInput()) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
 

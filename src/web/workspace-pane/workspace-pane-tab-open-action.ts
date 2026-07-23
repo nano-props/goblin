@@ -49,6 +49,7 @@ import {
 
 export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   workspaceId: WorkspaceId
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   type: WorkspacePaneStaticTabType
@@ -98,7 +99,12 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
     })
     if (!committed.ok) return { kind: 'mutation-failed' }
     if (!committed.projectionApplied) return { kind: 'superseded' }
-    const model = workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)
+    const model = workspacePaneTabTargetForPaneTarget({
+      paneTarget: input.paneTarget,
+      routeTarget: input.routeTarget,
+      workspacePaneRoute: input.workspacePaneRoute,
+      worktreeHead: input.worktreeHead,
+    })
     const tab = model?.tabs.find((candidate) => candidate.type === input.type)
     if (!model || !tab || !primaryWindowPresentationIsCurrent(presentationToken)) {
       return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
@@ -111,7 +117,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
         openerIdentity,
       )
     }
-    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, presentationToken)
+    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, { presentationToken })
     return presented
       ? { kind: 'completed', changed: !alreadyOpen, presentation: 'observed' }
       : { kind: 'navigation-rejected' }
@@ -338,6 +344,7 @@ async function commitWorkspacePaneStaticTab(
     {
       workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
+      routeTarget: { kind: 'git-branch', workspaceId: input.workspaceId, branchName: input.branchName },
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       paneTarget: requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath),

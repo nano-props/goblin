@@ -16,6 +16,7 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -50,7 +51,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    expect(actions.showWorkspaceRootPaneTab?.(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
+    expect(actions.showWorkspaceRootPaneTab(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
     expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(
       REPO_ID,
       'files',
@@ -90,7 +91,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       })
 
       expect(
-        actions.showWorkspaceRootPaneTab?.(REPO_ID, {
+        actions.showWorkspaceRootPaneTab(REPO_ID, {
           kind: 'terminal',
           terminalSessionId: 'term-222222222222222222222',
         }),
@@ -106,6 +107,117 @@ describe('createPrimaryWindowNavigationActions', () => {
       ).toBe(commit ? 'terminal' : 'files')
     },
   )
+
+  test('commits a filesystem route only while its workspace runtime remains current', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const routeCommit = Promise.withResolvers<boolean>()
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
+    const actions = createPrimaryWindowNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+    const previousPreference = preferredWorkspacePaneTabForTarget(repo.ui, {
+      kind: 'workspace-root',
+      workspaceId: REPO_ID,
+    })
+    const commit = actions.commitFilesystemWorkspacePaneRoute(
+      {
+        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        authority: { kind: 'workspace-runtime' },
+      },
+      { kind: 'static', tab: 'files' },
+      { onAbandon },
+    )
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: replaceWorkspace(repo, (draft) => {
+          draft.workspaceRuntimeId = 'repo-runtime-replacement'
+        }),
+      },
+    }))
+    routeCommit.resolve(true)
+
+    await expect(commit).resolves.toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
+    expect(
+      preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
+        kind: 'workspace-root',
+        workspaceId: REPO_ID,
+      }),
+    ).toBe(previousPreference)
+  })
+
+  test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      status: [{ path: WORKTREE_PATH, branch: 'feature/worktree', isMain: false, entries: [] }],
+      currentBranchName: 'feature/worktree',
+    })
+    const routeCommit = Promise.withResolvers<boolean>()
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
+    const actions = createPrimaryWindowNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+    const commit = actions.commitFilesystemWorkspacePaneRoute(
+      {
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        authority: { kind: 'branch', branchName: 'feature/worktree' },
+      },
+      { kind: 'static', tab: 'files' },
+      { onAbandon },
+    )
+    setRepoWorktreeStatusQueryData(REPO_ID, repo.workspaceRuntimeId, {
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      loadedAt: 2,
+      status: [],
+    })
+    routeCommit.resolve(true)
+
+    await expect(commit).resolves.toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('abandons exactly once when filesystem presentation projection commit throws', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const actions = createPrimaryWindowNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+    vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTabForTarget').mockImplementationOnce(() => {
+      throw new Error('projection commit failed')
+    })
+
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          authority: { kind: 'workspace-runtime' },
+        },
+        { kind: 'static', tab: 'files' },
+        { onAbandon },
+      ),
+    ).rejects.toThrow('projection commit failed')
+    expect(onAbandon).toHaveBeenCalledOnce()
+  })
 
   test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
@@ -489,7 +601,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
-  test('keeps command-owned route commits free of workspace pane supplements', () => {
+  test('keeps command-owned route commits free of workspace pane supplements', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
@@ -502,6 +614,10 @@ describe('createPrimaryWindowNavigationActions', () => {
       selectTerminal: vi.fn(),
     })
     const navigation = routeNavigation()
+    navigation.commitWorkspacePaneRoute = vi.fn(async (workspaceId, branchName, route, options) => {
+      if (route?.kind !== 'terminal') return false
+      return navigation.openRepoBranchTerminal(workspaceId, branchName, route.terminalSessionId, options)
+    })
     const actions = createPrimaryWindowNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
@@ -509,7 +625,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    const accepted = actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
+    const accepted = await actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
       kind: 'terminal',
       terminalSessionId: 'term-111111111111111111111',
     })
@@ -553,6 +669,29 @@ describe('createPrimaryWindowNavigationActions', () => {
     routeCommit.resolve(true)
     await expect(committed).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('status')
+  })
+
+  test('forwards operation abandonment to the route owner', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+    })
+    const navigation = routeNavigation()
+    navigation.commitWorkspacePaneRoute = vi.fn(async (_workspaceId, _branchName, _route, options) => {
+      options?.onAbandon?.()
+      return false
+    })
+    const actions = createPrimaryWindowNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+
+    await expect(actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, null, { onAbandon })).resolves.toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
   })
 
   test('blocks workspace history restore before mutating history while terminal creation is pending', () => {
@@ -1227,6 +1366,9 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
       options?.onCommit?.()
       return true
     }),
+    commitFilesystemWorkspacePaneRoute: vi.fn(async () => {
+      throw new Error('Unexpected workspace-root route commit in test')
+    }),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()
       return true
@@ -1242,6 +1384,15 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openRepoWorktree: vi.fn((_repoId, _worktreePath, options) => {
       options?.onCommit?.()
       return true
+    }),
+    openRepoWorktreeTerminal: vi.fn(() => {
+      throw new Error('Unexpected worktree terminal navigation in test')
+    }),
+    openRepoWorktreeTab: vi.fn(() => {
+      throw new Error('Unexpected worktree tab navigation in test')
+    }),
+    commitWorkspacePaneRoute: vi.fn(async () => {
+      throw new Error('Unexpected workspace pane route commit in test')
     }),
     openRepoNewWorktree: vi.fn(),
     cancelRepoNewWorktree: vi.fn(),

@@ -91,11 +91,7 @@ export function projectServerTerminalSession(input: {
       message: input.serverSession.message,
       role: controller.role,
       controllerStatus: controller.controllerStatus,
-      canonicalCols: input.serverSession.cols,
-      canonicalRows: input.serverSession.rows,
-      snapshot: null,
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: input.serverSession.canonicalSize,
     },
     controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
   }
@@ -115,8 +111,7 @@ function createSessionSummaryFromCreate(
     canonicalTitle: result.canonicalTitle,
     phase: result.phase,
     message: result.message,
-    cols: result.canonicalCols,
-    rows: result.canonicalRows,
+    canonicalSize: result.canonicalSize,
   }
   const target = base.target
   if (target.kind === 'workspace-root' && result.presentation.kind === 'workspace-root') {

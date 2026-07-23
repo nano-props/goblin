@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   terminalExecutionPath,
   terminalPresentationBranch,
@@ -6,10 +6,12 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import {
   runWorkspacePaneRuntimeNewAction,
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
+import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -30,6 +32,7 @@ import {
   primaryWindowPresentationIsCurrent,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
+import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
 
 const terminalBase: TerminalSessionBase = {
   target: {
@@ -41,6 +44,11 @@ const terminalBase: TerminalSessionBase = {
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
 const terminalPaneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)!
+const terminalRouteTarget = {
+  kind: 'git-branch' as const,
+  workspaceId: terminalBase.target.workspaceId,
+  branchName: 'main',
+}
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 
@@ -49,6 +57,10 @@ describe('workspace pane runtime tab command actions', () => {
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
     resetPrimaryWindowPresentationForTest()
+  })
+
+  afterEach(() => {
+    document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
   })
 
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
@@ -121,7 +133,9 @@ describe('workspace pane runtime tab command actions', () => {
       currentBranchName: branchName,
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
+    const routeRequest = createdTerminalRouteRequest()
     const context = workspacePaneRuntimeTabCommandContext({
+      routeTarget: terminalRouteTarget,
       filesystemTarget:
         terminalBase.target.kind === 'git-worktree'
           ? gitWorktreePaneFilesystemTarget({
@@ -152,7 +166,7 @@ describe('workspace pane runtime tab command actions', () => {
         kind: 'git-worktree' as const,
         head: { kind: 'branch', branchName: 'feature/renamed' },
       },
-      beginPrimaryWindowPresentation(),
+      routeRequest,
     )
 
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
@@ -160,7 +174,7 @@ describe('workspace pane runtime tab command actions', () => {
       'term-111111111111111111111',
       { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
       terminalExecutionPath(terminalBase.target),
-      expect.objectContaining({ generation: expect.any(Number) }),
+      routeRequest,
     )
   })
 
@@ -184,11 +198,13 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminal,
       createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal,
+      focusTerminal: vi.fn(),
     }
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -200,13 +216,69 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
-      expect.objectContaining({ generation: expect.any(Number) }),
+      expect.objectContaining({
+        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        onCommit: expect.any(Function),
+        onAbandon: expect.any(Function),
+      }),
     )
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
+  test('primary terminal action owns keyboard input until the committed terminal settles focus', async () => {
+    installTerminalFocusSink()
+    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
+    const showTerminalSession = vi.fn((_sessionId, routeRequest) => {
+      expect(terminalOwnsKeyboardInput()).toBe(true)
+      routeRequest.onCommit()
+      return true
+    })
+    const createTerminal = vi.fn(async () => 'created-session')
+    const bridge: TerminalSessionCommandBridge = {
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions: [terminalSession('term-111111111111111111111', true)],
+        count: 1,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: false,
+      }),
+      createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+      selectTerminal: vi.fn(),
+      focusTerminal,
+    }
+
+    await expect(
+      runWorkspacePaneRuntimePrimaryAction('terminal', {
+        terminal: {
+          routeTarget: terminalRouteTarget,
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(focusTerminal).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+    )
+    const focusRequest = focusTerminal.mock.calls[0]![1]
+    if (!focusRequest) throw new Error('missing focus request')
+    expect(focusRequest.isCurrent()).toBe(true)
+    expect(terminalOwnsKeyboardInput()).toBe(true)
+
+    focusRequest.onSettled?.()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+  })
+
   test('primary terminal action queues existing-session focus behind workspace pane coordination', async () => {
+    installTerminalFocusSink()
     let releaseCoordinator!: () => void
     let markCoordinatorStarted!: () => void
     const coordinatorStarted = new Promise<void>((resolve) => {
@@ -231,7 +303,9 @@ describe('workspace pane runtime tab command actions', () => {
     let sessions = [terminalSession('term-111111111111111111111', true)]
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
-    const showTerminalSession = vi.fn((_sessionId, token) => primaryWindowPresentationIsCurrent(token))
+    const showTerminalSession = vi.fn((_sessionId, routeRequest) =>
+      primaryWindowPresentationIsCurrent(routeRequest.presentationToken),
+    )
     const bridge: TerminalSessionCommandBridge = {
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey: '/repo\0/repo-worktree',
@@ -245,10 +319,12 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminal,
       createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal,
+      focusTerminal: vi.fn(),
     }
 
     const actionPromise = runWorkspacePaneRuntimePrimaryAction('terminal', {
       terminal: {
+        routeTarget: terminalRouteTarget,
         base: terminalBase,
         bridge,
         openerIdentity: null,
@@ -259,16 +335,22 @@ describe('workspace pane runtime tab command actions', () => {
     await Promise.resolve()
 
     expect(showTerminalSession).not.toHaveBeenCalled()
+    expect(terminalOwnsKeyboardInput()).toBe(true)
 
     sessions = [terminalSession('term-222222222222222222222', true)]
     beginPrimaryWindowPresentation()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
     releaseCoordinator()
     await coordinatorBlocker
 
     await expect(actionPromise).resolves.toBe(false)
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-222222222222222222222',
-      expect.objectContaining({ generation: expect.any(Number) }),
+      expect.objectContaining({
+        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        onCommit: expect.any(Function),
+        onAbandon: expect.any(Function),
+      }),
     )
     expect(showTerminalSession).toHaveReturnedWith(false)
     expect(selectTerminal).not.toHaveBeenCalled()
@@ -291,12 +373,14 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminal,
       createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
     }
 
     const pendingCreatePresentation = beginPrimaryWindowPresentation()
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -326,11 +410,13 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminal: vi.fn(async () => 'created-session'),
       createTerminalWithAdmission: vi.fn(),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
     }
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -342,11 +428,24 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
-      expect.objectContaining({ generation: expect.any(Number) }),
+      expect.objectContaining({
+        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        onCommit: expect.any(Function),
+        onAbandon: expect.any(Function),
+      }),
     )
   })
 
   test('new terminal action joins a pending duplicate create through terminal ownership', async () => {
+    installTerminalFocusSink()
+    const branchName = terminalPresentationBranch(terminalBase.presentation)
+    if (!branchName) throw new Error('expected Git worktree terminal fixture')
+    seedRepoWithReadModelForTest({
+      id: terminalCoordinates.workspaceId,
+      workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      currentBranchName: branchName,
+    })
     const createTerminal = vi.fn(async () => 'created-session')
     const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
@@ -356,6 +455,10 @@ describe('workspace pane runtime tab command actions', () => {
       runtimeProjectionApplied: true,
     }))
     const showTerminalSession = vi.fn(() => true)
+    const showCreatedTerminalSession = vi.fn(
+      (_terminalSessionId: string, _presentation: unknown, _routeRequest: CreatedTerminalRouteRequest) => true,
+    )
+    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey: '/repo\0/repo-worktree',
@@ -369,23 +472,35 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminal,
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
+      focusTerminal,
     }
 
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
           showTerminalSession,
-          showCreatedTerminalSession: showTerminalSession,
+          showCreatedTerminalSession,
         },
       }),
     ).resolves.toBe(true)
 
     expect(showTerminalSession).not.toHaveBeenCalled()
+    expect(showCreatedTerminalSession).toHaveBeenCalledOnce()
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(terminalBase, undefined)
     expect(createTerminal).not.toHaveBeenCalled()
+    expect(focusTerminal).toHaveBeenCalledWith(
+      'created-session',
+      expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+    )
+    const focusRequest = focusTerminal.mock.calls[0]![1]
+    if (!focusRequest) throw new Error('missing focus request')
+    expect(focusRequest.isCurrent()).toBe(true)
+    focusRequest.onSettled?.()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('primary terminal action rejects when no bridge is available', async () => {
@@ -394,6 +509,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge: null,
           openerIdentity: null,
@@ -410,6 +526,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
+          routeTarget: terminalRouteTarget,
           base: null,
           bridge: null,
           openerIdentity: null,
@@ -435,4 +552,15 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
     hasBell: false,
     hasRecentOutput: false,
   }
+}
+
+function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
+  return { presentationToken: beginPrimaryWindowPresentation(), routeTarget: terminalRouteTarget }
+}
+
+function installTerminalFocusSink(): void {
+  const sink = document.createElement('div')
+  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+  sink.tabIndex = -1
+  document.body.append(sink)
 }

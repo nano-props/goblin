@@ -43,7 +43,12 @@ The terminal has two different authority domains that should stay separate:
 - **Session authority** lives on the server. The server owns session lifecycle, controller/viewer state, PTY binding, canonical geometry, and the headless xterm render state used for snapshots.
 - **View authority** lives in the currently mounted client xterm. The live xterm instance owns local rendering behavior and is the only component that should report the active controller view's fitted `cols`/`rows`.
 
-Create may send a lightweight startup geometry hint before a real view exists. After a view is mounted, the client sends live xterm geometry to the server through attach, resize, restart, and takeover operations. The server validates controller authority, updates the PTY and headless render state, then broadcasts the resulting canonical geometry. This keeps the server model authoritative without asking the server, a temporary xterm, or an ad hoc DOM probe to predict client rendering details.
+Create carries no geometry and allocates no PTY. After the selected view mounts,
+its real xterm is fitted against the DOM and attach uses those exact dimensions
+to create the first bound PTY. Resize, restart, and takeover likewise report the
+mounted xterm's fitted geometry. The server validates generation and controller
+authority, applies the native PTY mutation, and only then commits canonical
+geometry and the matching headless-render size.
 
 ### Stable business boundary over PTY boundary
 
@@ -63,11 +68,17 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 - Input and resize authority belong to the current controller only.
 - Takeover is an explicit handoff flow, not implicit behavior triggered by random input.
 
-### Attributed input
+### Input admission
 
-- PTY writes must carry client-side provenance before they cross the terminal client.
-- User intent, terminal-emulator replies, and replay side effects are different classes of input.
-- Replay side effects are local rendering artifacts and must never be forwarded as user stdin.
+- A hidden, pending terminal presentation accepts no local input. Input is
+  discarded rather than buffered for later delivery.
+- Keyboard auto-repeat belongs to the element that admitted its initial
+  keydown. When focus transfers from the pending presentation sink to xterm,
+  repeats inherited from a key that was already held remain discarded until
+  that key is released; a new keydown in xterm starts normal repeat admission.
+- A presented controller forwards xterm input directly through the
+  generation-bearing write operation. A viewer or stale generation cannot
+  write.
 - A terminal write result has one narrow meaning: `accepted` confirms that
   the target PTY runtime `write()` call returned normally, `rejected` means
   the current authority/binding could not accept it, and `indeterminate`
@@ -78,8 +89,8 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 ### Geometry is part of correctness
 
 - Terminal size is not a cosmetic concern.
-- Session creation, attach, resize, replay, and takeover all depend on coherent geometry.
-- Startup geometry should be a best-effort hint until a live xterm view exists.
+- Prepared creation has no business geometry. Attach, resize, recovery replay,
+  restart, and takeover all depend on coherent fitted geometry.
 - Once a controller view is mounted, PTY geometry should closely follow that view's fitted xterm geometry.
 
 ## Layering
@@ -109,7 +120,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 - Maintains the client-local projection of live sessions, selection, bells, and attach/replay orchestration state.
 - Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
 - Treats the terminal client as the transport to server truth, not as the source of truth itself.
-- Owns input provenance before writes are sent to the server.
+- Admits local input only after the selected xterm has been fully presented.
 
 ### Client view layer
 
@@ -168,14 +179,19 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
-The server implements every close source through one idempotent session close
-promise. The session remains in the authoritative manager until all pending
-spawns settle and PTY termination is acknowledged. Direct close, prune,
-detached-user cleanup, workspace-runtime cleanup, and physical-worktree quiescence
-join that same promise; they cannot detach or broadcast the session twice. A
-termination failure leaves the session addressable in `error` state so a later
-close can retry. Only process shutdown uses an explicitly forceful disposal
-path.
+Addressable close sources use one idempotent session-close promise. The session
+remains in the authoritative Directory until pending spawns settle and PTY
+termination is acknowledged. Direct close, prune, detached-user cleanup, and
+physical-worktree quiescence join that promise; a bounded termination failure
+leaves the session addressable in `error` state for an explicit later retry.
+
+Workspace-runtime invalidation is different because the entire lookup scope has
+already become invalid. It removes Directory authority synchronously and moves
+the detached binding into a resource-retirement registry. A bounded kill timeout
+does not recreate the session or start a retry loop: the registry follows the
+supervisor's durable native-exit completion until the PTY exits, or until process
+shutdown transfers all remaining processes to supervisor shutdown. This registry
+owns cleanup capability only; it is not a second session authority.
 
 This distinction matters for destructive worktree operations. The client sends
 one repository-removal intent; it does not close tabs first. The server
@@ -393,8 +409,8 @@ Control is a business concept, not just a transport detail.
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
 - Broker presence is the source of attachment online/offline state. An
-  offline controller intent projects to no effective controller, while
-  `userSticky` lets the user's next attachment auto-claim.
+  offline controller intent projects to no effective controller, so the next
+  online attachment may claim through the ordinary attach rule.
 - Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
 
 ### Why this matters
@@ -417,15 +433,18 @@ Geometry should be treated as part of terminal correctness.
 
 ### Principles
 
-- Session creation may use a lightweight host-box estimate as a startup hint.
+- Logical creation has no PTY geometry.
 - The live controller xterm is the source for fitted view geometry.
 - The server remains the source of truth for canonical PTY geometry after it accepts a controller resize.
-- Geometry should flow through create, attach, resize, restart, and takeover consistently.
+- Geometry should flow from the mounted xterm through attach, resize, restart,
+  and takeover consistently.
 
 ### Implications
 
-- Creating a PTY with a fallback size and fixing it later is still not equivalent to starting close to the visible host size.
-- Startup estimates must stay lightweight and must not duplicate xterm internals.
+- Creating a PTY with a fallback size and fixing it later is not equivalent to
+  starting at the visible host size, so the application has no startup fallback.
+- xterm's own invisible construction default is an implementation value and
+  never crosses the attach boundary.
 - Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
 - Extra defensive redraws are not a substitute for correct geometry flow.
 
@@ -433,7 +452,11 @@ Geometry should be treated as part of terminal correctness.
 
 When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at a wildly wrong column count and resizing later is still observable because the shell may lay out its prompt against the initial `$COLUMNS` before the resize settles.
 
-Before the xterm view exists, geometry is only a startup hint derived from the host box or cached canonical state. After the view opens, `FitAddon.fit()` on the real xterm instance is the authoritative client-side measurement; controller attach/resize/restart/takeover sends those fitted dimensions to the server, and the accepted server value becomes canonical session geometry.
+Before the xterm view exists, Goblin has no local geometry to report. After the
+view opens, `FitAddon.fit()` on that real xterm is the authoritative client-side
+measurement; controller attach/resize/restart/takeover sends those fitted
+dimensions to the server, and an acknowledged server mutation becomes canonical
+session geometry.
 
 ### Narrow-host multi-line prompt wrap
 
@@ -454,32 +477,22 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - Replay is a rendering concern built on top of server-owned session state.
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
 - Replay should not redefine control or session identity.
-- Replay must run inside an explicit local boundary so any terminal-emulator replies it causes can be identified as replay side effects.
-- Same-session active-view replay is not a generic repair mechanism; re-enable it only when the attribution boundary can prove replay side effects cannot reach PTY stdin.
+- Recovery replay occurs only while the local presentation is hidden and input
+  admission is closed.
+- Same-session active-view replay is not a generic repair mechanism.
 
-### Input attribution during replay
+### Input during presentation
 
-Server snapshots are serialized from the server-side headless xterm screen. Hydrating a client still means writing terminal-control sequences into local xterm, and those sequences can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot hydration they are client-created side effects of redrawing a server-authored screen, not user input.
-
-The client input pipeline therefore uses an internal envelope:
-
-- **user intent**: keyboard input, text paste, file paste/drop resolution, mobile toolbar helpers, and explicit UI command writes
-- **terminal-emulator input**: data emitted by xterm as terminal protocol traffic
-
-Input admission also depends on presentation lifecycle. While a newly created
-xterm is hidden behind the startup layout barrier (`awaiting-attach` or
-`awaiting-replay`), the client discards all input, including attributed user
-intent. It does not buffer and later flush startup keystrokes: doing so could
-deliver stale commands after a different authoritative snapshot has committed,
-and an unbounded queue would become a second input authority. Input becomes
-admissible only after attach and replay have committed and the fitted xterm has
-been revealed.
-
-Outside that hidden startup boundary, replay attribution still distinguishes
-the source of input. A replay boundary suppresses terminal-emulator protocol
-replies while allowing attributed user intent when the attached terminal is
-already presentation-ready. This keeps replay a rendering operation instead of
-a hidden stdin writer without weakening startup admission.
+The client has one presentation distinction: pending or presented. While
+pending, the xterm is hidden and every local input path is discarded. The
+client does not classify, buffer, or replay startup input. Attach/recovery data
+already available at the presentation cutoff is rendered into that fitted
+xterm; a fresh stream is allowed to have no output. A full-viewport xterm
+render event and a final synchronous fit proposal confirm the frame before
+reveal. First output is not a shell-readiness signal. Only the presented
+controller can then send generation-bearing writes. Focus transfer
+does not re-admit auto-repeat whose original keydown occurred on the pending
+focus sink; only a keydown observed by the presented xterm owns later repeats.
 
 ### Fresh stream and recovery frame contract
 
@@ -498,23 +511,35 @@ The protocol therefore distinguishes startup from recovery:
   `frame: 'stream'`. The client does not reset or replay xterm; raw output begins
   at sequence 1 through realtime.
 - If the PTY already exists, attach returns `frame: 'snapshot'` with
-  `snapshot`, `snapshotSeq`, and `outputEra`. The client replays that recovery
+  `snapshot` and `snapshotSeq`. The client replays that recovery
   frame and then applies later realtime output.
-- Restart always returns a snapshot frame because it replaces an existing
-  binding and establishes an explicit reset boundary.
+- Restart creates a new PTY generation with no missed history and therefore
+  returns `frame: 'stream'`, just like the first prepared attach.
 
-The realtime socket is paused while attach is processed. For a stream frame the
-response is sent first and the buffer is resumed without dropping output, so
-sequence 1 cannot race ahead of the binding metadata. For a snapshot frame,
-buffered output at or before the snapshot checkpoint is dropped and only later
-output is flushed. A concurrent attach that did not initiate the fresh spawn is
-treated as recovery and receives a snapshot.
+The realtime socket is paused while attach or restart is processed. For a
+stream frame the response is sent first and the buffer is resumed without
+dropping output, so sequence 1 cannot race ahead of binding metadata. For a
+snapshot frame, buffered output at or before the snapshot checkpoint is dropped
+and only later output is flushed. A concurrent attach that did not initiate the
+fresh spawn is recovery and receives a snapshot.
 
-This is the same lifecycle split used by VS Code: create the client terminal and
-know its dimensions before starting a fresh process, stream fresh process data
-directly, and reserve serializer replay for persistent or revived processes.
-The server-side headless xterm remains authoritative for recovery; Server First
-does not imply Snapshot First.
+The headless render chain serializes snapshot bytes and reads `snapshotSeq` in
+one ordered step. Output queued before that step is included in both; output
+queued after it remains realtime data. If a headless write or resize fails,
+recovery for that generation fails instead of returning a screen/checkpoint
+pair that may disagree. This does not pretend that the still-running PTY has
+exited; the current stream remains open and restart creates a new recoverable
+generation.
+
+The relevant VS Code lifecycle split is similar but not identical: it constructs
+xterm before process creation, waits on a container-ready barrier, streams fresh
+process data directly, and reserves serializer replay for persistent or revived
+processes. VS Code's barrier can auto-open and its process path can still use
+last-known or default grid dimensions when a real container is unavailable.
+Goblin intentionally does not copy that geometry fallback: here the first size
+crosses a network boundary and becomes the server PTY's canonical geometry.
+Only the structural split is shared. The server-side headless xterm remains
+authoritative for recovery; Server First does not imply Snapshot First.
 
 VS Code also batches process data briefly to reduce renderer messages. That is a
 transport optimization, not a prompt-readiness contract. This implementation
@@ -537,17 +562,17 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 ### Non-streaming flows
 
 - session service reads
-- metadata/frame handshakes for create, attach, and restart
+- logical-session metadata for create and frame handshakes for attach/restart
 - explicit mutations such as resize, takeover, close, and reorder
 
 ### Design rule
 
 Use realtime streaming where the user experience requires continuity.
-Use targeted request/response flows for mutations. A fresh attach orders its
-metadata response before undropped realtime output; a recovery or restart
-response carries the server snapshot and its output checkpoint. Control-only
-mutations such as takeover apply role/lifecycle state synchronously, while any
-later view recreation goes through the ordinary attach frame decision.
+Use targeted request/response flows for mutations. A fresh attach or restart
+orders its metadata response before undropped realtime output; only recovery
+attach carries a server snapshot and output checkpoint. Control-only mutations
+such as takeover apply role/lifecycle state synchronously, while later view
+recreation goes through the ordinary attach frame decision.
 
 ## State model
 

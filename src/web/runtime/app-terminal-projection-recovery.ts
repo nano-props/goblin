@@ -20,14 +20,13 @@ export interface AppTerminalProjectionRecoveryDependencies {
   beginHydration: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
   markReady: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
   markFailed: (workspaceId: WorkspaceId, workspaceRuntimeId: string, errorMessage: string) => void
-  shouldRefresh: (workspaceId: WorkspaceId) => boolean
+  isFocusRefreshDue: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => boolean
   logFailure: (error: unknown) => void
 }
 
-export interface TerminalProjectionRecoveryOptions {
-  resynchronizeConnectedViews?: boolean
-  minimumRevision?: number
-}
+export type TerminalProjectionRecoveryRequirement =
+  | { kind: 'minimum-revision'; revision: number }
+  | { kind: 'reconnect' }
 
 export class AppTerminalProjectionRecovery {
   private readonly dependencies: AppTerminalProjectionRecoveryDependencies
@@ -43,16 +42,17 @@ export class AppTerminalProjectionRecovery {
     })
   }
 
-  shouldRefresh(workspaceId: WorkspaceId): boolean {
-    return this.dependencies.shouldRefresh(workspaceId)
+  isFocusRefreshDue(target: RuntimeProjectionTarget): boolean {
+    return this.dependencies.isFocusRefreshDue(target.workspaceId, target.workspaceRuntimeId)
   }
 
-  request(scope: RuntimeProjectionScope, options: TerminalProjectionRecoveryOptions = {}): void {
+  request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void {
     const clientId = this.dependencies.readClientId()
+    const reconnect = requirement.kind === 'reconnect'
     this.coordinator.request({
       scope,
-      minimumRevision: options.minimumRevision ?? 0,
-      refresh: options.minimumRevision === undefined,
+      minimumRevision: reconnect ? 0 : requirement.revision,
+      freshness: reconnect ? 'after-current' : 'join-current',
       recover: async () => await this.dependencies.recoverSessions(scope.target),
       accept: (catalog) => {
         if (!scope.isActive()) return { kind: 'inactive' }
@@ -72,7 +72,7 @@ export class AppTerminalProjectionRecovery {
       complete: () => {
         this.dependencies.markReady(scope.target.workspaceId, scope.target.workspaceRuntimeId)
       },
-      afterAccept: options.resynchronizeConnectedViews
+      afterAccept: reconnect
         ? () =>
             this.dependencies.projection.resynchronizeConnectedViews(
               scope.target.workspaceId,

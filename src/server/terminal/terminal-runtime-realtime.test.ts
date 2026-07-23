@@ -13,7 +13,7 @@ function makeTerminalActionHost(overrides: Partial<ServerTerminalActionHost>): S
     attach: async () => ({ ok: false, message: 'not configured' }),
     restart: async () => ({ ok: false, message: 'not configured' }),
     write: async () => ({ status: 'rejected' }),
-    resize: () => false,
+    resize: () => ({ ok: false, message: 'not configured' }),
     takeover: () => ({ ok: false, message: 'not configured' }),
     close: () => false,
     listSessions: () => [],
@@ -50,7 +50,11 @@ describe('terminal realtime handlers', () => {
           type: 'request',
           requestId: `request-${status}`,
           action: 'write',
-          input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'input' },
+          input: {
+            terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+            terminalRuntimeGeneration: 1,
+            data: 'input',
+          },
         },
       )
 
@@ -82,7 +86,6 @@ describe('terminal realtime handlers', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'prompt',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -102,8 +105,7 @@ describe('terminal realtime handlers', () => {
           phase: 'open' as const,
           message: null,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
@@ -118,7 +120,12 @@ describe('terminal realtime handlers', () => {
         type: 'request',
         requestId: 'request-fresh-attach',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 0,
+          cols: 100,
+          rows: 30,
+        },
       },
     )
 
@@ -150,7 +157,6 @@ describe('terminal realtime handlers', () => {
               terminalRuntimeGeneration: 1,
               terminalSessionId: 'term-111111111111111111111',
               data: 'included',
-              outputEra: 0,
               seq: 1,
               processName: 'zsh',
             },
@@ -168,10 +174,8 @@ describe('terminal realtime handlers', () => {
           message: null,
           snapshot: 'included',
           snapshotSeq: 1,
-          outputEra: 0,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
@@ -186,7 +190,12 @@ describe('terminal realtime handlers', () => {
         type: 'request',
         requestId: 'request-snapshot-attach',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          cols: 100,
+          rows: 30,
+        },
       },
     )
 
@@ -210,7 +219,7 @@ describe('terminal realtime handlers', () => {
         buffered.send(sessionsChanged)
         return {
           ok: true as const,
-          frame: 'snapshot' as const,
+          frame: 'stream' as const,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 6 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 2,
@@ -218,12 +227,8 @@ describe('terminal realtime handlers', () => {
           canonicalTitle: null,
           phase: 'open' as const,
           message: null,
-          snapshot: 'prompt',
-          snapshotSeq: 1,
-          outputEra: 1,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
@@ -238,14 +243,19 @@ describe('terminal realtime handlers', () => {
         type: 'request',
         requestId: 'request-restart',
         action: 'restart',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          cols: 100,
+          rows: 30,
+        },
       },
     )
 
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
       action: 'restart',
-      payload: { terminalProjectionEffect: { kind: 'delta', revision: 6 } },
+      payload: { frame: 'stream', terminalProjectionEffect: { kind: 'delta', revision: 6 } },
     })
     expect(sent[1]).toBe(sessionsChanged)
   })

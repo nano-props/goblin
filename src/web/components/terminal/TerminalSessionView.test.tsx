@@ -12,6 +12,7 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
+  TerminalFocusRequest,
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalSnapshot,
@@ -20,6 +21,7 @@ import type {
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
+import { TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -179,18 +181,10 @@ async function renderTerminalSession() {
     processName: 'zsh',
     attachment: {
       role: 'controller' as const,
-      controllerStatus: 'connected' as const,
-      active: true,
-      canTakeover: false,
-      canonicalCols: 120,
-      canonicalRows: 40,
-      phase: 'open' as const,
     },
   }
   const context: TerminalSessionContextValue = terminalSessionContextForTest({
     createTerminal: async () => 'term-111111111111111111111',
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
@@ -199,11 +193,10 @@ async function renderTerminalSession() {
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput,
+    captureInputWriter: (terminalSessionId) => (data) => writeInput(terminalSessionId, data),
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
   })
@@ -264,6 +257,10 @@ function dropDataWithFiles(files: File[]): DataTransfer {
   } as unknown as DataTransfer
 }
 
+function captureInputWriterForTest(writeInput: (terminalSessionId: string, data: string) => void) {
+  return (terminalSessionId: string) => (data: string) => writeInput(terminalSessionId, data)
+}
+
 /**
  * Build a `DataTransfer`-shaped object with both a `files` collection
  * and `getData('text/plain')`. The session's capture-phase paste handler
@@ -303,7 +300,11 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
-  test('attaches the explicit terminal session before projection selection catches up', async () => {
+  test('attaches and fulfils focus for the explicit routed session before projection selection catches up', async () => {
+    const focusSink = document.createElement('div')
+    focusSink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+    focusSink.tabIndex = -1
+    document.body.appendChild(focusSink)
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
       terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -342,18 +343,12 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
       },
     }
     const attach = vi.fn()
+    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -362,13 +357,11 @@ describe('TerminalSessionView', () => {
       attach,
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
-      focusTerminal: vi.fn(),
+      focusTerminal,
     })
     const readContext: TerminalSessionReadContextValue = {
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
@@ -406,8 +399,14 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({ terminalSessionId: 'term-111111111111111111111' }),
         expect.any(HTMLDivElement),
       )
+      expect(focusTerminal).toHaveBeenCalledOnce()
+      expect(focusTerminal).toHaveBeenCalledWith(
+        'term-222222222222222222222',
+        expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+      )
     } finally {
       unmount()
+      focusSink.remove()
     }
   })
 
@@ -441,11 +440,6 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
       },
     }
     const attach = vi.fn()
@@ -453,8 +447,6 @@ describe('TerminalSessionView', () => {
     const filesystemTargetListeners = new Set<() => void>()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -463,11 +455,9 @@ describe('TerminalSessionView', () => {
       attach,
       detach,
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -560,18 +550,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'viewer' as const,
-        controllerStatus: 'connected' as const,
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -580,11 +562,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
     })
@@ -641,8 +621,6 @@ describe('TerminalSessionView', () => {
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -651,11 +629,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -719,8 +695,6 @@ describe('TerminalSessionView', () => {
     const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -729,11 +703,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -780,8 +752,6 @@ describe('TerminalSessionView', () => {
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: vi.fn(),
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -790,11 +760,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -830,7 +798,7 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('focuses the controller terminal after the ready render shows the host', async () => {
+  test('does not create an unversioned focus intent when runtime readiness changes', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
       terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -862,19 +830,11 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const focusTerminal = vi.fn()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -883,11 +843,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
     })
@@ -925,13 +883,12 @@ describe('TerminalSessionView', () => {
 
       const readyHost = container.querySelector('.goblin-terminal-session__host')
       expect(readyHost?.classList.contains('goblin-terminal-session__host--hidden')).toBe(false)
-      expect(focusTerminal).toHaveBeenCalledTimes(1)
-      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(focusTerminal).not.toHaveBeenCalled()
 
       activeSnapshot = { ...openSnapshot, takeoverPending: true }
       rerender(tree())
 
-      expect(focusTerminal).toHaveBeenCalledTimes(1)
+      expect(focusTerminal).not.toHaveBeenCalled()
     } finally {
       unmount()
     }
@@ -969,19 +926,11 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const focusTerminal = vi.fn()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -990,11 +939,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
     })
@@ -1046,11 +993,7 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('error phase as a viewer shows the takeover path, not the restart button', async () => {
-    // Regression for the previous two-flag gating where a viewer in
-    // error phase would see neither the viewer overlay (open-gated)
-    // nor the correctly-gated error chip, leaving the dead restart
-    // button visible.
+  test('error phase as a viewer is readonly without impossible takeover or restart actions', async () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
@@ -1083,18 +1026,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'viewer' as const,
-        controllerStatus: 'connected' as const,
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'error' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1103,11 +1038,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart,
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
     })
@@ -1134,18 +1067,14 @@ describe('TerminalSessionView', () => {
     )
 
     try {
-      // Viewer overlay is the primary affordance, with a takeover
-      // button that the user must click before they can restart.
-      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeTruthy()
+      expect(container.querySelector('.goblin-terminal-session__viewer-overlay')).toBeNull()
       const takeoverButton = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )
-      expect(takeoverButton).toBeDefined()
+      expect(takeoverButton).toBeUndefined()
 
-      // The error chip with its restart button must NOT render for
-      // a viewer — that button would silently no-op on the server.
       const errorChips = container.querySelectorAll('.goblin-terminal-session__status-overlay--error')
-      expect(errorChips).toHaveLength(0)
+      expect(errorChips).toHaveLength(1)
       const restartButton = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.restart',
       )
@@ -1198,18 +1127,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'viewer' as const,
-        controllerStatus: 'connected' as const,
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1218,11 +1139,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -1312,18 +1232,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1332,11 +1244,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -1391,7 +1302,7 @@ describe('TerminalSessionView', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/shot with space.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/shot with space.png'")
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1443,18 +1354,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'viewer' as const,
-        controllerStatus: 'connected' as const,
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1463,11 +1366,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -1545,18 +1447,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1565,11 +1459,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -1615,11 +1508,7 @@ describe('TerminalSessionView', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith(
-        'term-111111111111111111111',
-        "'/resolved/weird name & space.png'",
-        'paste',
-      )
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/weird name & space.png'")
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       unmount()
@@ -1663,18 +1552,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1683,11 +1564,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -1770,7 +1650,7 @@ describe('TerminalSessionView', () => {
     try {
       await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/safe-name.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/safe-name.png'")
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1881,11 +1761,7 @@ describe('TerminalSessionView', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith(
-        'term-111111111111111111111',
-        "'/abs/a.png' '/tmp/b.png'",
-        'paste',
-      )
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'")
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1933,18 +1809,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -1953,11 +1821,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -2014,7 +1881,7 @@ describe('TerminalSessionView', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'")
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -2086,18 +1953,10 @@ describe('TerminalSessionView', () => {
       processName: 'zsh',
       attachment: {
         role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        active: true,
-        canTakeover: false,
-        canonicalCols: 120,
-        canonicalRows: 40,
-        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -2106,11 +1965,10 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput,
+      captureInputWriter: captureInputWriterForTest(writeInput),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -2192,7 +2050,7 @@ describe('TerminalSessionView', () => {
         await new Promise((r) => setTimeout(r, 0))
       })
 
-      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/a.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/a.png'")
     } finally {
       unmount()
     }
@@ -2215,8 +2073,6 @@ describe('TerminalSessionView', () => {
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal,
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -2225,11 +2081,9 @@ describe('TerminalSessionView', () => {
       attach: vi.fn(),
       detach: vi.fn(),
       restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       clearSearch: vi.fn(),
-      writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -2337,7 +2191,7 @@ describe('TerminalSessionView', () => {
       const event = await dispatchPasteWithText(rendered.sessionRoot, 'file:///home/user/foo.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/home/user/foo.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/home/user/foo.png'")
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
@@ -2359,11 +2213,7 @@ describe('TerminalSessionView', () => {
       const event = await dispatchPasteWithText(rendered.sessionRoot, 'C:\\Users\\me\\bar.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith(
-        'term-111111111111111111111',
-        "'C:\\Users\\me\\bar.png'",
-        'paste',
-      )
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'C:\\Users\\me\\bar.png'")
     } finally {
       await rendered.cleanup()
     }

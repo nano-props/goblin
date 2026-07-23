@@ -1,12 +1,8 @@
 import { BufferedRealtimeSocket } from '#/server/realtime/buffered-realtime-socket.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
+import type { TerminalOutputCheckpoint } from '#/shared/terminal-types.ts'
 
-export interface AppRealtimeOutputFlushBoundary {
-  terminalRuntimeSessionId: string
-  terminalRuntimeGeneration: number
-  outputEra: number
-  seq: number
-}
+export type AppRealtimeOutputFlushBoundary = TerminalOutputCheckpoint
 
 export type AppRealtimeOutputFlushBoundaryContext =
   AppRealtimeOutputFlushBoundary | readonly AppRealtimeOutputFlushBoundary[]
@@ -32,7 +28,6 @@ export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtim
     if (!event) return false
     const boundary = this.flushBoundaryByRuntimeBinding.get(runtimeBindingKey(event))
     if (!boundary) return false
-    if (event.outputEra !== boundary.outputEra) return event.outputEra < boundary.outputEra
     return event.seq <= boundary.seq
   }
 
@@ -49,9 +44,7 @@ export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtim
   }
 }
 
-function parseTerminalOutputEvent(
-  payload: string,
-): { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number; outputEra: number; seq: number } | null {
+function parseTerminalOutputEvent(payload: string): TerminalOutputCheckpoint | null {
   try {
     const parsed = JSON.parse(payload) as unknown
     if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) return null
@@ -61,22 +54,19 @@ function parseTerminalOutputEvent(
     const maybeEvent = event as {
       terminalRuntimeSessionId?: unknown
       terminalRuntimeGeneration?: unknown
-      outputEra?: unknown
       seq?: unknown
     }
     if (
       typeof maybeEvent.terminalRuntimeSessionId !== 'string' ||
       !Number.isSafeInteger(maybeEvent.terminalRuntimeGeneration) ||
-      typeof maybeEvent.outputEra !== 'number' ||
-      typeof maybeEvent.seq !== 'number'
+      !Number.isSafeInteger(maybeEvent.seq)
     ) {
       return null
     }
     return {
       terminalRuntimeSessionId: maybeEvent.terminalRuntimeSessionId,
       terminalRuntimeGeneration: maybeEvent.terminalRuntimeGeneration as number,
-      outputEra: maybeEvent.outputEra,
-      seq: maybeEvent.seq,
+      seq: maybeEvent.seq as number,
     }
   } catch {
     return null
@@ -87,7 +77,6 @@ function normalizeBoundary(boundary: AppRealtimeOutputFlushBoundary): AppRealtim
   return {
     terminalRuntimeSessionId: boundary.terminalRuntimeSessionId,
     terminalRuntimeGeneration: boundary.terminalRuntimeGeneration,
-    outputEra: normalizeOutputNumber(boundary.outputEra),
     seq: normalizeOutputNumber(boundary.seq),
   }
 }
@@ -97,7 +86,6 @@ function runtimeBindingKey(binding: { terminalRuntimeSessionId: string; terminal
 }
 
 function isCheckpointAfter(next: AppRealtimeOutputFlushBoundary, current: AppRealtimeOutputFlushBoundary): boolean {
-  if (next.outputEra !== current.outputEra) return next.outputEra > current.outputEra
   return next.seq > current.seq
 }
 

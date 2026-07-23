@@ -10,6 +10,7 @@ import {
   useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
@@ -29,7 +30,7 @@ function CommandProbe() {
 }
 
 function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
-  return {
+  return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: 'term-111111111111111111111',
@@ -38,8 +39,6 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
       runtimeProjectionApplied: false,
       requestRole: 'leader',
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
@@ -49,14 +48,12 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
     detach: vi.fn(),
     restart: vi.fn(),
     focusTerminal: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput: vi.fn(),
     takeover: vi.fn(async () => false),
     ...overrides,
-  }
+  })
 }
 
 describe('useTerminalSessionContext', () => {

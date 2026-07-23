@@ -4,99 +4,130 @@ import { terminalLog } from '#/web/logger.ts'
 
 export interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
 }
 
 type TerminalRenderQueueEntry =
   | {
       kind: 'replace'
-      term: XTermTerminal
       data: string
       checkpoint: RenderedOutputCheckpoint
       resolve: (applied: boolean) => void
-      reject: (err: unknown) => void
+      reject: (error: unknown) => void
+      settled: boolean
+      revision: number
     }
   | {
       kind: 'append'
-      term: XTermTerminal
       data: string
       checkpoint: RenderedOutputCheckpoint
+      resolve: (applied: boolean) => void
+      settled: boolean
+      revision: number
     }
 
 interface TerminalRenderQueueOptions {
-  isCurrentTerm: (term: XTermTerminal) => boolean
+  isCurrent: () => boolean
   isCheckpointRendered: (checkpoint: RenderedOutputCheckpoint) => boolean
   markOutputRendered: (checkpoint: RenderedOutputCheckpoint) => void
 }
 
 export class TerminalRenderQueue {
-  private running = false
+  private readonly term: XTermTerminal
+  private active: TerminalRenderQueueEntry | null = null
   private entries: TerminalRenderQueueEntry[] = []
   private readonly options: TerminalRenderQueueOptions
-  private generation = 0
+  private revision = 0
 
-  constructor(options: TerminalRenderQueueOptions) {
+  constructor(term: XTermTerminal, options: TerminalRenderQueueOptions) {
+    this.term = term
     this.options = options
   }
 
-  replace(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
-    this.generation += 1
+  replace(data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
     this.clear()
     return new Promise<boolean>((resolve, reject) => {
-      this.entries.push({ kind: 'replace', term, data, checkpoint, resolve, reject })
+      this.entries.push({
+        kind: 'replace',
+        data,
+        checkpoint,
+        resolve,
+        reject,
+        settled: false,
+        revision: this.revision,
+      })
       this.pump()
     })
   }
 
-  append(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): void {
-    if (!data) return
-    this.entries.push({ kind: 'append', term, data, checkpoint })
-    this.pump()
+  append(data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
+    if (!data) return Promise.resolve(true)
+    return new Promise<boolean>((resolve) => {
+      this.entries.push({
+        kind: 'append',
+        data,
+        checkpoint,
+        resolve,
+        settled: false,
+        revision: this.revision,
+      })
+      this.pump()
+    })
   }
 
   clear(): void {
-    this.generation += 1
-    const queued = this.entries.splice(0)
-    for (const entry of queued) {
-      if (entry.kind === 'replace') entry.resolve(false)
-    }
+    this.revision += 1
+    for (const entry of this.entries.splice(0)) this.settle(entry, false)
+    if (this.active) this.settle(this.active, false)
   }
 
   private pump(): void {
-    if (this.running) return
+    if (this.active) return
     const entry = this.entries.shift()
     if (!entry) return
-    this.running = true
-    const generation = this.generation
-    void this.run(entry, generation)
-      .then((applied) => {
-        if (entry.kind === 'replace') entry.resolve(applied)
-      })
-      .catch((err) => {
-        if (entry.kind === 'replace') entry.reject(err)
-        else terminalLog.warn('failed to append terminal output', { err })
+    this.active = entry
+    void this.run(entry)
+      .then((applied) => this.settle(entry, applied))
+      .catch((error) => {
+        if (entry.kind === 'replace') this.reject(entry, error)
+        else {
+          terminalLog.warn('failed to append terminal output', { error })
+          this.settle(entry, false)
+        }
       })
       .finally(() => {
-        this.running = false
+        if (this.active === entry) this.active = null
         this.pump()
       })
   }
 
-  private async run(entry: TerminalRenderQueueEntry, generation: number): Promise<boolean> {
-    if (!this.options.isCurrentTerm(entry.term)) return false
+  private async run(entry: TerminalRenderQueueEntry): Promise<boolean> {
+    if (!this.isCurrent(entry)) return false
     if (entry.kind === 'replace') {
-      entry.term.reset()
-      if (entry.data) await termWrite(entry.term, entry.data)
-      if (this.isCurrentEntry(entry.term, generation)) this.options.markOutputRendered(entry.checkpoint)
-      return this.isCurrentEntry(entry.term, generation)
+      this.term.reset()
+      if (entry.data) await termWrite(this.term, entry.data)
+    } else {
+      if (this.options.isCheckpointRendered(entry.checkpoint)) return true
+      await termWrite(this.term, entry.data)
     }
-    if (this.options.isCheckpointRendered(entry.checkpoint)) return true
-    await termWrite(entry.term, entry.data)
-    if (this.isCurrentEntry(entry.term, generation)) this.options.markOutputRendered(entry.checkpoint)
-    return this.isCurrentEntry(entry.term, generation)
+    if (this.isCurrent(entry)) this.options.markOutputRendered(entry.checkpoint)
+    return this.isCurrent(entry)
   }
 
-  private isCurrentEntry(term: XTermTerminal, generation: number): boolean {
-    return this.generation === generation && this.options.isCurrentTerm(term)
+  private isCurrent(entry: TerminalRenderQueueEntry): boolean {
+    return this.revision === entry.revision && this.options.isCurrent()
+  }
+
+  private settle(entry: TerminalRenderQueueEntry, applied: boolean): void {
+    if (entry.settled) return
+    entry.settled = true
+    entry.resolve(applied)
+  }
+
+  private reject(entry: Extract<TerminalRenderQueueEntry, { kind: 'replace' }>, error: unknown): void {
+    if (entry.settled) return
+    entry.settled = true
+    entry.reject(error)
   }
 }
 

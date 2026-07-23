@@ -45,8 +45,6 @@ describe('health routes', () => {
           lastFailure: null,
         },
         liveSessionCount: 1,
-        totalRingBufferChars: 100,
-        maxRingBufferChars: 100,
       },
     } satisfies ServerAppRealtimeDiagnostics)
 

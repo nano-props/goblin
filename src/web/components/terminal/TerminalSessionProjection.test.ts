@@ -78,8 +78,7 @@ function makeServerSession(
     canonicalTitle: string | null
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
-    cols: number
-    rows: number
+    canonicalSize: { cols: number; rows: number } | null
     workspaceRuntimeId: string
   }> = {},
 ): TerminalSessionSummary {
@@ -94,8 +93,7 @@ function makeServerSession(
     canonicalTitle: overrides.canonicalTitle ?? null,
     phase: overrides.phase ?? 'open',
     message: overrides.message ?? null,
-    cols: overrides.cols ?? 80,
-    rows: overrides.rows ?? 24,
+    canonicalSize: overrides.canonicalSize ?? { cols: 80, rows: 24 },
   }
 }
 
@@ -390,7 +388,6 @@ describe('TerminalSessionProjection', () => {
         ...contradictoryIdentity,
         data: 'must not be routed',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       projection.handleServerBell({
@@ -413,14 +410,12 @@ describe('TerminalSessionProjection', () => {
         ...contradictoryIdentity,
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       })
       projection.handleLifecycle({
         ...contradictoryIdentity,
         phase: 'open',
         message: null,
-        takeoverPending: false,
       })
       projection.handleSessionClosed(contradictoryIdentity)
 
@@ -452,7 +447,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -463,7 +457,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -489,7 +482,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       vi.advanceTimersByTime(5000)
@@ -499,7 +491,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 2,
-        outputEra: 0,
         processName: 'bash',
       })
 
@@ -525,7 +516,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'stale output',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
 
@@ -660,7 +650,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -671,8 +660,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       })
       expect(handleIdentitySpy).toHaveBeenCalledTimes(1)
 
@@ -682,7 +670,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         phase: 'open',
         message: null,
-        takeoverPending: false,
       })
       expect(handleLifecycleSpy).toHaveBeenCalledTimes(1)
 
@@ -1568,7 +1555,9 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
     const session = requiredTerminalSession(localProjection, terminalSessionId)
-    terminalSessionRuntimeAccess(session).runtime.failRuntime('error.restart-failed')
+    const restartAttempt = terminalSessionRuntimeAccess(session).runtime.prepareRestart()
+    if (!restartAttempt) throw new Error('expected restart attempt')
+    terminalSessionRuntimeAccess(session).runtime.failStartAttempt(restartAttempt, 'error.restart-failed')
 
     localProjection.handleExit({
       terminalRuntimeSessionId,
@@ -1621,11 +1610,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
@@ -1673,11 +1658,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1741,11 +1722,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)

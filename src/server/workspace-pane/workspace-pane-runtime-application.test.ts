@@ -54,8 +54,6 @@ const request = {
   worktreePath: '/repo/worktree',
   target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
   kind: 'primary' as const,
-  cols: 100,
-  rows: 30,
   clientId: 'client-test',
 }
 const paneTabsSnapshot = { revision: 1, entries: [] }
@@ -228,8 +226,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
       {
         kind: request.kind,
         startupShellCommand: undefined,
-        cols: request.cols,
-        rows: request.rows,
         target: request.target,
       },
       { physicalWorktreeCapability, permit: expect.any(Object) },
@@ -956,14 +952,13 @@ function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-    terminalRuntimeGeneration: 1,
-    processName: 'zsh',
+    terminalRuntimeGeneration: 0,
+    processName: '',
     canonicalTitle: null,
-    phase: 'open' as const,
+    phase: 'opening' as const,
     message: null,
-    controller: { clientId: 'client-test', status: 'connected' as const },
-    canonicalCols: 100,
-    canonicalRows: 30,
+    controller: null,
+    canonicalSize: null,
   }
 }
 
@@ -992,8 +987,7 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
     canonicalTitle: null,
     phase: 'open' as const,
     message: null,
-    cols: 100,
-    rows: 30,
+    canonicalSize: { cols: 100, rows: 30 },
   }
 }
 

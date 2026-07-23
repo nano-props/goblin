@@ -1,14 +1,13 @@
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   appendOutput,
   applyTerminalTitle,
   createEmptyTerminalRenderState,
   disposeRender,
-  resetRender,
+  replaySnapshot,
   resizeRender,
-  takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 
@@ -20,7 +19,7 @@ describe('terminal-render-state', () => {
   })
 
   function createState(): TerminalRenderState {
-    const state = createEmptyTerminalRenderState()
+    const state = createEmptyTerminalRenderState(80, 24)
     states.push(state)
     return state
   }
@@ -40,98 +39,16 @@ describe('terminal-render-state', () => {
   }
 
   describe('appendOutput', () => {
-    test('increments sequence and appends data without truncation when under limit', () => {
+    test('increments the output sequence for each chunk', () => {
       const state = createRawOnlyState()
       const first = appendOutput(state, 'hello')
       expect(first.seq).toBe(1)
       expect(first).toMatchObject({ controlEvents: [] })
       expect(state.sequence).toBe(1)
-      expect(state.buffer).toBe('hello')
-      expect(state.bufferTruncated).toBe(false)
 
       const second = appendOutput(state, ' world')
       expect(second.seq).toBe(2)
       expect(state.sequence).toBe(2)
-      expect(state.buffer).toBe('hello world')
-    })
-
-    test('truncates the buffer to the last 16 MB and sets the truncated flag', () => {
-      const state = createRawOnlyState()
-      const big = 'a'.repeat(20 * 1024 * 1024) // 20 MB
-      appendOutput(state, big)
-      expect(state.buffer.length).toBeLessThanOrEqual(16 * 1024 * 1024 + 10) // allow a small margin for the reset prefix
-      expect(state.bufferTruncated).toBe(true)
-    })
-
-    test('keeps the tail end of a long buffer (recent data is preserved)', () => {
-      const state = createRawOnlyState()
-      const prefix = 'x'.repeat(5 * 1024 * 1024)
-      const suffix = 'tail-marker-12345'
-      appendOutput(state, prefix + suffix)
-      expect(state.buffer).toContain(suffix)
-    })
-
-    test('prefixes the truncated tail with a reset so the replay is safe to apply', () => {
-      const state = createRawOnlyState()
-      const big = 'a'.repeat(20 * 1024 * 1024)
-      appendOutput(state, big)
-      // After truncation, the head is an ANSI reset so any truncated SGR
-      // sequences from the cut point don't bleed into the replayed state.
-      expect(state.buffer.startsWith('\x1b[0m')).toBe(true)
-    })
-
-    test('does not break surrogate pairs at the truncation boundary', () => {
-      const state = createRawOnlyState()
-      // Build a string where a surrogate pair sits exactly at the 16 MB boundary
-      const pad = 'a'.repeat(16 * 1024 * 1024 - 1)
-      const pair = '\uD83D\uDE00' // 😀
-      appendOutput(state, pad + pair + 'tail')
-      expect(state.buffer).toContain('tail')
-      // The high or low surrogate must not be left dangling at the start of the tail
-      const tailStart = state.buffer.indexOf('\x1b[0m') + 4
-      const firstCode = state.buffer.charCodeAt(tailStart)
-      const isLoneLow = firstCode >= 0xdc00 && firstCode <= 0xdfff
-      expect(isLoneLow).toBe(false)
-    })
-
-    test('strips an incomplete CSI sequence at the truncation boundary', () => {
-      const state = createRawOnlyState()
-      // \x1b[31m sets red; truncate so tail starts inside the sequence
-      const pad = 'a'.repeat(16 * 1024 * 1024 - 3)
-      appendOutput(state, pad + '\x1b[31mred-text')
-      const afterReset = state.buffer.slice(4) // after \x1b[0m
-      expect(afterReset.startsWith('\x1b[')).toBe(false)
-      expect(state.buffer).toContain('red-text')
-    })
-
-    test('preserves a complete CSI sequence at the truncation boundary', () => {
-      const state = createRawOnlyState()
-      const pad = 'a'.repeat(16 * 1024 * 1024 - 10)
-      appendOutput(state, pad + '\x1b[38;2;255;0;0mcolor')
-      expect(state.buffer).toContain('color')
-    })
-
-    test('prefers a line boundary for a clean visual cut', () => {
-      const state = createRawOnlyState()
-      const line1 = 'first-line\n'
-      const line2 = 'second-line\n'
-      const line3 = 'third-line-tail'
-      const pad = 'x'.repeat(16 * 1024 * 1024 - line1.length - line2.length - line3.length + 1)
-      appendOutput(state, pad + line1 + line2 + line3)
-      const afterReset = state.buffer.slice(4) // after \x1b[0m
-      expect(afterReset.startsWith('second-line')).toBe(true)
-    })
-
-    test('handles a lone trailing ESC at the truncation boundary', () => {
-      const state = createRawOnlyState()
-      // Fill the buffer with content ending in a bare ESC. The
-      // truncation boundary must not leave `\x1b` as the very first
-      // character of the tail, since that would be a malformed escape
-      // for the client to parse.
-      const pad = 'a'.repeat(16 * 1024 * 1024)
-      appendOutput(state, pad + '\x1b')
-      const afterReset = state.buffer.slice(4)
-      expect(afterReset.charCodeAt(0)).not.toBe(0x1b)
     })
 
     test('returns title control events without applying title state', () => {
@@ -142,6 +59,37 @@ describe('terminal-render-state', () => {
       applyTerminalTitle(state, 'deferred')
       expect(state.title).toBe('deferred')
     })
+  })
+
+  test('normalizes serializer failure to an unavailable snapshot', async () => {
+    const state = createState()
+    state.screen.serializer.serialize = () => {
+      throw new Error('serializer unavailable')
+    }
+
+    await expect(replaySnapshot(state)).resolves.toBeNull()
+  })
+
+  test('marks recovery unavailable when headless output application fails', async () => {
+    const state = createState()
+    vi.spyOn(state.screen.terminal, 'write').mockImplementation(() => {
+      throw new Error('headless write failed')
+    })
+
+    appendOutput(state, 'unapplied output')
+
+    await expect(replaySnapshot(state)).resolves.toBeNull()
+  })
+
+  test('marks recovery unavailable when headless resize application fails', async () => {
+    const state = createState()
+    vi.spyOn(state.screen.terminal, 'resize').mockImplementation(() => {
+      throw new Error('headless resize failed')
+    })
+
+    resizeRender(state, 100, 30)
+
+    await expect(replaySnapshot(state)).resolves.toBeNull()
   })
 
   describe('title extraction', () => {
@@ -259,7 +207,7 @@ describe('terminal-render-state', () => {
     })
   })
 
-  describe('takeSnapshot', () => {
+  describe('replaySnapshot', () => {
     test('loads and serializes under Node ESM runtime interop', () => {
       const moduleUrl = pathToFileURL(`${process.cwd()}/src/server/terminal/terminal-render-state.ts`).href
       const result = spawnSync(
@@ -272,11 +220,11 @@ describe('terminal-render-state', () => {
               appendOutput,
               createEmptyTerminalRenderState,
               disposeRender,
-              takeSnapshot,
+              replaySnapshot,
             } from ${JSON.stringify(moduleUrl)}
-            const state = createEmptyTerminalRenderState()
+            const state = createEmptyTerminalRenderState(80, 24)
             appendOutput(state, 'ok')
-            const snap = await takeSnapshot(state)
+            const snap = await replaySnapshot(state)
             disposeRender(state)
             if (!snap || snap.snapshot !== 'ok' || snap.snapshotSeq !== 1) {
               throw new Error(JSON.stringify(snap))
@@ -289,80 +237,35 @@ describe('terminal-render-state', () => {
       expect(result.status).toBe(0)
     })
 
-    test('returns null when nothing has been appended', async () => {
-      const state = createState()
-      await expect(takeSnapshot(state)).resolves.toBeNull()
-    })
-
     test('returns null instead of hanging after render disposal', async () => {
       const state = createState()
       appendOutput(state, 'history')
       disposeRender(state)
 
-      await expect(withSnapshotTimeout(takeSnapshot(state))).resolves.toBeNull()
-    })
-
-    test('continues on the replacement screen when reset disposes an in-flight write', async () => {
-      const state = createState()
-      const oldScreen = (state as unknown as { screen: { terminal: { write: () => void } } }).screen
-      oldScreen.terminal.write = () => undefined
-
-      appendOutput(state, 'stuck')
-      const snapshotPromise = takeSnapshot(state)
-      resetRender(state)
-      appendOutput(state, 'fresh')
-
-      await expect(withSnapshotTimeout(snapshotPromise)).resolves.toEqual({
-        snapshot: 'fresh',
-        snapshotSeq: 1,
-        outputEra: 1,
-        snapshotTruncated: false,
-      })
+      await expect(withSnapshotTimeout(replaySnapshot(state))).resolves.toBeNull()
     })
 
     test('serializes the current headless screen and applied sequence as the snapshot', async () => {
       const state = createState()
       appendOutput(state, 'a')
       appendOutput(state, 'b')
-      const snap = await takeSnapshot(state)
-      expect(snap).toEqual({ snapshot: 'ab', snapshotSeq: 2, outputEra: 0, snapshotTruncated: false })
+      const snap = await replaySnapshot(state)
+      expect(snap).toEqual({ snapshot: 'ab', snapshotSeq: 2 })
     })
 
-    test('serializes zsh prompt end-marker repaint as the final screen, not raw replay bytes', async () => {
+    test('serializes the final screen after transient erase/repaint bytes', async () => {
       const state = createState()
       appendOutput(
         state,
         '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ ',
       )
 
-      const snap = await takeSnapshot(state)
+      const snap = await replaySnapshot(state)
 
       expect(snap?.snapshot).toContain('👾:~/repo')
       expect(snap?.snapshot).toContain('$ ')
       expect(snap?.snapshot).not.toContain('\x1b[7m%')
-      expect(snap).toMatchObject({ snapshotSeq: 1, snapshotTruncated: false })
-    })
-
-    test('keeps raw bytes for diagnostics while snapshots use headless screen semantics', async () => {
-      const state = createState()
-      const marker =
-        '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J'
-      appendOutput(state, `command output${marker}next prompt`)
-
-      const snap = await takeSnapshot(state)
-
-      expect(state.buffer).toBe(`command output${marker}next prompt`)
-      expect(snap?.snapshot).toContain('next prompt')
-      expect(snap?.snapshot).not.toContain(marker)
-    })
-
-    test('includes the truncated flag once the raw buffer has been truncated', async () => {
-      const state = createState()
-      state.bufferTruncated = true
-      appendOutput(state, 'a')
-      const snap = await takeSnapshot(state)
-      expect(snap).toBeTruthy()
-      expect(snap!.snapshotTruncated).toBe(true)
+      expect(snap).toMatchObject({ snapshotSeq: 1 })
     })
 
     test('queues resize into the same headless screen chain without changing the snapshot sequence', async () => {
@@ -370,22 +273,39 @@ describe('terminal-render-state', () => {
       appendOutput(state, 'prompt')
       resizeRender(state, 100, 30)
 
-      const snap = await takeSnapshot(state)
+      const snap = await replaySnapshot(state)
 
-      expect(snap).toEqual({ snapshot: 'prompt', snapshotSeq: 1, outputEra: 0, snapshotTruncated: false })
+      expect(snap).toEqual({ snapshot: 'prompt', snapshotSeq: 1 })
     })
-  })
 
-  describe('resetRender', () => {
-    test('clears the buffer, sequence, and title back to the initial state', () => {
-      const state = createRawOnlyState()
-      appendOutput(state, 'history')
-      appendOutputAndApplyTitleEvents(state, '\x1b]0;a title\x07')
-      resetRender(state)
-      expect(state.sequence).toBe(0)
-      expect(state.buffer).toBe('')
-      expect(state.bufferTruncated).toBe(false)
-      expect(state.title).toBeNull()
+    test('serializes atomically before output queued after the snapshot request', async () => {
+      const state = createState()
+      const firstWriteCompleted = Promise.withResolvers<void>()
+      const operations: string[] = []
+      const originalWrite = state.screen.terminal.write.bind(state.screen.terminal)
+      const write = vi.spyOn(state.screen.terminal, 'write').mockImplementation((data, callback) => {
+        operations.push(`write:${String(data)}`)
+        if (data === 'first') {
+          firstWriteCompleted.promise.then(() => originalWrite(data, callback))
+          return
+        }
+        originalWrite(data, callback)
+      })
+      const serialize = vi.spyOn(state.screen.serializer, 'serialize').mockImplementation(() => {
+        operations.push('serialize')
+        return 'first'
+      })
+
+      appendOutput(state, 'first')
+      await vi.waitFor(() => expect(write).toHaveBeenCalledOnce())
+      const snapshot = replaySnapshot(state)
+      appendOutput(state, 'second')
+      firstWriteCompleted.resolve()
+
+      await expect(snapshot).resolves.toEqual({ snapshot: 'first', snapshotSeq: 1 })
+      await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2))
+      expect(serialize).toHaveBeenCalledOnce()
+      expect(operations).toEqual(['write:first', 'serialize', 'write:second'])
     })
   })
 })

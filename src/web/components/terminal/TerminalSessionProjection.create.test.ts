@@ -17,14 +17,6 @@ const mocks = vi.hoisted(() => ({
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
   setBadgeMock: vi.fn(),
-  estimateTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
-    cols: 101,
-    rows: 31,
-  })),
-  estimateManagedTerminalGeometryMock: vi.fn<() => { cols: number; rows: number } | null>(() => ({
-    cols: 101,
-    rows: 31,
-  })),
   clientIdMock: vi.fn(() => 'client_local'),
 }))
 
@@ -53,13 +45,6 @@ vi.mock('#/web/client-page-id.ts', () => ({
   readClientPageId: mocks.clientIdMock,
 }))
 
-vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
-  DEFAULT_TERMINAL_COLS: 80,
-  DEFAULT_TERMINAL_ROWS: 24,
-  estimateTerminalGeometry: mocks.estimateTerminalGeometryMock,
-  estimateManagedTerminalGeometry: mocks.estimateManagedTerminalGeometryMock,
-}))
-
 vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   class MockTerminalSession {
     descriptor: any
@@ -82,9 +67,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     restart(): void {}
     focus(): void {}
     dispose(): void {}
-    isTerminalFocusTarget(): boolean {
-      return false
-    }
     findNext() {
       return { resultIndex: -1, resultCount: 0, found: false }
     }
@@ -94,7 +76,9 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     clearSearch(): void {}
     scrollToBottom(): void {}
     scrollLines(): void {}
-    writeInput(): void {}
+    captureInputWriter(): null {
+      return null
+    }
     takeover(): Promise<boolean> {
       return Promise.resolve(true)
     }
@@ -149,8 +133,8 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
       this.terminalRuntimeGeneration = input.terminalRuntimeGeneration
       this.snapshotState = {
-        phase: 'open',
-        message: null,
+        phase: input.phase,
+        message: input.message,
         processName: input.processName,
         canonicalTitle: input.canonicalTitle,
         attachment: {
@@ -158,8 +142,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
           controllerStatus: input.controllerStatus,
           active: input.role === 'controller',
           canTakeover: input.role !== 'controller',
-          canonicalCols: input.canonicalCols,
-          canonicalRows: input.canonicalRows,
+          canonicalSize: input.canonicalSize,
         },
       }
       this.notify()
@@ -185,23 +168,6 @@ const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${REPO_ROOT}`
-
-class MockResizeObserver {
-  static instances: MockResizeObserver[] = []
-  observe = vi.fn()
-  disconnect = vi.fn()
-  unobserve = vi.fn()
-  private readonly callback: () => void
-  constructor(callback: () => void) {
-    this.callback = callback
-    MockResizeObserver.instances.push(this)
-  }
-  trigger(): void {
-    this.callback()
-  }
-}
-
-let originalResizeObserver: typeof ResizeObserver | undefined
 
 function makeRuntimeMembershipIndex() {
   return runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }])
@@ -231,14 +197,13 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     terminalSessionId: 'term-111111111111111111111',
     terminalProjectionEffect: { kind: 'delta', revision: 11 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-    terminalRuntimeGeneration: 1,
-    processName: 'zsh',
+    terminalRuntimeGeneration: 0,
+    processName: '',
     canonicalTitle: null,
-    phase: 'open' as const,
+    phase: 'opening' as const,
     message: null,
-    controller: { clientId: 'client_local', status: 'connected' as const },
-    canonicalCols: 101,
-    canonicalRows: 31,
+    controller: null,
+    canonicalSize: null,
     ...overrides,
   }
 }
@@ -285,48 +250,24 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.listWorkspaceTabsMock.mockReset()
     mocks.listWorkspaceTabsMock.mockResolvedValue([])
     mocks.setBadgeMock.mockReset()
-    mocks.estimateTerminalGeometryMock.mockClear()
-    mocks.estimateManagedTerminalGeometryMock.mockClear()
     mocks.clientIdMock.mockClear()
     projection = new TerminalSessionProjection()
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     setTerminalSessionProjectionForTests(projection)
-    originalResizeObserver = globalThis.ResizeObserver
-    Object.defineProperty(globalThis, 'ResizeObserver', {
-      configurable: true,
-      value: MockResizeObserver,
-    })
-    MockResizeObserver.instances = []
   })
 
   afterEach(() => {
     projection.destroy()
     setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
-    if (originalResizeObserver) {
-      Object.defineProperty(globalThis, 'ResizeObserver', {
-        configurable: true,
-        value: originalResizeObserver,
-      })
-    } else {
-      Reflect.deleteProperty(globalThis, 'ResizeObserver')
-    }
-    MockResizeObserver.instances = []
   })
 
-  test('creates a terminal with the registered host geometry', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
+  test('creates a prepared terminal without application geometry', async () => {
     await projection.createTerminal(terminalBase())
 
-    expect(mocks.estimateManagedTerminalGeometryMock).toHaveBeenCalledWith(host)
     expect(mocks.createMock).toHaveBeenCalledWith({
       target: terminalBase().target,
       kind: 'primary',
-      cols: 101,
-      rows: 31,
     })
   })
 
@@ -366,7 +307,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     expect(requiredTerminalSession(projection, 'term-111111111111111111111').currentRuntimeBinding()).toEqual({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
     })
   })
 
@@ -384,8 +325,6 @@ describe('TerminalSessionProjection create flow', () => {
       request: {
         target: terminalBase().target,
         kind: 'primary',
-        cols: 80,
-        rows: 24,
       },
       insertAfterIdentity: 'workspace-pane:status',
     })
@@ -395,18 +334,12 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('passes a startup shell command through terminal create', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
     await projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/README.md'\r" })
 
     expect(mocks.createMock).toHaveBeenCalledWith({
       target: terminalBase().target,
       kind: 'additional',
       startupShellCommand: "bat '/repo/README.md'\r",
-      cols: 101,
-      rows: 31,
     })
   })
 
@@ -429,8 +362,6 @@ describe('TerminalSessionProjection create flow', () => {
       target: terminalBase().target,
       kind: 'additional',
       startupShellCommand: "bat '/repo/README.md'\r",
-      cols: 80,
-      rows: 24,
     })
   })
 
@@ -528,7 +459,7 @@ describe('TerminalSessionProjection create flow', () => {
     },
   )
 
-  test('keeps admission-time geometry for a different command queued behind an in-flight create', async () => {
+  test('keeps a different command queued behind an in-flight create', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
       terminalSessionId: 'term-222222222222222222222',
@@ -541,8 +472,6 @@ describe('TerminalSessionProjection create flow', () => {
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     const secondCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/b.ts'\r" })
-    // The second queue entry captures default geometry now. The first result
-    // later materializes a 101x31 attachment, but must not rewrite this fact.
     await Promise.resolve()
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
 
@@ -554,8 +483,6 @@ describe('TerminalSessionProjection create flow', () => {
       target: terminalBase().target,
       kind: 'additional',
       startupShellCommand: "bat '/repo/b.ts'\r",
-      cols: 80,
-      rows: 24,
     })
   })
 
@@ -563,13 +490,9 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.setBadgeMock).toHaveBeenCalledWith(0)
   })
 
-  test('keeps the filesystem target pending while create is in flight with registered host geometry', async () => {
+  test('keeps the filesystem target pending while create is in flight', async () => {
     const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
     const pending = projection.createTerminal(terminalBase())
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
@@ -584,10 +507,6 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('clears createPending when create rejects', async () => {
     mocks.createMock.mockRejectedValueOnce(new Error('boom'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
     await expect(projection.createTerminal(terminalBase())).rejects.toThrow('boom')
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -617,7 +536,7 @@ describe('TerminalSessionProjection create flow', () => {
     },
   )
 
-  test('creates with default startup geometry when no host geometry is available yet', async () => {
+  test('does not send application geometry when creating without a mounted host', async () => {
     const pending = projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
@@ -627,8 +546,6 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       target: terminalBase().target,
       kind: 'primary',
-      cols: 80,
-      rows: 24,
     })
   })
 
@@ -667,63 +584,18 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
-  test('falls back to default startup geometry when registered host geometry is unavailable', async () => {
-    mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
-
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
-    const pending = projection.createTerminal(terminalBase())
-
-    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    expect(mocks.createMock).toHaveBeenCalledWith({
-      target: terminalBase().target,
-      kind: 'primary',
-      cols: 80,
-      rows: 24,
-    })
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    await expect(pending).resolves.toBe('term-111111111111111111111')
-  })
-
-  test('creates with default startup geometry when terminal host is permanently unmeasurable', async () => {
-    mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
-
-    const container = document.createElement('div')
-    container.style.display = 'none'
-    document.body.appendChild(container)
-    const host = document.createElement('div')
-    container.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
-    const pending = projection.createTerminal(terminalBase())
-
-    await expect(pending).resolves.toBe('term-111111111111111111111')
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(mocks.createMock).toHaveBeenCalledWith({
-      target: terminalBase().target,
-      kind: 'primary',
-      cols: 80,
-      rows: 24,
-    })
-  })
-
   test('durable close: handleSessionClosed drops the matching local session', async () => {
     // The server emits a session-closed broadcast when window A
     // closes a session. Sibling windows route the event into
     // handleSessionClosed to drop the local entry without a
     // full reconcile.
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -732,15 +604,12 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('durable close: exact canonical and runtime identity removes the session', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -748,9 +617,6 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('durable close: runtime mismatch does not delete the durable candidate', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
@@ -852,9 +718,6 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     const terminalSessionId = await projection.createTerminal(terminalBase())
     mocks.setBadgeMock.mockClear()
     terminalSessionProjectionAccess(projection).bellState.handleBell(
@@ -874,9 +737,6 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('publishes repo bell counts through repo listeners', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     const listener = vi.fn()
     const unsubscribe = projection.subscribeWorkspaceBellCount(REPO_ROOT, listener)
 
@@ -907,9 +767,6 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('publishes repo bell count changes when a bell session is removed', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     const terminalSessionId = await projection.createTerminal(terminalBase())
     emitBellForKey(projection, terminalSessionId)
 
@@ -921,7 +778,7 @@ describe('TerminalSessionProjection create flow', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+        terminalRuntimeGeneration: 0,
         terminalSessionId,
       })
 
@@ -933,9 +790,6 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('does not prune sessions when the repo still exists but branch metadata is temporarily missing', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
     projection.setRuntimeMembershipIndex(

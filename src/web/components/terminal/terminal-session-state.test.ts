@@ -11,11 +11,9 @@ describe('TerminalSessionState', () => {
       processName: 'terminal',
       canonicalTitle: null,
     })
-    // No attachment is published until a terminalRuntimeSessionId is set AND
-    // the phase is 'open'. The contract is the same as before the
-    // identity/lifecycle split: the public snapshot surfaces the
-    // attachment only on the open state.
-    expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toBeUndefined()
+    // An unbound runtime passes null. Once a runtime id is addressable, its
+    // control identity remains orthogonal to lifecycle.
+    expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toEqual({ role: 'controller' })
   })
 
   test('applyOpenResult sets identity and lifecycle in one shot', () => {
@@ -26,8 +24,7 @@ describe('TerminalSessionState', () => {
         canonicalTitle: '~/Developer/goblin — npm run dev',
         role: 'viewer',
         controllerStatus: 'connected',
-        canonicalCols: 120,
-        canonicalRows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       }),
     ).toBe(true)
     // The default phase is 'open' for an attach/restart metadata payload.
@@ -40,11 +37,6 @@ describe('TerminalSessionState', () => {
       canonicalTitle: '~/Developer/goblin — npm run dev',
       attachment: {
         role: 'viewer',
-        controllerStatus: 'connected',
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
       },
     })
   })
@@ -53,7 +45,7 @@ describe('TerminalSessionState', () => {
     // The split is the architectural contract: an identity event
     // updates role/controllerStatus/canonicalSize and returns
     // `changed` only for those fields. A lifecycle event updates
-    // phase/message/takeoverPending and returns `changed` only for
+    // phase/message and returns `changed` only for
     // those fields. A future caller cannot accidentally re-introduce
     // the conflation because the types do not overlap.
     const state = new TerminalSessionState()
@@ -62,8 +54,7 @@ describe('TerminalSessionState', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
 
     // Identity-only update: phase is unchanged.
@@ -72,8 +63,7 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       role: 'viewer',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     }
     expect(state.applyIdentity(identityOnly)).toBe(true)
     expect(state.getPhase()).toBe('open')
@@ -85,12 +75,10 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       phase: 'opening',
       message: 'restarting',
-      takeoverPending: true,
     }
     expect(state.applyLifecycle(lifecycleOnly)).toBe(true)
     expect(state.getPhase()).toBe('opening')
     expect(state.getClientController().role).toBe('viewer')
-    expect(state.isTakeoverPending()).toBe(true)
   })
 
   test('isController reflects role only — a transitional phase does not flip it', () => {
@@ -105,8 +93,7 @@ describe('TerminalSessionState', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
     expect(state.isController()).toBe(true)
     expect(state.canSendInput()).toBe(true)
@@ -117,7 +104,6 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       phase: 'opening',
       message: null,
-      takeoverPending: false,
     })
     expect(state.isController()).toBe(true) // Role-only — still controller.
     expect(state.canSendInput()).toBe(false) // Write-path — phase is transitional.
@@ -130,8 +116,7 @@ describe('TerminalSessionState', () => {
       canonicalTitle: null,
       role: 'viewer',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
     // Viewer cannot send input regardless of phase.
     expect(state.canSendInput()).toBe(false)
@@ -140,7 +125,6 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
-      takeoverPending: false,
     })
     expect(state.canSendInput()).toBe(false)
 
@@ -150,8 +134,7 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
     expect(state.canSendInput()).toBe(true)
 
@@ -160,7 +143,6 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       phase: 'restarting',
       message: null,
-      takeoverPending: false,
     })
     expect(state.canSendInput()).toBe(false)
   })
@@ -175,15 +157,13 @@ describe('TerminalSessionState', () => {
       terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     }
     const lifecycle: TerminalLifecycleViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
-      takeoverPending: false,
     }
 
     const a = new TerminalSessionState()
@@ -204,20 +184,24 @@ describe('TerminalSessionState', () => {
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
     })
-    expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment?.active).toBe(true)
-    expect(state.setRestarting()).toBe(true)
-    // When the phase leaves 'open', the attachment is removed from
-    // the snapshot — even though the role is still 'controller'.
-    // The client reads the role from the (no longer published)
-    // attachment only when phase is 'open'.
+    expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toEqual({ role: 'controller' })
+    expect(
+      state.applyLifecycle({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        phase: 'restarting',
+        message: null,
+      }),
+    ).toBe(true)
+    expect(state.canSendInput()).toBe(false)
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
       phase: 'restarting',
       message: null,
       processName: 'zsh',
       canonicalTitle: null,
+      attachment: { role: 'controller' },
     })
   })
 
@@ -228,17 +212,15 @@ describe('TerminalSessionState', () => {
       canonicalTitle: '~/Developer/goblin — npm run dev',
       role: 'viewer',
       controllerStatus: 'connected',
-      canonicalCols: 120,
-      canonicalRows: 40,
+      canonicalSize: { cols: 120, rows: 40 },
     })
-    state.beginReplay({ outputEra: 0, seq: 1 })
+    state.beginReplay({ seq: 1 })
     state.captureReplayOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'live',
       seq: 2,
-      outputEra: 0,
       processName: 'zsh',
     })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
@@ -254,11 +236,6 @@ describe('TerminalSessionState', () => {
       canonicalTitle: '~/Developer/goblin — npm run dev',
       attachment: {
         role: 'viewer',
-        controllerStatus: 'connected',
-        active: false,
-        canTakeover: true,
-        canonicalCols: 120,
-        canonicalRows: 40,
       },
     })
   })

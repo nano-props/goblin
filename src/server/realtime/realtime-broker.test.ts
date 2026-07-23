@@ -6,7 +6,11 @@ import {
   REALTIME_HEARTBEAT_INTERVAL_MS,
   RealtimeBroker,
 } from '#/server/realtime/realtime-broker.ts'
-import { BufferedRealtimeSocket } from '#/server/realtime/buffered-realtime-socket.ts'
+import {
+  BufferedRealtimeSocket,
+  MAX_BUFFERED_REALTIME_BYTES,
+  MAX_BUFFERED_REALTIME_ENTRIES,
+} from '#/server/realtime/buffered-realtime-socket.ts'
 
 const USER_ID = 'user_realtime'
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
@@ -51,6 +55,32 @@ describe('realtime broker', () => {
     expect(rawSocket.close).toHaveBeenCalledWith(1001, 'realtime heartbeat timeout')
     expect(broker.hasUserSockets(USER_ID)).toBe(false)
     broker.disconnectAll()
+  })
+
+  test('closes a paused socket when buffered bytes exceed the transport budget', () => {
+    const rawSocket = { send: vi.fn(), close: vi.fn() }
+    const onDeactivate = vi.fn()
+    const bufferedSocket = new BufferedRealtimeSocket(rawSocket, onDeactivate)
+    bufferedSocket.pause()
+
+    bufferedSocket.send('x'.repeat(MAX_BUFFERED_REALTIME_BYTES))
+    bufferedSocket.send('x')
+
+    expect(rawSocket.send).not.toHaveBeenCalled()
+    expect(rawSocket.close).toHaveBeenCalledWith(1013, 'realtime buffer capacity exceeded')
+    expect(onDeactivate).toHaveBeenCalledOnce()
+  })
+
+  test('closes a paused socket when buffered event count exceeds the transport budget', () => {
+    const rawSocket = { send: vi.fn(), close: vi.fn() }
+    const bufferedSocket = new BufferedRealtimeSocket(rawSocket)
+    bufferedSocket.pause()
+
+    for (let index = 0; index < MAX_BUFFERED_REALTIME_ENTRIES; index += 1) bufferedSocket.send('')
+    bufferedSocket.send('')
+
+    expect(rawSocket.send).not.toHaveBeenCalled()
+    expect(rawSocket.close).toHaveBeenCalledWith(1013, 'realtime buffer capacity exceeded')
   })
 
   test('rejects new sockets at the admission limit without counting duplicate registration', () => {

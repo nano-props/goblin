@@ -142,9 +142,18 @@ work is related but separate.
 an output checkpoint could be serialized while the shell was in a transient
 prompt redraw. `create` now prepares a logical session and returns metadata
 only. The selected client mounts and fits one xterm before attach starts a fresh
-PTY; fresh output streams from sequence 1. Attach to an existing PTY and restart
-still use server headless snapshots with explicit sequence boundaries. See
+PTY; fresh output streams from sequence 1. Restart likewise establishes a fresh
+generation and streams from sequence 1. Only attach to an existing PTY uses a
+server headless snapshot with an explicit sequence boundary. See
 `docs/terminal.md` and `docs/terminal-session-lifecycle.md` for the contract.
+
+The implementation also closes the two gaps needed to make that split safe:
+the supervisor transfers early output/exit through a bounded single-owner event
+lease, and the realtime socket orders the attach/restart response before output
+for the new binding. Client presentation remains hidden and rejects local input
+until the fitted xterm has consumed the output available at its presentation
+cutoff (which may be empty) and emitted a full-viewport `onRender`. First output
+is not treated as shell readiness.
 
 ## P2: Further tighten client projection boundaries
 

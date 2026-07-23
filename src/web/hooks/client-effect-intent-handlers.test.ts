@@ -21,7 +21,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { observedPrimaryWindowNavigationActionsForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
@@ -51,7 +51,7 @@ describe('client effect intent handlers', () => {
       currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)
-    d.navigation.showRepoBranchTerminalSession = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.mocked(d.navigation.showRepoBranchTerminalSession)
     handleTerminalBellClickIntent(
       {
         type: 'terminal-bell-click',
@@ -70,11 +70,7 @@ describe('client effect intent handlers', () => {
     )
 
     await vi.waitFor(() => {
-      expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(
-        REPO_ID,
-        'feature/query',
-        'term-queryqueryqueryquery1',
-      )
+      expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'term-queryqueryqueryquery1')
     })
   })
 
@@ -178,7 +174,15 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
     navigation: navigationWithStoreActions(),
     currentWorkspaceId,
     currentWorkspacePaneCommandTarget: currentWorkspaceId
-      ? { kind: 'git-branch' as const, branchName: currentBranchName, workspacePaneRoute: null }
+      ? {
+          routeTarget: {
+            kind: 'git-branch' as const,
+            workspaceId: workspaceIdForTest(currentWorkspaceId),
+            branchName: currentBranchName,
+          },
+          workspacePaneRoute: null,
+          filesystemTarget: null,
+        }
       : null,
     closeAllOverlays: vi.fn(),
     openWorkspacePathDialog: vi.fn(),
@@ -198,7 +202,7 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
 }
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
-  const navigation: PrimaryWindowNavigationActions = {
+  return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: (workspaceId) => useWorkspacesStore.getState().closeWorkspace(workspaceId),
@@ -211,14 +215,11 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
       return true
     },
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
-  }
-  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
-  return navigation
+  })
 }
 
 function serverOperation(

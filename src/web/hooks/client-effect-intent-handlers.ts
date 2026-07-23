@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { isTerminalFocused } from '#/web/terminal-focus.ts'
+import { terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -81,7 +81,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-workspace-root-terminal':
-      deps.navigation.showWorkspaceRootPaneTab?.(plan.workspaceId, {
+      deps.navigation.showWorkspaceRootPaneTab(plan.workspaceId, {
         kind: 'terminal',
         terminalSessionId: plan.terminalSessionId,
       })
@@ -95,7 +95,7 @@ export function handleTerminalBellClickIntent(
       })
       return
     case 'show-detached-worktree-terminal':
-      deps.navigation.showRepoWorktreeTerminalSession?.(plan.workspaceId, plan.worktreePath, plan.terminalSessionId)
+      deps.navigation.showRepoWorktreeTerminalSession(plan.workspaceId, plan.worktreePath, plan.terminalSessionId)
       return
   }
 }
@@ -150,7 +150,7 @@ export async function handleWorkspaceClientIntent(
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
-    terminalFocused: isTerminalFocused(),
+    terminalFocused: terminalOwnsKeyboardInput(),
     currentWorkspaceId: currentWorkspace?.id ?? null,
     currentWorkspaceRuntimeId: currentWorkspace?.workspaceRuntimeId ?? null,
     currentWorkspaceCapability: currentWorkspace?.capability ?? null,

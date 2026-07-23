@@ -1,7 +1,7 @@
 import type { WorkspacePaneStaticTabMetadataInput } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
@@ -17,7 +17,6 @@ interface WorkspacePaneTabItemsInput {
   statusCount: number
   t: WorkspacePaneStaticTabMetadataInput['t']
   staticTabAvailable?: (type: WorkspacePaneStaticTabType) => boolean
-  runtimeTabAvailable?: (type: WorkspacePaneRuntimeTabType) => boolean
 }
 
 export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): WorkspacePaneTabItem[] {
@@ -37,7 +36,6 @@ export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): Worksp
         }),
       ]
     }
-    if (input.runtimeTabAvailable && !input.runtimeTabAvailable(tab.runtimeType)) return []
     const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
     if (tab.kind === 'pending') {
       const runtimeState = input.model.runtimeTabStateByType[tab.runtimeType]

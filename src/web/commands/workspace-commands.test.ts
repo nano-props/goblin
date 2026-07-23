@@ -13,7 +13,10 @@ import {
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import {
+  setTerminalSessionCommandBridgeForTest as setExactTerminalSessionCommandBridge,
+  setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge,
+} from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
@@ -38,11 +41,16 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { TerminalCreateOptions, TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type {
+  TerminalCreateOptions,
+  TerminalFilesystemTargetSnapshot,
+  TerminalFocusRequest,
+} from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   gitWorktreePaneFilesystemTarget,
+  workspacePaneFilesystemRootPath,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
@@ -55,11 +63,25 @@ interface WorkspaceCommandFixtureOptions {
 
 function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
   if (options.filesystemTarget) {
-    return {
-      kind: 'git-worktree',
-      workspacePaneRoute: options.workspacePaneRoute,
-      filesystemTarget: options.filesystemTarget,
-    }
+    return options.branchName
+      ? {
+          routeTarget: {
+            kind: 'git-branch',
+            workspaceId: options.filesystemTarget.workspaceId,
+            branchName: options.branchName,
+          },
+          workspacePaneRoute: options.workspacePaneRoute,
+          filesystemTarget: options.filesystemTarget,
+        }
+      : {
+          routeTarget: {
+            kind: 'git-worktree',
+            workspaceId: options.filesystemTarget.workspaceId,
+            worktreePath: workspacePaneFilesystemRootPath(options.filesystemTarget),
+          },
+          workspacePaneRoute: options.workspacePaneRoute,
+          filesystemTarget: options.filesystemTarget,
+        }
   }
   if (options.branchName) {
     const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
@@ -68,7 +90,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       : null
     if (repo?.capability.kind === 'git' && branch?.worktree) {
       return {
-        kind: 'git-worktree',
+        routeTarget: { kind: 'git-branch', workspaceId: repo.id, branchName: options.branchName },
         workspacePaneRoute: options.workspacePaneRoute,
         filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
@@ -79,12 +101,21 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
         }),
       }
     }
-    return { kind: 'git-branch', branchName: options.branchName, workspacePaneRoute: options.workspacePaneRoute }
+    if (!options.workspaceId) throw new Error('expected workspace id for branch command fixture')
+    return {
+      routeTarget: {
+        kind: 'git-branch',
+        workspaceId: workspaceIdForTest(options.workspaceId),
+        branchName: options.branchName,
+      },
+      workspacePaneRoute: options.workspacePaneRoute,
+      filesystemTarget: null,
+    }
   }
   const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
   if (!repo || repo.capability.probe.status !== 'ready') throw new Error('expected ready workspace command fixture')
   return {
-    kind: 'workspace-root',
+    routeTarget: { kind: 'workspace-root', workspaceId: repo.id },
     workspacePaneRoute: options.workspacePaneRoute,
     filesystemTarget: workspaceRootPaneFilesystemTarget({
       workspaceId: repo.id,
@@ -143,16 +174,18 @@ import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import { dispatchSelectWorkspacePaneTabByIdentityAction as dispatchSelectWorkspacePaneTabByIdentityActionRaw } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import { dispatchMoveWorkspacePaneTabAction as dispatchMoveWorkspacePaneTabActionRaw } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
+  observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
-  observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
   type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { resetPrimaryWindowPresentationForTest } from '#/web/primary-window-presentation.ts'
+import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -173,19 +206,35 @@ const WORKTREE_PANE_TARGET = {
   worktreePath: WORKTREE_PATH,
   head: { kind: 'branch' as const, branchName: 'feature/worktree' },
 }
+const WORKTREE_ROUTE_TARGET = {
+  kind: 'git-branch' as const,
+  workspaceId: REPO_ID,
+  branchName: 'feature/worktree',
+}
+const dispatchSelectWorkspacePaneTabByIdentityAction = (
+  options: Omit<Parameters<typeof dispatchSelectWorkspacePaneTabByIdentityActionRaw>[0], 'routeTarget'>,
+) => dispatchSelectWorkspacePaneTabByIdentityActionRaw({ routeTarget: WORKTREE_ROUTE_TARGET, ...options })
+const dispatchMoveWorkspacePaneTabAction = (
+  options: Omit<Parameters<typeof dispatchMoveWorkspacePaneTabActionRaw>[0], 'routeTarget'>,
+) => dispatchMoveWorkspacePaneTabActionRaw({ routeTarget: WORKTREE_ROUTE_TARGET, ...options })
 const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
+  resetPrimaryWindowPresentationForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
-  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
+  useTerminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
 })
 
 afterEach(() => {
+  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
   resetTerminalActionDialogsStore()
@@ -1041,7 +1090,7 @@ describe('workspace commands', () => {
     const { createTerminal, createTerminalWithAdmission, createOperationCount, isCreatePending } =
       createSingleFlightTerminalWithProjection(async () => await firstCreate.promise)
     const showRepoBranchTerminalSession = vi.fn(() => true)
-    setTerminalSessionCommandBridge({
+    setExactTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: isCreatePending() }),
       createTerminal,
       createTerminalWithAdmission,
@@ -1090,6 +1139,7 @@ describe('workspace commands', () => {
   })
 
   test('different terminal create shapes serialize through the same target queue', async () => {
+    installTerminalFocusSink()
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1127,11 +1177,14 @@ describe('workspace commands', () => {
     const showRepoBranchTerminalSession = vi.fn((_repoId: string, _branchName: string, _terminalSessionId: string) => {
       return !createPending()
     })
-    setTerminalSessionCommandBridge({
+    const firstFocusTerminal = vi.fn(() => true)
+    const secondFocusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
+    setExactTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: createPending() }),
       createTerminal,
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
+      focusTerminal: firstFocusTerminal,
     })
     const navigation = navigationWith({ showRepoBranchTerminalSession })
     const commitWorkspacePaneRoute = vi.fn(navigation.commitWorkspacePaneRoute)
@@ -1159,6 +1212,7 @@ describe('workspace commands', () => {
     await vi.waitFor(() => expect(createTerminalWithAdmission).toHaveBeenCalledTimes(1))
 
     const secondCommand = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
       base,
       createTerminal: async (createBase) => {
         const terminalSessionId = await createTerminal(createBase)
@@ -1171,8 +1225,11 @@ describe('workspace commands', () => {
         }
       },
       openerIdentity: 'workspace-pane:files',
-      showCreatedTerminalTab: (terminalSessionId) =>
-        showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId),
+      showCreatedTerminalTab: (terminalSessionId, _presentation, routeRequest) => {
+        expect(routeRequest.presentationToken).toEqual(expect.objectContaining({ generation: expect.any(Number) }))
+        return showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId)
+      },
+      focusTerminal: secondFocusTerminal,
       options: { resolveStartupShellCommand: async () => "bat '/repo/a.ts'\r" },
     })
     await Promise.resolve()
@@ -1181,13 +1238,8 @@ describe('workspace commands', () => {
     firstCreate.resolve('term-111111111111111111111')
     await expect(firstCommand).resolves.toBe(true)
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledOnce())
-    expect(commitWorkspacePaneRoute).toHaveBeenNthCalledWith(
-      1,
-      REPO_ID,
-      'feature/worktree',
-      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
-    )
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(firstFocusTerminal).not.toHaveBeenCalled()
 
     secondCreate.resolve('term-222222222222222222222')
     await expect(secondCommand).resolves.toEqual({
@@ -1200,6 +1252,15 @@ describe('workspace commands', () => {
       'feature/worktree',
       'term-222222222222222222222',
     )
+    expect(secondFocusTerminal).toHaveBeenCalledWith(
+      'term-222222222222222222222',
+      expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+    )
+    const focusRequest = secondFocusTerminal.mock.calls[0]![1]
+    if (!focusRequest) throw new Error('expected focus request')
+    expect(focusRequest.isCurrent()).toBe(true)
+    focusRequest.onSettled?.()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('new terminal tab command does not navigate when the server rejects a stale workspace runtime', async () => {
@@ -1454,6 +1515,7 @@ describe('workspace commands', () => {
     expect(
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
+        routeTarget: payload.routeTarget,
         workspaceId: payload.workspaceId,
         currentWorkspacePaneRoute: payload.workspacePaneRoute ?? null,
         navigation: navigationWith(),
@@ -1510,6 +1572,7 @@ describe('workspace commands', () => {
     expect(
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
+        routeTarget: payload.routeTarget,
         workspaceId: payload.workspaceId,
         currentWorkspacePaneRoute: { kind: 'static', tab: 'status' },
         navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
@@ -1582,6 +1645,7 @@ describe('workspace commands', () => {
     expect(
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
+        routeTarget: payload.routeTarget,
         workspaceId: payload.workspaceId,
         currentWorkspacePaneRoute: workspacePaneRoute,
         navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
@@ -3318,7 +3382,7 @@ function navigationWith(
   options: { autoSeedInitialRoute?: boolean } = {},
 ): PrimaryWindowNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
-  const navigation: PrimaryWindowNavigationActions = {
+  return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: (workspaceId) =>
       useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
@@ -3344,17 +3408,32 @@ function navigationWith(
       options?.onCommit?.()
       return true
     },
-    commitWorkspacePaneRoute: () => false,
+    commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
+      if (target.routeTarget.kind !== 'workspace-root') {
+        throw new Error('unexpected detached-worktree route commit in workspace command fixture')
+      }
+      useWorkspacesStore
+        .getState()
+        .setWorkspacePaneTabForTarget(
+          target.routeTarget,
+          route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
+        )
+      options?.onCommit?.()
+      return true
+    },
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-  }
-  if (!overrides.commitWorkspacePaneRoute) {
-    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
-  }
-  return navigation
+  })
+}
+
+function installTerminalFocusSink(): void {
+  const sink = document.createElement('div')
+  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+  sink.tabIndex = -1
+  document.body.append(sink)
 }
 
 function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): TerminalFilesystemTargetSnapshot {

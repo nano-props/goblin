@@ -1,13 +1,83 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   returnToFromHref,
+  parsedWorkspacePaneRouteFromTargetHref,
   routeReturnSearch,
+  settleOwnedPrimaryWindowRouteCommit,
   settlePrimaryWindowRouteCommit,
-  workspacePaneHrefBelongsToBranch,
   workspacePaneRouteFromBranchHref,
 } from '#/web/primary-window-route-navigation.ts'
+import {
+  beginPrimaryWindowPresentation,
+  observePrimaryWindowHistoryNavigation,
+  primaryWindowNavigationState,
+} from '#/web/primary-window-presentation.ts'
 
 describe('primary window route navigation helpers', () => {
+  test('settles an awaited owned navigation when a newer presentation abandons it', async () => {
+    const navigation = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<void>()
+    const committed = settleOwnedPrimaryWindowRouteCommit({
+      targetHref: '/workspace/example/branch/main/tab/status',
+      currentHref: () => '/workspace/example/branch/main',
+      navigate: async () => {
+        started.resolve()
+        await navigation.promise
+      },
+    })
+    await started.promise
+
+    beginPrimaryWindowPresentation()
+
+    await expect(committed).resolves.toBe(false)
+    navigation.resolve()
+    await navigation.promise
+    await Promise.resolve()
+  })
+
+  test('propagates a routed commit effect failure through the awaited transaction', async () => {
+    let currentHref = '/start'
+    const committed = settleOwnedPrimaryWindowRouteCommit({
+      targetHref: '/target',
+      currentHref: () => currentHref,
+      commitEffect: () => {
+        throw new Error('commit effect failed')
+      },
+      navigate: async (navigationId) => {
+        currentHref = '/target'
+        observePrimaryWindowHistoryNavigation({
+          href: currentHref,
+          state: primaryWindowNavigationState({}, navigationId),
+          action: { type: 'PUSH' },
+        })
+      },
+    })
+
+    await expect(committed).rejects.toThrow('commit effect failed')
+  })
+
+  test('propagates an abandon effect failure after a newer presentation supersedes the route', async () => {
+    const navigation = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<void>()
+    const committed = settleOwnedPrimaryWindowRouteCommit({
+      targetHref: '/target',
+      currentHref: () => '/start',
+      abandonEffect: () => {
+        throw new Error('abandon effect failed')
+      },
+      navigate: async () => {
+        started.resolve()
+        await navigation.promise
+      },
+    })
+    await started.promise
+
+    beginPrimaryWindowPresentation()
+
+    await expect(committed).rejects.toThrow('abandon effect failed')
+    navigation.resolve()
+  })
+
   test('accepts an operation route only after navigation lands on the requested href', async () => {
     let currentHref = '/workspace/example/branch/main'
 
@@ -46,14 +116,24 @@ describe('primary window route navigation helpers', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  test('recognizes only workspace pane routes within the exact repo branch', () => {
-    const branchRoot = '/workspace/example/branch/main'
-    expect(workspacePaneHrefBelongsToBranch(branchRoot, branchRoot)).toBe(true)
-    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/tab/files`, branchRoot)).toBe(true)
-    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/terminal/term-1`, branchRoot)).toBe(true)
-    expect(workspacePaneHrefBelongsToBranch('/workspace/example/branch/other/tab/files', branchRoot)).toBe(false)
-    expect(workspacePaneHrefBelongsToBranch('/workspace/other/branch/main/tab/files', branchRoot)).toBe(false)
-    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/dashboard`, branchRoot)).toBe(false)
+  test('rejects an owned fast-path commit when its source-route precondition is stale', async () => {
+    const navigate = vi.fn(async () => {})
+    const commitEffect = vi.fn()
+    const abandonEffect = vi.fn()
+
+    await expect(
+      settleOwnedPrimaryWindowRouteCommit({
+        targetHref: '/workspace/example/branch/main/terminal/term-2',
+        expectedCurrentHref: '/workspace/example/branch/main/terminal/term-1',
+        navigate,
+        currentHref: () => '/workspace/example/branch/main/terminal/term-2',
+        commitEffect,
+        abandonEffect,
+      }),
+    ).resolves.toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+    expect(commitEffect).not.toHaveBeenCalled()
+    expect(abandonEffect).toHaveBeenCalledOnce()
   })
 
   test('reads the current workspace pane route only for the exact repo branch', () => {
@@ -69,9 +149,14 @@ describe('primary window route navigation helpers', () => {
     })
     expect(workspacePaneRouteFromBranchHref('/workspace/example/branch/other/tab/files', branchRoot)).toBeUndefined()
     expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/not-a-tab`, branchRoot)).toBeUndefined()
+    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/files/extra`, branchRoot)).toBeUndefined()
+    expect(parsedWorkspacePaneRouteFromTargetHref(`${branchRoot}/tab/not%20a%20tab`, branchRoot)).toEqual({
+      kind: 'invalid-static',
+      tabKey: 'not a tab',
+    })
   })
 
-  test('rejects an operation route when navigation throws', async () => {
+  test('propagates an operation route navigation failure', async () => {
     await expect(
       settlePrimaryWindowRouteCommit({
         targetHref: '/workspace/example/branch/main/tab/status',
@@ -80,7 +165,7 @@ describe('primary window route navigation helpers', () => {
         },
         currentHref: () => '/workspace/example/branch/main',
       }),
-    ).resolves.toBe(false)
+    ).rejects.toThrow('navigation failed')
   })
 
   test('records a route return target when opening a different route', () => {

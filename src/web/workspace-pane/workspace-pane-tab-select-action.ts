@@ -12,7 +12,6 @@ import {
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import { dispatchWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
-import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
@@ -29,6 +28,7 @@ import {
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   tabIndex: number
@@ -38,6 +38,7 @@ export interface SelectWorkspacePaneTabByIndexActionOptions {
 export interface MoveWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   direction: 1 | -1
@@ -47,11 +48,12 @@ export interface MoveWorkspacePaneTabActionOptions {
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   identity: string
   navigation: PrimaryWindowNavigationActions
-  runtimeActionContext?: WorkspacePaneRuntimeTabActionContext
+  onTerminalReselect?: (terminalSessionId: string) => void
   reselect?: boolean
 }
 
@@ -87,7 +89,7 @@ async function selectWorkspacePaneTabByIndexAction(
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab.kind === 'pending') return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken)
+  return await selectWorkspacePaneControllerTab(target, tab, navigation, { presentationToken })
 }
 
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
@@ -107,7 +109,7 @@ async function selectWorkspacePaneTabByIdentityAction(
   coordinatorTarget: WorkspacePaneTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
-  const { workspaceId, workspacePaneRoute, identity, navigation, runtimeActionContext, reselect } = options
+  const { workspaceId, workspacePaneRoute, identity, navigation, onTerminalReselect, reselect } = options
   if (!workspaceId) return false
   const sourceRoute = workspacePaneRoute
   const target = resolveSelectableWorkspacePaneTarget(options, sourceRoute)
@@ -117,12 +119,12 @@ async function selectWorkspacePaneTabByIdentityAction(
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab?.kind === 'pending') return false
   const committed = tab
-    ? await selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken)
+    ? await selectWorkspacePaneControllerTab(target, tab, navigation, { presentationToken })
     : tabEntry
       ? await selectWorkspacePaneControllerTabEntry(target, tabEntry, navigation, presentationToken)
       : false
   if (committed && reselect && tab?.kind === 'runtime' && tab.runtimeType === 'terminal') {
-    runtimeActionContext?.terminal?.scrollToBottom?.(tab.sessionId)
+    onTerminalReselect?.(tab.sessionId)
   }
   return committed
 }
@@ -161,7 +163,9 @@ async function moveWorkspacePaneTabAction(
   const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation, beginPrimaryWindowPresentation())
+  return await selectWorkspacePaneControllerTab(target, tab, navigation, {
+    presentationToken: beginPrimaryWindowPresentation(),
+  })
 }
 
 function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current: WorkspacePaneTabModel): boolean {
@@ -177,6 +181,7 @@ function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current
 function workspacePaneTabActionCoordinatorTarget(input: {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
 }): WorkspacePaneTabModel | null {
@@ -187,13 +192,19 @@ function workspacePaneTabActionCoordinatorTarget(input: {
 function resolveSelectableWorkspacePaneTarget(
   input: {
     workspaceId: WorkspaceId | null
+    routeTarget: WorkspacePaneTabsTarget
     paneTarget: WorkspacePaneTabsTarget
     worktreeHead?: GitHead
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
-  return workspacePaneTabTargetForPaneTarget(input.paneTarget, workspacePaneRoute, input.worktreeHead)
+  return workspacePaneTabTargetForPaneTarget({
+    paneTarget: input.paneTarget,
+    routeTarget: input.routeTarget,
+    workspacePaneRoute,
+    worktreeHead: input.worktreeHead,
+  })
 }
 
 function paneTargetPresentationBranch(

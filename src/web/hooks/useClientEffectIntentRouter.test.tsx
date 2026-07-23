@@ -21,6 +21,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
+  observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -29,7 +30,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   terminalExecutionPath,
   terminalPresentationBranch,
@@ -104,7 +105,7 @@ beforeEach(() => {
   currentWorkspacePaneRoute = null
   currentFilesystemTarget = null
   setTerminalSessionCommandBridge(null)
-  navigation = {
+  navigation = observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: (repoId) => {
       activateWorkspaceSpy(repoId)
@@ -130,13 +131,11 @@ beforeEach(() => {
       showWorkspaceRootPaneTabSpy(workspaceId, presentation)
       return true
     },
-    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
-  }
-  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  })
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: currentNativeBridge({
@@ -671,17 +670,11 @@ function HookHost() {
     navigation,
     currentWorkspaceId,
     currentWorkspacePaneCommandTarget: currentBranchName
-      ? currentFilesystemTarget?.kind === 'git-worktree'
-        ? {
-            kind: 'git-worktree',
-            workspacePaneRoute: currentWorkspacePaneRoute,
-            filesystemTarget: currentFilesystemTarget,
-          }
-        : {
-            kind: 'git-branch',
-            branchName: currentBranchName,
-            workspacePaneRoute: currentWorkspacePaneRoute,
-          }
+      ? {
+          routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId!, branchName: currentBranchName },
+          workspacePaneRoute: currentWorkspacePaneRoute,
+          filesystemTarget: currentFilesystemTarget?.kind === 'git-worktree' ? currentFilesystemTarget : null,
+        }
       : null,
     closeAllOverlays,
     openWorkspacePathDialog: () => {},
