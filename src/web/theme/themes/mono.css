@@ -101,8 +101,8 @@ html[data-color-theme='mono'][data-theme='dark'] {
   --goblin-focus-ring: #71717a;
   --goblin-action-primary: #fafafa;
   --goblin-action-primary-foreground: #18181b;
-  --goblin-action-danger: #f87171;
-  --goblin-action-danger-foreground: #450a0a;
+  --goblin-action-danger: #dc2626;
+  --goblin-action-danger-foreground: #ffffff;
 
   --goblin-accent: #fafafa;
   --goblin-accent-text: #fafafa;
@@ -119,7 +119,7 @@ html[data-color-theme='mono'][data-theme='dark'] {
   --goblin-status-success-rgb: 34 197 94;
   --goblin-status-success-surface: rgb(var(--goblin-status-success-rgb) / 0.12);
   --goblin-status-success-border: rgb(var(--goblin-status-success-rgb) / 0.3);
-  --goblin-status-danger-text: var(--goblin-action-danger);
+  --goblin-status-danger-text: #f87171;
   --goblin-status-danger-rgb: 248 113 113;
   --goblin-status-danger-surface: rgb(var(--goblin-status-danger-rgb) / 0.1);
   --goblin-status-danger-border: rgb(var(--goblin-status-danger-rgb) / 0.32);

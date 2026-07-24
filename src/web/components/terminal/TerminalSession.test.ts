@@ -5,7 +5,7 @@ import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
+import { installTerminalThemeStyles } from '#/web/test-utils/terminal-theme.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type {
@@ -2657,15 +2657,15 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     const term = xtermMocks.terminals[0]!
-    expect(term.options.theme).toMatchObject({ background: '#fbfbfd', foreground: '#1d1d1f' })
+    expect(term.options.theme).toMatchObject({ background: '#ffffff', foreground: '#1d1d1f' })
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.background).toBe(
-      'rgb(251, 251, 253)',
+      'rgb(255, 255, 255)',
     )
     expect(
       host
         .querySelector<HTMLElement>('.goblin-managed-terminal-frame')
         ?.style.getPropertyValue('--goblin-terminal-background'),
-    ).toBe('#fbfbfd')
+    ).toBe('#ffffff')
 
     document.documentElement.setAttribute('data-theme', 'dark')
     await Promise.resolve()

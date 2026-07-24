@@ -57,7 +57,7 @@ html[data-color-theme='macos'][data-theme='light'] {
   --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.25);
   --shadow-control-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.3);
 
-  --color-terminal-background: #fbfbfd;
+  --color-terminal-background: #ffffff;
   --color-terminal-foreground: #1d1d1f;
   --color-terminal-cursor: #1d1d1f;
   --color-terminal-selection-background: rgba(0, 122, 255, 0.22);
@@ -105,8 +105,8 @@ html[data-color-theme='macos'][data-theme='dark'] {
   --goblin-focus-ring: #0a84ff;
   --goblin-action-primary: #0a84ff;
   --goblin-action-primary-foreground: #001a33;
-  --goblin-action-danger: #ff453a;
-  --goblin-action-danger-foreground: #1a0606;
+  --goblin-action-danger: #d70015;
+  --goblin-action-danger-foreground: #ffffff;
 
   --goblin-accent: #0a84ff;
   --goblin-accent-text: #409cff;
@@ -125,7 +125,7 @@ html[data-color-theme='macos'][data-theme='dark'] {
   --goblin-status-success-rgb: 48 209 88;
   --goblin-status-success-surface: rgb(var(--goblin-status-success-rgb) / 0.16);
   --goblin-status-success-border: rgb(var(--goblin-status-success-rgb) / 0.45);
-  --goblin-status-danger-text: var(--goblin-action-danger);
+  --goblin-status-danger-text: #ff453a;
   --goblin-status-danger-rgb: 255 69 58;
   --goblin-status-danger-surface: rgb(var(--goblin-status-danger-rgb) / 0.09);
   --goblin-status-danger-border: rgb(var(--goblin-status-danger-rgb) / 0.45);
