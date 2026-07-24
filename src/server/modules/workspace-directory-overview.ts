@@ -43,7 +43,7 @@ async function runWithDirectoryOverviewTimeout<T>(
   operation: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   const timeoutController = new AbortController()
-  const timer = setTimeout(() => timeoutController.abort(), DIRECTORY_OVERVIEW_TIMEOUT_MS)
+  using timer = setTimeout(() => timeoutController.abort(), DIRECTORY_OVERVIEW_TIMEOUT_MS)
   const signal = requestSignal ? AbortSignal.any([requestSignal, timeoutController.signal]) : timeoutController.signal
   try {
     return await operation(signal)
@@ -52,8 +52,6 @@ async function runWithDirectoryOverviewTimeout<T>(
       throw new Error('workspace directory overview timed out', { cause: error })
     }
     throw error
-  } finally {
-    clearTimeout(timer)
   }
 }
 

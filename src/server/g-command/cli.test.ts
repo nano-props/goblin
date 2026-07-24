@@ -1,6 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtempDisposable, readFile, writeFile } from 'node:fs/promises'
 import { describe, expect, test, vi } from 'vitest'
 import { runGoblinCommand } from '#/server/g-command/cli.ts'
 import type { GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
@@ -107,7 +107,8 @@ describe('g command cli', () => {
   test('g init creates an empty commented goblin.toml in the current directory', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'g-command-init-test-'))
+    await using temporaryDirectory = await mkdtempDisposable(path.join(os.tmpdir(), 'g-command-init-test-'))
+    const tmp = temporaryDirectory.path
     const previousCwd = process.cwd()
     try {
       process.chdir(tmp)
@@ -126,14 +127,14 @@ describe('g command cli', () => {
       expect(config).not.toContain('\n[worktree]')
     } finally {
       process.chdir(previousCwd)
-      await rm(tmp, { recursive: true, force: true })
     }
   })
 
   test('g init refuses to overwrite an existing goblin.toml', async () => {
     const { io } = makeIo()
     const { transport, postJson } = makeTransport()
-    const tmp = await mkdtemp(path.join(os.tmpdir(), 'g-command-init-test-'))
+    await using temporaryDirectory = await mkdtempDisposable(path.join(os.tmpdir(), 'g-command-init-test-'))
+    const tmp = temporaryDirectory.path
     const previousCwd = process.cwd()
     try {
       process.chdir(tmp)
@@ -147,7 +148,6 @@ describe('g command cli', () => {
       await expect(readFile(path.join(tmp, 'goblin.toml'), 'utf8')).resolves.toBe('existing\n')
     } finally {
       process.chdir(previousCwd)
-      await rm(tmp, { recursive: true, force: true })
     }
   })
 

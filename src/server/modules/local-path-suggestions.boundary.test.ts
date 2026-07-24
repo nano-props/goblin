@@ -74,13 +74,15 @@ async function suggest(prefix: string, signal?: AbortSignal): Promise<string[]> 
 
 function fakeDirectory(entries: Dirent[], afterFirstRead?: () => void) {
   let index = 0
+  const close = vi.fn(async () => {})
   return {
     read: vi.fn(async () => {
       const entry = entries[index++] ?? null
       if (index === 1) afterFirstRead?.()
       return entry
     }),
-    close: vi.fn(async () => {}),
+    close,
+    [Symbol.asyncDispose]: close,
   }
 }
 

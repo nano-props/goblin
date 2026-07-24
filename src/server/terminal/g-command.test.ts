@@ -1,26 +1,17 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempDisposableSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { buildGoblinTerminalCommandEnvironment, resolveGoblinCommandEntry } from '#/server/terminal/g-command.ts'
 
-const tmpDirs: string[] = []
-
-afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true })
-  }
-})
-
-function makeTmpDir(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'goblin-g-command-'))
-  tmpDirs.push(dir)
-  return dir
+function makeTmpDir() {
+  return mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-g-command-'))
 }
 
 describe('g terminal command', () => {
   test('builds the terminal environment from static launcher resources', () => {
-    const binDir = makeTmpDir()
+    using temporaryDirectory = makeTmpDir()
+    const binDir = temporaryDirectory.path
     writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
     const entryPath = path.join(binDir, 'g-command.js')
     writeFileSync(entryPath, '')
@@ -45,7 +36,8 @@ describe('g terminal command', () => {
   })
 
   test('refuses to build an environment when the packaged entrypoint is missing', () => {
-    const binDir = makeTmpDir()
+    using temporaryDirectory = makeTmpDir()
+    const binDir = temporaryDirectory.path
     writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
 
     const env = buildGoblinTerminalCommandEnvironment({
@@ -59,7 +51,8 @@ describe('g terminal command', () => {
   })
 
   test('resolves built command entry before source fallback', () => {
-    const dir = makeTmpDir()
+    using temporaryDirectory = makeTmpDir()
+    const dir = temporaryDirectory.path
     const built = path.join(dir, 'g-command.js')
     const source = path.join(dir, 'g-command.ts')
     writeFileSync(built, '')

@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempDisposableSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -15,7 +15,6 @@ const { isWindowsTerminalInstalled, openInWindowsTerminal } = await import('#/sy
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
 const originalPlatform = process.platform
-const tempDirs: string[] = []
 
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   Object.defineProperty(process, 'platform', { value: platform, configurable: true })
@@ -26,10 +25,8 @@ function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   }
 }
 
-function makeTempDir(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'goblin-wt-test-'))
-  tempDirs.push(dir)
-  return dir
+function makeTempDir() {
+  return mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-wt-test-'))
 }
 
 function makeFakeWindowsTerminal(dir: string): string {
@@ -42,14 +39,14 @@ afterEach(() => {
   process.env.PATH = originalPath
   if (originalPathExt === undefined) delete process.env.PATHEXT
   else process.env.PATHEXT = originalPathExt
-  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   execaMock.mockReset()
 })
 
 describe('isWindowsTerminalInstalled', () => {
   test('returns false on non-win32 platforms even when an executable is on PATH', () => {
     withPlatform('darwin', () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       const fake = path.join(dir, 'wt.exe')
       writeFileSync(fake, '')
       chmodSync(fake, 0o755)
@@ -62,7 +59,8 @@ describe('isWindowsTerminalInstalled', () => {
 
   test('returns true on win32 when wt.exe is on PATH', () => {
     withPlatform('win32', () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       const fake = makeFakeWindowsTerminal(dir)
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
@@ -74,7 +72,8 @@ describe('isWindowsTerminalInstalled', () => {
 
   test('returns false on win32 when neither wt.exe nor WindowsApps fallback resolves', () => {
     withPlatform('win32', () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
       process.env.LOCALAPPDATA = dir
@@ -85,7 +84,8 @@ describe('isWindowsTerminalInstalled', () => {
 
   test('does not fall back to cmd.exe when wt.exe is missing', () => {
     withPlatform('win32', () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       const cmd = path.join(dir, 'cmd.exe')
       writeFileSync(cmd, '@echo off\r\n')
       // Only cmd.exe is present. We expect isInstalled to stay false so the
@@ -127,7 +127,8 @@ describe('openInWindowsTerminal', () => {
 
   test('returns not-installed when wt.exe cannot be found', async () => {
     withPlatform('win32', async () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
       process.env.LOCALAPPDATA = dir
@@ -144,7 +145,8 @@ describe('openInWindowsTerminal', () => {
 
   test('spawns wt.exe with -d <path> on success', async () => {
     withPlatform('win32', async () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       const fake = makeFakeWindowsTerminal(dir)
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
@@ -170,7 +172,8 @@ describe('openInWindowsTerminal', () => {
 
   test('returns the error message when wt.exe fails to spawn', async () => {
     withPlatform('win32', async () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       makeFakeWindowsTerminal(dir)
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'

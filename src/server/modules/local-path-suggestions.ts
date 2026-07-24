@@ -35,13 +35,14 @@ export async function getLocalPathSuggestionsForHost(input: {
     if (isExpectedFilesystemError(error)) return []
     throw error
   }
+  await using managedDirectory = directory
 
   const suggestions: string[] = []
   let inspected = 0
   try {
     while (inspected < MAX_INSPECTED_ENTRIES && suggestions.length < MAX_SUGGESTIONS) {
       throwIfAborted(input.signal)
-      const entry = await directory.read()
+      const entry = await managedDirectory.read()
       if (!entry) break
       inspected += 1
       if (!nativeLeafMatches(entry.name, plan.typedLeaf, plan.platform)) continue
@@ -52,8 +53,6 @@ export async function getLocalPathSuggestionsForHost(input: {
   } catch (error) {
     if (!isExpectedFilesystemError(error)) throw error
     return []
-  } finally {
-    await directory.close()
   }
   return suggestions.sort((left, right) => left.localeCompare(right, 'en'))
 }
