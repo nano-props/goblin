@@ -7,6 +7,8 @@ import {
   isTerminalWsMessageWithinLimit,
   isValidTerminalSize,
   isValidTerminalRuntimeSessionId,
+  isValidTerminalWriteData,
+  MAX_TERMINAL_WRITE_CHARS,
   normalizeTerminalClientMessage,
   normalizeTerminalCreateResult,
   normalizeTerminalRealtimeMessage,
@@ -42,6 +44,13 @@ describe('shared terminal validators', () => {
     expect(normalizeTerminalSize(80, 301)).toBeNull()
     expect(isValidTerminalSize(120, 40)).toBe(true)
     expect(isValidTerminalSize('120', 40)).toBe(false)
+  })
+
+  test('validates terminal write data at the shared protocol boundary', () => {
+    expect(isValidTerminalWriteData('echo ok')).toBe(true)
+    expect(isValidTerminalWriteData('echo\0bad')).toBe(false)
+    expect(isValidTerminalWriteData('x'.repeat(MAX_TERMINAL_WRITE_CHARS))).toBe(true)
+    expect(isValidTerminalWriteData('x'.repeat(MAX_TERMINAL_WRITE_CHARS + 1))).toBe(false)
   })
 
   test('validates attachment ids and bell payloads', () => {

@@ -126,12 +126,16 @@ The protocol now has three explicit outcomes:
 
 `open` means the spawned PTY handle is bound to its data and exit listeners. It
 does not mean that a first output chunk has arrived. Quiet processes that wait
-for stdin are therefore writable immediately; output acceptance is tracked
-separately by the server render sequence and snapshot checkpoint.
+for stdin are therefore writable immediately after an explicit client focus;
+output acceptance is tracked separately by the server render sequence and
+snapshot checkpoint.
 
 The client applies any stream output already available at its presentation
 cutoff, then commits a full-viewport render even when that output set is empty.
-It must not use first output as a presentation or shell-readiness signal.
+An empty fresh frame may be revealed, but automatic focus remains fenced until
+real PTY output has rendered. First output is not a lifecycle or shell-readiness
+signal; the fence only prevents input owned by the previous focus target from
+entering a blank fresh PTY. A visible quiet process remains explicitly focusable.
 
 The server, not the client, chooses the attach frame from PTY state. A second
 attach waiting on an in-flight fresh spawn is a recovery attach and receives a

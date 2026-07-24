@@ -25,8 +25,7 @@ export interface AppTerminalProjectionRecoveryDependencies {
 }
 
 export type TerminalProjectionRecoveryRequirement =
-  | { kind: 'minimum-revision'; revision: number }
-  | { kind: 'reconnect' }
+  { kind: 'minimum-revision'; revision: number } | { kind: 'reconnect' }
 
 export class AppTerminalProjectionRecovery {
   private readonly dependencies: AppTerminalProjectionRecoveryDependencies

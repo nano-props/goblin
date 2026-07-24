@@ -39,7 +39,8 @@ export class TerminalProjectionRecoveryCoordinator {
     if (!input.scope.isActive()) return
     const { workspaceId, workspaceRuntimeId } = input.scope.target
     const currentObligation = this.freshObligationByWorkspaceId.get(workspaceId)
-    if (currentObligation?.workspaceRuntimeId !== workspaceRuntimeId) this.freshObligationByWorkspaceId.delete(workspaceId)
+    if (currentObligation?.workspaceRuntimeId !== workspaceRuntimeId)
+      this.freshObligationByWorkspaceId.delete(workspaceId)
     if (input.afterAccept && !this.freshObligationByWorkspaceId.has(workspaceId)) {
       this.freshObligationByWorkspaceId.set(workspaceId, { workspaceRuntimeId, afterAccept: input.afterAccept })
     }
@@ -60,10 +61,7 @@ export class TerminalProjectionRecoveryCoordinator {
     void this.run(workspaceId, admitted)
   }
 
-  private async run(
-    workspaceId: string,
-    pending: PendingTerminalProjectionRecovery,
-  ): Promise<void> {
+  private async run(workspaceId: string, pending: PendingTerminalProjectionRecovery): Promise<void> {
     try {
       let retriedStaleRevision: number | null = null
       let retriedSupersededRevision: number | null = null

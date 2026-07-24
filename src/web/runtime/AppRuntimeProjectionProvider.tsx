@@ -57,9 +57,7 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
             .getState()
             .markProjectionFailed(workspaceId, workspaceRuntimeId, errorMessage),
         isFocusRefreshDue: (workspaceId, workspaceRuntimeId) =>
-          useTerminalProjectionHydrationStore
-            .getState()
-            .isProjectionFocusRefreshDue(workspaceId, workspaceRuntimeId),
+          useTerminalProjectionHydrationStore.getState().isProjectionFocusRefreshDue(workspaceId, workspaceRuntimeId),
         logFailure: (error) =>
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error }),
       }),

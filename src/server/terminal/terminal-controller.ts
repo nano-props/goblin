@@ -4,8 +4,6 @@ import type { TerminalController } from '#/shared/terminal-types.ts'
  * Server-side attachment membership and controller intent. Geometry belongs
  * to the current bound PTY state, never to an attachment or create request.
  */
-export type TerminalAuthorityAction = 'write' | 'resize' | 'restart'
-
 export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-client'
 
 type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
@@ -28,26 +26,23 @@ export interface TerminalClientAdmission {
 export function isAuthoritative(
   state: TerminalControllerState,
   clientId: string,
-  action: TerminalAuthorityAction,
   isClientOnline: TerminalClientPresence,
 ): boolean {
-  return decideTerminalActionAuthority(state, clientId, action, isClientOnline).kind === 'allow'
+  return decideTerminalAuthority(state, clientId, isClientOnline).kind === 'allow'
 }
 
 export function explainAuthority(
   state: TerminalControllerState,
   clientId: string,
-  action: TerminalAuthorityAction,
   isClientOnline: TerminalClientPresence,
 ): TerminalAuthorityReason | null {
-  const decision = decideTerminalActionAuthority(state, clientId, action, isClientOnline)
+  const decision = decideTerminalAuthority(state, clientId, isClientOnline)
   return decision.kind === 'allow' ? null : decision.reason
 }
 
-function decideTerminalActionAuthority(
+function decideTerminalAuthority(
   state: TerminalControllerState,
   clientId: string,
-  action: TerminalAuthorityAction,
   isClientOnline: TerminalClientPresence,
 ): TerminalAuthorityDecision {
   if (!state.attachments.has(clientId) || !isClientOnline(clientId)) {

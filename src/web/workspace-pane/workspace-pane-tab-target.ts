@@ -76,18 +76,6 @@ export function workspaceRootPaneTargetLease(
   }
 }
 
-export function detachedWorktreePaneTargetLease(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  worktreePath: string,
-): FilesystemWorkspacePaneTargetLease {
-  return {
-    routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
-    workspaceRuntimeId,
-    authority: { kind: 'detached-worktree' },
-  }
-}
-
 export function gitWorktreePaneTargetLease(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,

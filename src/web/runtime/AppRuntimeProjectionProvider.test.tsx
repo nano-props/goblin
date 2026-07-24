@@ -778,18 +778,14 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     useTerminalProjectionHydrationStore.setState({
       refreshCooldownMs: 10_000,
-      hydrationByWorkspace: new Map([
-        [REPO_ID, { workspaceRuntimeId: 'repo-runtime-retired', phase: 'pending' }],
-      ]),
+      hydrationByWorkspace: new Map([[REPO_ID, { workspaceRuntimeId: 'repo-runtime-retired', phase: 'pending' }]]),
       lastSuccessfulRecoveryByWorkspace: new Map([
         [REPO_ID, { workspaceRuntimeId: 'repo-runtime-retired', completedAt: Date.now() }],
       ]),
     })
 
     expect(
-      useTerminalProjectionHydrationStore
-        .getState()
-        .isProjectionFocusRefreshDue(REPO_ID, repo.workspaceRuntimeId),
+      useTerminalProjectionHydrationStore.getState().isProjectionFocusRefreshDue(REPO_ID, repo.workspaceRuntimeId),
     ).toBe(true)
   })
 

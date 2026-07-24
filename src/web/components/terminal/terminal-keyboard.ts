@@ -8,13 +8,6 @@ interface SessionIdEventLike {
   code?: string
 }
 
-interface KeyOwnershipEventLike {
-  type: string
-  key: string
-  code?: string
-  repeat: boolean
-}
-
 type SafariShiftKeyPair = readonly [unshifted: string, shifted: string]
 
 const MAC_OPTION_ARROW_INPUT: Record<string, string> = {
@@ -94,33 +87,6 @@ export function terminalInputForMacOptionArrow(
   if (!options.isMac || options.applicationCursorKeysMode || event.type !== 'keydown') return null
   if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return null
   return MAC_OPTION_ARROW_INPUT[event.key] ?? null
-}
-
-/**
- * Rejects browser key-repeat events whose initial keydown belonged to another
- * focus target. This prevents a key held on the hidden navigation focus sink
- * from beginning to write merely because focus later moves to xterm.
- */
-export class TerminalKeyRepeatFilter {
-  private readonly pressedKeys = new Set<string>()
-
-  reset(): void {
-    this.pressedKeys.clear()
-  }
-
-  accepts(event: KeyOwnershipEventLike): boolean {
-    const key = event.code || event.key
-    if (!key) return true
-    if (event.type === 'keyup') {
-      this.pressedKeys.delete(key)
-      return true
-    }
-    if (event.type === 'keydown' && !event.repeat) {
-      this.pressedKeys.add(key)
-      return true
-    }
-    return !event.repeat || this.pressedKeys.has(key)
-  }
 }
 
 export class SafariShiftKeyResolver {

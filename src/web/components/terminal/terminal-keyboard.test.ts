@@ -3,7 +3,6 @@
 import { describe, expect, test } from 'vitest'
 import {
   SafariShiftKeyResolver,
-  TerminalKeyRepeatFilter,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
@@ -201,41 +200,6 @@ describe('terminalInputForMacOptionArrow', () => {
   })
 })
 
-describe('TerminalKeyRepeatFilter', () => {
-  test('rejects repeats whose initial keydown belonged to the previous focus target', () => {
-    const filter = new TerminalKeyRepeatFilter()
-
-    expect(filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a', repeat: true }))).toBe(false)
-    expect(filter.accepts(keyRepeatEvent({ type: 'keypress', code: 'KeyA', key: 'a', repeat: true }))).toBe(false)
-    expect(filter.accepts(keyRepeatEvent({ type: 'keyup', code: 'KeyA', key: 'a' }))).toBe(true)
-  })
-
-  test('accepts repeats only after this terminal observed the initial keydown', () => {
-    const filter = new TerminalKeyRepeatFilter()
-
-    expect(filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a' }))).toBe(true)
-    expect(filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a', repeat: true }))).toBe(true)
-    expect(filter.accepts(keyRepeatEvent({ type: 'keypress', code: 'KeyA', key: 'a', repeat: true }))).toBe(true)
-    expect(filter.accepts(keyRepeatEvent({ type: 'keyup', code: 'KeyA', key: 'a' }))).toBe(true)
-    expect(filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a', repeat: true }))).toBe(false)
-  })
-
-  test('reset retires ownership from a destroyed presentation', () => {
-    const filter = new TerminalKeyRepeatFilter()
-    filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a' }))
-
-    filter.reset()
-
-    expect(filter.accepts(keyRepeatEvent({ code: 'KeyA', key: 'a', repeat: true }))).toBe(false)
-  })
-
-  test('stays permissive for events without a stable key identity', () => {
-    const filter = new TerminalKeyRepeatFilter()
-
-    expect(filter.accepts(keyRepeatEvent({ code: '', key: '', repeat: true }))).toBe(true)
-  })
-})
-
 describe('isMacNavigatorPlatform', () => {
   test('recognizes Mac platforms', () => {
     expect(isMacNavigatorPlatform('MacIntel')).toBe(true)
@@ -245,12 +209,3 @@ describe('isMacNavigatorPlatform', () => {
     expect(isMacNavigatorPlatform('Linux x86_64')).toBe(false)
   })
 })
-
-function keyRepeatEvent(partial: Partial<{ type: string; key: string; code: string; repeat: boolean }>): {
-  type: string
-  key: string
-  code: string
-  repeat: boolean
-} {
-  return { type: 'keydown', key: '', code: '', repeat: false, ...partial }
-}

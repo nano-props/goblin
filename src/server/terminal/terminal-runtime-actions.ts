@@ -19,9 +19,13 @@ import type {
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
-import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
+import {
+  isValidTerminalRuntimeSessionId,
+  isValidTerminalSize,
+  isValidTerminalWriteData,
+} from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
-import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'

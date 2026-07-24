@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
@@ -64,7 +64,7 @@ import {
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
-import { TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
+import { observeTerminalInputKeyboardActivity, TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -105,6 +105,7 @@ export function Layout() {
 }
 
 function AuthenticatedAppShell() {
+  useEffect(() => observeTerminalInputKeyboardActivity(), [])
   useWorkspaceFilesystemInvalidationSync()
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const activeWorkspaceSlug = workspaceRouteContextFromMatches(routeMatches)?.workspaceSlug ?? null

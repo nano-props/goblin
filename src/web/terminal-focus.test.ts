@@ -8,6 +8,7 @@ import {
 import {
   claimTerminalInputFocus,
   fulfillTerminalPresentationFocus,
+  observeTerminalInputKeyboardActivity,
   TERMINAL_INPUT_FOCUS_SINK_ID,
   terminalOwnsKeyboardInput,
 } from '#/web/terminal-focus.ts'
@@ -15,12 +16,17 @@ import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 
 type RequiredTerminalFocusRequest = Required<TerminalFocusRequest>
 
+let stopObservingKeyboardActivity: (() => void) | null = null
+
 beforeEach(() => {
   resetPrimaryWindowPresentationForTest()
   installTerminalFocusSink()
+  stopObservingKeyboardActivity = observeTerminalInputKeyboardActivity()
 })
 
 afterEach(() => {
+  stopObservingKeyboardActivity?.()
+  stopObservingKeyboardActivity = null
   document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
   resetPrimaryWindowPresentationForTest()
 })
@@ -59,6 +65,52 @@ describe('terminal presentation focus', () => {
     expect(firstLease).not.toBeNull()
     expect(claimTerminalInputFocus(token)).toBeNull()
     firstLease?.release()
+  })
+
+  test('does not transfer a key that was already held when terminal navigation claimed focus', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true }))
+    const token = beginPrimaryWindowPresentation()
+    const lease = claimTerminalInputFocus(token)
+    if (!lease) throw new Error('expected terminal input focus lease')
+    const focusTerminal = acceptedFocus()
+
+    lease.commit('term-created', focusTerminal)
+    const request = focusTerminal.mock.calls[0]![1]
+
+    expect(request.isCurrent()).toBe(false)
+    request.onSettled()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', code: 'KeyA', bubbles: true }))
+  })
+
+  test('cancels automatic focus when keyboard activity reaches the transition sink', () => {
+    const token = beginPrimaryWindowPresentation()
+    const lease = claimTerminalInputFocus(token)
+    if (!lease) throw new Error('expected terminal input focus lease')
+    const focusTerminal = acceptedFocus()
+    lease.commit('term-created', focusTerminal)
+    const request = focusTerminal.mock.calls[0]![1]
+    const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
+    if (!(sink instanceof HTMLElement)) throw new Error('expected terminal input focus sink')
+
+    sink.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', bubbles: true }))
+
+    expect(request.isCurrent()).toBe(false)
+    request.onSettled()
+    expect(terminalOwnsKeyboardInput()).toBe(false)
+  })
+
+  test('does not treat the navigation shortcut itself as inherited terminal input', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
+    const token = beginPrimaryWindowPresentation()
+    const lease = claimTerminalInputFocus(token)
+    if (!lease) throw new Error('expected terminal input focus lease')
+    const focusTerminal = acceptedFocus()
+
+    lease.commit('term-created', focusTerminal)
+
+    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
+    focusTerminal.mock.calls[0]![1].onSettled()
   })
 
   test('does not create mount-time focus after the user selected another control', () => {

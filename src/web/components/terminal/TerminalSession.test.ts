@@ -181,6 +181,10 @@ const xtermMocks = vi.hoisted(() => {
       return { dispose: vi.fn(() => (this.renderHandlers = this.renderHandlers.filter((handler) => handler !== cb))) }
     }
 
+    emitRender(start = 0, end = this.rows - 1) {
+      for (const handler of this.renderHandlers) handler({ start, end })
+    }
+
     onTitleChange(cb: (title: string) => void) {
       this.titleHandlers.push(cb)
       return { dispose: vi.fn(() => (this.titleHandlers = this.titleHandlers.filter((handler) => handler !== cb))) }
@@ -850,13 +854,15 @@ describe('TerminalSession', () => {
     expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
   })
 
-  test('presents a quiet fresh stream after an empty viewport render and then admits input', async () => {
+  test('does not transfer automatic focus to a fresh stream until real output has rendered', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+    const settled = vi.fn()
 
+    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
@@ -871,6 +877,22 @@ describe('TerminalSession', () => {
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(term.write).not.toHaveBeenCalled()
+    expect(term.focus).not.toHaveBeenCalled()
+    expect(settled).not.toHaveBeenCalled()
+
+    term.refresh.mockImplementationOnce(() => {})
+    emitSessionOutput(session, 1, 'prompt')
+    await flushTerminalStart()
+
+    expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
+    expect(term.focus).not.toHaveBeenCalled()
+    expect(settled).not.toHaveBeenCalled()
+
+    term.emitRender()
+    await flushTerminalStart()
+
+    expect(term.focus).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledOnce()
     term.emitUserData('l')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
@@ -879,6 +901,59 @@ describe('TerminalSession', () => {
       terminalRuntimeGeneration: 1,
       data: 'l',
     })
+  })
+
+  test('keeps a quiet fresh stream visible and allows an explicit focus request', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+    const settled = vi.fn()
+
+    session.focus({ isCurrent: () => true, onSettled: settled })
+    session.attach(host)
+    await flushTerminalStart()
+    const term = xtermMocks.terminals[0]!
+
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+    expect(term.write).not.toHaveBeenCalled()
+    expect(term.focus).not.toHaveBeenCalled()
+
+    session.focus()
+    term.emitUserData('input for quiet process')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
+    expect(term.focus).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledOnce()
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: 'input for quiet process',
+    })
+  })
+
+  test('drops an automatic focus transfer invalidated by keyboard activity before fresh output', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+    let focusIsCurrent = true
+    const settled = vi.fn()
+
+    session.focus({ isCurrent: () => focusIsCurrent, onSettled: settled })
+    session.attach(host)
+    await flushTerminalStart()
+    const term = xtermMocks.terminals[0]!
+    focusIsCurrent = false
+
+    emitSessionOutput(session, 1, 'prompt')
+    await flushTerminalStart()
+
+    expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
+    expect(term.focus).not.toHaveBeenCalled()
+    expect(settled).toHaveBeenCalledOnce()
   })
 
   test('flushes current-generation stream output that arrives during the final render exactly once', async () => {
@@ -1252,32 +1327,6 @@ describe('TerminalSession', () => {
     session.clearSearch()
     expect(xtermMocks.searchAddons[0]!.clearDecorations).toHaveBeenCalled()
     expect(session.snapshot().search).toBeUndefined()
-  })
-
-  test('rejects keyboard repeats that began before focus moved to the presented xterm', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-
-    const handler = xtermMocks.terminals[0]!.customKeyEventHandler
-    expect(handler).toBeTypeOf('function')
-    const inheritedRepeat = new KeyboardEvent('keydown', {
-      key: 'a',
-      code: 'KeyA',
-      repeat: true,
-      cancelable: true,
-    })
-    expect(handler?.(inheritedRepeat)).toBe(false)
-    expect(inheritedRepeat.defaultPrevented).toBe(true)
-
-    expect(handler?.(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA' }))).toBe(true)
-    expect(handler?.(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', repeat: true }))).toBe(true)
-    expect(handler?.(new KeyboardEvent('keyup', { key: 'a', code: 'KeyA' }))).toBe(true)
-    expect(handler?.(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', repeat: true }))).toBe(false)
   })
 
   test('handles mac option arrows with VS Code-like terminal input', async () => {

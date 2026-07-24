@@ -152,8 +152,11 @@ the supervisor transfers early output/exit through a bounded single-owner event
 lease, and the realtime socket orders the attach/restart response before output
 for the new binding. Client presentation remains hidden and rejects local input
 until the fitted xterm has consumed the output available at its presentation
-cutoff (which may be empty) and emitted a full-viewport `onRender`. First output
-is not treated as shell readiness.
+cutoff (which may be empty) and emitted a full-viewport `onRender`. An empty
+fresh stream can then be revealed for quiet-process access, but its automatic
+focus intent remains fenced until real PTY output is rendered. Keyboard activity
+owned by the previous focus target retires that intent instead of being replayed
+or filtered inside xterm. First output is not treated as shell readiness.
 
 ## P2: Further tighten client projection boundaries
 

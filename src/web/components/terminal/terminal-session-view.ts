@@ -17,7 +17,6 @@ import {
 } from '#/web/components/terminal/terminal-theme.ts'
 import {
   SafariShiftKeyResolver,
-  TerminalKeyRepeatFilter,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
@@ -25,6 +24,12 @@ import { terminalLog } from '#/web/logger.ts'
 import { constrainTerminalSize } from '#/shared/terminal-validators.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+
+interface PendingTerminalFocusRequest {
+  request: TerminalFocusRequest
+  kind: 'automatic' | 'explicit'
+}
+
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
@@ -37,8 +42,9 @@ export class TerminalSessionView {
   private disposeFontObserver: (() => void) | null = null
   private host: HTMLElement | null = null
   private presentationState: 'pending' | 'presented' = 'pending'
-  private pendingFocusRequest: TerminalFocusRequest | null = null
-  private readonly keyRepeatFilter = new TerminalKeyRepeatFilter()
+  private pendingFocusRequest: PendingTerminalFocusRequest | null = null
+  private automaticFocusReady = false
+  private automaticFocusRenderAbortController: AbortController | null = null
   private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
 
   constructor(handlers: {
@@ -53,11 +59,6 @@ export class TerminalSessionView {
     this.frame.className = 'goblin-managed-terminal-frame'
     this.xtermHost = document.createElement('div')
     this.xtermHost.className = 'goblin-managed-terminal-host'
-    this.xtermHost.addEventListener('focusout', (event) => {
-      if (!(event.relatedTarget instanceof Node) || !this.xtermHost.contains(event.relatedTarget)) {
-        this.keyRepeatFilter.reset()
-      }
-    })
     this.frame.appendChild(this.xtermHost)
     this.handlers = handlers
   }
@@ -109,8 +110,10 @@ export class TerminalSessionView {
   }
 
   private markPresentationPending(): void {
+    this.automaticFocusRenderAbortController?.abort()
+    this.automaticFocusRenderAbortController = null
     this.presentationState = 'pending'
-    this.keyRepeatFilter.reset()
+    this.automaticFocusReady = false
     this.frame.style.visibility = 'hidden'
   }
 
@@ -118,16 +121,36 @@ export class TerminalSessionView {
     return this.presentationState === 'presented'
   }
 
-  async present(term: XTermTerminal, signal: AbortSignal): Promise<'presented' | 'layout-changed' | 'cancelled'> {
+  async present(
+    term: XTermTerminal,
+    signal: AbortSignal,
+    automaticFocusReady: boolean,
+  ): Promise<'presented' | 'layout-changed' | 'cancelled'> {
     if (this.term !== term || !this.host?.isConnected) return 'cancelled'
     if (!(await waitForFullViewportRender(term, signal))) return 'cancelled'
     if (this.term !== term || !this.host?.isConnected) return 'cancelled'
     const dimensions = this.proposedProtocolSize()
     if (!dimensions || dimensions.cols !== term.cols || dimensions.rows !== term.rows) return 'layout-changed'
     this.presentationState = 'presented'
+    this.automaticFocusReady ||= automaticFocusReady
     this.frame.style.visibility = ''
-    this.commitFocusRequest(term)
+    this.commitFocusRequestIfAdmitted(term)
     return 'presented'
+  }
+
+  async admitAutomaticFocusAfterRender(term: XTermTerminal): Promise<void> {
+    if (this.automaticFocusReady || this.automaticFocusRenderAbortController) return
+    if (this.term !== term || this.presentationState !== 'presented' || !this.host?.isConnected) return
+    const controller = new AbortController()
+    this.automaticFocusRenderAbortController = controller
+    try {
+      if (!(await waitForFullViewportRender(term, controller.signal))) return
+      if (this.term !== term || this.presentationState !== 'presented' || !this.host?.isConnected) return
+      this.automaticFocusReady = true
+      this.commitFocusRequestIfAdmitted(term)
+    } finally {
+      if (this.automaticFocusRenderAbortController === controller) this.automaticFocusRenderAbortController = null
+    }
   }
 
   blurIfFocused(): void {
@@ -171,7 +194,6 @@ export class TerminalSessionView {
   }
 
   focus(request?: TerminalFocusRequest): void {
-    if (!request && this.pendingFocusRequest) return
     this.settleFocusRequest()
     const next = request ?? { isCurrent: () => true }
     try {
@@ -183,8 +205,8 @@ export class TerminalSessionView {
       next.onSettled?.()
       throw error
     }
-    this.pendingFocusRequest = next
-    if (this.term && this.presentationState === 'presented') this.commitFocusRequest(this.term)
+    this.pendingFocusRequest = { request: next, kind: request ? 'automatic' : 'explicit' }
+    if (this.term && this.presentationState === 'presented') this.commitFocusRequestIfAdmitted(this.term)
   }
 
   clearSearch(): void {
@@ -232,7 +254,6 @@ export class TerminalSessionView {
     this.disposeThemeObserver = null
     this.disposeFontObserver?.()
     this.disposeFontObserver = null
-    this.keyRepeatFilter.reset()
     this.safariShiftKeyResolver.reset()
     this.fitAddon = null
     this.searchAddon = null
@@ -244,14 +265,8 @@ export class TerminalSessionView {
 
   private installKeyboardHandlers(term: XTermTerminal, onInput: (data: string) => void): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
-    const keyRepeatFilter = this.keyRepeatFilter
     const safariShiftKeyResolver = this.safariShiftKeyResolver
     term.attachCustomKeyEventHandler((event) => {
-      if (!keyRepeatFilter.accepts(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        return false
-      }
       const optionInput = terminalInputForMacOptionArrow(event, {
         isMac,
         applicationCursorKeysMode: term.modes.applicationCursorKeysMode,
@@ -377,18 +392,19 @@ export class TerminalSessionView {
   }
 
   private settleFocusRequest(): void {
-    const request = this.pendingFocusRequest
+    const pending = this.pendingFocusRequest
     this.pendingFocusRequest = null
-    request?.onSettled?.()
+    pending?.request.onSettled?.()
   }
 
-  private commitFocusRequest(term: XTermTerminal): void {
-    const request = this.pendingFocusRequest
+  private commitFocusRequestIfAdmitted(term: XTermTerminal): void {
+    const pending = this.pendingFocusRequest
+    if (!pending || (pending.kind === 'automatic' && !this.automaticFocusReady)) return
     this.pendingFocusRequest = null
     try {
-      if (request?.isCurrent()) term.focus()
+      if (pending.request.isCurrent()) term.focus()
     } finally {
-      request?.onSettled?.()
+      pending.request.onSettled?.()
     }
   }
 }

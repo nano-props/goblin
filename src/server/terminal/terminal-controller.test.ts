@@ -97,13 +97,9 @@ describe('terminal membership and authority', () => {
 
   test('allows only the effective controller to mutate a binding', () => {
     const state = createState({ attachments: new Set(['a1', 'a2']), controllerClientId: 'a1' })
-    expect(isAuthoritative(state, 'a1', 'write', online)).toBe(true)
-    expect(isAuthoritative(state, 'a1', 'resize', online)).toBe(true)
-    expect(isAuthoritative(state, 'a1', 'restart', online)).toBe(true)
-    expect(explainAuthority(state, 'a2', 'write', online)).toBe('not-controller')
-    expect(explainAuthority(createState({ attachments: new Set(['a1']) }), 'a1', 'write', online)).toBe(
-      'session-unowned',
-    )
-    expect(explainAuthority(state, 'missing', 'write', online)).toBe('unknown-client')
+    expect(isAuthoritative(state, 'a1', online)).toBe(true)
+    expect(explainAuthority(state, 'a2', online)).toBe('not-controller')
+    expect(explainAuthority(createState({ attachments: new Set(['a1']) }), 'a1', online)).toBe('session-unowned')
+    expect(explainAuthority(state, 'missing', online)).toBe('unknown-client')
   })
 })

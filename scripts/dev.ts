@@ -23,8 +23,8 @@ const electronArgs = [
   // it. Only used for end-to-end testing.
   ...(process.env.AGENT_BROWSER_CDP_PORT ? [`--remote-debugging-port=${process.env.AGENT_BROWSER_CDP_PORT}`] : []),
 ]
-const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'src/system', 'vite.config.ts'].map((target) =>
-  path.join(repoRoot, target),
+const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'src/system', 'vite.config.ts'].map(
+  (target) => path.join(repoRoot, target),
 )
 
 let shuttingDown = false

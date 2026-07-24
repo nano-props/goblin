@@ -635,7 +635,11 @@ export class TerminalSession {
         this.assertCurrentStart(epoch, term)
         await this.commitPendingPresentationOutput(epoch, term)
         for (;;) {
-          const presentation = await this.view.present(term, presentationAbortController.signal)
+          const presentation = await this.view.present(
+            term,
+            presentationAbortController.signal,
+            result.frame === 'snapshot' || this.currentBindingHasRenderedOutput(),
+          )
           if (presentation === 'cancelled') throw new StartCancelledError()
           if (presentation === 'presented') break binding
           if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
@@ -1019,9 +1023,23 @@ export class TerminalSession {
     const current = this.renderedOutputCheckpoint
     if (!current || !sameRenderedBinding(current, checkpoint)) {
       this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
-      return
+    } else if (checkpoint.seq > current.seq) {
+      this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
     }
-    if (checkpoint.seq > current.seq) this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
+    const term = this.view.currentTerminal()
+    if (!term || !this.view.isPresented()) return
+    void this.view.admitAutomaticFocusAfterRender(term).catch((error: unknown) => {
+      terminalLog.warn('terminal automatic focus render barrier failed', {
+        terminalRuntimeSessionId: checkpoint.terminalRuntimeSessionId,
+        error,
+      })
+    })
+  }
+
+  private currentBindingHasRenderedOutput(): boolean {
+    const binding = this.runtime.currentRuntimeBinding()
+    const checkpoint = this.renderedOutputCheckpoint
+    return !!binding && !!checkpoint && sameRenderedBinding(binding, checkpoint) && checkpoint.seq > 0
   }
 
   private checkpointFromOutputEvent(event: TerminalOutputEvent): RenderedOutputCheckpoint {

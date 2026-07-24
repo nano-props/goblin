@@ -72,10 +72,13 @@ geometry and the matching headless-render size.
 
 - A hidden, pending terminal presentation accepts no local input. Input is
   discarded rather than buffered for later delivery.
-- Keyboard auto-repeat belongs to the element that admitted its initial
-  keydown. When focus transfers from the pending presentation sink to xterm,
-  repeats inherited from a key that was already held remain discarded until
-  that key is released; a new keydown in xterm starts normal repeat admission.
+- A fresh stream may reveal an empty fitted xterm, but automatic focus remains
+  on the transition sink until real PTY output has been parsed and the resulting
+  viewport has rendered. A deliberate focus request or pointer click may enter
+  a visible quiet process immediately.
+- Keyboard activity that began before or arrived during terminal navigation
+  retires that navigation's automatic focus intent. It is discarded at the
+  transition sink rather than inherited, filtered inside xterm, or replayed.
 - A presented controller forwards xterm input directly through the
   generation-bearing write operation. A viewer or stale generation cannot
   write.
@@ -483,16 +486,23 @@ The system supports replay and snapshot hydration so users can reattach to runni
 
 ### Input during presentation
 
-The client has one presentation distinction: pending or presented. While
-pending, the xterm is hidden and every local input path is discarded. The
-client does not classify, buffer, or replay startup input. Attach/recovery data
-already available at the presentation cutoff is rendered into that fitted
-xterm; a fresh stream is allowed to have no output. A full-viewport xterm
-render event and a final synchronous fit proposal confirm the frame before
-reveal. First output is not a shell-readiness signal. Only the presented
-controller can then send generation-bearing writes. Focus transfer
-does not re-admit auto-repeat whose original keydown occurred on the pending
-focus sink; only a keydown observed by the presented xterm owns later repeats.
+Presentation and automatic focus are separate client-owned boundaries. While
+presentation is pending, the xterm is hidden and every local input path is
+discarded. The client does not classify, buffer, or replay startup input.
+Attach/recovery data already available at the presentation cutoff is rendered
+into that fitted xterm, and a full-viewport render plus a final synchronous fit
+proposal confirm the frame before reveal. A fresh stream is allowed to reveal
+with no output so a quiet process cannot deadlock waiting for stdin.
+
+Recovery snapshots may fulfil the pending automatic focus intent at reveal. A
+fresh stream fulfils it only after real PTY output has been parsed and a
+subsequent full-viewport render has completed. If plain keyboard activity was
+already held when navigation began or reaches the transition sink while the
+intent is pending, the intent is retired without focusing xterm. The user may
+still explicitly click or focus the visible terminal, including a quiet one.
+First output is not a server lifecycle or shell-readiness signal; it is only a
+client-side fence preventing an old keyboard stream from entering a blank fresh
+presentation. Only a presented controller can send generation-bearing writes.
 
 ### Fresh stream and recovery frame contract
 

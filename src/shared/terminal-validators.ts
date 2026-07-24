@@ -337,6 +337,11 @@ const TerminalSessionClosedEventSchema = v.strictObject({
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_RUNTIME_SESSION_ID_RE.test(value)
 }
+
+export function isValidTerminalWriteData(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS && !value.includes('\0')
+}
+
 const TerminalIdentityEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,

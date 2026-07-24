@@ -22,7 +22,11 @@ import {
   type TerminalTitleEvent,
   type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
-import { isValidTerminalRuntimeSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
+import {
+  isValidTerminalRuntimeSessionId,
+  isValidTerminalWriteData,
+  normalizeTerminalSize,
+} from '#/shared/terminal-validators.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import {
   claimTerminalClientControl,
@@ -34,6 +38,7 @@ import {
   isAuthoritative,
   prepareTerminalClientAdmission,
   terminalIdentityChanged,
+  type TerminalAuthorityReason,
 } from '#/server/terminal/terminal-controller.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import {
@@ -57,8 +62,6 @@ import type { TerminalSessionAdmission } from '#/server/terminal/terminal-sessio
 import { serverLogger } from '#/server/logger.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
-
-const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
 type TerminalSessionRetirementOutcome = 'detached' | 'already-detached' | 'failed'
 const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
@@ -348,7 +351,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (this.isSessionClosing(terminalRuntimeSessionId)) return { status: 'rejected' }
     if (terminalPtyBoundState(session)?.activity !== 'active') return { status: 'rejected' }
     if (session.phase !== 'open') return { status: 'rejected' }
-    if (!isAuthoritative(session, clientId, 'write', this.sessionPresence(session))) return { status: 'rejected' }
+    if (!isAuthoritative(session, clientId, this.sessionPresence(session))) return { status: 'rejected' }
     return await session.ptyBinding.write(session, data)
   }
 
@@ -456,7 +459,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       return { ok: false, message: 'error.unavailable' }
     }
     if (session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
-    if (!isAuthoritative(session, clientId, 'resize', this.sessionPresence(session))) {
+    if (!isAuthoritative(session, clientId, this.sessionPresence(session))) {
       return { ok: false, message: 'error.unavailable' }
     }
     const geometry = await this.resizeSessionPty(session, terminalRuntimeGeneration, size.cols, size.rows, {
@@ -464,12 +467,12 @@ export class TerminalSessionManager<TUser extends string | number> {
         this.isSessionAvailableForAdmission(session) &&
         terminalPtyGeneration(session) === terminalRuntimeGeneration &&
         session.phase === 'open' &&
-        isAuthoritative(session, clientId, 'resize', this.sessionPresence(session)),
+        isAuthoritative(session, clientId, this.sessionPresence(session)),
       commit: () =>
         this.isSessionAvailableForAdmission(session) &&
         terminalPtyGeneration(session) === terminalRuntimeGeneration &&
         session.phase === 'open' &&
-        isAuthoritative(session, clientId, 'resize', this.sessionPresence(session)),
+        isAuthoritative(session, clientId, this.sessionPresence(session)),
     })
     if (geometry.changed) this.emitIdentity(session)
     if (!geometry.accepted) return { ok: false, message: 'error.unavailable' }
@@ -582,7 +585,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!bound || bound.generation !== terminalRuntimeGeneration) {
       return { result: { ok: false, message: 'error.unavailable' }, projectionChanged: null }
     }
-    const denyReason = explainAuthority(session, clientId, 'restart', this.sessionPresence(session))
+    const denyReason = explainAuthority(session, clientId, this.sessionPresence(session))
     if (denyReason !== null) {
       return { result: { ok: false, message: authorityReasonToMessage(denyReason) }, projectionChanged: null }
     }
@@ -595,7 +598,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           !this.isSessionAvailableForAdmission(session) ||
           !current ||
           current.generation !== terminalRuntimeGeneration ||
-          explainAuthority(session, clientId, 'restart', this.sessionPresence(session)) !== null
+          explainAuthority(session, clientId, this.sessionPresence(session)) !== null
         ) {
           throw new Error('error.unavailable')
         }
@@ -1294,15 +1297,11 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 }
 
-export function isValidTerminalWriteData(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS && !value.includes('\0')
-}
-
 // Map the shared authority-rejection reasons to user-visible error
 // keys. Lives next to the manager because the keys are the wire
 // protocol's; the decision function itself stays string-free so it
 // can be reused for non-IPC paths (e.g. internal supervisor logic).
-function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' | 'unknown-client'): string {
+function authorityReasonToMessage(reason: TerminalAuthorityReason): string {
   switch (reason) {
     case 'not-controller':
       return 'error.not-controller'

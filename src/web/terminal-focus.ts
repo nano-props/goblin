@@ -27,13 +27,67 @@ interface TerminalInputFocusRecord {
   token: PrimaryWindowPresentationToken
   terminalSessionId: string | null
   state: 'claimed' | 'pending' | 'accepted' | 'settled' | 'abandoned'
+  keyboardActivity: boolean
+  releaseKeyboardActivityObservation: () => void
   releasePresentationAbandon: () => void
+}
+
+interface TerminalInputKeyboardActivity {
+  references: number
+  pressedKeys: Set<string>
+  dispose: () => void
 }
 
 // One sink has at most one focus intent for a presentation generation. A
 // settled record deliberately remains until the next generation so a remount
 // cannot recreate and replay the same intent.
 const terminalInputFocusBySink = new WeakMap<HTMLElement, TerminalInputFocusRecord>()
+const terminalInputKeyboardActivityByDocument = new WeakMap<Document, TerminalInputKeyboardActivity>()
+
+/** Tracks plain-text key ownership before a terminal navigation claims focus. */
+export function observeTerminalInputKeyboardActivity(): () => void {
+  if (typeof document === 'undefined') return () => {}
+  const ownerDocument = document
+  let activity = terminalInputKeyboardActivityByDocument.get(ownerDocument)
+  if (!activity) {
+    const pressedKeys = new Set<string>()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTerminalTransitionKeyboardActivity(event)) return
+      const key = keyboardIdentity(event)
+      if (key) pressedKeys.add(key)
+    }
+    const onKeyUp = (event: KeyboardEvent) => {
+      const key = keyboardIdentity(event)
+      if (key) pressedKeys.delete(key)
+    }
+    const clearPressedKeys = () => pressedKeys.clear()
+    ownerDocument.addEventListener('keydown', onKeyDown, true)
+    ownerDocument.addEventListener('keyup', onKeyUp, true)
+    ownerDocument.defaultView?.addEventListener('blur', clearPressedKeys)
+    activity = {
+      references: 0,
+      pressedKeys,
+      dispose: () => {
+        ownerDocument.removeEventListener('keydown', onKeyDown, true)
+        ownerDocument.removeEventListener('keyup', onKeyUp, true)
+        ownerDocument.defaultView?.removeEventListener('blur', clearPressedKeys)
+      },
+    }
+    terminalInputKeyboardActivityByDocument.set(ownerDocument, activity)
+  }
+  activity.references += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    const current = terminalInputKeyboardActivityByDocument.get(ownerDocument)
+    if (!current) return
+    current.references -= 1
+    if (current.references > 0) return
+    current.dispose()
+    terminalInputKeyboardActivityByDocument.delete(ownerDocument)
+  }
+}
 
 /**
  * Claims keyboard ownership for an app-owned terminal navigation. Calling this
@@ -50,9 +104,20 @@ export function claimTerminalInputFocus(token: PrimaryWindowPresentationToken): 
     token,
     terminalSessionId: null,
     state: 'claimed',
+    keyboardActivity: (terminalInputKeyboardActivityByDocument.get(sink.ownerDocument)?.pressedKeys.size ?? 0) > 0,
+    releaseKeyboardActivityObservation: () => {},
     releasePresentationAbandon: () => {},
   }
   terminalInputFocusBySink.set(sink, record)
+  const markKeyboardActivity = (event: KeyboardEvent) => {
+    if (isTerminalTransitionKeyboardActivity(event)) record.keyboardActivity = true
+  }
+  sink.addEventListener('keydown', markKeyboardActivity, true)
+  sink.addEventListener('keyup', markKeyboardActivity, true)
+  record.releaseKeyboardActivityObservation = () => {
+    sink.removeEventListener('keydown', markKeyboardActivity, true)
+    sink.removeEventListener('keyup', markKeyboardActivity, true)
+  }
   sink.focus({ preventScroll: true })
   if (document.activeElement !== sink) {
     abandonTerminalInputFocus(sink, record)
@@ -161,7 +226,8 @@ function submitTerminalInputFocus(
     abandonTerminalInputFocus(sink, record)
     return
   }
-  const isCurrent = () => record.state === 'accepted' && terminalInputFocusIsCurrent(sink, record)
+  const isCurrent = () =>
+    record.state === 'accepted' && !record.keyboardActivity && terminalInputFocusIsCurrent(sink, record)
   const onSettled = () => {
     if (record.state !== 'accepted') return
     settleTerminalInputFocus(sink, record)
@@ -186,6 +252,8 @@ function terminalInputFocusIsCurrent(sink: HTMLElement, record: TerminalInputFoc
 
 function settleTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusRecord): void {
   record.state = 'settled'
+  record.releaseKeyboardActivityObservation()
+  record.releaseKeyboardActivityObservation = () => {}
   record.releasePresentationAbandon()
   record.releasePresentationAbandon = () => {}
   if (terminalInputFocusBySink.get(sink) === record && document.activeElement === sink) sink.blur()
@@ -194,6 +262,8 @@ function settleTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusR
 function abandonTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusRecord): void {
   if (record.state === 'settled' || record.state === 'abandoned') return
   record.state = 'abandoned'
+  record.releaseKeyboardActivityObservation()
+  record.releaseKeyboardActivityObservation = () => {}
   record.releasePresentationAbandon()
   record.releasePresentationAbandon = () => {}
   if (terminalInputFocusBySink.get(sink) === record && document.activeElement === sink) sink.blur()
@@ -212,4 +282,13 @@ function terminalInputFocusSink(): HTMLElement | null {
   if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') return null
   const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
   return sink instanceof HTMLElement ? sink : null
+}
+
+function keyboardIdentity(event: KeyboardEvent): string {
+  return event.code || event.key
+}
+
+function isTerminalTransitionKeyboardActivity(event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey) return false
+  return event.key !== 'Meta' && event.key !== 'Control' && event.key !== 'Alt' && event.key !== 'Shift'
 }
