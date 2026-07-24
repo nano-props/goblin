@@ -21,9 +21,9 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  beginPrimaryWindowPresentation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
@@ -70,16 +70,16 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
   if (!options.workspaceId || options.tabIndex < 1) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  const presentationToken = beginPrimaryWindowPresentation()
+  const navigationGeneration = beginPrimaryWindowNavigation()
   return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
-    selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, presentationToken),
+    selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, navigationGeneration),
   )
 }
 
 async function selectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
   coordinatorTarget: WorkspacePaneTabModel,
-  presentationToken: PrimaryWindowPresentationToken,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, tabIndex, navigation } = options
   if (!workspaceId || tabIndex < 1) return false
@@ -89,7 +89,7 @@ async function selectWorkspacePaneTabByIndexAction(
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab.kind === 'pending') return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation, { presentationToken })
+  return await selectWorkspacePaneControllerTab(target, tab, navigation, { navigationGeneration })
 }
 
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
@@ -98,16 +98,16 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   if (!options.workspaceId) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  const presentationToken = beginPrimaryWindowPresentation()
+  const navigationGeneration = beginPrimaryWindowNavigation()
   return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
-    selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, presentationToken),
+    selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, navigationGeneration),
   )
 }
 
 async function selectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
   coordinatorTarget: WorkspacePaneTabModel,
-  presentationToken: PrimaryWindowPresentationToken,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, identity, navigation, onTerminalReselect, reselect } = options
   if (!workspaceId) return false
@@ -119,9 +119,9 @@ async function selectWorkspacePaneTabByIdentityAction(
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab?.kind === 'pending') return false
   const committed = tab
-    ? await selectWorkspacePaneControllerTab(target, tab, navigation, { presentationToken })
+    ? await selectWorkspacePaneControllerTab(target, tab, navigation, { navigationGeneration })
     : tabEntry
-      ? await selectWorkspacePaneControllerTabEntry(target, tabEntry, navigation, presentationToken)
+      ? await selectWorkspacePaneControllerTabEntry(target, tabEntry, navigation, navigationGeneration)
       : false
   if (committed && reselect && tab?.kind === 'runtime' && tab.runtimeType === 'terminal') {
     onTerminalReselect?.(tab.sessionId)
@@ -164,7 +164,7 @@ async function moveWorkspacePaneTabAction(
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   return await selectWorkspacePaneControllerTab(target, tab, navigation, {
-    presentationToken: beginPrimaryWindowPresentation(),
+    navigationGeneration: beginPrimaryWindowNavigation(),
   })
 }
 

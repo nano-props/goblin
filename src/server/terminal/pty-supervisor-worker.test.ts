@@ -13,11 +13,16 @@ class FakeWorker extends EventEmitter {
   killed = false
   sendResult = true
   sendError: Error | null = null
+  sendCallbackError: Error | null = null
   pid = 4242
 
-  send(message: unknown): boolean {
+  send(message: unknown, callback?: (error: Error | null) => void): boolean {
     if (this.sendError) throw this.sendError
     this.sent.push(message)
+    if (callback) {
+      const callbackError = this.sendCallbackError
+      queueMicrotask(() => callback(callbackError))
+    }
     return this.sendResult
   }
 
@@ -138,6 +143,22 @@ describe('WorkerBackedPtySupervisor', () => {
     })
   })
 
+  test('invalidates a worker that emits a malformed protocol message', async () => {
+    const supervisor = buildSupervisor(worker)
+    const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+
+    worker.emit('message', { type: 'pty-spawn-result', ok: true })
+
+    await expect(promise).resolves.toEqual({ ok: false, message: 'PTY worker protocol violation' })
+    expect(worker.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: { kind: 'protocol', detail: 'malformed worker message' },
+    })
+  })
+
   test('spawn failure surfaces a structured error to the caller', async () => {
     const supervisor = buildSupervisor(worker)
     const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
@@ -193,6 +214,54 @@ describe('WorkerBackedPtySupervisor', () => {
     const retry = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
     const request = worker.sent.at(-1) as SpawnRequest
     worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: request.requestId,
+      ok: true,
+      ptySessionId: request.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    await expect(retry).resolves.toMatchObject({ ok: true })
+  })
+
+  test('retires the worker when IPC asynchronously rejects a spawn send', async () => {
+    const workerA = new FakeWorker()
+    const workerB = new FakeWorker()
+    const workers = [workerA, workerB]
+    const supervisor = new WorkerBackedPtySupervisor({
+      workerEntry: '/tmp/pty-worker.js',
+      spawnWorker: () => workers.shift() as never,
+    })
+    const first = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    const firstRequest = workerA.sent[0] as SpawnRequest
+    workerA.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: firstRequest.requestId,
+      ok: true,
+      ptySessionId: firstRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    const firstResult = await first
+    if (!firstResult.ok) throw new Error(firstResult.message)
+    const onExit = vi.fn()
+    firstResult.events.claim({ onData: vi.fn(), onExit }).activate()
+    workerA.sendCallbackError = new Error('IPC channel closed')
+
+    await expect(supervisor.spawn({ cwd: '/repo/second', cols: 100, rows: 30 })).resolves.toEqual({
+      ok: false,
+      message: 'PTY worker unavailable (send-failed: action=pty-spawn)',
+    })
+    expect(workerA.killed).toBe(true)
+    expect(onExit).toHaveBeenCalledWith(null, null)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: { kind: 'send-failed', detail: 'action=pty-spawn' },
+    })
+
+    const retry = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    const request = workerB.sent[0] as SpawnRequest
+    workerB.emit('message', {
       type: 'pty-spawn-result',
       requestId: request.requestId,
       ok: true,
@@ -431,6 +500,36 @@ describe('WorkerBackedPtySupervisor', () => {
     expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
   })
 
+  test('retires the worker when IPC asynchronously rejects a resize send', async () => {
+    const workerA = new FakeWorker()
+    const workerB = new FakeWorker()
+    const workers = [workerA, workerB]
+    const supervisor = new WorkerBackedPtySupervisor({
+      workerEntry: '/tmp/pty-worker.js',
+      spawnWorker: () => workers.shift() as never,
+    })
+    const handle = await spawnSession(supervisor, workerA)
+    workerA.sendCallbackError = new Error('IPC channel closed')
+
+    await expect(supervisor.resize(handle, 100, 30)).resolves.toBe(false)
+
+    expect(workerA.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'send-failed',
+        detail: `action=pty-resize ptySessionId=${handle.ptySessionId}`,
+      },
+    })
+
+    const retry = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    expect(workerB.sent[0]).toMatchObject({ type: 'pty-spawn' })
+    supervisor.shutdown()
+    await expect(retry).resolves.toEqual({ ok: false, message: 'PTY worker stopped' })
+  })
+
   test('retires an indeterminate worker when a resize acknowledgement times out', async () => {
     vi.useFakeTimers()
     const supervisor = buildSupervisor(worker, { resizeAckTimeoutMs: 25 })
@@ -491,10 +590,49 @@ describe('WorkerBackedPtySupervisor', () => {
     worker.sendError = new Error('channel closed')
 
     await expect(supervisor.write(handle, 'input')).resolves.toEqual({ status: 'rejected' })
-    expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+    expect(worker.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'send-failed',
+        detail: `action=pty-write ptySessionId=${handle.ptySessionId}`,
+      },
+    })
   })
 
-  test('settles an unacknowledged write as indeterminate after the bounded timeout', async () => {
+  test('retires the worker when IPC asynchronously rejects a write send', async () => {
+    const workerA = new FakeWorker()
+    const workerB = new FakeWorker()
+    const workers = [workerA, workerB]
+    const supervisor = new WorkerBackedPtySupervisor({
+      workerEntry: '/tmp/pty-worker.js',
+      spawnWorker: () => workers.shift() as never,
+    })
+    const handle = await spawnSession(supervisor, workerA)
+    workerA.sendCallbackError = new Error('IPC channel closed')
+
+    await expect(supervisor.write(handle, 'input')).resolves.toEqual({ status: 'rejected' })
+
+    expect(workerA.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'send-failed',
+        detail: `action=pty-write ptySessionId=${handle.ptySessionId}`,
+      },
+    })
+
+    const retry = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    expect(workerB.sent[0]).toMatchObject({ type: 'pty-spawn' })
+    supervisor.shutdown()
+    await expect(retry).resolves.toEqual({ ok: false, message: 'PTY worker stopped' })
+  })
+
+  test('retires an indeterminate worker when a write acknowledgement times out', async () => {
     vi.useFakeTimers()
     const supervisor = new WorkerBackedPtySupervisor({
       workerEntry: '/tmp/pty-worker.js',
@@ -508,7 +646,16 @@ describe('WorkerBackedPtySupervisor', () => {
     await vi.advanceTimersByTimeAsync(25)
 
     await expect(write).resolves.toEqual({ status: 'indeterminate' })
-    expect(supervisor.getDiagnostics().pendingRequests).toBe(1)
+    expect(worker.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'timeout',
+        detail: `action=pty-write ptySessionId=${handle.ptySessionId} timeoutMs=25`,
+      },
+    })
     worker.emit('message', {
       type: 'pty-write-result',
       requestId: request.requestId,
@@ -541,29 +688,6 @@ describe('WorkerBackedPtySupervisor', () => {
       status: 'accepted',
     } satisfies PtyWorkerMessage)
     await expect(afterAck).resolves.toEqual({ status: 'accepted' })
-  })
-
-  test('retains transport byte reservations after caller timeout until a late acknowledgement', async () => {
-    vi.useFakeTimers()
-    const supervisor = buildSupervisor(worker, { maxPendingWriteBytes: 5, writeAckTimeoutMs: 25 })
-    const handle = await spawnSession(supervisor, worker)
-    const first = supervisor.write(handle, '12345')
-
-    await vi.advanceTimersByTimeAsync(25)
-    await expect(first).resolves.toEqual({ status: 'indeterminate' })
-
-    await expect(supervisor.write(handle, '1')).resolves.toEqual({ status: 'rejected' })
-    const firstRequest = worker.sent.at(-1) as { requestId: string }
-    worker.emit('message', {
-      type: 'pty-write-result',
-      requestId: firstRequest.requestId,
-      status: 'accepted',
-    } satisfies PtyWorkerMessage)
-
-    const afterAck = supervisor.write(handle, '12345')
-    expect(worker.sent.at(-1)).toMatchObject({ type: 'pty-write', data: '12345' })
-    supervisor.shutdown()
-    await expect(afterAck).resolves.toEqual({ status: 'indeterminate' })
   })
 
   test('killAndWait resolves only after the worker confirms PTY exit', async () => {
@@ -602,6 +726,42 @@ describe('WorkerBackedPtySupervisor', () => {
     await Promise.all([closing, durableExit])
     expect(settled).toBe(true)
     expect(durableExitSettled).toBe(true)
+  })
+
+  test('retires the worker when a kill send throws synchronously', async () => {
+    const supervisor = buildSupervisor(worker)
+    const handle = await spawnSession(supervisor, worker)
+    worker.sendError = new Error('IPC channel closed')
+
+    expect(() => supervisor.kill(handle)).not.toThrow()
+
+    expect(worker.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      lastFailure: {
+        kind: 'send-failed',
+        detail: `action=pty-kill ptySessionId=${handle.ptySessionId}`,
+      },
+    })
+  })
+
+  test('retires the worker when IPC asynchronously rejects a kill send', async () => {
+    const supervisor = buildSupervisor(worker)
+    const handle = await spawnSession(supervisor, worker)
+    worker.sendCallbackError = new Error('IPC channel closed')
+
+    await expect(supervisor.killAndWait(handle)).resolves.toBeUndefined()
+
+    expect(worker.killed).toBe(true)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      lastFailure: {
+        kind: 'send-failed',
+        detail: `action=pty-kill ptySessionId=${handle.ptySessionId}`,
+      },
+    })
   })
 
   test('buffers data received before the spawn result until the event owner activates', async () => {
@@ -783,7 +943,7 @@ describe('WorkerBackedPtySupervisor', () => {
       state: 'idle',
       workerRunning: false,
       pendingRequests: 0,
-      restartScheduled: false,
+      consecutiveWorkerInvalidations: 0,
     })
 
     const promise = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
@@ -869,7 +1029,7 @@ describe('WorkerBackedPtySupervisor', () => {
       state: 'idle',
       workerRunning: false,
       pendingRequests: 0,
-      restartAttempts: 1,
+      consecutiveWorkerInvalidations: 1,
       lastFailure: { kind: 'disconnect', detail: 'parent IPC channel closed' },
     })
 

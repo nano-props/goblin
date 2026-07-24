@@ -8,6 +8,7 @@ import {
 } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import {
   createPtyHandle,
+  type PtyEventLease,
   type PtyHandle,
   type PtySpawnResult,
   type PtySupervisor,
@@ -400,6 +401,119 @@ describe('TerminalPtyBinding geometry boundary', () => {
 })
 
 describe('TerminalPtyBinding adoption boundary', () => {
+  test('fails a committed binding closed when output publication throws', async () => {
+    const channel = createPtyEventChannel()
+    const handle = createPtyHandle('pty_observer_failure_123456')
+    const supervisor = createChannelSupervisor(channel.lease, handle)
+    const emitLifecycle = vi.fn()
+    const binding = new TerminalPtyBinding(supervisor, {
+      isSessionLive: () => true,
+      emitLifecycle,
+      emitOutput: () => {
+        throw new Error('output sink failed')
+      },
+      emitBell: vi.fn(),
+      emitTitle: vi.fn(),
+      emitExit: vi.fn(),
+      confirmedExit: vi.fn(),
+    })
+    const session: TerminalPtySessionState<string> = {
+      id: 'pty_runtime_observer_failure_123456',
+      userId: 'user-test',
+      cwd: '/repo/worktree',
+      phase: 'opening',
+      message: null,
+      ptyState: { kind: 'prepared' },
+    }
+
+    await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
+      result: { ok: true },
+    })
+    expect(() => channel.sink.data({ data: 'output', processName: 'zsh' })).not.toThrow()
+
+    expect(session).toMatchObject({
+      phase: 'error',
+      message: 'error.unavailable',
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+    })
+    expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
+    expect(supervisor.kill).toHaveBeenCalledWith(handle)
+    await expect(binding.write(session, 'rejected input')).resolves.toEqual({ status: 'rejected' })
+    expect(emitLifecycle).toHaveBeenLastCalledWith(session)
+  })
+
+  test('does not roll admission back when buffered output fails after commit', async () => {
+    const channel = createPtyEventChannel()
+    channel.sink.data({ data: 'startup output', processName: 'zsh' })
+    const handle = createPtyHandle('pty_buffered_observer_failure_123456')
+    const supervisor = createChannelSupervisor(channel.lease, handle)
+    const admission = { commit: vi.fn(), rollback: vi.fn() }
+    const binding = new TerminalPtyBinding(supervisor, {
+      isSessionLive: () => true,
+      emitLifecycle: vi.fn(),
+      emitOutput: () => {
+        throw new Error('output sink failed')
+      },
+      emitBell: vi.fn(),
+      emitTitle: vi.fn(),
+      emitExit: vi.fn(),
+      confirmedExit: vi.fn(),
+    })
+    const session: TerminalPtySessionState<string> = {
+      id: 'pty_runtime_buffered_observer_failure_123456',
+      userId: 'user-test',
+      cwd: '/repo/worktree',
+      phase: 'opening',
+      message: null,
+      ptyState: { kind: 'prepared' },
+    }
+
+    await expect(binding.spawn(session, 80, 24, admission)).resolves.toMatchObject({
+      result: { ok: false, message: 'error.unavailable' },
+    })
+
+    expect(admission.commit).toHaveBeenCalledOnce()
+    expect(admission.rollback).not.toHaveBeenCalled()
+    expect(session).toMatchObject({
+      phase: 'error',
+      message: 'error.unavailable',
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+    })
+    expect(supervisor.kill).toHaveBeenCalledWith(handle)
+  })
+
+  test('confirms native exit even when exit publication throws', async () => {
+    const channel = createPtyEventChannel()
+    const handle = createPtyHandle('pty_exit_publication_failure_123456')
+    const supervisor = createChannelSupervisor(channel.lease, handle)
+    const confirmedExit = vi.fn()
+    const binding = new TerminalPtyBinding(supervisor, {
+      isSessionLive: () => true,
+      emitLifecycle: vi.fn(),
+      emitOutput: vi.fn(),
+      emitBell: vi.fn(),
+      emitTitle: vi.fn(),
+      emitExit: () => {
+        throw new Error('exit sink failed')
+      },
+      confirmedExit,
+    })
+    const session: TerminalPtySessionState<string> = {
+      id: 'pty_runtime_exit_publication_failure_123456',
+      userId: 'user-test',
+      cwd: '/repo/worktree',
+      phase: 'opening',
+      message: null,
+      ptyState: { kind: 'prepared' },
+    }
+
+    await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
+      result: { ok: true },
+    })
+    expect(() => channel.sink.exit(0, null)).not.toThrow()
+    expect(confirmedExit).toHaveBeenCalledWith(session, 1)
+  })
+
   test('does not roll a replacement back after its buffered exit is published', async () => {
     let spawnCount = 0
     const supervisor = {
@@ -515,6 +629,20 @@ function createDeferredSupervisor(spawns: readonly Promise<PtySpawnResult>[]) {
     kill: vi.fn(),
     waitForExit: vi.fn(() => new Promise<void>(() => {})),
     killAndWait: vi.fn(async (_handle: PtyHandle) => {}),
+    getDiagnostics: vi.fn(),
+    shutdown: vi.fn(),
+  } satisfies PtySupervisor
+}
+
+function createChannelSupervisor(events: PtyEventLease, handle: PtyHandle) {
+  return {
+    mode: 'in-process' as const,
+    spawn: vi.fn(async () => ({ ok: true as const, handle, processName: 'zsh', events })),
+    write: vi.fn(async () => ({ status: 'accepted' as const })),
+    resize: vi.fn(async () => true),
+    kill: vi.fn(),
+    waitForExit: vi.fn(() => new Promise<void>(() => {})),
+    killAndWait: vi.fn(async () => {}),
     getDiagnostics: vi.fn(),
     shutdown: vi.fn(),
   } satisfies PtySupervisor

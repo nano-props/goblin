@@ -48,6 +48,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
     session: {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
       target: worktreeTarget(WORKSPACE_RUNTIME_ID),
       presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },

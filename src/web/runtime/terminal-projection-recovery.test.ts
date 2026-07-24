@@ -505,4 +505,42 @@ describe('TerminalProjectionRecoveryCoordinator', () => {
     expect(completeRecovery).toHaveBeenCalledOnce()
     expect(reject).toHaveBeenCalledOnce()
   })
+
+  test('does not complete recovery until reconnect view resynchronization succeeds', async () => {
+    const failure = new Error('view rebuild failed')
+    const resynchronize = vi.fn().mockImplementationOnce(() => {
+      throw failure
+    })
+    const completeRecovery = vi.fn()
+    const reject = vi.fn()
+    const coordinator = new TerminalProjectionRecoveryCoordinator()
+    const scope = new RuntimeProjectionScope(TARGET, () => true)
+
+    coordinator.request({
+      scope,
+      complete: completeRecovery,
+      minimumRevision: 0,
+      freshness: 'after-current',
+      recover: async () => ({ revision: 1, sessions: [] }),
+      accept: () => ({ kind: 'accepted' }),
+      afterAccept: resynchronize,
+      reject,
+    })
+
+    await vi.waitFor(() => expect(reject).toHaveBeenCalledWith(failure))
+    expect(completeRecovery).not.toHaveBeenCalled()
+
+    coordinator.request({
+      scope,
+      complete: completeRecovery,
+      minimumRevision: 1,
+      freshness: 'join-current',
+      recover: async () => ({ revision: 1, sessions: [] }),
+      accept: () => ({ kind: 'accepted' }),
+      reject,
+    })
+
+    await vi.waitFor(() => expect(completeRecovery).toHaveBeenCalledOnce())
+    expect(resynchronize).toHaveBeenCalledTimes(2)
+  })
 })

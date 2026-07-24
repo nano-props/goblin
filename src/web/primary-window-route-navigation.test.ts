@@ -8,10 +8,10 @@ import {
   workspacePaneRouteFromBranchHref,
 } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowPresentation,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
-} from '#/web/primary-window-presentation.ts'
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 describe('primary window route navigation helpers', () => {
   test('settles an awaited owned navigation when a newer presentation abandons it', async () => {
@@ -27,7 +27,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
 
     await expect(committed).resolves.toBe(false)
     navigation.resolve()
@@ -43,11 +43,11 @@ describe('primary window route navigation helpers', () => {
       commitEffect: () => {
         throw new Error('commit effect failed')
       },
-      navigate: async (navigationId) => {
+      navigate: async (navigationGeneration) => {
         currentHref = '/target'
         observePrimaryWindowHistoryNavigation({
           href: currentHref,
-          state: primaryWindowNavigationState({}, navigationId),
+          state: primaryWindowNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
       },
@@ -72,7 +72,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
 
     await expect(committed).rejects.toThrow('abandon effect failed')
     navigation.resolve()

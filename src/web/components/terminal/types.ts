@@ -55,6 +55,7 @@ export interface TerminalAttachmentSnapshot {
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
+  identityRevision: number
   canonicalSize: TerminalSize
 }
 
@@ -101,8 +102,11 @@ export interface TerminalFocusRequest {
   onSettled?: () => void
 }
 
-/** A narrow input capability bound to one presented runtime generation. */
-export type TerminalInputWriter = (data: string) => void
+/**
+ * Captured from a presented controller and bound to that runtime generation.
+ * Returns true when data enters the local ordered queue, not when the server acknowledges it.
+ */
+export type TerminalInputWriter = (data: string) => boolean
 
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase

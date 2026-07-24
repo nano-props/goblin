@@ -11,6 +11,7 @@ import type {
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
 import type {
+  TerminalControllerViewModel,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalSearchResult,
@@ -33,6 +34,7 @@ export interface TerminalRuntimeAttemptToken {
 }
 
 export interface TerminalRepoSessionHydration extends TerminalRuntimeBinding {
+  identityRevision: number
   phase: TerminalSessionPhase
   message: string | null
   processName: string
@@ -249,19 +251,16 @@ export class TerminalSessionRuntime {
     }
     this.stagedAuthoritativeHydration = null
     const previous = this.activeBinding()
+    const metadata = this.applyRuntimeMetadata(result, !previous || !sameBinding(previous, binding))
+    if (!metadata.accepted) {
+      if (!previous) throw new Error('stale terminal identity cannot supersede an unbound attach')
+      this.bindingState = { kind: 'active', binding: previous }
+      return { accepted: false, changed: false, resolution: 'superseded' }
+    }
     this.bindingState = { kind: 'active', binding }
-    const metadataChanged = this.state.applyOpenResult({
-      phase: result.phase,
-      message: result.message,
-      processName: result.processName,
-      canonicalTitle: result.canonicalTitle,
-      role: result.role,
-      controllerStatus: result.controllerStatus,
-      canonicalSize: result.canonicalSize,
-    })
     return {
       accepted: true,
-      changed: !previous || !sameBinding(previous, binding) || metadataChanged,
+      changed: !previous || !sameBinding(previous, binding) || metadata.changed,
       resolution: 'response',
     }
   }
@@ -308,16 +307,8 @@ export class TerminalSessionRuntime {
     const binding = bindingFrom(input)
     const previous = this.activeBinding()
     this.bindingState = { kind: 'active', binding }
-    const metadataChanged = this.state.applyOpenResult({
-      phase: input.phase,
-      message: input.message,
-      processName: input.processName,
-      canonicalTitle: input.canonicalTitle ?? null,
-      role: input.role,
-      controllerStatus: input.controllerStatus,
-      canonicalSize: input.canonicalSize,
-    })
-    return !previous || !sameBinding(previous, binding) || metadataChanged
+    const metadata = this.applyRuntimeMetadata(input, !previous || !sameBinding(previous, binding))
+    return !previous || !sameBinding(previous, binding) || metadata.changed
   }
 
   private stageAuthoritativeHydration(input: TerminalRepoSessionHydration): boolean {
@@ -328,6 +319,12 @@ export class TerminalSessionRuntime {
       current.terminalRuntimeGeneration > input.terminalRuntimeGeneration
     ) {
       return false
+    }
+    if (current && sameBinding(current, input)) {
+      if (current.identityRevision > input.identityRevision) return false
+      if (current.identityRevision === input.identityRevision && !sameHydrationIdentity(current, input)) {
+        throw new Error('staged terminal identity conflicts at the same revision')
+      }
     }
     this.stagedAuthoritativeHydration = { ...input }
     return true
@@ -402,8 +399,8 @@ export class TerminalSessionRuntime {
     return { changed, output: event.data }
   }
 
-  handleIdentity(event: TerminalIdentityViewModel): boolean {
-    if (this.classifyRuntimeBinding(event) !== 'active') return false
+  handleIdentity(event: TerminalIdentityViewModel): { accepted: boolean; changed: boolean } {
+    if (this.classifyRuntimeBinding(event) !== 'active') return { accepted: false, changed: false }
     return this.state.applyIdentity(event)
   }
 
@@ -412,22 +409,22 @@ export class TerminalSessionRuntime {
     return this.state.applyLifecycle(event)
   }
 
-  applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): boolean {
-    if (this.classifyRuntimeBinding(result) !== 'active') return false
-    const idChanged = this.state.applyIdentity({
-      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
-      terminalRuntimeGeneration: result.terminalRuntimeGeneration,
+  applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): { accepted: boolean; changed: boolean } {
+    if (this.classifyRuntimeBinding(result) !== 'active') return { accepted: false, changed: false }
+    const identity = this.state.applyIdentity({
+      identityRevision: result.identityRevision,
       role: result.role,
       controllerStatus: result.controllerStatus,
       canonicalSize: result.canonicalSize,
     })
+    if (!identity.accepted) return identity
     const lifecycleChanged = this.state.applyLifecycle({
       terminalRuntimeSessionId: result.terminalRuntimeSessionId,
       terminalRuntimeGeneration: result.terminalRuntimeGeneration,
       phase: result.phase,
       message: null,
     })
-    return idChanged || lifecycleChanged
+    return { accepted: true, changed: identity.changed || lifecycleChanged }
   }
 
   setCanonicalTitle(canonicalTitle: string | null): boolean {
@@ -463,7 +460,7 @@ export class TerminalSessionRuntime {
     ) {
       return { accepted: false, changed: false }
     }
-    return { accepted: true, changed: this.state.setCanonicalSize(result.canonicalSize) }
+    return this.state.applyIdentity(result)
   }
 
   markClosing(): void {
@@ -500,6 +497,20 @@ export class TerminalSessionRuntime {
       ? result.terminalRuntimeGeneration === 1
       : result.terminalRuntimeGeneration === known.terminalRuntimeGeneration
   }
+
+  private applyRuntimeMetadata(
+    input: TerminalRepoSessionHydration | (TerminalRuntimeAttachResult & TerminalControllerViewModel),
+    establishIdentity: boolean,
+  ): { accepted: boolean; changed: boolean } {
+    const identity = establishIdentity
+      ? { accepted: true, changed: this.state.establishIdentity(input) }
+      : this.state.applyIdentity(input)
+    if (!identity.accepted) return identity
+    return {
+      accepted: true,
+      changed: this.state.applyRuntimeMetadata(input) || identity.changed,
+    }
+  }
 }
 
 function bindingFrom(input: TerminalRuntimeBinding): TerminalRuntimeBinding {
@@ -513,5 +524,17 @@ function sameBinding(a: TerminalRuntimeBinding, b: TerminalRuntimeBinding): bool
   return (
     a.terminalRuntimeSessionId === b.terminalRuntimeSessionId &&
     a.terminalRuntimeGeneration === b.terminalRuntimeGeneration
+  )
+}
+
+function sameHydrationIdentity(a: TerminalRepoSessionHydration, b: TerminalRepoSessionHydration): boolean {
+  return (
+    a.role === b.role &&
+    a.controllerStatus === b.controllerStatus &&
+    ((a.canonicalSize === null && b.canonicalSize === null) ||
+      (a.canonicalSize !== null &&
+        b.canonicalSize !== null &&
+        a.canonicalSize.cols === b.canonicalSize.cols &&
+        a.canonicalSize.rows === b.canonicalSize.rows))
   )
 }

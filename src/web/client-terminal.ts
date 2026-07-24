@@ -197,6 +197,7 @@ export function createServerTerminalClient(options: {
         const identityEvent = {
           terminalRuntimeSessionId: message.event.terminalRuntimeSessionId,
           terminalRuntimeGeneration: message.event.terminalRuntimeGeneration,
+          identityRevision: message.event.identityRevision,
           terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
           canonicalSize: message.event.canonicalSize,

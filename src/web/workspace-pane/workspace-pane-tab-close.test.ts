@@ -43,13 +43,9 @@ import {
   resetTerminalAutoFocusForTest,
 } from '#/web/terminal-focus.ts'
 import {
-  beginPrimaryWindowPresentation,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
-import {
-  workspacePaneActionTargetFromCoordinates,
-  workspacePaneRouteIntentPending,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+  beginPrimaryWindowNavigation,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-close-repo')
 const BRANCH_NAME = 'feature/worktree-close'
@@ -62,7 +58,7 @@ const WORKTREE_PANE_TARGET = {
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
@@ -73,7 +69,7 @@ beforeEach(() => {
 afterEach(() => {
   setTerminalSessionCommandBridgeForTest(null)
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
 })
 
 test('commits active close-back route through command-owned navigation', async () => {
@@ -106,7 +102,7 @@ test('commits active close-back route through command-owned navigation', async (
     REPO_ID,
     BRANCH_NAME,
     { kind: 'static', tab: 'status' },
-    expect.objectContaining({ presentationToken: expect.any(Object) }),
+    expect.objectContaining({ navigationGeneration: expect.any(Number) }),
   )
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
 })
@@ -254,7 +250,7 @@ test('carries automatic focus from active close through route commit and mount t
   mountedRequest.onSettled()
 })
 
-test('releases terminal focus and route intent when active close lifecycle fails', async () => {
+test('releases terminal focus when active close lifecycle fails', async () => {
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
@@ -269,18 +265,12 @@ test('releases terminal focus and route intent when active close lifecycle fails
   })
   useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
   const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
+  const updateWorkspaceTabs = vi.fn(async () => await lifecycle.promise)
+  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
   installPendingTerminalFocusBridge()
   const commitFilesystemWorkspacePaneRoute = vi.fn<
     PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
   >(async () => true)
-  const actionTarget = workspacePaneActionTargetFromCoordinates({
-    workspaceId: REPO_ID,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
-    branchName: null,
-    worktreePath: '/tmp/workspace-pane-tab-close-repo',
-  })
-
   const close = dispatchCloseWorkspacePaneTabAction({
     routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
     paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
@@ -289,16 +279,14 @@ test('releases terminal focus and route intent when active close lifecycle fails
     navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
   })
 
-  await vi.waitFor(() => expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(true))
+  await vi.waitFor(() => expect(updateWorkspaceTabs).toHaveBeenCalledOnce())
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
 
   lifecycle.reject(new Error('simulated close failure'))
   await expect(close).resolves.toBe(false)
 
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-  expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(false)
-
-  const nextPresentation = beginPrimaryWindowPresentation()
+  const nextPresentation = beginPrimaryWindowNavigation()
   const nextFocusLease = claimTerminalAutoFocus(nextPresentation)
   expect(nextFocusLease).not.toBeNull()
   nextFocusLease?.release()

@@ -576,7 +576,7 @@ export class TerminalSessionProjection {
       const session = this.ensureSession(descriptor)
       session.hydrate(projected.hydrateInput, options.hydrationSource ?? 'snapshot')
       if (!this.sessions.has(descriptor.terminalSessionId)) continue
-      if (projected.controlsTerminal)
+      if (session.controlsTerminal())
         controllerTerminalSessionIdByFilesystemTarget.set(
           projected.terminalFilesystemTargetKey,
           descriptor.terminalSessionId,

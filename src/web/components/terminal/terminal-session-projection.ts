@@ -29,7 +29,6 @@ export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
   terminalFilesystemTargetKey: string
   hydrateInput: TerminalSessionHydrationInput
-  controlsTerminal: boolean
 }
 
 export interface ProjectedCreateTerminalSession {
@@ -85,6 +84,7 @@ export function projectServerTerminalSession(input: {
     hydrateInput: {
       terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
       terminalRuntimeGeneration: input.serverSession.terminalRuntimeGeneration,
+      identityRevision: input.serverSession.identityRevision,
       processName: input.serverSession.processName,
       canonicalTitle: input.serverSession.canonicalTitle,
       phase: input.serverSession.phase,
@@ -93,7 +93,6 @@ export function projectServerTerminalSession(input: {
       controllerStatus: controller.controllerStatus,
       canonicalSize: input.serverSession.canonicalSize,
     },
-    controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
   }
 }
 
@@ -105,6 +104,7 @@ function createSessionSummaryFromCreate(
   const common = {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalRuntimeGeneration: result.terminalRuntimeGeneration,
+    identityRevision: result.identityRevision,
     terminalSessionId: result.terminalSessionId,
     controller: result.controller,
     processName: result.processName,

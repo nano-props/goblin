@@ -126,6 +126,9 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     isVisible(): boolean {
       return false
     }
+    controlsTerminal(): boolean {
+      return this.snapshotState.attachment?.role === 'controller'
+    }
     snapshot() {
       return this.snapshotState
     }
@@ -198,6 +201,7 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     terminalProjectionEffect: { kind: 'delta', revision: 11 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     processName: '',
     canonicalTitle: null,
     phase: 'opening' as const,

@@ -14,6 +14,7 @@ import {
   clearWorkspaceRuntimesForUser,
   closeWorkspaceRuntimesForDurableRemoval,
   commitWorkspaceProbeState,
+  isCurrentWorkspaceRuntime,
   releaseWorkspaceRuntime,
 } from '#/server/modules/workspace-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
@@ -24,6 +25,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
+import { AppRealtimeSocketLimitError, MAX_APP_REALTIME_SOCKETS } from '#/server/realtime/realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
@@ -1935,6 +1937,90 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('keeps the workspace runtime alive until queued terminal close effects finish', async () => {
+    const reconcileStarted = Promise.withResolvers<void>()
+    const finishReconcile = Promise.withResolvers<void>()
+    let blockReconcile = false
+    const captureTargets: WorkspacePaneTargetProjectionProvider['captureTargets'] = async (
+      _userId,
+      workspaceId,
+      scope,
+    ) => {
+      if (blockReconcile) {
+        reconcileStarted.resolve()
+        await finishReconcile.promise
+      }
+      return [
+        {
+          target: {
+            kind: 'git-worktree',
+            workspaceId,
+            workspaceRuntimeId: scope.slice(scope.lastIndexOf('\0') + 1),
+            root: LINKED_REPO_ROOT,
+          },
+          nativeWorktreePath: '/repo-linked',
+          canonicalBranch: 'feature',
+        },
+      ]
+    }
+    const { host, shutdown } = buildRuntime({ captureTargets })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const opened = await requestWorkspacePaneRuntime(
+      host,
+      socket,
+      {
+        runtimeType: 'terminal',
+        request: {
+          target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID),
+          kind: 'additional',
+        },
+      },
+      'req_runtime_open_before_retained_close',
+    )
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+
+    blockReconcile = true
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        {
+          runtimeType: 'terminal',
+          sessionId: opened.runtime.terminalSessionId,
+          target: { target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID) },
+        },
+        'req_runtime_retained_close',
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      runtime: { action: 'closed', terminalSessionId: opened.runtime.terminalSessionId },
+    })
+    await reconcileStarted.promise
+    socket.send.mockClear()
+
+    expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID, 'client_a')).toEqual({
+      released: true,
+      runtimeClosed: false,
+    })
+    expect(isCurrentWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)).toBe(true)
+
+    finishReconcile.resolve()
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+    })
+    await vi.waitFor(() => {
+      expect(isCurrentWorkspaceRuntime(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)).toBe(false)
+    })
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('rejects terminal IPC calls from untrusted senders', async () => {
     const { host, shutdown } = buildRuntime()
     const result = await createAdmittedTerminal(host, 'client_with_$pecial!chars' as never, USER_1, {
@@ -1967,6 +2053,7 @@ describe('server terminal runtime', () => {
       ok: true,
       terminalRuntimeSessionId,
       terminalRuntimeGeneration: 1,
+      identityRevision: 2,
       role: 'controller',
       controllerStatus: 'connected',
       controller: { clientId: 'client_b', status: 'connected' },
@@ -2522,45 +2609,65 @@ describe('server terminal runtime', () => {
     }
   })
 
-  test('runtime routes a heartbeat envelope to the broker with the right (userId, clientId) pair', async () => {
-    // Regression guard for the
-    // `broker.recordHeartbeat(clientId, userId)` arg-order bug
-    // that the original implementation shipped. The broker keys
-    // on `userClientKey(userId, clientId)`, so a swapped call
-    // silently misses every live heartbeat — the deadline scan
-    // then prematurely flips presence offline for healthy
-    // controllers. The broker unit tests passed because they
-    // call the broker directly with the right order; this test
-    // covers the wiring through the runtime's `handleRealtimeMessage`.
+  test('runtime routes a heartbeat envelope to the registered socket', () => {
+    // The broker owns a distinct clock for every registered buffered socket.
+    // This covers the raw-to-buffered transport lookup in
+    // `handleRealtimeMessage`; recording the raw socket would silently miss
+    // the registered transport and evict a healthy controller.
     //
     // The assertion is end-to-end: after a real heartbeat has been
     // routed through the runtime, advancing the fake clock past
     // the original deadline must NOT flip broker presence offline.
     // The raw socket would remain registered either way; this assertion
     // is about `isClientOnline`.
+    useFakeTimers()
+    vi.setSystemTime(TEST_NOW)
     const { host, shutdown, isClientOnline } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-
-    useFakeTimers()
     try {
-      vi.setSystemTime(TEST_NOW)
-
       // First heartbeat at t=0.
       host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
       // Advance just shy of the original deadline.
       vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS - 1_000)
-      // Heartbeat again — this MUST use the right (userId, clientId)
-      // order, otherwise the broker's clock never updates and the
-      // very next scan would flip presence offline.
+      // Heartbeat again. If it is not attributed to this exact registered
+      // transport, the next scan will flip presence offline.
       host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
       // Advance past the original 90 s deadline. A correctly routed
       // heartbeat (a real client sending every 30 s) means the
       // broker clock is fresh, so presence must remain online.
       vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
       expect(isClientOnline('client_a')).toBe(true)
+      expect(socket.close).not.toHaveBeenCalled()
     } finally {
-      vi.useRealTimers()
+      shutdown()
+    }
+  })
+
+  test('does not route messages from a socket rejected by admission', () => {
+    const { host, shutdown } = buildRuntime()
+    const admittedSockets = Array.from({ length: MAX_APP_REALTIME_SOCKETS }, (_, index) => ({
+      clientId: `client_admitted_${index}`,
+      socket: { send: vi.fn(), close: vi.fn() },
+    }))
+    for (const admitted of admittedSockets) {
+      host.registerSocket(admitted.clientId, USER_1, admitted.socket)
+    }
+    const overflowSocket = { send: vi.fn(), close: vi.fn() }
+
+    try {
+      expect(() => host.registerSocket('client_overflow', USER_1, overflowSocket)).toThrow(AppRealtimeSocketLimitError)
+
+      host.handleRealtimeMessage(
+        'client_overflow',
+        USER_1,
+        overflowSocket,
+        JSON.stringify({ type: 'ping', requestId: 'health_overflow' }),
+      )
+
+      expect(overflowSocket.send).not.toHaveBeenCalled()
+      expect(overflowSocket.close).not.toHaveBeenCalled()
+    } finally {
       shutdown()
     }
   })
@@ -2573,6 +2680,22 @@ describe('server terminal runtime', () => {
     host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'ping', requestId: 'health_1' }))
 
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong', requestId: 'health_1' }))
+    shutdown()
+  })
+
+  test('runtime closes a socket whose health response cannot be sent', () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('socket unavailable')
+      }),
+      close: vi.fn(),
+    }
+    host.registerSocket('client_a', USER_1, socket)
+
+    host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'ping', requestId: 'health_1' }))
+
+    expect(socket.close).toHaveBeenCalledWith(1011, 'realtime ping failed')
     shutdown()
   })
 

@@ -1,9 +1,7 @@
 import type { PtyDataEvent, PtyEventLease, PtyEventObserver } from '#/server/terminal/pty-supervisor.ts'
-import { serverLogger } from '#/server/logger.ts'
 
 const MAX_PENDING_EVENT_BYTES = 16 * 1024 * 1024
 const MAX_PENDING_EVENTS = 65_536
-const ptyEventLeaseLogger = serverLogger.child({ module: 'pty-event-lease' })
 
 type PtyEvent =
   | { kind: 'data'; event: PtyDataEvent; ownershipTransferBufferedBytes: number }
@@ -62,14 +60,16 @@ export function createPtyEventChannel(
       for (let index = 0; index < pending.length; index += 1) {
         const event = pending[index]!
         if (event.kind === 'data') pendingBytes -= event.ownershipTransferBufferedBytes
-        try {
-          if (event.kind === 'data') observer.onData(event.event)
-          else observer.onExit(event.code, event.signal)
-        } catch (error) {
-          ptyEventLeaseLogger.warn({ err: error, eventKind: event.kind }, 'failed to deliver PTY event')
-        }
+        if (event.kind === 'data') observer.onData(event.event)
+        else observer.onExit(event.code, event.signal)
       }
       pending.length = 0
+    } catch (error) {
+      // An observer owns the business effects of the stream. Continuing after
+      // one of those effects failed would publish later events over partial
+      // state, so a non-conforming observer permanently loses the lease.
+      dispose()
+      throw error
     } finally {
       draining = false
     }

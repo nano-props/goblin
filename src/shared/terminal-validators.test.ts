@@ -677,21 +677,23 @@ describe('shared terminal validators', () => {
   })
 
   test('normalizes terminal create results with required prepared-session metadata', () => {
-    const normalizedCreateResult = normalizeTerminalCreateResult({
+    const createResult = {
       ok: true,
-      action: 'created',
+      action: 'created' as const,
       presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       processName: '',
       canonicalTitle: null,
       phase: 'opening',
       message: null,
       controller: null,
       canonicalSize: null,
-    })
+    }
+    const normalizedCreateResult = normalizeTerminalCreateResult(createResult)
     expect(normalizedCreateResult).not.toHaveProperty('sessions')
     expect(normalizedCreateResult).toMatchObject({
       ok: true,
@@ -701,6 +703,8 @@ describe('shared terminal validators', () => {
       terminalRuntimeGeneration: 0,
     })
     expect(normalizedCreateResult).not.toHaveProperty('tabs')
+    expect(normalizeTerminalCreateResult({ ...createResult, identityRevision: 1 })).toBeNull()
+    expect(normalizeTerminalCreateResult({ ...createResult, identityRevision: undefined })).toBeNull()
 
     expect(
       normalizeTerminalCreateResult({
@@ -725,6 +729,7 @@ describe('shared terminal validators', () => {
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       processName: '',
       canonicalTitle: null,
       phase: 'opening',
@@ -763,6 +768,7 @@ describe('shared terminal validators', () => {
     const session = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
       presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
       controller: null,
@@ -944,6 +950,7 @@ describe('shared terminal validators', () => {
         terminalProjectionEffect: { kind: 'delta', revision: 11 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 0,
+        identityRevision: 0,
         processName: '',
         canonicalTitle: null,
         phase: 'opening',
@@ -1081,6 +1088,10 @@ describe('shared terminal validators', () => {
         ok: true,
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 3,
+        identityRevision: 1,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'client_a', status: 'connected' },
         canonicalSize: { cols: 120, rows: 40 },
       },
     } as const
@@ -1089,6 +1100,10 @@ describe('shared terminal validators', () => {
       true,
       { ...resizeResponse.payload, terminalRuntimeGeneration: 0 },
       { ...resizeResponse.payload, canonicalSize: null },
+      ...[-1, 0.5, Number.MAX_SAFE_INTEGER + 1].map((identityRevision) => ({
+        ...resizeResponse.payload,
+        identityRevision,
+      })),
     ]) {
       expect(normalizeAppRealtimeSocketServerMessage({ ...resizeResponse, payload })).toMatchObject({
         ok: false,
@@ -1107,6 +1122,7 @@ describe('shared terminal validators', () => {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 3,
+          identityRevision: 1,
           role: 'controller',
           controllerStatus: 'connected',
           controller: { clientId: 'client_a', status: 'connected' },
@@ -1130,6 +1146,7 @@ describe('shared terminal validators', () => {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 0,
+          identityRevision: 0,
           role: 'controller',
           controllerStatus: 'connected',
           controller: { clientId: 'client_a', status: 'connected' },
@@ -1148,6 +1165,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          identityRevision: 1,
           role: 'controller',
           controllerStatus: 'connected',
           controller: { clientId: 'client_a', status: 'connected' },
@@ -1173,6 +1191,7 @@ describe('shared terminal validators', () => {
           terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -1198,9 +1217,11 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
+          streamSeq: 7,
           terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -1212,7 +1233,7 @@ describe('shared terminal validators', () => {
     ).toMatchObject({
       type: 'response',
       action: 'attach',
-      payload: { ok: true, frame: 'stream' },
+      payload: { ok: true, frame: 'stream', streamSeq: 7 },
     })
 
     expect(
@@ -1224,8 +1245,11 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
+          streamSeq: 0,
+          terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'opening',
@@ -1251,8 +1275,11 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
+          streamSeq: 0,
+          terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 2,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'opening',
@@ -1280,6 +1307,7 @@ describe('shared terminal validators', () => {
           frame: 'snapshot',
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -1341,6 +1369,7 @@ describe('shared terminal validators', () => {
     const metadata = {
       terminalRuntimeSessionId: 'pty_1234567890abcdef',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -1351,7 +1380,13 @@ describe('shared terminal validators', () => {
     const invalidResponses = [
       {
         action: 'attach',
-        payload: { ok: true, frame: 'stream', terminalProjectionEffect: { kind: 'none' }, ...metadata },
+        payload: {
+          ok: true,
+          frame: 'stream',
+          streamSeq: 0,
+          terminalProjectionEffect: { kind: 'none' },
+          ...metadata,
+        },
       },
       {
         action: 'attach',
@@ -1401,6 +1436,7 @@ describe('shared terminal validators', () => {
       terminalProjectionEffect: { kind: 'none' },
       terminalRuntimeSessionId: 'pty_1234567890abcdef',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -1427,6 +1463,40 @@ describe('shared terminal validators', () => {
           error: 'Invalid terminal socket response payload',
         })
       }
+    }
+  })
+
+  test('rejects missing or invalid stream sequence checkpoints', () => {
+    const payload = {
+      ok: true,
+      frame: 'stream',
+      streamSeq: 0,
+      terminalProjectionEffect: { kind: 'delta', revision: 2 },
+      terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 0,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      controller: { clientId: 'client_a', status: 'connected' },
+      canonicalSize: { cols: 120, rows: 40 },
+    } as const
+
+    for (const [index, streamSeq] of [undefined, -1, 0.5, Number.MAX_SAFE_INTEGER + 1].entries()) {
+      expect(
+        normalizeAppRealtimeSocketServerMessage({
+          type: 'response',
+          requestId: `invalid_stream_seq_${index}`,
+          ok: true,
+          action: 'attach',
+          payload: { ...payload, streamSeq },
+        }),
+      ).toMatchObject({
+        ok: false,
+        action: 'attach',
+        error: 'Invalid terminal socket response payload',
+      })
     }
   })
 
@@ -1462,6 +1532,29 @@ describe('shared terminal validators', () => {
 })
 
 describe('terminal runtime generation validation', () => {
+  test('requires a non-negative safe-integer identity revision on identity events', () => {
+    const message = {
+      type: 'identity' as const,
+      event: {
+        terminalRuntimeSessionId: 'pty_identity_validation',
+        terminalRuntimeGeneration: 1,
+        identityRevision: 0,
+        terminalSessionId: 'term-identity-validation',
+        controller: { clientId: 'client_identity_validation', status: 'connected' as const },
+        canonicalSize: { cols: 80, rows: 24 },
+      },
+    }
+    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+    for (const identityRevision of [undefined, -1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(
+        normalizeTerminalRealtimeMessage({
+          ...message,
+          event: { ...message.event, identityRevision },
+        }),
+      ).toBeNull()
+    }
+  })
+
   test('requires a bound safe-integer generation on PTY realtime events', () => {
     const message = {
       type: 'exit' as const,

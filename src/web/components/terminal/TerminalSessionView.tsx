@@ -294,7 +294,10 @@ export function TerminalSessionView({
         toast.error(t('terminal.paste-file-overflow'))
         return
       }
-      inputWriter(plan.data)
+      if (!inputWriter(plan.data)) {
+        toast.error(t('terminal.paste-file-failed'))
+        return
+      }
       if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
       if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
     },

@@ -1,13 +1,13 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createWorkspacePaneTabModel,
   isWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readSuccessfulRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -29,7 +29,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
+  const branchModel = readSuccessfulRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const target = workspacePaneTabsTargetForRepoBranch(
     { workspaceId: repo.id, branches: branchModel.branches },
@@ -85,7 +85,7 @@ export function openWorkspacePaneRoute(
   >,
   repoId: WorkspaceId,
   branchName: string,
-  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+  options?: { replace?: boolean; navigationGeneration?: PrimaryWindowNavigationGeneration; onCommit?: () => void },
 ): boolean {
   const resolution = resolveWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing') return false

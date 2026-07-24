@@ -953,6 +953,7 @@ function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     processName: '',
     canonicalTitle: null,
     phase: 'opening' as const,
@@ -978,6 +979,7 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
   return {
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     terminalSessionId,
     target: request.target,
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },

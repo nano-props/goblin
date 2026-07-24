@@ -188,8 +188,8 @@ export interface WorkspacePaneTabModelInput {
   /**
    * Persisted preferences may fall back to the first materialized tab when
    * their preferred tab no longer has backing state. Explicit route requests
-   * must not: a route miss is an empty pane until reconciliation replaces the
-   * URL with the bare branch route.
+   * must not: a route miss is an empty pane until an explicit command changes
+   * the URL.
    */
   allowPreferredTabFallback?: boolean
   tabEntries: readonly WorkspacePaneTabEntry[]

@@ -19,6 +19,7 @@ import {
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
+  markTerminalSessionError,
   markTerminalSessionOpen,
   markTerminalSessionOpening,
   markTerminalSessionRestarting,
@@ -119,6 +120,7 @@ export type TerminalPtyState =
       kind: 'bound'
       activity: 'active' | 'retained'
       generation: number
+      identityRevision: number
       cols: number
       rows: number
       processName: string
@@ -139,6 +141,25 @@ export function terminalPtyBoundState(
 
 export function terminalPtyProcessName(session: Pick<TerminalPtySessionState, 'ptyState'>): string {
   return session.ptyState.kind === 'bound' ? session.ptyState.processName : 'terminal'
+}
+
+export function terminalPtyIdentityRevision(session: Pick<TerminalPtySessionState, 'ptyState'>): number {
+  return session.ptyState.kind === 'bound' ? session.ptyState.identityRevision : 0
+}
+
+export function advanceTerminalPtyIdentityRevision(
+  session: Pick<TerminalPtySessionState, 'ptyState'>,
+  expectedGeneration: number,
+): number {
+  const state = terminalPtyBoundState(session)
+  if (!state || state.generation !== expectedGeneration) {
+    throw new Error('cannot advance identity revision for a stale terminal generation')
+  }
+  if (state.identityRevision === Number.MAX_SAFE_INTEGER) {
+    throw new Error('terminal identity revision exhausted')
+  }
+  state.identityRevision += 1
+  return state.identityRevision
 }
 
 export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionState> {
@@ -196,6 +217,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       kind: 'bound',
       activity: 'active',
       generation,
+      identityRevision: 0,
       cols,
       rows,
       processName: 'terminal',
@@ -226,6 +248,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       kind: 'bound',
       activity: 'active',
       generation,
+      identityRevision: 0,
       cols,
       rows,
       processName: 'terminal',
@@ -428,6 +451,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       resizeRender(state.render, cols, rows)
       state.cols = cols
       state.rows = rows
+      advanceTerminalPtyIdentityRevision(session, terminalRuntimeGeneration)
       return { accepted: admission.validate() && admission.commit(), changed: true }
     })
   }
@@ -470,6 +494,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           resizeRender(state.render, cols, rows)
           state.cols = cols
           state.rows = rows
+          advanceTerminalPtyIdentityRevision(session, terminalRuntimeGeneration)
           changed = true
         }
       }
@@ -613,68 +638,72 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     const claim = events.claim({
       onData: ({ data, processName: processNameAfterData }) => {
         if (!this.isCurrentBinding(session, generation, handle)) return
-        const titleBeforeData = render.title
-        const processNameBeforeData = lastProcessName
+        try {
+          const titleBeforeData = render.title
+          const processNameBeforeData = lastProcessName
 
-        const output = appendOutput(render, data)
+          const output = appendOutput(render, data)
 
-        lastProcessName = processNameAfterData
-        state.processName = processNameAfterData
-        let eventCanonicalTitle = titleBeforeData
-        const hasTitleUpdate = output.controlEvents.some((event) => event.type === 'title')
+          lastProcessName = processNameAfterData
+          state.processName = processNameAfterData
+          let eventCanonicalTitle = titleBeforeData
+          const hasTitleUpdate = output.controlEvents.some((event) => event.type === 'title')
 
-        // Stale title detection: when a child process exits without
-        // setting a new title-OSC, the tab would keep showing the
-        // child's title. Detect the non-shell -> shell process name
-        // transition with no title update in the chunk and clear it before
-        // any bell in the same chunk is emitted.
-        if (
-          titleBeforeData !== null &&
-          !hasTitleUpdate &&
-          render.title === titleBeforeData &&
-          !isShellProcessName(processNameBeforeData) &&
-          isShellProcessName(processNameAfterData)
-        ) {
-          applyTerminalTitle(render, null)
-          eventCanonicalTitle = null
-          if (lastBroadcastTitle !== null) {
-            lastBroadcastTitle = null
-            this.events.emitTitle(session, {
-              terminalRuntimeSessionId: session.id,
-              terminalRuntimeGeneration: generation,
-              canonicalTitle: null,
-            })
-          }
-        }
-
-        for (const event of output.controlEvents) {
-          if (event.type === 'title') {
-            applyTerminalTitle(render, event.title)
-            eventCanonicalTitle = event.title
-            if (eventCanonicalTitle !== lastBroadcastTitle) {
-              lastBroadcastTitle = eventCanonicalTitle
+          // Stale title detection: when a child process exits without
+          // setting a new title-OSC, the tab would keep showing the
+          // child's title. Detect the non-shell -> shell process name
+          // transition with no title update in the chunk and clear it before
+          // any bell in the same chunk is emitted.
+          if (
+            titleBeforeData !== null &&
+            !hasTitleUpdate &&
+            render.title === titleBeforeData &&
+            !isShellProcessName(processNameBeforeData) &&
+            isShellProcessName(processNameAfterData)
+          ) {
+            applyTerminalTitle(render, null)
+            eventCanonicalTitle = null
+            if (lastBroadcastTitle !== null) {
+              lastBroadcastTitle = null
               this.events.emitTitle(session, {
                 terminalRuntimeSessionId: session.id,
                 terminalRuntimeGeneration: generation,
-                canonicalTitle: eventCanonicalTitle,
+                canonicalTitle: null,
               })
             }
-            continue
           }
-          this.events.emitBell(session, {
+
+          for (const event of output.controlEvents) {
+            if (event.type === 'title') {
+              applyTerminalTitle(render, event.title)
+              eventCanonicalTitle = event.title
+              if (eventCanonicalTitle !== lastBroadcastTitle) {
+                lastBroadcastTitle = eventCanonicalTitle
+                this.events.emitTitle(session, {
+                  terminalRuntimeSessionId: session.id,
+                  terminalRuntimeGeneration: generation,
+                  canonicalTitle: eventCanonicalTitle,
+                })
+              }
+              continue
+            }
+            this.events.emitBell(session, {
+              terminalRuntimeSessionId: session.id,
+              terminalRuntimeGeneration: generation,
+              processName: processNameAfterData,
+              canonicalTitle: eventCanonicalTitle,
+            })
+          }
+          this.events.emitOutput(session, {
             terminalRuntimeSessionId: session.id,
             terminalRuntimeGeneration: generation,
+            data,
+            seq: output.seq,
             processName: processNameAfterData,
-            canonicalTitle: eventCanonicalTitle,
           })
+        } catch (error) {
+          this.failBindingObserver(session, state, error, 'data')
         }
-        this.events.emitOutput(session, {
-          terminalRuntimeSessionId: session.id,
-          terminalRuntimeGeneration: generation,
-          data,
-          seq: output.seq,
-          processName: processNameAfterData,
-        })
       },
       onExit: () => {
         if (!this.isCurrentBinding(session, generation, handle)) return
@@ -682,8 +711,16 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         state.activity = 'retained'
         try {
           this.events.emitExit(session, { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation })
-        } finally {
+        } catch (error) {
+          ptyLifecycleLogger.warn(
+            { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation, err: error },
+            'failed to publish PTY exit',
+          )
+        }
+        try {
           this.events.confirmedExit(session, generation)
+        } catch (error) {
+          this.failBindingObserver(session, state, error, 'exit-confirmation')
         }
       },
     })
@@ -718,6 +755,53 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       if (claimIndex >= 0) this.disposables.splice(claimIndex, 1)
       claim.dispose()
       throw error
+    }
+  }
+
+  private failBindingObserver(
+    session: TSession,
+    state: TerminalPtyBoundState,
+    error: unknown,
+    eventKind: 'data' | 'exit-confirmation',
+  ): void {
+    if (!this.events.isSessionLive(session) || terminalPtyBoundState(session) !== state) return
+    ptyLifecycleLogger.error(
+      {
+        terminalRuntimeSessionId: session.id,
+        terminalRuntimeGeneration: state.generation,
+        eventKind,
+        err: error,
+      },
+      'PTY binding observer failed',
+    )
+    try {
+      // Native callbacks cannot carry an exception back to node-pty/the worker
+      // transport. Retire the binding synchronously and keep its handle owned
+      // by the normal exit-completion path.
+      this.disposeResources(session)
+    } catch (retirementError) {
+      ptyLifecycleLogger.error(
+        {
+          terminalRuntimeSessionId: session.id,
+          terminalRuntimeGeneration: state.generation,
+          err: retirementError,
+        },
+        'failed to retire PTY after observer failure',
+      )
+    }
+    if (!this.events.isSessionLive(session) || terminalPtyBoundState(session) !== state) return
+    if (!markTerminalSessionError(session, 'error.unavailable')) return
+    try {
+      this.events.emitLifecycle(session)
+    } catch (lifecycleError) {
+      ptyLifecycleLogger.warn(
+        {
+          terminalRuntimeSessionId: session.id,
+          terminalRuntimeGeneration: state.generation,
+          err: lifecycleError,
+        },
+        'failed to publish PTY observer failure lifecycle',
+      )
     }
   }
 

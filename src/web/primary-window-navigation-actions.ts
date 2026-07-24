@@ -20,14 +20,14 @@ import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspa
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
-  beginPrimaryWindowPresentation,
-  primaryWindowPresentationIsCurrent,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
-export interface PrimaryWindowPresentationNavigationOptions {
+export interface PrimaryWindowNavigationOptions {
   replace?: boolean
-  presentationToken?: PrimaryWindowPresentationToken
+  navigationGeneration?: PrimaryWindowNavigationGeneration
   /**
    * Once an action receives these effects, it owns their normal settlement:
    * accepted navigation invokes `onCommit`, rejected/abandoned navigation
@@ -53,29 +53,29 @@ export interface PrimaryWindowNavigationActions {
     workspaceId: WorkspaceId,
     worktreePath: string,
     terminalSessionId: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => boolean
   showWorkspaceRootPaneTab: (
     workspaceId: WorkspaceId,
     presentation: WorkspaceRootPanePresentation,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => boolean
   commitFilesystemWorkspacePaneRoute: (
     target: FilesystemWorkspacePaneCommitTarget,
     route: WorkspacePaneRouteTarget,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => Promise<boolean>
   commitWorkspaceRootTerminalSession: (
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     terminalSessionId: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => Promise<boolean>
   commitWorkspacePaneRoute: (
     workspaceId: WorkspaceId,
     branch: string,
     route: WorkspacePaneRouteTarget,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => Promise<boolean>
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined
   goBack: (workspaceId: WorkspaceId) => void
@@ -109,47 +109,47 @@ export function createPrimaryWindowNavigationActions({
       return routeNavigation.currentWorkspacePaneRoute(workspaceId, branchName)
     },
     activateWorkspace(workspaceId) {
-      const presentationToken = beginPrimaryWindowPresentation()
-      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, presentationToken, {
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
         onBlocked: 'stay',
       })
     },
     async closeWorkspace(workspaceId) {
       const nextWorkspaceId =
         workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
-      const presentationToken = workspaceId === currentWorkspaceId ? beginPrimaryWindowPresentation() : null
+      const navigationGeneration = workspaceId === currentWorkspaceId ? beginPrimaryWindowNavigation() : null
       const result = await closeWorkspace(workspaceId)
       if (!result.ok || workspaceId !== currentWorkspaceId) return result
       if (nextWorkspaceId)
-        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, presentationToken!, {
+        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, navigationGeneration!, {
           onBlocked: 'dashboard',
         })
-      else routeNavigation.openHome({ presentationToken: presentationToken! })
+      else routeNavigation.openHome({ navigationGeneration: navigationGeneration! })
       return result
     },
     cycleWorkspace(direction) {
       const workspaceId = nextNavigationWorkspaceId(workspaceOrder, currentWorkspaceId, direction)
       if (workspaceId) {
-        const presentationToken = beginPrimaryWindowPresentation()
-        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, presentationToken, {
+        const navigationGeneration = beginPrimaryWindowNavigation()
+        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
           onBlocked: 'stay',
         })
       }
     },
     selectRepoBranch(workspaceId, branch, options) {
-      const presentationToken = beginPrimaryWindowPresentation()
-      return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, presentationToken })
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, navigationGeneration })
     },
     showRepoWorktreeTerminalSession(workspaceId, worktreePath, terminalSessionId, options) {
-      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
+      const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
       return routeNavigation.openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, {
         ...options,
-        presentationToken: token,
+        navigationGeneration: generation,
       })
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
-      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      const navigationOptions = workspaceRootPanePresentationOptions(workspaceId, presentation, options, token)
+      const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+      const navigationOptions = workspaceRootPanePresentationOptions(workspaceId, presentation, options, generation)
       return presentation.kind === 'terminal'
         ? routeNavigation.openWorkspaceRootTerminal(workspaceId, presentation.terminalSessionId, navigationOptions)
         : routeNavigation.openWorkspaceRootTab(workspaceId, presentation.tab, navigationOptions)
@@ -172,30 +172,42 @@ export function createPrimaryWindowNavigationActions({
       if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'back')) return
       const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
       if (!canonicalWorkspaceId) return
-      const presentationToken = beginPrimaryWindowPresentation()
       const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'back')
       if (!traversal) return
-      const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
-      if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
+        navigationGeneration,
+        onCommit() {
+          if (!commitWorkspaceNavigation(traversal)) {
+            throw new Error('workspace navigation history changed before its route committed')
+          }
+        },
+      })
     },
     goForward(workspaceId) {
       if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'forward')) return
       const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
       if (!canonicalWorkspaceId) return
-      const presentationToken = beginPrimaryWindowPresentation()
       const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'forward')
       if (!traversal) return
-      const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
-      if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
+        navigationGeneration,
+        onCommit() {
+          if (!commitWorkspaceNavigation(traversal)) {
+            throw new Error('workspace navigation history changed before its route committed')
+          }
+        },
+      })
     },
     openSettings(page) {
-      const presentationToken = beginPrimaryWindowPresentation()
-      routeNavigation.openSettings(page, { presentationToken })
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      routeNavigation.openSettings(page, { navigationGeneration })
     },
     openCreateWorktree() {
       if (!currentWorkspaceId) return
-      const presentationToken = beginPrimaryWindowPresentation()
-      routeNavigation.openRepoNewWorktree(currentWorkspaceId, { presentationToken })
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      routeNavigation.openRepoNewWorktree(currentWorkspaceId, { navigationGeneration })
     },
   }
 }
@@ -203,12 +215,12 @@ export function createPrimaryWindowNavigationActions({
 function workspaceRootPanePresentationOptions(
   workspaceId: WorkspaceId,
   presentation: WorkspaceRootPanePresentation,
-  options: PrimaryWindowPresentationNavigationOptions | undefined,
-  presentationToken: PrimaryWindowPresentationToken,
-): PrimaryWindowPresentationNavigationOptions {
+  options: PrimaryWindowNavigationOptions | undefined,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
+): PrimaryWindowNavigationOptions {
   return {
     ...options,
-    presentationToken,
+    navigationGeneration,
     onCommit: () => {
       if (!commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation)) {
         options?.onAbandon?.()
@@ -243,10 +255,10 @@ async function commitFilesystemWorkspacePaneRoute(
   routeNavigation: PrimaryWindowRouteNavigation,
   target: FilesystemWorkspacePaneCommitTarget,
   route: WorkspacePaneRouteTarget,
-  options?: PrimaryWindowPresentationNavigationOptions,
+  options?: PrimaryWindowNavigationOptions,
 ): Promise<boolean> {
-  const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-  if (!primaryWindowPresentationIsCurrent(token) || !filesystemWorkspacePaneCommitTargetIsCurrent(target)) {
+  const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+  if (!primaryWindowNavigationIsCurrent(generation) || !filesystemWorkspacePaneCommitTargetIsCurrent(target)) {
     options?.onAbandon?.()
     return false
   }
@@ -254,12 +266,12 @@ async function commitFilesystemWorkspacePaneRoute(
   try {
     const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
       replace: options?.replace,
-      presentationToken: token,
+      navigationGeneration: generation,
       routePrecondition: options?.routePrecondition,
     })
     const presentationCommitted =
       committed &&
-      primaryWindowPresentationIsCurrent(token) &&
+      primaryWindowNavigationIsCurrent(generation) &&
       filesystemWorkspacePaneCommitTargetIsCurrent(target) &&
       (route === null
         ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
@@ -297,16 +309,16 @@ async function commitWorkspacePaneRoute(
   workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneRouteTarget,
-  options?: PrimaryWindowPresentationNavigationOptions,
+  options?: PrimaryWindowNavigationOptions,
 ): Promise<boolean> {
-  const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-  if (!primaryWindowPresentationIsCurrent(token)) {
+  const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+  if (!primaryWindowNavigationIsCurrent(generation)) {
     options?.onAbandon?.()
     return false
   }
   const routeOptions = {
     replace: options?.replace,
-    presentationToken: token,
+    navigationGeneration: generation,
     onCommit: options?.onCommit,
     onAbandon: options?.onAbandon,
     routePrecondition: options?.routePrecondition,
@@ -317,7 +329,7 @@ async function commitWorkspacePaneRoute(
 function restoreWorkspacePresentationOrOpenDashboard(
   workspaceId: WorkspaceId,
   routeNavigation: PrimaryWindowRouteNavigation,
-  presentationToken: PrimaryWindowPresentationToken,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
   options: { onBlocked: 'stay' | 'dashboard' },
 ): void {
   const state = useWorkspacesStore.getState()
@@ -331,10 +343,10 @@ function restoreWorkspacePresentationOrOpenDashboard(
     entry.route.kind !== 'newWorktree' &&
     (workspace?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
-    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
+    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { navigationGeneration })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
   }
-  routeNavigation.openWorkspaceDashboard(workspaceId, { presentationToken })
+  routeNavigation.openWorkspaceDashboard(workspaceId, { navigationGeneration })
 }
 
 function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: WorkspaceId): WorkspaceId | null {

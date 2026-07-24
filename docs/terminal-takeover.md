@@ -147,12 +147,13 @@ the effective controller would stay pinned to the dead client,
 and every sibling viewer would be stranded in viewer mode with
 no path to auto-claim.
 
-A per-`clientId` heartbeat closes this gap. The client emits a small
-heartbeat while its realtime socket is open; the broker treats the
-server receipt time as the presence clock. If that clock goes stale,
-the broker closes the stale sockets and marks the attachment offline.
-Stored controller intent is not erased, but it no longer projects to an
-effective controller, so the next attach can auto-claim the session.
+Each realtime socket owns its own heartbeat clock. The client emits a small
+heartbeat while that socket is open; if its receipt time goes stale, the broker
+closes that exact transport. A healthy replacement socket with the same
+`clientId` cannot keep an obsolete socket alive. Client presence turns offline
+only after its last socket is gone. Stored controller intent is not erased, but
+it no longer projects to an effective controller, so the next attach can
+auto-claim the session.
 
 ## Known behavior: self-reconnect mid-flight
 

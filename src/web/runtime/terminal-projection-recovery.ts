@@ -130,12 +130,12 @@ export class TerminalProjectionRecoveryCoordinator {
           retriedStaleRevision = null
           continue
         }
-        acceptedRequest.complete()
         const obligation = this.freshObligationByWorkspaceId.get(acceptedRequest.scope.target.workspaceId)
         if (obligation?.workspaceRuntimeId === pending.workspaceRuntimeId) {
-          this.freshObligationByWorkspaceId.delete(acceptedRequest.scope.target.workspaceId)
           obligation.afterAccept()
+          this.freshObligationByWorkspaceId.delete(acceptedRequest.scope.target.workspaceId)
         }
+        acceptedRequest.complete()
         return
       }
     } catch (error) {

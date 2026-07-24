@@ -73,6 +73,7 @@ function makeServerSession(
   terminalSessionId: string,
   overrides: Partial<{
     terminalRuntimeGeneration: number
+    identityRevision: number
     controller: { clientId: string; status: 'connected' }
     processName: string
     canonicalTitle: string | null
@@ -85,6 +86,7 @@ function makeServerSession(
   return {
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? 1,
+    identityRevision: overrides.identityRevision ?? 0,
     terminalSessionId,
     target: { ...RUNTIME_TARGET, workspaceRuntimeId: overrides.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID },
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
@@ -426,6 +428,7 @@ describe('TerminalSessionProjection', () => {
       })
       projection.handleIdentity({
         ...contradictoryIdentity,
+        identityRevision: 1,
         role: 'controller',
         controllerStatus: 'connected',
         canonicalSize: { cols: 100, rows: 30 },
@@ -675,6 +678,7 @@ describe('TerminalSessionProjection', () => {
       projection.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         terminalSessionId: 'term-111111111111111111111',
         role: 'controller',
         controllerStatus: 'connected',
@@ -1622,6 +1626,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
       terminalRuntimeGeneration: 2,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -1670,6 +1675,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: lineageB,
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -1734,6 +1740,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: lineageC,
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',

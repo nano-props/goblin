@@ -32,7 +32,7 @@ export type ServerTerminalHostState = 'running' | 'shutting-down'
 
 export type PtySupervisorMode = 'in-process' | 'worker-backed'
 
-export type PtySupervisorState = 'idle' | 'running' | 'restarting' | 'shutting-down'
+export type PtySupervisorState = 'idle' | 'running' | 'shutting-down'
 
 export interface PtySupervisorFailureDiagnostics {
   kind: 'exit' | 'error' | 'disconnect' | 'protocol' | 'timeout' | 'send-failed' | 'spawn-failed'
@@ -48,8 +48,7 @@ export interface PtySupervisorDiagnostics {
   workerStartedAt: number | null
   workerUptimeMs: number | null
   pendingRequests: number
-  restartAttempts: number
-  restartScheduled: boolean
+  consecutiveWorkerInvalidations: number
   shuttingDown: boolean
   lastSuccessfulResponseAt: number | null
   lastExitCode: number | null

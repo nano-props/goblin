@@ -28,10 +28,10 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowPresentation,
-  primaryWindowPresentationIsCurrent,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 
 const terminalBase: TerminalSessionBase = {
@@ -57,7 +57,7 @@ describe('workspace pane runtime tab command actions', () => {
     resetTerminalAutoFocusForTest()
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
-    resetPrimaryWindowPresentationForTest()
+    resetPrimaryWindowNavigationForTest()
   })
 
   afterEach(() => {
@@ -219,7 +219,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
       expect.objectContaining({
-        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        navigationGeneration: expect.any(Number),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -306,7 +306,7 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
     const showTerminalSession = vi.fn((_sessionId, routeRequest) =>
-      primaryWindowPresentationIsCurrent(routeRequest.presentationToken),
+      primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration),
     )
     const bridge: TerminalSessionCommandBridge = {
       terminalFilesystemTargetSnapshot: () => ({
@@ -339,7 +339,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).not.toHaveBeenCalled()
 
     sessions = [terminalSession('term-222222222222222222222', true)]
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     releaseCoordinator()
     await coordinatorBlocker
 
@@ -347,7 +347,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-222222222222222222222',
       expect.objectContaining({
-        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        navigationGeneration: expect.any(Number),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -376,7 +376,7 @@ describe('workspace pane runtime tab command actions', () => {
       focusTerminal: vi.fn(),
     }
 
-    const pendingCreatePresentation = beginPrimaryWindowPresentation()
+    const pendingCreatePresentation = beginPrimaryWindowNavigation()
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
@@ -392,7 +392,7 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(primaryWindowPresentationIsCurrent(pendingCreatePresentation)).toBe(true)
+    expect(primaryWindowNavigationIsCurrent(pendingCreatePresentation)).toBe(true)
   })
 
   test('primary terminal action presents an existing session while another create is pending', async () => {
@@ -429,7 +429,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
       expect.objectContaining({
-        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        navigationGeneration: expect.any(Number),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -553,5 +553,5 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { presentationToken: beginPrimaryWindowPresentation(), routeTarget: terminalRouteTarget }
+  return { navigationGeneration: beginPrimaryWindowNavigation(), routeTarget: terminalRouteTarget }
 }

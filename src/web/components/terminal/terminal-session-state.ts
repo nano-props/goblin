@@ -17,6 +17,7 @@ export class TerminalSessionState {
     processName: string
     canonicalTitle: string | null
     clientController: TerminalControllerViewModel
+    identityRevision: number
     canonicalSize: { cols: number; rows: number } | null
   } = {
     phase: 'opening',
@@ -27,6 +28,7 @@ export class TerminalSessionState {
       role: 'controller',
       controllerStatus: 'connected',
     },
+    identityRevision: -1,
     canonicalSize: null,
   }
   /** Client-only replay buffering used to merge output around
@@ -142,22 +144,44 @@ export class TerminalSessionState {
     message?: string | null
     processName: string
     canonicalTitle?: string | null
+    identityRevision: number
     role: TerminalControllerViewModel['role']
     controllerStatus: TerminalControllerViewModel['controllerStatus']
     canonicalSize: { cols: number; rows: number } | null
   }): boolean {
-    let changed = false
-    changed = this.setClientController(input.role, input.controllerStatus) || changed
-    changed = this.setCanonicalSize(input.canonicalSize) || changed
-    changed = this.setPhaseAndMessage(input.phase ?? 'open', input.message ?? null) || changed
-    changed = this.setProcessName(input.processName) || changed
-    changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
+    let changed = this.establishIdentity(input)
+    changed = this.applyRuntimeMetadata(input) || changed
     return changed
   }
 
-  applyIdentity(event: TerminalIdentityViewModel): boolean {
-    let changed = this.setClientController(event.role, event.controllerStatus)
-    changed = this.setCanonicalSize(event.canonicalSize) || changed
+  establishIdentity(input: TerminalIdentityStateInput): boolean {
+    assertValidIdentityRevision(input.identityRevision)
+    this.runtimeState.identityRevision = input.identityRevision
+    return this.applyIdentityFields(input)
+  }
+
+  applyIdentity(event: TerminalIdentityStateInput): { accepted: boolean; changed: boolean } {
+    assertValidIdentityRevision(event.identityRevision)
+    if (event.identityRevision < this.runtimeState.identityRevision) return { accepted: false, changed: false }
+    if (event.identityRevision === this.runtimeState.identityRevision) {
+      if (!this.identityFieldsMatch(event)) {
+        throw new Error('terminal identity payload conflicts at the same revision')
+      }
+      return { accepted: true, changed: false }
+    }
+    this.runtimeState.identityRevision = event.identityRevision
+    return { accepted: true, changed: this.applyIdentityFields(event) }
+  }
+
+  applyRuntimeMetadata(input: {
+    phase?: TerminalSessionPhase
+    message?: string | null
+    processName: string
+    canonicalTitle?: string | null
+  }): boolean {
+    let changed = this.setPhaseAndMessage(input.phase ?? 'open', input.message ?? null)
+    changed = this.setProcessName(input.processName) || changed
+    changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
     return changed
   }
 
@@ -185,6 +209,21 @@ export class TerminalSessionState {
     }
     this.runtimeState.clientController = { role, controllerStatus }
     return true
+  }
+
+  private applyIdentityFields(input: TerminalIdentityStateInput): boolean {
+    let changed = this.setClientController(input.role, input.controllerStatus)
+    changed = this.setCanonicalSize(input.canonicalSize) || changed
+    return changed
+  }
+
+  private identityFieldsMatch(input: TerminalIdentityStateInput): boolean {
+    const currentController = this.runtimeState.clientController
+    return (
+      currentController.role === input.role &&
+      currentController.controllerStatus === input.controllerStatus &&
+      sameCanonicalSize(this.runtimeState.canonicalSize, input.canonicalSize)
+    )
   }
 
   // Updates the replay boundary. Pending output is preserved when a newer
@@ -262,6 +301,23 @@ export class TerminalSessionState {
     this.runtimeState.message = message
     return true
   }
+}
+
+interface TerminalIdentityStateInput extends TerminalControllerViewModel {
+  identityRevision: number
+  canonicalSize: { cols: number; rows: number } | null
+}
+
+function assertValidIdentityRevision(revision: number): void {
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('invalid terminal identity revision')
+}
+
+function sameCanonicalSize(
+  a: { cols: number; rows: number } | null,
+  b: { cols: number; rows: number } | null,
+): boolean {
+  if (!a || !b) return a === b
+  return a.cols === b.cols && a.rows === b.rows
 }
 
 function sameSearchResult(a: TerminalSearchResult | null, b: TerminalSearchResult | null): boolean {

@@ -1,46 +1,28 @@
 import { BufferedRealtimeSocket } from '#/server/realtime/buffered-realtime-socket.ts'
-import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalOutputCheckpoint } from '#/shared/terminal-types.ts'
 
-export type AppRealtimeOutputFlushBoundary = TerminalOutputCheckpoint
+export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<TerminalOutputCheckpoint> {
+  private flushBoundary: TerminalOutputCheckpoint | null = null
 
-export type AppRealtimeOutputFlushBoundaryContext =
-  AppRealtimeOutputFlushBoundary | readonly AppRealtimeOutputFlushBoundary[]
-
-export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtimeOutputFlushBoundaryContext> {
-  private readonly flushBoundaryByRuntimeBinding = new Map<string, AppRealtimeOutputFlushBoundary>()
-
-  constructor(socket: RealtimeSocket, onDeactivate?: () => void) {
-    super(socket, onDeactivate)
-  }
-
-  protected override beforeResume(boundary: AppRealtimeOutputFlushBoundaryContext | null): void {
-    if (!boundary) return
-    if ('terminalRuntimeSessionId' in boundary) {
-      this.recordFlushBoundary(boundary)
-      return
-    }
-    for (const entry of boundary) this.recordFlushBoundary(entry)
+  protected override beforeFlush(boundary: TerminalOutputCheckpoint | null): void {
+    this.flushBoundary = boundary
   }
 
   protected override shouldDropBufferedSend(payload: string): boolean {
     const event = parseTerminalOutputEvent(payload)
     if (!event) return false
-    const boundary = this.flushBoundaryByRuntimeBinding.get(runtimeBindingKey(event))
+    const boundary = this.flushBoundary
     if (!boundary) return false
+    if (
+      event.terminalRuntimeSessionId !== boundary.terminalRuntimeSessionId ||
+      event.terminalRuntimeGeneration !== boundary.terminalRuntimeGeneration
+    )
+      return false
     return event.seq <= boundary.seq
   }
 
   protected override onBufferCleared(): void {
-    this.flushBoundaryByRuntimeBinding.clear()
-  }
-
-  private recordFlushBoundary(boundary: AppRealtimeOutputFlushBoundary): void {
-    const key = runtimeBindingKey(boundary)
-    const current = this.flushBoundaryByRuntimeBinding.get(key)
-    if (!current || isCheckpointAfter(boundary, current)) {
-      this.flushBoundaryByRuntimeBinding.set(key, normalizeBoundary(boundary))
-    }
+    this.flushBoundary = null
   }
 }
 
@@ -71,25 +53,4 @@ function parseTerminalOutputEvent(payload: string): TerminalOutputCheckpoint | n
   } catch {
     return null
   }
-}
-
-function normalizeBoundary(boundary: AppRealtimeOutputFlushBoundary): AppRealtimeOutputFlushBoundary {
-  return {
-    terminalRuntimeSessionId: boundary.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: boundary.terminalRuntimeGeneration,
-    seq: normalizeOutputNumber(boundary.seq),
-  }
-}
-
-function runtimeBindingKey(binding: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }): string {
-  return `${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
-}
-
-function isCheckpointAfter(next: AppRealtimeOutputFlushBoundary, current: AppRealtimeOutputFlushBoundary): boolean {
-  return next.seq > current.seq
-}
-
-function normalizeOutputNumber(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(0, Math.floor(value))
 }

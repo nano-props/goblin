@@ -36,7 +36,7 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-repo')
@@ -702,7 +702,7 @@ describe('openWorkspacePaneTab', () => {
       navigation: navigationWithStoreActions(),
     })
     await Promise.resolve()
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     mutation.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')])
 
     await expect(opened).resolves.toBe(true)

@@ -473,6 +473,7 @@ const terminalCalls = {
 const invokeIpc = vi.fn<Window['goblinNative']['invokeIpc']>()
 const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['openExternalUrl']>()
 const mockFonts = new MockFontFaceSet()
+let nextIdentityRevision = 0
 
 function requiredWorkspaceLocator(input: string) {
   const locator =
@@ -502,6 +503,7 @@ beforeEach(() => {
     toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame'],
   })
   xtermMocks.terminals.length = 0
+  nextIdentityRevision = 0
   xtermMocks.fitAddons.length = 0
   xtermMocks.searchAddons.length = 0
   xtermMocks.unicodeAddons.length = 0
@@ -578,6 +580,10 @@ beforeEach(() => {
           ok: true,
           terminalRuntimeSessionId: input.terminalRuntimeSessionId,
           terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+          identityRevision: ++nextIdentityRevision,
+          role: 'controller',
+          controllerStatus: 'connected',
+          controller: { clientId: 'client_local', status: 'connected' },
           canonicalSize: { cols: input.cols, rows: input.rows },
         })),
         takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
@@ -632,6 +638,10 @@ beforeEach(() => {
         ok: true,
         terminalRuntimeSessionId: input.terminalRuntimeSessionId,
         terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+        identityRevision: ++nextIdentityRevision,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: input.cols, rows: input.rows },
       })),
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
@@ -777,6 +787,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -790,9 +801,12 @@ describe('TerminalSession', () => {
 
   test('remeasures a pending presentation before reveal and recovers at the current layout', async () => {
     const firstAttach = deferred<TerminalAttachResult>()
-    terminalCalls.attach
-      .mockReturnValueOnce(firstAttach.promise)
-      .mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa', { canonicalSize: { cols: 90, rows: 25 } }))
+    terminalCalls.attach.mockReturnValueOnce(firstAttach.promise).mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        identityRevision: 1,
+        canonicalSize: { cols: 90, rows: 25 },
+      }),
+    )
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -825,6 +839,36 @@ describe('TerminalSession', () => {
     expect(term.rows).toBe(25)
   })
 
+  test('fails a controller attach response that did not commit its requested geometry', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        canonicalSize: { cols: 99, rows: 29 },
+      }),
+    )
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    expect(terminalCalls.attach).toHaveBeenCalledOnce()
+    expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(warnSpy).toHaveBeenCalledWith(
+      'terminal presentation failed',
+      expect.objectContaining({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        error: expect.objectContaining({
+          message: 'terminal start response did not commit the requested controller geometry',
+        }),
+      }),
+    )
+    warnSpy.mockRestore()
+  })
+
   test('keeps the fresh xterm intact and renders realtime output from sequence 1', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
@@ -854,7 +898,39 @@ describe('TerminalSession', () => {
     expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
   })
 
-  test('does not transfer automatic focus to a fresh stream until real output has rendered', async () => {
+  test('rebuilds a visible terminal from the authoritative snapshot after an append render failure', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    const failedTerm = xtermMocks.terminals[0]!
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        snapshot: 'authoritative screen after render failure',
+        snapshotSeq: 1,
+      }),
+    )
+    failedTerm.write.mockImplementationOnce(() => {
+      throw new Error('xterm write buffer overflow')
+    })
+
+    emitSessionOutput(session, 1, 'live output that failed to render')
+    await flushUntil(() => xtermMocks.terminals.length === 2)
+    await flushTerminalStart()
+
+    expect(failedTerm.dispose).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
+    expect(xtermMocks.terminals[1]!.write).toHaveBeenCalledWith(
+      'authoritative screen after render failure',
+      expect.any(Function),
+    )
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+  })
+
+  test('transfers automatic focus when a fresh stream presentation is complete', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -877,20 +953,13 @@ describe('TerminalSession', () => {
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(term.write).not.toHaveBeenCalled()
-    expect(term.focus).not.toHaveBeenCalled()
-    expect(settled).not.toHaveBeenCalled()
+    expect(term.focus).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledOnce()
 
-    term.refresh.mockImplementationOnce(() => {})
     emitSessionOutput(session, 1, 'prompt')
     await flushTerminalStart()
 
     expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
-    expect(term.focus).not.toHaveBeenCalled()
-    expect(settled).not.toHaveBeenCalled()
-
-    term.emitRender()
-    await flushTerminalStart()
-
     expect(term.focus).toHaveBeenCalledOnce()
     expect(settled).toHaveBeenCalledOnce()
     term.emitUserData('l')
@@ -903,7 +972,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('keeps a quiet fresh stream visible and allows an explicit focus request', async () => {
+  test('automatically focuses a quiet fresh stream after presentation', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -918,14 +987,13 @@ describe('TerminalSession', () => {
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(term.write).not.toHaveBeenCalled()
-    expect(term.focus).not.toHaveBeenCalled()
+    expect(term.focus).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledOnce()
 
-    session.focus()
     term.emitUserData('input for quiet process')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
     expect(term.focus).toHaveBeenCalledOnce()
-    expect(settled).toHaveBeenCalledOnce()
     expect(terminalCalls.write).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -933,7 +1001,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('drops an automatic focus transfer whose presentation lease expires before fresh output', async () => {
+  test('drops an automatic focus transfer whose presentation lease expires before presentation', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -944,20 +1012,20 @@ describe('TerminalSession', () => {
 
     session.attach(host)
     expect(session.focus({ isCurrent: () => focusIsCurrent, onSettled: settled })).toBe(true)
-    await flushTerminalStart()
+    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
+    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
     focusIsCurrent = false
 
-    emitSessionOutput(session, 1, 'prompt')
     await flushTerminalStart()
 
-    expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(term.focus).not.toHaveBeenCalled()
     expect(settled).toHaveBeenCalledOnce()
   })
 
   test('batches redraw chunks already pending at the presentation cutoff', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa', 2))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -966,13 +1034,15 @@ describe('TerminalSession', () => {
     session.attach(host)
     await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
     const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
 
     const promptEolMark = '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m    \r \r'
     const prompt = '\r\x1b[0m\x1b[27m\x1b[24m\x1b[J~/project\r\n$ \x1b[K\x1b[?2004h'
     emitSessionOutput(session, 1, promptEolMark)
-    emitSessionOutput(session, 1, prompt, 2)
+    await Promise.resolve()
     expect(term.write).not.toHaveBeenCalled()
+    expect(term.refresh).not.toHaveBeenCalled()
+    emitSessionOutput(session, 1, prompt, 2)
+    await flushMicrotasksUntil(() => term.write.mock.calls.length === 1)
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
 
     await flushTerminalStart()
@@ -984,8 +1054,125 @@ describe('TerminalSession', () => {
     expect(term.write).toHaveBeenCalledTimes(1)
   })
 
-  test('ignores stale-generation output while a fresh stream presentation is pending', async () => {
+  test('does not move the finite presentation cutoff when later output arrives during viewport rendering', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa', 1))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+    const term = xtermMocks.terminals[0]!
+    const frame = host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')
+    const firstFrame = 'first frame'
+    const laterOutput = 'later output'
+
+    emitSessionOutput(session, 1, firstFrame)
+    await flushMicrotasksUntil(() => term.write.mock.calls.length === 1)
+    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+
+    expect(frame?.style.visibility).toBe('hidden')
+    expect(term.write).toHaveBeenNthCalledWith(1, firstFrame, expect.any(Function))
+
+    emitSessionOutput(session, 1, laterOutput, 2)
+    expect(frame?.style.visibility).toBe('hidden')
+    term.emitRender()
+    await flushMicrotasksUntil(() => term.write.mock.calls.length === 2)
+
+    expect(frame?.style.visibility).toBe('')
+    expect(term.write).toHaveBeenNthCalledWith(2, laterOutput, expect.any(Function))
+    expect(term.write).toHaveBeenCalledTimes(2)
+    expect(term.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  test('rebuilds from the authoritative snapshot when pending presentation output cannot render', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+    const failedTerm = xtermMocks.terminals[0]!
+    await flushMicrotasksUntil(() => failedTerm.refresh.mock.calls.length === 1)
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        snapshot: 'authoritative screen after pending render failure',
+        snapshotSeq: 1,
+      }),
+    )
+    failedTerm.write.mockImplementationOnce(() => {
+      throw new Error('xterm write buffer overflow')
+    })
+
+    emitSessionOutput(session, 1, 'pending live output')
+    failedTerm.emitRender()
+    await flushUntil(() => xtermMocks.terminals.length === 2)
+    await flushTerminalStart()
+
+    expect(failedTerm.dispose).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
+    expect(xtermMocks.terminals[1]!.write).toHaveBeenCalledWith(
+      'authoritative screen after pending render failure',
+      expect.any(Function),
+    )
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+  })
+
+  test('forwards an xterm protocol reply generated by hidden fresh output', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa', 1))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+    const term = xtermMocks.terminals[0]!
+    term.write.mockImplementationOnce((_data: string, callback?: () => void) => {
+      term.emitData('\x1b[1;1R')
+      if (callback) queueMicrotask(callback)
+    })
+
+    emitSessionOutput(session, 1, '\x1b[6n')
+    await flushMicrotasksUntil(() => terminalCalls.write.mock.calls.length === 1)
+    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1b[1;1R',
+    })
+  })
+
+  test('discards an xterm protocol reply generated by snapshot replay', async () => {
+    const attach = deferred<TerminalAttachResult>()
+    terminalCalls.attach.mockReturnValueOnce(attach.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    const term = xtermMocks.terminals[0]!
+    term.write.mockImplementationOnce((_data: string, callback?: () => void) => {
+      term.emitData('\x1b[1;1R')
+      if (callback) queueMicrotask(callback)
+    })
+    attach.resolve(attachResult('pty_session_1_aaaaaaaaa', { snapshot: '\x1b[6n', snapshotSeq: 1 }))
+
+    await flushTerminalStart()
+
+    expect(term.write).toHaveBeenCalledWith('\x1b[6n', expect.any(Function))
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+  })
+
+  test('ignores stale-generation output while a fresh stream presentation is pending', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa', 1))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -995,17 +1182,16 @@ describe('TerminalSession', () => {
     await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
     const term = xtermMocks.terminals[0]!
     emitSessionOutput(session, 0, 'stale prompt')
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await Promise.resolve()
 
     expect(term.write).not.toHaveBeenCalled()
+    expect(term.refresh).not.toHaveBeenCalled()
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
-    await flushTerminalStart()
-
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     emitSessionOutput(session, 1, 'current prompt')
     await flushUntil(() => term.write.mock.calls.length === 1)
 
     expect(term.write).toHaveBeenCalledWith('current prompt', expect.any(Function))
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
   })
 
   test('cancels a fresh stream presentation that detaches before its viewport render', async () => {
@@ -1865,14 +2051,19 @@ describe('TerminalSession', () => {
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
+    const settled = vi.fn()
 
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushTerminalStart()
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -1910,6 +2101,83 @@ describe('TerminalSession', () => {
     ])
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('authoritative recovery', expect.any(Function))
+    expect(xtermMocks.terminals.at(-1)!.focus).toHaveBeenCalledOnce()
+    expect(settled).toHaveBeenCalledOnce()
+    expect(host.contains(document.activeElement)).toBe(true)
+  })
+
+  test('does not retain an unscoped focus request while presentation is pending', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    expect(session.focus()).toBe(false)
+    await flushTerminalStart()
+
+    expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
+  })
+
+  test('rebuilds a connected view as one focus and transient-state transaction', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const firstTerm = xtermMocks.terminals[0]!
+    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    session.focus()
+    expect(terminalHasKeyboardFocus()).toBe(true)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+    notify.mockClear()
+
+    session.resynchronizeConnectedView()
+
+    expect(firstTerm.dispose).toHaveBeenCalledOnce()
+    expect(session.snapshot().progress).toBeUndefined()
+    expect(notify).toHaveBeenCalledWith('metadata')
+    await flushTerminalStart()
+
+    const rebuiltTerm = xtermMocks.terminals.at(-1)!
+    expect(rebuiltTerm).not.toBe(firstTerm)
+    expect(rebuiltTerm.focus).toHaveBeenCalledOnce()
+    expect(terminalHasKeyboardFocus()).toBe(true)
+  })
+
+  test('clears and publishes transient state for a connected viewer during resynchronization', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+    notify.mockClear()
+
+    session.resynchronizeConnectedView()
+
+    expect(session.snapshot().progress).toBeUndefined()
+    expect(notify).toHaveBeenCalledWith('metadata')
+    expect(terminalCalls.attach).toHaveBeenCalledOnce()
   })
 
   test('continues after terminal write failures', async () => {
@@ -2013,6 +2281,10 @@ describe('TerminalSession', () => {
         terminalRuntimeSessionId:
           failure === 'session mismatch' ? 'pty_session_2_bbbbbbbbb' : 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: failure === 'generation mismatch' ? 2 : 1,
+        identityRevision: 1,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: failure === 'canonical size mismatch' ? { cols: 102, rows: 32 } : { cols: 101, rows: 31 },
       })
     }
@@ -2077,8 +2349,13 @@ describe('TerminalSession', () => {
       ok: true,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
+      role: 'controller',
+      controllerStatus: 'connected',
+      controller: { clientId: 'client_local', status: 'connected' },
       canonicalSize: { cols: 101, rows: 31 },
     })
+    nextIdentityRevision = 1
     await flushMicrotasksUntil(() => terminalCalls.resize.mock.calls.length === 2)
 
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
@@ -2087,6 +2364,8 @@ describe('TerminalSession', () => {
       cols: 103,
       rows: 33,
     })
+    await flushTerminalStart()
+    expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
   })
 
   test('does not let a stale resize acknowledgement regress newer controller geometry', async () => {
@@ -2106,6 +2385,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 2,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 120, rows: 40 },
@@ -2115,6 +2395,10 @@ describe('TerminalSession', () => {
       ok: true,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
+      role: 'controller',
+      controllerStatus: 'connected',
+      controller: { clientId: 'client_local', status: 'connected' },
       canonicalSize: { cols: 101, rows: 31 },
     })
     await flushTerminalStart()
@@ -2128,6 +2412,46 @@ describe('TerminalSession', () => {
       canonicalSize: { cols: 120, rows: 40 },
     })
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  test('ignores a stale resize acknowledgement without rebuilding the current controller view', async () => {
+    const resize = deferred<TerminalResizeResult>()
+    terminalCalls.resize.mockReturnValueOnce(resize.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.resize(101, 31)
+    await flushUntil(() => terminalCalls.resize.mock.calls.length === 1)
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    resize.resolve({
+      ok: true,
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 1,
+      role: 'controller',
+      controllerStatus: 'connected',
+      controller: { clientId: 'client_local', status: 'connected' },
+      canonicalSize: { cols: 101, rows: 31 },
+    })
+    await flushTerminalStart()
+
+    expect(session.snapshot().attachment).toEqual({ role: 'controller' })
+    expect(term.dispose).not.toHaveBeenCalled()
+    expect(xtermMocks.terminals).toHaveLength(1)
   })
 
   test('does not send resize or input while attached as a mirror page before explicit takeover', async () => {
@@ -2160,6 +2484,7 @@ describe('TerminalSession', () => {
   test('renders the recovery snapshot for a newly hydrated controller binding', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('term-remoteremoteremote001', {
+        identityRevision: 1,
         snapshot: 'hydrated-screen',
         snapshotSeq: 5,
       }),
@@ -2171,6 +2496,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -2204,6 +2530,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -2243,6 +2570,7 @@ describe('TerminalSession', () => {
     })
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('term-remoteremoteremote001', {
+        identityRevision: 1,
         processName: 'node',
         snapshot: 'remote-screen',
         snapshotSeq: 5,
@@ -2252,6 +2580,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -2280,6 +2609,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -2334,7 +2664,7 @@ describe('TerminalSession', () => {
 
     const inputWriter = session.captureInputWriter()
     if (!inputWriter) throw new Error('expected presented input writer')
-    inputWriter("bat '/worktree/file.ts'\r")
+    expect(inputWriter("bat '/worktree/file.ts'\r")).toBe(true)
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
@@ -2345,7 +2675,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('commits asynchronous input only to the generation that admitted it', async () => {
+  test('commits asynchronous input only to the generation captured by its writer', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -2363,12 +2693,42 @@ describe('TerminalSession', () => {
 
     session.restart()
 
-    inputWriter("'/tmp/from-old-generation'")
+    expect(inputWriter("'/tmp/from-old-generation'")).toBe(false)
     await flushTerminalStart()
     expect(terminalCalls.write).not.toHaveBeenCalled()
   })
 
-  test('drops a captured input writer after the presentation is replaced on the same generation', async () => {
+  test('rejects a captured input writer after controller authority is lost', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    session.attach(host)
+    await flushTerminalStart()
+    const inputWriter = session.captureInputWriter()
+    if (!inputWriter) throw new Error('expected presented input writer')
+
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+
+    expect(inputWriter("'/tmp/after-takeover'")).toBe(false)
+    await Promise.resolve()
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+  })
+
+  test('keeps a captured input writer bound to the same runtime generation across presentation rebuilds', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -2387,10 +2747,14 @@ describe('TerminalSession', () => {
     session.detach(host)
     session.attach(host)
     await flushTerminalStart()
-    inputWriter("'/tmp/from-old-presentation'")
-    await Promise.resolve()
+    expect(inputWriter("'/tmp/from-old-presentation'")).toBe(true)
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
-    expect(terminalCalls.write).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: "'/tmp/from-old-presentation'",
+    })
   })
 
   test('tracks server title changes separately from process name', async () => {
@@ -2465,6 +2829,45 @@ describe('TerminalSession', () => {
     expect(session.snapshot().takeoverPending).toBeUndefined()
   })
 
+  test('ignores a takeover response superseded by a newer identity revision', async () => {
+    const takeoverResponse = deferred<TerminalTakeoverResult>()
+    terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    session.attach(host)
+
+    const takeover = session.takeover()
+    await flushUntil(() => terminalCalls.takeover.mock.calls.length === 1)
+    const candidateTerm = xtermMocks.terminals[0]!
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    takeoverResponse.resolve(
+      takeoverResult('pty_session_1_aaaaaaaaa', {
+        identityRevision: 1,
+        canonicalSize: { cols: 100, rows: 30 },
+      }),
+    )
+
+    await expect(takeover).resolves.toBe(false)
+    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
+    expect(candidateTerm.dispose).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).not.toHaveBeenCalled()
+  })
+
   test('reports a committed takeover as successful when its recovery presentation fails', async () => {
     terminalCalls.takeover.mockResolvedValueOnce(takeoverResult('pty_session_1_aaaaaaaaa'))
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'recovery unavailable' })
@@ -2494,12 +2897,19 @@ describe('TerminalSession', () => {
     // wait for a realtime `identity` event before painting the
     // post-takeover frame. A subsequent realtime event for the same
     // session is idempotent.
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        controller: { clientId: 'client_remote', status: 'connected' },
-        canonicalSize: { cols: 120, rows: 40 },
-      }),
-    )
+    terminalCalls.attach
+      .mockResolvedValueOnce(
+        attachResult('pty_session_1_aaaaaaaaa', {
+          controller: { clientId: 'client_remote', status: 'connected' },
+          canonicalSize: { cols: 120, rows: 40 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 2, {
+          controller: { clientId: 'client_local', status: 'connected' },
+          canonicalSize: { cols: 100, rows: 30 },
+        }),
+      )
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('pty_session_1_aaaaaaaaa', {
         controller: { clientId: 'client_local', status: 'connected' },
@@ -2538,6 +2948,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 2,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -2554,7 +2965,7 @@ describe('TerminalSession', () => {
       }),
     )
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
+      recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, {
         controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 100, rows: 30 },
         snapshot: 'post-takeover-screen',
@@ -2600,7 +3011,7 @@ describe('TerminalSession', () => {
     const takeoverResponse = deferred<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
+      recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, {
         terminalRuntimeGeneration: 1,
         snapshot: 'post-takeover recovery',
       }),
@@ -2639,7 +3050,7 @@ describe('TerminalSession', () => {
 
   test('mounting a hydrated unowned session attaches and auto-claims without manual takeover', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
+      recoveryAttachResult('pty_session_1_aaaaaaaaa', 2, {
         controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 100, rows: 30 },
       }),
@@ -2670,7 +3081,7 @@ describe('TerminalSession', () => {
 
   test('mounted viewer hydrate to unowned auto-attaches without manual takeover', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
+      recoveryAttachResult('pty_session_1_aaaaaaaaa', 3, {
         controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 100, rows: 30 },
         snapshot: 'reclaimed-after-hydrate',
@@ -2695,6 +3106,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -2722,6 +3134,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 100, rows: 30 },
       }),
     )
+    terminalCalls.attach.mockResolvedValueOnce(recoveryAttachResult('pty_session_1_aaaaaaaaa', 1))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -2746,7 +3159,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('reconciles mismatched recovery geometry back to the fitted takeover xterm', async () => {
+  test('commits fitted geometry in the first post-takeover recovery attach', async () => {
     terminalCalls.attach
       .mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
@@ -2755,9 +3168,9 @@ describe('TerminalSession', () => {
         }),
       )
       .mockResolvedValueOnce(
-        attachResult('pty_session_1_aaaaaaaaa', {
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 2, {
           controller: { clientId: 'client_local', status: 'connected' },
-          canonicalSize: { cols: 132, rows: 43 },
+          canonicalSize: { cols: 100, rows: 30 },
         }),
       )
     terminalCalls.takeover.mockResolvedValueOnce(
@@ -2778,8 +3191,8 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
     await expect(takeover).resolves.toBe(true)
 
-    expect(terminalCalls.attach).toHaveBeenCalledTimes(3)
-    expect(terminalCalls.attach).toHaveBeenNthCalledWith(3, {
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
+    expect(terminalCalls.attach).toHaveBeenNthCalledWith(2, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       cols: 100,
@@ -2797,7 +3210,7 @@ describe('TerminalSession', () => {
         }),
       )
       .mockResolvedValueOnce(
-        attachResult('pty_session_1_aaaaaaaaa', {
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, {
           controller: { clientId: 'client_local', status: 'connected' },
           phase: 'restarting',
         }),
@@ -2824,12 +3237,19 @@ describe('TerminalSession', () => {
   })
 
   test('realtime identity event is the authority for non-takeover paths', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        controller: { clientId: 'client_remote', status: 'connected' },
-        canonicalSize: { cols: 120, rows: 40 },
-      }),
-    )
+    terminalCalls.attach
+      .mockResolvedValueOnce(
+        attachResult('pty_session_1_aaaaaaaaa', {
+          controller: { clientId: 'client_remote', status: 'connected' },
+          canonicalSize: { cols: 120, rows: 40 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, {
+          controller: { clientId: 'client_local', status: 'connected' },
+          canonicalSize: { cols: 100, rows: 30 },
+        }),
+      )
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('pty_session_1_aaaaaaaaa', {
         controller: null,
@@ -2850,6 +3270,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 2,
       role: 'unowned',
       controllerStatus: 'none',
       canonicalSize: { cols: 120, rows: 40 },
@@ -2868,7 +3289,7 @@ describe('TerminalSession', () => {
         }),
       )
       .mockResolvedValueOnce(
-        attachResult('pty_session_1_aaaaaaaaa', {
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 3, {
           controller: { clientId: 'client_local', status: 'connected' },
           canonicalSize: { cols: 100, rows: 30 },
           snapshot: 'reclaimed-screen',
@@ -2888,6 +3309,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'unowned',
       controllerStatus: 'none',
       canonicalSize: { cols: 120, rows: 40 },
@@ -2905,12 +3327,19 @@ describe('TerminalSession', () => {
   })
 
   test('starts a generation-fenced recovery attach when identity grants local control', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        controller: { clientId: 'client_remote', status: 'connected' },
-        canonicalSize: { cols: 120, rows: 40 },
-      }),
-    )
+    terminalCalls.attach
+      .mockResolvedValueOnce(
+        attachResult('pty_session_1_aaaaaaaaa', {
+          controller: { clientId: 'client_remote', status: 'connected' },
+          canonicalSize: { cols: 120, rows: 40 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 2, {
+          controller: { clientId: 'client_local', status: 'connected' },
+          canonicalSize: { cols: 100, rows: 30 },
+        }),
+      )
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -2922,6 +3351,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 101, rows: 31 },
@@ -3304,6 +3734,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 2,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -3548,6 +3979,7 @@ describe('TerminalSession', () => {
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -3575,6 +4007,7 @@ describe('TerminalSession', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -3817,6 +4250,7 @@ describe('TerminalSession', () => {
       session.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'controller',
         controllerStatus: 'connected',
         canonicalSize: { cols: 100, rows: 30 },
@@ -3868,6 +4302,7 @@ describe('TerminalSession', () => {
       session.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalSize: { cols: 100, rows: 30 },
@@ -3890,6 +4325,7 @@ function attachResult(
     terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
@@ -3904,15 +4340,26 @@ function attachResult(
   return result
 }
 
+function recoveryAttachResult(
+  terminalRuntimeSessionId: string,
+  identityRevision: number,
+  overrides: Parameters<typeof attachResult>[1] = {},
+): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
+  return attachResult(terminalRuntimeSessionId, { ...overrides, identityRevision })
+}
+
 function streamAttachResult(
   terminalRuntimeSessionId: string,
+  streamSeq = 0,
 ): Extract<TerminalAttachResult, { ok: true; frame: 'stream' }> {
   return {
     ok: true,
     frame: 'stream',
+    streamSeq,
     terminalProjectionEffect: { kind: 'delta', revision: 1 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
@@ -3954,6 +4401,7 @@ function takeoverResult(
     ok: true,
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
+    identityRevision: 1,
     role: 'controller',
     controllerStatus: 'connected',
     controller: { clientId: 'client_local', status: 'connected' },
@@ -3968,6 +4416,7 @@ function hydrateManagedSession(
   overrides: Partial<{
     terminalRuntimeSessionId: string
     terminalRuntimeGeneration: number
+    identityRevision: number
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
     processName: string
@@ -3980,6 +4429,7 @@ function hydrateManagedSession(
   session.hydrate({
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     phase: 'opening',
     message: null,
     processName: 'zsh',

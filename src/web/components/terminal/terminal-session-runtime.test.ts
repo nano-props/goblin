@@ -5,12 +5,17 @@ import {
 } from '#/web/components/terminal/terminal-session-runtime.ts'
 import type { TerminalIdentityViewModel } from '#/web/components/terminal/types.ts'
 
-type ProjectedTerminalRuntimeAttachResult = TerminalRuntimeAttachResult & {
+type OptionalIdentityRevision<T> = T extends unknown
+  ? Omit<T, 'identityRevision'> & { identityRevision?: number }
+  : never
+type CommittedProjectedTerminalRuntimeAttachResult = TerminalRuntimeAttachResult & {
   role: TerminalIdentityViewModel['role']
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
+type ProjectedTerminalRuntimeAttachResult = OptionalIdentityRevision<CommittedProjectedTerminalRuntimeAttachResult>
 
 function applyAttachResult(runtime: TerminalSessionRuntime, result: ProjectedTerminalRuntimeAttachResult): boolean {
+  const identityRevision = result.identityRevision ?? 0
   let attempt = runtime.currentAttemptToken()
   if (!attempt) {
     runtime.hydrateRepoSession(
@@ -18,6 +23,7 @@ function applyAttachResult(runtime: TerminalSessionRuntime, result: ProjectedTer
         ? {
             terminalRuntimeSessionId: result.terminalRuntimeSessionId,
             terminalRuntimeGeneration: result.terminalRuntimeGeneration,
+            identityRevision,
             phase: result.phase,
             message: result.message,
             processName: result.processName,
@@ -29,6 +35,7 @@ function applyAttachResult(runtime: TerminalSessionRuntime, result: ProjectedTer
         : {
             terminalRuntimeSessionId: result.terminalRuntimeSessionId,
             terminalRuntimeGeneration: 0,
+            identityRevision: 0,
             phase: 'opening',
             message: null,
             processName: 'terminal',
@@ -40,7 +47,7 @@ function applyAttachResult(runtime: TerminalSessionRuntime, result: ProjectedTer
     )
     attempt = runtime.startAttaching()
   }
-  const committed = runtime.commitAttachResult(attempt, result)
+  const committed = runtime.commitAttachResult(attempt, { ...result, identityRevision })
   if (!committed.accepted) throw new Error('test attach result was not accepted')
   return committed.changed
 }
@@ -59,6 +66,7 @@ describe('TerminalSessionRuntime', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       frame: 'stream',
+      streamSeq: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -74,6 +82,10 @@ describe('TerminalSessionRuntime', () => {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 112, rows: 37 },
       }),
     ).toEqual({ accepted: true, changed: true })
@@ -84,6 +96,10 @@ describe('TerminalSessionRuntime', () => {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 2,
+        identityRevision: 0,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 120, rows: 40 },
       }),
     ).toEqual({ accepted: false, changed: false })
@@ -97,7 +113,9 @@ describe('TerminalSessionRuntime', () => {
       ok: true,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       frame: 'stream',
+      streamSeq: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -252,6 +270,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -273,6 +292,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -429,6 +449,7 @@ describe('TerminalSessionRuntime', () => {
       runtime.hydrateRepoSession({
         terminalRuntimeSessionId: 'term-remoteremoteremote001',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         phase: 'open',
         message: null,
         processName: 'node',
@@ -461,6 +482,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -496,6 +518,7 @@ describe('TerminalSessionRuntime runtime binding generations', () => {
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_runtime_generation_test',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -533,6 +556,7 @@ describe('TerminalSessionRuntime restart generation activation', () => {
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_restart_activation_test',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -558,6 +582,7 @@ describe('TerminalSessionRuntime restart generation activation', () => {
       phase: 'open',
       message: null,
       frame: 'stream',
+      streamSeq: 0,
       controller: { clientId: 'client_local', status: 'connected' },
       canonicalSize: { cols: 100, rows: 30 },
       role: 'controller',
@@ -577,11 +602,12 @@ describe('TerminalSessionRuntime restart generation activation', () => {
 })
 
 describe('TerminalSessionRuntime exact start attempts', () => {
-  const startResult = (terminalRuntimeGeneration: number): ProjectedTerminalRuntimeAttachResult => {
+  const startResult = (terminalRuntimeGeneration: number): CommittedProjectedTerminalRuntimeAttachResult => {
     const metadata = {
       ok: true as const,
       terminalRuntimeSessionId: 'pty_exact_attempt_aaaa',
       terminalRuntimeGeneration,
+      identityRevision: 0,
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
@@ -593,7 +619,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
     }
     return terminalRuntimeGeneration === 1
       ? { ...metadata, frame: 'snapshot', snapshot: '', snapshotSeq: 0 }
-      : { ...metadata, frame: 'stream' }
+      : { ...metadata, frame: 'stream', streamSeq: 0 }
   }
 
   test('rejects a second restart while the admitted attempt is pending', () => {
@@ -626,12 +652,37 @@ describe('TerminalSessionRuntime exact start attempts', () => {
       terminalRuntimeGeneration: 1,
     })
   })
+
+  test('supersedes a same-binding attach response with an older identity revision', () => {
+    const runtime = new TerminalSessionRuntime()
+    applyAttachResult(runtime, {
+      ...startResult(1),
+      identityRevision: 2,
+      canonicalSize: { cols: 101, rows: 31 },
+    })
+    const attempt = runtime.startAttaching()
+
+    expect(
+      runtime.commitAttachResult(attempt, {
+        ...startResult(1),
+        identityRevision: 1,
+        canonicalSize: { cols: 100, rows: 30 },
+      }),
+    ).toEqual({ accepted: false, changed: false, resolution: 'superseded' })
+    expect(runtime.currentAttemptToken()).toBeNull()
+    expect(runtime.currentRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: 'pty_exact_attempt_aaaa',
+      terminalRuntimeGeneration: 1,
+    })
+    expect(runtime.currentCanonicalSize()).toEqual({ cols: 101, rows: 31 })
+  })
 })
 
 describe('TerminalSessionRuntime authoritative hydration during attempts', () => {
   const hydration = (terminalRuntimeGeneration: number, phase: 'open' | 'error' = 'open') => ({
     terminalRuntimeSessionId: 'pty_authoritative_hydration',
     terminalRuntimeGeneration,
+    identityRevision: 0,
     phase,
     message: phase === 'error' ? 'server error' : null,
     processName: `shell-${terminalRuntimeGeneration}`,
@@ -644,6 +695,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     ok: true as const,
     ...hydration(terminalRuntimeGeneration),
     frame: 'stream' as const,
+    streamSeq: 0,
     phase: 'open' as const,
     message: null,
     controller: { clientId: 'client-authoritative', status: 'connected' as const },

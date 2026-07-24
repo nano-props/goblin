@@ -185,6 +185,9 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     isVisible(): boolean {
       return false
     }
+    controlsTerminal(): boolean {
+      return this.snapshotValue.attachment?.role === 'controller'
+    }
 
     findNext(): TerminalSearchResult {
       return { resultIndex: -1, resultCount: 0, found: false }
@@ -351,7 +354,10 @@ let sessionClosedHandler:
       workspaceId: typeof REPO_ID
     }) => void)
   | null = null
-type TestTerminalSessionSummary = TerminalSessionSummary
+type OptionalIdentityRevision<T> = T extends unknown
+  ? Omit<T, 'identityRevision'> & { identityRevision?: number }
+  : never
+type TestTerminalSessionSummary = OptionalIdentityRevision<TerminalSessionSummary>
 const listSessionsMock = vi.fn<
   (
     ...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId?: string }>
@@ -368,6 +374,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   return {
     ...session,
     terminalRuntimeGeneration: session.terminalRuntimeGeneration ?? 1,
+    identityRevision: session.identityRevision ?? 0,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
   }
 }
@@ -420,6 +427,7 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
     terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
@@ -435,9 +443,11 @@ function restartResult() {
   return {
     ok: true as const,
     frame: 'stream' as const,
+    streamSeq: 0,
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 2,
+    identityRevision: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
@@ -506,6 +516,7 @@ beforeEach(() => {
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
         terminalRuntimeGeneration: reused?.terminalRuntimeGeneration ?? 0,
+        identityRevision: reused?.identityRevision ?? 0,
         processName: reused?.processName ?? '',
         canonicalTitle: reused?.canonicalTitle ?? null,
         phase: reused?.phase ?? 'opening',
@@ -525,6 +536,7 @@ beforeEach(() => {
       {
         terminalRuntimeSessionId: terminalSessionId,
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId,
         target: runtimeWorkspacePaneTargetForTest({
           workspaceId,
@@ -551,6 +563,7 @@ beforeEach(() => {
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -714,6 +727,7 @@ beforeEach(() => {
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -1081,6 +1095,7 @@ describe('TerminalSessionProvider', () => {
         identityHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-222222222222222222222',
           role: 'controller',
           controllerStatus: 'connected',
@@ -1110,6 +1125,7 @@ describe('TerminalSessionProvider', () => {
       expect(second.handleIdentity).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-222222222222222222222',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         terminalSessionId: 'term-222222222222222222222',
         role: 'controller',
         controllerStatus: 'connected',
@@ -1648,6 +1664,7 @@ describe('TerminalSessionProvider', () => {
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       processName: '',
       canonicalTitle: null,
       phase: 'opening' as const,

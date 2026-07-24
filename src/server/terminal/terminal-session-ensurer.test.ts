@@ -254,6 +254,7 @@ function preparedResult(terminalSessionId: string): Extract<TerminalSessionPrepa
         terminalProjectionEffect: { kind: 'delta', revision: 7 },
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
         terminalRuntimeGeneration: 0,
+        identityRevision: 0,
         processName: '',
         canonicalTitle: null,
         phase: 'opening',

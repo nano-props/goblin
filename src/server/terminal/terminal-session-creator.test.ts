@@ -147,6 +147,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     terminalSessionId,
     target: {
       kind: 'git-worktree',
@@ -185,6 +186,7 @@ function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmis
     terminalProjectionEffect: { kind: 'delta', revision: 7 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     processName: '',
     canonicalTitle: null,
     phase: 'opening' as const,

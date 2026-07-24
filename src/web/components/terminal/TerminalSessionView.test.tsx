@@ -22,7 +22,7 @@ import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/work
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
-import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -197,7 +197,10 @@ async function renderTerminalSession() {
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    captureInputWriter: (terminalSessionId) => (data) => writeInput(terminalSessionId, data),
+    captureInputWriter: (terminalSessionId) => (data) => {
+      writeInput(terminalSessionId, data)
+      return true
+    },
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
   })
@@ -259,7 +262,10 @@ function dropDataWithFiles(files: File[]): DataTransfer {
 }
 
 function captureInputWriterForTest(writeInput: (terminalSessionId: string, data: string) => void) {
-  return (terminalSessionId: string) => (data: string) => writeInput(terminalSessionId, data)
+  return (terminalSessionId: string) => (data: string) => {
+    writeInput(terminalSessionId, data)
+    return true
+  }
 }
 
 /**
@@ -379,8 +385,8 @@ describe('TerminalSessionView', () => {
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
-    const presentationToken = beginPrimaryWindowPresentation()
-    const focusLease = claimTerminalAutoFocus(presentationToken)
+    const navigationGeneration = beginPrimaryWindowNavigation()
+    const focusLease = claimTerminalAutoFocus(navigationGeneration)
     if (!focusLease) throw new Error('expected terminal automatic-focus lease')
     focusLease.commit('term-222222222222222222222', focusTerminal)
     expect(focusTerminal).toHaveBeenCalledOnce()

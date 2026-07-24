@@ -1,113 +1,77 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  beginPrimaryWindowPresentation,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
-  admitPrimaryWindowNavigationWhenUncontested,
   primaryWindowNavigationState,
-  primaryWindowPresentationIsCurrent,
-  registerPrimaryWindowPresentationAbandon,
+  primaryWindowNavigationIsCurrent,
   registerPrimaryWindowNavigation,
-  releasePrimaryWindowNavigation,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 import { runOwnedPrimaryWindowNavigation } from '#/web/primary-window-route-navigation.ts'
 
-beforeEach(() => resetPrimaryWindowPresentationForTest())
+beforeEach(() => resetPrimaryWindowNavigationForTest())
 
-describe('primary window presentation history ownership', () => {
-  test('admits once after foreign navigation settles without observing navigation started by the callback', () => {
-    const foreignToken = beginPrimaryWindowPresentation()
-    const foreignNavigation = registerPrimaryWindowNavigation(foreignToken, '/foreign')
-    if (!foreignNavigation) throw new Error('missing foreign navigation fixture')
-    const admitted = vi.fn(() => {
-      const ownToken = beginPrimaryWindowPresentation()
-      const ownNavigation = registerPrimaryWindowNavigation(ownToken, '/owned')
-      if (!ownNavigation) throw new Error('missing owned navigation fixture')
-      releasePrimaryWindowNavigation(ownNavigation.navigationId)
-    })
-
-    const cancel = admitPrimaryWindowNavigationWhenUncontested(admitted)
-    expect(admitted).not.toHaveBeenCalled()
-    releasePrimaryWindowNavigation(foreignNavigation.navigationId)
-
-    expect(admitted).toHaveBeenCalledOnce()
-    cancel()
-  })
-
-  test('does not admit stale reconciliation while a committed navigation is settling', async () => {
-    const token = beginPrimaryWindowPresentation()
-    const commitEffect = vi.fn()
-    const abandonEffect = vi.fn()
-    const navigation = registerPrimaryWindowNavigation(token, '/target', commitEffect, abandonEffect)
-    if (!navigation) throw new Error('missing navigation fixture')
-    const admitted = vi.fn(() => beginPrimaryWindowPresentation())
-    admitPrimaryWindowNavigationWhenUncontested(admitted)
-
-    expect(
-      observePrimaryWindowHistoryNavigation({
-        href: '/target',
-        state: primaryWindowNavigationState({}, navigation.navigationId),
-        action: { type: 'PUSH' },
-      }),
-    ).toEqual({ ok: true })
-
-    await expect(navigation.settled).resolves.toEqual({ status: 'committed' })
-    expect(commitEffect).toHaveBeenCalledOnce()
-    expect(abandonEffect).not.toHaveBeenCalled()
-    expect(admitted).not.toHaveBeenCalled()
-  })
-
-  test('settles every ownership before propagating an abandonment effect failure', () => {
-    const token = beginPrimaryWindowPresentation()
+describe('primary window navigation lifecycle', () => {
+  test('allows one history commit owner per generation and settles it when superseded', async () => {
+    const generation = beginPrimaryWindowNavigation()
     const effects: string[] = []
-    registerPrimaryWindowPresentationAbandon(token, () => {
+    const failed = registerPrimaryWindowNavigation(generation, '/failed', undefined, () => {
       effects.push('failed')
       throw new Error('abandon failed')
     })
-    registerPrimaryWindowPresentationAbandon(token, () => effects.push('settled'))
+    if (!failed) throw new Error('expected owned navigation registration')
 
-    expect(() => beginPrimaryWindowPresentation()).toThrow('abandon failed')
-    expect(effects).toEqual(['failed', 'settled'])
+    expect(() => registerPrimaryWindowNavigation(generation, '/duplicate')).toThrow(
+      'primary window navigation generation already owns a history commit',
+    )
+
+    expect(() => beginPrimaryWindowNavigation()).not.toThrow()
+    expect(effects).toEqual(['failed'])
+    await expect(failed.settled).resolves.toMatchObject({
+      status: 'failed',
+      intendedStatus: 'abandoned',
+      error: expect.objectContaining({ message: 'abandon failed' }),
+    })
   })
 
-  test('an unknown same-href PUSH supersedes the current presentation', () => {
-    const token = beginPrimaryWindowPresentation()
+  test('an unknown same-href PUSH supersedes the current navigation', () => {
+    const generation = beginPrimaryWindowNavigation()
     observePrimaryWindowHistoryNavigation({ href: '/same', state: {}, action: { type: 'PUSH' } })
-    expect(primaryWindowPresentationIsCurrent(token)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('treats a late PUSH from an abandoned registration as the new external presentation', () => {
-    const staleToken = beginPrimaryWindowPresentation()
+    const staleGeneration = beginPrimaryWindowNavigation()
     const commitEffect = vi.fn()
-    const registration = registerPrimaryWindowNavigation(staleToken, '/owned', commitEffect)
-    if (!registration) throw new Error('missing navigation id')
-    const currentToken = beginPrimaryWindowPresentation()
+    const registration = registerPrimaryWindowNavigation(staleGeneration, '/owned', commitEffect)
+    if (!registration) throw new Error('missing navigation registration')
+    const currentGeneration = beginPrimaryWindowNavigation()
 
     observePrimaryWindowHistoryNavigation({
       href: '/owned',
-      state: primaryWindowNavigationState({}, registration.navigationId),
+      state: primaryWindowNavigationState({}, staleGeneration),
       action: { type: 'PUSH' },
     })
 
-    expect(primaryWindowPresentationIsCurrent(currentToken)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
     expect(commitEffect).not.toHaveBeenCalled()
   })
 
-  test('advances URL presentation authority even when mismatched navigation cleanup fails', async () => {
-    const token = beginPrimaryWindowPresentation()
-    const registration = registerPrimaryWindowNavigation(token, '/expected', undefined, () => {
+  test('advances navigation generation even when mismatched navigation cleanup fails', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(generation, '/expected', undefined, () => {
       throw new Error('abandon effect failed')
     })
-    if (!registration) throw new Error('missing navigation id')
+    if (!registration) throw new Error('missing navigation registration')
 
-    const observation = observePrimaryWindowHistoryNavigation({
+    observePrimaryWindowHistoryNavigation({
       href: '/actual',
-      state: primaryWindowNavigationState({}, registration.navigationId),
+      state: primaryWindowNavigationState({}, generation),
       action: { type: 'PUSH' },
     })
 
-    expect(observation).toEqual({ ok: true })
-    expect(primaryWindowPresentationIsCurrent(token)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
     await expect(registration.settled).resolves.toMatchObject({
       status: 'failed',
       intendedStatus: 'abandoned',
@@ -116,19 +80,17 @@ describe('primary window presentation history ownership', () => {
   })
 
   test('records a committed navigation effect failure without throwing from history observation', async () => {
-    const token = beginPrimaryWindowPresentation()
-    const registration = registerPrimaryWindowNavigation(token, '/owned', () => {
+    const generation = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(generation, '/owned', () => {
       throw new Error('commit effect failed')
     })
-    if (!registration) throw new Error('missing navigation id')
+    if (!registration) throw new Error('missing navigation registration')
 
-    expect(
-      observePrimaryWindowHistoryNavigation({
-        href: '/owned',
-        state: primaryWindowNavigationState({}, registration.navigationId),
-        action: { type: 'PUSH' },
-      }),
-    ).toEqual({ ok: true })
+    observePrimaryWindowHistoryNavigation({
+      href: '/owned',
+      state: primaryWindowNavigationState({}, generation),
+      action: { type: 'PUSH' },
+    })
     await expect(registration.settled).resolves.toMatchObject({
       status: 'failed',
       intendedStatus: 'committed',
@@ -144,6 +106,7 @@ describe('primary window presentation history ownership', () => {
     expect(
       runOwnedPrimaryWindowNavigation({
         targetHref: '/owned',
+        currentHref: '/start',
         commitEffect,
         abandonEffect,
         navigate: async () => await navigation.promise,
@@ -151,7 +114,7 @@ describe('primary window presentation history ownership', () => {
     ).toBe(true)
     await Promise.resolve()
 
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
 
@@ -171,13 +134,14 @@ describe('primary window presentation history ownership', () => {
 
     runOwnedPrimaryWindowNavigation({
       targetHref: '/first',
+      currentHref: href,
       commitEffect: () => committed.push('first'),
-      navigate: async (navigationId) => {
+      navigate: async (navigationGeneration) => {
         firstEntered.resolve()
         href = '/first'
         observePrimaryWindowHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, navigationId),
+          state: primaryWindowNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
         await releaseFirst.promise
@@ -187,15 +151,16 @@ describe('primary window presentation history ownership', () => {
 
     runOwnedPrimaryWindowNavigation({
       targetHref: '/second',
+      currentHref: href,
       commitEffect: () => {
         committed.push('second')
         secondCommitted.resolve()
       },
-      navigate: async (navigationId) => {
+      navigate: async (navigationGeneration) => {
         href = '/second'
         observePrimaryWindowHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, navigationId),
+          state: primaryWindowNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
       },
@@ -214,11 +179,11 @@ describe('primary window presentation history ownership', () => {
   })
 
   test('a current owned observation commits its effect exactly once', () => {
-    const token = beginPrimaryWindowPresentation()
+    const generation = beginPrimaryWindowNavigation()
     const commitEffect = vi.fn()
-    const registration = registerPrimaryWindowNavigation(token, '/owned', commitEffect)
-    if (!registration) throw new Error('missing navigation id')
-    const state = primaryWindowNavigationState({}, registration.navigationId)
+    const registration = registerPrimaryWindowNavigation(generation, '/owned', commitEffect)
+    if (!registration) throw new Error('missing navigation registration')
+    const state = primaryWindowNavigationState({}, generation)
 
     observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
     observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
@@ -226,48 +191,71 @@ describe('primary window presentation history ownership', () => {
     expect(commitEffect).toHaveBeenCalledOnce()
   })
 
-  test('releasing a rejected navigation makes its later id external', () => {
-    const rejectedToken = beginPrimaryWindowPresentation()
-    const registration = registerPrimaryWindowNavigation(rejectedToken, '/rejected')
-    if (!registration) throw new Error('missing navigation id')
-    releasePrimaryWindowNavigation(registration.navigationId)
-    const currentToken = beginPrimaryWindowPresentation()
+  test('a settled registration cannot release a later owner in the same generation', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const first = registerPrimaryWindowNavigation(generation, '/first')
+    if (!first) throw new Error('missing first navigation registration')
+    observePrimaryWindowHistoryNavigation({
+      href: '/first',
+      state: primaryWindowNavigationState({}, generation),
+      action: { type: 'PUSH' },
+    })
+    await expect(first.settled).resolves.toEqual({ status: 'committed' })
+
+    const secondAbandon = vi.fn()
+    const second = registerPrimaryWindowNavigation(generation, '/second', undefined, secondAbandon)
+    if (!second) throw new Error('missing second navigation registration')
+
+    first.release()
+
+    expect(secondAbandon).not.toHaveBeenCalled()
+    second.release()
+    expect(secondAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('releasing a rejected navigation makes its later history event external', () => {
+    const rejectedGeneration = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(rejectedGeneration, '/rejected')
+    if (!registration) throw new Error('missing navigation registration')
+    registration.release()
+    const currentGeneration = beginPrimaryWindowNavigation()
 
     observePrimaryWindowHistoryNavigation({
       href: '/rejected',
-      state: primaryWindowNavigationState({}, registration.navigationId),
+      state: primaryWindowNavigationState({}, rejectedGeneration),
       action: { type: 'PUSH' },
     })
 
-    expect(primaryWindowPresentationIsCurrent(currentToken)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
   })
 
   test.each(['BACK', 'FORWARD'] as const)('%s supersedes at the history callback boundary', (type) => {
-    const token = beginPrimaryWindowPresentation()
+    const generation = beginPrimaryWindowNavigation()
     observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type } })
-    expect(primaryWindowPresentationIsCurrent(token)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('GO supersedes at the history callback boundary', () => {
-    const token = beginPrimaryWindowPresentation()
+    const generation = beginPrimaryWindowNavigation()
     observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
-    expect(primaryWindowPresentationIsCurrent(token)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('an async blocker rejection releases ownership without committing its effect', async () => {
     const blocked = Promise.withResolvers<void>()
     const navigationStarted = Promise.withResolvers<void>()
     const navigationReleased = Promise.withResolvers<void>()
-    let navigationId = ''
+    let navigationGeneration: PrimaryWindowNavigationGeneration | null = null
     const commitEffect = vi.fn()
     const abandonEffect = vi.fn(() => navigationReleased.resolve())
     expect(
       runOwnedPrimaryWindowNavigation({
         targetHref: '/blocked',
+        currentHref: '/start',
         commitEffect,
         abandonEffect,
-        navigate: async (ownedNavigationId) => {
-          navigationId = ownedNavigationId
+        navigate: async (ownedNavigationGeneration) => {
+          navigationGeneration = ownedNavigationGeneration
           navigationStarted.resolve()
           return await blocked.promise
         },
@@ -278,9 +266,10 @@ describe('primary window presentation history ownership', () => {
     blocked.reject(new Error('blocked'))
     await blocked.promise.catch(() => {})
     await navigationReleased.promise
+    if (navigationGeneration === null) throw new Error('missing navigation generation')
     observePrimaryWindowHistoryNavigation({
       href: '/blocked',
-      state: primaryWindowNavigationState({}, navigationId),
+      state: primaryWindowNavigationState({}, navigationGeneration),
       action: { type: 'PUSH' },
     })
 
@@ -295,7 +284,7 @@ describe('primary window presentation history ownership', () => {
     expect(
       runOwnedPrimaryWindowNavigation({
         targetHref: '/workspace',
-        currentHref: () => '/workspace',
+        currentHref: '/workspace',
         commitEffect,
         navigate,
       }),
@@ -306,15 +295,15 @@ describe('primary window presentation history ownership', () => {
   })
 
   test('rejects a stale same-target presentation without committing', () => {
-    const staleToken = beginPrimaryWindowPresentation()
-    beginPrimaryWindowPresentation()
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const commitEffect = vi.fn()
 
     expect(
       runOwnedPrimaryWindowNavigation({
-        token: staleToken,
+        generation: staleGeneration,
         targetHref: '/workspace',
-        currentHref: () => '/workspace',
+        currentHref: '/workspace',
         commitEffect,
         navigate: vi.fn(async () => {}),
       }),
@@ -324,13 +313,13 @@ describe('primary window presentation history ownership', () => {
 
   test('accepts a same-target commit whose effect starts the next presentation', () => {
     const commitEffect = vi.fn(() => {
-      beginPrimaryWindowPresentation()
+      beginPrimaryWindowNavigation()
     })
 
     expect(
       runOwnedPrimaryWindowNavigation({
         targetHref: '/workspace',
-        currentHref: () => '/workspace',
+        currentHref: '/workspace',
         commitEffect,
         navigate: vi.fn(async () => {}),
       }),

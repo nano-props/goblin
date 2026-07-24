@@ -25,11 +25,6 @@ import { constrainTerminalSize } from '#/shared/terminal-validators.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 
-interface PendingTerminalFocusRequest {
-  request: TerminalFocusRequest
-  kind: 'automatic' | 'explicit'
-}
-
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
@@ -42,9 +37,7 @@ export class TerminalSessionView {
   private disposeFontObserver: (() => void) | null = null
   private host: HTMLElement | null = null
   private presentationState: 'pending' | 'presented' = 'pending'
-  private pendingFocusRequest: PendingTerminalFocusRequest | null = null
-  private automaticFocusReady = false
-  private automaticFocusRenderAbortController: AbortController | null = null
+  private pendingFocusRequest: TerminalFocusRequest | null = null
   private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
 
   constructor(handlers: {
@@ -110,10 +103,7 @@ export class TerminalSessionView {
   }
 
   private markPresentationPending(): void {
-    this.automaticFocusRenderAbortController?.abort()
-    this.automaticFocusRenderAbortController = null
     this.presentationState = 'pending'
-    this.automaticFocusReady = false
     this.frame.style.visibility = 'hidden'
   }
 
@@ -121,36 +111,39 @@ export class TerminalSessionView {
     return this.presentationState === 'presented'
   }
 
-  async present(
-    term: XTermTerminal,
-    signal: AbortSignal,
-    automaticFocusReady: boolean,
-  ): Promise<'presented' | 'layout-changed' | 'cancelled'> {
+  takeFocusRequestForRebuild(): TerminalFocusRequest | null {
+    const pending = this.pendingFocusRequest
+    if (pending) {
+      let isCurrent: boolean
+      try {
+        isCurrent = pending.isCurrent()
+      } catch (error) {
+        this.settleFocusRequest()
+        throw error
+      }
+      if (!isCurrent) {
+        this.settleFocusRequest()
+        return null
+      }
+      this.pendingFocusRequest = null
+      return pending
+    }
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement) || !this.frame.contains(activeElement)) return null
+    const ownerDocument = this.frame.ownerDocument
+    return transferredTerminalFocusRequest(ownerDocument)
+  }
+
+  async present(term: XTermTerminal, signal: AbortSignal): Promise<'presented' | 'layout-changed' | 'cancelled'> {
     if (this.term !== term || !this.host?.isConnected) return 'cancelled'
     if (!(await waitForFullViewportRender(term, signal))) return 'cancelled'
     if (this.term !== term || !this.host?.isConnected) return 'cancelled'
     const dimensions = this.proposedProtocolSize()
     if (!dimensions || dimensions.cols !== term.cols || dimensions.rows !== term.rows) return 'layout-changed'
     this.presentationState = 'presented'
-    this.automaticFocusReady ||= automaticFocusReady
     this.frame.style.visibility = ''
-    this.commitFocusRequestIfAdmitted(term)
+    this.commitFocusRequest(term)
     return 'presented'
-  }
-
-  async admitAutomaticFocusAfterRender(term: XTermTerminal): Promise<void> {
-    if (this.automaticFocusReady || this.automaticFocusRenderAbortController) return
-    if (this.term !== term || this.presentationState !== 'presented' || !this.host?.isConnected) return
-    const controller = new AbortController()
-    this.automaticFocusRenderAbortController = controller
-    try {
-      if (!(await waitForFullViewportRender(term, controller.signal))) return
-      if (this.term !== term || this.presentationState !== 'presented' || !this.host?.isConnected) return
-      this.automaticFocusReady = true
-      this.commitFocusRequestIfAdmitted(term)
-    } finally {
-      if (this.automaticFocusRenderAbortController === controller) this.automaticFocusRenderAbortController = null
-    }
   }
 
   blurIfFocused(): void {
@@ -205,8 +198,8 @@ export class TerminalSessionView {
       next.onSettled?.()
       throw error
     }
-    this.pendingFocusRequest = { request: next, kind: request ? 'automatic' : 'explicit' }
-    if (this.term && this.presentationState === 'presented') this.commitFocusRequestIfAdmitted(this.term)
+    this.pendingFocusRequest = next
+    if (this.term && this.presentationState === 'presented') this.commitFocusRequest(this.term)
   }
 
   clearSearch(): void {
@@ -394,17 +387,17 @@ export class TerminalSessionView {
   private settleFocusRequest(): void {
     const pending = this.pendingFocusRequest
     this.pendingFocusRequest = null
-    pending?.request.onSettled?.()
+    pending?.onSettled?.()
   }
 
-  private commitFocusRequestIfAdmitted(term: XTermTerminal): void {
+  private commitFocusRequest(term: XTermTerminal): void {
     const pending = this.pendingFocusRequest
-    if (!pending || (pending.kind === 'automatic' && !this.automaticFocusReady)) return
+    if (!pending) return
     this.pendingFocusRequest = null
     try {
-      if (pending.request.isCurrent()) term.focus()
+      if (pending.isCurrent()) term.focus()
     } finally {
-      pending.request.onSettled?.()
+      pending.onSettled?.()
     }
   }
 }
@@ -440,6 +433,50 @@ function terminalSearchOptions(incremental?: boolean): ISearchOptions {
 function blurElementIfFocused(element: HTMLElement): void {
   const activeElement = document.activeElement
   if (activeElement instanceof HTMLElement && element.contains(activeElement)) activeElement.blur()
+}
+
+function documentFocusIsNeutral(ownerDocument: Document): boolean {
+  return (
+    ownerDocument.activeElement === null ||
+    ownerDocument.activeElement === ownerDocument.body ||
+    ownerDocument.activeElement === ownerDocument.documentElement
+  )
+}
+
+function transferredTerminalFocusRequest(ownerDocument: Document): TerminalFocusRequest {
+  let current = true
+  let observing = false
+  const ownerWindow = ownerDocument.defaultView
+  const abandon = () => {
+    current = false
+  }
+  const abandonForKeyboardNavigation = (event: KeyboardEvent) => {
+    if (event.key === 'Tab') abandon()
+  }
+  const stopObserving = () => {
+    if (!observing) return
+    observing = false
+    ownerDocument.removeEventListener('pointerdown', abandon, true)
+    ownerDocument.removeEventListener('keydown', abandonForKeyboardNavigation, true)
+    ownerWindow?.removeEventListener('blur', abandon)
+  }
+  const startObserving = () => {
+    if (observing) return
+    observing = true
+    ownerDocument.addEventListener('pointerdown', abandon, true)
+    ownerDocument.addEventListener('keydown', abandonForKeyboardNavigation, true)
+    ownerWindow?.addEventListener('blur', abandon)
+  }
+  return {
+    isCurrent: () => {
+      startObserving()
+      return current && documentFocusIsNeutral(ownerDocument)
+    },
+    onSettled: () => {
+      current = false
+      stopObserving()
+    },
+  }
 }
 
 function hasMeasurableBox(element: HTMLElement): boolean {

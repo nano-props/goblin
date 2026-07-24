@@ -55,6 +55,12 @@ const TERMINAL_SESSION_PHASE_VALUES = [
 const TerminalRuntimeSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_RUNTIME_SESSION_ID_RE))
 const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
+const TerminalIdentityRevisionSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(0),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
+)
 const TerminalColsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS))
 const TerminalRowsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS))
 const TerminalSizeSchema = v.strictObject({ cols: TerminalColsSchema, rows: TerminalRowsSchema })
@@ -153,15 +159,19 @@ const TerminalNotifyBellInputSchema = v.strictObject({
 
 function hasConsistentTerminalBindingMetadata(input: {
   terminalRuntimeGeneration: number
+  identityRevision: number
   canonicalSize: { cols: number; rows: number } | null
 }): boolean {
-  return input.terminalRuntimeGeneration === 0 ? input.canonicalSize === null : input.canonicalSize !== null
+  return input.terminalRuntimeGeneration === 0
+    ? input.identityRevision === 0 && input.canonicalSize === null
+    : input.canonicalSize !== null
 }
 
 export const TerminalSessionSummarySchema = v.pipe(
   v.strictObject({
     terminalRuntimeSessionId: v.string(),
     terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
     terminalSessionId: v.string(),
     presentation: TerminalPresentationSchema,
     controller: v.nullable(TerminalControllerSchema),
@@ -181,6 +191,7 @@ export const TerminalSessionsSnapshotSchema = v.strictObject({
 const TerminalRuntimeMetadataSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  identityRevision: TerminalIdentityRevisionSchema,
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
@@ -222,6 +233,7 @@ const TerminalAttachResultSchema = v.variant('ok', [
     v.object({
       ok: v.literal(true),
       frame: v.literal('stream'),
+      streamSeq: TerminalOutputSequenceSchema,
       terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
       ...TerminalRuntimeMetadataSchemaEntries,
       terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
@@ -248,6 +260,7 @@ const TerminalRestartResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     frame: v.literal('stream'),
+    streamSeq: TerminalOutputSequenceSchema,
     terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
     ...TerminalRuntimeMetadataSchemaEntries,
     terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
@@ -264,6 +277,7 @@ const TerminalTakeoverResultSchema = v.variant('ok', [
     ok: v.literal(true),
     terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
     terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
     role: v.picklist(['controller', 'viewer', 'unowned']),
     controllerStatus: v.picklist(['connected', 'none']),
     controller: v.nullable(TerminalControllerSchema),
@@ -280,6 +294,10 @@ const TerminalResizeResultSchema = v.variant('ok', [
     ok: v.literal(true),
     terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
     terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
+    role: v.picklist(['controller', 'viewer', 'unowned']),
+    controllerStatus: v.picklist(['connected', 'none']),
+    controller: v.nullable(TerminalControllerSchema),
     canonicalSize: TerminalSizeSchema,
   }),
   v.object({
@@ -345,6 +363,7 @@ export function isValidTerminalWriteData(value: unknown): value is string {
 const TerminalIdentityEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+  identityRevision: TerminalIdentityRevisionSchema,
   terminalSessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalSize: TerminalSizeSchema,

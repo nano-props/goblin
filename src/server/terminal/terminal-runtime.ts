@@ -130,7 +130,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'exit', event })
       },
       onSessionClosed(userId, session, reason) {
-        handleSessionClosed(userId, session, reason)
+        return handleSessionClosed(userId, session, reason)
       },
       onIdentity(userId, event) {
         broker.broadcastToUser(userId, { type: 'identity', event })
@@ -437,14 +437,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     userId: string,
     session: TerminalSessionSummary,
     reason: TerminalSessionCloseReason,
-  ): void {
+  ): void | Promise<void> {
     if (reason !== 'session') return
     const coordinates = terminalSessionCoordinates(session)
     broadcastTerminalSessionsChanged(
       userId,
       manager.terminalSessionsChangedEventForScope(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId),
     )
-    void sessionService
+    return sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {
         publishWorkspaceTabsChanged(userId, coordinates.workspaceId)

@@ -6,7 +6,6 @@ import {
 } from '#/shared/workspace-pane-runtime.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
-import type { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 import { invokeRealtimeRpcHandler, type RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
 import type { RealtimeRpcRequestMessage } from '#/shared/realtime-rpc.ts'
 
@@ -32,8 +31,7 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
   userId: string,
   socket: RealtimeSocket,
   message: WorkspacePaneRuntimeRealtimeRequestMessage,
-  bufferedSocket?: BufferedAppRealtimeSocket,
-): Promise<void> {
+): Promise<null> {
   let response: AppRealtimeResponseMessage
   try {
     const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
@@ -53,14 +51,6 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
       error: error instanceof Error ? error.message : String(error),
     } as AppRealtimeResponseMessage
   }
-  try {
-    socket.send(JSON.stringify(response))
-  } catch {
-    bufferedSocket?.deactivate()
-  }
-  // Runtime open now commits terminal metadata only. A newly prepared
-  // terminal has no PTY output yet, while output from a reused live terminal
-  // must all remain observable because this response carries no snapshot
-  // checkpoint that could subsume it.
-  bufferedSocket?.resume(null)
+  socket.send(JSON.stringify(response))
+  return null
 }

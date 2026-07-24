@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   createTerminalRealtimeHandlers,
   handleTerminalRealtimeRequestMessage,
-  shouldPauseRealtimeRequest,
+  requiresRealtimeOrdering,
 } from '#/server/terminal/terminal-runtime-realtime.ts'
 import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
@@ -26,11 +26,11 @@ import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-v
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 describe('terminal realtime handlers', () => {
-  test('pauses every externally supported authoritative terminal frame request, including takeover', () => {
-    expect(shouldPauseRealtimeRequest('attach')).toBe(true)
-    expect(shouldPauseRealtimeRequest('restart')).toBe(true)
-    expect(shouldPauseRealtimeRequest('takeover')).toBe(true)
-    expect(shouldPauseRealtimeRequest('resize')).toBe(false)
+  test('orders every externally supported authoritative terminal frame request, including takeover', () => {
+    expect(requiresRealtimeOrdering('attach')).toBe(true)
+    expect(requiresRealtimeOrdering('restart')).toBe(true)
+    expect(requiresRealtimeOrdering('takeover')).toBe(true)
+    expect(requiresRealtimeOrdering('resize')).toBe(false)
   })
 
   test('preserves every terminal write result through serialization and shared validation', async () => {
@@ -45,7 +45,6 @@ describe('terminal realtime handlers', () => {
         'client-test',
         'user-test',
         { send: (data) => (serialized = data), close: () => {} },
-        undefined,
         {
           type: 'request',
           requestId: `request-${status}`,
@@ -72,7 +71,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
       workspaceId: 'goblin+file:///repo',
@@ -97,9 +95,11 @@ describe('terminal realtime handlers', () => {
         return {
           ok: true as const,
           frame: 'stream' as const,
+          streamSeq: 1,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 5 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
@@ -110,13 +110,8 @@ describe('terminal realtime handlers', () => {
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-fresh-attach',
         action: 'attach',
@@ -126,8 +121,9 @@ describe('terminal realtime handlers', () => {
           cols: 100,
           rows: 30,
         },
-      },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(3))
 
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
@@ -135,6 +131,7 @@ describe('terminal realtime handlers', () => {
       payload: {
         ok: true,
         frame: 'stream',
+        streamSeq: 1,
         terminalProjectionEffect: { kind: 'delta', revision: 5 },
       },
     })
@@ -146,7 +143,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const host = makeTerminalActionHost({
       attach: async () => {
         buffered.send(
@@ -168,6 +164,7 @@ describe('terminal realtime handlers', () => {
           terminalProjectionEffect: { kind: 'none' as const },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
@@ -180,13 +177,8 @@ describe('terminal realtime handlers', () => {
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-snapshot-attach',
         action: 'attach',
@@ -196,8 +188,9 @@ describe('terminal realtime handlers', () => {
           cols: 100,
           rows: 30,
         },
-      },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
 
     expect(sent).toHaveLength(1)
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({ payload: { ok: true, frame: 'snapshot' } })
@@ -207,7 +200,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
       workspaceId: 'goblin+file:///repo',
@@ -220,9 +212,11 @@ describe('terminal realtime handlers', () => {
         return {
           ok: true as const,
           frame: 'stream' as const,
+          streamSeq: 0,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 6 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 2,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
@@ -233,13 +227,8 @@ describe('terminal realtime handlers', () => {
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-restart',
         action: 'restart',
@@ -249,13 +238,14 @@ describe('terminal realtime handlers', () => {
           cols: 100,
           rows: 30,
         },
-      },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(2))
 
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
       action: 'restart',
-      payload: { frame: 'stream', terminalProjectionEffect: { kind: 'delta', revision: 6 } },
+      payload: { frame: 'stream', streamSeq: 0, terminalProjectionEffect: { kind: 'delta', revision: 6 } },
     })
     expect(sent[1]).toBe(sessionsChanged)
   })

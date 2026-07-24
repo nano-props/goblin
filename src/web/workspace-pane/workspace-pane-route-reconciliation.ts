@@ -1,23 +1,12 @@
 import type { ParsedWorkspacePaneRoute, ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
-import {
-  isWorkspacePaneRuntimeTabEntry,
-  workspacePaneTabEntryIdentity,
-  WORKSPACE_PANE_RUNTIME_TAB_TYPES,
-  type WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
-import {
-  type WorkspacePaneMaterializedTab,
-  type WorkspacePaneTabModel,
-} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
   { kind: 'none' } | { kind: 'pending' } | { kind: 'unverified' } | { kind: 'missing' }
 
 export type WorkspacePaneRouteHistoryResolution =
   { kind: 'defer' } | { kind: 'record'; route: WorkspacePaneRouteTarget }
-
-export type FilesystemWorkspacePaneReplacementResolution =
-  { kind: 'pending' } | { kind: 'unverified' } | { kind: 'resolved'; replacement: WorkspacePaneMaterializedTab | null }
 
 export function reconcileWorkspacePaneRoute(
   route: ParsedWorkspacePaneRouteTarget,
@@ -30,53 +19,11 @@ export function reconcileWorkspacePaneRoute(
   return reconcileTerminalWorkspacePaneRoute(route, model)
 }
 
-export function resolveFilesystemWorkspacePaneReplacement(
-  model: WorkspacePaneTabModel,
-): FilesystemWorkspacePaneReplacementResolution {
-  const tabEntriesState = tabEntriesProjectionReconciliation(model)
-  if (tabEntriesState) return tabEntriesState
-  const entries = orderedReplacementEntries(model)
-  for (const entry of entries) {
-    if (isWorkspacePaneRuntimeTabEntry(entry)) {
-      const phase = model.runtimeTabStateByType[entry.type].projectionPhase
-      if (phase === 'pending') return { kind: 'pending' }
-      if (phase === 'failed') return { kind: 'unverified' }
-    }
-    const identity = workspacePaneTabEntryIdentity(entry)
-    const materialized = model.tabs.find(
-      (tab): tab is WorkspacePaneMaterializedTab => tab.kind !== 'pending' && tab.identity === identity,
-    )
-    if (materialized) return { kind: 'resolved', replacement: materialized }
-  }
-  return { kind: 'resolved', replacement: null }
-}
-
-function orderedReplacementEntries(model: WorkspacePaneTabModel): WorkspacePaneTabEntry[] {
-  const selectedTerminalSessionId = model.runtimeTabStateByType.terminal.selectedSessionId
-  const selectedTerminalEntry = selectedTerminalSessionId
-    ? model.tabEntries.find(
-        (entry) =>
-          isWorkspacePaneRuntimeTabEntry(entry) &&
-          entry.type === 'terminal' &&
-          entry.runtimeSessionId === selectedTerminalSessionId,
-      )
-    : null
-  if (!selectedTerminalEntry) return model.tabEntries
-  return [
-    selectedTerminalEntry,
-    ...model.tabEntries.filter(
-      (entry) => workspacePaneTabEntryIdentity(entry) !== workspacePaneTabEntryIdentity(selectedTerminalEntry),
-    ),
-  ]
-}
-
 export function workspacePaneRouteHistoryResolution(
   route: ParsedWorkspacePaneRouteTarget,
   reconciliation: WorkspacePaneRouteReconciliation,
 ): WorkspacePaneRouteHistoryResolution {
-  if (reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') return { kind: 'defer' }
-  if (reconciliation.kind === 'missing') return { kind: 'record', route: null }
-  if (route?.kind === 'invalid-static') return { kind: 'record', route: null }
+  if (reconciliation.kind !== 'none' || route?.kind === 'invalid-static') return { kind: 'defer' }
   return { kind: 'record', route }
 }
 

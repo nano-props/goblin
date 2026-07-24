@@ -1,30 +1,22 @@
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
-import { terminalLog } from '#/web/logger.ts'
 
 export interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
 }
 
-type TerminalRenderQueueEntry =
-  | {
-      kind: 'replace'
-      data: string
-      checkpoint: RenderedOutputCheckpoint
-      resolve: (applied: boolean) => void
-      reject: (error: unknown) => void
-      settled: boolean
-      revision: number
-    }
-  | {
-      kind: 'append'
-      data: string
-      checkpoint: RenderedOutputCheckpoint
-      resolve: (applied: boolean) => void
-      settled: boolean
-      revision: number
-    }
+export type TerminalRenderSource = 'snapshot' | 'live-output'
+
+interface TerminalRenderQueueEntry {
+  source: TerminalRenderSource
+  data: string
+  checkpoint: RenderedOutputCheckpoint
+  resolve: (applied: boolean) => void
+  reject: (error: unknown) => void
+  settled: boolean
+  revision: number
+}
 
 interface TerminalRenderQueueOptions {
   isCurrent: () => boolean
@@ -48,7 +40,7 @@ export class TerminalRenderQueue {
     this.clear()
     return new Promise<boolean>((resolve, reject) => {
       this.entries.push({
-        kind: 'replace',
+        source: 'snapshot',
         data,
         checkpoint,
         resolve,
@@ -62,12 +54,13 @@ export class TerminalRenderQueue {
 
   append(data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
     if (!data) return Promise.resolve(true)
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>((resolve, reject) => {
       this.entries.push({
-        kind: 'append',
+        source: 'live-output',
         data,
         checkpoint,
         resolve,
+        reject,
         settled: false,
         revision: this.revision,
       })
@@ -81,6 +74,10 @@ export class TerminalRenderQueue {
     if (this.active) this.settle(this.active, false)
   }
 
+  activeRenderSource(): TerminalRenderSource | null {
+    return this.active && this.isCurrent(this.active) ? this.active.source : null
+  }
+
   private pump(): void {
     if (this.active) return
     const entry = this.entries.shift()
@@ -88,13 +85,7 @@ export class TerminalRenderQueue {
     this.active = entry
     void this.run(entry)
       .then((applied) => this.settle(entry, applied))
-      .catch((error) => {
-        if (entry.kind === 'replace') this.reject(entry, error)
-        else {
-          terminalLog.warn('failed to append terminal output', { error })
-          this.settle(entry, false)
-        }
-      })
+      .catch((error) => this.reject(entry, error))
       .finally(() => {
         if (this.active === entry) this.active = null
         this.pump()
@@ -103,7 +94,7 @@ export class TerminalRenderQueue {
 
   private async run(entry: TerminalRenderQueueEntry): Promise<boolean> {
     if (!this.isCurrent(entry)) return false
-    if (entry.kind === 'replace') {
+    if (entry.source === 'snapshot') {
       this.term.reset()
       if (entry.data) await termWrite(this.term, entry.data)
     } else {
@@ -124,7 +115,7 @@ export class TerminalRenderQueue {
     entry.resolve(applied)
   }
 
-  private reject(entry: Extract<TerminalRenderQueueEntry, { kind: 'replace' }>, error: unknown): void {
+  private reject(entry: TerminalRenderQueueEntry, error: unknown): void {
     if (entry.settled) return
     entry.settled = true
     entry.reject(error)

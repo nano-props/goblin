@@ -31,7 +31,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
@@ -134,7 +134,7 @@ describe('workspace pane tab controller transactions', () => {
         authority: { kind: 'workspace-runtime' },
       },
       { kind: 'static', tab: 'files' },
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
@@ -167,7 +167,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         {
-          presentationToken: beginPrimaryWindowPresentation(),
+          navigationGeneration: beginPrimaryWindowNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -187,7 +187,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => false) }),
         {
-          presentationToken: beginPrimaryWindowPresentation(),
+          navigationGeneration: beginPrimaryWindowNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -198,15 +198,15 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons provided terminal focus before rejecting a stale presentation', async () => {
-    const staleToken = beginPrimaryWindowPresentation()
-    beginPrimaryWindowPresentation()
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const navigation = controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => true) })
 
     await expect(
       selectWorkspacePaneControllerTab(workspacePaneTarget(), terminalTab(), navigation, {
-        presentationToken: staleToken,
+        navigationGeneration: staleGeneration,
         focusEffects: { onCommit, onAbandon },
       }),
     ).resolves.toBe(false)
@@ -216,9 +216,9 @@ describe('workspace pane tab controller transactions', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('does not create a replacement worktree presentation after the queued token is superseded', async () => {
-    const tokenA = beginPrimaryWindowPresentation()
-    beginPrimaryWindowPresentation()
+  test('does not create a replacement worktree presentation after the queued generation is superseded', async () => {
+    const supersededGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const target = {
       ...workspacePaneTarget(),
@@ -237,7 +237,7 @@ describe('workspace pane tab controller transactions', () => {
         target,
         workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
-        tokenA,
+        supersededGeneration,
       ),
     ).resolves.toBe(false)
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
@@ -350,9 +350,9 @@ describe('workspace pane tab controller transactions', () => {
     ).rejects.toThrow('router failed')
   })
 
-  test('abandons a stale presentation token exactly once without invoking navigation', async () => {
-    const staleToken = beginPrimaryWindowPresentation()
-    beginPrimaryWindowPresentation()
+  test('abandons a stale navigation generation exactly once without invoking navigation', async () => {
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const commitWorkspacePaneRoute = vi.fn(async () => true)
@@ -364,7 +364,7 @@ describe('workspace pane tab controller transactions', () => {
         TARGET_ROUTE,
         { commitWorkspacePaneRoute },
         { onCommit, onAbandon },
-        staleToken,
+        staleGeneration,
       ),
     ).resolves.toBe(false)
 

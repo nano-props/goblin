@@ -1,9 +1,8 @@
 import {
-  currentPrimaryWindowPresentationToken,
-  primaryWindowPresentationIsCurrent,
-  registerPrimaryWindowPresentationAbandon,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  currentPrimaryWindowNavigationGeneration,
+  primaryWindowNavigationIsCurrent,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 type FocusTerminal = (
@@ -21,96 +20,79 @@ export interface TerminalAutoFocusLease {
   release(): void
 }
 
-interface TerminalAutoFocusRecord {
-  token: PrimaryWindowPresentationToken
+interface TerminalAutoFocusIntent {
+  generation: PrimaryWindowNavigationGeneration
   terminalSessionId: string | null
-  state: 'claimed' | 'pending' | 'accepted' | 'settled' | 'abandoned'
-  releaseAbandonObservation: () => void
-  releasePresentationAbandon: () => void
+  phase: 'open' | 'submitted' | 'finished'
 }
 
-// One document has at most one automatic-focus intent for a presentation
-// generation. A settled record deliberately remains until the next generation
-// so a remount cannot recreate and replay the same intent.
-const terminalAutoFocusByDocument = new WeakMap<Document, TerminalAutoFocusRecord>()
+const terminalAutoFocusByDocument = new WeakMap<Document, TerminalAutoFocusIntent>()
+const observedDocuments = new WeakSet<Document>()
 
-/**
- * Records an app-owned intent to focus the terminal selected by a navigation.
- * It does not move DOM focus or intercept keyboard input. The selected session
- * fulfils the intent only after its own presentation boundary admits focus.
- */
-export function claimTerminalAutoFocus(token: PrimaryWindowPresentationToken): TerminalAutoFocusLease | null {
+/** Reserves one automatic-focus intent for a primary-window navigation. */
+export function claimTerminalAutoFocus(generation: PrimaryWindowNavigationGeneration): TerminalAutoFocusLease | null {
   const ownerDocument = currentDocument()
-  if (!ownerDocument || !primaryWindowPresentationIsCurrent(token)) return null
+  if (!ownerDocument || !primaryWindowNavigationIsCurrent(generation)) return null
   const existing = terminalAutoFocusByDocument.get(ownerDocument)
-  if (existing?.token.generation === token.generation) return null
+  if (existing?.generation === generation) return null
 
-  const record: TerminalAutoFocusRecord = {
-    token,
-    terminalSessionId: null,
-    state: 'claimed',
-    releaseAbandonObservation: () => {},
-    releasePresentationAbandon: () => {},
-  }
-  terminalAutoFocusByDocument.set(ownerDocument, record)
-  record.releasePresentationAbandon = registerPrimaryWindowPresentationAbandon(token, () => {
-    abandonTerminalAutoFocus(record)
-  })
-  if (record.state === 'abandoned') return null
-  record.releaseAbandonObservation = observeAutoFocusAbandon(ownerDocument, record)
-
+  observeExplicitFocusAbandon(ownerDocument)
+  const intent: TerminalAutoFocusIntent = { generation, terminalSessionId: null, phase: 'open' }
+  terminalAutoFocusByDocument.set(ownerDocument, intent)
   return {
     commit(terminalSessionId, focusTerminal) {
-      commitTerminalAutoFocus(ownerDocument, record, terminalSessionId, focusTerminal)
+      if (!terminalAutoFocusIntentIsOpen(ownerDocument, intent)) return
+      if (intent.terminalSessionId !== null && intent.terminalSessionId !== terminalSessionId) {
+        finishTerminalAutoFocus(intent)
+        return
+      }
+      intent.terminalSessionId = terminalSessionId
+      submitTerminalAutoFocus(ownerDocument, intent, focusTerminal)
     },
     release() {
-      abandonTerminalAutoFocus(record)
+      finishTerminalAutoFocus(intent)
     },
   }
 }
 
 export function claimTerminalPresentationFocus(
-  token: PrimaryWindowPresentationToken,
+  generation: PrimaryWindowNavigationGeneration,
   terminalSessionId: string,
 ): TerminalPresentationFocusEffects | null {
-  const lease = claimTerminalAutoFocus(token)
+  const lease = claimTerminalAutoFocus(generation)
   if (!lease) return null
-  let transferred = false
+  let settled = false
   return {
     onCommit() {
-      if (transferred) return
-      transferred = true
+      if (settled) return
+      settled = true
       lease.commit(terminalSessionId, (sessionId, request) => {
         const bridge = readTerminalSessionCommandBridge()
         return bridge ? bridge.focusTerminal(sessionId, request) : false
       })
     },
     onAbandon() {
-      if (transferred) return
-      transferred = true
+      if (settled) return
+      settled = true
       lease.release()
     },
   }
 }
 
-/**
- * Fulfils the current generation's focus intent when its xterm mounts. An
- * initial terminal URL has no app-owned navigation intent, so it may create one
- * only while focus is still on the neutral document surface.
- */
+/** Fulfils the current navigation's intent when the selected terminal mounts. */
 export function fulfillTerminalPresentationFocus(terminalSessionId: string, focusTerminal: FocusTerminal): void {
   const ownerDocument = currentDocument()
   if (!ownerDocument) return
-  const token = currentPrimaryWindowPresentationToken()
+  const generation = currentPrimaryWindowNavigationGeneration()
   const existing = terminalAutoFocusByDocument.get(ownerDocument)
-  if (existing?.token.generation === token.generation) {
-    if (existing.terminalSessionId === terminalSessionId && existing.state === 'pending') {
+  if (existing?.generation === generation) {
+    if (existing.terminalSessionId === terminalSessionId && existing.phase === 'open') {
       submitTerminalAutoFocus(ownerDocument, existing, focusTerminal)
     }
     return
   }
   if (!documentFocusIsNeutral(ownerDocument)) return
-  claimTerminalAutoFocus(token)?.commit(terminalSessionId, focusTerminal)
+  claimTerminalAutoFocus(generation)?.commit(terminalSessionId, focusTerminal)
 }
 
 export function terminalHasKeyboardFocus(): boolean {
@@ -122,103 +104,65 @@ export function terminalHasKeyboardFocus(): boolean {
 /** Cancels automatic focus when another UI explicitly takes focus ownership. */
 export function cancelTerminalAutoFocus(): void {
   const ownerDocument = currentDocument()
-  if (!ownerDocument) return
-  const record = terminalAutoFocusByDocument.get(ownerDocument)
-  if (record) abandonTerminalAutoFocus(record)
+  const intent = ownerDocument ? terminalAutoFocusByDocument.get(ownerDocument) : null
+  if (intent) finishTerminalAutoFocus(intent)
 }
 
 export function resetTerminalAutoFocusForTest(): void {
   const ownerDocument = currentDocument()
-  if (!ownerDocument) return
-  const record = terminalAutoFocusByDocument.get(ownerDocument)
-  if (record) abandonTerminalAutoFocus(record)
-  terminalAutoFocusByDocument.delete(ownerDocument)
-}
-
-function commitTerminalAutoFocus(
-  ownerDocument: Document,
-  record: TerminalAutoFocusRecord,
-  terminalSessionId: string,
-  focusTerminal: FocusTerminal,
-): void {
-  if (record.state !== 'claimed' && record.state !== 'pending') return
-  if (!terminalAutoFocusIsCurrent(ownerDocument, record)) {
-    abandonTerminalAutoFocus(record)
-    return
-  }
-  if (record.terminalSessionId !== null && record.terminalSessionId !== terminalSessionId) {
-    abandonTerminalAutoFocus(record)
-    return
-  }
-  record.terminalSessionId = terminalSessionId
-  submitTerminalAutoFocus(ownerDocument, record, focusTerminal)
+  if (ownerDocument) terminalAutoFocusByDocument.delete(ownerDocument)
 }
 
 function submitTerminalAutoFocus(
   ownerDocument: Document,
-  record: TerminalAutoFocusRecord,
+  intent: TerminalAutoFocusIntent,
   focusTerminal: FocusTerminal,
 ): void {
-  if ((record.state !== 'claimed' && record.state !== 'pending') || record.terminalSessionId === null) return
-  if (!terminalAutoFocusIsCurrent(ownerDocument, record)) {
-    abandonTerminalAutoFocus(record)
-    return
-  }
-  const isCurrent = () => record.state === 'accepted' && terminalAutoFocusIsCurrent(ownerDocument, record)
-  const onSettled = () => {
-    if (record.state !== 'accepted') return
-    settleTerminalAutoFocus(record)
-  }
-  record.state = 'accepted'
+  if (!terminalAutoFocusIntentIsOpen(ownerDocument, intent) || intent.terminalSessionId === null) return
+  const isCurrent = () =>
+    intent.phase === 'submitted' &&
+    terminalAutoFocusByDocument.get(ownerDocument) === intent &&
+    primaryWindowNavigationIsCurrent(intent.generation)
+  const onSettled = () => finishTerminalAutoFocus(intent)
+  intent.phase = 'submitted'
   try {
-    if (focusTerminal(record.terminalSessionId, { isCurrent, onSettled })) return
+    if (focusTerminal(intent.terminalSessionId, { isCurrent, onSettled })) return
   } catch (error) {
-    abandonTerminalAutoFocus(record)
+    finishTerminalAutoFocus(intent)
     throw error
   }
-  if (record.state === 'accepted') record.state = 'pending'
+  if (intent.phase === 'submitted') intent.phase = 'open'
 }
 
-function observeAutoFocusAbandon(ownerDocument: Document, record: TerminalAutoFocusRecord): () => void {
-  let disposed = false
-  let installed = false
-  const abandon = () => abandonTerminalAutoFocus(record)
-  // The action that claimed the intent may itself be handling a pointer event.
-  // Start observing after that dispatch so only a later pointer intent cancels it.
-  queueMicrotask(() => {
-    if (disposed || !terminalAutoFocusIsCurrent(ownerDocument, record)) return
-    installed = true
-    ownerDocument.addEventListener('pointerdown', abandon, true)
-    ownerDocument.defaultView?.addEventListener('blur', abandon)
-  })
-  return () => {
-    disposed = true
-    if (!installed) return
-    ownerDocument.removeEventListener('pointerdown', abandon, true)
-    ownerDocument.defaultView?.removeEventListener('blur', abandon)
+function terminalAutoFocusIntentIsOpen(ownerDocument: Document, intent: TerminalAutoFocusIntent): boolean {
+  if (
+    intent.phase === 'open' &&
+    terminalAutoFocusByDocument.get(ownerDocument) === intent &&
+    primaryWindowNavigationIsCurrent(intent.generation)
+  ) {
+    return true
   }
+  finishTerminalAutoFocus(intent)
+  return false
 }
 
-function terminalAutoFocusIsCurrent(ownerDocument: Document, record: TerminalAutoFocusRecord): boolean {
-  return terminalAutoFocusByDocument.get(ownerDocument) === record && primaryWindowPresentationIsCurrent(record.token)
+function finishTerminalAutoFocus(intent: TerminalAutoFocusIntent): void {
+  intent.phase = 'finished'
 }
 
-function settleTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
-  record.state = 'settled'
-  releaseTerminalAutoFocus(record)
-}
-
-function abandonTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
-  if (record.state === 'settled' || record.state === 'abandoned') return
-  record.state = 'abandoned'
-  releaseTerminalAutoFocus(record)
-}
-
-function releaseTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
-  record.releaseAbandonObservation()
-  record.releaseAbandonObservation = () => {}
-  record.releasePresentationAbandon()
-  record.releasePresentationAbandon = () => {}
+function observeExplicitFocusAbandon(ownerDocument: Document): void {
+  if (observedDocuments.has(ownerDocument)) return
+  observedDocuments.add(ownerDocument)
+  const abandon = () => {
+    const intent = terminalAutoFocusByDocument.get(ownerDocument)
+    if (intent) finishTerminalAutoFocus(intent)
+  }
+  const abandonForKeyboardNavigation = (event: KeyboardEvent) => {
+    if (event.key === 'Tab') abandon()
+  }
+  ownerDocument.addEventListener('pointerdown', abandon, true)
+  ownerDocument.addEventListener('keydown', abandonForKeyboardNavigation, true)
+  ownerDocument.defaultView?.addEventListener('blur', abandon)
 }
 
 function documentFocusIsNeutral(ownerDocument: Document): boolean {

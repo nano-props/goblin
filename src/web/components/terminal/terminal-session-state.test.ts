@@ -22,6 +22,7 @@ describe('TerminalSessionState', () => {
       state.applyOpenResult({
         processName: 'zsh',
         canonicalTitle: '~/Developer/goblin — npm run dev',
+        identityRevision: 0,
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalSize: { cols: 120, rows: 40 },
@@ -52,6 +53,7 @@ describe('TerminalSessionState', () => {
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
+      identityRevision: 0,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -61,11 +63,12 @@ describe('TerminalSessionState', () => {
     const identityOnly: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
     }
-    expect(state.applyIdentity(identityOnly)).toBe(true)
+    expect(state.applyIdentity(identityOnly)).toEqual({ accepted: true, changed: true })
     expect(state.getPhase()).toBe('open')
     expect(state.getClientController().role).toBe('viewer')
 
@@ -91,6 +94,7 @@ describe('TerminalSessionState', () => {
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
+      identityRevision: 0,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -114,6 +118,7 @@ describe('TerminalSessionState', () => {
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
+      identityRevision: 0,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -130,8 +135,7 @@ describe('TerminalSessionState', () => {
 
     // Controller can send input only when phase is 'open'.
     state.applyIdentity({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -155,6 +159,7 @@ describe('TerminalSessionState', () => {
     const identity: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
@@ -182,6 +187,7 @@ describe('TerminalSessionState', () => {
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
+      identityRevision: 0,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalSize: { cols: 120, rows: 40 },
@@ -210,6 +216,7 @@ describe('TerminalSessionState', () => {
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
+      identityRevision: 0,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalSize: { cols: 120, rows: 40 },
@@ -247,5 +254,39 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot(null).canonicalTitle).toBe('hello world')
     expect(state.setCanonicalTitle('   ')).toBe(true)
     expect(state.snapshot(null).canonicalTitle).toBeNull()
+  })
+
+  test('rejects stale identity, accepts an idempotent replay, and fast-fails an equal-revision conflict', () => {
+    const state = new TerminalSessionState()
+    state.applyOpenResult({
+      processName: 'zsh',
+      canonicalTitle: null,
+      identityRevision: 0,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    const current = {
+      identityRevision: 2,
+      role: 'viewer' as const,
+      controllerStatus: 'connected' as const,
+      canonicalSize: { cols: 120, rows: 40 },
+    }
+
+    expect(state.applyIdentity(current)).toEqual({ accepted: true, changed: true })
+    expect(
+      state.applyIdentity({
+        identityRevision: 1,
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalSize: { cols: 100, rows: 30 },
+      }),
+    ).toEqual({ accepted: false, changed: false })
+    expect(state.applyIdentity(current)).toEqual({ accepted: true, changed: false })
+    expect(() => state.applyIdentity({ ...current, role: 'controller' })).toThrow(
+      'terminal identity payload conflicts at the same revision',
+    )
+    expect(state.getClientController().role).toBe('viewer')
+    expect(state.getCanonicalSize()).toEqual({ cols: 120, rows: 40 })
   })
 })

@@ -67,6 +67,7 @@ describe('terminal web host client', () => {
           terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -110,6 +111,7 @@ describe('terminal web host client', () => {
           terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -143,6 +145,7 @@ describe('terminal web host client', () => {
         event: {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-111111111111111111111',
           controller: { clientId, status: 'connected' },
           canonicalSize: { cols: 100, rows: 30 },
@@ -154,6 +157,7 @@ describe('terminal web host client', () => {
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'controller',
       controllerStatus: 'connected',
@@ -491,6 +495,7 @@ describe('terminal web host client', () => {
         event: {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
@@ -560,6 +565,7 @@ describe('terminal web host client', () => {
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'unowned',
       controllerStatus: 'none',

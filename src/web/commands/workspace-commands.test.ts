@@ -186,7 +186,7 @@ import {
   type PrimaryWindowNavigationOverridesForTest,
   type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { resetPrimaryWindowPresentationForTest } from '#/web/primary-window-presentation.ts'
+import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest, terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -225,7 +225,7 @@ let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestB
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
   resetWorkspacePaneActionQueueForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
@@ -492,7 +492,7 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/no-worktree',
       { kind: 'static', tab: 'status' },
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
@@ -1234,7 +1234,7 @@ describe('workspace commands', () => {
       },
       openerIdentity: 'workspace-pane:files',
       showCreatedTerminalTab: (terminalSessionId, _presentation, routeRequest) => {
-        expect(routeRequest.presentationToken).toEqual(expect.objectContaining({ generation: expect.any(Number) }))
+        expect(routeRequest.navigationGeneration).toEqual(expect.any(Number))
         return showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId)
       },
       focusTerminal: secondFocusTerminal,

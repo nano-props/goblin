@@ -10,6 +10,7 @@ import {
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
@@ -20,12 +21,12 @@ import {
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowPresentation,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
-  primaryWindowPresentationIsCurrent,
+  primaryWindowNavigationIsCurrent,
   registerPrimaryWindowNavigation,
-} from '#/web/primary-window-presentation.ts'
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-destination-navigation-repo')
 const CURRENT_WORKTREE = '/tmp/goblin-destination-current-worktree'
@@ -113,6 +114,25 @@ describe('workspace pane destination navigation', () => {
     expect(setWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
+  test('rejects cached branch data after a failed refresh without writing supplements', async () => {
+    const repo = seedDestinationRepo()
+    const presentation = beginPresentation('feature/destination')
+    const routeCommit = Promise.withResolvers<boolean>()
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
+    const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
+      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+    })
+    await Promise.resolve()
+    const queryKey = repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'full')
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('missing repo projection query')
+    query.setState({ ...query.state, status: 'error', error: new Error('projection unavailable') })
+    routeCommit.resolve(true)
+
+    await expect(committed).resolves.toEqual({ kind: 'superseded' })
+    expect(setWorkspacePaneTab).not.toHaveBeenCalled()
+  })
+
   test('uses a primary-window presentation generation so the latest destination wins', async () => {
     seedDestinationRepo()
     const first = beginPresentation('feature/current')
@@ -142,7 +162,7 @@ describe('workspace pane destination navigation', () => {
     })
     await Promise.resolve()
 
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
@@ -202,14 +222,14 @@ describe('workspace pane destination navigation', () => {
     const { actions, routeNavigation } = primaryNavigationActions()
     vi.mocked(routeNavigation.commitWorkspacePaneRoute).mockImplementation(
       async (_repoId, _branchName, _route, options) => {
-        const token = options?.presentationToken
-        if (!token) return false
+        const generation = options?.navigationGeneration
+        if (!generation) return false
         const href = '/workspace/destination/tab/status'
-        const registration = registerPrimaryWindowNavigation(token, href, options.onCommit)
+        const registration = registerPrimaryWindowNavigation(generation, href, options.onCommit)
         if (!registration) return false
         observePrimaryWindowHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, registration.navigationId),
+          state: primaryWindowNavigationState({}, generation),
           action: { type: 'PUSH' },
         })
         return true
@@ -257,7 +277,7 @@ function beginPresentation(branchName: string) {
 function acceptedRouteCommit() {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
-      if (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken)) {
+      if (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration)) {
         options?.onCommit?.()
       }
       return true
@@ -269,7 +289,10 @@ function deferredRouteCommit(completion: Promise<boolean>) {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       const accepted = await completion
-      if (accepted && (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken))) {
+      if (
+        accepted &&
+        (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration))
+      ) {
         options?.onCommit?.()
       }
       return accepted

@@ -14,8 +14,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
   observePrimaryWindowHistoryNavigation,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -28,7 +28,7 @@ const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 
 describe('filesystem workspace pane route navigation', () => {
   beforeEach(() => {
-    resetPrimaryWindowPresentationForTest()
+    resetPrimaryWindowNavigationForTest()
     resetWorkspacesStore()
     seedRepoWithReadModelForTest({ id: WORKSPACE_ID, branches: [], currentBranchName: null })
   })
@@ -42,7 +42,7 @@ describe('filesystem workspace pane route navigation', () => {
       { kind: 'static' as const, tab: 'files' as const },
       { kind: 'terminal' as const, terminalSessionId: TERMINAL_SESSION_ID },
     ] satisfies WorkspacePaneRouteTarget[]) {
-      resetPrimaryWindowPresentationForTest()
+      resetPrimaryWindowNavigationForTest()
       const rootHref = filesystemRootHref(target)
       const sourceRoute = { kind: 'invalid-static' as const, tabKey: 'missing tab' }
       const harness = routeNavigationHarness(`${rootHref}/tab/${encodeURIComponent(sourceRoute.tabKey)}`)
@@ -133,12 +133,11 @@ function routeNavigationHarness(initialHref: string) {
     const state = input.state?.(location.state) ?? location.state
     location.href = href
     location.state = state
-    const observation = observePrimaryWindowHistoryNavigation({
+    observePrimaryWindowHistoryNavigation({
       href,
       state,
       action: { type: input.replace ? 'REPLACE' : 'PUSH' },
     })
-    if (!observation.ok) throw observation.error
   })
   return {
     currentHref: () => location.href,

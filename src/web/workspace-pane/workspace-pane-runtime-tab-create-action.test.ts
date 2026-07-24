@@ -16,10 +16,10 @@ import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowPresentation,
-  primaryWindowPresentationIsCurrent,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import type {
   TerminalCreateCommandResult,
@@ -63,7 +63,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
   resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
@@ -210,14 +210,14 @@ describe('workspace pane runtime tab create action', () => {
         head: { kind: 'branch', branchName: BRANCH_NAME },
       },
       expect.objectContaining({
-        presentationToken: expect.objectContaining({ generation: expect.any(Number) }),
+        navigationGeneration: expect.any(Number),
       }),
     )
   })
 
   test('captures presentation authority before create and does not revive it after later navigation', async () => {
     const showCreatedRuntimeTab = vi.fn((_type, _sessionId, _presentation, routeRequest) =>
-      primaryWindowPresentationIsCurrent(routeRequest.presentationToken),
+      primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration),
     )
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState(),
@@ -234,7 +234,7 @@ describe('workspace pane runtime tab create action', () => {
 
     action?.onCreate()
     await vi.waitFor(() => expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce())
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     const commandInput = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls[0]?.[0] as {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
@@ -249,7 +249,7 @@ describe('workspace pane runtime tab create action', () => {
     const createButton = document.createElement('button')
     document.body.appendChild(createButton)
     createButton.focus()
-    const previousPresentation = beginPrimaryWindowPresentation()
+    const previousPresentation = beginPrimaryWindowNavigation()
     const heldCommand = holdTerminalCreateCommand()
     const navigation = Promise.withResolvers<boolean>()
     const routeStarted = Promise.withResolvers<CreatedTerminalRouteRequest>()
@@ -267,13 +267,13 @@ describe('workspace pane runtime tab create action', () => {
       focusTerminal,
     })
 
-    expect(primaryWindowPresentationIsCurrent(previousPresentation)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(previousPresentation)).toBe(false)
     expect(document.activeElement).toBe(createButton)
     const commandInput = await heldCommand.input.promise
     const commit = commandInput.commitCreatedTerminalTab(createAdmission())
     const routeRequest = await routeStarted.promise
 
-    expect(primaryWindowPresentationIsCurrent(routeRequest.presentationToken)).toBe(true)
+    expect(primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration)).toBe(true)
     expect(focusTerminal).not.toHaveBeenCalled()
     navigation.resolve(true)
     await expect(commit).resolves.toEqual({ status: 'committed' })
@@ -377,7 +377,7 @@ describe('workspace pane runtime tab create action', () => {
     })
     const commandInput = await heldCommand.input.promise
 
-    beginPrimaryWindowPresentation()
+    beginPrimaryWindowNavigation()
     await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({ status: 'committed' })
     heldCommand.result.resolve(committedCreateCommandResult())
     await dispatch
@@ -504,7 +504,7 @@ function translate(key: string): string {
 function createdTerminalRouteRequest(
   routeTarget: CreatedTerminalRouteRequest['routeTarget'] = BRANCH_ROUTE_TARGET,
 ): CreatedTerminalRouteRequest {
-  return { presentationToken: beginPrimaryWindowPresentation(), routeTarget }
+  return { navigationGeneration: beginPrimaryWindowNavigation(), routeTarget }
 }
 
 interface HeldTerminalCreateCommandInput {

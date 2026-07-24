@@ -2,7 +2,7 @@ import { afterEach, vi } from 'vitest'
 import type { ParsedWorkspacePaneRoute, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type {
   PrimaryWindowNavigationActions,
-  PrimaryWindowPresentationNavigationOptions,
+  PrimaryWindowNavigationOptions,
 } from '#/web/primary-window-navigation-actions.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
@@ -18,19 +18,19 @@ export interface ObservedBranchRouteNavigationForTest {
   showRepoBranchEmptyWorkspacePane: (
     workspaceId: WorkspaceId,
     branchName: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => boolean
   showRepoBranchWorkspacePaneTab: (
     workspaceId: WorkspaceId,
     branchName: string,
     tab: Extract<WorkspacePaneRouteTarget, { kind: 'static' }>['tab'],
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => boolean
   showRepoBranchTerminalSession: (
     workspaceId: WorkspaceId,
     branchName: string,
     terminalSessionId: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
+    options?: PrimaryWindowNavigationOptions,
   ) => boolean
 }
 
@@ -132,7 +132,7 @@ export function observedWorkspacePaneRouteCommitForTest(
   if (!showRepoBranchEmptyWorkspacePane || !showRepoBranchWorkspacePaneTab || !showRepoBranchTerminalSession) {
     throw new Error('Observed workspace pane route commits require branch route callbacks')
   }
-  const abandonCommit = (commitOptions: PrimaryWindowPresentationNavigationOptions | undefined) => {
+  const abandonCommit = (commitOptions: PrimaryWindowNavigationOptions | undefined) => {
     commitOptions?.onAbandon?.()
     return false
   }

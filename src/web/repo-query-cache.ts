@@ -7,11 +7,7 @@ import type {
 import type { PullRequestFetchMode } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  repoOperationsQueryKey,
-  repoProjectionQueryKey,
-  repoWorktreeStatusQueryKey,
-} from '#/web/repo-query-keys.ts'
+import { repoOperationsQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 
 export function getRepoOperationsQueryData(
   repoRoot: WorkspaceId,
@@ -51,12 +47,37 @@ export function getRepoProjectionQueryData(
   return projection && projection.loadedAt > 0 ? projection : undefined
 }
 
+export function getSuccessfulRepoProjectionQueryData(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  branch: string | null | undefined,
+  mode: PullRequestFetchMode | undefined,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): GitWorkspaceRuntimeProjection | undefined {
+  const query = queryClient.getQueryState<GitWorkspaceRuntimeProjection>(
+    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
+  )
+  const projection = query?.status === 'success' ? query.data : undefined
+  return projection && projection.loadedAt > 0 ? projection : undefined
+}
+
 export function getRepoWorktreeStatusQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoWorktreeStatusSnapshot | undefined {
   return queryClient.getQueryData<RepoWorktreeStatusSnapshot>(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId))
+}
+
+export function getSuccessfulRepoWorktreeStatusQueryData(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): RepoWorktreeStatusSnapshot | undefined {
+  const query = queryClient.getQueryState<RepoWorktreeStatusSnapshot>(
+    repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
+  )
+  return query?.status === 'success' ? query.data : undefined
 }
 
 export function setRepoWorktreeStatusQueryData(

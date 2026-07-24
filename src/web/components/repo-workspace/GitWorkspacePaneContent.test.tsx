@@ -1453,7 +1453,7 @@ describe('GitWorkspacePaneContent', () => {
       workspaceId,
       repo.workspaceRuntimeId,
       'term-111111111111111111111',
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",

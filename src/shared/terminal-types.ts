@@ -18,6 +18,7 @@ export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' |
 
 /** Monotonic PTY binding generation owned by the server runtime session. */
 export type TerminalRuntimeGeneration = number
+export type TerminalIdentityRevision = number
 
 export interface TerminalSize {
   cols: number
@@ -151,6 +152,7 @@ export type TerminalTakeoverResult =
       ok: true
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: TerminalRuntimeGeneration
+      identityRevision: TerminalIdentityRevision
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
@@ -163,6 +165,8 @@ export type TerminalTakeoverResult =
 export interface TerminalRuntimeMetadata {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
+  /** Monotonic controller/geometry revision within this runtime generation. */
+  identityRevision: TerminalIdentityRevision
   processName: string
   canonicalTitle: string | null
   phase: TerminalSessionPhase
@@ -183,6 +187,8 @@ export interface TerminalBoundRuntimeMetadata extends Omit<TerminalRuntimeMetada
  */
 export interface TerminalStreamFrame {
   frame: 'stream'
+  /** Last output sequence already admitted before this stream response was committed. */
+  streamSeq: number
   phase: 'open'
 }
 
@@ -264,6 +270,10 @@ export interface TerminalResizeCommit {
   ok: true
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
+  identityRevision: TerminalIdentityRevision
+  role: TerminalClientRole
+  controllerStatus: TerminalControllerStatus
+  controller: TerminalController | null
   canonicalSize: TerminalSize
 }
 
@@ -301,6 +311,7 @@ export type TerminalPruneInput = WorkspaceRuntimeScope
 interface TerminalSessionSummaryFields {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
+  identityRevision: TerminalIdentityRevision
   terminalSessionId: string
   controller: TerminalController | null
   processName: string
@@ -410,6 +421,7 @@ export interface TerminalExitEvent {
 export interface TerminalIdentityEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
+  identityRevision: TerminalIdentityRevision
   terminalSessionId: string
   controller: TerminalController | null
   canonicalSize: TerminalSize

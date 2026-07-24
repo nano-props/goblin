@@ -33,7 +33,7 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readSuccessfulRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
@@ -111,7 +111,7 @@ function moveBranchSelection(
   direction: MoveDirection,
   navigation: PrimaryWindowNavigationActions,
 ): boolean {
-  const branchModel = readRepoBranchSnapshotQueryProjection(input.repo)
+  const branchModel = readSuccessfulRepoBranchSnapshotQueryProjection(input.repo)
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,
@@ -192,17 +192,25 @@ export function useKeyboard({
         }
       }
 
-      if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
-        if (e.repeat) return
+      if (primaryModifierPressed(e) && !e.altKey) {
         const workspaceId = currentWorkspaceIdRef.current
         const paneTarget = currentWorkspacePaneCommandTargetRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
+        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
+        const rendererOwnedShortcut =
+          tabIndex !== null ||
+          (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
+        if (rendererOwnedShortcut) {
+          e.preventDefault()
+          e.stopPropagation()
+          if (workspaceShortcutsSuppressed) return
+          if (e.repeat) return
+        }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
           const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
           if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
             return
-          e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
             workspaceId,
@@ -213,7 +221,6 @@ export function useKeyboard({
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
-          e.preventDefault()
           const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
           if (
             !repo ||
@@ -235,7 +242,6 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           if (!paneTarget) return
-          e.preventDefault()
           void runCloseWorkspacePaneTabOrWindowCommand({
             workspaceId,
             target: paneTarget,
@@ -243,10 +249,8 @@ export function useKeyboard({
           })
           return
         }
-        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
         if (tabIndex !== null) {
           if (!paneTarget) return
-          e.preventDefault()
           void runSelectWorkspacePaneTabByIndexCommand({
             workspaceId,
             target: paneTarget,

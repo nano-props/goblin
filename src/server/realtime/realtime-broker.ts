@@ -20,15 +20,13 @@ export interface RealtimeBrokerOptions {
 
 /**
  * Client is expected to send a heartbeat every
- * `REALTIME_HEARTBEAT_INTERVAL_MS` (30 s). If a `(userId, clientId)` goes
- * silent for `REALTIME_HEARTBEAT_DEADLINE_MS` (90 s), transport-owned
- * presence flips offline and the stale sockets for that client are closed.
- * A reconnect registers fresh sockets and flips presence online again.
+ * `REALTIME_HEARTBEAT_INTERVAL_MS` (30 s). If a socket goes silent for
+ * `REALTIME_HEARTBEAT_DEADLINE_MS` (90 s), that exact transport is closed.
+ * Client presence remains online while any socket for that client remains.
  *
- * The actual silence detection latency is `REALTIME_HEARTBEAT_DEADLINE_MS +
- * REALTIME_HEARTBEAT_INTERVAL_MS` = 120 s in the worst case: if a beat lands
- * at t=89.9 s, the next scan at t=90 s sees the deadline as unbreached; the
- * scan at t=120 s finally fires.
+ * The actual silence detection latency is at most
+ * `REALTIME_HEARTBEAT_DEADLINE_MS + REALTIME_HEARTBEAT_INTERVAL_MS` = 120 s
+ * because scans run at the heartbeat interval.
  */
 export const REALTIME_HEARTBEAT_INTERVAL_MS = 30_000
 export const REALTIME_HEARTBEAT_DEADLINE_MS = 90_000
@@ -45,17 +43,17 @@ export class AppRealtimeSocketLimitError extends Error {
   }
 }
 
-interface ClientPresenceRecord {
-  socketCount: number
+interface RealtimeSocketMeta {
+  clientId: string
+  userId: string
   lastHeartbeatAt: number
-  online: boolean
 }
 
 export class RealtimeBroker<TMessage> {
   private readonly options: Required<RealtimeBrokerOptions>
   private readonly socketsByUserId = new Map<string, Set<RealtimeSocket>>()
-  private readonly socketMetaBySocket = new Map<RealtimeSocket, { clientId: string; userId: string }>()
-  private readonly presenceByClientKey = new Map<string, ClientPresenceRecord>()
+  private readonly socketMetaBySocket = new Map<RealtimeSocket, RealtimeSocketMeta>()
+  private readonly socketCountByClientKey = new Map<string, number>()
   private readonly heartbeatTimer: ReturnType<typeof setInterval>
 
   constructor(options: RealtimeBrokerOptions) {
@@ -77,39 +75,24 @@ export class RealtimeBroker<TMessage> {
       this.socketsByUserId.set(userId, sockets)
     }
     sockets.add(socket)
-    this.socketMetaBySocket.set(socket, { clientId, userId })
+    this.socketMetaBySocket.set(socket, { clientId, userId, lastHeartbeatAt: Date.now() })
     const clientKey = userClientKey(userId, clientId)
-    const existing = this.presenceByClientKey.get(clientKey)
-    if (existing) {
-      existing.socketCount += 1
-      existing.lastHeartbeatAt = Date.now()
-      if (!existing.online) this.setClientPresence(clientKey, true)
-      return
-    }
-    this.presenceByClientKey.set(clientKey, {
-      socketCount: 1,
-      lastHeartbeatAt: Date.now(),
-      online: true,
-    })
-    this.emitPresence(clientKey, false, true)
+    const socketCount = this.socketCountByClientKey.get(clientKey) ?? 0
+    this.socketCountByClientKey.set(clientKey, socketCount + 1)
+    if (socketCount === 0) this.emitPresence(clientKey, false, true)
   }
 
-  /** Update the last-heartbeat receipt time for `(userId, clientId)`. */
-  recordHeartbeat(userId: string, clientId: string): void {
-    const clientKey = userClientKey(userId, clientId)
-    const record = this.presenceByClientKey.get(clientKey)
-    if (!record || record.socketCount === 0) return
-    record.lastHeartbeatAt = Date.now()
-    if (!record.online) this.setClientPresence(clientKey, true)
+  /** Update the last-heartbeat receipt time for the socket that sent it. */
+  recordHeartbeat(socket: RealtimeSocket): void {
+    const meta = this.socketMetaBySocket.get(socket)
+    if (meta) meta.lastHeartbeatAt = Date.now()
   }
 
   private scanHeartbeats(): void {
     const now = Date.now()
-    for (const [clientKey, record] of Array.from(this.presenceByClientKey)) {
-      if (!record.online) continue
-      if (record.socketCount === 0) continue
-      if (now - record.lastHeartbeatAt < REALTIME_HEARTBEAT_DEADLINE_MS) continue
-      this.closeClientSockets(clientKey, 1001, this.options.heartbeatTimeoutReason)
+    for (const [socket, meta] of Array.from(this.socketMetaBySocket)) {
+      if (now - meta.lastHeartbeatAt < REALTIME_HEARTBEAT_DEADLINE_MS) continue
+      this.closeSocket(socket, 1001, this.options.heartbeatTimeoutReason)
     }
   }
 
@@ -122,14 +105,12 @@ export class RealtimeBroker<TMessage> {
     sockets.delete(socket)
     this.socketMetaBySocket.delete(socket)
     const clientKey = userClientKey(userId, clientId)
-    const record = this.presenceByClientKey.get(clientKey)
-    if (record) {
-      record.socketCount = Math.max(0, record.socketCount - 1)
-      if (record.socketCount === 0) {
-        const wasOnline = record.online
-        this.presenceByClientKey.delete(clientKey)
-        if (wasOnline) this.emitPresence(clientKey, true, false)
-      }
+    const socketCount = this.socketCountByClientKey.get(clientKey) ?? 0
+    if (socketCount <= 1) {
+      this.socketCountByClientKey.delete(clientKey)
+      if (socketCount === 1) this.emitPresence(clientKey, true, false)
+    } else {
+      this.socketCountByClientKey.set(clientKey, socketCount - 1)
     }
     if (sockets.size > 0) return
     this.socketsByUserId.delete(userId)
@@ -149,7 +130,7 @@ export class RealtimeBroker<TMessage> {
   }
 
   isClientOnline(userId: string, clientId: string): boolean {
-    return this.presenceByClientKey.get(userClientKey(userId, clientId))?.online ?? false
+    return (this.socketCountByClientKey.get(userClientKey(userId, clientId)) ?? 0) > 0
   }
 
   hasUserSockets(userId: string): boolean {
@@ -157,8 +138,8 @@ export class RealtimeBroker<TMessage> {
   }
 
   hasOnlineUserClients(userId: string): boolean {
-    for (const [clientKey, record] of this.presenceByClientKey) {
-      if (!record.online) continue
+    for (const [clientKey, socketCount] of this.socketCountByClientKey) {
+      if (socketCount === 0) continue
       if (splitUserClientKey(clientKey).userId === userId) return true
     }
     return false
@@ -182,15 +163,7 @@ export class RealtimeBroker<TMessage> {
     }
     this.socketsByUserId.clear()
     this.socketMetaBySocket.clear()
-    this.presenceByClientKey.clear()
-  }
-
-  private setClientPresence(clientKey: string, online: boolean): void {
-    const record = this.presenceByClientKey.get(clientKey)
-    if (!record || record.online === online) return
-    const previousOnline = record.online
-    record.online = online
-    this.emitPresence(clientKey, previousOnline, online)
+    this.socketCountByClientKey.clear()
   }
 
   private emitPresence(clientKey: string, previousOnline: boolean, online: boolean): void {
@@ -198,19 +171,12 @@ export class RealtimeBroker<TMessage> {
     this.options.onClientPresenceChanged({ clientId, userId, previousOnline, online })
   }
 
-  private closeClientSockets(clientKey: string, code?: number, reason?: string): void {
-    const { userId, clientId } = splitUserClientKey(clientKey)
-    const sockets = this.socketsByUserId.get(userId)
-    if (!sockets) return
-    for (const socket of Array.from(sockets)) {
-      const meta = this.socketMetaBySocket.get(socket)
-      if (meta?.clientId !== clientId) continue
-      try {
-        if (socket.forceClose) socket.forceClose(code, reason)
-        else socket.close(code, reason)
-      } catch {}
-      this.unregisterSocket(socket)
-    }
+  private closeSocket(socket: RealtimeSocket, code?: number, reason?: string): void {
+    try {
+      if (socket.forceClose) socket.forceClose(code, reason)
+      else socket.close(code, reason)
+    } catch {}
+    this.unregisterSocket(socket)
   }
 
   private sendOrUnregister(socket: RealtimeSocket, payload: string): void {

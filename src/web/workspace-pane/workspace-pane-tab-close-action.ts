@@ -51,11 +51,10 @@ import {
   runWorkspacePaneAction,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { finishWorkspacePaneRouteIntent } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  beginPrimaryWindowPresentation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { terminalLog } from '#/web/logger.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
@@ -70,7 +69,7 @@ export interface CloseWorkspacePaneTabActionOptions {
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
-  presentationToken?: PrimaryWindowPresentationToken
+  navigationGeneration?: PrimaryWindowNavigationGeneration
 }
 
 export interface ConfirmedTerminalWorkspacePaneTabClose {
@@ -101,7 +100,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
   if (!options.workspaceId) return await closeWorkspacePaneTabAction(options)
   const coordinatorTarget = resolveCloseWorkspacePaneTarget(options)
   if (!coordinatorTarget) return false
-  const presentationToken = beginPrimaryWindowPresentation()
+  const navigationGeneration = beginPrimaryWindowNavigation()
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: coordinatorTarget.workspaceId,
@@ -112,7 +111,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
     () =>
       closeWorkspacePaneTabAction({
         ...options,
-        presentationToken,
+        navigationGeneration,
         workspacePaneRoute: options.workspacePaneRoute,
       }),
   )
@@ -152,9 +151,9 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const queueWorkspaceRuntimeId = coordinates.workspaceRuntimeId
   if (queueWorkspaceId !== coordinates.workspaceId) return false
   const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
-  const presentationToken = beginPrimaryWindowPresentation()
+  const navigationGeneration = beginPrimaryWindowNavigation()
   return await runWorkspacePaneAction(queueTarget, () =>
-    confirmCloseTerminalWorkspacePaneTabAction({ ...options, presentationToken }),
+    confirmCloseTerminalWorkspacePaneTabAction({ ...options, navigationGeneration }),
   )
 }
 
@@ -175,7 +174,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
         closeTarget,
         confirmedIdentity,
         options.currentWorkspacePaneRoute,
-        options.presentationToken,
+        options.navigationGeneration,
         options.selectedIdentity,
       )
     : null
@@ -251,7 +250,7 @@ function beginCloseWorkspacePaneTabAction(
     target,
     closingIdentity,
     options.workspacePaneRoute,
-    options.presentationToken,
+    options.navigationGeneration,
     options.selectedIdentity,
   )
   let close
@@ -287,7 +286,7 @@ function workspacePaneCloseTransition(
   target: WorkspacePaneTabModel,
   closingIdentity: string,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  presentationToken: PrimaryWindowPresentationToken | undefined,
+  navigationGeneration: PrimaryWindowNavigationGeneration | undefined,
   selectedIdentity: string | null | undefined = target.selectedIdentity,
 ): WorkspacePaneCloseTransition {
   const wasActive = selectedIdentity === closingIdentity
@@ -305,7 +304,7 @@ function workspacePaneCloseTransition(
         closingEntry,
         nextEntry,
         workspacePaneRoute,
-        presentationToken,
+        navigationGeneration,
       })
     : null
   return { wasActive, nextEntry, presentationLease }
@@ -382,7 +381,6 @@ async function runWorkspacePaneCloseTransition(
 
 function abandonWorkspacePaneCloseTransition(presentationLease: WorkspacePaneControllerPresentationLease | null): void {
   presentationLease?.focusEffects?.onAbandon()
-  finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
 }
 
 async function completeWorkspacePaneTabLifecycle(completion: Promise<boolean>): Promise<boolean> {

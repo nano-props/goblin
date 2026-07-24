@@ -56,8 +56,8 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -165,24 +165,47 @@ function AuthenticatedWorkspaceShell() {
       ? commandWorkspace.capability.probe.capabilities
       : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
+  const commandBranchProjection = useRepoProjectionReadModel(
+    commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
+    commandWorkspace?.workspaceRuntimeId ?? '',
+    routeContext?.kind === 'branch' ? routeContext.branchName : null,
+    'full',
+    routeContext?.kind === 'branch' && commandWorkspace?.capability.kind === 'git',
+  )
   const commandWorktreeStatus = useRepoWorktreeStatusReadModel(
     commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
     commandWorkspace?.workspaceRuntimeId ?? '',
-    routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git',
+    (routeContext?.kind === 'branch' || routeContext?.kind === 'worktree') &&
+      commandWorkspace?.capability.kind === 'git',
   )
   const commandWorktree =
-    routeContext?.kind === 'worktree' && commandWorktreePath
+    routeContext?.kind === 'worktree' && commandWorktreePath && commandWorktreeStatus.isSuccess
       ? (commandWorktreeStatus.data?.status.find((worktree) => worktree.path === commandWorktreePath) ?? null)
       : null
   const commandBranch =
-    commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
-      ? (readRepoBranchSnapshotQueryProjection(commandWorkspace)?.branches.find(
+    commandWorkspace &&
+    routeContext?.kind === 'branch' &&
+    routeContext.branchName &&
+    commandBranchProjection.isSuccess &&
+    commandWorktreeStatus.isSuccess &&
+    commandBranchProjection.data?.snapshot &&
+    commandWorktreeStatus.data
+      ? (repoBranchSnapshotDataFromSnapshot(commandBranchProjection.data.snapshot).branches.find(
           (branch) => branch.name === routeContext.branchName,
         ) ?? null)
       : null
+  const commandBranchCandidateWorktreePath = commandBranch?.worktree?.path ?? null
+  const commandBranchWorktreePath =
+    routeContext?.kind === 'branch' &&
+    commandBranchCandidateWorktreePath &&
+    commandWorktreeStatus.data?.status.some(
+      (worktree) => worktree.path === commandBranchCandidateWorktreePath && worktree.branch === routeContext.branchName,
+    )
+      ? commandBranchCandidateWorktreePath
+      : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
     routeContext?.kind === 'branch' && routeContext.branchName && commandWorkspace
-      ? commandWorkspace?.capability.kind === 'git' && commandBranch?.worktree?.path
+      ? commandWorkspace?.capability.kind === 'git' && commandBranchWorktreePath
         ? {
             routeTarget: {
               kind: 'git-branch',
@@ -193,8 +216,8 @@ function AuthenticatedWorkspaceShell() {
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
-              worktreePath: commandBranch.worktree.path,
-              head: gitHead(commandBranch.name),
+              worktreePath: commandBranchWorktreePath,
+              head: gitHead(routeContext.branchName),
               capabilities: commandWorkspace.capability.probe.capabilities,
             }),
           }

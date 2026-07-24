@@ -33,14 +33,14 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowPresentation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
 export interface CreatedTerminalRouteRequest {
-  presentationToken: PrimaryWindowPresentationToken
+  navigationGeneration: PrimaryWindowNavigationGeneration
   routeTarget: WorkspacePaneTabsTarget
 }
 
@@ -135,8 +135,8 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   const base = options.base
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  const presentationToken = beginPrimaryWindowPresentation()
-  let ownedFocusLease = claimTerminalAutoFocus(presentationToken)
+  const navigationGeneration = beginPrimaryWindowNavigation()
+  let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
   try {
     return await runWorkspacePaneAction(
       target,
@@ -155,7 +155,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
               openerIdentity: options.openerIdentity,
               showCreatedTerminalTab: async (terminalSessionId, presentation) => {
                 const accepted = await options.showCreatedTerminalTab(terminalSessionId, presentation, {
-                  presentationToken,
+                  navigationGeneration,
                   routeTarget: options.routeTarget,
                 })
                 if (accepted) ownedFocusLease?.commit(terminalSessionId, options.focusTerminal)
@@ -220,7 +220,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
     { kind: 'terminal', terminalSessionId },
     navigation,
     undefined,
-    routeRequest.presentationToken,
+    routeRequest.navigationGeneration,
   )
 }
 

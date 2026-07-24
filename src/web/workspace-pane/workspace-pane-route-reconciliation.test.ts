@@ -8,7 +8,6 @@ import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   reconcileWorkspacePaneRoute,
-  resolveFilesystemWorkspacePaneReplacement,
   workspacePaneRouteHistoryResolution,
 } from '#/web/workspace-pane/workspace-pane-route-reconciliation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -52,7 +51,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for terminal projection before replacing a missing routed terminal session', () => {
+  test('waits for terminal projection before declaring a routed terminal session missing', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'pending' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
@@ -60,7 +59,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for tab entries before replacing a routed terminal session', () => {
+  test('waits for tab entries before validating a routed terminal session', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -132,7 +131,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for terminal creation before replacing a missing routed terminal session', () => {
+  test('waits for terminal creation before declaring a routed terminal session missing', () => {
     const model = terminalModel({
       routedSessionId: 'missing-session',
       terminalProjectionPhase: 'ready',
@@ -144,7 +143,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('replaces a stale terminal route with the bare branch route', () => {
+  test('reports a stale terminal route as missing', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
@@ -152,7 +151,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for tab entries before replacing a missing routed static tab', () => {
+  test('waits for tab entries before validating a routed static tab', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -215,7 +214,13 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for terminal creation before replacing a missing routed static tab', () => {
+  test('defers history for a missing route instead of predicting a replacement navigation', () => {
+    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'missing' })).toEqual({
+      kind: 'defer',
+    })
+  })
+
+  test('waits for terminal creation before declaring a routed static tab missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -234,72 +239,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('waits for runtime projection before choosing a replacement for a missing static route', () => {
-    const model = replacementTerminalModel('pending')
-
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'files' }, model)).toEqual({ kind: 'missing' })
-    expect(resolveFilesystemWorkspacePaneReplacement(model)).toEqual({ kind: 'pending' })
-  })
-
-  test('chooses the authoritative selected terminal after replacement projection is complete', () => {
-    const model = replacementTerminalModel('ready')
-
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'files' }, model)).toEqual({ kind: 'missing' })
-    expect(resolveFilesystemWorkspacePaneReplacement(model)).toMatchObject({
-      kind: 'resolved',
-      replacement: {
-        kind: 'runtime',
-        runtimeType: 'terminal',
-        sessionId: 'term-111111111111111111111',
-      },
-    })
-  })
-
-  test('chooses an earlier static entry without waiting for an unrelated runtime projection', () => {
-    const model = createWorkspacePaneTabModel({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/route',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: null,
-      tabEntries: [
-        workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-      ],
-      tabEntriesProjectionPhase: 'ready',
-      runtimeTabViews: [],
-      runtimeTabStateByType: { terminal: { projectionPhase: 'pending', selectedSessionId: null } },
-    })
-
-    expect(resolveFilesystemWorkspacePaneReplacement(model)).toMatchObject({
-      kind: 'resolved',
-      replacement: { kind: 'static', type: 'status' },
-    })
-  })
-
-  test('keeps a selected runtime replacement unverified when its projection failed', () => {
-    const model = replacementTerminalModel('failed')
-
-    expect(resolveFilesystemWorkspacePaneReplacement(model)).toEqual({ kind: 'unverified' })
-  })
-
-  test('resolves a missing filesystem route to the bare pane when no tab remains', () => {
-    const model = createWorkspacePaneTabModel({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/route',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: null,
-      tabEntries: [],
-      tabEntriesProjectionPhase: 'ready',
-      runtimeTabViews: [],
-      runtimeTabStateByType: { terminal: { projectionPhase: 'ready' } },
-    })
-
-    expect(resolveFilesystemWorkspacePaneReplacement(model)).toEqual({ kind: 'resolved', replacement: null })
-  })
-
-  test('replaces an unmaterialized static route with the bare branch route', () => {
+  test('reports an unmaterialized static route as missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -320,7 +260,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('replaces an invalid static route with the bare branch route', () => {
+  test('reports an invalid static route as missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -362,7 +302,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
+  test('reports an unmaterialized route as missing when the pane is empty', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -410,28 +350,6 @@ function terminalModel(input: {
       },
     },
     requestedSessionIdByRuntimeType: { terminal: input.routedSessionId },
-  })
-}
-
-function replacementTerminalModel(terminalProjectionPhase: 'pending' | 'ready' | 'failed') {
-  return createWorkspacePaneTabModel({
-    workspaceId: REPO_ID,
-    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    branchName: 'feature/route',
-    worktreePath: WORKTREE_PATH,
-    preferredTab: null,
-    tabEntries: [
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-    ],
-    tabEntriesProjectionPhase: 'ready',
-    runtimeTabViews: [terminalView('term-111111111111111111111')],
-    runtimeTabStateByType: {
-      terminal: {
-        projectionPhase: terminalProjectionPhase,
-        selectedSessionId: 'term-111111111111111111111',
-      },
-    },
   })
 }
 

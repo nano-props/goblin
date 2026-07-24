@@ -52,7 +52,7 @@ describe('PTY event lease', () => {
     expect(delivered).toEqual(['first', 'second', 'third'])
   })
 
-  test('continues draining through exit when an observer throws', () => {
+  test('fails closed when an observer throws', () => {
     const channel = createPtyEventChannel()
     const exit = vi.fn()
     channel.sink.data(ptyData('first'))
@@ -64,8 +64,9 @@ describe('PTY event lease', () => {
       onExit: exit,
     })
 
-    expect(() => claim.activate()).not.toThrow()
-    expect(exit).toHaveBeenCalledWith(0, null)
+    expect(() => claim.activate()).toThrow('observer failed')
+    expect(exit).not.toHaveBeenCalled()
+    expect(() => channel.lease.claim({ onData: vi.fn(), onExit: vi.fn() })).toThrow('PTY event lease is unavailable')
   })
 
   test('treats exit as terminal and ignores later source callbacks', () => {

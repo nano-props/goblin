@@ -32,6 +32,23 @@ describe('TerminalRenderQueue', () => {
     writeCallbacks.shift()?.()
     await expect(replace).resolves.toBe(true)
   })
+
+  test('reports an append write failure to its owner', async () => {
+    const error = new Error('xterm write buffer overflow')
+    const term = {
+      reset: vi.fn(),
+      write: vi.fn(() => {
+        throw error
+      }),
+    } as unknown as XTermTerminal
+    const queue = new TerminalRenderQueue(term, {
+      isCurrent: () => true,
+      isCheckpointRendered: () => false,
+      markOutputRendered: vi.fn(),
+    })
+
+    await expect(queue.append('live output', checkpoint(1))).rejects.toBe(error)
+  })
 })
 
 function checkpoint(seq: number): RenderedOutputCheckpoint {

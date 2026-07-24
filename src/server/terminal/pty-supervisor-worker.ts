@@ -32,7 +32,7 @@ const ptyWorkerLogger = serverLogger.child({ module: 'pty-supervisor-worker' })
 type TerminalWorkerChildProcess = ChildProcess
 type WorkerInvalidationKind = Extract<
   PtySupervisorFailureDiagnostics['kind'],
-  'exit' | 'error' | 'disconnect' | 'protocol' | 'timeout'
+  'exit' | 'error' | 'disconnect' | 'protocol' | 'timeout' | 'send-failed'
 >
 
 interface PendingSpawn {
@@ -45,7 +45,7 @@ interface PendingSpawn {
 interface PendingWrite {
   ptySessionId: string
   byteLength: number
-  resolve: ((value: TerminalWriteResult) => void) | null
+  resolve(value: TerminalWriteResult): void
   timeout: ReturnType<typeof setTimeout>
 }
 
@@ -86,7 +86,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   private readonly pendingResizes = new Map<string, PendingResize>()
   private pendingWriteBytes = 0
   private readonly sessions = new Map<string, PtyEventOwnership>()
-  private restartAttempts = 0
+  private consecutiveWorkerInvalidations = 0
   private shuttingDown = false
   private lastSuccessfulResponseAt: number | null = null
   private lastExitCode: number | null = null
@@ -125,20 +125,28 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (!worker) return { status: 'rejected' }
     const requestId = createRequestId()
     return await new Promise<TerminalWriteResult>((resolve) => {
+      const timeoutMs = this.options.writeAckTimeoutMs ?? DEFAULT_WRITE_ACK_TIMEOUT_MS
       const timeout = setTimeout(() => {
-        const pending = this.pendingWrites.get(requestId)
-        if (!pending?.resolve) return
-        const resolvePending = pending.resolve
-        pending.resolve = null
-        resolvePending({ status: 'indeterminate' })
-      }, this.options.writeAckTimeoutMs ?? DEFAULT_WRITE_ACK_TIMEOUT_MS)
+        if (!this.pendingWrites.has(requestId)) return
+        this.invalidateWorker(
+          worker,
+          'timeout',
+          `action=pty-write ptySessionId=${handle.ptySessionId} timeoutMs=${timeoutMs}`,
+          'PTY worker write timed out',
+        )
+      }, timeoutMs)
       this.pendingWrites.set(requestId, { ptySessionId: handle.ptySessionId, byteLength, resolve, timeout })
       this.pendingWriteBytes += byteLength
       try {
         // `false` signals IPC backpressure, not rejection. The worker result is authoritative.
-        worker.send({ type: 'pty-write', requestId, ptySessionId: handle.ptySessionId, data })
+        worker.send({ type: 'pty-write', requestId, ptySessionId: handle.ptySessionId, data }, (error) => {
+          if (!error) return
+          this.settlePendingWrite(requestId, { status: 'rejected' })
+          this.invalidateWorkerAfterSendFailure(worker, `action=pty-write ptySessionId=${handle.ptySessionId}`)
+        })
       } catch {
         this.settlePendingWrite(requestId, { status: 'rejected' })
+        this.invalidateWorkerAfterSendFailure(worker, `action=pty-write ptySessionId=${handle.ptySessionId}`)
       }
     })
   }
@@ -163,10 +171,13 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       this.pendingResizes.set(requestId, { ptySessionId: handle.ptySessionId, resolve, timeout })
       try {
         worker.send({ type: 'pty-resize', requestId, ptySessionId: handle.ptySessionId, cols, rows }, (error) => {
-          if (error) this.settlePendingResize(requestId, false)
+          if (!error) return
+          this.settlePendingResize(requestId, false)
+          this.invalidateWorkerAfterSendFailure(worker, `action=pty-resize ptySessionId=${handle.ptySessionId}`)
         })
       } catch {
         this.settlePendingResize(requestId, false)
+        this.invalidateWorkerAfterSendFailure(worker, `action=pty-resize ptySessionId=${handle.ptySessionId}`)
       }
     })
   }
@@ -174,7 +185,9 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   kill(handle: PtyHandle): void {
     if (this.shuttingDown) return
     if (!this.sessions.has(handle.ptySessionId)) return
-    this.worker?.send({ type: 'pty-kill', ptySessionId: handle.ptySessionId })
+    const worker = this.worker
+    if (!worker) return
+    this.sendKillRequest(worker, handle.ptySessionId)
   }
 
   async waitForExit(handle: PtyHandle): Promise<void> {
@@ -189,7 +202,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (!ownership || ownership.exitCompletion.completed) return
     const worker = this.worker
     if (!worker) return
-    worker.send({ type: 'pty-kill', ptySessionId: handle.ptySessionId })
+    this.sendKillRequest(worker, handle.ptySessionId)
     await ownership.exitCompletion.wait(5_000, 'PTY close timed out')
   }
 
@@ -202,8 +215,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       workerStartedAt: this.worker ? this.workerStartedAt : null,
       workerUptimeMs: this.worker ? Math.max(0, this.now() - this.workerStartedAt) : null,
       pendingRequests: this.pendingSpawns.size + this.pendingWrites.size + this.pendingResizes.size,
-      restartAttempts: this.restartAttempts,
-      restartScheduled: false,
+      consecutiveWorkerInvalidations: this.consecutiveWorkerInvalidations,
       shuttingDown: this.shuttingDown,
       lastSuccessfulResponseAt: this.lastSuccessfulResponseAt,
       lastExitCode: this.lastExitCode,
@@ -253,14 +265,18 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     const worker = this.options.spawnWorker ? this.options.spawnWorker(entry) : defaultSpawnWorker(entry)
     this.workerStartedAt = this.now()
     ptyWorkerLogger.info(
-      { pid: worker.pid, restartAttempts: this.restartAttempts, sessions: this.sessions.size },
+      {
+        pid: worker.pid,
+        consecutiveWorkerInvalidations: this.consecutiveWorkerInvalidations,
+        sessions: this.sessions.size,
+      },
       'spawned PTY worker',
     )
     worker.on('message', (raw) => {
       if (this.worker !== worker) return
       const message = normalizePtyWorkerMessage(raw)
       if (!message) {
-        ptyWorkerLogger.warn({ raw: typeof raw }, 'dropped malformed PTY worker message')
+        this.invalidateWorker(worker, 'protocol', 'malformed worker message', 'PTY worker protocol violation')
         return
       }
       this.handleWorkerMessage(worker, message)
@@ -311,7 +327,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
         }
         this.pendingSpawns.delete(message.requestId)
         this.lastSuccessfulResponseAt = this.now()
-        this.restartAttempts = 0
+        this.consecutiveWorkerInvalidations = 0
         this.pendingSpawnsByPtySessionId.delete(message.ptySessionId)
         if (message.processName !== 'terminal' || pending.ownership.processName === 'terminal') {
           pending.ownership.processName = message.processName
@@ -401,7 +417,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     this.pendingWrites.delete(requestId)
     this.pendingWriteBytes -= pending.byteLength
     clearTimeout(pending.timeout)
-    pending.resolve?.(result)
+    pending.resolve(result)
     return true
   }
 
@@ -415,11 +431,20 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   }
 
   private sendSpawnRequest(requestId: string, pending: PendingSpawn): void {
+    let worker: TerminalWorkerChildProcess
     try {
-      const worker = this.ensureWorker()
-      // ChildProcess.send() returning false only reports IPC backpressure. The
-      // callback reports an actual delivery failure; otherwise the worker's
-      // spawn result remains authoritative.
+      worker = this.ensureWorker()
+    } catch {
+      this.pendingSpawns.delete(requestId)
+      this.releasePendingSpawn(pending)
+      this.recordFailure('send-failed', 'action=pty-spawn')
+      pending.resolve({ ok: false, message: this.unavailableMessage() })
+      return
+    }
+    try {
+      // ChildProcess.send() returning false only reports IPC backpressure.
+      // A callback error proves the transport did not deliver the request, so
+      // every session and pending request owned by that worker becomes invalid.
       worker.send(
         {
           type: 'pty-spawn',
@@ -428,18 +453,12 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
           input: pending.input,
         },
         (error) => {
-          if (!error || this.pendingSpawns.get(requestId) !== pending) return
-          this.pendingSpawns.delete(requestId)
-          this.releasePendingSpawn(pending)
-          this.recordFailure('send-failed', 'action=pty-spawn')
-          pending.resolve({ ok: false, message: this.unavailableMessage() })
+          if (!error) return
+          this.invalidateWorkerAfterSendFailure(worker, 'action=pty-spawn')
         },
       )
     } catch {
-      this.pendingSpawns.delete(requestId)
-      this.releasePendingSpawn(pending)
-      this.recordFailure('send-failed', 'action=pty-spawn')
-      pending.resolve({ ok: false, message: this.unavailableMessage() })
+      this.invalidateWorkerAfterSendFailure(worker, 'action=pty-spawn')
     }
   }
 
@@ -459,6 +478,20 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     } catch {}
   }
 
+  private invalidateWorkerAfterSendFailure(worker: TerminalWorkerChildProcess, detail: string): void {
+    this.invalidateWorker(worker, 'send-failed', detail, `PTY worker unavailable (send-failed: ${detail})`)
+  }
+
+  private sendKillRequest(worker: TerminalWorkerChildProcess, ptySessionId: string): void {
+    try {
+      worker.send({ type: 'pty-kill', ptySessionId }, (error) => {
+        if (error) this.invalidateWorkerAfterSendFailure(worker, `action=pty-kill ptySessionId=${ptySessionId}`)
+      })
+    } catch {
+      this.invalidateWorkerAfterSendFailure(worker, `action=pty-kill ptySessionId=${ptySessionId}`)
+    }
+  }
+
   private invalidateWorker(
     worker: TerminalWorkerChildProcess,
     kind: WorkerInvalidationKind,
@@ -473,13 +506,13 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       this.lastExitSignal = exit.signal
     }
     this.recordFailure(kind, detail)
-    this.restartAttempts += 1
+    this.consecutiveWorkerInvalidations += 1
     ptyWorkerLogger.warn(
       {
         pid: worker.pid,
         kind,
         detail,
-        restartAttempts: this.restartAttempts,
+        consecutiveWorkerInvalidations: this.consecutiveWorkerInvalidations,
         sessions: this.sessions.size,
       },
       'PTY worker transport lost',

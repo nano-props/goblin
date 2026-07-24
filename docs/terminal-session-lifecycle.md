@@ -130,12 +130,16 @@ for stdin are therefore writable immediately after an explicit client focus;
 output acceptance is tracked separately by the server render sequence and
 snapshot checkpoint.
 
-The client applies any stream output already available at its presentation
-cutoff, then commits a full-viewport render even when that output set is empty.
-An empty fresh frame may be revealed, but automatic focus remains fenced until
-real PTY output has rendered. First output is not a lifecycle or shell-readiness
-signal; it only prevents automatic focus from running before the fresh xterm has
-rendered real output. A visible quiet process remains explicitly focusable.
+The fresh response carries `streamSeq`, the last output sequence admitted before
+that response was committed. The client waits for realtime delivery through that
+fixed checkpoint, parses it into xterm, and commits one full-viewport render.
+Output after `streamSeq` belongs to the next live frame and cannot keep moving
+the presentation boundary. `streamSeq: 0` presents an empty frame for a quiet
+process. Recovery uses the same finite rule with `snapshotSeq`. After the final
+geometry check, the frame is revealed and a current automatic focus intent is
+fulfilled. Snapshot-generated protocol replies are discarded; replies generated
+by fresh live output use the current runtime generation. Neither checkpoint nor
+first output has lifecycle, focus, prompt-readiness, or shell-redraw semantics.
 
 The server, not the client, chooses the attach frame from PTY state. A second
 attach waiting on an in-flight fresh spawn is a recovery attach and receives a
@@ -167,11 +171,13 @@ stream; an explicit restart creates a new recoverable generation.
 
 ### Transport ordering
 
-Attach pauses that socket's realtime fanout while the response is built. The
-response is sent before buffered events are resumed:
+The socket serializes authoritative frame transitions. While attach is active,
+its realtime effects are buffered; the response is sent first, those effects
+are flushed, and only then may the next frame transition begin:
 
-- stream frame: drop nothing, so sequence 1 and every later event reach the
-  mounted xterm after its binding metadata is committed;
+- stream frame: drop nothing, so every event through the response's `streamSeq`
+  reaches the mounted xterm after its binding metadata is committed; later
+  events continue in the same ordered stream;
 - snapshot frame: drop buffered output represented by the snapshot checkpoint,
   then flush only later output.
 

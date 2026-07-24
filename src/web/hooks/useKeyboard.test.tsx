@@ -42,9 +42,9 @@ import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
-  beginPrimaryWindowPresentation,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -83,14 +83,14 @@ interface HookHostOptions {
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
 })
 
 afterEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
   setTerminalSessionCommandBridge(null)
   delete testWindow.goblinNative
   document.body.replaceChildren()
@@ -126,7 +126,7 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
     })
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const keydown = new KeyboardEvent('keydown', {
       key: 'p',
@@ -348,7 +348,7 @@ describe('useKeyboard', () => {
     terminalHost.remove()
   })
 
-  test('primary modifier plus t creates a new terminal tab', async () => {
+  test('primary modifier plus t consumes autorepeat without creating another terminal', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -384,15 +384,30 @@ describe('useKeyboard', () => {
       },
     })
 
+    const initialShortcut = new KeyboardEvent('keydown', {
+      key: 't',
+      code: 'KeyT',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    const repeatedShortcut = new KeyboardEvent('keydown', {
+      key: 't',
+      code: 'KeyT',
+      ctrlKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, repeat: true, bubbles: true }),
-      )
+      window.dispatchEvent(initialShortcut)
+      window.dispatchEvent(repeatedShortcut)
       await Promise.resolve()
     })
 
-    expect(createTerminal).toHaveBeenCalledTimes(1)
+    expect(createTerminal).toHaveBeenCalledOnce()
+    expect(initialShortcut.defaultPrevented).toBe(true)
+    expect(repeatedShortcut.defaultPrevented).toBe(true)
   })
 
   test('dispatches Ctrl+T without waiting for the initiating key to be released', async () => {
@@ -575,12 +590,40 @@ describe('useKeyboard', () => {
     const openCreateWorktree = vi.fn()
     await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
 
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'n',
+      code: 'KeyN',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(shortcut)
       await Promise.resolve()
     })
 
     expect(openCreateWorktree).not.toHaveBeenCalled()
+    expect(shortcut.defaultPrevented).toBe(true)
+  })
+
+  test('does not consume unowned primary-modifier combinations', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    await renderHookHost()
+    const copy = new KeyboardEvent('keydown', {
+      key: 'c',
+      code: 'KeyC',
+      ctrlKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
+
+    await act(async () => {
+      document.body.dispatchEvent(copy)
+      await Promise.resolve()
+    })
+
+    expect(copy.defaultPrevented).toBe(false)
   })
 
   test('primary modifier plus n does not open create worktree while a branch action is busy', async () => {
@@ -806,7 +849,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(repeatedClose.defaultPrevented).toBe(false)
+    expect(repeatedClose.defaultPrevented).toBe(true)
     expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
 
     const secondClose = new KeyboardEvent('keydown', {

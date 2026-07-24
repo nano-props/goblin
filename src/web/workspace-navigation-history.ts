@@ -2,7 +2,10 @@ import { useEffect, useMemo } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import type { HistoryState } from '@tanstack/history'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type {
+  PrimaryWindowRouteNavigation,
+  PrimaryWindowRouteNavigationOptions,
+} from '#/web/primary-window-route-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -11,12 +14,8 @@ import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/share
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  observePrimaryWindowHistoryNavigation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+import { observePrimaryWindowHistoryNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { navigationLog } from '#/web/logger.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -107,16 +106,13 @@ export function useWorkspaceNavigationHistory({
   }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
 }
 
-/** One primary-window subscription owns both presentation arbitration and browser traversal metadata. */
+/** One primary-window subscription owns navigation settlement and browser traversal metadata. */
 export function usePrimaryWindowHistoryPresentationObserver(): void {
   const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
   useEffect(() => {
     if (!router) return
     return router.history.subscribe(({ location, action }) => {
-      const observation = observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
-      if (!observation.ok) {
-        navigationLog.error('primary-window history presentation cleanup failed', { error: observation.error })
-      }
+      observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
       browserHistoryAction =
         action.type === 'GO'
           ? { href: location.href, type: 'GO', index: action.index }
@@ -304,7 +300,7 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
-  options?: { presentationToken?: PrimaryWindowPresentationToken },
+  options?: PrimaryWindowRouteNavigationOptions,
 ): WorkspaceNavigationRestoreResult {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {

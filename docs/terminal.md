@@ -70,21 +70,27 @@ geometry and the matching headless-render size.
 
 ### Input and automatic focus
 
-- A hidden, pending terminal presentation accepts no local input. Input is
-  discarded rather than buffered for later delivery.
-- A fresh stream may reveal an empty fitted xterm, but automatic focus remains
-  pending until real PTY output has been parsed and the resulting viewport has
-  rendered. Pending focus never moves the DOM to a transition element and never
-  consumes keyboard events. A deliberate focus request or pointer click may
-  enter a visible quiet process immediately.
+- A hidden, pending terminal presentation accepts no local user intent. User
+  input is discarded rather than buffered for later delivery. Xterm protocol
+  replies produced while parsing fresh live output are not user input and are
+  forwarded through the current generation; snapshot-replay side effects are
+  discarded.
+- Fresh streams and recovery snapshots fulfil automatic focus at the same
+  presentation boundary: the fixed frame checkpoint has been parsed, the fitted
+  xterm has rendered its full viewport, and the final geometry check has passed.
+  A fresh stream uses the server-authored `streamSeq`; a recovery snapshot uses
+  `snapshotSeq`. The frame may be empty (`streamSeq: 0`), so a quiet process is
+  focused without waiting for output. Pending focus never moves the DOM to a
+  transition element and never consumes keyboard events.
 - Automatic focus is one presentation-generation-scoped intent. A subsequent
   pointer action or window blur retires it; programmatic popover cleanup and
   keyboard activity do not. The client deliberately keeps no global pressed-key
   registry or navigation-time keyboard gate; a physically held key may therefore
   repeat into a terminal that receives focus during the hold.
-- A presented controller forwards xterm input directly through the
-  generation-bearing write operation. A viewer or stale generation cannot
-  write.
+- A presented controller forwards user input through the generation-bearing
+  write operation. A current controller may also forward xterm protocol replies
+  while its hidden view parses fresh live output. A viewer or stale generation
+  cannot write.
 - A terminal write result has one narrow meaning: `accepted` confirms that
   the target PTY runtime `write()` call returned normally, `rejected` means
   the current authority/binding could not accept it, and `indeterminate`
@@ -337,12 +343,14 @@ not `await` the preparation in a component and only then call create.
 Terminal create options describe the session being launched; they must not
 carry workspace-pane scheduling callbacks.
 
-Route reconciliation remains a boundary concern: stale or unrenderable explicit
-pane URLs should fast-fail to the bare branch route. Do not replace
-`/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` with a different live
-tab just because one exists. The resulting workspace history entry should record
-the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
-The tab model must apply the same rule before reconciliation effects run:
+Route reconciliation is validation, not navigation. A stale or unrenderable
+explicit pane URL renders the empty/not-found pane and remains the URL authority
+until an explicit user command chooses another route. Do not replace
+`/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` in a render effect,
+and never choose a different live tab just because one exists. Workspace history
+must defer recording the invalid route rather than predict a replacement that
+the router has not committed.
+The tab model must apply the same rule before route validation runs:
 generic preferred-tab fallback is only for persisted preferences, never for an
 explicit URL route.
 
@@ -484,30 +492,34 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
 - Replay should not redefine control or session identity.
 - Recovery replay occurs only while the local presentation is hidden and its
-  generation-bearing writer rejects local input.
+  generation-bearing writer rejects local user input and snapshot-generated
+  protocol replies.
 - Same-session active-view replay is not a generic repair mechanism.
 
 ### Input during presentation
 
 Presentation and automatic focus are separate client-owned boundaries. While
-presentation is pending, the xterm is hidden and every local input path is
-discarded. The client does not classify, buffer, or replay startup input.
-Attach/recovery data already available at the presentation cutoff is rendered
-into that fitted xterm, and a full-viewport render plus a final synchronous fit
-proposal confirm the frame before reveal. A fresh stream is allowed to reveal
-with no output so a quiet process cannot deadlock waiting for stdin.
+presentation is pending, the xterm is hidden and every local user-input path is
+discarded. The client does not buffer or replay startup user input. Recovery
+snapshot parsing cannot write protocol side effects back to the PTY; protocol
+replies produced by fresh live output retain their normal current-generation
+path. Attach/recovery data is rendered into the fitted xterm, and the frame is
+revealed only after it contains the response's fixed output checkpoint, a
+full-viewport render has completed, and the final synchronous fit proposal still
+matches. Output after that checkpoint belongs to the next live frame and does
+not move the presentation boundary. A fresh stream with `streamSeq: 0` therefore
+reveals without output so a quiet process cannot deadlock waiting for stdin.
 
-Recovery snapshots may fulfil the pending automatic focus intent at reveal. A
-fresh stream fulfils it only after real PTY output has been parsed and a
-subsequent full-viewport render has completed. The intent does not move DOM
-focus or intercept input while it waits. A later user pointer action or window
-blur retires the intent; keyboard activity and focus restoration performed by a
-popover close do not. The user may still explicitly click or focus the visible
-terminal, including a quiet one. The client does not track the origin of repeat
-events, so a physically held key may follow focus into that terminal. First
-output is not a server lifecycle or shell-readiness signal; it only makes
-automatic focus wait for a real rendered frame. Only a presented controller can
-send generation-bearing writes.
+Fresh streams and recovery snapshots fulfil a pending automatic focus intent
+when that presentation is revealed. The intent does not move DOM focus or
+intercept input while it waits. A later user pointer action or window blur
+retires the intent; keyboard activity and focus restoration performed by a
+popover close do not. The user may still explicitly click or focus a presented
+terminal. The client does not track the origin of repeat events, so a physically
+held key may follow focus into that terminal. First output has no lifecycle,
+presentation, focus, or shell-readiness meaning. Local user intent requires a
+presented controller; fresh-output protocol replies require the same current
+controller binding but do not require reveal.
 
 ### Fresh stream and recovery frame contract
 
@@ -523,20 +535,27 @@ The protocol therefore distinguishes startup from recovery:
 - The client mounts its one real xterm, waits for a measurable host, fits it,
   and sends `attach` with the exact `cols`/`rows`.
 - If the session has no PTY history, attach starts the PTY and returns
-  `frame: 'stream'`. The client does not reset or replay xterm; raw output begins
-  at sequence 1 through realtime.
+  `frame: 'stream'` with `streamSeq`, the last output sequence admitted before
+  the response was committed. The client does not reset or replay xterm; it
+  consumes realtime output through that finite checkpoint before presentation.
 - If the PTY already exists, attach returns `frame: 'snapshot'` with
   `snapshot` and `snapshotSeq`. The client replays that recovery
   frame and then applies later realtime output.
 - Restart creates a new PTY generation with no missed history and therefore
   returns `frame: 'stream'`, just like the first prepared attach.
 
-The realtime socket is paused while attach or restart is processed. For a
-stream frame the response is sent first and the buffer is resumed without
-dropping output, so sequence 1 cannot race ahead of binding metadata. For a
-snapshot frame, buffered output at or before the snapshot checkpoint is dropped
-and only later output is flushed. A concurrent attach that did not initiate the
-fresh spawn is recovery and receives a snapshot.
+The realtime socket serializes attach, restart, and takeover transitions. While
+one transition is active, its realtime effects are buffered; its response is
+sent first, the effects are flushed, and only then may the next transition
+begin. A stream frame drops no buffered output. Every event through `streamSeq`
+is therefore delivered after the client has committed the binding metadata,
+and later output cannot extend that presentation checkpoint. For a snapshot
+frame, buffered output at or before the snapshot checkpoint is dropped and only
+later output is flushed. A concurrent attach that did not initiate the fresh
+spawn is recovery and receives a snapshot.
+
+Neither sequence checkpoint is a shell redraw transaction or a prompt-ready
+signal. It is only a transport-consistent, finite output boundary.
 
 The headless render chain serializes snapshot bytes and reads `snapshotSeq` in
 one ordered step. Output queued before that step is included in both; output

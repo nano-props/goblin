@@ -133,7 +133,7 @@ Notes:
 
 ## Sequential command workflows
 
-Workspace-pane command classification and the queue/token/CAS concurrency matrix are normative in
+Workspace-pane command classification and the queue/generation/CAS concurrency matrix are normative in
 `workspace-pane-command-invariants.md`.
 
 User operations that combine server writes, client projection supplements, and
@@ -155,8 +155,8 @@ pieces. In particular:
 - Do not navigate first to hide an unresolved write, unless the product action
   itself is explicitly a navigation command.
 - Do not let route reconciliation invent a successful target for a command.
-  Reconciliation may canonicalize externally arrived stale URLs or wait for a
-  real runtime lifecycle state; it is not a command repair layer.
+  Reconciliation may wait for a real runtime lifecycle state and validate an
+  externally arrived URL; it does not navigate or repair a command.
 
 The normal shape is:
 

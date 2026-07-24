@@ -52,12 +52,12 @@ interface PendingOutputWrite {
   checkpoint: RenderedOutputCheckpoint
 }
 
-interface TerminalInputAdmission extends TerminalRuntimeBinding {
-  presentationEpoch: number
+interface PendingPresentationOutputBoundary extends RenderedOutputCheckpoint {
+  resolve(): void
 }
 
 interface PendingInputWrite {
-  admission: TerminalInputAdmission
+  binding: TerminalRuntimeBinding
   data: string
 }
 
@@ -94,6 +94,7 @@ export class TerminalSession {
   private renderQueue: TerminalRenderQueue | null = null
   private inFlightStartOperation: InFlightTerminalStartOperation | null = null
   private pendingOutput: PendingOutputWrite[] = []
+  private pendingPresentationOutputBoundary: PendingPresentationOutputBoundary | null = null
   private pendingInputWrite: PendingInputWrite | null = null
   private inputFlushScheduled = false
   private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
@@ -152,6 +153,7 @@ export class TerminalSession {
       request?.onSettled?.()
       return false
     }
+    if (!request && !this.view.isPresented()) return false
     this.view.focus(request)
     return true
   }
@@ -174,9 +176,8 @@ export class TerminalSession {
 
   resynchronizeConnectedView(): void {
     if (this.disposed || !this.view.isConnected()) return
-    if (!this.shouldStartAttachedSession()) return
-    if (this.view.currentTerminal()) this.destroyActiveView()
-    this.start()
+    const transientChanged = this.replaceActiveView()
+    if (transientChanged) this.notify('metadata')
   }
 
   detach(host: HTMLElement): void {
@@ -187,9 +188,8 @@ export class TerminalSession {
     if (this.disposed) return
     const attempt = this.runtime.prepareRestart()
     if (!attempt) return
+    this.replaceActiveView(attempt)
     this.notify('metadata')
-    this.destroyActiveView()
-    this.start(attempt)
   }
 
   dispose(): void {
@@ -213,14 +213,14 @@ export class TerminalSession {
   }
 
   private writeInput(data: string): void {
-    this.captureInputWriter()?.(data)
+    const binding = this.currentXtermInputBinding()
+    if (binding) this.enqueueInput(binding, data)
   }
 
   captureInputWriter(): TerminalInputWriter | null {
     const binding = this.currentWritableInputBinding()
     if (!binding) return null
-    const admission: TerminalInputAdmission = { ...binding, presentationEpoch: this.startEpoch }
-    return (data) => this.enqueueInput(admission, data)
+    return (data) => this.enqueueInput(binding, data)
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
@@ -228,14 +228,23 @@ export class TerminalSession {
     return this.runtime.currentRuntimeBinding()
   }
 
-  private enqueueInput(admission: TerminalInputAdmission, data: string): void {
-    if (!data || !this.isCurrentInputAdmission(admission)) return
+  private currentXtermInputBinding(): TerminalRuntimeBinding | null {
+    if (!this.view.currentTerminal() || !this.runtime.canSendInput()) return null
+    const renderSource = this.renderQueue?.activeRenderSource() ?? null
+    if (renderSource === 'snapshot') return null
+    if (!this.view.isPresented() && renderSource !== 'live-output') return null
+    return this.runtime.currentRuntimeBinding()
+  }
+
+  private enqueueInput(binding: TerminalRuntimeBinding, data: string): boolean {
+    if (!data || !this.isCurrentInputBinding(binding)) return false
     const pending = this.pendingInputWrite
-    if (pending && !sameInputAdmission(pending.admission, admission)) {
-      throw new Error('terminal input queue contains conflicting admissions')
+    if (pending && !sameRuntimeBinding(pending.binding, binding)) {
+      throw new Error('terminal input queue contains conflicting runtime bindings')
     }
-    this.pendingInputWrite = pending ? { admission: pending.admission, data: pending.data + data } : { admission, data }
+    this.pendingInputWrite = pending ? { binding: pending.binding, data: pending.data + data } : { binding, data }
     this.scheduleInputFlush()
+    return true
   }
 
   private scheduleInputFlush(): void {
@@ -251,17 +260,17 @@ export class TerminalSession {
     if (this.disposed) return
     const pending = this.pendingInputWrite
     this.pendingInputWrite = null
-    if (!pending || !this.isCurrentInputAdmission(pending.admission)) return
-    const { terminalRuntimeSessionId, terminalRuntimeGeneration } = pending.admission
+    if (!pending || !this.isCurrentInputBinding(pending.binding)) return
+    const { terminalRuntimeSessionId, terminalRuntimeGeneration } = pending.binding
     void terminalClient
       .write({ terminalRuntimeSessionId, terminalRuntimeGeneration, data: pending.data })
       .then((result) => {
-        if (!this.isCurrentInputAdmission(pending.admission)) return
+        if (!this.isCurrentInputBinding(pending.binding)) return
         if (result.status !== 'accepted')
           this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
       })
       .catch((err) => {
-        if (!this.isCurrentInputAdmission(pending.admission)) return
+        if (!this.isCurrentInputBinding(pending.binding)) return
         this.writeFailureReporter.report({
           terminalRuntimeSessionId,
           failure: { kind: 'error', error: err },
@@ -269,10 +278,10 @@ export class TerminalSession {
       })
   }
 
-  private isCurrentInputAdmission(admission: TerminalInputAdmission): boolean {
-    if (this.disposed || this.startEpoch !== admission.presentationEpoch) return false
-    const binding = this.currentWritableInputBinding()
-    return binding !== null && sameRuntimeBinding(binding, admission)
+  private isCurrentInputBinding(binding: TerminalRuntimeBinding): boolean {
+    if (this.disposed || !this.runtime.canSendInput()) return false
+    const current = this.runtime.currentRuntimeBinding()
+    return current !== null && sameRuntimeBinding(current, binding)
   }
 
   private flushResize(): void {
@@ -310,12 +319,14 @@ export class TerminalSession {
 
   private async commitResize(proposal: PendingResize): Promise<void> {
     const { terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows } = proposal
+    let result: TerminalResizeResult
     try {
-      const result = await terminalClient.resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
-      this.finishResizeCommit(proposal, result, null)
+      result = await terminalClient.resize({ terminalRuntimeSessionId, terminalRuntimeGeneration, cols, rows })
     } catch (error) {
       this.finishResizeCommit(proposal, { ok: false, message: 'error.unavailable' }, error)
+      return
     }
+    this.finishResizeCommit(proposal, result, null)
   }
 
   private finishResizeCommit(proposal: PendingResize, result: TerminalResizeResult, error: unknown): void {
@@ -339,15 +350,14 @@ export class TerminalSession {
         rows: proposal.rows,
         error,
       })
-      this.destroyActiveView({ preserveTransientState: true })
-      if (this.view.isConnected() && this.shouldStartAttachedSession()) this.start()
+      this.replaceActiveView(undefined, { preserveTransientState: true })
       return
     }
     const commit = this.runtime.commitResizeResult(result)
     if (!commit.accepted) {
-      this.resizeDispatch = { kind: 'idle' }
-      this.destroyActiveView({ preserveTransientState: true })
-      if (this.view.isConnected() && this.shouldStartAttachedSession()) this.start()
+      const next = dispatch.next
+      if (next) this.scheduleResize(next)
+      else this.resizeDispatch = { kind: 'idle' }
       return
     }
     if (commit.changed) this.notify('metadata')
@@ -399,6 +409,10 @@ export class TerminalSession {
     return this.runtime.currentRuntimeBinding()
   }
 
+  controlsTerminal(): boolean {
+    return this.runtime.isController()
+  }
+
   addressableRuntimeBinding(): TerminalRuntimeBinding | null {
     return this.runtime.addressableRuntimeBinding()
   }
@@ -413,6 +427,7 @@ export class TerminalSession {
       {
         terminalRuntimeSessionId: input.terminalRuntimeSessionId,
         terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+        identityRevision: input.identityRevision,
         phase: input.phase,
         message: input.message,
         processName: input.processName,
@@ -468,8 +483,8 @@ export class TerminalSession {
 
   handleIdentity(event: TerminalIdentityViewModel): void {
     const previousBinding = this.runtime.currentRuntimeBinding()
-    const changed = this.runtime.handleIdentity(event)
-    if (!changed) return
+    const identity = this.runtime.handleIdentity(event)
+    if (!identity.accepted || !identity.changed) return
     this.reconcileViewOwnership(previousBinding)
     this.notify('metadata')
   }
@@ -490,6 +505,10 @@ export class TerminalSession {
     const binding = this.runtime.currentRuntimeBinding()
     const bindingChanged = previousBinding !== null && !sameRuntimeBinding(previousBinding, binding)
     if (this.view.currentTerminal() && (bindingChanged || !this.runtime.isController())) {
+      if (bindingChanged && this.runtime.isController()) {
+        this.replaceActiveView(undefined, { preserveTransientState: true })
+        return
+      }
       this.destroyActiveView({ preserveTransientState: true })
     }
     if (!this.view.isConnected() || this.view.currentTerminal()) return
@@ -548,13 +567,13 @@ export class TerminalSession {
         if (this.isCurrentStart(epoch, term)) this.destroyActiveView({ preserveTransientState: true })
         return false
       }
-      const metadataChanged = this.runtime.applyTakeover(result)
+      const metadata = this.runtime.applyTakeover(result)
       if (!this.runtime.isController()) {
         if (this.isCurrentStart(epoch, term)) this.destroyActiveView({ preserveTransientState: true })
-        if (metadataChanged) this.notify('metadata')
+        if (metadata.changed) this.notify('metadata')
         return false
       }
-      if (metadataChanged) this.notify('metadata')
+      if (metadata.changed) this.notify('metadata')
       if (!this.isCurrentStart(epoch, term)) {
         if (this.view.isConnected()) this.start()
         return true
@@ -604,6 +623,7 @@ export class TerminalSession {
   private beginPendingPresentation(): AbortController {
     const controller = new AbortController()
     this.presentationAbortController?.abort()
+    this.settlePendingPresentationOutputBoundary()
     this.presentationAbortController = controller
     return controller
   }
@@ -627,7 +647,17 @@ export class TerminalSession {
           currentAttempt = this.runtime.startAttaching()
           continue
         }
-        if (result.frame === 'snapshot') await this.replayPhase(epoch, term, result)
+        if (result.frame === 'snapshot') {
+          await this.replayPhase(epoch, term, result)
+        } else {
+          await this.waitForPresentationOutputBoundary(
+            epoch,
+            term,
+            result,
+            result.streamSeq,
+            presentationAbortController.signal,
+          )
+        }
         this.assertCurrentStart(epoch, term)
         if (!this.runtime.isController()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -644,20 +674,19 @@ export class TerminalSession {
         }
         this.assertCurrentStart(epoch, term)
         await this.commitPendingPresentationOutput(epoch, term)
-        for (;;) {
-          const presentation = await this.view.present(
-            term,
-            presentationAbortController.signal,
-            result.frame === 'snapshot' || this.currentBindingHasRenderedOutput(),
-          )
-          if (presentation === 'cancelled') throw new StartCancelledError()
-          if (presentation === 'presented') break binding
-          if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
-          this.assertCurrentStart(epoch, term)
-          if (this.runtime.phase() === 'open') {
-            currentAttempt = this.runtime.startAttaching()
-            continue binding
-          }
+        const renderedBinding = this.runtime.currentRuntimeBinding()
+        const requiredOutputSeq = result.frame === 'snapshot' ? result.snapshotSeq : result.streamSeq
+        if (!renderedBinding || !this.presentationOutputIncludes(renderedBinding, requiredOutputSeq)) {
+          throw new StartCancelledError()
+        }
+        const presentation = await this.view.present(term, presentationAbortController.signal)
+        if (presentation === 'cancelled') throw new StartCancelledError()
+        if (presentation === 'presented') break binding
+        if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
+        this.assertCurrentStart(epoch, term)
+        if (this.runtime.phase() === 'open') {
+          currentAttempt = this.runtime.startAttaching()
+          continue binding
         }
       }
       this.assertCurrentStart(epoch, term)
@@ -727,7 +756,11 @@ export class TerminalSession {
     }
     this.assertCurrentStart(epoch, term)
     if (result) return operation.originEpoch === epoch ? result : null
-    this.destroyActiveView({ preserveTransientState: true })
+    if (this.runtime.currentAttemptIsIndeterminate()) {
+      this.suspendActiveViewForAuthoritativeRecovery()
+    } else {
+      this.destroyActiveView({ preserveTransientState: true })
+    }
     throw new StartCancelledError()
   }
 
@@ -753,6 +786,7 @@ export class TerminalSession {
     term: XTermTerminal,
   ): Promise<TerminalStartResultWithController | null> {
     const restart = attempt.operation === 'restart'
+    const requestedSize = { cols: term.cols, rows: term.rows }
     const terminalRuntimeSessionId = restart
       ? this.runtime.restartingTerminalRuntimeSessionId()
       : this.runtime.currentTerminalRuntimeSessionId()
@@ -797,10 +831,17 @@ export class TerminalSession {
     }
 
     const projected = this.withLocalController(result)
-    const admittedAttempt = this.runtime.currentAttemptToken()
-    const attemptStillCurrent = admittedAttempt !== null && sameAttempt(admittedAttempt, attempt)
+    if (
+      projected.role === 'controller' &&
+      projected.phase === 'open' &&
+      (projected.canonicalSize.cols !== requestedSize.cols || projected.canonicalSize.rows !== requestedSize.rows)
+    ) {
+      throw new Error('terminal start response did not commit the requested controller geometry')
+    }
     const committed = this.runtime.commitAttachResult(attempt, projected)
     if (!committed.accepted) {
+      const admittedAttempt = this.runtime.currentAttemptToken()
+      const attemptStillCurrent = admittedAttempt !== null && sameAttempt(admittedAttempt, attempt)
       if (attemptStillCurrent) {
         const failed = this.runtime.failStartAttempt(attempt, 'error.unavailable')
         if (failed.resolution === 'staged') this.applySettledStagedHydration()
@@ -938,6 +979,7 @@ export class TerminalSession {
   private queueOutput(data: string, checkpoint: RenderedOutputCheckpoint): void {
     if (!this.view.currentTerminal()) return
     this.pendingOutput.push({ data, checkpoint })
+    this.settlePresentationOutputBoundaryForCheckpoint(checkpoint)
     if (!this.view.isPresented()) return
     if (this.outputFlushFrame !== null) return
     this.outputFlushFrame = requestAnimationFrame(() => {
@@ -961,7 +1003,9 @@ export class TerminalSession {
     const checkpoint = latestCheckpoint(currentOutput.map((entry) => entry.checkpoint))
     const term = this.view.currentTerminal()
     if (!term || !checkpoint) return
-    void this.enqueueRenderAppend(term, output, checkpoint)
+    void this.enqueueRenderAppend(term, output, checkpoint).catch((error) => {
+      this.recoverFromRenderFailure(term, error)
+    })
   }
 
   private async commitPendingPresentationOutput(epoch: number, term: XTermTerminal): Promise<void> {
@@ -977,8 +1021,76 @@ export class TerminalSession {
     const output = cutoff.filter((entry) => sameRenderedBinding(entry.checkpoint, binding))
     const checkpoint = latestCheckpoint(output.map((entry) => entry.checkpoint))
     if (!checkpoint) return
-    const applied = await this.enqueueRenderAppend(term, output.map((entry) => entry.data).join(''), checkpoint)
+    let applied: boolean
+    try {
+      applied = await this.enqueueRenderAppend(term, output.map((entry) => entry.data).join(''), checkpoint)
+    } catch (error) {
+      this.recoverFromRenderFailure(term, error)
+      throw new StartCancelledError()
+    }
     if (!applied || !this.isCurrentStart(epoch, term)) throw new StartCancelledError()
+  }
+
+  private presentationOutputIncludes(binding: TerminalRuntimeBinding, requiredSeq: number): boolean {
+    const current = this.runtime.currentRuntimeBinding()
+    if (!current || !sameRuntimeBinding(current, binding)) return false
+    if (requiredSeq === 0) return true
+    const rendered = this.renderedOutputCheckpoint
+    return !!rendered && sameRenderedBinding(rendered, binding) && rendered.seq >= requiredSeq
+  }
+
+  private presentationOutputBoundaryReached(boundary: RenderedOutputCheckpoint): boolean {
+    if (boundary.seq === 0) return true
+    const rendered = this.renderedOutputCheckpoint
+    if (rendered && sameRenderedBinding(rendered, boundary) && rendered.seq >= boundary.seq) return true
+    return this.pendingOutput.some(
+      (entry) => sameRenderedBinding(entry.checkpoint, boundary) && entry.checkpoint.seq >= boundary.seq,
+    )
+  }
+
+  private async waitForPresentationOutputBoundary(
+    epoch: number,
+    term: XTermTerminal,
+    binding: TerminalRuntimeBinding,
+    seq: number,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const checkpoint = { ...binding, seq }
+    if (this.presentationOutputBoundaryReached(checkpoint)) return
+    if (this.pendingPresentationOutputBoundary) {
+      throw new Error('conflicting terminal presentation output boundaries')
+    }
+
+    const completion = Promise.withResolvers<void>()
+    const pending: PendingPresentationOutputBoundary = { ...checkpoint, resolve: completion.resolve }
+    const settleOnAbort = () => this.settlePendingPresentationOutputBoundary(pending)
+    this.pendingPresentationOutputBoundary = pending
+    signal.addEventListener('abort', settleOnAbort, { once: true })
+    if (signal.aborted || this.presentationOutputBoundaryReached(pending)) {
+      this.settlePendingPresentationOutputBoundary(pending)
+    }
+
+    try {
+      await completion.promise
+    } finally {
+      signal.removeEventListener('abort', settleOnAbort)
+      this.settlePendingPresentationOutputBoundary(pending)
+    }
+    this.assertCurrentStart(epoch, term)
+    if (signal.aborted || !this.presentationOutputBoundaryReached(checkpoint)) throw new StartCancelledError()
+  }
+
+  private settlePresentationOutputBoundaryForCheckpoint(checkpoint: RenderedOutputCheckpoint): void {
+    const pending = this.pendingPresentationOutputBoundary
+    if (!pending || !sameRenderedBinding(pending, checkpoint) || checkpoint.seq < pending.seq) return
+    this.settlePendingPresentationOutputBoundary(pending)
+  }
+
+  private settlePendingPresentationOutputBoundary(expected?: PendingPresentationOutputBoundary): void {
+    const pending = this.pendingPresentationOutputBoundary
+    if (!pending || (expected && pending !== expected)) return
+    this.pendingPresentationOutputBoundary = null
+    pending.resolve()
   }
 
   private clearPendingOutput(): void {
@@ -1015,6 +1127,15 @@ export class TerminalSession {
     this.renderQueue?.clear()
   }
 
+  private recoverFromRenderFailure(term: XTermTerminal, error: unknown): void {
+    if (this.disposed || this.view.currentTerminal() !== term) return
+    terminalLog.warn('terminal output render failed; rebuilding from the authoritative snapshot', {
+      terminalRuntimeSessionId: this.runtime.currentTerminalRuntimeSessionId(),
+      error,
+    })
+    this.replaceActiveView(undefined, { preserveTransientState: true })
+  }
+
   private isOutputAlreadyRendered(event: TerminalOutputEvent): boolean {
     const checkpoint = this.renderedOutputCheckpoint
     if (!checkpoint || !sameRenderedBinding(checkpoint, event)) return false
@@ -1036,20 +1157,6 @@ export class TerminalSession {
     } else if (checkpoint.seq > current.seq) {
       this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
     }
-    const term = this.view.currentTerminal()
-    if (!term || !this.view.isPresented()) return
-    void this.view.admitAutomaticFocusAfterRender(term).catch((error: unknown) => {
-      terminalLog.warn('terminal automatic focus render barrier failed', {
-        terminalRuntimeSessionId: checkpoint.terminalRuntimeSessionId,
-        error,
-      })
-    })
-  }
-
-  private currentBindingHasRenderedOutput(): boolean {
-    const binding = this.runtime.currentRuntimeBinding()
-    const checkpoint = this.renderedOutputCheckpoint
-    return !!binding && !!checkpoint && sameRenderedBinding(binding, checkpoint) && checkpoint.seq > 0
   }
 
   private checkpointFromOutputEvent(event: TerminalOutputEvent): RenderedOutputCheckpoint {
@@ -1063,15 +1170,39 @@ export class TerminalSession {
   private destroyActiveView(options?: { preserveTransientState?: boolean }): boolean {
     this.presentationAbortController?.abort()
     this.presentationAbortController = null
+    this.settlePendingPresentationOutputBoundary()
     this.cancelResizeDispatch()
     this.clearPendingOutput()
-    this.pendingInputWrite = null
-    this.inputFlushScheduled = false
+    if (this.pendingInputWrite && !this.isCurrentInputBinding(this.pendingInputWrite.binding)) {
+      this.pendingInputWrite = null
+    }
     this.startEpoch += 1
     const transientChanged = options?.preserveTransientState ? false : this.runtime.resetTransientState()
     this.renderQueue = null
     this.view.destroyTerminal()
     return transientChanged
+  }
+
+  private replaceActiveView(
+    preparedAttempt?: TerminalRuntimeAttemptToken,
+    options?: { preserveTransientState?: boolean },
+  ): boolean {
+    const focusRequest = this.view.takeFocusRequestForRebuild()
+    const transientChanged = this.destroyActiveView(options)
+    if (!this.view.isConnected() || !this.shouldStartAttachedSession()) {
+      focusRequest?.onSettled?.()
+      return transientChanged
+    }
+    if (focusRequest) this.view.focus(focusRequest)
+    this.start(preparedAttempt)
+    return transientChanged
+  }
+
+  private suspendActiveViewForAuthoritativeRecovery(): void {
+    const focusRequest = this.view.takeFocusRequestForRebuild()
+    this.destroyActiveView({ preserveTransientState: true })
+    if (focusRequest && this.view.isConnected()) this.view.focus(focusRequest)
+    else focusRequest?.onSettled?.()
   }
 
   private isCurrentStart(epoch: number, term: XTermTerminal): boolean {
@@ -1142,10 +1273,6 @@ function sameRenderedBinding(
 function sameRuntimeBinding(a: TerminalRuntimeBinding | null, b: TerminalRuntimeBinding | null): boolean {
   if (!a || !b) return a === b
   return sameRenderedBinding(a, b)
-}
-
-function sameInputAdmission(a: TerminalInputAdmission, b: TerminalInputAdmission): boolean {
-  return a.presentationEpoch === b.presentationEpoch && sameRuntimeBinding(a, b)
 }
 
 function sameResizeProposal(a: PendingResize, b: PendingResize): boolean {

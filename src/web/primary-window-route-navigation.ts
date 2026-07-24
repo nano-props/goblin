@@ -9,20 +9,19 @@ import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowPresentation,
+  beginPrimaryWindowNavigation,
   executePrimaryWindowNavigation,
   primaryWindowNavigationState,
-  primaryWindowPresentationIsCurrent,
+  primaryWindowNavigationIsCurrent,
   registerPrimaryWindowNavigation,
-  releasePrimaryWindowNavigation,
   type PrimaryWindowNavigationOutcome,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import { navigationLog } from '#/web/logger.ts'
 
 export interface PrimaryWindowRouteNavigationOptions {
   replace?: boolean
-  presentationToken?: PrimaryWindowPresentationToken
+  navigationGeneration?: PrimaryWindowNavigationGeneration
   onCommit?: () => void
   onAbandon?: () => void
   routePrecondition?:
@@ -104,7 +103,7 @@ export interface PrimaryWindowRouteNavigation {
     workspaceId: WorkspaceId,
     options?: {
       returnTo?: string | null
-      presentationToken?: PrimaryWindowPresentationToken
+      navigationGeneration?: PrimaryWindowNavigationGeneration
       onCommit?: () => void
       onAbandon?: () => void
     },
@@ -133,15 +132,15 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         if (!router) return
         const target = router.buildLocation({ to: '/' })
         void runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          currentHref: () => router.state.location.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/',
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -156,16 +155,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           search,
         })
         void runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/settings/$page',
               params: { page },
               search,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -174,12 +174,13 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const href = returnToFromHref(router?.state.location.href ?? null)
         if (href && router) {
           void runOwnedPrimaryWindowNavigation({
-            token: options?.presentationToken,
+            generation: options?.navigationGeneration,
             commitEffect: options?.onCommit,
             abandonEffect: options?.onAbandon,
             targetHref: href,
-            navigate: async (navigationId) => {
-              router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationId))
+            currentHref: router.state.location.href,
+            navigate: async (navigationGeneration) => {
+              router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationGeneration))
             },
           })
         } else {
@@ -194,15 +195,16 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug', params: { workspaceSlug } })
         void runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug',
               params: { workspaceSlug },
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -215,15 +217,16 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/dashboard', params: { workspaceSlug } })
         void runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/dashboard',
               params: { workspaceSlug },
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -233,16 +236,16 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         if (!workspaceSlug || !router) return abandonPrimaryWindowRoute(options)
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/root', params: { workspaceSlug } })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          currentHref: () => router.state.location.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/root',
               params: { workspaceSlug },
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -253,17 +256,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const params = { workspaceSlug, tabKey: tab }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/root/tab/$tabKey', params })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          currentHref: () => router.state.location.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/root/tab/$tabKey',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -277,17 +280,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           params,
         })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          currentHref: () => router.state.location.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -296,7 +299,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const workspaceId = paneTarget.workspaceId
         const workspaceSlug = workspaceSlugForId(workspaceId)
         if (!workspaceSlug || !router) return abandonPrimaryWindowRoute(options)
-        if (options?.presentationToken && !primaryWindowPresentationIsCurrent(options.presentationToken)) {
+        if (options?.navigationGeneration && !primaryWindowNavigationIsCurrent(options.navigationGeneration)) {
           return abandonPrimaryWindowRoute(options)
         }
         const worktreeParams =
@@ -349,14 +352,14 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         if (expectedCurrentHref === null) return abandonPrimaryWindowRoute(options)
         const targetHref = routeHref(route)
         return await settleOwnedPrimaryWindowRouteCommit({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           targetHref,
           expectedCurrentHref,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           currentHref: () => router.state.location.href,
-          navigate: async (navigationId) => {
-            const navigationState = (state: HistoryState) => primaryWindowNavigationState(state, navigationId)
+          navigate: async (navigationGeneration) => {
+            const navigationState = (state: HistoryState) => primaryWindowNavigationState(state, navigationGeneration)
             if (route === null) {
               if (worktreeParams) {
                 await router.navigate({
@@ -421,16 +424,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const params = { workspaceSlug, branchSlug: branchSlugFromName(branchName) }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/branch/$branchSlug', params })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/branch/$branchSlug',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -441,16 +445,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const params = { workspaceSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey', params })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -464,16 +469,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           params,
         })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -484,16 +490,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const params = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(worktreePath) }
         const target = router.buildLocation({ to: '/workspace/$workspaceSlug/worktree/$worktreeSlug', params })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/worktree/$worktreeSlug',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -507,16 +514,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           params,
         })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/terminal/$terminalSessionId',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -530,16 +538,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           params,
         })
         return runOwnedPrimaryWindowNavigation({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
-          navigate: async (navigationId) => {
+          currentHref: router.state.location.href,
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/tab/$tabKey',
               params,
               replace: options?.replace,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
         })
@@ -547,7 +556,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       async commitWorkspacePaneRoute(workspaceId, branchName, route, options) {
         const workspaceSlug = workspaceSlugForId(workspaceId)
         if (!workspaceSlug) return abandonPrimaryWindowRoute(options)
-        if (options?.presentationToken && !primaryWindowPresentationIsCurrent(options.presentationToken)) {
+        if (options?.navigationGeneration && !primaryWindowNavigationIsCurrent(options.navigationGeneration)) {
           return abandonPrimaryWindowRoute(options)
         }
         const branchSlug = branchSlugFromName(branchName)
@@ -605,18 +614,18 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             return true
           }
           return await settleOwnedPrimaryWindowRouteCommit({
-            token: options?.presentationToken,
+            generation: options?.navigationGeneration,
             commitEffect: options?.onCommit,
             abandonEffect: options?.onAbandon,
             targetHref: target.href,
             expectedCurrentHref,
-            navigate: async (navigationId) => {
+            navigate: async (navigationGeneration) => {
               await router.navigate({
                 to: '/workspace/$workspaceSlug/branch/$branchSlug',
                 params: { workspaceSlug, branchSlug },
                 replace,
                 ignoreBlocker: true,
-                state: (state) => primaryWindowNavigationState(state, navigationId),
+                state: (state) => primaryWindowNavigationState(state, navigationGeneration),
               })
             },
             currentHref: () => router.state.location.href,
@@ -635,18 +644,18 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             return true
           }
           return await settleOwnedPrimaryWindowRouteCommit({
-            token: options?.presentationToken,
+            generation: options?.navigationGeneration,
             commitEffect: options?.onCommit,
             abandonEffect: options?.onAbandon,
             targetHref: target.href,
             expectedCurrentHref,
-            navigate: async (navigationId) => {
+            navigate: async (navigationGeneration) => {
               await router.navigate({
                 to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
                 params: { workspaceSlug, branchSlug, tabKey: route.tab },
                 replace,
                 ignoreBlocker: true,
-                state: (state) => primaryWindowNavigationState(state, navigationId),
+                state: (state) => primaryWindowNavigationState(state, navigationGeneration),
               })
             },
             currentHref: () => router.state.location.href,
@@ -668,12 +677,12 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           return true
         }
         return await settleOwnedPrimaryWindowRouteCommit({
-          token: options?.presentationToken,
+          generation: options?.navigationGeneration,
           commitEffect: options?.onCommit,
           abandonEffect: options?.onAbandon,
           targetHref: target.href,
           expectedCurrentHref,
-          navigate: async (navigationId) => {
+          navigate: async (navigationGeneration) => {
             await router.navigate({
               to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
               params: {
@@ -683,7 +692,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
               },
               replace,
               ignoreBlocker: true,
-              state: (state) => primaryWindowNavigationState(state, navigationId),
+              state: (state) => primaryWindowNavigationState(state, navigationGeneration),
             })
           },
           currentHref: () => router.state.location.href,
@@ -706,16 +715,17 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             search,
           })
           void runOwnedPrimaryWindowNavigation({
-            token: options?.presentationToken,
+            generation: options?.navigationGeneration,
             commitEffect: options?.onCommit,
             abandonEffect: options?.onAbandon,
             targetHref: target.href,
-            navigate: async (navigationId) => {
+            currentHref: router.state.location.href,
+            navigate: async (navigationGeneration) => {
               await router.navigate({
                 to: '/workspace/$workspaceSlug/worktree/new',
                 params: { workspaceSlug },
                 search,
-                state: (state) => primaryWindowNavigationState(state, navigationId),
+                state: (state) => primaryWindowNavigationState(state, navigationGeneration),
               })
             },
           })
@@ -727,12 +737,13 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const href = returnToFromHref(router?.state.location.href ?? null)
         if (href && router) {
           void runOwnedPrimaryWindowNavigation({
-            token: options?.presentationToken,
+            generation: options?.navigationGeneration,
             commitEffect: options?.onCommit,
             abandonEffect: options?.onAbandon,
             targetHref: href,
-            navigate: async (navigationId) => {
-              router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationId))
+            currentHref: router.state.location.href,
+            navigate: async (navigationGeneration) => {
+              router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationGeneration))
             },
           })
         } else {
@@ -750,23 +761,28 @@ export function usePrimaryWindowRouteActions(): PrimaryWindowRouteNavigation {
 }
 
 export function runOwnedPrimaryWindowNavigation(input: {
-  token?: PrimaryWindowPresentationToken
+  generation?: PrimaryWindowNavigationGeneration
   targetHref: string
-  currentHref?: () => string
+  currentHref: string
   commitEffect?: () => void
   abandonEffect?: () => void
-  navigate(navigationId: string): Promise<unknown>
+  navigate(navigationGeneration: PrimaryWindowNavigationGeneration): Promise<unknown>
 }): boolean {
-  const token = input.token ?? beginPrimaryWindowPresentation()
-  if (input.currentHref?.() === input.targetHref) {
-    if (!primaryWindowPresentationIsCurrent(token)) {
+  const generation = input.generation ?? beginPrimaryWindowNavigation()
+  if (input.currentHref === input.targetHref) {
+    if (!primaryWindowNavigationIsCurrent(generation)) {
       input.abandonEffect?.()
       return false
     }
     input.commitEffect?.()
     return true
   }
-  const registration = registerPrimaryWindowNavigation(token, input.targetHref, input.commitEffect, input.abandonEffect)
+  const registration = registerPrimaryWindowNavigation(
+    generation,
+    input.targetHref,
+    input.commitEffect,
+    input.abandonEffect,
+  )
   if (!registration) {
     input.abandonEffect?.()
     return false
@@ -780,11 +796,8 @@ export function runOwnedPrimaryWindowNavigation(input: {
     }
   })
   void Promise.resolve()
-    .then(
-      async () =>
-        await executePrimaryWindowNavigation(token, async () => await input.navigate(registration.navigationId)),
-    )
-    .finally(() => releasePrimaryWindowNavigation(registration.navigationId))
+    .then(async () => await executePrimaryWindowNavigation(generation, async () => await input.navigate(generation)))
+    .finally(() => registration.release())
     .catch((error: unknown) => navigationLog.error('primary-window navigation failed', { error }))
   return true
 }
@@ -793,41 +806,46 @@ type PrimaryWindowNavigationExecutionOutcome =
   { kind: 'completed'; executed: boolean; routeCommitted: boolean } | { kind: 'failed'; error: unknown }
 
 export async function settleOwnedPrimaryWindowRouteCommit(input: {
-  token?: PrimaryWindowPresentationToken
+  generation?: PrimaryWindowNavigationGeneration
   targetHref: string
   expectedCurrentHref?: string
   commitEffect?: () => void
   abandonEffect?: () => void
-  navigate(navigationId: string): Promise<void>
+  navigate(navigationGeneration: PrimaryWindowNavigationGeneration): Promise<void>
   currentHref(): string
 }): Promise<boolean> {
-  const token = input.token ?? beginPrimaryWindowPresentation()
+  const generation = input.generation ?? beginPrimaryWindowNavigation()
   const currentHref = input.currentHref()
   if (!primaryWindowRoutePreconditionMatches(currentHref, input.expectedCurrentHref)) {
     input.abandonEffect?.()
     return false
   }
   if (currentHref === input.targetHref) {
-    if (!primaryWindowPresentationIsCurrent(token)) {
+    if (!primaryWindowNavigationIsCurrent(generation)) {
       input.abandonEffect?.()
       return false
     }
     input.commitEffect?.()
     return true
   }
-  const registration = registerPrimaryWindowNavigation(token, input.targetHref, input.commitEffect, input.abandonEffect)
+  const registration = registerPrimaryWindowNavigation(
+    generation,
+    input.targetHref,
+    input.commitEffect,
+    input.abandonEffect,
+  )
   if (!registration) {
     input.abandonEffect?.()
     return false
   }
   let routeCommitted = false
   const execution: Promise<PrimaryWindowNavigationExecutionOutcome> = executePrimaryWindowNavigation(
-    token,
+    generation,
     async () => {
       routeCommitted = await settlePrimaryWindowRouteCommit({
         targetHref: input.targetHref,
         expectedCurrentHref: input.expectedCurrentHref,
-        navigate: async () => await input.navigate(registration.navigationId),
+        navigate: async () => await input.navigate(generation),
         currentHref: input.currentHref,
       })
     },
@@ -841,14 +859,14 @@ export async function settleOwnedPrimaryWindowRouteCommit(input: {
   ])
   if (first.kind === 'settled') {
     void execution.then((outcome) => {
-      releasePrimaryWindowNavigation(registration.navigationId)
+      registration.release()
       if (outcome.kind === 'failed') {
         navigationLog.error('settled primary-window navigation later failed', { error: outcome.error })
       }
     })
     return committedPrimaryWindowNavigationOutcome(first.settlement)
   }
-  releasePrimaryWindowNavigation(registration.navigationId)
+  registration.release()
   if (first.kind === 'failed') throw first.error
   return first.executed && first.routeCommitted && committedPrimaryWindowNavigationOutcome(await registration.settled)
 }

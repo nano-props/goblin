@@ -94,8 +94,7 @@ function createDeferredPtySupervisor(): DeferredPtySupervisor {
         workerStartedAt: null,
         workerUptimeMs: null,
         pendingRequests: spawns.length,
-        restartAttempts: 0,
-        restartScheduled: false,
+        consecutiveWorkerInvalidations: 0,
         shuttingDown: false,
         lastSuccessfulResponseAt: null,
         lastExitCode: null,
@@ -508,6 +507,76 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(supervisor.resize).toHaveBeenCalledTimes(1)
   })
 
+  test('orders concurrent takeover responses and never publishes a regressive identity', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const manager = createAlwaysOnlineManager(supervisor, { onIdentity })
+    const created = await createSession(manager, supervisor)
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      'client-b',
+    )
+    await manager.attachSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      80,
+      24,
+      'client-c',
+    )
+    onIdentity.mockClear()
+
+    const firstResize = Promise.withResolvers<boolean>()
+    vi.mocked(supervisor.resize).mockImplementationOnce(async () => await firstResize.promise)
+    const takeoverB = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      100,
+      30,
+      'client-b',
+    )
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledTimes(1))
+    const takeoverC = manager.takeoverSession(
+      USER_ID,
+      created.terminalRuntimeSessionId,
+      created.terminalRuntimeGeneration,
+      120,
+      40,
+      'client-c',
+    )
+
+    firstResize.resolve(true)
+    await expect(takeoverB).resolves.toMatchObject({
+      ok: true,
+      identityRevision: 2,
+      controller: { clientId: 'client-b' },
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await expect(takeoverC).resolves.toMatchObject({
+      ok: true,
+      identityRevision: 4,
+      controller: { clientId: 'client-c' },
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    const publishedIdentityRevisions = onIdentity.mock.calls.map(([, event]) => event.identityRevision)
+    expect(publishedIdentityRevisions).toHaveLength(2)
+    expect(publishedIdentityRevisions).toEqual([...publishedIdentityRevisions].sort((a, b) => a - b))
+    expect(publishedIdentityRevisions.at(-1)).toBe(4)
+    expect(onIdentity).toHaveBeenLastCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        identityRevision: 4,
+        controller: expect.objectContaining({ clientId: 'client-c' }),
+        canonicalSize: { cols: 120, rows: 40 },
+      }),
+    )
+  })
+
   test('rejects an old controller resize queued behind a committed takeover', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createAlwaysOnlineManager(supervisor)
@@ -602,6 +671,17 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       controller: { clientId: CLIENT_ID },
       canonicalSize: { cols: 100, rows: 30 },
     })
+    expect(onIdentity).toHaveBeenCalledOnce()
+    expect(onIdentity).toHaveBeenLastCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        terminalRuntimeGeneration: created.terminalRuntimeGeneration + 1,
+        identityRevision: 0,
+        controller: expect.objectContaining({ clientId: CLIENT_ID }),
+        canonicalSize: { cols: 100, rows: 30 },
+      }),
+    )
+    onIdentity.mockClear()
 
     oldResizeAcknowledged.resolve(true)
     await expect(takeover).resolves.toEqual({ ok: false, message: 'error.unavailable' })
@@ -984,7 +1064,79 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
       kind: 'closed',
     })
+    expect(retentions.retain).toHaveBeenCalledOnce()
     expect(release).toHaveBeenCalledOnce()
+  })
+
+  test('hands the workspace runtime retention to asynchronous close effects', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const closeEffect = Promise.withResolvers<void>()
+    const release = vi.fn()
+    const onSessionClosed = vi.fn(async () => await closeEffect.promise)
+    const retain = vi.fn(() => ({ release }))
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
+      () => true,
+      { retain },
+    )
+    const created = await createSession(manager, supervisor)
+
+    const closing = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+    await vi.waitFor(() => expect(onSessionClosed).toHaveBeenCalledOnce())
+    await expect(closing).resolves.toMatchObject({ kind: 'closed' })
+
+    expect(retain).toHaveBeenCalledOnce()
+    expect(release).not.toHaveBeenCalled()
+    closeEffect.resolve()
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
+  })
+
+  test('releases the workspace runtime retention when close effects throw synchronously', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const release = vi.fn()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      {
+        onOutput: vi.fn(),
+        onExit: vi.fn(),
+        onSessionClosed: vi.fn(() => {
+          throw new Error('close effect failed')
+        }),
+      },
+      () => true,
+      { retain: vi.fn(() => ({ release })) },
+    )
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  test('releases the workspace runtime retention when asynchronous close effects reject', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const release = vi.fn()
+    const closeEffect = Promise.withResolvers<void>()
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      {
+        onOutput: vi.fn(),
+        onExit: vi.fn(),
+        onSessionClosed: vi.fn(() => closeEffect.promise),
+      },
+      () => true,
+      { retain: vi.fn(() => ({ release })) },
+    )
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
+    expect(release).not.toHaveBeenCalled()
+    closeEffect.reject(new Error('close effect failed'))
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
   })
 
   test('releases the admission reservation when runtime retention rejects a stale generation', () => {
@@ -1074,6 +1226,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     await expect(freshAttach).resolves.toMatchObject({
       ok: true,
       frame: 'stream',
+      streamSeq: 1,
       terminalRuntimeGeneration: 1,
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       canonicalSize: { cols: 123, rows: 41 },
@@ -1224,7 +1377,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 120, 40, 'client-test-2')
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_concurrent_attach_123'))
 
-    await expect(first).resolves.toMatchObject({ ok: true, frame: 'stream' })
+    await expect(first).resolves.toMatchObject({ ok: true, frame: 'stream', streamSeq: 0 })
     await expect(second).resolves.toMatchObject({
       ok: true,
       frame: 'snapshot',
@@ -2240,6 +2393,10 @@ describe('TerminalSessionManager membership catalog', () => {
       ok: true,
       terminalRuntimeSessionId: created.terminalRuntimeSessionId,
       terminalRuntimeGeneration: created.terminalRuntimeGeneration,
+      identityRevision: 1,
+      role: 'controller',
+      controllerStatus: 'connected',
+      controller: { clientId: CLIENT_ID, status: 'connected' },
       canonicalSize: { cols: 100, rows: 30 },
     })
     const resizedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
