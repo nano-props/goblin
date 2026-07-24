@@ -2,7 +2,10 @@ import { useEffect, useMemo } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import type { HistoryState } from '@tanstack/history'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type {
+  PrimaryWindowRouteNavigation,
+  PrimaryWindowRouteNavigationOptions,
+} from '#/web/primary-window-route-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -11,10 +14,7 @@ import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/share
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  observePrimaryWindowHistoryNavigation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+import { observePrimaryWindowHistoryNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceNavigationRouteContext =
@@ -75,6 +75,7 @@ export function useWorkspaceNavigationHistory({
     const currentHistoryEntry =
       useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
     const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(routeHref)
+    const browserHistoryReplace = workspaceNavigationBrowserHistoryReplacement(routeHref)
     const replaceCurrentMatches =
       replaceCurrent &&
       !!replaceCurrentEntry &&
@@ -95,13 +96,17 @@ export function useWorkspaceNavigationHistory({
     }
     recordWorkspaceNavigation(
       entry,
-      replaceCurrentMatches ? { replace: true } : browserHistoryTraversal ? { browserHistoryTraversal } : undefined,
+      replaceCurrentMatches || browserHistoryReplace
+        ? { replace: true }
+        : browserHistoryTraversal
+          ? { browserHistoryTraversal }
+          : undefined,
     )
     clearBrowserHistoryAction(routeHref)
   }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
 }
 
-/** One primary-window subscription owns both presentation arbitration and browser traversal metadata. */
+/** One primary-window subscription owns navigation settlement and browser traversal metadata. */
 export function usePrimaryWindowHistoryPresentationObserver(): void {
   const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
   useEffect(() => {
@@ -295,7 +300,7 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
-  options?: { presentationToken?: PrimaryWindowPresentationToken },
+  options?: PrimaryWindowRouteNavigationOptions,
 ): WorkspaceNavigationRestoreResult {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {
@@ -324,7 +329,7 @@ export function restoreWorkspaceNavigationEntry(
       return { kind: 'accepted' }
     case 'worktree':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        const accepted = routeNavigation.openRepoWorktreeTerminal?.(
+        const accepted = routeNavigation.openRepoWorktreeTerminal(
           entry.workspaceId,
           entry.route.worktreePath,
           entry.route.terminalSessionId,
@@ -333,7 +338,7 @@ export function restoreWorkspaceNavigationEntry(
         return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
       if (entry.route.workspacePaneTab && entry.route.workspacePaneTab !== 'terminal') {
-        const accepted = routeNavigation.openRepoWorktreeTab?.(
+        const accepted = routeNavigation.openRepoWorktreeTab(
           entry.workspaceId,
           entry.route.worktreePath,
           entry.route.workspacePaneTab,
@@ -414,6 +419,11 @@ function workspaceNavigationBrowserHistoryTraversal(
     if (action.index > 0) return 'forward'
   }
   return null
+}
+
+function workspaceNavigationBrowserHistoryReplacement(routeHref: string): boolean {
+  const action = browserHistoryAction
+  return !!action && action.href === routeHref && action.type === 'REPLACE'
 }
 
 function clearBrowserHistoryAction(routeHref: string): void {

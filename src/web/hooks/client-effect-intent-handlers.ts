@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { isTerminalFocused } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -14,7 +14,7 @@ import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
-  runCloseWorkspacePaneTabOrWindowCommand,
+  runCloseCurrentWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
@@ -81,7 +81,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-workspace-root-terminal':
-      deps.navigation.showWorkspaceRootPaneTab?.(plan.workspaceId, {
+      deps.navigation.showWorkspaceRootPaneTab(plan.workspaceId, {
         kind: 'terminal',
         terminalSessionId: plan.terminalSessionId,
       })
@@ -95,7 +95,7 @@ export function handleTerminalBellClickIntent(
       })
       return
     case 'show-detached-worktree-terminal':
-      deps.navigation.showRepoWorktreeTerminalSession?.(plan.workspaceId, plan.worktreePath, plan.terminalSessionId)
+      deps.navigation.showRepoWorktreeTerminalSession(plan.workspaceId, plan.worktreePath, plan.terminalSessionId)
       return
   }
 }
@@ -150,7 +150,7 @@ export async function handleWorkspaceClientIntent(
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
-    terminalFocused: isTerminalFocused(),
+    terminalFocused: terminalHasKeyboardFocus(),
     currentWorkspaceId: currentWorkspace?.id ?? null,
     currentWorkspaceRuntimeId: currentWorkspace?.workspaceRuntimeId ?? null,
     currentWorkspaceCapability: currentWorkspace?.capability ?? null,
@@ -201,19 +201,17 @@ export async function handleWorkspaceClientIntent(
         navigation: deps.navigation,
         t: deps.t,
       })
-    case 'close-workspace-pane-tab-or-window':
-      return await runCloseWorkspacePaneTabOrWindowCommand({
+    case 'close-workspace-pane-tab':
+      await runCloseCurrentWorkspacePaneTabCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
       })
+      return true
     case 'close-workspace':
       const closeResult = await deps.navigation.closeWorkspace(plan.workspaceId)
       if (!closeResult.ok) toast.error(deps.t(closeResult.message))
       return closeResult.ok
-    case 'close-window':
-      window.close()
-      return true
     case 'cycle-workspace':
       deps.navigation.cycleWorkspace(plan.direction)
       return true

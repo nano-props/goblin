@@ -1,4 +1,7 @@
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  workspacePaneTerminalBaseForTabModel,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
   type WorkspacePaneStaticTabType,
@@ -12,8 +15,6 @@ import {
   readWorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import { confirmWorkspacePaneRuntimeTabClose } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 type WorkspacePaneTabCloseStart =
   { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
@@ -30,14 +31,7 @@ export function beginWorkspacePaneTabEntryClose(
       }),
     }
   }
-  const closeTarget = target.worktreePath
-    ? workspacePaneTerminalBaseFromCoordinates({
-        workspaceId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName: target.branchName,
-        rootPath: target.worktreePath,
-      })
-    : null
+  const closeTarget = workspacePaneTerminalBaseForTabModel(target)
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   if (
     !closeTarget ||

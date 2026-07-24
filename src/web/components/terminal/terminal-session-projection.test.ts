@@ -28,6 +28,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId: 'term-222222222222222222222',
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: { clientId: 'client_a', status: 'connected' },
@@ -35,8 +36,7 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: 'shell',
         phase: 'open',
         message: null,
-        cols: 120,
-        rows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       },
     })
 
@@ -51,19 +51,15 @@ describe('terminal session projection helpers', () => {
       hydrateInput: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
         message: null,
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 120,
-        canonicalRows: 40,
-        snapshot: null,
-        snapshotSeq: 0,
-        outputEra: 0,
+        canonicalSize: { cols: 120, rows: 40 },
       },
-      controlsTerminal: true,
     })
   })
 
@@ -77,6 +73,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: { clientId: 'client_a', status: 'connected' },
@@ -84,16 +81,13 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: null,
         phase: 'error',
         message: 'pty failed',
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     })
 
-    expect(projected?.hydrateInput.snapshot).toBeNull()
-    expect(projected?.hydrateInput.snapshotSeq).toBe(0)
+    expect(projected?.hydrateInput.canonicalSize).toEqual({ cols: 80, rows: 24 })
     expect(projected?.hydrateInput.role).toBe('viewer')
     expect(projected?.hydrateInput.controllerStatus).toBe('connected')
-    expect(projected?.controlsTerminal).toBe(false)
   })
 
   test('rejects server sessions from a different workspace runtime', () => {
@@ -106,6 +100,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         controller: null,
@@ -113,8 +108,7 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     })
 
@@ -131,6 +125,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
         presentation: {
           kind: 'git-worktree' as const,
@@ -141,8 +136,7 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     })
 
@@ -162,6 +156,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } },
         controller: null,
@@ -169,8 +164,7 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     })
 
@@ -188,16 +182,15 @@ describe('terminal session projection helpers', () => {
         terminalProjectionEffect: { kind: 'none' },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         snapshot: '',
         snapshotSeq: 0,
-        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
         controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 80,
-        canonicalRows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
       'client_b',
     )
@@ -222,30 +215,30 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        processName: 'zsh',
+        terminalRuntimeGeneration: 0,
+        identityRevision: 0,
+        processName: '',
         canonicalTitle: null,
-        phase: 'open',
+        phase: 'opening',
         message: null,
-        controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
+        controller: null,
+        canonicalSize: null,
       },
     )
 
     expect(projected.serverSession).toEqual({
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
       target: RUNTIME_TARGET,
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
-      controller: { clientId: 'client_a', status: 'connected' },
-      processName: 'zsh',
+      controller: null,
+      processName: '',
       canonicalTitle: null,
-      phase: 'open',
+      phase: 'opening',
       message: null,
-      cols: 120,
-      rows: 40,
+      canonicalSize: null,
     })
   })
 
@@ -263,13 +256,13 @@ describe('terminal session projection helpers', () => {
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
         message: null,
         controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       },
     )
 
@@ -283,8 +276,7 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: 'new title',
         phase: 'open',
         message: null,
-        cols: 120,
-        rows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       }),
     )
 
@@ -315,13 +307,13 @@ describe('terminal session projection helpers', () => {
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         processName: 'zsh',
         canonicalTitle: 'new-shell',
         phase: 'open',
         message: null,
         controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       },
     )
 
@@ -332,8 +324,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'term-111111111111111111111',
         processName: 'zsh',
         canonicalTitle: 'new-shell',
-        cols: 120,
-        rows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       }),
     )
   })

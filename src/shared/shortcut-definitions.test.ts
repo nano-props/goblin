@@ -26,15 +26,13 @@ describe('shortcut definitions', () => {
     expect(matchClientKeyboardShortcut({ key: 'Escape', code: 'Escape', shiftKey: false })).toBe('dismiss')
   })
 
-  test('resolves fixed close and workspace tab accelerators from shared definitions', () => {
+  test('assigns Cmd+W only to workspace tab close', () => {
     expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-new-terminal-tab'), {})).toBe('CmdOrCtrl+T')
     expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-create-worktree'), {})).toBe('CmdOrCtrl+N')
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {})).toBe(
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab'), {})).toBe(
       'CmdOrCtrl+W',
     )
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace'), {})).toBe(
-      'CmdOrCtrl+Shift+W',
-    )
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace'), {})).toBeUndefined()
   })
 
   test('defines the terminal primary action as the single terminal shortcut', () => {

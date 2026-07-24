@@ -36,8 +36,7 @@ describe('health routes', () => {
           workerStartedAt: 1_000,
           workerUptimeMs: 300,
           pendingRequests: 1,
-          restartAttempts: 0,
-          restartScheduled: false,
+          consecutiveWorkerInvalidations: 0,
           shuttingDown: false,
           lastSuccessfulResponseAt: 1_200,
           lastExitCode: null,
@@ -45,8 +44,6 @@ describe('health routes', () => {
           lastFailure: null,
         },
         liveSessionCount: 1,
-        totalRingBufferChars: 100,
-        maxRingBufferChars: 100,
       },
     } satisfies ServerAppRealtimeDiagnostics)
 

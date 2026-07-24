@@ -83,6 +83,7 @@ function terminalCommandBridge({
     createTerminal,
     createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
     selectTerminal: vi.fn(),
+    focusTerminal: vi.fn(),
     closeTerminalByDescriptor,
   }
 }

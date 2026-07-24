@@ -67,6 +67,7 @@ interface TerminalWorkspacePaneRuntimeCloseSuccess {
   ok: true
   runtimeType: 'terminal'
   runtime: TerminalWorkspacePaneRuntimeCloseEffect
+  paneTabsSnapshot: WorkspacePaneTabsSnapshot
 }
 
 export type WorkspacePaneRuntimeCloseResult =

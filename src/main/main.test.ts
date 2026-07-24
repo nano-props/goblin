@@ -52,6 +52,7 @@ const mocks = vi.hoisted(() => {
     wireShellIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
     wireAccessTokenIpc: vi.fn(),
+    registerNativeHostTerminationSignals: vi.fn(),
     isTrustedIpcEvent: vi.fn(() => true),
     resetReady() {
       whenReadyPromise = new Promise<void>((resolve) => {
@@ -173,6 +174,10 @@ vi.mock('#/main/external-open.ts', () => ({
   enqueueExternalOpenPath: mocks.enqueueExternalOpenPath,
 }))
 
+vi.mock('#/main/native-host-termination.ts', () => ({
+  registerNativeHostTerminationSignals: mocks.registerNativeHostTerminationSignals,
+}))
+
 describe('native host startup lifecycle', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -209,6 +214,16 @@ describe('native host startup lifecycle', () => {
     expect(mocks.exit).toHaveBeenCalledWith(0)
     expect(mocks.quit).not.toHaveBeenCalled()
     expect(secondPassEvent.preventDefault).not.toHaveBeenCalled()
+  })
+
+  test('routes process termination through Electron quit', async () => {
+    await import('#/main/main.ts')
+
+    const requestQuit = mocks.registerNativeHostTerminationSignals.mock.calls[0]?.[0]
+    expect(requestQuit).toEqual(expect.any(Function))
+    requestQuit?.()
+
+    expect(mocks.quit).toHaveBeenCalledOnce()
   })
 
   test('does not wait for timeout when the client quit drain reports failure', async () => {

@@ -5,7 +5,7 @@
 // as typed IPC events. Numbered workspace tab shortcuts are handled
 // here in the capture phase so terminal focus cannot swallow them;
 // Cmd/Ctrl+T (new terminal tab), Cmd/Ctrl+N (create worktree) and
-// Cmd/Ctrl+W (close workspace tab or window) use this DOM path only in
+// Cmd/Ctrl+W (close workspace tab) use this DOM path only in
 // the web runtime.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
@@ -19,13 +19,13 @@ import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
-import { isTerminalFocused } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
-  runCloseWorkspacePaneTabOrWindowCommand,
+  runCloseCurrentWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
@@ -33,7 +33,7 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readSuccessfulRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
@@ -111,7 +111,7 @@ function moveBranchSelection(
   direction: MoveDirection,
   navigation: PrimaryWindowNavigationActions,
 ): boolean {
-  const branchModel = readRepoBranchSnapshotQueryProjection(input.repo)
+  const branchModel = readSuccessfulRepoBranchSnapshotQueryProjection(input.repo)
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,
@@ -192,16 +192,24 @@ export function useKeyboard({
         }
       }
 
-      if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
+      if (primaryModifierPressed(e) && !e.altKey) {
         const workspaceId = currentWorkspaceIdRef.current
         const paneTarget = currentWorkspacePaneCommandTargetRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
+        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
+        const rendererOwnedShortcut =
+          tabIndex !== null ||
+          (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
+        if (rendererOwnedShortcut) {
+          e.preventDefault()
+          e.stopPropagation()
+          if (workspaceShortcutsSuppressed) return
+        }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
           const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
           if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
             return
-          e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
             workspaceId,
@@ -212,7 +220,6 @@ export function useKeyboard({
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
-          e.preventDefault()
           const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
           if (
             !repo ||
@@ -234,18 +241,15 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           if (!paneTarget) return
-          e.preventDefault()
-          void runCloseWorkspacePaneTabOrWindowCommand({
+          void runCloseCurrentWorkspacePaneTabCommand({
             workspaceId,
             target: paneTarget,
             navigation,
           })
           return
         }
-        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
         if (tabIndex !== null) {
           if (!paneTarget) return
-          e.preventDefault()
           void runSelectWorkspacePaneTabByIndexCommand({
             workspaceId,
             target: paneTarget,
@@ -256,7 +260,7 @@ export function useKeyboard({
         }
       }
 
-      if (isTerminalFocused()) return
+      if (terminalHasKeyboardFocus()) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
 

@@ -41,6 +41,13 @@ export class StickyCompletion {
     return { dispose }
   }
 
+  waitUntilCompleted(): Promise<void> {
+    if (this.completedValue) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      this.subscribe(resolve)
+    })
+  }
+
   wait(timeoutMs: number, timeoutMessage: string): Promise<void> {
     if (this.completedValue) return Promise.resolve()
     return new Promise<void>((resolve, reject) => {

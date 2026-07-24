@@ -383,6 +383,17 @@ export function createClientRealtimeSocketConnection<
   }
 
   async function request<TAction extends Action>(action: TAction, input: TInputs[TAction]): Promise<TOutputs[TAction]> {
+    const requestId = options.createRequestId()
+    let encodedMessage: string
+    try {
+      encodedMessage = options.encodeClientMessage({ type: 'request', requestId, action, input })
+    } catch (error) {
+      throw new ClientRealtimeRequestError(error instanceof Error ? error.message : `${requestLabel} encoding failed`, {
+        kind: 'send-failed',
+        delivery: 'not-sent',
+        outageId: null,
+      })
+    }
     let ws: WebSocket
     try {
       pendingSocketOpenRequests += 1
@@ -398,7 +409,6 @@ export function createClientRealtimeSocketConnection<
     }
     const requestSocket = ws
     return await new Promise<TOutputs[TAction]>((resolve, reject) => {
-      const requestId = options.createRequestId()
       const timeout = setTimeout(() => {
         const pending = pendingSocketRequests.get(requestId)
         if (!pending) return
@@ -420,7 +430,7 @@ export function createClientRealtimeSocketConnection<
         timeout,
       } as PendingSocketRequest<Action, Output>)
       try {
-        requestSocket.send(options.encodeClientMessage({ type: 'request', requestId, action, input }))
+        requestSocket.send(encodedMessage)
       } catch (error) {
         clearTimeout(timeout)
         pendingSocketRequests.delete(requestId)

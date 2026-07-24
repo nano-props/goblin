@@ -61,6 +61,8 @@ import type {
   TerminalAttachResult,
   TerminalRestartResult,
   TerminalMutationResult,
+  TerminalResizeInput,
+  TerminalResizeResult,
   TerminalWriteResult,
   TerminalSessionsSnapshot,
   TerminalTakeoverResult,
@@ -196,7 +198,7 @@ interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalRestartResult
   'terminal.write': TerminalWriteResult
-  'terminal.resize': TerminalMutationResult
+  'terminal.resize': TerminalResizeResult
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
   'terminal.prune': { pruned: number; remaining: number }
@@ -406,37 +408,28 @@ export function installWorkspacePaneTabsTestBridge(
       attach: async () => ({ ok: false, message: 'unhandled terminal attach' }),
       restart: async () => ({ ok: false, message: 'unhandled terminal restart' }),
       write: async () => ({ status: 'accepted' }),
-      resize: async () => true,
+      resize: async (input) => ({
+        ok: true,
+        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+        identityRevision: 1,
+        role: 'controller',
+        controllerStatus: 'connected',
+        controller: { clientId: 'attachment_local', status: 'connected' },
+        canonicalSize: { cols: input.cols, rows: input.rows },
+      }),
       takeover: async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'attachment_local', status: 'connected' as const },
-        canonicalCols: 80,
-        canonicalRows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
         phase: 'open' as const,
       }),
       close: async () => true,
-      create: async () => ({
-        ok: true as const,
-        action: 'created' as const,
-        terminalSessionId: 'term-testtesttesttesttest1',
-        terminalProjectionEffect: { kind: 'delta', revision: 1 },
-        terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        snapshot: '',
-        snapshotSeq: 0,
-        outputEra: 0,
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open' as const,
-        message: null,
-        controller: { clientId: 'attachment_local', status: 'connected' as const },
-        canonicalCols: 80,
-        canonicalRows: 24,
-      }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
@@ -512,14 +505,14 @@ export function installWorkspacePaneTabsTestBridge(
             terminalSessionId,
             terminalProjectionEffect: { kind: 'delta', revision: 1 },
             terminalRuntimeSessionId,
-            terminalRuntimeGeneration: 1,
-            processName: 'zsh',
+            terminalRuntimeGeneration: 0,
+            identityRevision: 0,
+            processName: '',
             canonicalTitle: null,
-            phase: 'open',
+            phase: 'opening',
             message: null,
-            controller: { clientId: 'attachment_local', status: 'connected' },
-            canonicalCols: input.request.cols ?? 80,
-            canonicalRows: input.request.rows ?? 24,
+            controller: null,
+            canonicalSize: null,
           },
         } as const
       },
@@ -535,9 +528,11 @@ export function installWorkspacePaneTabsTestBridge(
           target,
           currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
         )
+        const paneTabsSnapshot = commitServerSnapshot()
         return {
           ok: true,
           runtimeType: input.runtimeType,
+          paneTabsSnapshot,
           runtime: wasOpen
             ? {
                 action: 'closed' as const,
@@ -722,17 +717,27 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           attach: () => Promise.resolve({ ok: false, message: 'unhandled terminal attach' }),
           restart: () => Promise.resolve({ ok: false, message: 'unhandled terminal restart' }),
           write: () => Promise.resolve({ status: 'accepted' }),
-          resize: () => Promise.resolve(true),
+          resize: (input: TerminalResizeInput) =>
+            Promise.resolve({
+              ok: true as const,
+              terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+              terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+              identityRevision: 1,
+              role: 'controller' as const,
+              controllerStatus: 'connected' as const,
+              controller: { clientId: 'attachment_local', status: 'connected' as const },
+              canonicalSize: { cols: input.cols, rows: input.rows },
+            }),
           takeover: () =>
             Promise.resolve({
               ok: true as const,
               terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
               terminalRuntimeGeneration: 1,
+              identityRevision: 1,
               role: 'controller' as const,
               controllerStatus: 'connected' as const,
               controller: { clientId: 'attachment_local', status: 'connected' as const },
-              canonicalCols: 80,
-              canonicalRows: 24,
+              canonicalSize: { cols: 80, rows: 24 },
               phase: 'open' as const,
             }),
           close: () => Promise.resolve(true),
@@ -823,6 +828,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.write':
           return { status: 'accepted' } satisfies TerminalWriteResult
         case 'terminal.resize':
+          return { ok: false, message: `unhandled ${name}` } satisfies TerminalResizeResult
         case 'terminal.close':
         case 'terminal.notifyBell':
           return true satisfies TerminalMutationResult
@@ -831,11 +837,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ok: true as const,
             terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
             terminalRuntimeGeneration: 1,
+            identityRevision: 1,
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
-            canonicalCols: 80,
-            canonicalRows: 24,
+            canonicalSize: { cols: 80, rows: 24 },
             phase: 'open' as const,
           }
         case 'terminal.prune':
@@ -882,6 +888,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true,
             runtimeType,
+            paneTabsSnapshot: { revision: 1, entries: [] },
             runtime: {
               action: 'closed',
               terminalSessionId,

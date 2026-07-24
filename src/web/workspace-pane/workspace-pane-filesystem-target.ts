@@ -10,7 +10,6 @@ import type {
   WorkspaceGitReadyProbeState,
   WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
-import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 interface WorkspacePaneSurfaceTargetBase {
   workspaceId: WorkspaceId
@@ -109,25 +108,4 @@ export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesys
         target: workspacePaneFilesystemRuntimeTarget(target),
         presentation: { kind: 'git-worktree', head: target.head },
       }
-}
-
-export function workspacePaneTerminalBaseFromCoordinates(input: {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  branchName: string | null
-  rootPath: string
-}): TerminalSessionBase | null {
-  const tabsTarget =
-    input.branchName === null
-      ? { kind: 'workspace-root' as const, workspaceId: input.workspaceId }
-      : gitWorktreeWorkspacePaneTabsTarget(input.workspaceId, input.rootPath)
-  const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.workspaceRuntimeId) : null
-  if (!runtimeTarget) return null
-  if (input.branchName === null && runtimeTarget.kind === 'workspace-root') {
-    return { target: runtimeTarget, presentation: { kind: 'workspace-root' } }
-  }
-  if (input.branchName !== null && runtimeTarget.kind === 'git-worktree') {
-    return { target: runtimeTarget, presentation: terminalGitWorktreePresentation(input.branchName) }
-  }
-  return null
 }

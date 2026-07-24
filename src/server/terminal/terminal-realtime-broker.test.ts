@@ -43,11 +43,11 @@ describe('terminal realtime broker', () => {
     expect(broker.isClientOnline(USER_A, 'client_1_b')).toBe(false)
   })
 
-  test('disconnectAll force-closes paused buffered sockets', () => {
+  test('disconnectAll force-closes buffered sockets with an active transition', () => {
     const broker = createBroker()
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
-    bufferedSocket.pause()
+    bufferedSocket.enqueueTransition(() => new Promise(() => {}))
     broker.registerSocket('client_1_a', USER_A, bufferedSocket)
 
     broker.disconnectAll()
@@ -56,10 +56,18 @@ describe('terminal realtime broker', () => {
     expect(broker.hasUserSockets(USER_A)).toBe(false)
   })
 
-  test('buffered socket drops output covered by a snapshot flush boundary', () => {
+  test('buffered socket drops output covered by a snapshot flush boundary', async () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
-    bufferedSocket.pause()
+    let finishTransition:
+      | ((value: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number; seq: number }) => void)
+      | undefined
+    bufferedSocket.enqueueTransition(
+      () =>
+        new Promise((resolve) => {
+          finishTransition = resolve
+        }),
+    )
 
     bufferedSocket.send(
       JSON.stringify({
@@ -69,7 +77,6 @@ describe('terminal realtime broker', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'covered',
-          outputEra: 0,
           seq: 1,
           processName: 'zsh',
         },
@@ -83,7 +90,6 @@ describe('terminal realtime broker', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'after',
-          outputEra: 0,
           seq: 2,
           processName: 'zsh',
         },
@@ -97,20 +103,19 @@ describe('terminal realtime broker', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           data: 'other-session',
-          outputEra: 0,
           seq: 1,
           processName: 'zsh',
         },
       }),
     )
 
-    bufferedSocket.resume({
+    finishTransition?.({
       terminalRuntimeSessionId: 's_1',
       terminalRuntimeGeneration: 1,
-      outputEra: 0,
       seq: 1,
     })
 
+    await vi.waitFor(() => expect(rawSocket.send).toHaveBeenCalledTimes(2))
     expect(rawSocket.send).toHaveBeenCalledTimes(2)
     const messages = rawSocket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
     expect(messages.map((message) => message.event.data)).toEqual(['after', 'other-session'])
@@ -130,7 +135,6 @@ describe('terminal realtime broker', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -148,7 +152,6 @@ describe('terminal realtime broker', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         seq: 1,
-        outputEra: 0,
         processName: 'zsh',
       },
     })
@@ -188,7 +191,6 @@ describe('terminal realtime broker', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -212,7 +214,6 @@ describe('terminal realtime broker', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -237,7 +238,6 @@ describe('terminal realtime broker', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -367,11 +367,11 @@ describe('terminal realtime broker heartbeat presence', () => {
     broker.disconnectAll()
   })
 
-  test('heartbeat deadline force-closes a paused buffered socket', () => {
+  test('heartbeat deadline force-closes a buffered socket with an active transition', () => {
     const broker = createBroker()
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
-    bufferedSocket.pause()
+    bufferedSocket.enqueueTransition(() => new Promise(() => {}))
     broker.registerSocket('client_a_1', USER_A, bufferedSocket)
 
     vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
@@ -390,7 +390,7 @@ describe('terminal realtime broker heartbeat presence', () => {
 
     for (let i = 0; i < 3; i += 1) {
       vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
-      broker.recordHeartbeat(USER_A, 'client_a_1')
+      broker.recordHeartbeat(socket)
     }
 
     expect(broker.isClientOnline(USER_A, 'client_a_1')).toBe(true)
@@ -398,11 +398,32 @@ describe('terminal realtime broker heartbeat presence', () => {
     broker.disconnectAll()
   })
 
-  test('recordHeartbeat for an unknown client is a no-op', () => {
+  test('recordHeartbeat for an unknown socket is a no-op', () => {
     const onClientPresenceChanged = vi.fn()
     const broker = createBroker({ onClientPresenceChanged })
-    broker.recordHeartbeat(USER_A, 'never_online')
+    broker.recordHeartbeat({ send: vi.fn(), close: vi.fn() })
     vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+    expect(onClientPresenceChanged).not.toHaveBeenCalled()
+    broker.disconnectAll()
+  })
+
+  test('a healthy replacement socket does not keep a stale socket alive for the same client', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = createBroker({ onClientPresenceChanged })
+    const staleSocket = { send: vi.fn(), close: vi.fn() }
+    const healthySocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a_1', USER_A, staleSocket)
+    broker.registerSocket('client_a_1', USER_A, healthySocket)
+    onClientPresenceChanged.mockClear()
+
+    vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 2)
+    broker.recordHeartbeat(healthySocket)
+    vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS * 2)
+
+    expect(staleSocket.close).toHaveBeenCalledWith(1001, 'terminal heartbeat timeout')
+    expect(healthySocket.close).not.toHaveBeenCalled()
+    expect(broker.socketCount()).toBe(1)
+    expect(broker.isClientOnline(USER_A, 'client_a_1')).toBe(true)
     expect(onClientPresenceChanged).not.toHaveBeenCalled()
     broker.disconnectAll()
   })

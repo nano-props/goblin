@@ -1,7 +1,10 @@
 import { userInfo } from 'node:os'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { resolveLocalShell, resolveLocalShellWithStartupShellCommand } from '#/server/terminal/terminal-local-shell.ts'
-import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import {
+  spawnTerminalPtyRuntime as spawnTerminalPtyRuntimeWithEvents,
+  type SpawnTerminalPtyRuntimeInput,
+} from '#/server/terminal/terminal-pty-runtime.ts'
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -20,9 +23,16 @@ vi.mock('node:os', async (importOriginal) => {
 })
 
 const originalShell = process.env.SHELL
+const terminalEventObserver = { onData: vi.fn(), onExit: vi.fn() }
+
+function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput) {
+  return spawnTerminalPtyRuntimeWithEvents(input, terminalEventObserver)
+}
 
 beforeEach(() => {
   spawnMock.mockReset()
+  terminalEventObserver.onData.mockReset()
+  terminalEventObserver.onExit.mockReset()
   vi.mocked(userInfo).mockReset()
   // Force a stable test env. Without this, a CI runner with SHELL=
   // (or unset) would skip the inherited-SHELL branch and the test
@@ -40,8 +50,8 @@ function ptyStub(processName = 'zsh') {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn(),
-    onData: vi.fn(() => ({ dispose: vi.fn() })),
-    onExit: vi.fn(() => ({ dispose: vi.fn() })),
+    onData: vi.fn((_listener: (data: string) => void) => ({ dispose: vi.fn() })),
+    onExit: vi.fn((_listener: () => void) => ({ dispose: vi.fn() })),
   }
 }
 
@@ -187,6 +197,52 @@ describe('spawnTerminalPtyRuntime', () => {
 
     expect(result).toEqual({ ok: false, message: 'startupShellCommand cannot be combined with command or args' })
     expect(spawnMock).not.toHaveBeenCalled()
+  })
+
+  test('installs data ownership before returning the runtime capability', () => {
+    const term = ptyStub()
+    term.onData.mockImplementation((listener: (data: string) => void) => {
+      listener('early output')
+      return { dispose: vi.fn() }
+    })
+    spawnMock.mockReturnValue(term)
+
+    const result = spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })
+
+    expect(result.ok).toBe(true)
+    expect(terminalEventObserver.onData).toHaveBeenCalledWith('early output', 'zsh')
+  })
+
+  test('fails spawn and kills the candidate when data observer installation throws', () => {
+    const term = ptyStub()
+    term.onData.mockImplementation(() => {
+      throw new Error('data observer unavailable')
+    })
+    spawnMock.mockReturnValue(term)
+
+    expect(spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })).toEqual({
+      ok: false,
+      message: 'data observer unavailable',
+    })
+    expect(term.kill).toHaveBeenCalledOnce()
+    expect(term.onExit).not.toHaveBeenCalled()
+  })
+
+  test('releases data ownership and kills the candidate when exit observer installation throws', () => {
+    const dataDisposable = { dispose: vi.fn() }
+    const term = ptyStub()
+    term.onData.mockReturnValue(dataDisposable)
+    term.onExit.mockImplementation(() => {
+      throw new Error('exit observer unavailable')
+    })
+    spawnMock.mockReturnValue(term)
+
+    expect(spawnTerminalPtyRuntime({ cwd: '/repo', cols: 80, rows: 24 })).toEqual({
+      ok: false,
+      message: 'exit observer unavailable',
+    })
+    expect(dataDisposable.dispose).toHaveBeenCalledOnce()
+    expect(term.kill).toHaveBeenCalledOnce()
   })
 
   test('merges caller env into the spawned PTY environment while keeping terminal TERM', () => {

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   createTerminalRealtimeHandlers,
   handleTerminalRealtimeRequestMessage,
-  shouldPauseRealtimeRequest,
+  requiresRealtimeOrdering,
 } from '#/server/terminal/terminal-runtime-realtime.ts'
 import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
@@ -13,7 +13,7 @@ function makeTerminalActionHost(overrides: Partial<ServerTerminalActionHost>): S
     attach: async () => ({ ok: false, message: 'not configured' }),
     restart: async () => ({ ok: false, message: 'not configured' }),
     write: async () => ({ status: 'rejected' }),
-    resize: () => false,
+    resize: () => ({ ok: false, message: 'not configured' }),
     takeover: () => ({ ok: false, message: 'not configured' }),
     close: () => false,
     listSessions: () => [],
@@ -26,11 +26,11 @@ import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-v
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 describe('terminal realtime handlers', () => {
-  test('pauses every externally supported authoritative terminal frame request, including takeover', () => {
-    expect(shouldPauseRealtimeRequest('attach')).toBe(true)
-    expect(shouldPauseRealtimeRequest('restart')).toBe(true)
-    expect(shouldPauseRealtimeRequest('takeover')).toBe(true)
-    expect(shouldPauseRealtimeRequest('resize')).toBe(false)
+  test('orders every externally supported authoritative terminal frame request, including takeover', () => {
+    expect(requiresRealtimeOrdering('attach')).toBe(true)
+    expect(requiresRealtimeOrdering('restart')).toBe(true)
+    expect(requiresRealtimeOrdering('takeover')).toBe(true)
+    expect(requiresRealtimeOrdering('resize')).toBe(false)
   })
 
   test('preserves every terminal write result through serialization and shared validation', async () => {
@@ -45,12 +45,15 @@ describe('terminal realtime handlers', () => {
         'client-test',
         'user-test',
         { send: (data) => (serialized = data), close: () => {} },
-        undefined,
         {
           type: 'request',
           requestId: `request-${status}`,
           action: 'write',
-          input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'input' },
+          input: {
+            terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+            terminalRuntimeGeneration: 1,
+            data: 'input',
+          },
         },
       )
 
@@ -68,7 +71,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
       workspaceId: 'goblin+file:///repo',
@@ -82,7 +84,6 @@ describe('terminal realtime handlers', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'prompt',
-        outputEra: 0,
         seq: 1,
         processName: 'zsh',
       },
@@ -97,30 +98,31 @@ describe('terminal realtime handlers', () => {
           terminalProjectionEffect: { kind: 'delta' as const, revision: 5 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
           message: null,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-fresh-attach',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
-      },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 0,
+          cols: 100,
+          rows: 30,
+        },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(3))
 
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
@@ -139,7 +141,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const host = makeTerminalActionHost({
       attach: async () => {
         buffered.send(
@@ -150,7 +151,6 @@ describe('terminal realtime handlers', () => {
               terminalRuntimeGeneration: 1,
               terminalSessionId: 'term-111111111111111111111',
               data: 'included',
-              outputEra: 0,
               seq: 1,
               processName: 'zsh',
             },
@@ -162,33 +162,33 @@ describe('terminal realtime handlers', () => {
           terminalProjectionEffect: { kind: 'none' as const },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
           message: null,
           snapshot: 'included',
           snapshotSeq: 1,
-          outputEra: 0,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-snapshot-attach',
         action: 'attach',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
-      },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          cols: 100,
+          rows: 30,
+        },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
 
     expect(sent).toHaveLength(1)
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({ payload: { ok: true, frame: 'snapshot' } })
@@ -198,7 +198,6 @@ describe('terminal realtime handlers', () => {
     const sent: string[] = []
     const socket = { send: vi.fn((payload: string) => sent.push(payload)), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
       workspaceId: 'goblin+file:///repo',
@@ -210,42 +209,40 @@ describe('terminal realtime handlers', () => {
         buffered.send(sessionsChanged)
         return {
           ok: true as const,
-          frame: 'snapshot' as const,
+          frame: 'stream' as const,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 6 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 2,
+          identityRevision: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
           message: null,
-          snapshot: 'prompt',
-          snapshotSeq: 1,
-          outputEra: 1,
           controller: { clientId: 'client-test', status: 'connected' as const },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         }
       },
     })
 
-    await handleTerminalRealtimeRequestMessage(
-      createTerminalRealtimeHandlers(host),
-      'client-test',
-      'user-test',
-      socket,
-      buffered,
-      {
+    buffered.enqueueTransition(() =>
+      handleTerminalRealtimeRequestMessage(createTerminalRealtimeHandlers(host), 'client-test', 'user-test', socket, {
         type: 'request',
         requestId: 'request-restart',
         action: 'restart',
-        input: { terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', cols: 100, rows: 30 },
-      },
+        input: {
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          cols: 100,
+          rows: 30,
+        },
+      }),
     )
+    await vi.waitFor(() => expect(sent).toHaveLength(2))
 
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
       action: 'restart',
-      payload: { terminalProjectionEffect: { kind: 'delta', revision: 6 } },
+      payload: { frame: 'stream', terminalProjectionEffect: { kind: 'delta', revision: 6 } },
     })
     expect(sent[1]).toBe(sessionsChanged)
   })

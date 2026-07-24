@@ -19,7 +19,10 @@ const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
-  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
+  useTerminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   useWorkspacesStore.setState({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
 })
 

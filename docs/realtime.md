@@ -9,6 +9,12 @@ Use this doc for realtime transport and lifecycle rules.
 - Explain why one-shot invalidation/refetch or streaming is the right realtime category when adding a new realtime path.
 - Prefer fixes in the shared server-backed bridge or protocol layer.
 - Add Electron-specific realtime behavior only when the browser path cannot support the requirement.
+- `/ws/app` does not queue, throttle, or retry for a slow reader. Each outbound
+  message remains atomic. Before sending another message, the server terminates
+  the connection if the raw WebSocket sender already retains more than 16 MiB.
+  This bounds sustained accumulation rather than imposing a strict 16 MiB cap
+  at every instant: one atomic message may carry the retained bytes past the
+  threshold. Reconnect/recovery then restores the client projection.
 
 ## Channel categories
 

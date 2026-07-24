@@ -141,43 +141,54 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
           } catch {}
           return
         }
+        const socket = requireServerAppRealtimeSocket(ws)
         try {
-          appRealtimeHost.registerSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+          appRealtimeHost.registerSocket(clientId, userId, socket)
         } catch (err) {
           if (err instanceof AppRealtimeSocketLimitError) {
             try {
-              ws.close(1013, 'subscriber limit reached')
+              socket.close(1013, 'subscriber limit reached')
             } catch {}
             return
           }
+          socket.terminate()
           throw err
         }
       },
       onMessage(event, ws) {
+        const socket = requireServerAppRealtimeSocket(ws)
         if (typeof event.data !== 'string') {
           try {
-            ws.close(1003, 'text messages required')
+            socket.close(1003, 'text messages required')
           } catch {}
           return
         }
         if (!isAppRealtimeWsMessageWithinLimit(event.data)) {
           try {
-            ws.close(1009, 'message too large')
+            socket.close(1009, 'message too large')
           } catch {}
           return
         }
-        appRealtimeHost.handleRealtimeMessage(clientId, userId, ws as ServerAppRealtimeSocket, event.data)
+        appRealtimeHost.handleRealtimeMessage(clientId, userId, socket, event.data)
       },
       onClose(_event, ws) {
         if (!userId) return
-        appRealtimeHost.unregisterSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+        const socket = requireServerAppRealtimeSocket(ws)
+        appRealtimeHost.unregisterSocket(clientId, userId, socket)
       },
       onError(_event, ws) {
         if (!userId) return
-        appRealtimeHost.unregisterSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+        const socket = requireServerAppRealtimeSocket(ws)
+        appRealtimeHost.unregisterSocket(clientId, userId, socket)
+        socket.terminate()
       },
     }
   })
   app.get('/app', appRealtimeUpgrade)
   return app
+}
+
+function requireServerAppRealtimeSocket(ws: { raw?: unknown }): ServerAppRealtimeSocket {
+  if (!ws.raw) throw new Error('@hono/node-server did not expose its raw WebSocket transport')
+  return ws.raw as ServerAppRealtimeSocket
 }

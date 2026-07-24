@@ -7,6 +7,7 @@ import { repoOperationsQueryKey, repoProjectionQueryKey, repoWorktreeStatusQuery
 import {
   getRepoOperationsQueryData,
   getRepoProjectionQueryData,
+  getSuccessfulRepoWorktreeStatusQueryData,
   getRepoWorktreeStatusQueryData,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
@@ -942,6 +943,7 @@ describe('repo worktree status query data', () => {
       'transport failed',
     )
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toEqual(accepted)
+    expect(getSuccessfulRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
   test('accepts a successful empty collection as clean', async () => {

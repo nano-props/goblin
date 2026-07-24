@@ -8,6 +8,7 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
@@ -25,33 +26,46 @@ import {
 import {
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForCreatedRuntime,
+  workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
+  gitWorktreePaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
-import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import {
+  dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
+  type CreatedTerminalRouteRequest,
+  type CreatedTerminalNavigation,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
-  workspacePaneFilesystemRootPath,
-  type WorkspacePaneFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import {
-  beginPrimaryWindowPresentation,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  claimTerminalAutoFocus,
+  type TerminalAutoFocusLease,
+  type TerminalPresentationFocusEffects,
+} from '#/web/terminal-focus.ts'
+
+export interface ExistingTerminalPresentationRouteRequest extends TerminalPresentationFocusEffects {
+  navigationGeneration: PrimaryWindowNavigationGeneration
+}
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
+    routeTarget: WorkspacePaneTabsTarget
     base: TerminalSessionBase | null
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
     showTerminalSession: (
       terminalSessionId: string,
-      presentationToken: PrimaryWindowPresentationToken,
+      routeRequest: ExistingTerminalPresentationRouteRequest,
     ) => boolean | Promise<boolean>
     showCreatedTerminalSession: (
       terminalSessionId: string,
       presentation: TerminalPresentation,
-      presentationToken: PrimaryWindowPresentationToken,
+      routeRequest: CreatedTerminalRouteRequest,
     ) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
   }
@@ -59,8 +73,9 @@ export interface WorkspacePaneRuntimeTabCommandContext {
 
 interface WorkspacePaneTerminalRuntimeCommandOptionsBase {
   workspaceId: WorkspaceId | null
+  routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation
+  navigation: WorkspacePaneTabControllerCommitNavigation & CreatedTerminalNavigation
   t?: TerminalCreateTranslator
 }
 
@@ -94,6 +109,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
 
 async function terminalRuntimePrimaryAction({
   workspaceId,
+  routeTarget,
   branchName,
   filesystemTarget,
   workspacePaneRoute,
@@ -105,31 +121,33 @@ async function terminalRuntimePrimaryAction({
     'terminal',
     workspacePaneRuntimeTabCommandContext({
       workspaceId,
+      routeTarget,
       branchName,
       filesystemTarget,
       workspacePaneRoute,
-      showRuntimeTab: (type, sessionId, presentationToken) =>
+      showRuntimeTab: (type, sessionId, navigationGeneration) =>
         showTerminalRuntimeTab(
           type,
           sessionId,
           workspaceId,
-          branchName,
+          routeTarget,
           filesystemTarget,
           workspacePaneRoute,
           navigation,
-          presentationToken,
+          navigationGeneration,
         ),
-      showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, presentationToken) =>
+      showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, routeRequest) =>
         showCreatedTerminalRuntimeTab(
           type,
           sessionId,
           workspaceId,
-          branchName,
+          routeTarget,
+          filesystemTarget?.workspaceRuntimeId ?? null,
           presentation,
           worktreePath,
           workspacePaneRoute,
           navigation,
-          presentationToken,
+          routeRequest,
         ),
       terminalCreateTranslator: t,
     }),
@@ -139,7 +157,7 @@ async function terminalRuntimePrimaryAction({
 export async function dispatchNewTerminalRuntimeTabAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  const { workspaceId, branchName } = options
+  const { workspaceId } = options
   if (!workspaceId) return false
   const context = newTerminalRuntimeTabActionContext({ ...options, workspaceId })
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
@@ -147,6 +165,7 @@ export async function dispatchNewTerminalRuntimeTabAction(
 
 function newTerminalRuntimeTabActionContext({
   workspaceId,
+  routeTarget,
   branchName,
   filesystemTarget,
   workspacePaneRoute,
@@ -155,31 +174,33 @@ function newTerminalRuntimeTabActionContext({
 }: WorkspacePaneTerminalRuntimeCommandOptions & { workspaceId: WorkspaceId }): WorkspacePaneRuntimeTabCommandContext {
   return workspacePaneRuntimeTabCommandContext({
     workspaceId,
+    routeTarget,
     branchName,
     filesystemTarget,
     workspacePaneRoute,
-    showRuntimeTab: (type, sessionId, presentationToken) =>
+    showRuntimeTab: (type, sessionId, navigationGeneration) =>
       showTerminalRuntimeTab(
         type,
         sessionId,
         workspaceId,
-        branchName,
+        routeTarget,
         filesystemTarget,
         workspacePaneRoute,
         navigation,
-        presentationToken,
+        navigationGeneration,
       ),
-    showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, presentationToken) =>
+    showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, routeRequest) =>
       showCreatedTerminalRuntimeTab(
         type,
         sessionId,
         workspaceId,
-        branchName,
+        routeTarget,
+        filesystemTarget?.workspaceRuntimeId ?? null,
         presentation,
         worktreePath,
         workspacePaneRoute,
         navigation,
-        presentationToken,
+        routeRequest,
       ),
     terminalCreateTranslator: t,
   })
@@ -199,65 +220,79 @@ export async function runWorkspacePaneRuntimeNewAction(
   return await WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].createNew(context)
 }
 
-function showTerminalRuntimeTab(
+async function showTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
   workspaceId: WorkspaceId,
-  branchName: string | null,
+  routeTarget: WorkspacePaneTabsTarget,
   filesystemTarget: WorkspacePaneFilesystemTarget | null | undefined,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  presentationToken: PrimaryWindowPresentationToken,
-): boolean | Promise<boolean> {
-  if (type !== 'terminal') return false
-  if (filesystemTarget?.kind === 'git-worktree' && filesystemTarget.head.kind === 'detached') {
-    return (
-      navigation.showRepoWorktreeTerminalSession?.(
-        workspaceId,
-        workspacePaneFilesystemRootPath(filesystemTarget),
-        sessionId,
-        { presentationToken },
-      ) ?? false
-    )
-  }
-  const target = branchName
-    ? workspacePaneTabTargetForBranch(workspaceId, branchName, { workspacePaneRoute })
-    : workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
-  if (!target) return false
-  if (branchName === null) {
+  routeRequest: ExistingTerminalPresentationRouteRequest,
+): Promise<boolean> {
+  if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)
+  const target =
+    routeTarget.kind === 'git-branch'
+      ? workspacePaneTabTargetForBranch(workspaceId, routeTarget.branchName, { workspacePaneRoute })
+      : routeTarget.kind === 'workspace-root'
+        ? workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
+        : filesystemTarget?.kind === 'git-worktree'
+          ? workspacePaneTabTargetForPaneTarget({
+              paneTarget: routeTarget,
+              routeTarget,
+              workspacePaneRoute,
+              worktreeHead: filesystemTarget.head,
+            })
+          : null
+  if (!target) return abandonExistingTerminalPresentation(routeRequest)
+  if (routeTarget.kind !== 'git-branch') {
     const tab = target.tabs.find(
       (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
     )
-    return tab ? selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken) : false
+    return tab
+      ? await selectWorkspacePaneControllerTab(target, tab, navigation, {
+          navigationGeneration: routeRequest.navigationGeneration,
+          focusEffects: routeRequest,
+        })
+      : abandonExistingTerminalPresentation(routeRequest)
   }
-  return commitWorkspacePaneCurrentTargetRoute(
+  return await commitWorkspacePaneCurrentTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
-    undefined,
-    presentationToken,
+    routeRequest,
+    routeRequest.navigationGeneration,
   )
+}
+
+function abandonExistingTerminalPresentation(routeRequest: ExistingTerminalPresentationRouteRequest): false {
+  routeRequest.onAbandon()
+  return false
 }
 
 function showCreatedTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
   workspaceId: WorkspaceId,
-  sourceBranchName: string | null,
+  routeTarget: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string | null,
   presentation: TerminalPresentation,
   worktreePath: string,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
-  presentationToken: PrimaryWindowPresentationToken,
+  navigation: CreatedTerminalNavigation,
+  routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
   let target
-  if (presentation.kind === 'git-worktree' && presentation.head.kind === 'detached') {
-    return (
-      navigation.showRepoWorktreeTerminalSession?.(workspaceId, worktreePath, sessionId, { presentationToken }) ?? false
+  if (routeTarget.kind === 'git-worktree') {
+    if (!workspaceRuntimeId || presentation.kind !== 'git-worktree') return false
+    return navigation.commitFilesystemWorkspacePaneRoute(
+      gitWorktreePaneTargetLease(workspaceId, workspaceRuntimeId, worktreePath, presentation.head),
+      { kind: 'terminal', terminalSessionId: sessionId },
+      routeRequest,
     )
   }
-  if (sourceBranchName === null) {
+  if (routeTarget.kind === 'workspace-root') {
     if (presentation.kind !== 'workspace-root') return false
     target = workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
   } else {
@@ -269,18 +304,24 @@ function showCreatedTerminalRuntimeTab(
     })
   }
   if (!target) return false
-  if (sourceBranchName === null) {
+  if (routeTarget.kind === 'workspace-root') {
     const tab = target.tabs.find(
       (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
     )
-    return tab ? selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken) : false
+    if (!tab) return false
+    return navigation.commitWorkspaceRootTerminalSession(
+      workspaceId,
+      target.workspaceRuntimeId,
+      sessionId,
+      routeRequest,
+    )
   }
   return commitWorkspacePaneCommittedRuntimeTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
     undefined,
-    presentationToken,
+    routeRequest.navigationGeneration,
   )
 }
 
@@ -298,23 +339,35 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (worktree.count > 0) {
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
-    const presentationToken = beginPrimaryWindowPresentation()
-    return await runWorkspacePaneAction(target, async () => {
-      const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
-      const firstSession = nextWorktree.sessions[0]
-      return firstSession
-        ? await terminal.showTerminalSession(firstSession.terminalSessionId, presentationToken)
-        : nextWorktree.createPending
-    })
+    const navigationGeneration = beginPrimaryWindowNavigation()
+    let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
+    try {
+      return await runWorkspacePaneAction(target, async () => {
+        const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
+        const firstSession = nextWorktree.sessions[0]
+        if (!firstSession) return nextWorktree.createPending
+        const routeRequest = existingTerminalPresentationRouteRequest(
+          navigationGeneration,
+          firstSession.terminalSessionId,
+          ownedFocusLease,
+          bridge.focusTerminal,
+        )
+        ownedFocusLease = null
+        return await terminal.showTerminalSession(firstSession.terminalSessionId, routeRequest)
+      })
+    } finally {
+      ownedFocusLease?.release()
+    }
   }
   if (worktree.createPending) return true
-  const presentationToken = beginPrimaryWindowPresentation()
   const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+    routeTarget: terminal.routeTarget,
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: (terminalSessionId, presentation) =>
-      terminal.showCreatedTerminalSession(terminalSessionId, presentation, presentationToken),
+    showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
+      terminal.showCreatedTerminalSession(terminalSessionId, presentation, routeRequest),
+    focusTerminal: bridge.focusTerminal,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -326,13 +379,14 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
   const { base, bridge } = terminal
-  const presentationToken = beginPrimaryWindowPresentation()
   const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+    routeTarget: terminal.routeTarget,
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: (terminalSessionId, presentation) =>
-      terminal.showCreatedTerminalSession(terminalSessionId, presentation, presentationToken),
+    showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
+      terminal.showCreatedTerminalSession(terminalSessionId, presentation, routeRequest),
+    focusTerminal: bridge.focusTerminal,
     t: terminal.t,
   })
   return result.ok
@@ -347,4 +401,26 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
     branchName: workspaceRoot ? null : terminalPresentationBranch(base.presentation),
     worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),
   })
+}
+
+function existingTerminalPresentationRouteRequest(
+  navigationGeneration: PrimaryWindowNavigationGeneration,
+  terminalSessionId: string,
+  focusLease: TerminalAutoFocusLease | null,
+  focusTerminal: TerminalSessionCommandBridge['focusTerminal'],
+): ExistingTerminalPresentationRouteRequest {
+  let settled = false
+  return {
+    navigationGeneration,
+    onCommit() {
+      if (settled) return
+      settled = true
+      focusLease?.commit(terminalSessionId, focusTerminal)
+    },
+    onAbandon() {
+      if (settled) return
+      settled = true
+      focusLease?.release()
+    },
+  }
 }

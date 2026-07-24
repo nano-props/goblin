@@ -2,7 +2,6 @@
 
 import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
@@ -79,8 +78,6 @@ const mockSessions = vi.hoisted(
 
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
-  estimateTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
-  estimateManagedTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
@@ -90,8 +87,6 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,
-    estimateTerminalGeometry: geometryMocks.estimateTerminalGeometry,
-    estimateManagedTerminalGeometry: geometryMocks.estimateManagedTerminalGeometry,
   }
 })
 
@@ -187,12 +182,11 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       return this.snapshotValue
     }
 
-    isTerminalFocusTarget(): boolean {
-      return false
-    }
-
     isVisible(): boolean {
       return false
+    }
+    controlsTerminal(): boolean {
+      return this.snapshotValue.attachment?.role === 'controller'
     }
 
     findNext(): TerminalSearchResult {
@@ -207,7 +201,9 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 
     scrollToBottom() {}
 
-    writeInput() {}
+    captureInputWriter() {
+      return null
+    }
 
     takeover() {}
 
@@ -261,10 +257,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       canonicalTitle?: string | null
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
-      canonicalCols: number
-      canonicalRows: number
-      snapshot?: string
-      snapshotSeq?: number
+      canonicalSize: { cols: number; rows: number } | null
     }) {
       this.hydrateSpy(input)
       this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
@@ -276,11 +269,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
         canonicalTitle: input.canonicalTitle ?? null,
         attachment: {
           role: input.role,
-          controllerStatus: input.controllerStatus,
-          active: input.role === 'controller',
-          canTakeover: input.role !== 'controller',
-          canonicalCols: input.canonicalCols,
-          canonicalRows: input.canonicalRows,
         },
       }
       this.notify()
@@ -308,8 +296,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       terminalRuntimeSessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
-      canonicalCols: number
-      canonicalRows: number
+      canonicalSize: { cols: number; rows: number }
     }) {
       this.handleIdentitySpy(event)
     }
@@ -318,7 +305,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       terminalRuntimeSessionId: string
       phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
       message: string | null
-      takeoverPending: boolean
     }) {
       this.handleLifecycleSpy(event)
     }
@@ -368,7 +354,10 @@ let sessionClosedHandler:
       workspaceId: typeof REPO_ID
     }) => void)
   | null = null
-type TestTerminalSessionSummary = TerminalSessionSummary
+type OptionalIdentityRevision<T> = T extends unknown
+  ? Omit<T, 'identityRevision'> & { identityRevision?: number }
+  : never
+type TestTerminalSessionSummary = OptionalIdentityRevision<TerminalSessionSummary>
 const listSessionsMock = vi.fn<
   (
     ...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId?: string }>
@@ -385,6 +374,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   return {
     ...session,
     terminalRuntimeGeneration: session.terminalRuntimeGeneration ?? 1,
+    identityRevision: session.identityRevision ?? 0,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
   }
 }
@@ -437,16 +427,32 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
     terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     snapshot: '',
     snapshotSeq: 0,
-    outputEra: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
     message: null,
     controller: { clientId: 'client_local', status: 'connected' },
-    canonicalCols: 80,
-    canonicalRows: 24,
+    canonicalSize: { cols: 80, rows: 24 },
+  }
+}
+
+function restartResult() {
+  return {
+    ok: true as const,
+    frame: 'stream' as const,
+    terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
+    terminalRuntimeSessionId: 'unused',
+    terminalRuntimeGeneration: 2,
+    identityRevision: 0,
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open' as const,
+    message: null,
+    controller: { clientId: 'client_local', status: 'connected' as const },
+    canonicalSize: { cols: 80, rows: 24 },
   }
 }
 
@@ -508,14 +514,14 @@ beforeEach(() => {
         terminalProjectionEffect: { kind: 'delta', revision: ++sessionsChangedRevision },
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
-        processName: reused?.processName ?? 'zsh',
+        terminalRuntimeGeneration: reused?.terminalRuntimeGeneration ?? 0,
+        identityRevision: reused?.identityRevision ?? 0,
+        processName: reused?.processName ?? '',
         canonicalTitle: reused?.canonicalTitle ?? null,
-        phase: reused?.phase ?? 'open',
+        phase: reused?.phase ?? 'opening',
         message: reused?.message ?? null,
         controller: reused?.controller ?? null,
-        canonicalCols: reused?.cols ?? 80,
-        canonicalRows: reused?.rows ?? 24,
+        canonicalSize: reused?.canonicalSize ?? null,
       }
     }
     const controller = { clientId: 'client_local', status: 'connected' as const }
@@ -529,6 +535,7 @@ beforeEach(() => {
       {
         terminalRuntimeSessionId: terminalSessionId,
         terminalRuntimeGeneration: 1,
+        identityRevision: 0,
         terminalSessionId,
         target: runtimeWorkspacePaneTargetForTest({
           workspaceId,
@@ -542,27 +549,26 @@ beforeEach(() => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     ]
     // Create materializes a logical session from metadata only. The selected
     // view will fit its xterm and attach before the fresh PTY starts.
     return {
       ok: true,
-      action: 'created',
+      action: 'restored',
       presentation,
       terminalProjectionEffect: { kind: 'delta', revision: ++sessionsChangedRevision },
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
       message: null,
       controller,
-      canonicalCols: 80,
-      canonicalRows: 24,
+      canonicalSize: { cols: 80, rows: 24 },
     }
   })
   resetWorkspacesStore()
@@ -590,37 +596,21 @@ beforeEach(() => {
         attach: vi.fn(async () => ({
           ok: true,
           frame: 'snapshot' as const,
+          terminalProjectionEffect: { kind: 'none' as const },
           terminalRuntimeSessionId: 'unused',
           terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
-          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
           message: null,
           controller: { clientId: 'client_local', status: 'connected' as const },
-          canonicalCols: 80,
-          canonicalRows: 24,
+          canonicalSize: { cols: 80, rows: 24 },
         })),
-        restart: vi.fn(async () => ({
-          ok: true,
-          frame: 'snapshot' as const,
-          terminalRuntimeSessionId: 'unused',
-          terminalRuntimeGeneration: 1,
-          snapshot: '',
-          snapshotSeq: 0,
-          outputEra: 0,
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open',
-          message: null,
-          controller: { clientId: 'client_local', status: 'connected' as const },
-          canonicalCols: 80,
-          canonicalRows: 24,
-        })),
+        restart: vi.fn(async () => restartResult()),
         write: vi.fn(async () => ({ status: 'accepted' as const })),
-        resize: vi.fn(async () => true),
+        resize: vi.fn(async () => ({ ok: false as const, message: 'not configured' })),
         takeover: vi.fn(async () => ({
           ok: true as const,
           terminalRuntimeSessionId: 'term-111111111111111111111',
@@ -628,8 +618,7 @@ beforeEach(() => {
           role: 'controller' as const,
           controllerStatus: 'connected' as const,
           controller: { clientId: 'client_local', status: 'connected' as const },
-          canonicalCols: 80,
-          canonicalRows: 24,
+          canonicalSize: { cols: 80, rows: 24 },
           phase: 'open' as const,
         })),
         close: closeMock,
@@ -730,21 +719,18 @@ beforeEach(() => {
     }),
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
-      restart: vi.fn(async () => ({
-        ...attachResult(),
-        terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
-      })),
+      restart: vi.fn(async () => restartResult()),
       write: vi.fn(async () => ({ status: 'accepted' as const })),
-      resize: vi.fn(async () => true),
+      resize: vi.fn(async () => ({ ok: false as const, message: 'not configured' })),
       takeover: vi.fn(async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
-        canonicalCols: 80,
-        canonicalRows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
         phase: 'open' as const,
       })),
       close: closeMock,
@@ -859,14 +845,10 @@ describe('TerminalSessionProvider', () => {
       expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
         target: base.target,
         kind: 'primary',
-        cols: 100,
-        rows: 30,
       })
       expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
         target: base.target,
         kind: 'additional',
-        cols: 100,
-        rows: 30,
       })
       expect(
         getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
@@ -1100,7 +1082,6 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
-          outputEra: 0,
           processName: 'zsh',
         })
         titleHandler?.({
@@ -1113,11 +1094,11 @@ describe('TerminalSessionProvider', () => {
         identityHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-222222222222222222222',
           role: 'controller',
           controllerStatus: 'connected',
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         })
         lifecycleHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
@@ -1125,7 +1106,6 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'term-222222222222222222222',
           phase: 'open',
           message: null,
-          takeoverPending: false,
         })
       })
 
@@ -1136,7 +1116,6 @@ describe('TerminalSessionProvider', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'zsh',
       })
       expect(first.handleServerTitle).toHaveBeenCalledTimes(1)
@@ -1145,11 +1124,11 @@ describe('TerminalSessionProvider', () => {
       expect(second.handleIdentity).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-222222222222222222222',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         terminalSessionId: 'term-222222222222222222222',
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       })
       expect(second.handleLifecycle).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-222222222222222222222',
@@ -1157,7 +1136,6 @@ describe('TerminalSessionProvider', () => {
         terminalSessionId: 'term-222222222222222222222',
         phase: 'open',
         message: null,
-        takeoverPending: false,
       })
       expect(first.handleIdentity).not.toHaveBeenCalled()
     } finally {
@@ -1264,8 +1242,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 120,
-        rows: 40,
+        canonicalSize: { cols: 120, rows: 40 },
       },
     ])
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -1287,11 +1264,7 @@ describe('TerminalSessionProvider', () => {
           processName: 'zsh',
           role: 'viewer',
           controllerStatus: 'connected',
-          canonicalCols: 120,
-          canonicalRows: 40,
-          snapshot: null,
-          snapshotSeq: 0,
-          outputEra: 0,
+          canonicalSize: { cols: 120, rows: 40 },
         }),
       )
 
@@ -1342,8 +1315,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     ]
     listSessionsMock.mockImplementation(async () => serverSessions)
@@ -1400,8 +1372,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
       {
         terminalRuntimeSessionId: 'server_session_2',
@@ -1413,8 +1384,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 80,
-        rows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
       },
     ]
     listSessionsMock.mockImplementation(async () => serverSessions)
@@ -1494,8 +1464,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 100,
-        rows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       },
     ])
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -1537,8 +1506,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 100,
-        rows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       },
     ])
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -1565,17 +1533,14 @@ describe('TerminalSessionProvider', () => {
           canonicalTitle: null,
           phase: 'open',
           message: null,
-          cols: 100,
-          rows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       ])
       await emitSessionsChanged()
 
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          snapshot: null,
-          snapshotSeq: 0,
-          outputEra: 0,
+          canonicalSize: { cols: 100, rows: 30 },
         }),
       )
     } finally {
@@ -1601,8 +1566,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        cols: 100,
-        rows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       },
     ])
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -1629,8 +1593,7 @@ describe('TerminalSessionProvider', () => {
           canonicalTitle: null,
           phase: 'open',
           message: null,
-          cols: 100,
-          rows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       ])
 
@@ -1699,14 +1662,14 @@ describe('TerminalSessionProvider', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      processName: 'zsh',
+      terminalRuntimeGeneration: 0,
+      identityRevision: 0,
+      processName: '',
       canonicalTitle: null,
-      phase: 'open' as const,
+      phase: 'opening' as const,
       message: null,
-      controller: { clientId: 'client_local', status: 'connected' as const },
-      canonicalCols: 80,
-      canonicalRows: 24,
+      controller: null,
+      canonicalSize: null,
     })
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
@@ -1946,17 +1909,5 @@ function terminalExecutionRootForTest(target: TerminalExecutionTarget): string {
 }
 
 function RegisterHost({ terminalFilesystemTargetKey }: { terminalFilesystemTargetKey: string }) {
-  const context = useTerminalSessionContext()
-  const ref = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const host = ref.current
-    if (!host) return
-    context.registerHost(terminalFilesystemTargetKey, host)
-    return () => {
-      context.unregisterHost(terminalFilesystemTargetKey, host)
-    }
-  }, [context, terminalFilesystemTargetKey])
-
-  return <div ref={ref} />
+  return <div data-terminal-filesystem-target-key={terminalFilesystemTargetKey} />
 }

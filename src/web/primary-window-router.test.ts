@@ -53,16 +53,17 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   authenticatedAppShellMode,
+  currentWorkspacePaneRouteFromContext,
   primaryWindowLayoutRouteCallbacks,
   workspaceRouteContextFromMatches,
 } from '#/web/Layout.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowPresentation,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
-  primaryWindowPresentationIsCurrent,
-  resetPrimaryWindowPresentationForTest,
-} from '#/web/primary-window-presentation.ts'
+  primaryWindowNavigationIsCurrent,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -382,6 +383,19 @@ function navigateBrowser(pathname: string) {
 }
 
 describe('workspace route context derivation', () => {
+  test('preserves the active pane route for a detached worktree context', () => {
+    const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' }
+
+    expect(
+      currentWorkspacePaneRouteFromContext({
+        kind: 'worktree',
+        workspaceSlug: 'L3JlcG8',
+        worktreePath: '/tmp/detached-worktree',
+        workspacePaneRoute,
+      }),
+    ).toEqual(workspacePaneRoute)
+  })
+
   test('keeps workspace context when a branch slug is malformed', () => {
     expect(
       workspaceRouteContextFromMatches([
@@ -438,12 +452,12 @@ describe('primary window route callback facades', () => {
     ['/settings/general', { status: 'ready' as const }],
     ['/', { status: 'restoring-workspace' as const }],
   ])('browser traversal supersedes independently of conditional shell mode at %s', (pathname, bootstrapState) => {
-    resetPrimaryWindowPresentationForTest()
+    resetPrimaryWindowNavigationForTest()
     authenticatedAppShellMode(pathname, bootstrapState as AuthenticatedAppBootstrapState)
-    const token = beginPrimaryWindowPresentation()
+    const generation = beginPrimaryWindowNavigation()
 
     observePrimaryWindowHistoryNavigation({ href: '/', state: {}, action: { type: 'BACK' } })
 
-    expect(primaryWindowPresentationIsCurrent(token)).toBe(false)
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
   })
 })

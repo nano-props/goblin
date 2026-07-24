@@ -183,7 +183,6 @@ export function buildRemoteCommandInvocation(
 export function buildRemoteTerminalInvocation(
   target: RemoteWorkspaceTarget,
   remotePath: string,
-  _size: { cols: number; rows: number },
   options: { startupShellCommand?: string } = {},
 ): RemoteCommandInvocation {
   const startupShellCommand = normalizeTerminalStartupShellCommand(options.startupShellCommand)

@@ -61,7 +61,6 @@ describe('terminal session creator', () => {
       CLIENT_ID,
       USER_ID,
       expect.objectContaining({
-        clientId: CLIENT_ID,
         terminalSessionId: 'term-createdcreatedcreated',
       }),
       testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
@@ -141,15 +140,14 @@ function createRequest(overrides: Partial<ServerTerminalCreateInput> = {}): Serv
       root: WORKTREE_ROOT,
     },
     kind: overrides.kind ?? 'additional',
-    cols: overrides.cols ?? 80,
-    rows: overrides.rows ?? 24,
   }
 }
 
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-    terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 0,
+    identityRevision: 0,
     terminalSessionId,
     target: {
       kind: 'git-worktree',
@@ -159,12 +157,11 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
     },
     presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
     controller: null,
-    processName: 'zsh',
+    processName: '',
     canonicalTitle: null,
-    phase: 'open' as const,
+    phase: 'opening' as const,
     message: null,
-    cols: 80,
-    rows: 24,
+    canonicalSize: null,
   }
 }
 
@@ -188,13 +185,13 @@ function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmis
     presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
     terminalProjectionEffect: { kind: 'delta', revision: 7 },
     terminalRuntimeSessionId,
-    terminalRuntimeGeneration: 1,
-    processName: 'zsh',
+    terminalRuntimeGeneration: 0,
+    identityRevision: 0,
+    processName: '',
     canonicalTitle: null,
-    phase: 'open' as const,
+    phase: 'opening' as const,
     message: null,
     controller: null,
-    canonicalCols: 80,
-    canonicalRows: 24,
+    canonicalSize: null,
   }
 }

@@ -197,10 +197,10 @@ export function createServerTerminalClient(options: {
         const identityEvent = {
           terminalRuntimeSessionId: message.event.terminalRuntimeSessionId,
           terminalRuntimeGeneration: message.event.terminalRuntimeGeneration,
+          identityRevision: message.event.identityRevision,
           terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
-          canonicalCols: message.event.canonicalCols,
-          canonicalRows: message.event.canonicalRows,
+          canonicalSize: message.event.canonicalSize,
         }
         for (const subscriber of identitySubscribers) subscriber(identityEvent)
         return

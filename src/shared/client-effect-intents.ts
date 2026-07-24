@@ -19,7 +19,7 @@ export type ClientEffectIntent =
   | { type: 'create-worktree-requested' }
   | { type: 'app-quitting' }
   | { type: 'terminal-new-tab-requested' }
-  | { type: 'workspace-pane-close-tab-or-window-requested' }
+  | { type: 'workspace-pane-close-tab-requested' }
   | { type: 'close-workspace-requested' }
   | { type: 'cycle-workspace-requested'; direction: 1 | -1 }
   | { type: 'workspace-refresh-requested' }
@@ -47,7 +47,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'create-worktree-requested':
     case 'app-quitting':
     case 'terminal-new-tab-requested':
-    case 'workspace-pane-close-tab-or-window-requested':
+    case 'workspace-pane-close-tab-requested':
     case 'close-workspace-requested':
     case 'workspace-refresh-requested':
     case 'terminal-primary-action-requested':
@@ -69,10 +69,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'open-recent-workspace-requested':
       return isWorkspaceSessionEntry(event.entry)
     case 'terminal-bell-click':
-      return (
-        typeof event.terminalSessionId === 'string' &&
-        isValidTerminalSessionBase(event.session)
-      )
+      return typeof event.terminalSessionId === 'string' && isValidTerminalSessionBase(event.session)
     default:
       return false
   }

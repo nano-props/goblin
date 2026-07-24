@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  beginWorkspacePaneRouteIntent,
-  finishWorkspacePaneRouteIntent,
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
   workspacePaneActionTargetKey,
   workspacePaneActionTargetFromFilesystemTarget,
   workspacePaneActionTargetFromCoordinates,
   workspacePaneActionQueueStatsForTest,
-  workspacePaneRouteIntentPending,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -153,19 +150,5 @@ describe('workspace pane action queue', () => {
         worktreePath: '/repo-detached',
       }),
     ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })
-  })
-
-  test('bounds a pending route intent to its target and explicit lifetime', () => {
-    const intentId = beginWorkspacePaneRouteIntent(TARGET, 'static:files')
-
-    expect(workspacePaneRouteIntentPending(TARGET, 'static:files')).toBe(true)
-    expect(workspacePaneRouteIntentPending({ ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(
-      false,
-    )
-    expect(workspacePaneActionQueueStatsForTest().pendingRouteIntents).toBe(1)
-
-    finishWorkspacePaneRouteIntent(intentId)
-    expect(workspacePaneRouteIntentPending(TARGET, 'static:files')).toBe(false)
-    expect(workspacePaneActionQueueStatsForTest().pendingRouteIntents).toBe(0)
   })
 })

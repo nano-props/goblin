@@ -12,7 +12,7 @@ import type {
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
-import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
+import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import {
@@ -110,16 +110,11 @@ class TerminalSessionService {
     if (!isValidCwd(executionPath)) return { ok: false, message: 'error.invalid-arguments' }
 
     const terminalSessionId = input.terminalSessionId ?? createTerminalSessionId()
-    const cols = input.cols ?? 80
-    const rows = input.rows ?? 24
     if (!this.options.isValidTerminalSessionId(terminalSessionId))
       return { ok: false, message: 'error.invalid-arguments' }
-    if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     return await this.ensurer.ensure(userId, input, {
       terminalSessionId,
-      cols,
-      rows,
       physicalWorktreeCapability,
       signal,
     })

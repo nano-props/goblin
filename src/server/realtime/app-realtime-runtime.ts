@@ -1,6 +1,11 @@
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
-import type { RealtimeBroker, RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
-import type { ServerAppRealtimeDiagnostics, ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
+import type {
+  ServerAppRealtimeDiagnostics,
+  ServerAppRealtimeHost,
+  ServerAppRealtimeSocket,
+} from '#/server/realtime/app-realtime-host.ts'
+import { MemoryBoundRealtimeSocket } from '#/server/realtime/memory-bound-realtime-socket.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   isAppRealtimeWorkspacePaneRuntimeAction,
@@ -19,7 +24,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import {
   handleTerminalRealtimeRequestMessage,
-  shouldPauseRealtimeRequest,
+  requiresRealtimeOrdering,
 } from '#/server/terminal/terminal-runtime-realtime.ts'
 import {
   handleWorkspacePaneTabsRealtimeRequestMessage,
@@ -55,7 +60,10 @@ export interface AppRealtimeRuntimeOptions {
 
 export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): ServerAppRealtimeHost {
   const { broker } = options
-  const bufferedSocketByRawSocket = new WeakMap<RealtimeSocket, BufferedAppRealtimeSocket>()
+  const socketBindingByRawSocket = new WeakMap<
+    ServerAppRealtimeSocket,
+    { transport: MemoryBoundRealtimeSocket; buffered: BufferedAppRealtimeSocket }
+  >()
 
   return {
     isValidClientId: options.isValidClientId,
@@ -65,21 +73,22 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
         socket.close(1008, 'invalid client id')
         return
       }
-      const rawSocket = socket as RealtimeSocket
+      const transport = new MemoryBoundRealtimeSocket(socket)
       let buffered: BufferedAppRealtimeSocket
-      buffered = new BufferedAppRealtimeSocket(rawSocket, () => {
+      buffered = new BufferedAppRealtimeSocket(transport, () => {
         broker.unregisterSocket(buffered)
-        bufferedSocketByRawSocket.delete(rawSocket)
+        socketBindingByRawSocket.delete(socket)
       })
-      bufferedSocketByRawSocket.set(rawSocket, buffered)
-      broker.registerSocket(clientId, userId, buffered)
+      socketBindingByRawSocket.set(socket, { transport, buffered })
+      try {
+        broker.registerSocket(clientId, userId, buffered)
+      } catch (error) {
+        buffered.release()
+        throw error
+      }
     },
     unregisterSocket(_clientId, _userId, socket) {
-      const rawSocket = socket as RealtimeSocket
-      const buffered = bufferedSocketByRawSocket.get(rawSocket) ?? rawSocket
-      if (buffered instanceof BufferedAppRealtimeSocket) buffered.deactivate()
-      broker.unregisterSocket(buffered)
-      bufferedSocketByRawSocket.delete(rawSocket)
+      socketBindingByRawSocket.get(socket)?.buffered.release()
     },
     handleRealtimeMessage(clientId, userId, socket, payload) {
       if (typeof clientId !== 'string' || !options.isValidClientId(clientId)) {
@@ -101,34 +110,31 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
         appRealtimeRuntimeLogger.warn({ clientId }, 'invalid realtime message: null after normalize')
         return
       }
+      const binding = socketBindingByRawSocket.get(socket)
+      if (!binding) return
+      const { transport, buffered } = binding
       if (message.type === 'heartbeat') {
-        broker.recordHeartbeat(userId, clientId)
+        broker.recordHeartbeat(buffered)
         return
       }
       if (message.type === 'ping') {
-        broker.recordHeartbeat(userId, clientId)
-        const rawSocket = socket as RealtimeSocket
+        broker.recordHeartbeat(buffered)
         try {
-          rawSocket.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
+          transport.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
         } catch {
-          bufferedSocketByRawSocket.get(rawSocket)?.deactivate()
+          buffered.forceClose(1011, 'realtime ping failed')
         }
         return
       }
-      const rawSocket = socket as RealtimeSocket
-      const bufferedSocket = bufferedSocketByRawSocket.get(rawSocket)
       if (isAppRealtimeWorkspacePaneRuntimeAction(message.action)) {
-        // Keep provider realtime behind the runtime metadata response. Fresh
-        // terminal creation does not start a PTY; the later terminal attach
-        // request owns the stream-vs-snapshot frame boundary.
-        bufferedSocket?.pause()
-        void handleWorkspacePaneRuntimeRealtimeRequestMessage(
-          options.workspacePaneRuntimeHandlers,
-          clientId,
-          userId,
-          rawSocket,
-          message as WorkspacePaneRuntimeRealtimeRequestMessage,
-          bufferedSocket,
+        buffered.enqueueTransition(() =>
+          handleWorkspacePaneRuntimeRealtimeRequestMessage(
+            options.workspacePaneRuntimeHandlers,
+            clientId,
+            userId,
+            transport,
+            message as WorkspacePaneRuntimeRealtimeRequestMessage,
+          ),
         )
         return
       }
@@ -137,22 +143,20 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
           options.workspacePaneTabsHandlers,
           clientId,
           userId,
-          rawSocket,
+          transport,
           message as WorkspacePaneTabsRealtimeRequestMessage,
-          () => bufferedSocket?.deactivate(),
+          () => buffered.forceClose(1011, 'realtime request failed'),
         )
         return
       }
       const terminalMessage = message as TerminalSocketRequestMessage
-      if (shouldPauseRealtimeRequest(terminalMessage.action)) bufferedSocket?.pause()
-      void handleTerminalRealtimeRequestMessage(
-        options.terminalHandlers,
-        clientId,
-        userId,
-        rawSocket,
-        bufferedSocket,
-        terminalMessage,
-      )
+      const handleTerminalRequest = () =>
+        handleTerminalRealtimeRequestMessage(options.terminalHandlers, clientId, userId, transport, terminalMessage)
+      if (requiresRealtimeOrdering(terminalMessage.action)) {
+        buffered.enqueueTransition(handleTerminalRequest)
+        return
+      }
+      void handleTerminalRequest().catch(() => buffered.forceClose(1011, 'realtime request failed'))
     },
     shutdown() {
       options.onShutdown()

@@ -6,13 +6,11 @@ import {
   useState,
   type ClipboardEvent,
   type DragEvent,
-  type FocusEvent,
   type KeyboardEvent,
 } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
 import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
 import { resolvePastedFiles } from '#/web/clipboard/resolver.ts'
@@ -33,6 +31,8 @@ import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
+import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -61,35 +61,17 @@ export function TerminalSessionView({
     clearBell,
     attach,
     detach,
-    registerHost,
-    unregisterHost,
     scrollLines,
-    isTerminalFocusTarget,
     findNext,
     findPrevious,
     clearSearch,
-    writeInput,
+    captureInputWriter,
     takeover,
     restart,
     focusTerminal,
   } = context
   const { workspaceId, executionRootId } = terminalSessionCoordinates(base)
   const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(workspaceId, executionRootId)
-  useLayoutEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    registerHost(terminalFilesystemTargetKey, host)
-    return () => unregisterHost(terminalFilesystemTargetKey, host)
-  }, [registerHost, terminalFilesystemTargetKey, unregisterHost])
-
-  useLayoutEffect(() => {
-    const host = hostRef.current
-    if (!host || typeof ResizeObserver !== 'function') return
-    const observer = new ResizeObserver(() => registerHost(terminalFilesystemTargetKey, host))
-    observer.observe(host)
-    return () => observer.disconnect()
-  }, [registerHost, terminalFilesystemTargetKey])
-
   const selectedDescriptor = useTerminalFilesystemTargetSelectedDescriptor(terminalFilesystemTargetKey)
   const explicitDescriptor = useTerminalFilesystemTargetSessionDescriptor({
     terminalFilesystemTargetKey,
@@ -117,8 +99,15 @@ export function TerminalSessionView({
     const selectedDescriptor = descriptorRef.current
     if (!host || !selectedDescriptor || selectedDescriptor.terminalSessionId !== terminalSessionId) return
     attach(selectedDescriptor, host)
-    return () => detach(selectedDescriptor.terminalSessionId, host)
-  }, [attach, detach, terminalSessionId])
+    let mounted = true
+    queueMicrotask(() => {
+      if (mounted) fulfillTerminalPresentationFocus(selectedDescriptor.terminalSessionId, focusTerminal)
+    })
+    return () => {
+      mounted = false
+      detach(selectedDescriptor.terminalSessionId, host)
+    }
+  }, [attach, detach, focusTerminal, terminalSessionId])
 
   useEffect(() => {
     if (!terminalSessionId || typeof document === 'undefined' || !document.hasFocus()) return
@@ -149,7 +138,8 @@ export function TerminalSessionView({
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchTerm('')
-  }, [])
+    if (terminalSessionId) focusTerminal(terminalSessionId)
+  }, [focusTerminal, terminalSessionId])
   const searchNext = useCallback(
     (term = searchTerm, incremental = false) => {
       if (!terminalSessionId) return
@@ -161,20 +151,12 @@ export function TerminalSessionView({
     if (!terminalSessionId) return
     findPrevious(terminalSessionId, searchTerm)
   }, [findPrevious, terminalSessionId, searchTerm])
-  const handleFocus = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      setTerminalFocused(!!terminalSessionId && isTerminalFocusTarget(terminalSessionId, event.target))
-    },
-    [isTerminalFocusTarget, terminalSessionId],
-  )
-  const handleBlur = useCallback((event: FocusEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setTerminalFocused(false)
-  }, [])
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (isTerminalSearchShortcut(event)) {
         event.preventDefault()
         event.stopPropagation()
+        cancelTerminalAutoFocus()
         setSearchOpen(true)
         return
       }
@@ -254,8 +236,9 @@ export function TerminalSessionView({
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
-  const showViewerOverlay = isReadonly
-  const showErrorChip = sessionPhase === 'error-controller'
+  const showViewerOverlay = sessionPhase === 'open-viewer'
+  const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
+  const canRestart = sessionPhase === 'error-controller'
   const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   // Status-chip visibility is derived here (not in a JSX branch chain)
@@ -281,17 +264,6 @@ export function TerminalSessionView({
           : t('terminal.opening')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
-  const readyFocusedKeyRef = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    const ready = terminalSessionId !== null && sessionPhase === 'open-controller'
-    if (!ready || !terminalSessionId) {
-      if (readyFocusedKeyRef.current === terminalSessionId) readyFocusedKeyRef.current = null
-      return
-    }
-    if (searchOpen || readyFocusedKeyRef.current === terminalSessionId) return
-    focusTerminal(terminalSessionId)
-    readyFocusedKeyRef.current = terminalSessionId
-  }, [focusTerminal, terminalSessionId, searchOpen, sessionPhase])
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
@@ -308,7 +280,7 @@ export function TerminalSessionView({
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
   const writeResolutionToPty = useCallback(
-    (resolution: PasteResolution, terminalSessionId: string, source: 'paste' | 'drop') => {
+    (resolution: PasteResolution, inputWriter: TerminalInputWriter) => {
       const plan = planTerminalPathWrite(resolution.paths, {
         failedUnsafe: resolution.failedUnsafe,
         failedBackend: resolution.failedBackend,
@@ -322,11 +294,14 @@ export function TerminalSessionView({
         toast.error(t('terminal.paste-file-overflow'))
         return
       }
-      writeInput(terminalSessionId, plan.data, source)
+      if (!inputWriter(plan.data)) {
+        toast.error(t('terminal.paste-file-failed'))
+        return
+      }
       if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
       if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
     },
-    [t, writeInput],
+    [t],
   )
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
@@ -343,7 +318,8 @@ export function TerminalSessionView({
       // Capture the terminal session the user actually dropped into. Async
       // file resolution may finish after the user changes panes, but the
       // operation's target was fixed by the drop event.
-      const capturedSessionId = terminalSessionId
+      const inputWriter = captureInputWriter(terminalSessionId)
+      if (!inputWriter) return
       void processDrop({ files }).then(
         (outcome) => {
           // `no-op` is unreachable at this call site: `handleDrop`
@@ -351,7 +327,7 @@ export function TerminalSessionView({
           // `processDrop` can only return `files` or `too-large`.
           // `handlePasteCapture` uses the same if-narrowing shape.
           if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution, capturedSessionId, 'drop')
+            writeResolutionToPty(outcome.resolution, inputWriter)
             return
           }
           if (outcome.kind === 'too-large') {
@@ -366,7 +342,7 @@ export function TerminalSessionView({
         },
       )
     },
-    [isController, terminalSessionId, t, writeResolutionToPty],
+    [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
@@ -407,10 +383,11 @@ export function TerminalSessionView({
 
       // 'files' — resolve paths asynchronously. Capture the terminal
       // session id selected by the paste event.
-      const capturedSessionId = terminalSessionId
+      const inputWriter = captureInputWriter(terminalSessionId)
+      if (!inputWriter) return
       void resolvePastedFiles(files).then(
         (resolution) => {
-          writeResolutionToPty(resolution, capturedSessionId, 'paste')
+          writeResolutionToPty(resolution, inputWriter)
         },
         (err) => {
           // IPC / network / server failure. Surface it instead of
@@ -421,15 +398,13 @@ export function TerminalSessionView({
         },
       )
     },
-    [isController, terminalSessionId, t, writeResolutionToPty],
+    [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
 
   return (
     <div
       className="goblin-terminal-session focus-visible:outline-none"
       tabIndex={-1}
-      onFocusCapture={handleFocus}
-      onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
       onPasteCapture={handlePasteCapture}
       onDragEnter={handleDragEnter}
@@ -485,7 +460,7 @@ export function TerminalSessionView({
       {isMobileDevice() && isController && terminalSessionId && (
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
-          onInput={(data) => writeInput(terminalSessionId, data, 'toolbar')}
+          onInput={(data) => captureInputWriter(terminalSessionId)?.(data)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />
       )}
@@ -531,16 +506,13 @@ export function TerminalSessionView({
           newTerminalLabel={t('terminal.new')}
         />
       )}
-      {/* Error-state rendering is mode-driven: only the controller sees
-          the error chip with a working restart button; a viewer in
-          error state must takeover first (the viewer overlay covers
-          that path), so we suppress the chip rather than stack two
-          overlays. The empty-message case is reserved for the
-          "no sessions yet" placeholder and never renders the chip. */}
+      {/* A retained error binding stays visible to every attachment. Only
+          its controller can restart it; the existing takeover protocol is
+          intentionally unavailable once the PTY is no longer open. */}
       {showErrorChip && snapshot.message !== 'terminal.empty' && (
         <div className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error">
           <span>{t(terminalErrorMessageKey)}</span>
-          {terminalSessionId && (
+          {terminalSessionId && canRestart && (
             <Button type="button" size="sm" variant="ghost" onClick={() => restart(terminalSessionId)}>
               {t('terminal.restart')}
             </Button>

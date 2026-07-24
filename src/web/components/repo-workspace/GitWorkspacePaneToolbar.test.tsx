@@ -76,14 +76,17 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import {
   observeWorkspacePaneRouteForTest,
-  observedWorkspacePaneRouteCommitForTest,
+  observedPrimaryWindowNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedBranchRouteNavigationForTest,
+  type ObservedPrimaryWindowNavigationActionsForTest,
+  type PrimaryWindowNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
 let compactUi = false
@@ -201,7 +204,10 @@ beforeEach(() => {
   // useTerminalProjectionHydrationStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
   // loading-state test skips this and expects the same button to be busy.
-  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
+  useTerminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
 })
 
 afterEach(() => {
@@ -1194,13 +1200,13 @@ describe('GitWorkspacePaneToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn<PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab']>(
+    const showRepoBranchWorkspacePaneTab = vi.fn<
+      ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab']
+    >(() => true)
+    const showRepoBranchTerminalSession = vi.fn<ObservedBranchRouteNavigationForTest['showRepoBranchTerminalSession']>(
       () => true,
     )
-    const showRepoBranchTerminalSession = vi.fn<PrimaryWindowNavigationActions['showRepoBranchTerminalSession']>(
-      () => true,
-    )
-    const commitWorkspacePaneRoute: PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] = (
+    const commitWorkspacePaneRoute: PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] = async (
       repoId,
       branchName,
       route,
@@ -1403,7 +1409,7 @@ describe('GitWorkspacePaneToolbar', () => {
 function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
-  navigation: PrimaryWindowNavigationActions
+  navigation: ObservedPrimaryWindowNavigationActionsForTest
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   workspacePaneTabs?: WorkspacePaneTabEntry[]
@@ -1545,10 +1551,8 @@ function renderToolbar(options: {
   const closeTerminalByDescriptor = vi.fn(async () => true)
   const showRepoBranchWorkspacePaneTab = vi.fn(options.navigation.showRepoBranchWorkspacePaneTab)
   const showRepoBranchTerminalSession = vi.fn(options.navigation.showRepoBranchTerminalSession)
-  const commandContext: TerminalSessionContextValue = terminalSessionContextForTest({
+  const commandContext: TerminalSessionContextValue = terminalSessionContextWithCreatedAdmissionForTest({
     createTerminal,
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal,
     scrollToBottom,
     scrollLines: vi.fn(),
@@ -1557,11 +1561,9 @@ function renderToolbar(options: {
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput: vi.fn(),
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
   })
@@ -1569,6 +1571,7 @@ function renderToolbar(options: {
     terminalFilesystemTargetSnapshot: readContext.terminalFilesystemTargetSnapshot,
     createTerminal,
     selectTerminal,
+    focusTerminal: commandContext.focusTerminal,
     closeTerminalByDescriptor,
   })
 
@@ -1695,9 +1698,11 @@ function workspacePaneRouteForPreferredTab(
   return isWorkspacePaneStaticTabType(preferredTab) ? { kind: 'static', tab: preferredTab } : null
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
+function navigationWith(
+  overrides: PrimaryWindowNavigationOverridesForTest,
+): ObservedPrimaryWindowNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest()
-  const navigation: PrimaryWindowNavigationActions = {
+  return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},
@@ -1705,18 +1710,12 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
-  }
-  if (!overrides.commitWorkspacePaneRoute) {
-    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
-  }
-  return navigation
+  })
 }
 
 async function flush() {

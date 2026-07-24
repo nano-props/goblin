@@ -1,16 +1,21 @@
 import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import type {
-  TerminalSessionLike,
+  TerminalDescriptor,
   TerminalSessionSummary,
   TerminalSnapshot,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 
+interface TerminalSessionSummarySource {
+  descriptor: TerminalDescriptor
+  snapshot(): TerminalSnapshot
+}
+
 export function buildTerminalFilesystemTargetSnapshot(input: {
   terminalFilesystemTargetKey: string
   selectedDescriptor: TerminalFilesystemTargetSnapshot['selectedDescriptor']
   createPending: boolean
-  sessions: TerminalSessionLike[]
+  sessions: TerminalSessionSummarySource[]
   selectedTerminalSessionId: string | null
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
@@ -33,7 +38,7 @@ export function buildTerminalFilesystemTargetSnapshot(input: {
 
 function buildTerminalSessionSummaries(input: {
   terminalFilesystemTargetKey: string
-  sessions: TerminalSessionLike[]
+  sessions: TerminalSessionSummarySource[]
   selectedTerminalSessionId: string | null
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void

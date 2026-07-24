@@ -14,6 +14,7 @@ import type {
   TerminalSessionPhase,
   TerminalSessionSummary,
   TerminalSessionsSnapshot,
+  TerminalSize,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
@@ -54,14 +55,28 @@ const TERMINAL_SESSION_PHASE_VALUES = [
 const TerminalRuntimeSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_RUNTIME_SESSION_ID_RE))
 const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
+const TerminalIdentityRevisionSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(0),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
+)
 const TerminalColsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS))
 const TerminalRowsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS))
+const TerminalSizeSchema = v.strictObject({ cols: TerminalColsSchema, rows: TerminalRowsSchema })
 const TerminalRuntimeGenerationSchema = v.pipe(
   v.number(),
   v.integer(),
   v.minValue(0),
   v.maxValue(Number.MAX_SAFE_INTEGER),
 )
+const TerminalBoundRuntimeGenerationSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
+)
+const TerminalOutputSequenceSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER))
 const TerminalWriteDataSchema = v.pipe(
   v.string(),
   v.maxLength(MAX_TERMINAL_WRITE_CHARS),
@@ -73,15 +88,28 @@ const TerminalControllerSchema = v.object({
 })
 const TerminalAttachInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   cols: TerminalColsSchema,
   rows: TerminalRowsSchema,
 })
-const TerminalRestartInputSchema = TerminalAttachInputSchema
+const TerminalRestartInputSchema = v.strictObject({
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+  cols: TerminalColsSchema,
+  rows: TerminalRowsSchema,
+})
 const TerminalWriteInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
   data: TerminalWriteDataSchema,
 })
-const TerminalResizeInputSchema = TerminalAttachInputSchema
+const TerminalResizeInputSchema = v.strictObject({
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+  cols: TerminalColsSchema,
+  rows: TerminalRowsSchema,
+})
+const TerminalTakeoverInputSchema = TerminalResizeInputSchema
 const TerminalSessionInputSchema = v.strictObject({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
@@ -93,8 +121,6 @@ const TerminalListSessionsInputSchema = v.strictObject({
 export const TerminalCreateInputSchema = v.strictObject({
   kind: v.picklist(['primary', 'additional']),
   startupShellCommand: v.optional(TerminalWriteDataSchema),
-  cols: v.optional(TerminalColsSchema),
-  rows: v.optional(TerminalRowsSchema),
   target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
 const TerminalPruneInputSchema = v.strictObject({
@@ -131,20 +157,33 @@ const TerminalNotifyBellInputSchema = v.strictObject({
   session: TerminalSessionBaseSchema,
 })
 
-export const TerminalSessionSummarySchema = v.strictObject({
-  terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
-  terminalSessionId: v.string(),
-  presentation: TerminalPresentationSchema,
-  controller: v.nullable(TerminalControllerSchema),
-  processName: v.string(),
-  canonicalTitle: v.nullable(v.string()),
-  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
-  message: v.nullable(v.string()),
-  cols: v.number(),
-  rows: v.number(),
-  target: WorkspacePaneFilesystemExecutionTargetSchema,
-})
+function hasConsistentTerminalBindingMetadata(input: {
+  terminalRuntimeGeneration: number
+  identityRevision: number
+  canonicalSize: { cols: number; rows: number } | null
+}): boolean {
+  return input.terminalRuntimeGeneration === 0
+    ? input.identityRevision === 0 && input.canonicalSize === null
+    : input.canonicalSize !== null
+}
+
+export const TerminalSessionSummarySchema = v.pipe(
+  v.strictObject({
+    terminalRuntimeSessionId: v.string(),
+    terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
+    terminalSessionId: v.string(),
+    presentation: TerminalPresentationSchema,
+    controller: v.nullable(TerminalControllerSchema),
+    processName: v.string(),
+    canonicalTitle: v.nullable(v.string()),
+    phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
+    message: v.nullable(v.string()),
+    canonicalSize: v.nullable(TerminalSizeSchema),
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+  }),
+  v.check((input) => hasConsistentTerminalBindingMetadata(input), 'Terminal binding metadata is inconsistent'),
+)
 export const TerminalSessionsSnapshotSchema = v.strictObject({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   sessions: v.array(TerminalSessionSummarySchema),
@@ -152,13 +191,12 @@ export const TerminalSessionsSnapshotSchema = v.strictObject({
 const TerminalRuntimeMetadataSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  identityRevision: TerminalIdentityRevisionSchema,
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
   controller: v.nullable(TerminalControllerSchema),
-  canonicalCols: TerminalColsSchema,
-  canonicalRows: TerminalRowsSchema,
 }
 const TerminalProjectionNoneEffectSchema = v.strictObject({ kind: v.literal('none') })
 const TerminalProjectionDeltaEffectSchema = v.strictObject({
@@ -169,20 +207,27 @@ const TerminalProjectionEffectSchema = v.variant('kind', [
   TerminalProjectionNoneEffectSchema,
   TerminalProjectionDeltaEffectSchema,
 ])
-const TerminalCreateResultSchema = v.variant('ok', [
-  v.strictObject({
-    ok: v.literal(true),
-    action: v.picklist(['created', 'restored', 'reused']),
-    presentation: TerminalPresentationSchema,
-    terminalSessionId: v.string(),
-    terminalProjectionEffect: TerminalProjectionEffectSchema,
-    ...TerminalRuntimeMetadataSchemaEntries,
-  }),
-  v.strictObject({
-    ok: v.literal(false),
-    message: v.string(),
-  }),
-])
+const TerminalCreateResultSchema = v.pipe(
+  v.variant('ok', [
+    v.strictObject({
+      ok: v.literal(true),
+      action: v.picklist(['created', 'restored', 'reused']),
+      presentation: TerminalPresentationSchema,
+      terminalSessionId: v.string(),
+      terminalProjectionEffect: TerminalProjectionEffectSchema,
+      ...TerminalRuntimeMetadataSchemaEntries,
+      canonicalSize: v.nullable(TerminalSizeSchema),
+    }),
+    v.strictObject({
+      ok: v.literal(false),
+      message: v.string(),
+    }),
+  ]),
+  v.check(
+    (result) => !result.ok || hasConsistentTerminalBindingMetadata(result),
+    'Terminal binding metadata is inconsistent',
+  ),
+)
 const TerminalAttachResultSchema = v.variant('ok', [
   v.variant('frame', [
     v.object({
@@ -190,6 +235,8 @@ const TerminalAttachResultSchema = v.variant('ok', [
       frame: v.literal('stream'),
       terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
       ...TerminalRuntimeMetadataSchemaEntries,
+      terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+      canonicalSize: TerminalSizeSchema,
       phase: v.literal('open'),
     }),
     v.object({
@@ -197,9 +244,10 @@ const TerminalAttachResultSchema = v.variant('ok', [
       frame: v.literal('snapshot'),
       terminalProjectionEffect: TerminalProjectionNoneEffectSchema,
       snapshot: v.string(),
-      snapshotSeq: v.number(),
-      outputEra: v.number(),
+      snapshotSeq: TerminalOutputSequenceSchema,
       ...TerminalRuntimeMetadataSchemaEntries,
+      terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+      canonicalSize: TerminalSizeSchema,
     }),
   ]),
   v.object({
@@ -210,12 +258,12 @@ const TerminalAttachResultSchema = v.variant('ok', [
 const TerminalRestartResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
-    frame: v.literal('snapshot'),
+    frame: v.literal('stream'),
     terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
-    snapshot: v.string(),
-    snapshotSeq: v.number(),
-    outputEra: v.number(),
     ...TerminalRuntimeMetadataSchemaEntries,
+    terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+    canonicalSize: TerminalSizeSchema,
+    phase: v.literal('open'),
   }),
   v.object({
     ok: v.literal(false),
@@ -226,12 +274,12 @@ const TerminalTakeoverResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
-    terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+    terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
     role: v.picklist(['controller', 'viewer', 'unowned']),
     controllerStatus: v.picklist(['connected', 'none']),
     controller: v.nullable(TerminalControllerSchema),
-    canonicalCols: TerminalColsSchema,
-    canonicalRows: TerminalRowsSchema,
+    canonicalSize: TerminalSizeSchema,
     phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   }),
   v.object({
@@ -239,7 +287,22 @@ const TerminalTakeoverResultSchema = v.variant('ok', [
     message: v.string(),
   }),
 ])
-const TerminalMutationResultSchema = v.boolean()
+const TerminalResizeResultSchema = v.variant('ok', [
+  v.object({
+    ok: v.literal(true),
+    terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+    terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+    identityRevision: TerminalIdentityRevisionSchema,
+    role: v.picklist(['controller', 'viewer', 'unowned']),
+    controllerStatus: v.picklist(['connected', 'none']),
+    controller: v.nullable(TerminalControllerSchema),
+    canonicalSize: TerminalSizeSchema,
+  }),
+  v.object({
+    ok: v.literal(false),
+    message: v.string(),
+  }),
+])
 const TerminalWriteResultSchema = v.variant('status', [
   v.object({ status: v.literal('accepted') }),
   v.object({ status: v.literal('rejected') }),
@@ -251,16 +314,15 @@ const TerminalPruneResultSchema = v.object({
 })
 const TerminalOutputEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   data: v.string(),
-  outputEra: v.number(),
-  seq: v.number(),
+  seq: TerminalOutputSequenceSchema,
   processName: v.string(),
 })
 const TerminalBellRealtimeEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   processName: v.string(),
@@ -268,14 +330,14 @@ const TerminalBellRealtimeEventSchema = v.strictObject({
 })
 const TerminalTitleEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalExitEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
@@ -291,13 +353,18 @@ const TerminalSessionClosedEventSchema = v.strictObject({
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_RUNTIME_SESSION_ID_RE.test(value)
 }
+
+export function isValidTerminalWriteData(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS && !value.includes('\0')
+}
+
 const TerminalIdentityEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+  identityRevision: TerminalIdentityRevisionSchema,
   terminalSessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
-  canonicalCols: v.number(),
-  canonicalRows: v.number(),
+  canonicalSize: TerminalSizeSchema,
 })
 const TerminalLifecycleEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
@@ -305,7 +372,6 @@ const TerminalLifecycleEventSchema = v.object({
   terminalSessionId: v.string(),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
-  takeoverPending: v.boolean(),
 })
 const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('output'), event: TerminalOutputEventSchema }),
@@ -369,7 +435,7 @@ const TerminalClientMessageSchema = v.variant('type', [
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('takeover'),
-    input: TerminalResizeInputSchema,
+    input: TerminalTakeoverInputSchema,
   }),
   v.strictObject({
     type: v.literal('request'),
@@ -410,6 +476,14 @@ export function terminalUtf8ByteLength(value: string): number {
 
 export function isTerminalWsMessageWithinLimit(value: string): boolean {
   return terminalUtf8ByteLength(value) <= TERMINAL_WS_MESSAGE_LIMIT_BYTES
+}
+
+export function constrainTerminalSize(cols: number, rows: number): TerminalSize | null {
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) return null
+  return {
+    cols: Math.min(MAX_TERMINAL_COLS, Math.max(MIN_TERMINAL_COLS, Math.floor(cols))),
+    rows: Math.min(MAX_TERMINAL_ROWS, Math.max(MIN_TERMINAL_ROWS, Math.floor(rows))),
+  }
 }
 
 export function normalizeTerminalSize(cols: unknown, rows: unknown): { cols: number; rows: number } | null {
@@ -508,7 +582,7 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
     case 'write':
       return normalizeWithSchema(TerminalWriteResultSchema, payload)
     case 'resize':
-      return normalizeWithSchema(TerminalMutationResultSchema, payload)
+      return normalizeWithSchema(TerminalResizeResultSchema, payload)
     case 'takeover':
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'recover-sessions':

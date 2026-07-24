@@ -10,6 +10,7 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   createBranchSnapshot,
@@ -35,15 +36,13 @@ const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
 const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {
+  ...primaryWindowNavigationActionsForTest(),
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
   cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
-  showRepoBranchEmptyWorkspacePane: () => true,
-  showRepoBranchWorkspacePaneTab: vi.fn(),
-  showRepoBranchTerminalSession: vi.fn(),
-  commitWorkspacePaneRoute: vi.fn(() => true),
+  commitWorkspacePaneRoute: vi.fn(async () => true),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),

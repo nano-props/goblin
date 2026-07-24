@@ -17,7 +17,6 @@ export function terminalCreateErrorKey(error: unknown): string {
     return 'error.terminal-create-timeout'
   }
   if (isTerminalConnectionFailure(message)) return 'error.terminal-connection-unavailable'
-  if (isTerminalHostGeometryFailure(message)) return 'error.terminal-host-not-measurable'
   return 'error.terminal-create-failed'
 }
 
@@ -55,15 +54,5 @@ function isTerminalConnectionFailure(message: string): boolean {
     message === 'App realtime socket error' ||
     message === 'Terminal heartbeat send failed' ||
     message === 'App realtime heartbeat send failed'
-  )
-}
-
-function isTerminalHostGeometryFailure(message: string): boolean {
-  return (
-    message === 'terminal create host unavailable' ||
-    message === 'host is inside a display:none subtree' ||
-    message.startsWith('terminal create geometry wait timed out after ') ||
-    message.startsWith('terminal host measurable wait timed out after ') ||
-    message.startsWith('ResizeObserver unavailable; cannot wait for host to become measurable')
   )
 }

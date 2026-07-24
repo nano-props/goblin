@@ -153,6 +153,7 @@ function terminalSession(
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     terminalSessionId,
     target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'repo-runtime-test', root },
     presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
@@ -161,8 +162,7 @@ function terminalSession(
     canonicalTitle: null,
     phase: 'open',
     message: null,
-    cols: 80,
-    rows: 24,
+    canonicalSize: { cols: 80, rows: 24 },
   }
 }
 

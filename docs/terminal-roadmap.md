@@ -142,9 +142,27 @@ work is related but separate.
 an output checkpoint could be serialized while the shell was in a transient
 prompt redraw. `create` now prepares a logical session and returns metadata
 only. The selected client mounts and fits one xterm before attach starts a fresh
-PTY; fresh output streams from sequence 1. Attach to an existing PTY and restart
-still use server headless snapshots with explicit sequence boundaries. See
+PTY; fresh output streams from sequence 1. Restart likewise establishes a fresh
+generation and streams from sequence 1. Only attach to an existing PTY uses a
+server headless snapshot with an explicit sequence boundary. See
 `docs/terminal.md` and `docs/terminal-session-lifecycle.md` for the contract.
+
+The implementation also closes the two gaps needed to make that split safe:
+the supervisor transfers early output/exit through a bounded single-owner event
+lease, and the realtime socket orders the attach/restart response before output
+for the new binding. A fresh response has no render checkpoint: the client
+reveals the fitted xterm after one full-viewport `onRender`, then flushes any
+ordered realtime output that arrived while the view was hidden. Hidden views
+reject local input and do not parse fresh output, so fresh-output protocol
+replies follow the ordinary presented, current-generation input path. Recovery
+still replays its atomic `snapshot`/`snapshotSeq` frame before the viewport
+render; snapshot-generated protocol replies are discarded. Fresh streams and
+recovery snapshots fulfil the same presentation-scoped focus intent when the
+view is revealed. The intent does not move DOM focus or consume input while the
+presentation is pending. A later pointer action or window blur retires it;
+keyboard activity does not. The client deliberately does not track held keys
+across focus targets, so a repeat may follow focus into the selected terminal.
+First output has no presentation, prompt, or shell-readiness meaning.
 
 ## P2: Further tighten client projection boundaries
 

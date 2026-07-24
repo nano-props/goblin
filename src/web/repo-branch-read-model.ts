@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import {
   getRepoProjectionQueryData,
   getRepoWorktreeStatusQueryData,
+  getSuccessfulRepoProjectionQueryData,
 } from '#/web/repo-query-cache.ts'
 import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import {
@@ -71,6 +72,14 @@ export function readRepoBranchSnapshotQueryProjection(
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData | null {
   const projection = getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
+  return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
+}
+
+export function readSuccessfulRepoBranchSnapshotQueryProjection(
+  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
+  queryClient?: QueryClient,
+): RepoBranchSnapshotData | null {
+  const projection = getSuccessfulRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
   return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
 }
 

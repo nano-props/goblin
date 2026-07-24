@@ -1,7 +1,10 @@
 import type { ServerTerminalHostDiagnostics } from '#/server/terminal/terminal-host.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 
-export type ServerAppRealtimeSocket = RealtimeSocket
+export interface ServerAppRealtimeSocket extends RealtimeSocket {
+  readonly bufferedAmount: number
+  terminate(): void
+}
 
 export interface ServerAppRealtimeDiagnostics {
   terminal: ServerTerminalHostDiagnostics

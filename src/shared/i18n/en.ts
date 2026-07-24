@@ -43,7 +43,7 @@ export const en = {
   'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
   'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
   'menu.file.close-window': 'Close Window',
-  'menu.file.close-workspace-tab-or-window': 'Close Workspace Tab or Window',
+  'menu.file.close-workspace-tab': 'Close Workspace Tab',
   'menu.file.close-workspace': 'Close Workspace',
   'menu.file.settings': 'Settings…',
   'menu.file.quit': 'Quit',
@@ -386,18 +386,10 @@ export const en = {
   'terminal.takeover': 'Take over terminal',
   'terminal.takeover-failed':
     'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',
-  'terminal.takeover-failed-generic': 'Failed to take over the terminal.',
-  'terminal.takeover-session-gone': 'Terminal is no longer available.',
-  // AuthorityGate denial feedback. `session-closed` is intentionally
-  // silent (the session vanished, no need to nag) and has no key
-  // here; the rest maps 1:1 to `AuthorizationDenialReason`.
-  'terminal.write-blocked-reconnecting': 'Reconnecting — try again in a moment.',
   'terminal.write-not-sent': 'Connection unavailable. Input was not sent; try again in a moment.',
   'terminal.write-delivery-uncertain':
     'Connection interrupted. Recent input may not have arrived; check before retrying.',
-  'terminal.write-blocked-session-gone': 'Terminal is no longer available.',
   'terminal.write-blocked-rejected': 'Terminal rejected the request.',
-  'terminal.write-blocked-client-unavailable': 'Terminal client unavailable.',
   'terminal.index-title': 'Terminal {index}',
   'terminal.bell-unread': 'Unread terminal bell',
   'terminal.bell-unread-count': '{count} unread bell',
@@ -561,7 +553,6 @@ export const en = {
   'error.terminal-connection-timeout': 'Timed out connecting to the terminal service. Try again.',
   'error.terminal-create-timeout': 'Timed out creating the terminal. Try again.',
   'error.terminal-connection-unavailable': 'Terminal service is not available. Try again.',
-  'error.terminal-host-not-measurable': 'Terminal host is not visible',
   'error.vscode-not-installed': 'VS Code not installed',
   'error.editor-not-installed': 'No editor found',
   'error.finder-not-available': 'Finder is only available on macOS',
@@ -750,8 +741,7 @@ export const en = {
   'help.row.open-local-workspace': 'Open workspace',
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',
-  'help.row.close-workspace': 'Close current workspace',
-  'help.row.close-workspace-tab-or-window': 'Close workspace tab or window',
+  'help.row.close-workspace-tab': 'Close workspace tab',
   'help.row.close-window': 'Close window',
   'help.row.refresh': 'Refresh Workspace',
   'help.row.reload-page': 'Reload Page',

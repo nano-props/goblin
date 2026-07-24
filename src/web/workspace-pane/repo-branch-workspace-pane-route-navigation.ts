@@ -1,25 +1,29 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
+interface WorkspacePaneRouteNavigationOptions {
+  replace?: boolean
+  navigationGeneration?: PrimaryWindowNavigationGeneration
+  onCommit?: () => void
+  onAbandon?: () => void
+  routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+}
+
 export interface WorkspacePaneRouteNavigation {
-  openRepoBranch: (
-    repoId: WorkspaceId,
-    branchName: string,
-    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
-  ) => boolean
+  openRepoBranch: (repoId: WorkspaceId, branchName: string, options?: WorkspacePaneRouteNavigationOptions) => boolean
   openRepoBranchTab: (
     repoId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
-    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+    options?: WorkspacePaneRouteNavigationOptions,
   ) => boolean
   openRepoBranchTerminal: (
     repoId: WorkspaceId,
     branchName: string,
     terminalSessionId: string,
-    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+    options?: WorkspacePaneRouteNavigationOptions,
   ) => boolean
 }
 
@@ -28,7 +32,7 @@ export function openResolvedWorkspacePaneRoute(
   repoId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneRouteTarget,
-  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+  options?: WorkspacePaneRouteNavigationOptions,
 ): boolean {
   if (!route) {
     return options === undefined

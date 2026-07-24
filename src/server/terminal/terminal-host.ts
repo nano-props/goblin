@@ -5,6 +5,7 @@ import type {
   TerminalPruneInput,
   TerminalMutationResult,
   TerminalResizeInput,
+  TerminalResizeResult,
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionInput,
@@ -31,10 +32,10 @@ export type ServerTerminalHostState = 'running' | 'shutting-down'
 
 export type PtySupervisorMode = 'in-process' | 'worker-backed'
 
-export type PtySupervisorState = 'idle' | 'running' | 'restarting' | 'shutting-down'
+export type PtySupervisorState = 'idle' | 'running' | 'shutting-down'
 
 export interface PtySupervisorFailureDiagnostics {
-  kind: 'exit' | 'error' | 'send-failed' | 'spawn-failed'
+  kind: 'exit' | 'error' | 'disconnect' | 'protocol' | 'timeout' | 'send-failed' | 'spawn-failed'
   at: number
   detail: string
 }
@@ -47,8 +48,7 @@ export interface PtySupervisorDiagnostics {
   workerStartedAt: number | null
   workerUptimeMs: number | null
   pendingRequests: number
-  restartAttempts: number
-  restartScheduled: boolean
+  consecutiveWorkerInvalidations: number
   shuttingDown: boolean
   lastSuccessfulResponseAt: number | null
   lastExitCode: number | null
@@ -62,17 +62,8 @@ export interface ServerTerminalHostDiagnostics {
   registeredSockets: number
   shuttingDown: boolean
   pty: PtySupervisorDiagnostics
-  /**
-   * T4.1: aggregate stats across all live terminal sessions.
-   * `liveSessionCount` is the number of in-memory sessions owned by
-   * the manager; `totalRingBufferChars` and `maxRingBufferChars` are
-   * the sum and the maximum per-session replay buffer size, in
-   * JavaScript string chars (close to bytes for ASCII-heavy terminal
-   * output; an upper bound is `chars * 2` for full UTF-16).
-   */
+  /** Number of in-memory logical sessions owned by the manager. */
   liveSessionCount: number
-  totalRingBufferChars: number
-  maxRingBufferChars: number
 }
 
 export interface ServerTerminalActionHost {
@@ -81,7 +72,7 @@ export interface ServerTerminalActionHost {
   attach(clientId: string, userId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
   restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalRestartResult>
   write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalWriteResult>
-  resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
+  resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalResizeResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
   /** Internal application/test read; intentionally not exposed as a realtime action. */

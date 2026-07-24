@@ -49,6 +49,7 @@ export function TerminalActionDialogHost({ currentWorkspaceId, currentWorkspaceP
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           workspaceId: payload.workspaceId,
           workspacePaneRoute: payload.workspacePaneRoute,
+          routeTarget: payload.routeTarget,
           currentWorkspacePaneRoute,
           navigation,
           targetIdentity: payload.targetIdentity,

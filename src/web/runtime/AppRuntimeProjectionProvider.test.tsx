@@ -8,6 +8,7 @@ import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalAttachResult,
+  TerminalRestartResult,
   TerminalSessionSummary,
   TerminalSessionsChangedEvent,
   TerminalSessionsSnapshot,
@@ -169,15 +170,27 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('keeps its projection registry usable across StrictMode effect replay', async () => {
+  test('reuses one cold recovery across StrictMode effect replay', async () => {
     const repo = seedCurrentRepo()
+    const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
+    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise)
     const result = renderInJsdom(
       <StrictMode>
         <RuntimeProbe currentWorkspaceId={REPO_ID} />
       </StrictMode>,
     )
     try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalled())
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      await act(async () => {
+        coldRecovery.resolve({ revision: 0, sessions: [] })
+      })
+      await vi.waitFor(() =>
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          phase: 'ready',
+        }),
+      )
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
       expect(document.body.textContent).toContain('probe')
     } finally {
       result.unmount()
@@ -687,6 +700,95 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
+  test('does not queue a second focus refresh while cold recovery is pending', async () => {
+    const repo = seedCurrentRepo()
+    const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
+    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise).mockResolvedValue({ revision: 1, sessions: [] })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+        coldRecovery.resolve({ revision: 1, sessions: [] })
+      })
+
+      await vi.waitFor(() =>
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          phase: 'ready',
+        }),
+      )
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('measures the focus refresh cooldown from the latest successful refresh', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const repo = seedCurrentRepo()
+    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 100 })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() =>
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          phase: 'ready',
+        }),
+      )
+      recoverSessionsMock.mockClear()
+
+      now.mockReturnValue(1_099)
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      expect(recoverSessionsMock).not.toHaveBeenCalled()
+
+      now.mockReturnValue(1_100)
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      await vi.waitFor(() =>
+        expect(
+          useTerminalProjectionHydrationStore.getState().lastSuccessfulRecoveryByWorkspace.get(REPO_ID)?.completedAt,
+        ).toBe(1_100),
+      )
+      recoverSessionsMock.mockClear()
+
+      now.mockReturnValue(1_199)
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      expect(recoverSessionsMock).not.toHaveBeenCalled()
+
+      now.mockReturnValue(1_200)
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+    } finally {
+      now.mockRestore()
+      result.unmount()
+    }
+  })
+
+  test('does not let an old runtime hydration entry govern current runtime refresh admission', () => {
+    const repo = seedCurrentRepo()
+    useTerminalProjectionHydrationStore.setState({
+      refreshCooldownMs: 10_000,
+      hydrationByWorkspace: new Map([[REPO_ID, { workspaceRuntimeId: 'repo-runtime-retired', phase: 'pending' }]]),
+      lastSuccessfulRecoveryByWorkspace: new Map([
+        [REPO_ID, { workspaceRuntimeId: 'repo-runtime-retired', completedAt: Date.now() }],
+      ]),
+    })
+
+    expect(
+      useTerminalProjectionHydrationStore.getState().isProjectionFocusRefreshDue(REPO_ID, repo.workspaceRuntimeId),
+    ).toBe(true)
+  })
+
   test('focus sync only refreshes the current repo session list', async () => {
     const firstRepo = seedCurrentRepo()
     seedSecondRepo()
@@ -694,6 +796,12 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
+      await vi.waitFor(() =>
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+          workspaceRuntimeId: firstRepo.workspaceRuntimeId,
+          phase: 'ready',
+        }),
+      )
       recoverSessionsMock.mockClear()
 
       await act(async () => {
@@ -939,21 +1047,18 @@ function testBridge(): ClientBridge {
     }),
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
-      restart: vi.fn(async () => ({
-        ...attachResult(),
-        terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
-      })),
+      restart: vi.fn(async () => restartResult()),
       write: vi.fn(async () => ({ status: 'accepted' as const })),
-      resize: vi.fn(async () => true),
+      resize: vi.fn(async () => ({ ok: false as const, message: 'not configured' })),
       takeover: vi.fn(async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
-        canonicalCols: 80,
-        canonicalRows: 24,
+        canonicalSize: { cols: 80, rows: 24 },
         phase: 'open' as const,
       })),
       close: vi.fn(async () => true),
@@ -1001,16 +1106,32 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
     terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     snapshot: '',
     snapshotSeq: 0,
-    outputEra: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
     message: null,
     controller: { clientId: 'client_local', status: 'connected' },
-    canonicalCols: 80,
-    canonicalRows: 24,
+    canonicalSize: { cols: 80, rows: 24 },
+  }
+}
+
+function restartResult(): Extract<TerminalRestartResult, { ok: true }> {
+  return {
+    ok: true,
+    frame: 'stream',
+    terminalProjectionEffect: { kind: 'delta', revision: 1 },
+    terminalRuntimeSessionId: 'unused',
+    terminalRuntimeGeneration: 1,
+    identityRevision: 0,
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open',
+    message: null,
+    controller: { clientId: 'client_local', status: 'connected' },
+    canonicalSize: { cols: 80, rows: 24 },
   }
 }
 
@@ -1027,14 +1148,14 @@ function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
     ...base,
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
+    identityRevision: 0,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,
     controller: null,
     phase: 'open',
     message: null,
-    cols: 80,
-    rows: 24,
+    canonicalSize: { cols: 80, rows: 24 },
   }
 }
 
