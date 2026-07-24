@@ -511,9 +511,10 @@ order would have been:
 1. **R3: empty-state CTA** — client-only, lowest risk, visible UX win.
 2. **R2: `session-closed` broadcast** — additive protocol change, no
    behavior regression.
-3. **R1: durable close** — largest blast radius, requires injecting
-   the durable-close queue into the session disposal path and sequencing
-   close-before-create in the projection.
+3. **R1: server-owned composed close** — largest blast radius, removes the
+   client close queue and routes tab retirement through the Workspace runtime
+   command. Server retirement single-flight keeps Directory membership and the
+   physical PTY outcome in one authoritative transaction.
 
 ---
 
@@ -526,11 +527,12 @@ order would have been:
   receive snapshots, and headless recovery includes fresh output. Realtime
   tests prove the attach response precedes sequence 1 without dropping it.
   Client tests prove a stream frame performs no xterm reset or snapshot write.
-- **R1**: projection durable-close tests cover awaiting an in-flight
-  close before creating, in-flight close failures allowing the queued
-  create to proceed afterward, deduplicating concurrent enqueues,
-  destroying pending entries, and dropping the local session on
-  `session-closed`.
+- **R1**: manager tests cover retirement single-flight, preserving Directory
+  membership after a failed close, removing it exactly once after confirmed
+  retirement, and rejecting admission while retirement is in progress.
+  Workspace runtime application tests cover the composed terminal-close and
+  tab-commit boundary. Projection tests cover removing only the exact runtime
+  binding named by `session-closed`.
 - **R2**: runtime-action tests cover the targeted `session-closed`
   action broadcast on successful user close, non-user closes not
   leaking phantom events, and failed closes not synthesizing fake
@@ -579,10 +581,11 @@ any individual implementation:
 4. **Close is a broadcast event.** When the server confirms a user
    close, other windows learn about it through `session-closed`, not
    through a full reconcile.
-5. **A subsequent create in the same worktree must await in-flight
-   closes in that worktree.** The session service must never hand back an
-   orphan as `action: 'restored'` when the local dispose is still
-   pending.
+5. **Close/create coordination stays at the authoritative server boundary.**
+   A closing session remains represented by Directory/retirement state until
+   its physical outcome is known. A later admission must reject that retiring
+   identity rather than restoring it, and the client must not recreate a
+   durable-close queue to compensate.
 6. **Empty-state UI is part of the contract.** A terminal session with
    zero sessions must show the affordance to open one.
 7. **Treat React/provider lifetime concerns separately from terminal

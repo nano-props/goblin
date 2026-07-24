@@ -96,8 +96,8 @@ interface ResolvedTerminalCreateOptions {
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
- * (per-filesystem-target session lists, bell controller,
- * selector snapshot caches, pending create/close queues) that has no
+ * (per-filesystem-target session lists, bell controller, selector snapshot
+ * caches, pending creates, and close-operation single-flight) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.

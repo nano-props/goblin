@@ -588,7 +588,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
-  test('durable close: handleSessionClosed drops the matching local session', async () => {
+  test('session-closed drops the matching local session', async () => {
     // The server emits a session-closed broadcast when window A
     // closes a session. Sibling windows route the event into
     // handleSessionClosed to drop the local entry without a
@@ -607,7 +607,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('durable close: exact canonical and runtime identity removes the session', async () => {
+  test('session-closed removes the exact canonical and runtime identity', async () => {
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
@@ -620,7 +620,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('durable close: runtime mismatch does not delete the durable candidate', async () => {
+  test('session-closed with a runtime mismatch preserves the local session', async () => {
     await projection.createTerminal(terminalBase())
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
