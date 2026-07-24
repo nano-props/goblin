@@ -93,6 +93,10 @@ export class BufferedRealtimeSocket<TFlushContext = void> implements RealtimeSoc
 
   protected onBufferCleared(): void {}
 
+  // A finite slow-reader backlog after `send` belongs to the raw WebSocket/TCP
+  // transport, not this ordering buffer. It drains as the peer reads and is
+  // reclaimed with the raw socket when the peer disconnects; this wrapper
+  // retains only the explicitly bounded transition state above.
   private sendNow(payload: string): void {
     try {
       this.socket.send(payload)
