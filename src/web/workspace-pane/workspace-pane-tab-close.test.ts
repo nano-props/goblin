@@ -38,10 +38,9 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
-  claimTerminalInputFocus,
+  claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
-  TERMINAL_INPUT_FOCUS_SINK_ID,
-  terminalOwnsKeyboardInput,
+  resetTerminalAutoFocusForTest,
 } from '#/web/terminal-focus.ts'
 import {
   beginPrimaryWindowPresentation,
@@ -62,21 +61,18 @@ const WORKTREE_PANE_TARGET = {
 }
 
 beforeEach(() => {
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   setTerminalSessionCommandBridgeForTest(null)
   installWorkspacePaneTabsTestBridge()
-  const focusSink = document.createElement('div')
-  focusSink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  focusSink.tabIndex = -1
-  document.body.appendChild(focusSink)
 })
 
 afterEach(() => {
   setTerminalSessionCommandBridgeForTest(null)
-  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
 })
 
@@ -196,7 +192,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
   })
 })
 
-test('holds terminal keyboard ownership from active close through route commit and mount transfer', async () => {
+test('carries automatic focus from active close through route commit and mount transfer', async () => {
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
@@ -229,7 +225,6 @@ test('holds terminal keyboard ownership from active close through route commit a
     navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
   })
 
-  expect(terminalOwnsKeyboardInput()).toBe(true)
   lifecycle.resolve([workspacePaneRuntimeTabEntry('terminal', terminalSessionId)])
   await vi.waitFor(() => expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce())
   expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -243,16 +238,12 @@ test('holds terminal keyboard ownership from active close through route commit a
       routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
     }),
   )
-  expect(terminalOwnsKeyboardInput()).toBe(true)
-
   routeCommit.resolve()
   await expect(close).resolves.toBe(true)
   expect(bridgeFocus).toHaveBeenCalledWith(
     terminalSessionId,
     expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
   )
-  expect(terminalOwnsKeyboardInput()).toBe(true)
-
   const mountedFocus = vi.fn(
     (_terminalSessionId: string, _request: { isCurrent: () => boolean; onSettled: () => void }) => true,
   )
@@ -261,7 +252,6 @@ test('holds terminal keyboard ownership from active close through route commit a
   const mountedRequest = mountedFocus.mock.calls[0]![1]
   expect(mountedRequest.isCurrent()).toBe(true)
   mountedRequest.onSettled()
-  expect(terminalOwnsKeyboardInput()).toBe(false)
 })
 
 test('releases terminal focus and route intent when active close lifecycle fails', async () => {
@@ -300,18 +290,16 @@ test('releases terminal focus and route intent when active close lifecycle fails
   })
 
   await vi.waitFor(() => expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(true))
-  expect(terminalOwnsKeyboardInput()).toBe(true)
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
 
   lifecycle.reject(new Error('simulated close failure'))
   await expect(close).resolves.toBe(false)
 
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-  expect(terminalOwnsKeyboardInput()).toBe(false)
   expect(workspacePaneRouteIntentPending(actionTarget, 'static:files')).toBe(false)
 
   const nextPresentation = beginPrimaryWindowPresentation()
-  const nextFocusLease = claimTerminalInputFocus(nextPresentation)
+  const nextFocusLease = claimTerminalAutoFocus(nextPresentation)
   expect(nextFocusLease).not.toBeNull()
   nextFocusLease?.release()
 })

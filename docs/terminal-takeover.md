@@ -190,8 +190,8 @@ operational transform, no simultaneous-cursor reconciliation. Two
 windows literally cannot both be writing. The model chooses
 **which one** and the loser becomes a viewer.
 
-This is also not an authentication boundary. Client-side input admission
-protects the local interaction model, while authenticated server-side
+This is also not an authentication boundary. Client-side controller/viewer
+gating protects the local interaction model, while authenticated server-side
 attachment, generation, and controller validation remains authoritative for
 every PTY mutation.
 

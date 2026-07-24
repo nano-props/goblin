@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -150,7 +150,7 @@ export async function handleWorkspaceClientIntent(
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
-    terminalFocused: terminalOwnsKeyboardInput(),
+    terminalFocused: terminalHasKeyboardFocus(),
     currentWorkspaceId: currentWorkspace?.id ?? null,
     currentWorkspaceRuntimeId: currentWorkspace?.workspaceRuntimeId ?? null,
     currentWorkspaceCapability: currentWorkspace?.capability ?? null,

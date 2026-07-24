@@ -7,7 +7,7 @@ import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
-import { terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type {
   TerminalMutationResult,
@@ -956,7 +956,7 @@ describe('TerminalSession', () => {
     expect(settled).toHaveBeenCalledOnce()
   })
 
-  test('flushes split zsh output arriving after the presentation cutoff exactly once', async () => {
+  test('batches redraw chunks already pending at the presentation cutoff', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -3450,7 +3450,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     xtermMocks.terminals[0]!.focus()
-    expect(terminalOwnsKeyboardInput()).toBe(true)
+    expect(terminalHasKeyboardFocus()).toBe(true)
   })
 
   test('keeps disconnected focus pending and accepts its retry after the view attaches', async () => {

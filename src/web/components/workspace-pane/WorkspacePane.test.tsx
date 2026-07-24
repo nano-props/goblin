@@ -633,6 +633,7 @@ describe('WorkspacePane', () => {
       terminalFilesystemTargetSnapshot: workspaceTerminalReadContext.terminalFilesystemTargetSnapshot,
       createTerminal: terminalCommandContext.createTerminal,
       selectTerminal: terminalCommandContext.selectTerminal,
+      focusTerminal: workspaceTerminalCommands.focusTerminal,
       closeTerminalByDescriptor,
     })
     const commitFilesystemWorkspacePaneRoute = vi.fn<

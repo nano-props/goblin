@@ -6,29 +6,24 @@ import {
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
 import {
-  claimTerminalInputFocus,
+  claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
-  observeTerminalInputKeyboardActivity,
-  TERMINAL_INPUT_FOCUS_SINK_ID,
-  terminalOwnsKeyboardInput,
+  resetTerminalAutoFocusForTest,
+  terminalHasKeyboardFocus,
 } from '#/web/terminal-focus.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 
 type RequiredTerminalFocusRequest = Required<TerminalFocusRequest>
 
-let stopObservingKeyboardActivity: (() => void) | null = null
-
 beforeEach(() => {
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
-  installTerminalFocusSink()
-  stopObservingKeyboardActivity = observeTerminalInputKeyboardActivity()
 })
 
 afterEach(() => {
-  stopObservingKeyboardActivity?.()
-  stopObservingKeyboardActivity = null
-  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
+  document.body.replaceChildren()
 })
 
 describe('terminal presentation focus', () => {
@@ -58,177 +53,123 @@ describe('terminal presentation focus', () => {
     expect(remount).not.toHaveBeenCalled()
   })
 
-  test('admits at most one raw lease for a presentation generation', () => {
+  test('admits at most one automatic-focus intent for a presentation generation', () => {
     const token = beginPrimaryWindowPresentation()
-    const firstLease = claimTerminalInputFocus(token)
+    const firstLease = claimTerminalAutoFocus(token)
 
     expect(firstLease).not.toBeNull()
-    expect(claimTerminalInputFocus(token)).toBeNull()
+    expect(claimTerminalAutoFocus(token)).toBeNull()
     firstLease?.release()
   })
 
-  test('defers automatic focus while inherited input is held and absorbs repeats until keyup', () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true }))
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
+  test('does not move DOM focus while a mouse-created terminal is pending', () => {
+    const createButton = document.createElement('button')
+    document.body.appendChild(createButton)
+    createButton.focus()
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
-    const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
-    if (!(sink instanceof HTMLElement)) throw new Error('expected terminal input focus sink')
 
     lease.commit('term-created', focusTerminal)
-    expect(focusTerminal).not.toHaveBeenCalled()
-    expect(document.activeElement).toBe(sink)
-    expect(terminalOwnsKeyboardInput()).toBe(true)
 
-    const repeat = new KeyboardEvent('keydown', {
-      key: 'a',
-      code: 'KeyA',
-      repeat: true,
+    expect(document.activeElement).toBe(createButton)
+    expect(terminalHasKeyboardFocus()).toBe(false)
+    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
+    focusTerminal.mock.calls[0]![1].onSettled()
+  })
+
+  test('allows programmatic popover focus restoration before the terminal view mounts', () => {
+    const createItem = document.createElement('button')
+    const popoverTrigger = document.createElement('button')
+    document.body.append(createItem, popoverTrigger)
+    createItem.focus()
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
+    const beforeMount = rejectedFocus()
+    const afterMount = acceptedFocus()
+
+    lease.commit('term-created', beforeMount)
+    popoverTrigger.focus()
+    fulfillTerminalPresentationFocus('term-created', afterMount)
+
+    expect(beforeMount).toHaveBeenCalledOnce()
+    expect(afterMount).toHaveBeenCalledOnce()
+    expect(afterMount.mock.calls[0]![1].isCurrent()).toBe(true)
+    afterMount.mock.calls[0]![1].onSettled()
+  })
+
+  test('does not intercept or retire a pending focus intent after a later key', async () => {
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
+    const focusTerminal = acceptedFocus()
+    lease.commit('term-created', focusTerminal)
+    const request = focusTerminal.mock.calls[0]![1]
+    await Promise.resolve()
+    const input = new KeyboardEvent('keydown', {
+      key: 'w',
+      code: 'KeyW',
+      metaKey: true,
       bubbles: true,
       cancelable: true,
     })
-    sink.dispatchEvent(repeat)
-    expect(repeat.defaultPrevented).toBe(true)
-    expect(focusTerminal).not.toHaveBeenCalled()
 
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', code: 'KeyA', bubbles: true }))
-    expect(focusTerminal).toHaveBeenCalledOnce()
-    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
-    focusTerminal.mock.calls[0]![1].onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
+    document.body.dispatchEvent(input)
+
+    expect(input.defaultPrevented).toBe(false)
+    expect(request.isCurrent()).toBe(true)
+    request.onSettled()
   })
 
-  test('retries automatic focus after input reaching a pending transition sink is released', () => {
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
+  test('retires pending automatic focus after a later pointer action without consuming it', async () => {
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
-    const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
-    if (!(sink instanceof HTMLElement)) throw new Error('expected terminal input focus sink')
+    const request = focusTerminal.mock.calls[0]![1]
+    await Promise.resolve()
+    const pointer = new PointerEvent('pointerdown', { bubbles: true, cancelable: true })
 
-    const input = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true, cancelable: true })
-    sink.dispatchEvent(input)
+    document.body.dispatchEvent(pointer)
 
-    expect(input.defaultPrevented).toBe(true)
-    expect(focusTerminal).toHaveBeenCalledOnce()
-    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(false)
-    expect(terminalOwnsKeyboardInput()).toBe(true)
-
-    focusTerminal.mock.calls[0]![1].onSettled()
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', code: 'KeyA', bubbles: true }))
-
-    expect(focusTerminal).toHaveBeenCalledTimes(2)
-    expect(focusTerminal.mock.calls[1]![1].isCurrent()).toBe(true)
-    focusTerminal.mock.calls[1]![1].onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
-  })
-
-  test('gates the initiating shortcut key before the document observer sees it', () => {
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
-    )
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token, { kind: 'keyboard', initiatingKey: 'KeyT' })
-    if (!lease) throw new Error('expected terminal input focus lease')
-    const focusTerminal = acceptedFocus()
-
-    lease.commit('term-created', focusTerminal)
-    expect(focusTerminal).not.toHaveBeenCalled()
-
-    const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
-    if (!(sink instanceof HTMLElement)) throw new Error('expected terminal input focus sink')
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', code: 'ControlLeft', bubbles: true }))
-    expect(focusTerminal).not.toHaveBeenCalled()
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 't', code: 'KeyT', bubbles: true }))
-
-    expect(focusTerminal).toHaveBeenCalledOnce()
-    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
-    focusTerminal.mock.calls[0]![1].onSettled()
-  })
-
-  test('absorbs a repeating navigation chord and focuses only after the chord is released', () => {
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
-    )
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token, { kind: 'keyboard', initiatingKey: 'KeyT' })
-    if (!lease) throw new Error('expected terminal input focus lease')
-    const focusTerminal = acceptedFocus()
-    lease.commit('term-created', focusTerminal)
-    const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
-    if (!(sink instanceof HTMLElement)) throw new Error('expected terminal input focus sink')
-
-    const repeat = new KeyboardEvent('keydown', {
-      key: 't',
-      code: 'KeyT',
-      repeat: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', code: 'ControlLeft', bubbles: true }))
-    expect(focusTerminal).not.toHaveBeenCalled()
-    sink.dispatchEvent(repeat)
-    sink.dispatchEvent(new KeyboardEvent('keyup', { key: 't', code: 'KeyT', bubbles: true }))
-
-    expect(repeat.defaultPrevented).toBe(true)
-    expect(focusTerminal).toHaveBeenCalledOnce()
-    expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
-    focusTerminal.mock.calls[0]![1].onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
-  })
-
-  test('does not create mount-time focus after the user selected another control', () => {
-    const userTarget = document.createElement('input')
-    document.body.appendChild(userTarget)
-    userTarget.focus()
-    const focusTerminal = acceptedFocus()
-
-    fulfillTerminalPresentationFocus('term-initial', focusTerminal)
-
-    expect(focusTerminal).not.toHaveBeenCalled()
-    expect(document.activeElement).toBe(userTarget)
-    userTarget.remove()
+    expect(pointer.defaultPrevented).toBe(false)
+    expect(request.isCurrent()).toBe(false)
+    request.onSettled()
   })
 
   test('retries a committed target when its session materializes at the view boundary', () => {
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
     const beforeMaterialization = rejectedFocus()
     const afterMaterialization = acceptedFocus()
 
     lease.commit('term-created', beforeMaterialization)
-    expect(terminalOwnsKeyboardInput()).toBe(true)
-
     fulfillTerminalPresentationFocus('term-created', afterMaterialization)
 
     expect(beforeMaterialization).toHaveBeenCalledOnce()
     expect(afterMaterialization).toHaveBeenCalledOnce()
-    const focusRequest = afterMaterialization.mock.calls[0]![1]
-    expect(focusRequest.isCurrent()).toBe(true)
-    focusRequest.onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
+    const request = afterMaterialization.mock.calls[0]![1]
+    expect(request.isCurrent()).toBe(true)
+    request.onSettled()
   })
 
-  test('releases keyboard ownership when a focus callback throws', () => {
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
+  test('releases the focus intent when a focus callback throws', () => {
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
 
     expect(() =>
       lease.commit('term-created', () => {
         throw new Error('focus failed')
       }),
     ).toThrow('focus failed')
-    expect(terminalOwnsKeyboardInput()).toBe(false)
+
+    const remount = acceptedFocus()
+    fulfillTerminalPresentationFocus('term-created', remount)
+    expect(remount).not.toHaveBeenCalled()
   })
 
   test('does not duplicate focus when navigation commit already reached the session', () => {
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     const mountedFocusTerminal = acceptedFocus()
 
@@ -238,20 +179,17 @@ describe('terminal presentation focus', () => {
     expect(focusTerminal).toHaveBeenCalledOnce()
     expect(mountedFocusTerminal).not.toHaveBeenCalled()
     focusTerminal.mock.calls[0]![1].onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('prevents a superseded presentation from focusing its old terminal', () => {
-    const firstToken = beginPrimaryWindowPresentation()
-    const firstLease = claimTerminalInputFocus(firstToken)
-    if (!firstLease) throw new Error('expected first terminal input focus lease')
+    const firstLease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!firstLease) throw new Error('expected first terminal automatic-focus lease')
     const focusFirst = acceptedFocus()
     firstLease.commit('term-a', focusFirst)
     const firstRequest = focusFirst.mock.calls[0]![1]
 
-    const secondToken = beginPrimaryWindowPresentation()
-    const secondLease = claimTerminalInputFocus(secondToken)
-    if (!secondLease) throw new Error('expected second terminal input focus lease')
+    const secondLease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!secondLease) throw new Error('expected second terminal automatic-focus lease')
     const focusSecond = acceptedFocus()
     secondLease.commit('term-b', focusSecond)
     const secondRequest = focusSecond.mock.calls[0]![1]
@@ -259,37 +197,23 @@ describe('terminal presentation focus', () => {
     expect(firstRequest.isCurrent()).toBe(false)
     expect(secondRequest.isCurrent()).toBe(true)
     firstRequest.onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(true)
     secondRequest.onSettled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
-  test('does not reclaim focus after the user leaves a pending terminal presentation', () => {
-    const token = beginPrimaryWindowPresentation()
-    const lease = claimTerminalInputFocus(token)
-    if (!lease) throw new Error('expected terminal input focus lease')
-    const focusTerminal = acceptedFocus()
-    lease.commit('term-pending', focusTerminal)
-    const request = focusTerminal.mock.calls[0]![1]
-    const userTarget = document.createElement('input')
-    document.body.appendChild(userTarget)
+  test('reports terminal keyboard focus only from the active xterm DOM host', () => {
+    const host = document.createElement('div')
+    host.className = 'goblin-managed-terminal-host'
+    const textarea = document.createElement('textarea')
+    host.appendChild(textarea)
+    document.body.appendChild(host)
 
-    userTarget.focus()
-
-    expect(request.isCurrent()).toBe(false)
-    request.onSettled()
-    expect(document.activeElement).toBe(userTarget)
-    expect(terminalOwnsKeyboardInput()).toBe(false)
-    userTarget.remove()
+    expect(terminalHasKeyboardFocus()).toBe(false)
+    textarea.focus()
+    expect(terminalHasKeyboardFocus()).toBe(true)
+    textarea.blur()
+    expect(terminalHasKeyboardFocus()).toBe(false)
   })
 })
-
-function installTerminalFocusSink(): void {
-  const sink = document.createElement('div')
-  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  sink.tabIndex = -1
-  document.body.appendChild(sink)
-}
 
 function acceptedFocus() {
   return vi.fn((_terminalSessionId: string, _request: RequiredTerminalFocusRequest) => true)

@@ -207,6 +207,94 @@ describe('WorkspacePaneTabStrip', () => {
     expect(onNew).not.toHaveBeenCalled()
   })
 
+  test('does not let compact popover focus restoration steal an immediate terminal focus handoff', async () => {
+    const terminalInput = appendTerminalFocusTarget()
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' })]}
+        onNew={() => terminalInput.focus()}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!trigger) throw new Error('missing terminal popover trigger')
+    await openCompactSwitcher(trigger)
+    const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'terminal.new',
+    )
+    if (!newTerminalAction) throw new Error('missing new terminal action')
+
+    act(() => newTerminalAction.click())
+    expect(document.activeElement).toBe(terminalInput)
+    await flushTimers()
+
+    expect(document.activeElement).toBe(terminalInput)
+  })
+
+  test('allows a terminal mounted after compact popover close to receive focus', async () => {
+    const terminalInput = appendTerminalFocusTarget()
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' })]}
+        onNew={() => setTimeout(() => terminalInput.focus(), 0)}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!trigger) throw new Error('missing terminal popover trigger')
+    await openCompactSwitcher(trigger)
+    const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'terminal.new',
+    )
+    if (!newTerminalAction) throw new Error('missing new terminal action')
+
+    act(() => newTerminalAction.click())
+    await flushTimers()
+
+    expect(document.activeElement).toBe(terminalInput)
+  })
+
+  test('restores compact popover trigger focus after a normal dismiss', async () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!trigger) throw new Error('missing terminal popover trigger')
+    await openCompactSwitcher(trigger)
+    const content = document.body.querySelector<HTMLElement>('[data-slot="popover-content"]')
+    if (!content) throw new Error('missing terminal popover content')
+
+    act(() => content.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    await flushTimers()
+
+    expect(document.activeElement).toBe(trigger)
+  })
+
   test('blocks tab switching and closing while terminal creation is pending', () => {
     const onSelect = vi.fn()
     const onClose = vi.fn()
@@ -1564,4 +1652,21 @@ async function flushTimers() {
     vi.runAllTimers()
     await Promise.resolve()
   })
+}
+
+async function openCompactSwitcher(trigger: HTMLButtonElement) {
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+    await Promise.resolve()
+  })
+}
+
+function appendTerminalFocusTarget(): HTMLTextAreaElement {
+  const host = document.createElement('div')
+  host.className = 'goblin-managed-terminal-host'
+  const input = document.createElement('textarea')
+  host.appendChild(input)
+  document.body.appendChild(host)
+  return input
 }

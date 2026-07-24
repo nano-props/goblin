@@ -19,7 +19,7 @@ import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
-import { terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -209,7 +209,6 @@ export function useKeyboard({
             target: paneTarget,
             navigation,
             t: translate,
-            inputFocusAdmission: { kind: 'keyboard', initiatingKey: e.code },
           })
           return
         }
@@ -258,7 +257,7 @@ export function useKeyboard({
         }
       }
 
-      if (terminalOwnsKeyboardInput()) return
+      if (terminalHasKeyboardFocus()) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
 

@@ -1571,6 +1571,7 @@ function renderToolbar(options: {
     terminalFilesystemTargetSnapshot: readContext.terminalFilesystemTargetSnapshot,
     createTerminal,
     selectTerminal,
+    focusTerminal: commandContext.focusTerminal,
     closeTerminalByDescriptor,
   })
 

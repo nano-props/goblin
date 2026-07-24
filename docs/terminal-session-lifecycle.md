@@ -134,8 +134,8 @@ The client applies any stream output already available at its presentation
 cutoff, then commits a full-viewport render even when that output set is empty.
 An empty fresh frame may be revealed, but automatic focus remains fenced until
 real PTY output has rendered. First output is not a lifecycle or shell-readiness
-signal; the fence only prevents input owned by the previous focus target from
-entering a blank fresh PTY. A visible quiet process remains explicitly focusable.
+signal; it only prevents automatic focus from running before the fresh xterm has
+rendered real output. A visible quiet process remains explicitly focusable.
 
 The server, not the client, chooses the attach frame from PTY state. A second
 attach waiting on an in-flight fresh spawn is a recovery attach and receives a
@@ -597,7 +597,7 @@ any individual implementation:
    recovery attach snapshots at the type and validator boundaries.
 2. **Done** — decide explicitly that same-session snapshot reapply is not a
    supported repair path. Recovery replay occurs only inside a hidden
-   presentation with local input admission closed.
+   presentation whose generation-bearing writer rejects local input.
 3. **Done** — move `TerminalSessionProjection` to a client-level singleton
    lifetime. The projection is now created on first access and lives
    for the client's entire lifetime; the provider is only a wiring

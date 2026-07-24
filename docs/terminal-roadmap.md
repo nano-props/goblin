@@ -154,9 +154,11 @@ for the new binding. Client presentation remains hidden and rejects local input
 until the fitted xterm has consumed the output available at its presentation
 cutoff (which may be empty) and emitted a full-viewport `onRender`. An empty
 fresh stream can then be revealed for quiet-process access, but its automatic
-focus intent remains fenced until real PTY output is rendered. Keyboard activity
-owned by the previous focus target retires that intent instead of being replayed
-or filtered inside xterm. First output is not treated as shell readiness.
+focus intent remains pending until real PTY output is rendered. The intent does
+not move DOM focus or consume input. A later pointer action or window blur
+retires it; keyboard activity does not. The client deliberately does not track
+held keys across focus targets, so a repeat may follow focus into the selected terminal. First
+output is not treated as shell readiness.
 
 ## P2: Further tighten client projection boundaries
 

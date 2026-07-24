@@ -18,6 +18,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/WorkspacePaneTabTitle.tsx'
+import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 export type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 
@@ -81,6 +82,11 @@ export function WorkspacePaneTabSwitcherPopover({
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           contentRef.current?.focus({ preventScroll: true })
+        }}
+        onCloseAutoFocus={(event) => {
+          // A terminal may win the focus race before Radix finishes closing.
+          // Preserve that completed handoff instead of restoring the trigger.
+          if (terminalHasKeyboardFocus()) event.preventDefault()
         }}
       >
         <ScrollArea className="max-h-64" scrollbarMode="compact">
@@ -251,9 +257,7 @@ function WorkspacePaneTabChrome({
           onClose: (event: React.MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
         } as const)
   const collectionAria =
-    index !== undefined && total !== undefined
-      ? { 'aria-posinset': index + 1, 'aria-setsize': total }
-      : {}
+    index !== undefined && total !== undefined ? { 'aria-posinset': index + 1, 'aria-setsize': total } : {}
   return (
     <ToolbarClosableTab
       containerProps={{

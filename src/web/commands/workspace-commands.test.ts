@@ -187,7 +187,7 @@ import {
   type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetPrimaryWindowPresentationForTest } from '#/web/primary-window-presentation.ts'
-import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { resetTerminalAutoFocusForTest, terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -223,6 +223,7 @@ const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
+  resetTerminalAutoFocusForTest()
   resetWorkspacePaneActionQueueForTest()
   resetPrimaryWindowPresentationForTest()
   primaryWindowQueryClient.clear()
@@ -236,7 +237,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetTerminalAutoFocusForTest()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
   resetTerminalActionDialogsStore()
@@ -553,6 +554,7 @@ describe('workspace commands', () => {
     })
     const createTerminal = vi.fn(async () => 'terminal-new')
     const selectTerminal = vi.fn()
+    const focusTerminal = vi.fn(() => false)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey: WORKTREE_KEY,
@@ -588,6 +590,7 @@ describe('workspace commands', () => {
       }),
       createTerminal,
       selectTerminal,
+      focusTerminal,
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchTerminalSession })
@@ -607,6 +610,10 @@ describe('workspace commands', () => {
     )
     expect(createTerminal).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
+    expect(focusTerminal).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
+    )
   })
 
   test('terminal primary action still records the opener when it creates a new terminal', async () => {
@@ -1141,7 +1148,6 @@ describe('workspace commands', () => {
   })
 
   test('different terminal create shapes serialize through the same target queue', async () => {
-    installTerminalFocusSink()
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1262,7 +1268,7 @@ describe('workspace commands', () => {
     if (!focusRequest) throw new Error('expected focus request')
     expect(focusRequest.isCurrent()).toBe(true)
     focusRequest.onSettled?.()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
+    expect(terminalHasKeyboardFocus()).toBe(false)
   })
 
   test('new terminal tab command does not navigate when the server rejects a stale workspace runtime', async () => {
@@ -2811,10 +2817,12 @@ describe('workspace commands', () => {
       return true
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
+    const focusTerminal = vi.fn(() => false)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal,
+      focusTerminal,
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
 
@@ -2844,6 +2852,7 @@ describe('workspace commands', () => {
     )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(selectTerminal).not.toHaveBeenCalled()
+    expect(focusTerminal).toHaveBeenCalledOnce()
   })
 
   test('select workspace pane tab by index ignores a pending terminal tab', async () => {
@@ -2899,10 +2908,12 @@ describe('workspace commands', () => {
       useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
+    const focusTerminal = vi.fn(() => false)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal,
+      focusTerminal,
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
@@ -2934,6 +2945,7 @@ describe('workspace commands', () => {
     )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(selectTerminal).not.toHaveBeenCalled()
+    expect(focusTerminal).toHaveBeenCalledOnce()
   })
 
   test('move workspace pane tab command works for branch-scope tabs without a worktree', async () => {
@@ -3429,13 +3441,6 @@ function navigationWith(
     openCreateWorktree: () => {},
     ...overrides,
   })
-}
-
-function installTerminalFocusSink(): void {
-  const sink = document.createElement('div')
-  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  sink.tabIndex = -1
-  document.body.append(sink)
 }
 
 function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): TerminalFilesystemTargetSnapshot {

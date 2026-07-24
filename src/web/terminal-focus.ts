@@ -6,163 +6,65 @@ import {
 } from '#/web/primary-window-presentation.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
-export const TERMINAL_INPUT_FOCUS_SINK_ID = 'goblin-terminal-input-focus-sink'
-
 type FocusTerminal = (
   terminalSessionId: string,
   request: { isCurrent: () => boolean; onSettled: () => void },
 ) => boolean
-
-export interface TerminalInputFocusLease {
-  commit(terminalSessionId: string, focusTerminal: FocusTerminal): void
-  release(): void
-}
-
-export interface TerminalInputFocusAdmission {
-  kind: 'keyboard'
-  initiatingKey: string
-}
 
 export interface TerminalPresentationFocusEffects {
   onCommit(): void
   onAbandon(): void
 }
 
-interface TerminalInputFocusRecord {
+export interface TerminalAutoFocusLease {
+  commit(terminalSessionId: string, focusTerminal: FocusTerminal): void
+  release(): void
+}
+
+interface TerminalAutoFocusRecord {
   token: PrimaryWindowPresentationToken
   terminalSessionId: string | null
   state: 'claimed' | 'pending' | 'accepted' | 'settled' | 'abandoned'
-  releaseGateKeys: Set<string>
-  focusTerminal: FocusTerminal | null
-  releaseKeyboardActivityObservation: () => void
+  releaseAbandonObservation: () => void
   releasePresentationAbandon: () => void
 }
 
-interface TerminalInputKeyboardActivity {
-  references: number
-  pressedKeys: Set<string>
-  dispose: () => void
-}
-
-// One sink has at most one focus intent for a presentation generation. A
-// settled record deliberately remains until the next generation so a remount
-// cannot recreate and replay the same intent.
-const terminalInputFocusBySink = new WeakMap<HTMLElement, TerminalInputFocusRecord>()
-const terminalInputKeyboardActivityByDocument = new WeakMap<Document, TerminalInputKeyboardActivity>()
-
-/** Tracks physical key ownership before a terminal navigation claims focus. */
-export function observeTerminalInputKeyboardActivity(): () => void {
-  if (typeof document === 'undefined') return () => {}
-  const ownerDocument = document
-  let activity = terminalInputKeyboardActivityByDocument.get(ownerDocument)
-  if (!activity) {
-    const pressedKeys = new Set<string>()
-    const onKeyDown = (event: KeyboardEvent) => {
-      const key = keyboardIdentity(event)
-      if (!key) return
-      pressedKeys.add(key)
-    }
-    const onKeyUp = (event: KeyboardEvent) => {
-      const key = keyboardIdentity(event)
-      if (!key) return
-      pressedKeys.delete(key)
-    }
-    const clearPressedKeys = () => {
-      pressedKeys.clear()
-    }
-    ownerDocument.addEventListener('keydown', onKeyDown, true)
-    ownerDocument.addEventListener('keyup', onKeyUp, true)
-    ownerDocument.defaultView?.addEventListener('blur', clearPressedKeys)
-    activity = {
-      references: 0,
-      pressedKeys,
-      dispose: () => {
-        ownerDocument.removeEventListener('keydown', onKeyDown, true)
-        ownerDocument.removeEventListener('keyup', onKeyUp, true)
-        ownerDocument.defaultView?.removeEventListener('blur', clearPressedKeys)
-      },
-    }
-    terminalInputKeyboardActivityByDocument.set(ownerDocument, activity)
-  }
-  activity.references += 1
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    const current = terminalInputKeyboardActivityByDocument.get(ownerDocument)
-    if (!current) return
-    current.references -= 1
-    if (current.references > 0) return
-    current.dispose()
-    terminalInputKeyboardActivityByDocument.delete(ownerDocument)
-  }
-}
+// One document has at most one automatic-focus intent for a presentation
+// generation. A settled record deliberately remains until the next generation
+// so a remount cannot recreate and replay the same intent.
+const terminalAutoFocusByDocument = new WeakMap<Document, TerminalAutoFocusRecord>()
 
 /**
- * Claims keyboard ownership for an app-owned terminal navigation. Calling this
- * is the admission boundary that may move focus to the hidden sink; later
- * mount/render code can only fulfil this record.
+ * Records an app-owned intent to focus the terminal selected by a navigation.
+ * It does not move DOM focus or intercept keyboard input. The selected session
+ * fulfils the intent only after its own presentation boundary admits focus.
  */
-export function claimTerminalInputFocus(
-  token: PrimaryWindowPresentationToken,
-  admission?: TerminalInputFocusAdmission,
-): TerminalInputFocusLease | null {
-  const sink = terminalInputFocusSink()
-  if (!sink || !primaryWindowPresentationIsCurrent(token)) return null
-  const existing = terminalInputFocusBySink.get(sink)
+export function claimTerminalAutoFocus(token: PrimaryWindowPresentationToken): TerminalAutoFocusLease | null {
+  const ownerDocument = currentDocument()
+  if (!ownerDocument || !primaryWindowPresentationIsCurrent(token)) return null
+  const existing = terminalAutoFocusByDocument.get(ownerDocument)
   if (existing?.token.generation === token.generation) return null
-  const keyboardActivity = terminalInputKeyboardActivityByDocument.get(sink.ownerDocument)
-  const releaseGateKeys = new Set(keyboardActivity?.pressedKeys ?? [])
-  if (admission) releaseGateKeys.add(admission.initiatingKey)
 
-  const record: TerminalInputFocusRecord = {
+  const record: TerminalAutoFocusRecord = {
     token,
     terminalSessionId: null,
     state: 'claimed',
-    releaseGateKeys,
-    focusTerminal: null,
-    releaseKeyboardActivityObservation: () => {},
+    releaseAbandonObservation: () => {},
     releasePresentationAbandon: () => {},
   }
-  terminalInputFocusBySink.set(sink, record)
-  const holdKey = (event: KeyboardEvent) => {
-    const key = keyboardIdentity(event)
-    if (key) record.releaseGateKeys.add(key)
-    event.preventDefault()
-    event.stopPropagation()
-  }
-  const releaseClaimedKey = (event: KeyboardEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const key = keyboardIdentity(event)
-    if (!key || !record.releaseGateKeys.delete(key) || record.releaseGateKeys.size > 0) return
-    submitStoredTerminalInputFocus(sink, record)
-  }
-  const abandonOnWindowBlur = () => abandonTerminalInputFocus(sink, record)
-  sink.addEventListener('keydown', holdKey, true)
-  sink.addEventListener('keyup', releaseClaimedKey, true)
-  sink.ownerDocument.defaultView?.addEventListener('blur', abandonOnWindowBlur)
-  record.releaseKeyboardActivityObservation = () => {
-    sink.removeEventListener('keydown', holdKey, true)
-    sink.removeEventListener('keyup', releaseClaimedKey, true)
-    sink.ownerDocument.defaultView?.removeEventListener('blur', abandonOnWindowBlur)
-  }
-  sink.focus({ preventScroll: true })
-  if (document.activeElement !== sink) {
-    abandonTerminalInputFocus(sink, record)
-    return null
-  }
+  terminalAutoFocusByDocument.set(ownerDocument, record)
   record.releasePresentationAbandon = registerPrimaryWindowPresentationAbandon(token, () => {
-    abandonTerminalInputFocus(sink, record)
+    abandonTerminalAutoFocus(record)
   })
   if (record.state === 'abandoned') return null
+  record.releaseAbandonObservation = observeAutoFocusAbandon(ownerDocument, record)
 
   return {
     commit(terminalSessionId, focusTerminal) {
-      commitTerminalInputFocus(sink, record, terminalSessionId, focusTerminal)
+      commitTerminalAutoFocus(ownerDocument, record, terminalSessionId, focusTerminal)
     },
     release() {
-      abandonTerminalInputFocus(sink, record)
+      abandonTerminalAutoFocus(record)
     },
   }
 }
@@ -171,7 +73,7 @@ export function claimTerminalPresentationFocus(
   token: PrimaryWindowPresentationToken,
   terminalSessionId: string,
 ): TerminalPresentationFocusEffects | null {
-  const lease = claimTerminalInputFocus(token)
+  const lease = claimTerminalAutoFocus(token)
   if (!lease) return null
   let transferred = false
   return {
@@ -192,144 +94,141 @@ export function claimTerminalPresentationFocus(
 }
 
 /**
- * Fulfils the current generation's admitted focus intent when its xterm mounts.
- * An initial terminal URL has no app-owned navigation admission, so it may
- * create one intent only while focus is still on the neutral document surface.
+ * Fulfils the current generation's focus intent when its xterm mounts. An
+ * initial terminal URL has no app-owned navigation intent, so it may create one
+ * only while focus is still on the neutral document surface.
  */
 export function fulfillTerminalPresentationFocus(terminalSessionId: string, focusTerminal: FocusTerminal): void {
-  const sink = terminalInputFocusSink()
-  if (!sink) return
+  const ownerDocument = currentDocument()
+  if (!ownerDocument) return
   const token = currentPrimaryWindowPresentationToken()
-  const existing = terminalInputFocusBySink.get(sink)
+  const existing = terminalAutoFocusByDocument.get(ownerDocument)
   if (existing?.token.generation === token.generation) {
     if (existing.terminalSessionId === terminalSessionId && existing.state === 'pending') {
-      submitTerminalInputFocus(sink, existing, focusTerminal)
+      submitTerminalAutoFocus(ownerDocument, existing, focusTerminal)
     }
     return
   }
-  if (!documentFocusIsNeutral()) return
-  claimTerminalInputFocus(token)?.commit(terminalSessionId, focusTerminal)
+  if (!documentFocusIsNeutral(ownerDocument)) return
+  claimTerminalAutoFocus(token)?.commit(terminalSessionId, focusTerminal)
 }
 
-export function terminalOwnsKeyboardInput(): boolean {
+export function terminalHasKeyboardFocus(): boolean {
   const activeElement =
     typeof document !== 'undefined' && typeof HTMLElement !== 'undefined' ? document.activeElement : null
-  if (!(activeElement instanceof HTMLElement)) return false
-  if (activeElement.closest('.goblin-managed-terminal-host')) return true
-  if (activeElement.id !== TERMINAL_INPUT_FOCUS_SINK_ID) return false
-  const record = terminalInputFocusBySink.get(activeElement)
-  return (
-    !!record &&
-    record.state !== 'settled' &&
-    record.state !== 'abandoned' &&
-    primaryWindowPresentationIsCurrent(record.token)
-  )
+  return activeElement instanceof HTMLElement && !!activeElement.closest('.goblin-managed-terminal-host')
 }
 
-function commitTerminalInputFocus(
-  sink: HTMLElement,
-  record: TerminalInputFocusRecord,
+/** Cancels automatic focus when another UI explicitly takes focus ownership. */
+export function cancelTerminalAutoFocus(): void {
+  const ownerDocument = currentDocument()
+  if (!ownerDocument) return
+  const record = terminalAutoFocusByDocument.get(ownerDocument)
+  if (record) abandonTerminalAutoFocus(record)
+}
+
+export function resetTerminalAutoFocusForTest(): void {
+  const ownerDocument = currentDocument()
+  if (!ownerDocument) return
+  const record = terminalAutoFocusByDocument.get(ownerDocument)
+  if (record) abandonTerminalAutoFocus(record)
+  terminalAutoFocusByDocument.delete(ownerDocument)
+}
+
+function commitTerminalAutoFocus(
+  ownerDocument: Document,
+  record: TerminalAutoFocusRecord,
   terminalSessionId: string,
   focusTerminal: FocusTerminal,
 ): void {
   if (record.state !== 'claimed' && record.state !== 'pending') return
-  if (!terminalInputFocusIsCurrent(sink, record)) {
-    abandonTerminalInputFocus(sink, record)
+  if (!terminalAutoFocusIsCurrent(ownerDocument, record)) {
+    abandonTerminalAutoFocus(record)
     return
   }
   if (record.terminalSessionId !== null && record.terminalSessionId !== terminalSessionId) {
-    abandonTerminalInputFocus(sink, record)
+    abandonTerminalAutoFocus(record)
     return
   }
   record.terminalSessionId = terminalSessionId
-  record.focusTerminal = focusTerminal
-  submitStoredTerminalInputFocus(sink, record)
+  submitTerminalAutoFocus(ownerDocument, record, focusTerminal)
 }
 
-function submitStoredTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusRecord): void {
-  const focusTerminal = record.focusTerminal
-  if (!focusTerminal || record.releaseGateKeys.size > 0) return
-  submitTerminalInputFocus(sink, record, focusTerminal)
-}
-
-function submitTerminalInputFocus(
-  sink: HTMLElement,
-  record: TerminalInputFocusRecord,
+function submitTerminalAutoFocus(
+  ownerDocument: Document,
+  record: TerminalAutoFocusRecord,
   focusTerminal: FocusTerminal,
 ): void {
   if ((record.state !== 'claimed' && record.state !== 'pending') || record.terminalSessionId === null) return
-  record.focusTerminal = focusTerminal
-  if (record.releaseGateKeys.size > 0) return
-  if (!terminalInputFocusIsCurrent(sink, record)) {
-    abandonTerminalInputFocus(sink, record)
+  if (!terminalAutoFocusIsCurrent(ownerDocument, record)) {
+    abandonTerminalAutoFocus(record)
     return
   }
-  const isCurrent = () =>
-    record.state === 'accepted' && record.releaseGateKeys.size === 0 && terminalInputFocusIsCurrent(sink, record)
+  const isCurrent = () => record.state === 'accepted' && terminalAutoFocusIsCurrent(ownerDocument, record)
   const onSettled = () => {
     if (record.state !== 'accepted') return
-    if (record.releaseGateKeys.size > 0 && terminalInputFocusIsCurrent(sink, record)) {
-      record.state = 'pending'
-      return
-    }
-    settleTerminalInputFocus(sink, record)
+    settleTerminalAutoFocus(record)
   }
   record.state = 'accepted'
   try {
     if (focusTerminal(record.terminalSessionId, { isCurrent, onSettled })) return
   } catch (error) {
-    abandonTerminalInputFocus(sink, record)
+    abandonTerminalAutoFocus(record)
     throw error
   }
   if (record.state === 'accepted') record.state = 'pending'
 }
 
-function terminalInputFocusIsCurrent(sink: HTMLElement, record: TerminalInputFocusRecord): boolean {
-  return (
-    terminalInputFocusBySink.get(sink) === record &&
-    primaryWindowPresentationIsCurrent(record.token) &&
-    document.activeElement === sink
-  )
+function observeAutoFocusAbandon(ownerDocument: Document, record: TerminalAutoFocusRecord): () => void {
+  let disposed = false
+  let installed = false
+  const abandon = () => abandonTerminalAutoFocus(record)
+  // The action that claimed the intent may itself be handling a pointer event.
+  // Start observing after that dispatch so only a later pointer intent cancels it.
+  queueMicrotask(() => {
+    if (disposed || !terminalAutoFocusIsCurrent(ownerDocument, record)) return
+    installed = true
+    ownerDocument.addEventListener('pointerdown', abandon, true)
+    ownerDocument.defaultView?.addEventListener('blur', abandon)
+  })
+  return () => {
+    disposed = true
+    if (!installed) return
+    ownerDocument.removeEventListener('pointerdown', abandon, true)
+    ownerDocument.defaultView?.removeEventListener('blur', abandon)
+  }
 }
 
-function settleTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusRecord): void {
+function terminalAutoFocusIsCurrent(ownerDocument: Document, record: TerminalAutoFocusRecord): boolean {
+  return terminalAutoFocusByDocument.get(ownerDocument) === record && primaryWindowPresentationIsCurrent(record.token)
+}
+
+function settleTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
   record.state = 'settled'
-  record.focusTerminal = null
-  record.releaseGateKeys.clear()
-  record.releaseKeyboardActivityObservation()
-  record.releaseKeyboardActivityObservation = () => {}
-  record.releasePresentationAbandon()
-  record.releasePresentationAbandon = () => {}
-  if (terminalInputFocusBySink.get(sink) === record && document.activeElement === sink) sink.blur()
+  releaseTerminalAutoFocus(record)
 }
 
-function abandonTerminalInputFocus(sink: HTMLElement, record: TerminalInputFocusRecord): void {
+function abandonTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
   if (record.state === 'settled' || record.state === 'abandoned') return
   record.state = 'abandoned'
-  record.focusTerminal = null
-  record.releaseGateKeys.clear()
-  record.releaseKeyboardActivityObservation()
-  record.releaseKeyboardActivityObservation = () => {}
-  record.releasePresentationAbandon()
-  record.releasePresentationAbandon = () => {}
-  if (terminalInputFocusBySink.get(sink) === record && document.activeElement === sink) sink.blur()
+  releaseTerminalAutoFocus(record)
 }
 
-function documentFocusIsNeutral(): boolean {
-  if (typeof document === 'undefined') return false
+function releaseTerminalAutoFocus(record: TerminalAutoFocusRecord): void {
+  record.releaseAbandonObservation()
+  record.releaseAbandonObservation = () => {}
+  record.releasePresentationAbandon()
+  record.releasePresentationAbandon = () => {}
+}
+
+function documentFocusIsNeutral(ownerDocument: Document): boolean {
   return (
-    document.activeElement === null ||
-    document.activeElement === document.body ||
-    document.activeElement === document.documentElement
+    ownerDocument.activeElement === null ||
+    ownerDocument.activeElement === ownerDocument.body ||
+    ownerDocument.activeElement === ownerDocument.documentElement
   )
 }
 
-function terminalInputFocusSink(): HTMLElement | null {
-  if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') return null
-  const sink = document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)
-  return sink instanceof HTMLElement ? sink : null
-}
-
-function keyboardIdentity(event: KeyboardEvent): string {
-  return event.code || event.key
+function currentDocument(): Document | null {
+  return typeof document === 'undefined' ? null : document
 }

@@ -32,7 +32,7 @@ import {
   primaryWindowPresentationIsCurrent,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
-import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 
 const terminalBase: TerminalSessionBase = {
   target: {
@@ -54,13 +54,15 @@ const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
+    resetTerminalAutoFocusForTest()
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
     resetPrimaryWindowPresentationForTest()
   })
 
   afterEach(() => {
-    document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+    resetTerminalAutoFocusForTest()
+    document.body.replaceChildren()
   })
 
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
@@ -226,11 +228,13 @@ describe('workspace pane runtime tab command actions', () => {
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('primary terminal action owns keyboard input until the committed terminal settles focus', async () => {
-    installTerminalFocusSink()
+  test('primary terminal action preserves DOM focus until the committed terminal accepts focus', async () => {
+    const actionTarget = document.createElement('button')
+    document.body.appendChild(actionTarget)
+    actionTarget.focus()
     const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
     const showTerminalSession = vi.fn((_sessionId, routeRequest) => {
-      expect(terminalOwnsKeyboardInput()).toBe(true)
+      expect(document.activeElement).toBe(actionTarget)
       routeRequest.onCommit()
       return true
     })
@@ -271,14 +275,12 @@ describe('workspace pane runtime tab command actions', () => {
     const focusRequest = focusTerminal.mock.calls[0]![1]
     if (!focusRequest) throw new Error('missing focus request')
     expect(focusRequest.isCurrent()).toBe(true)
-    expect(terminalOwnsKeyboardInput()).toBe(true)
+    expect(document.activeElement).toBe(actionTarget)
 
     focusRequest.onSettled?.()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('primary terminal action queues existing-session focus behind workspace pane coordination', async () => {
-    installTerminalFocusSink()
     let releaseCoordinator!: () => void
     let markCoordinatorStarted!: () => void
     const coordinatorStarted = new Promise<void>((resolve) => {
@@ -335,11 +337,9 @@ describe('workspace pane runtime tab command actions', () => {
     await Promise.resolve()
 
     expect(showTerminalSession).not.toHaveBeenCalled()
-    expect(terminalOwnsKeyboardInput()).toBe(true)
 
     sessions = [terminalSession('term-222222222222222222222', true)]
     beginPrimaryWindowPresentation()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
     releaseCoordinator()
     await coordinatorBlocker
 
@@ -437,7 +437,6 @@ describe('workspace pane runtime tab command actions', () => {
   })
 
   test('new terminal action joins a pending duplicate create through terminal ownership', async () => {
-    installTerminalFocusSink()
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
@@ -500,7 +499,6 @@ describe('workspace pane runtime tab command actions', () => {
     if (!focusRequest) throw new Error('missing focus request')
     expect(focusRequest.isCurrent()).toBe(true)
     focusRequest.onSettled?.()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('primary terminal action rejects when no bridge is available', async () => {
@@ -556,11 +554,4 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
   return { presentationToken: beginPrimaryWindowPresentation(), routeTarget: terminalRouteTarget }
-}
-
-function installTerminalFocusSink(): void {
-  const sink = document.createElement('div')
-  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  sink.tabIndex = -1
-  document.body.append(sink)
 }

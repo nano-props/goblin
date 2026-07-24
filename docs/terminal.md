@@ -68,19 +68,20 @@ geometry and the matching headless-render size.
 - Input and resize authority belong to the current controller only.
 - Takeover is an explicit handoff flow, not implicit behavior triggered by random input.
 
-### Input admission
+### Input and automatic focus
 
 - A hidden, pending terminal presentation accepts no local input. Input is
   discarded rather than buffered for later delivery.
 - A fresh stream may reveal an empty fitted xterm, but automatic focus remains
-  on the transition sink until real PTY output has been parsed and the resulting
-  viewport has rendered. A deliberate focus request or pointer click may enter
-  a visible quiet process immediately.
-- Keyboard activity that began before or arrived during terminal navigation is
-  discarded at the transition sink rather than inherited, filtered inside
-  xterm, or replayed. It temporarily gates automatic focus; releasing the held
-  keys retries the still-current intent. A route, generation, window-focus, or
-  explicit focus-owner change retires it.
+  pending until real PTY output has been parsed and the resulting viewport has
+  rendered. Pending focus never moves the DOM to a transition element and never
+  consumes keyboard events. A deliberate focus request or pointer click may
+  enter a visible quiet process immediately.
+- Automatic focus is one presentation-generation-scoped intent. A subsequent
+  pointer action or window blur retires it; programmatic popover cleanup and
+  keyboard activity do not. The client deliberately keeps no global pressed-key
+  registry or navigation-time keyboard gate; a physically held key may therefore
+  repeat into a terminal that receives focus during the hold.
 - A presented controller forwards xterm input directly through the
   generation-bearing write operation. A viewer or stale generation cannot
   write.
@@ -482,8 +483,8 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - Replay is a rendering concern built on top of server-owned session state.
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
 - Replay should not redefine control or session identity.
-- Recovery replay occurs only while the local presentation is hidden and input
-  admission is closed.
+- Recovery replay occurs only while the local presentation is hidden and its
+  generation-bearing writer rejects local input.
 - Same-session active-view replay is not a generic repair mechanism.
 
 ### Input during presentation
@@ -498,14 +499,15 @@ with no output so a quiet process cannot deadlock waiting for stdin.
 
 Recovery snapshots may fulfil the pending automatic focus intent at reveal. A
 fresh stream fulfils it only after real PTY output has been parsed and a
-subsequent full-viewport render has completed. Keyboard activity already held
-when navigation began or reaching the transition sink while the intent is
-pending temporarily gates that transfer. The sink keeps discarding the input
-and retries the still-current intent after all held keys are released. The user
-may still explicitly click or focus the visible terminal, including a quiet one.
-First output is not a server lifecycle or shell-readiness signal; it is only a
-client-side fence preventing an old keyboard stream from entering a blank fresh
-presentation. Only a presented controller can send generation-bearing writes.
+subsequent full-viewport render has completed. The intent does not move DOM
+focus or intercept input while it waits. A later user pointer action or window
+blur retires the intent; keyboard activity and focus restoration performed by a
+popover close do not. The user may still explicitly click or focus the visible
+terminal, including a quiet one. The client does not track the origin of repeat
+events, so a physically held key may follow focus into that terminal. First
+output is not a server lifecycle or shell-readiness signal; it only makes
+automatic focus wait for a real rendered frame. Only a presented controller can
+send generation-bearing writes.
 
 ### Fresh stream and recovery frame contract
 

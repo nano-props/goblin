@@ -31,7 +31,7 @@ import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
-import { fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
+import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
 import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
@@ -156,6 +156,7 @@ export function TerminalSessionView({
       if (isTerminalSearchShortcut(event)) {
         event.preventDefault()
         event.stopPropagation()
+        cancelTerminalAutoFocus()
         setSearchOpen(true)
         return
       }

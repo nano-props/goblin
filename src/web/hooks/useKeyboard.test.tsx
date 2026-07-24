@@ -45,11 +45,7 @@ import {
   beginPrimaryWindowPresentation,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
-import {
-  claimTerminalInputFocus,
-  observeTerminalInputKeyboardActivity,
-  TERMINAL_INPUT_FOCUS_SINK_ID,
-} from '#/web/terminal-focus.ts'
+import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
@@ -86,32 +82,34 @@ interface HookHostOptions {
 }
 
 beforeEach(() => {
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
 })
 
 afterEach(() => {
-  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
   setTerminalSessionCommandBridge(null)
   delete testWindow.goblinNative
+  document.body.replaceChildren()
 })
 
 describe('useKeyboard', () => {
-  test('does not dispatch bare branch shortcuts while terminal creation owns keyboard admission', async () => {
+  test('does not dispatch bare branch shortcuts while an xterm owns keyboard focus', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
     })
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
-    const sink = document.createElement('div')
-    sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-    sink.tabIndex = -1
-    document.body.appendChild(sink)
-    const presentation = beginPrimaryWindowPresentation()
-    expect(claimTerminalInputFocus(presentation)).not.toBeNull()
+    const host = document.createElement('div')
+    host.className = 'goblin-managed-terminal-host'
+    const textarea = document.createElement('textarea')
+    host.appendChild(textarea)
+    document.body.appendChild(host)
+    textarea.focus()
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }))
@@ -119,6 +117,31 @@ describe('useKeyboard', () => {
     })
 
     expect(branchShortcutMocks.runBranchActionShortcut).not.toHaveBeenCalled()
+  })
+
+  test('does not suppress a later workspace shortcut while automatic terminal focus is pending', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+    })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowPresentation())
+    if (!lease) throw new Error('expected terminal automatic-focus lease')
+    const keydown = new KeyboardEvent('keydown', {
+      key: 'p',
+      code: 'KeyP',
+      bubbles: true,
+      cancelable: true,
+    })
+    await Promise.resolve()
+
+    await act(async () => {
+      document.body.dispatchEvent(keydown)
+      await Promise.resolve()
+    })
+
+    expect(branchShortcutMocks.runBranchActionShortcut).toHaveBeenCalledOnce()
   })
 
   test('esc exits the settings route', async () => {
@@ -157,6 +180,7 @@ describe('useKeyboard', () => {
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal,
+      focusTerminal: vi.fn(() => false),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -289,6 +313,7 @@ describe('useKeyboard', () => {
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal,
+      focusTerminal: vi.fn(() => false),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -370,7 +395,7 @@ describe('useKeyboard', () => {
     expect(createTerminal).toHaveBeenCalledTimes(1)
   })
 
-  test('keeps the initiating key gated when Ctrl+T is admitted during window capture', async () => {
+  test('dispatches Ctrl+T without waiting for the initiating key to be released', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -414,39 +439,32 @@ describe('useKeyboard', () => {
       worktreePath: WORKTREE_PATH,
       route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
-    const sink = installTerminalFocusSink()
-    const stopObservingKeyboardActivity = observeTerminalInputKeyboardActivity()
-
-    try {
-      await act(async () => {
-        document.body.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
-        )
-        document.body.dispatchEvent(
-          new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }),
-        )
-        await Promise.resolve()
-      })
-      await vi.waitFor(() =>
-        expect(observedWorkspacePaneRouteForTarget(REPO_ID, 'feature/worktree')).toEqual({
-          kind: 'terminal',
-          terminalSessionId: 'term-222222222222222222222',
-        }),
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 't',
+      code: 'KeyT',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
       )
+      document.body.dispatchEvent(shortcut)
+      await Promise.resolve()
+    })
+    await vi.waitFor(() =>
+      expect(observedWorkspacePaneRouteForTarget(REPO_ID, 'feature/worktree')).toEqual({
+        kind: 'terminal',
+        terminalSessionId: 'term-222222222222222222222',
+      }),
+    )
 
-      expect(createTerminal).toHaveBeenCalledOnce()
-      expect(document.activeElement).toBe(sink)
-      expect(focusTerminal).not.toHaveBeenCalled()
-
-      sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', code: 'ControlLeft', bubbles: true }))
-      expect(focusTerminal).not.toHaveBeenCalled()
-      sink.dispatchEvent(new KeyboardEvent('keyup', { key: 't', code: 'KeyT', bubbles: true }))
-
-      expect(focusTerminal).toHaveBeenCalledOnce()
-      focusTerminal.mock.calls[0]![1]?.onSettled?.()
-    } finally {
-      stopObservingKeyboardActivity()
-    }
+    expect(shortcut.defaultPrevented).toBe(true)
+    expect(createTerminal).toHaveBeenCalledOnce()
+    expect(focusTerminal).toHaveBeenCalledOnce()
+    expect(focusTerminal.mock.calls[0]![1]?.isCurrent()).toBe(true)
+    focusTerminal.mock.calls[0]![1]?.onSettled?.()
   })
 
   test('primary modifier plus t creates a terminal for a workspace root target', async () => {
@@ -774,6 +792,38 @@ describe('useKeyboard', () => {
         worktreePath: WORKTREE_PATH,
       }),
     )
+
+    const repeatedClose = new KeyboardEvent('keydown', {
+      key: 'w',
+      code: 'KeyW',
+      ctrlKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      window.dispatchEvent(repeatedClose)
+      await Promise.resolve()
+    })
+
+    expect(repeatedClose.defaultPrevented).toBe(false)
+    expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
+
+    const secondClose = new KeyboardEvent('keydown', {
+      key: 'w',
+      code: 'KeyW',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      document.body.dispatchEvent(secondClose)
+      await Promise.resolve()
+    })
+
+    expect(secondClose.defaultPrevented).toBe(true)
+    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(2))
   })
 })
 
@@ -899,14 +949,6 @@ function installNativeBridgeStub() {
       setBadge: () => {},
     },
   })
-}
-
-function installTerminalFocusSink(): HTMLElement {
-  const sink = document.createElement('div')
-  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  sink.tabIndex = -1
-  document.body.appendChild(sink)
-  return sink
 }
 
 function terminalFilesystemTargetSnapshot(): TerminalFilesystemTargetSnapshot {

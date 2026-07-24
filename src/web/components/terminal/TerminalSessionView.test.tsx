@@ -21,7 +21,7 @@ import type {
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
-import { claimTerminalInputFocus, TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
+import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
@@ -302,10 +302,7 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 
 describe('TerminalSessionView', () => {
   test('retries precommitted focus after the StrictMode view reaches its stable mount', async () => {
-    const focusSink = document.createElement('div')
-    focusSink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-    focusSink.tabIndex = -1
-    document.body.appendChild(focusSink)
+    resetTerminalAutoFocusForTest()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
       terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -383,8 +380,8 @@ describe('TerminalSessionView', () => {
       subscribeSnapshot: () => () => {},
     }
     const presentationToken = beginPrimaryWindowPresentation()
-    const focusLease = claimTerminalInputFocus(presentationToken)
-    if (!focusLease) throw new Error('expected terminal input focus lease')
+    const focusLease = claimTerminalAutoFocus(presentationToken)
+    if (!focusLease) throw new Error('expected terminal automatic-focus lease')
     focusLease.commit('term-222222222222222222222', focusTerminal)
     expect(focusTerminal).toHaveBeenCalledOnce()
     expect(currentFocusRequest?.isCurrent()).toBe(false)
@@ -428,7 +425,7 @@ describe('TerminalSessionView', () => {
     } finally {
       currentFocusRequest?.onSettled?.()
       unmount()
-      focusSink.remove()
+      resetTerminalAutoFocusForTest()
     }
   })
 

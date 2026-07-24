@@ -20,7 +20,7 @@ import {
   primaryWindowPresentationIsCurrent,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
-import { TERMINAL_INPUT_FOCUS_SINK_ID, terminalOwnsKeyboardInput } from '#/web/terminal-focus.ts'
+import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import type {
   TerminalCreateCommandResult,
   TerminalCreatedTabCommitResult,
@@ -62,6 +62,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  resetTerminalAutoFocusForTest()
   resetPrimaryWindowPresentationForTest()
   resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
@@ -74,8 +75,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  document.getElementById(TERMINAL_INPUT_FOCUS_SINK_ID)?.remove()
+  resetTerminalAutoFocusForTest()
   resetWorkspacesStore()
+  document.body.replaceChildren()
 })
 
 describe('workspace pane runtime tab create action', () => {
@@ -244,7 +246,9 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('claims one presentation before dispatch and transfers focus only after route commit', async () => {
-    installTerminalFocusSink()
+    const createButton = document.createElement('button')
+    document.body.appendChild(createButton)
+    createButton.focus()
     const previousPresentation = beginPrimaryWindowPresentation()
     const heldCommand = holdTerminalCreateCommand()
     const navigation = Promise.withResolvers<boolean>()
@@ -264,7 +268,7 @@ describe('workspace pane runtime tab create action', () => {
     })
 
     expect(primaryWindowPresentationIsCurrent(previousPresentation)).toBe(false)
-    expect(terminalOwnsKeyboardInput()).toBe(true)
+    expect(document.activeElement).toBe(createButton)
     const commandInput = await heldCommand.input.promise
     const commit = commandInput.commitCreatedTerminalTab(createAdmission())
     const routeRequest = await routeStarted.promise
@@ -285,11 +289,9 @@ describe('workspace pane runtime tab create action', () => {
     await expect(dispatch).resolves.toEqual(committedCreateCommandResult())
 
     focusRequest.onSettled?.()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
-  test('releases focus ownership when terminal creation fails', async () => {
-    installTerminalFocusSink()
+  test('releases automatic focus when terminal creation fails', async () => {
     terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValueOnce({
       ok: false,
       error: new Error('create failed'),
@@ -306,14 +308,11 @@ describe('workspace pane runtime tab create action', () => {
       focusTerminal,
     })
 
-    expect(terminalOwnsKeyboardInput()).toBe(true)
     await expect(dispatch).resolves.toMatchObject({ ok: false })
-    expect(terminalOwnsKeyboardInput()).toBe(false)
     expect(focusTerminal).not.toHaveBeenCalled()
   })
 
-  test('releases focus ownership when the create target is superseded', async () => {
-    installTerminalFocusSink()
+  test('releases automatic focus when the create target is superseded', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const showCreatedTerminalTab = vi.fn(() => true)
     const focusTerminal = vi.fn()
@@ -338,11 +337,9 @@ describe('workspace pane runtime tab create action', () => {
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
     expect(focusTerminal).not.toHaveBeenCalled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
-  test('releases focus ownership when navigation rejects the created route', async () => {
-    installTerminalFocusSink()
+  test('releases automatic focus when navigation rejects the created route', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
@@ -358,7 +355,6 @@ describe('workspace pane runtime tab create action', () => {
     await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({
       status: 'navigation-rejected',
     })
-    expect(terminalOwnsKeyboardInput()).toBe(false)
     heldCommand.result.resolve({
       ok: true,
       terminalSessionId: TERMINAL_SESSION_ID,
@@ -369,7 +365,6 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('does not focus when an older create commits after a newer presentation', async () => {
-    installTerminalFocusSink()
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
@@ -388,7 +383,6 @@ describe('workspace pane runtime tab create action', () => {
     await dispatch
 
     expect(focusTerminal).not.toHaveBeenCalled()
-    expect(terminalOwnsKeyboardInput()).toBe(false)
   })
 
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
@@ -511,14 +505,6 @@ function createdTerminalRouteRequest(
   routeTarget: CreatedTerminalRouteRequest['routeTarget'] = BRANCH_ROUTE_TARGET,
 ): CreatedTerminalRouteRequest {
   return { presentationToken: beginPrimaryWindowPresentation(), routeTarget }
-}
-
-function installTerminalFocusSink(): HTMLElement {
-  const sink = document.createElement('div')
-  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
-  sink.tabIndex = -1
-  document.body.append(sink)
-  return sink
 }
 
 interface HeldTerminalCreateCommandInput {
