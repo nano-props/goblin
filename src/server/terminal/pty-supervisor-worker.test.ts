@@ -59,6 +59,7 @@ function buildSupervisor(
   worker: FakeWorker,
   options: {
     now?: () => number
+    spawnAckTimeoutMs?: number
     writeAckTimeoutMs?: number
     resizeAckTimeoutMs?: number
     maxPendingWriteBytes?: number
@@ -68,6 +69,7 @@ function buildSupervisor(
     workerEntry: '/tmp/pty-worker.js',
     spawnWorker: () => worker as never,
     now: options.now,
+    spawnAckTimeoutMs: options.spawnAckTimeoutMs,
     writeAckTimeoutMs: options.writeAckTimeoutMs,
     resizeAckTimeoutMs: options.resizeAckTimeoutMs,
     maxPendingWriteBytes: options.maxPendingWriteBytes,
@@ -175,6 +177,112 @@ describe('WorkerBackedPtySupervisor', () => {
     } satisfies PtyWorkerMessage)
 
     await expect(promise).resolves.toEqual({ ok: false, message: 'spawn failed' })
+  })
+
+  test('invalidates a connected worker whose spawn acknowledgement never arrives', async () => {
+    vi.useFakeTimers()
+    const workerA = new FakeWorker()
+    const workerB = new FakeWorker()
+    const workers = [workerA, workerB]
+    const supervisor = new WorkerBackedPtySupervisor({
+      workerEntry: '/tmp/pty-worker.js',
+      spawnWorker: () => workers.shift() as never,
+      spawnAckTimeoutMs: 10_000,
+    })
+
+    const liveSpawn = supervisor.spawn({ cwd: '/repo/live', cols: 80, rows: 24 })
+    const liveRequest = workerA.sent[0] as SpawnRequest
+    workerA.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: liveRequest.requestId,
+      ok: true,
+      ptySessionId: liveRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    const live = await liveSpawn
+    if (!live.ok) throw new Error(live.message)
+    const liveExit = vi.fn()
+    live.events.claim({ onData: vi.fn(), onExit: liveExit }).activate()
+
+    const firstPending = supervisor.spawn({ cwd: '/repo/first', cols: 100, rows: 30 })
+    const secondPending = supervisor.spawn({ cwd: '/repo/second', cols: 120, rows: 40 })
+    const firstRequest = workerA.sent[1] as SpawnRequest
+    let firstSettled = false
+    void firstPending.then(() => {
+      firstSettled = true
+    })
+
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(firstSettled).toBe(false)
+    expect(workerA.killed).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(firstPending).resolves.toEqual({ ok: false, message: 'PTY worker spawn timed out' })
+    await expect(secondPending).resolves.toEqual({ ok: false, message: 'PTY worker spawn timed out' })
+    expect(workerA.killed).toBe(true)
+    expect(liveExit).toHaveBeenCalledWith(null, null)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'timeout',
+        detail: `action=pty-spawn ptySessionId=${firstRequest.ptySessionId} timeoutMs=10000`,
+      },
+    })
+
+    workerA.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: firstRequest.requestId,
+      ok: true,
+      ptySessionId: firstRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+
+    const retry = supervisor.spawn({ cwd: '/repo/retry', cols: 80, rows: 24 })
+    const retryRequest = workerB.sent[0] as SpawnRequest
+    workerB.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: retryRequest.requestId,
+      ok: true,
+      ptySessionId: retryRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    await expect(retry).resolves.toMatchObject({ ok: true })
+    expect(supervisor.getDiagnostics()).toMatchObject({ workerRunning: true, pendingRequests: 0 })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test('clears spawn deadlines after successful and failed acknowledgements', async () => {
+    vi.useFakeTimers()
+    const supervisor = buildSupervisor(worker, { spawnAckTimeoutMs: 25 })
+
+    const successful = supervisor.spawn({ cwd: '/repo/success', cols: 80, rows: 24 })
+    const successfulRequest = worker.sent[0] as SpawnRequest
+    worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: successfulRequest.requestId,
+      ok: true,
+      ptySessionId: successfulRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    await expect(successful).resolves.toMatchObject({ ok: true })
+
+    const failed = supervisor.spawn({ cwd: '/repo/failure', cols: 80, rows: 24 })
+    const failedRequest = worker.sent[1] as SpawnRequest
+    worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: failedRequest.requestId,
+      ok: false,
+      error: 'spawn failed',
+      failure: { code: 'unknown', recoverable: false },
+    } satisfies PtyWorkerMessage)
+    await expect(failed).resolves.toEqual({ ok: false, message: 'spawn failed' })
+
+    await vi.advanceTimersByTimeAsync(25)
+    expect(worker.killed).toBe(false)
+    expect(supervisor.getDiagnostics()).toMatchObject({ workerRunning: true, pendingRequests: 0, lastFailure: null })
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   test('waits for the spawn result when IPC send reports backpressure', async () => {

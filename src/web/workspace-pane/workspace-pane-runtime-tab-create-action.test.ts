@@ -385,7 +385,7 @@ describe('workspace pane runtime tab create action', () => {
     expect(focusTerminal).not.toHaveBeenCalled()
   })
 
-  test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
+  test('delegates creation with the exact base and route commit boundary', async () => {
     await expect(
       dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         routeTarget: BRANCH_ROUTE_TARGET,

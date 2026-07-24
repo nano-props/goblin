@@ -22,6 +22,7 @@ import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
+const DEFAULT_SPAWN_ACK_TIMEOUT_MS = 10_000
 const DEFAULT_WRITE_ACK_TIMEOUT_MS = 5_000
 const DEFAULT_RESIZE_ACK_TIMEOUT_MS = 5_000
 const MAX_PENDING_WRITE_ACKS = 1_024
@@ -40,6 +41,7 @@ interface PendingSpawn {
   handle: PtyHandle
   ownership: PtyEventOwnership
   resolve(value: PtySpawnResult): void
+  timeout: ReturnType<typeof setTimeout> | null
 }
 
 interface PendingWrite {
@@ -70,6 +72,7 @@ export interface WorkerBackedPtySupervisorOptions {
   fileExists?: typeof existsSync
   spawnWorker?: (entry: string) => TerminalWorkerChildProcess
   now?: () => number
+  spawnAckTimeoutMs?: number
   writeAckTimeoutMs?: number
   resizeAckTimeoutMs?: number
   maxPendingWriteBytes?: number
@@ -107,7 +110,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       exitCompletion: new StickyCompletion(),
     }
     return await new Promise<PtySpawnResult>((resolve) => {
-      const pending: PendingSpawn = { input, handle, ownership, resolve }
+      const pending: PendingSpawn = { input, handle, ownership, resolve, timeout: null }
       this.pendingSpawns.set(requestId, pending)
       this.pendingSpawnsByPtySessionId.set(handle.ptySessionId, pending)
       this.sendSpawnRequest(requestId, pending)
@@ -229,14 +232,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     this.shuttingDown = true
     const worker = this.worker
     this.worker = null
-    // Reject any in-flight spawns.
-    for (const pending of this.pendingSpawns.values()) {
-      pending.ownership.channel.lease.dispose()
-      pending.ownership.exitCompletion.complete()
-      pending.resolve({ ok: false, message: 'PTY worker stopped' })
-    }
-    this.pendingSpawns.clear()
-    this.pendingSpawnsByPtySessionId.clear()
+    this.failPendingSpawns('PTY worker stopped')
     this.settlePendingWrites({ status: 'indeterminate' })
     this.settlePendingResizes(false)
     // Drop all event ownership — the runtime that owns us has already
@@ -325,25 +321,26 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
           )
           return
         }
-        this.pendingSpawns.delete(message.requestId)
+        const settled = this.takePendingSpawn(message.requestId)
+        if (!settled) return
         this.lastSuccessfulResponseAt = this.now()
         this.consecutiveWorkerInvalidations = 0
-        this.pendingSpawnsByPtySessionId.delete(message.ptySessionId)
-        if (message.processName !== 'terminal' || pending.ownership.processName === 'terminal') {
-          pending.ownership.processName = message.processName
+        if (message.processName !== 'terminal' || settled.ownership.processName === 'terminal') {
+          settled.ownership.processName = message.processName
         }
-        const processName = pending.ownership.processName
-        if (!pending.ownership.exitCompletion.completed) this.sessions.set(message.ptySessionId, pending.ownership)
-        pending.resolve({
+        const processName = settled.ownership.processName
+        if (!settled.ownership.exitCompletion.completed) this.sessions.set(message.ptySessionId, settled.ownership)
+        settled.resolve({
           ok: true,
-          handle: pending.handle,
+          handle: settled.handle,
           processName,
-          events: pending.ownership.channel.lease,
+          events: settled.ownership.channel.lease,
         })
       } else {
-        this.pendingSpawns.delete(message.requestId)
-        this.releasePendingSpawn(pending)
-        pending.resolve({ ok: false, message: message.error })
+        const settled = this.takePendingSpawn(message.requestId)
+        if (!settled) return
+        this.disposePendingSpawnOwnership(settled)
+        settled.resolve({ ok: false, message: message.error })
         if (message.failure.recoverable && this.sessions.size === 0) {
           this.recordFailure('spawn-failed', message.error)
           ptyWorkerLogger.warn(
@@ -423,11 +420,12 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
 
   private failPendingSpawns(error: Error | string): void {
     const message = error instanceof Error ? error.message : error
-    for (const pending of Array.from(this.pendingSpawns.values())) {
-      this.releasePendingSpawn(pending)
+    for (const requestId of Array.from(this.pendingSpawns.keys())) {
+      const pending = this.takePendingSpawn(requestId)
+      if (!pending) continue
+      this.disposePendingSpawnOwnership(pending)
       pending.resolve({ ok: false, message })
     }
-    this.pendingSpawns.clear()
   }
 
   private sendSpawnRequest(requestId: string, pending: PendingSpawn): void {
@@ -435,12 +433,22 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     try {
       worker = this.ensureWorker()
     } catch {
-      this.pendingSpawns.delete(requestId)
-      this.releasePendingSpawn(pending)
+      if (!this.takePendingSpawn(requestId)) return
+      this.disposePendingSpawnOwnership(pending)
       this.recordFailure('send-failed', 'action=pty-spawn')
       pending.resolve({ ok: false, message: this.unavailableMessage() })
       return
     }
+    const timeoutMs = this.options.spawnAckTimeoutMs ?? DEFAULT_SPAWN_ACK_TIMEOUT_MS
+    pending.timeout = setTimeout(() => {
+      if (this.pendingSpawns.get(requestId) !== pending) return
+      this.invalidateWorker(
+        worker,
+        'timeout',
+        `action=pty-spawn ptySessionId=${pending.handle.ptySessionId} timeoutMs=${timeoutMs}`,
+        'PTY worker spawn timed out',
+      )
+    }, timeoutMs)
     try {
       // ChildProcess.send() returning false only reports IPC backpressure.
       // A callback error proves the transport did not deliver the request, so
@@ -540,10 +548,19 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     return this.sessions.get(ptySessionId) ?? this.pendingSpawnsByPtySessionId.get(ptySessionId)?.ownership ?? null
   }
 
-  private releasePendingSpawn(pending: PendingSpawn): void {
+  private takePendingSpawn(requestId: string): PendingSpawn | null {
+    const pending = this.pendingSpawns.get(requestId)
+    if (!pending) return null
+    this.pendingSpawns.delete(requestId)
     if (this.pendingSpawnsByPtySessionId.get(pending.handle.ptySessionId) === pending) {
       this.pendingSpawnsByPtySessionId.delete(pending.handle.ptySessionId)
     }
+    if (pending.timeout !== null) clearTimeout(pending.timeout)
+    pending.timeout = null
+    return pending
+  }
+
+  private disposePendingSpawnOwnership(pending: PendingSpawn): void {
     pending.ownership.channel.lease.dispose()
     pending.ownership.exitCompletion.complete()
   }

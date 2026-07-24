@@ -15,6 +15,10 @@ export function bootstrapPtyWorker(parent: PtyWorkerParentProcess = process): Pt
   const runtime = new PtyWorkerRuntime({
     emit(message: PtyWorkerMessage) {
       if (typeof parent.send === 'function') {
+        // Known limitation: PTY output currently has no worker-to-parent IPC
+        // backpressure policy. `send()` may return false while Node retains an
+        // unsent backlog; do not mistake downstream realtime limits for a
+        // bound on this upstream queue.
         parent.send(message)
       }
     },

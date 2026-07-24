@@ -64,9 +64,7 @@ function loadPreload(
   const ipcRenderer = {
     invoke: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
-      return (
-        options.invoke?.(channel, ...args) ?? Promise.resolve({ ok: true, data: 'ok' })
-      )
+      return options.invoke?.(channel, ...args) ?? Promise.resolve({ ok: true, data: 'ok' })
     }),
     sendSync: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
@@ -319,7 +317,8 @@ describe('preload goblinNative bridge', () => {
       [CLIENT_EFFECT_INTENT_CHANNEL]: 'client effect intent dispatch (paired with the IPC dispatch channel)',
       [APP_QUIT_DRAINED_CHANNEL]:
         'renderer → main quit drain acknowledgement — main owns native app/server shutdown ordering',
-      [HOST_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
+      [HOST_OPEN_SETTINGS_WINDOW_CHANNEL]:
+        'native primary-window activation — bring the Electron surface forward before routing it to the requested settings page',
       [HOST_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',
       [HOST_OPEN_DIRECTORY_DIALOG_CHANNEL]: 'native OS directory picker dialog (no browser equivalent)',
