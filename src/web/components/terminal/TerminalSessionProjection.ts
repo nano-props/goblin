@@ -1219,6 +1219,11 @@ export class TerminalSessionProjection {
       return false
     }
     if (!result.ok) return false
+    writeCanonicalWorkspacePaneTabsSnapshot(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).workspaceRuntimeId,
+      result.paneTabsSnapshot,
+    )
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
     return true
   }

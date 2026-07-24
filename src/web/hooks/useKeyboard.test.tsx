@@ -348,7 +348,7 @@ describe('useKeyboard', () => {
     terminalHost.remove()
   })
 
-  test('primary modifier plus t consumes autorepeat without creating another terminal', async () => {
+  test('primary modifier plus t dispatches every keydown event including autorepeat', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -405,7 +405,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(createTerminal).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(2))
     expect(initialShortcut.defaultPrevented).toBe(true)
     expect(repeatedShortcut.defaultPrevented).toBe(true)
   })
@@ -850,7 +850,7 @@ describe('useKeyboard', () => {
     })
 
     expect(repeatedClose.defaultPrevented).toBe(true)
-    expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(2))
 
     const secondClose = new KeyboardEvent('keydown', {
       key: 'w',
@@ -866,7 +866,7 @@ describe('useKeyboard', () => {
     })
 
     expect(secondClose.defaultPrevented).toBe(true)
-    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(3))
   })
 })
 

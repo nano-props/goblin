@@ -14,7 +14,7 @@ import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
-  runCloseWorkspacePaneTabOrWindowCommand,
+  runCloseCurrentWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
@@ -201,19 +201,17 @@ export async function handleWorkspaceClientIntent(
         navigation: deps.navigation,
         t: deps.t,
       })
-    case 'close-workspace-pane-tab-or-window':
-      return await runCloseWorkspacePaneTabOrWindowCommand({
+    case 'close-workspace-pane-tab':
+      await runCloseCurrentWorkspacePaneTabCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
       })
+      return true
     case 'close-workspace':
       const closeResult = await deps.navigation.closeWorkspace(plan.workspaceId)
       if (!closeResult.ok) toast.error(deps.t(closeResult.message))
       return closeResult.ok
-    case 'close-window':
-      window.close()
-      return true
     case 'cycle-workspace':
       deps.navigation.cycleWorkspace(plan.direction)
       return true

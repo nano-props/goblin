@@ -126,6 +126,8 @@ function submitTerminalAutoFocus(
   const onSettled = () => finishTerminalAutoFocus(intent)
   intent.phase = 'submitted'
   try {
+    // Presentation readiness is the focus boundary. Waiting for keyup here
+    // would recreate a global keyboard gate; a held key may follow focus.
     if (focusTerminal(intent.terminalSessionId, { isCurrent, onSettled })) return
   } catch (error) {
     finishTerminalAutoFocus(intent)

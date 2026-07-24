@@ -58,6 +58,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
     const request = vi.fn(async () => ({
       ok: true as const,
       runtimeType: 'terminal' as const,
+      paneTabsSnapshot: { revision: 2, entries: [] },
       runtime: {
         action: 'closed' as const,
         terminalSessionId: 'term-111111111111111111111',
@@ -80,6 +81,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 1,
       },
+      paneTabsSnapshot: { revision: 2, entries: [] },
     })
     expect(request).toHaveBeenNthCalledWith(1, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, closeInput)
   })
@@ -90,6 +92,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         vi.fn(async () => ({
           ok: true,
           runtimeType: 'terminal',
+          paneTabsSnapshot: { revision: 2, entries: [] },
           runtime: {
             action: 'closed',
             terminalSessionId: 'term-111111111111111111111',

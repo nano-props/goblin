@@ -23,11 +23,18 @@ import {
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
 }))
+const workspacePaneTabsCommitMocks = vi.hoisted(() => ({
+  writeCanonicalSnapshot: vi.fn(() => true),
+}))
 
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     close: workspacePaneRuntimeMocks.close,
   },
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
+  writeCanonicalWorkspacePaneTabsSnapshot: workspacePaneTabsCommitMocks.writeCanonicalSnapshot,
 }))
 
 function workspaceIdFixture(input: string) {
@@ -106,6 +113,7 @@ function successfulRuntimeCloseSnapshot(
   return {
     ok: true as const,
     runtimeType: 'terminal' as const,
+    paneTabsSnapshot: { revision: 7, entries: [] },
     runtime:
       terminalRuntimeSessionId === null
         ? { action: 'already-closed' as const, terminalSessionId }
@@ -126,6 +134,7 @@ describe('TerminalSessionProjection', () => {
     resetWorkspacesStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
+    workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockClear()
     selectedChanges = []
     projection = new TerminalSessionProjection((terminalFilesystemTargetKey, terminalSessionId) =>
       selectedChanges.push({ terminalFilesystemTargetKey, terminalSessionId }),
@@ -1077,7 +1086,7 @@ describe('TerminalSessionProjection', () => {
       expect(closedSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
     })
 
-    test('applies the exact close effect after refreshing workspace tabs', async () => {
+    test('commits the close response snapshot before applying its exact terminal effect', async () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -1098,6 +1107,11 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
+      expect(workspacePaneTabsCommitMocks.writeCanonicalSnapshot).toHaveBeenCalledWith(
+        REPO_ROOT,
+        WORKSPACE_RUNTIME_ID,
+        { revision: 7, entries: [] },
+      )
       expect(
         projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual(['term-222222222222222222222'])

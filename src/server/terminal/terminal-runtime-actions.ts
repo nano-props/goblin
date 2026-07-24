@@ -25,7 +25,7 @@ import {
   isValidTerminalWriteData,
 } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
-import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import type { TerminalSessionCloseReason, TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -192,7 +192,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {
-      return (await closeOutcome(clientId, userId, input)).kind === 'closed'
+      return (await closeOutcome(clientId, userId, input, 'session')).kind === 'closed'
     },
 
     async closeForWorkspacePane(
@@ -200,7 +200,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalSessionInput,
     ): Promise<TerminalCloseOutcome> {
-      const outcome = await closeOutcome(clientId, userId, input)
+      const outcome = await closeOutcome(clientId, userId, input, 'workspace-pane')
       return { kind: outcome.kind }
     },
 
@@ -258,10 +258,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     clientId: string,
     userId: string,
     input: TerminalSessionInput,
+    reason: TerminalSessionCloseReason,
   ): Promise<TerminalSessionCloseOutcome> {
     if (!isValidTerminalClientId(clientId)) return { kind: 'failed' }
     if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)) return { kind: 'failed' }
-    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId)
+    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId, reason)
     if (outcome.kind === 'closed') {
       const session = outcome.session
       // General repo/session-list invalidation is emitted by the

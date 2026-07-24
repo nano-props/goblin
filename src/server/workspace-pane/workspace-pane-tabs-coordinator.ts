@@ -94,8 +94,17 @@ export interface WorkspaceRuntimeTabPlacementInput {
   commitAdmission: (canonicalBranchName: string | null) => void
 }
 
-export interface WorkspaceRuntimeTabPlacement {
+export interface WorkspacePaneRuntimeTabsCoordinator {
   ensureRuntimeTabForSession(input: WorkspaceRuntimeTabPlacementInput): Promise<WorkspacePaneRuntimeTabCommitResult>
+  reconcileWorktreeAdmitted(input: {
+    userId: string
+    workspaceId: WorkspaceId
+    scope: string
+    worktreePath: string
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
+    permit: PhysicalWorktreeOperationPermit
+    assertCurrent?: () => void
+  }): Promise<WorkspacePaneTabsSnapshot>
 }
 
 export interface WorkspacePaneTabsCoordinatorOptions {
@@ -106,7 +115,7 @@ export interface WorkspacePaneTabsCoordinatorOptions {
   targetProjection: WorkspacePaneTargetProjectionProvider
 }
 
-export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacement {
+export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>

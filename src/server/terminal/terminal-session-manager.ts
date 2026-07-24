@@ -68,7 +68,7 @@ import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-ses
 type TerminalSessionRetirementOutcome = 'detached' | 'already-detached' | 'failed'
 const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
-export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
+export type TerminalSessionCloseReason = 'session' | 'workspace-pane' | 'scope' | 'detached-user' | 'shutdown'
 
 interface TerminalPtyRestartResult {
   attempt: number
@@ -656,11 +656,12 @@ export class TerminalSessionManager<TUser extends string | number> {
   async closeSessionForUserOutcome(
     userId: TUser,
     terminalRuntimeSessionId: string,
+    reason: TerminalSessionCloseReason = 'session',
   ): Promise<TerminalSessionCloseOutcome> {
     const session = this.getSession(userId, terminalRuntimeSessionId)
     if (!session) return { kind: 'already-closed' }
     const summary = this.sessionSummary(session)
-    const retirement = await this.requestSessionRetirementOutcome(terminalRuntimeSessionId)
+    const retirement = await this.requestSessionRetirementOutcome(terminalRuntimeSessionId, reason)
     if (retirement.admission === 'initiated' && retirement.outcome === 'detached') {
       return { kind: 'closed', session: summary }
     }

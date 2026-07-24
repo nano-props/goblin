@@ -52,6 +52,7 @@ import {
   type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -540,6 +541,17 @@ describe('useClientEffectIntentRouter', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
+      setWorkspacePaneTabsForTargetQueryData({
+        workspaceId: repo.id,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        branchName: 'main',
+        worktreePath: '/tmp/repo-worktree',
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+          ...visibleSessionIds.map((id) => workspacePaneRuntimeTabEntry('terminal', id)),
+        ],
+      })
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
@@ -597,7 +609,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-or-window-requested' })
+      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-requested' })
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -613,7 +625,9 @@ describe('useClientEffectIntentRouter', () => {
         }),
       )
     })
-    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
+    await waitFor(() => {
+      expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
+    })
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 

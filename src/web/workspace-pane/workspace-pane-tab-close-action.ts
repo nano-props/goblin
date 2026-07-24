@@ -17,6 +17,7 @@ import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
   selectWorkspacePaneControllerTabEntry,
+  workspacePaneControllerRouteForEntry,
   workspacePaneTabControllerTargetIsCurrent,
   type WorkspacePaneControllerPresentationLease,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
@@ -51,10 +52,6 @@ import {
   runWorkspacePaneAction,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  beginPrimaryWindowNavigation,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
 import { terminalLog } from '#/web/logger.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
@@ -69,7 +66,6 @@ export interface CloseWorkspacePaneTabActionOptions {
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
-  navigationGeneration?: PrimaryWindowNavigationGeneration
 }
 
 export interface ConfirmedTerminalWorkspacePaneTabClose {
@@ -94,13 +90,34 @@ type CloseWorkspacePaneTabActionStart =
       completion: Promise<boolean>
     }
 
+type CloseWorkspacePaneTabSelection =
+  { kind: 'observed-route'; route: ParsedWorkspacePaneRoute | null | undefined } | { kind: 'current' }
+
 export async function dispatchCloseWorkspacePaneTabAction(
   options: CloseWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId) return await closeWorkspacePaneTabAction(options)
-  const coordinatorTarget = resolveCloseWorkspacePaneTarget(options)
+  return await dispatchCloseWorkspacePaneTabSelection(options, {
+    kind: 'observed-route',
+    route: options.workspacePaneRoute,
+  })
+}
+
+export async function dispatchCloseCurrentWorkspacePaneTabAction(
+  options: CloseWorkspacePaneTabActionOptions,
+): Promise<boolean> {
+  return await dispatchCloseWorkspacePaneTabSelection(options, { kind: 'current' })
+}
+
+async function dispatchCloseWorkspacePaneTabSelection(
+  options: CloseWorkspacePaneTabActionOptions,
+  selection: CloseWorkspacePaneTabSelection,
+): Promise<boolean> {
+  if (!options.workspaceId) return await closeWorkspacePaneTabAction(options, selection)
+  const coordinatorTarget = resolveCloseWorkspacePaneTarget(
+    options,
+    selection.kind === 'current' ? undefined : selection.route,
+  )
   if (!coordinatorTarget) return false
-  const navigationGeneration = beginPrimaryWindowNavigation()
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: coordinatorTarget.workspaceId,
@@ -108,17 +125,15 @@ export async function dispatchCloseWorkspacePaneTabAction(
       branchName: coordinatorTarget.branchName,
       worktreePath: coordinatorTarget.worktreePath,
     }),
-    () =>
-      closeWorkspacePaneTabAction({
-        ...options,
-        navigationGeneration,
-        workspacePaneRoute: options.workspacePaneRoute,
-      }),
+    () => closeWorkspacePaneTabAction(options, selection),
   )
 }
 
-async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionOptions): Promise<boolean> {
-  const start = beginCloseWorkspacePaneTabAction(options)
+async function closeWorkspacePaneTabAction(
+  options: CloseWorkspacePaneTabActionOptions,
+  selection: CloseWorkspacePaneTabSelection,
+): Promise<boolean> {
+  const start = beginCloseWorkspacePaneTabAction(options, selection)
   if (start.kind === 'done') return start.result
   return await runWorkspacePaneCloseTransition(start.presentationLease, async () => {
     if (!(await completeWorkspacePaneTabLifecycle(start.completion))) return false
@@ -148,13 +163,9 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const base = options.confirmedTerminal.base
   const coordinates = terminalExecutionCoordinates(base.target)
   const queueWorkspaceId = options.workspaceId ?? coordinates.workspaceId
-  const queueWorkspaceRuntimeId = coordinates.workspaceRuntimeId
   if (queueWorkspaceId !== coordinates.workspaceId) return false
   const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
-  const navigationGeneration = beginPrimaryWindowNavigation()
-  return await runWorkspacePaneAction(queueTarget, () =>
-    confirmCloseTerminalWorkspacePaneTabAction({ ...options, navigationGeneration }),
-  )
+  return await runWorkspacePaneAction(queueTarget, () => confirmCloseTerminalWorkspacePaneTabAction(options))
 }
 
 async function confirmCloseTerminalWorkspacePaneTabAction(
@@ -167,14 +178,13 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     target: confirmedTerminal.base,
   }
   const confirmedIdentity = targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed)
-  const closeTarget = workspaceId ? resolveCloseWorkspacePaneTarget(options) : null
+  const closeTarget = workspaceId ? resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute) : null
   if (closeTarget && workspacePaneTabTargetBlocksInteraction(closeTarget)) return false
   const transition = closeTarget
     ? workspacePaneCloseTransition(
         closeTarget,
         confirmedIdentity,
         options.currentWorkspacePaneRoute,
-        options.navigationGeneration,
         options.selectedIdentity,
       )
     : null
@@ -210,10 +220,13 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
 
 function beginCloseWorkspacePaneTabAction(
   options: CloseWorkspacePaneTabActionOptions,
+  selection: CloseWorkspacePaneTabSelection,
 ): CloseWorkspacePaneTabActionStart {
   const { workspaceId, targetIdentity } = options
   const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
-  const target = workspaceId ? resolveCloseWorkspacePaneTarget(options) : null
+  const target = workspaceId
+    ? resolveCloseWorkspacePaneTarget(options, selection.kind === 'current' ? undefined : selection.route)
+    : null
   if (!target) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
@@ -221,6 +234,8 @@ function beginCloseWorkspacePaneTabAction(
     : target.selectedEntry
   if (!tabEntry) return { kind: 'done', result: false }
   const closingIdentity = workspacePaneTabEntryIdentity(tabEntry)
+  const workspacePaneRoute =
+    selection.kind === 'current' ? workspacePaneControllerRouteForEntry(tabEntry) : selection.route
   const tab = target.tabs.find((candidate) => candidate.identity === closingIdentity) ?? null
   const runtimeView = tab && isWorkspacePaneRuntimeTab(tab) ? tab.view : options.runtimeView
   if (!skipRuntimeCloseConfirm && runtimeView?.type === 'terminal') {
@@ -238,7 +253,7 @@ function beginCloseWorkspacePaneTabAction(
         target.workspaceId,
         workspacePaneRouteTargetForModel(target),
         closeConfirm,
-        options.workspacePaneRoute,
+        workspacePaneRoute,
         options.selectedIdentity ?? target.selectedIdentity,
       )
     ) {
@@ -246,13 +261,7 @@ function beginCloseWorkspacePaneTabAction(
     }
   }
 
-  const transition = workspacePaneCloseTransition(
-    target,
-    closingIdentity,
-    options.workspacePaneRoute,
-    options.navigationGeneration,
-    options.selectedIdentity,
-  )
+  const transition = workspacePaneCloseTransition(target, closingIdentity, workspacePaneRoute, options.selectedIdentity)
   let close
   try {
     close = beginWorkspacePaneTabEntryClose(target, tabEntry)
@@ -286,7 +295,6 @@ function workspacePaneCloseTransition(
   target: WorkspacePaneTabModel,
   closingIdentity: string,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  navigationGeneration: PrimaryWindowNavigationGeneration | undefined,
   selectedIdentity: string | null | undefined = target.selectedIdentity,
 ): WorkspacePaneCloseTransition {
   const wasActive = selectedIdentity === closingIdentity
@@ -304,7 +312,6 @@ function workspacePaneCloseTransition(
         closingEntry,
         nextEntry,
         workspacePaneRoute,
-        navigationGeneration,
       })
     : null
   return { wasActive, nextEntry, presentationLease }
@@ -358,12 +365,13 @@ function resolveCloseWorkspacePaneTarget(
     CloseWorkspacePaneTabActionOptions,
     'workspaceId' | 'workspacePaneRoute' | 'routeTarget' | 'paneTarget' | 'worktreeHead'
   >,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
   return workspacePaneTabTargetForPaneTarget({
     paneTarget: input.paneTarget,
     routeTarget: input.routeTarget,
-    workspacePaneRoute: input.workspacePaneRoute,
+    workspacePaneRoute,
     worktreeHead: input.worktreeHead,
   })
 }

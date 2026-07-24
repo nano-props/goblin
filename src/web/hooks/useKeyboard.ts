@@ -5,7 +5,7 @@
 // as typed IPC events. Numbered workspace tab shortcuts are handled
 // here in the capture phase so terminal focus cannot swallow them;
 // Cmd/Ctrl+T (new terminal tab), Cmd/Ctrl+N (create worktree) and
-// Cmd/Ctrl+W (close workspace tab or window) use this DOM path only in
+// Cmd/Ctrl+W (close workspace tab) use this DOM path only in
 // the web runtime.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
@@ -25,7 +25,7 @@ import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
-  runCloseWorkspacePaneTabOrWindowCommand,
+  runCloseCurrentWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
@@ -204,7 +204,6 @@ export function useKeyboard({
           e.preventDefault()
           e.stopPropagation()
           if (workspaceShortcutsSuppressed) return
-          if (e.repeat) return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
@@ -242,7 +241,7 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           if (!paneTarget) return
-          void runCloseWorkspacePaneTabOrWindowCommand({
+          void runCloseCurrentWorkspacePaneTabCommand({
             workspaceId,
             target: paneTarget,
             navigation,

@@ -10,7 +10,7 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import {
   WorkspacePaneRuntimeStaleError,
-  type WorkspaceRuntimeTabPlacement,
+  type WorkspacePaneRuntimeTabsCoordinator,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -36,7 +36,7 @@ type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
 
 interface WorkspacePaneRuntimeApplicationDependencies {
-  workspaceTabsCoordinator: WorkspaceRuntimeTabPlacement
+  workspaceTabsCoordinator: WorkspacePaneRuntimeTabsCoordinator
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminal: ServerTerminalCreateProvider & {
@@ -173,6 +173,8 @@ export class WorkspacePaneRuntimeApplication {
               executionPath,
               input.sessionId,
               scope,
+              physicalCapability,
+              permit,
               () => this.isCurrentTarget(clientId, userId, target),
             )
         }
@@ -278,6 +280,8 @@ export class WorkspacePaneRuntimeApplication {
     executionPath: string,
     terminalSessionId: string,
     scope: string,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+    permit: PhysicalWorktreeOperationPermit,
     isCurrentMembership: () => boolean,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
@@ -292,35 +296,46 @@ export class WorkspacePaneRuntimeApplication {
     ) {
       return runtimeFailure('terminal', 'error.workspace-runtime-stale')
     }
+    let runtime: Extract<WorkspacePaneRuntimeCloseResult, { ok: true }>['runtime']
     if (session) {
       const close = await this.deps.terminal.close(clientId, userId, {
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
       })
       if (close.kind === 'failed') return runtimeFailure('terminal', 'error.unavailable')
       if (close.kind === 'already-closed') {
-        return {
-          ok: true,
-          runtimeType: 'terminal',
-          runtime: {
-            action: 'already-closed',
-            terminalSessionId,
-          },
+        runtime = { action: 'already-closed', terminalSessionId }
+      } else {
+        runtime = {
+          action: 'closed',
+          terminalSessionId,
+          terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
         }
       }
+    } else {
+      runtime = { action: 'already-closed', terminalSessionId }
     }
+
+    const paneTabsSnapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
+      userId,
+      workspaceId: target.workspaceId,
+      scope,
+      worktreePath: executionPath,
+      physicalWorktreeCapability,
+      permit,
+      assertCurrent: isCurrentMembership,
+    })
+    this.deps.broadcastWorkspaceTabsChanged(
+      userId,
+      target.workspaceId,
+      target.workspaceRuntimeId,
+      paneTabsSnapshot.revision,
+    )
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime: {
-        ...(session
-          ? {
-              action: 'closed' as const,
-              terminalSessionId,
-              terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-              terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-            }
-          : { action: 'already-closed' as const, terminalSessionId }),
-      },
+      runtime,
+      paneTabsSnapshot,
     }
   }
 

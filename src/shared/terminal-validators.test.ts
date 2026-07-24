@@ -1031,6 +1031,7 @@ describe('shared terminal validators', () => {
   })
 
   test('normalizes runtime close command responses', () => {
+    const paneTabsSnapshot = { revision: 8, entries: [] }
     const effects = [
       {
         action: 'closed' as const,
@@ -1050,13 +1051,13 @@ describe('shared terminal validators', () => {
           requestId: `request_runtime_close_${index}`,
           ok: true,
           action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
-          payload: { ok: true, runtimeType: 'terminal', runtime },
+          payload: { ok: true, runtimeType: 'terminal', runtime, paneTabsSnapshot },
         }),
       ).toMatchObject({
         type: 'response',
         ok: true,
         action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
-        payload: { ok: true, runtimeType: 'terminal', runtime },
+        payload: { ok: true, runtimeType: 'terminal', runtime, paneTabsSnapshot },
       })
       expect(
         normalizeAppRealtimeSocketServerMessage({
@@ -1068,6 +1069,7 @@ describe('shared terminal validators', () => {
             ok: true,
             runtimeType: 'terminal',
             runtime: { ...runtime, action: 'invalid' },
+            paneTabsSnapshot,
           },
         }),
       ).toMatchObject({
@@ -1076,6 +1078,38 @@ describe('shared terminal validators', () => {
         error: 'Invalid realtime socket response payload',
       })
     }
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'request_runtime_close_still_owned',
+        ok: true,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        payload: {
+          ok: true,
+          runtimeType: 'terminal',
+          runtime: effects[0],
+          paneTabsSnapshot: {
+            revision: 9,
+            entries: [
+              {
+                target: {
+                  kind: 'git-worktree',
+                  workspaceId: 'goblin+file:///repo',
+                  workspaceRuntimeId: 'repo-runtime-test',
+                  root: 'goblin+file:///repo/worktree',
+                },
+                tabs: [{ type: 'terminal', runtimeSessionId: effects[0].terminalSessionId }],
+              },
+            ],
+          },
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+      error: 'Invalid realtime socket response payload',
+    })
   })
 
   test('validates terminal socket success response payloads by action', () => {

@@ -62,7 +62,7 @@ export class BufferedRealtimeSocket<TFlushContext = void> implements RealtimeSoc
 
   forceClose(code?: number, reason?: string): void {
     if (!this.active) return
-    this.closeNow(code, reason)
+    this.closeNow(code, reason, true)
   }
 
   enqueueTransition(transition: RealtimeTransition<TFlushContext>): void {
@@ -93,10 +93,6 @@ export class BufferedRealtimeSocket<TFlushContext = void> implements RealtimeSoc
 
   protected onBufferCleared(): void {}
 
-  // A finite slow-reader backlog after `send` belongs to the raw WebSocket/TCP
-  // transport, not this ordering buffer. It drains as the peer reads and is
-  // reclaimed with the raw socket when the peer disconnects; this wrapper
-  // retains only the explicitly bounded transition state above.
   private sendNow(payload: string): void {
     try {
       this.socket.send(payload)
@@ -105,11 +101,12 @@ export class BufferedRealtimeSocket<TFlushContext = void> implements RealtimeSoc
     }
   }
 
-  private closeNow(code?: number, reason?: string): void {
+  private closeNow(code?: number, reason?: string, force = false): void {
     this.active = false
     this.clearRetainedState()
     try {
-      this.socket.close(code, reason)
+      if (force && this.socket.forceClose) this.socket.forceClose(code, reason)
+      else this.socket.close(code, reason)
     } catch {}
     this.onRelease?.()
   }

@@ -33,6 +33,8 @@ const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/other-workspac
 const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, navigationGeneration: expect.any(Number) })
+const historyRestoreOptions = (options: { returnTo?: string | null } = {}) =>
+  expect.objectContaining({ ...options, onCommit: expect.any(Function) })
 const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
 const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 
@@ -954,7 +956,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(
       REPO_A_ID,
-      presentationOptions({ returnTo: '/workspace/repo-a/branch/main' }),
+      historyRestoreOptions({ returnTo: '/workspace/repo-a/branch/main' }),
     )
   })
 
@@ -986,7 +988,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_A_ID, 'feature/test', presentationOptions())
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_A_ID, 'feature/test', historyRestoreOptions())
   })
 
   test.each(['back', 'forward'] as const)('moves %s history only after the restored route commits', (direction) => {
@@ -1087,7 +1089,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       else actions.goForward(REPO_ID)
 
       expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_ID, direction)
-      expect(navigation.openRepoWorktree).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH, presentationOptions())
+      expect(navigation.openRepoWorktree).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH, historyRestoreOptions())
       expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     },
   )
@@ -1131,7 +1133,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     actions.goBack(REPO_ID)
 
     expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_ID, 'back')
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions())
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, historyRestoreOptions())
   })
 
   test('restores a malformed terminal history entry as the bare branch route', () => {
@@ -1162,13 +1164,13 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_A_ID, 'feature/test', presentationOptions())
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_A_ID, 'feature/test', historyRestoreOptions())
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test.each(['back', 'forward'] as const)(
-    'does not commit %s history when route restore is unavailable',
+    'does not commit %s history or advance navigation when route restore is unavailable',
     (direction) => {
       const target = branchHistoryEntry(REPO_A_ID, 'feature/test', 'history')
       const traversal = { ...historyTraversal(target), direction }
@@ -1184,12 +1186,14 @@ describe('createPrimaryWindowNavigationActions', () => {
         commitWorkspaceNavigation,
         routeNavigation: navigation,
       })
+      const generationBefore = currentPrimaryWindowNavigationGeneration()
 
       if (direction === 'back') actions.goBack(REPO_A_ID)
       else actions.goForward(REPO_A_ID)
 
       expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, direction)
       expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
+      expect(currentPrimaryWindowNavigationGeneration()).toBe(generationBefore)
     },
   )
 

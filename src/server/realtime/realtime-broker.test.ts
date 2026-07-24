@@ -154,6 +154,16 @@ describe('realtime broker', () => {
     expect(onRelease).toHaveBeenCalledOnce()
   })
 
+  test('uses immediate transport shutdown for a forced buffered-socket close', () => {
+    const rawSocket = { send: vi.fn(), close: vi.fn(), forceClose: vi.fn() }
+    const bufferedSocket = new BufferedRealtimeSocket(rawSocket)
+
+    bufferedSocket.forceClose(1013, 'capacity exceeded')
+
+    expect(rawSocket.forceClose).toHaveBeenCalledWith(1013, 'capacity exceeded')
+    expect(rawSocket.close).not.toHaveBeenCalled()
+  })
+
   test('closes the raw transport when an immediate realtime send fails', () => {
     const rawSocket = {
       send: vi.fn(() => {

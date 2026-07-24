@@ -89,6 +89,8 @@ beforeEach(() => {
 const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, navigationGeneration: expect.any(Number) })
 
+const historyRestoreOptions = () => expect.objectContaining({ onCommit: expect.any(Function) })
+
 const terminalReadContext: TerminalSessionReadContextValue = {
   terminalFilesystemTargetSnapshot: () => EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   subscribeTerminalFilesystemTarget: () => () => {},
@@ -1398,7 +1400,7 @@ describe('WorkspacePane', () => {
       testNavigation.goBack(REPO_ID)
     })
 
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status', presentationOptions())
+    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status', historyRestoreOptions())
   })
 
   test('renders a stale terminal URL as an empty pane without navigating', () => {

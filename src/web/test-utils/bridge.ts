@@ -528,9 +528,11 @@ export function installWorkspacePaneTabsTestBridge(
           target,
           currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
         )
+        const paneTabsSnapshot = commitServerSnapshot()
         return {
           ok: true,
           runtimeType: input.runtimeType,
+          paneTabsSnapshot,
           runtime: wasOpen
             ? {
                 action: 'closed' as const,
@@ -886,6 +888,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true,
             runtimeType,
+            paneTabsSnapshot: { revision: 1, entries: [] },
             runtime: {
               action: 'closed',
               terminalSessionId,

@@ -174,9 +174,7 @@ export function createPrimaryWindowNavigationActions({
       if (!canonicalWorkspaceId) return
       const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'back')
       if (!traversal) return
-      const navigationGeneration = beginPrimaryWindowNavigation()
       restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
-        navigationGeneration,
         onCommit() {
           if (!commitWorkspaceNavigation(traversal)) {
             throw new Error('workspace navigation history changed before its route committed')
@@ -190,9 +188,7 @@ export function createPrimaryWindowNavigationActions({
       if (!canonicalWorkspaceId) return
       const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'forward')
       if (!traversal) return
-      const navigationGeneration = beginPrimaryWindowNavigation()
       restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
-        navigationGeneration,
         onCommit() {
           if (!commitWorkspaceNavigation(traversal)) {
             throw new Error('workspace navigation history changed before its route committed')

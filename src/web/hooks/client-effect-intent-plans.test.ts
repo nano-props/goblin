@@ -304,7 +304,7 @@ describe('client effect intent plans', () => {
 
   test('suppresses workspace tab close shortcut while workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-or-window-requested' },
+      { type: 'workspace-pane-close-tab-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
@@ -323,7 +323,7 @@ describe('client effect intent plans', () => {
 
   test('suppresses workspace tab close shortcut while overlays block workspace actions', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-or-window-requested' },
+      { type: 'workspace-pane-close-tab-requested' },
       {
         overlayBlocked: true,
         workspaceShortcutSuppressed: true,
@@ -340,9 +340,9 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('routes workspace tab close shortcut to close-window when no repo is active', () => {
+  test('treats workspace tab close as a no-op when no workspace is active', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'workspace-pane-close-tab-or-window-requested' },
+      { type: 'workspace-pane-close-tab-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
@@ -356,7 +356,25 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toEqual({ kind: 'close-window' })
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
+  test('does not turn close workspace into close window when no workspace is active', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'close-workspace-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentWorkspaceId: null,
+        currentWorkspaceRuntimeId: null,
+        currentWorkspaceCapability: null,
+        currentWorkspaceCanExecute: false,
+        currentWorkspacePaneCommandTarget: null,
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
   })
 
   test('keeps native new-terminal intent active while workspace shortcuts are suppressed', () => {

@@ -438,12 +438,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     session: TerminalSessionSummary,
     reason: TerminalSessionCloseReason,
   ): void | Promise<void> {
-    if (reason !== 'session') return
+    if (reason !== 'session' && reason !== 'workspace-pane') return
     const coordinates = terminalSessionCoordinates(session)
     broadcastTerminalSessionsChanged(
       userId,
       manager.terminalSessionsChangedEventForScope(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId),
     )
+    // The composed workspace-pane close reconciles tabs under its existing
+    // physical-worktree permit and returns that canonical snapshot. General
+    // session retirement has no such command boundary, so it reconciles here.
+    if (reason === 'workspace-pane') return
     return sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {
