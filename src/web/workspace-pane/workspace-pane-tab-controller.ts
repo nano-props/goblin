@@ -43,10 +43,6 @@ export interface WorkspacePaneControllerTarget {
   paneTarget: WorkspacePaneModelTarget
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
-export type WorkspacePaneTabControllerShowNavigation = Pick<
-  PrimaryWindowNavigationActions,
-  'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
->
 export type WorkspacePaneTabControllerCommitNavigation = Pick<
   PrimaryWindowNavigationActions,
   'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute'

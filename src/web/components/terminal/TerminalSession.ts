@@ -138,12 +138,22 @@ export class TerminalSession {
     this.queueResize(term.cols, term.rows)
   }
 
-  focus(request?: TerminalFocusRequest): void {
-    if (this.disposed || !this.shouldStartAttachedSession()) {
+  focus(request?: TerminalFocusRequest): boolean {
+    if (this.disposed) {
       request?.onSettled?.()
-      return
+      return false
+    }
+    // A session may exist in the client projection before its React-owned view
+    // has reached a stable mount. Keep the presentation-level focus intent
+    // pending at that boundary so StrictMode's synthetic mount cleanup cannot
+    // settle an intent that the stable mount still needs to fulfil.
+    if (!this.view.isConnected()) return false
+    if (!this.shouldStartAttachedSession()) {
+      request?.onSettled?.()
+      return false
     }
     this.view.focus(request)
+    return true
   }
 
   private shouldStartAttachedSession(): boolean {

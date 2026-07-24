@@ -65,6 +65,7 @@ import {
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
@@ -126,9 +127,6 @@ const navigation: PrimaryWindowNavigationActions = {
   closeWorkspace: vi.fn(),
   cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
-  showRepoBranchEmptyWorkspacePane: () => true,
-  showRepoBranchWorkspacePaneTab: vi.fn(),
-  showRepoBranchTerminalSession: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -1939,15 +1937,13 @@ describe('WorkspacePane', () => {
     function RoutedWorkspaceHarness() {
       const [route, setRoute] = useState<WorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
       const navigationWithRoute = useMemo<PrimaryWindowNavigationActions>(() => {
-        const showRepoBranchEmptyWorkspacePane: PrimaryWindowNavigationActions['showRepoBranchEmptyWorkspacePane'] = (
-          workspaceId,
-          nextBranch,
-        ) => {
-          useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, nextBranch, null)
-          setRoute(null)
-          return true
-        }
-        const showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
+        const showRepoBranchEmptyWorkspacePane: ObservedBranchRouteNavigationForTest['showRepoBranchEmptyWorkspacePane'] =
+          (workspaceId, nextBranch) => {
+            useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, nextBranch, null)
+            setRoute(null)
+            return true
+          }
+        const showRepoBranchWorkspacePaneTab: ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab'] = (
           workspaceId,
           nextBranch,
           tab,
@@ -2428,7 +2424,7 @@ function navigationWithStore(
     routeNavigation: routeNavigationOverrides,
   })
   const commitRoute = navigation.commitWorkspacePaneRoute
-  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, { commitRoute })
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest({}, { commitRoute })
   return navigation
 }
 

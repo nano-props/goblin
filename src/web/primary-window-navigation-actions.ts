@@ -14,12 +14,10 @@ import {
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   workspaceRootPaneTargetLease,
-  workspacePaneRouteNavigationBlockedForBranch,
   type FilesystemWorkspacePaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   beginPrimaryWindowPresentation,
@@ -51,23 +49,6 @@ export interface PrimaryWindowNavigationActions {
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
-  showRepoBranchEmptyWorkspacePane: (
-    workspaceId: WorkspaceId,
-    branch: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
-  ) => boolean
-  showRepoBranchWorkspacePaneTab: (
-    workspaceId: WorkspaceId,
-    branch: string,
-    tab: WorkspacePaneStaticTabType,
-    options?: PrimaryWindowPresentationNavigationOptions,
-  ) => boolean
-  showRepoBranchTerminalSession: (
-    workspaceId: WorkspaceId,
-    branch: string,
-    terminalSessionId: string,
-    options?: PrimaryWindowPresentationNavigationOptions,
-  ) => boolean
   showRepoWorktreeTerminalSession: (
     workspaceId: WorkspaceId,
     worktreePath: string,
@@ -158,51 +139,6 @@ export function createPrimaryWindowNavigationActions({
     selectRepoBranch(workspaceId, branch, options) {
       const presentationToken = beginPrimaryWindowPresentation()
       return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, presentationToken })
-    },
-    showRepoBranchEmptyWorkspacePane(workspaceId, branch, options) {
-      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      return routeNavigation.openRepoBranch(workspaceId, branch, {
-        ...options,
-        presentationToken: token,
-        onCommit: () => {
-          rememberWorkspacePaneRouteSelection(workspaceId, branch, { kind: 'empty' })
-          options?.onCommit?.()
-        },
-      })
-    },
-    showRepoBranchWorkspacePaneTab(workspaceId, branch, tab, options) {
-      if (workspacePaneRouteNavigationBlockedForBranch(workspaceId, branch)) {
-        options?.onAbandon?.()
-        return false
-      }
-      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      const accepted = routeNavigation.openRepoBranchTab(workspaceId, branch, tab, {
-        ...options,
-        presentationToken: token,
-        onCommit: () => {
-          rememberWorkspacePaneRouteSelection(workspaceId, branch, { kind: 'static', tab })
-          options?.onCommit?.()
-        },
-      })
-      if (!accepted) return false
-      return true
-    },
-    showRepoBranchTerminalSession(workspaceId, branch, terminalSessionId, options) {
-      if (workspacePaneRouteNavigationBlockedForBranch(workspaceId, branch)) {
-        options?.onAbandon?.()
-        return false
-      }
-      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      const accepted = routeNavigation.openRepoBranchTerminal(workspaceId, branch, terminalSessionId, {
-        ...options,
-        presentationToken: token,
-        onCommit: () => {
-          rememberWorkspacePaneRouteSelection(workspaceId, branch, { kind: 'terminal', terminalSessionId })
-          options?.onCommit?.()
-        },
-      })
-      if (!accepted) return false
-      return true
     },
     showRepoWorktreeTerminalSession(workspaceId, worktreePath, terminalSessionId, options) {
       const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
@@ -354,35 +290,6 @@ function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorksp
   if (!state.workspaces[target.workspaceId]) return false
   state.setWorkspacePaneTabForTarget(target, null)
   return true
-}
-
-type WorkspacePaneRememberedRoute =
-  | { kind: 'empty' }
-  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
-  | { kind: 'terminal'; terminalSessionId: string }
-
-function rememberWorkspacePaneRouteSelection(
-  workspaceId: WorkspaceId,
-  branchName: string,
-  route: WorkspacePaneRememberedRoute,
-): void {
-  const state = useWorkspacesStore.getState()
-  const workspace = state.workspaces[workspaceId]
-  const branchModel = workspace?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(workspace) : null
-  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
-  if (!workspace || !branchModel || !branch) return
-  state.setWorkspacePaneTab(
-    workspaceId,
-    branchName,
-    route.kind === 'empty' ? null : route.kind === 'static' ? route.tab : 'terminal',
-  )
-  if (route.kind !== 'terminal') return
-  const worktreePath = branch.worktree?.path ?? null
-  if (!worktreePath) return
-  state.setSelectedTerminal(
-    formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath),
-    route.terminalSessionId,
-  )
 }
 
 async function commitWorkspacePaneRoute(

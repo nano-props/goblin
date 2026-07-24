@@ -10,6 +10,7 @@ import {
 import {
   isWorkspacePaneRuntimeTab,
   nextWorkspacePaneTabEntryAfterClose,
+  workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
@@ -34,7 +35,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
-import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
@@ -312,13 +312,7 @@ function workspacePaneCloseTransition(
 }
 
 function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {
-  if (!target.worktreePath) return null
-  return workspacePaneTerminalBaseFromCoordinates({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: target.branchName,
-    rootPath: target.worktreePath,
-  })
+  return workspacePaneTerminalBaseForTabModel(target)
 }
 
 function openWorkspacePaneRuntimeCloseConfirm(

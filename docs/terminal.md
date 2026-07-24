@@ -76,9 +76,11 @@ geometry and the matching headless-render size.
   on the transition sink until real PTY output has been parsed and the resulting
   viewport has rendered. A deliberate focus request or pointer click may enter
   a visible quiet process immediately.
-- Keyboard activity that began before or arrived during terminal navigation
-  retires that navigation's automatic focus intent. It is discarded at the
-  transition sink rather than inherited, filtered inside xterm, or replayed.
+- Keyboard activity that began before or arrived during terminal navigation is
+  discarded at the transition sink rather than inherited, filtered inside
+  xterm, or replayed. It temporarily gates automatic focus; releasing the held
+  keys retries the still-current intent. A route, generation, window-focus, or
+  explicit focus-owner change retires it.
 - A presented controller forwards xterm input directly through the
   generation-bearing write operation. A viewer or stale generation cannot
   write.
@@ -496,10 +498,11 @@ with no output so a quiet process cannot deadlock waiting for stdin.
 
 Recovery snapshots may fulfil the pending automatic focus intent at reveal. A
 fresh stream fulfils it only after real PTY output has been parsed and a
-subsequent full-viewport render has completed. If plain keyboard activity was
-already held when navigation began or reaches the transition sink while the
-intent is pending, the intent is retired without focusing xterm. The user may
-still explicitly click or focus the visible terminal, including a quiet one.
+subsequent full-viewport render has completed. Keyboard activity already held
+when navigation began or reaching the transition sink while the intent is
+pending temporarily gates that transfer. The sink keeps discarding the input
+and retries the still-current intent after all held keys are released. The user
+may still explicitly click or focus the visible terminal, including a quiet one.
 First output is not a server lifecycle or shell-readiness signal; it is only a
 client-side fence preventing an old keyboard stream from entering a blank fresh
 presentation. Only a presented controller can send generation-bearing writes.

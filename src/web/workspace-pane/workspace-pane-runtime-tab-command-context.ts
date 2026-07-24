@@ -21,6 +21,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import type { TerminalInputFocusAdmission } from '#/web/terminal-focus.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -43,6 +44,7 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
     routeRequest: CreatedTerminalRouteRequest,
   ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
+  inputFocusAdmission?: TerminalInputFocusAdmission
 }
 
 interface WorkspacePaneRuntimeTabCommandContextResolver {
@@ -97,5 +99,6 @@ function assignTerminalRuntimeTabCommandContext(
           )
         : false,
     t: input.terminalCreateTranslator,
+    inputFocusAdmission: input.inputFocusAdmission,
   }
 }

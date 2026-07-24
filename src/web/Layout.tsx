@@ -166,10 +166,7 @@ function AuthenticatedWorkspaceShell() {
     hydratedRouteWorkspaceId ? s.workspaces[hydratedRouteWorkspaceId] : undefined,
   )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
-  const currentWorkspacePaneRoute =
-    routeContext?.kind === 'branch' || routeContext?.kind === 'workspace-root'
-      ? (routeContext.workspacePaneRoute ?? null)
-      : null
+  const currentWorkspacePaneRoute = currentWorkspacePaneRouteFromContext(routeContext)
   const commandCapabilities =
     commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
       ? commandWorkspace.capability.probe.capabilities
@@ -379,6 +376,12 @@ type WorkspaceRouteContext =
       worktreePath: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
+
+export function currentWorkspacePaneRouteFromContext(
+  routeContext: WorkspaceRouteContext | null,
+): ParsedWorkspacePaneRoute | null {
+  return routeContext && 'workspacePaneRoute' in routeContext ? routeContext.workspacePaneRoute : null
+}
 
 export function workspaceRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,

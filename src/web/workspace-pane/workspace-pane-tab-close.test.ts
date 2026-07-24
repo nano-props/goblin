@@ -26,6 +26,7 @@ import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/termina
 import {
   observedPrimaryWindowNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type PrimaryWindowNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -420,6 +421,84 @@ test('sends a detached worktree close to the server without requiring a branch',
   expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
 })
 
+test('derives a detached worktree terminal close target through the production dispatch path', async () => {
+  const terminalSessionId = 'term-222222222222222222222'
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [],
+    status: [{ path: WORKTREE_PATH, isMain: false, entries: [] }],
+    currentBranchName: null,
+  })
+  const paneTarget = {
+    ...WORKTREE_PANE_TARGET,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  }
+  const runtimeTarget = runtimeWorkspacePaneTargetForTest(paneTarget)
+  const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(REPO_ID, runtimeTarget.root)
+  setWorkspacePaneTabsForTargetQueryData({
+    ...paneTarget,
+    tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId), workspacePaneStaticTabEntry('status')],
+  })
+  const closeTerminalByDescriptor = vi.fn(async () => true)
+  setTerminalSessionCommandBridgeForTest({
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey,
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }),
+    createTerminal: vi.fn(async () => terminalSessionId),
+    selectTerminal: vi.fn(),
+    closeTerminalByDescriptor,
+  })
+  const commitFilesystemWorkspacePaneRoute = vi.fn<
+    PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
+  >(async (_target, _route, options) => {
+    options?.onCommit?.()
+    return true
+  })
+
+  await expect(
+    dispatchCloseWorkspacePaneTabAction({
+      routeTarget: WORKTREE_PANE_TARGET,
+      paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'detached' },
+      workspaceId: REPO_ID,
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId },
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      skipRuntimeCloseConfirm: true,
+    }),
+  ).resolves.toBe(true)
+
+  expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, {
+    target: runtimeTarget,
+    presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+  })
+  expect(closeTerminalByDescriptor).not.toHaveBeenCalledWith(
+    terminalSessionId,
+    expect.objectContaining({
+      target: expect.objectContaining({ kind: 'workspace-root' }),
+    }),
+  )
+  expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    {
+      routeTarget: WORKTREE_PANE_TARGET,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      authority: { kind: 'detached-worktree' },
+    },
+    { kind: 'static', tab: 'status' },
+    expect.objectContaining({
+      routePrecondition: {
+        kind: 'exact-route',
+        route: { kind: 'terminal', terminalSessionId },
+      },
+    }),
+  )
+})
+
 test('confirmed workspace terminal close selects Files without inventing a branch route', async () => {
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
@@ -596,7 +675,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   )
 })
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
+function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
   return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: vi.fn(),

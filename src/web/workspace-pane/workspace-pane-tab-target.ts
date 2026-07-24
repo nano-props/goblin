@@ -112,7 +112,7 @@ export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWor
   if (workspace.capability.kind !== 'git') return false
   return (
     getRepoWorktreeStatusQueryData(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)?.status.some(
-      (worktree) => worktree.path === worktreePath && worktree.branch === null,
+      (worktree) => worktree.path === worktreePath && worktree.branch === undefined,
     ) ?? false
   )
 }
@@ -396,9 +396,6 @@ function preferredWorkspacePaneTabForRoute(
 }
 
 export function workspacePaneTabTargetBlocksInteraction(model: WorkspacePaneTabModel): boolean {
-  const target =
-    model.branchName === null
-      ? { kind: 'workspace-root' as const, workspaceId: model.workspaceId }
-      : requiredGitWorkspacePaneTabsTarget(model.workspaceId, model.branchName, model.worktreePath)
-  return workspacePaneTabModelBlocksTabInteraction(model) || workspacePaneTabsInteractionBlockedForTarget(target)
+  if (workspacePaneTabModelBlocksTabInteraction(model) || model.paneTarget.kind === 'inactive') return true
+  return workspacePaneTabsInteractionBlockedForTarget(model.paneTarget)
 }

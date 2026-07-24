@@ -24,6 +24,7 @@ import {
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type PrimaryWindowNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -31,7 +32,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
@@ -44,7 +45,11 @@ import {
   beginPrimaryWindowPresentation,
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
-import { claimTerminalInputFocus, TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
+import {
+  claimTerminalInputFocus,
+  observeTerminalInputKeyboardActivity,
+  TERMINAL_INPUT_FOCUS_SINK_ID,
+} from '#/web/terminal-focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
@@ -363,6 +368,85 @@ describe('useKeyboard', () => {
     })
 
     expect(createTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps the initiating key gated when Ctrl+T is admitted during window capture', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        ],
+      },
+    })
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
+    setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+      focusTerminal,
+    })
+    await renderHookHost({
+      currentWorkspaceId: REPO_ID,
+      currentBranchName: 'feature/worktree',
+      currentWorkspacePaneCommandTarget: {
+        routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        filesystemTarget: gitWorktreePaneFilesystemTarget({
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: workspaceRuntimeIdForTest(),
+          worktreePath: WORKTREE_PATH,
+          head: { kind: 'branch', branchName: 'feature/worktree' },
+          capabilities: FILESYSTEM_CAPABILITIES,
+        }),
+      },
+    })
+    seedInitialObservedWorkspacePaneRouteForTest({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+    })
+    const sink = installTerminalFocusSink()
+    const stopObservingKeyboardActivity = observeTerminalInputKeyboardActivity()
+
+    try {
+      await act(async () => {
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
+        )
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }),
+        )
+        await Promise.resolve()
+      })
+      await vi.waitFor(() =>
+        expect(observedWorkspacePaneRouteForTarget(REPO_ID, 'feature/worktree')).toEqual({
+          kind: 'terminal',
+          terminalSessionId: 'term-222222222222222222222',
+        }),
+      )
+
+      expect(createTerminal).toHaveBeenCalledOnce()
+      expect(document.activeElement).toBe(sink)
+      expect(focusTerminal).not.toHaveBeenCalled()
+
+      sink.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', code: 'ControlLeft', bubbles: true }))
+      expect(focusTerminal).not.toHaveBeenCalled()
+      sink.dispatchEvent(new KeyboardEvent('keyup', { key: 't', code: 'KeyT', bubbles: true }))
+
+      expect(focusTerminal).toHaveBeenCalledOnce()
+      focusTerminal.mock.calls[0]![1]?.onSettled?.()
+    } finally {
+      stopObservingKeyboardActivity()
+    }
   })
 
   test('primary modifier plus t creates a terminal for a workspace root target', async () => {
@@ -778,7 +862,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
   return null
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
+function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {
   return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: () => {},
@@ -815,6 +899,14 @@ function installNativeBridgeStub() {
       setBadge: () => {},
     },
   })
+}
+
+function installTerminalFocusSink(): HTMLElement {
+  const sink = document.createElement('div')
+  sink.id = TERMINAL_INPUT_FOCUS_SINK_ID
+  sink.tabIndex = -1
+  document.body.appendChild(sink)
+  return sink
 }
 
 function terminalFilesystemTargetSnapshot(): TerminalFilesystemTargetSnapshot {

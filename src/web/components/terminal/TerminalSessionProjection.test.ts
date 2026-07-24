@@ -163,6 +163,24 @@ describe('TerminalSessionProjection', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
+  test('returns the session focus admission result', () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+      'client_local',
+    )
+    const session = requiredTerminalSession(projection, terminalSessionId)
+    const request = { isCurrent: () => true, onSettled: vi.fn() }
+    const focus = vi.spyOn(session, 'focus').mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    expect(projection.focusTerminal(terminalSessionId, request)).toBe(false)
+    expect(projection.focusTerminal(terminalSessionId, request)).toBe(true)
+    expect(focus).toHaveBeenNthCalledWith(1, request)
+    expect(focus).toHaveBeenNthCalledWith(2, request)
+  })
+
   describe('versioned terminal session snapshots', () => {
     test('rejects older snapshots without evicting the accepted projection', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())

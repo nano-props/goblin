@@ -53,6 +53,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   authenticatedAppShellMode,
+  currentWorkspacePaneRouteFromContext,
   primaryWindowLayoutRouteCallbacks,
   workspaceRouteContextFromMatches,
 } from '#/web/Layout.tsx'
@@ -382,6 +383,19 @@ function navigateBrowser(pathname: string) {
 }
 
 describe('workspace route context derivation', () => {
+  test('preserves the active pane route for a detached worktree context', () => {
+    const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' }
+
+    expect(
+      currentWorkspacePaneRouteFromContext({
+        kind: 'worktree',
+        workspaceSlug: 'L3JlcG8',
+        worktreePath: '/tmp/detached-worktree',
+        workspacePaneRoute,
+      }),
+    ).toEqual(workspacePaneRoute)
+  })
+
   test('keeps workspace context when a branch slug is malformed', () => {
     expect(
       workspaceRouteContextFromMatches([

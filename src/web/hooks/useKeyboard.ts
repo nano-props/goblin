@@ -209,6 +209,7 @@ export function useKeyboard({
             target: paneTarget,
             navigation,
             t: translate,
+            inputFocusAdmission: { kind: 'keyboard', initiatingKey: e.code },
           })
           return
         }

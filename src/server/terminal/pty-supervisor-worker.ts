@@ -23,6 +23,7 @@ import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
 const DEFAULT_WRITE_ACK_TIMEOUT_MS = 5_000
+const DEFAULT_RESIZE_ACK_TIMEOUT_MS = 5_000
 const MAX_PENDING_WRITE_ACKS = 1_024
 const MAX_PENDING_RESIZE_ACKS = 1_024
 const DEFAULT_MAX_PENDING_WRITE_BYTES = 8 * 1024 * 1024
@@ -31,7 +32,7 @@ const ptyWorkerLogger = serverLogger.child({ module: 'pty-supervisor-worker' })
 type TerminalWorkerChildProcess = ChildProcess
 type WorkerInvalidationKind = Extract<
   PtySupervisorFailureDiagnostics['kind'],
-  'exit' | 'error' | 'disconnect' | 'protocol'
+  'exit' | 'error' | 'disconnect' | 'protocol' | 'timeout'
 >
 
 interface PendingSpawn {
@@ -51,6 +52,7 @@ interface PendingWrite {
 interface PendingResize {
   ptySessionId: string
   resolve(accepted: boolean): void
+  timeout: ReturnType<typeof setTimeout>
 }
 
 interface PtyEventOwnership {
@@ -69,6 +71,7 @@ export interface WorkerBackedPtySupervisorOptions {
   spawnWorker?: (entry: string) => TerminalWorkerChildProcess
   now?: () => number
   writeAckTimeoutMs?: number
+  resizeAckTimeoutMs?: number
   maxPendingWriteBytes?: number
 }
 
@@ -147,7 +150,17 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (!worker) return false
     const requestId = createRequestId()
     return await new Promise<boolean>((resolve) => {
-      this.pendingResizes.set(requestId, { ptySessionId: handle.ptySessionId, resolve })
+      const timeoutMs = this.options.resizeAckTimeoutMs ?? DEFAULT_RESIZE_ACK_TIMEOUT_MS
+      const timeout = setTimeout(() => {
+        if (!this.pendingResizes.has(requestId)) return
+        this.invalidateWorker(
+          worker,
+          'timeout',
+          `action=pty-resize ptySessionId=${handle.ptySessionId} timeoutMs=${timeoutMs}`,
+          'PTY worker resize timed out',
+        )
+      }, timeoutMs)
+      this.pendingResizes.set(requestId, { ptySessionId: handle.ptySessionId, resolve, timeout })
       try {
         worker.send({ type: 'pty-resize', requestId, ptySessionId: handle.ptySessionId, cols, rows }, (error) => {
           if (error) this.settlePendingResize(requestId, false)
@@ -373,6 +386,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     const pending = this.pendingResizes.get(requestId)
     if (!pending) return false
     this.pendingResizes.delete(requestId)
+    clearTimeout(pending.timeout)
     pending.resolve(accepted)
     return true
   }

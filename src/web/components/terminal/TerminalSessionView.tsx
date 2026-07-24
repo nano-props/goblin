@@ -99,8 +99,14 @@ export function TerminalSessionView({
     const selectedDescriptor = descriptorRef.current
     if (!host || !selectedDescriptor || selectedDescriptor.terminalSessionId !== terminalSessionId) return
     attach(selectedDescriptor, host)
-    fulfillTerminalPresentationFocus(selectedDescriptor.terminalSessionId, focusTerminal)
-    return () => detach(selectedDescriptor.terminalSessionId, host)
+    let mounted = true
+    queueMicrotask(() => {
+      if (mounted) fulfillTerminalPresentationFocus(selectedDescriptor.terminalSessionId, focusTerminal)
+    })
+    return () => {
+      mounted = false
+      detach(selectedDescriptor.terminalSessionId, host)
+    }
   }, [attach, detach, focusTerminal, terminalSessionId])
 
   useEffect(() => {

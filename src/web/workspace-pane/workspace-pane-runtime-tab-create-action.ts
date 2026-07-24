@@ -36,7 +36,7 @@ import {
   beginPrimaryWindowPresentation,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
-import { claimTerminalInputFocus } from '#/web/terminal-focus.ts'
+import { claimTerminalInputFocus, type TerminalInputFocusAdmission } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
 export interface CreatedTerminalRouteRequest {
@@ -97,6 +97,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
     routeRequest: CreatedTerminalRouteRequest,
   ) => boolean | Promise<boolean>
   focusTerminal: (terminalSessionId: string, request?: TerminalFocusRequest) => boolean
+  inputFocusAdmission?: TerminalInputFocusAdmission
   insertAfterIdentity?: string | null
   options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
@@ -136,7 +137,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   const base = options.base
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   const presentationToken = beginPrimaryWindowPresentation()
-  let ownedFocusLease = claimTerminalInputFocus(presentationToken)
+  let ownedFocusLease = claimTerminalInputFocus(presentationToken, options.inputFocusAdmission)
   try {
     return await runWorkspacePaneAction(
       target,

@@ -38,6 +38,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import type { TerminalInputFocusAdmission } from '#/web/terminal-focus.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -60,6 +61,7 @@ interface NewTerminalTabCommandOptions {
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
+  inputFocusAdmission?: TerminalInputFocusAdmission
 }
 
 interface WorkspacePaneTabCommandTargetOptions {

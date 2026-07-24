@@ -34,6 +34,7 @@ import {
   observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
@@ -766,7 +767,7 @@ function openerScopeKey(workspaceId: WorkspaceId, branchName: string, worktreePa
 }
 
 function navigationWithStoreActions(
-  showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
+  showRepoBranchWorkspacePaneTab: ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab'] = (
     repoId,
     branch,
     tab,
@@ -779,13 +780,10 @@ function navigationWithStoreActions(
   },
 ): WorkspacePaneTabControllerCommitNavigation {
   seedInitialObservedWorkspacePaneRouteForTest()
-  const navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> = {
-    showRepoBranchWorkspacePaneTab,
-  }
   return {
     commitWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({
       showRepoBranchEmptyWorkspacePane: () => false,
-      showRepoBranchWorkspacePaneTab: navigation.showRepoBranchWorkspacePaneTab,
+      showRepoBranchWorkspacePaneTab,
       showRepoBranchTerminalSession: () => false,
     }),
     commitFilesystemWorkspacePaneRoute: unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute'),

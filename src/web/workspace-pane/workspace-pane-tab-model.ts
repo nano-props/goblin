@@ -12,11 +12,13 @@ import {
   type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import {
+  runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
@@ -160,6 +162,20 @@ export interface WorkspacePaneTabModel {
   /** Canonical selected entry, independent of whether its live runtime view has projected. */
   selectedEntry: WorkspacePaneTabEntry | null
   selectedIdentity: string | null
+}
+
+/** Derives terminal execution from the model's authoritative pane target. */
+export function workspacePaneTerminalBaseForTabModel(
+  model: Pick<WorkspacePaneTabModel, 'workspaceRuntimeId' | 'paneTarget' | 'branchName'>,
+): TerminalSessionBase | null {
+  if (model.paneTarget.kind === 'inactive' || model.paneTarget.kind === 'git-branch') return null
+  const target = runtimeWorkspacePaneTarget(model.paneTarget, model.workspaceRuntimeId)
+  if (!target) return null
+  if (target.kind === 'workspace-root') return { target, presentation: { kind: 'workspace-root' } }
+  if (target.kind === 'git-worktree') {
+    return { target, presentation: terminalGitWorktreePresentation(model.branchName) }
+  }
+  return null
 }
 
 export interface WorkspacePaneTabModelInput {

@@ -55,6 +55,7 @@ function buildSupervisor(
   options: {
     now?: () => number
     writeAckTimeoutMs?: number
+    resizeAckTimeoutMs?: number
     maxPendingWriteBytes?: number
   } = {},
 ) {
@@ -63,6 +64,7 @@ function buildSupervisor(
     spawnWorker: () => worker as never,
     now: options.now,
     writeAckTimeoutMs: options.writeAckTimeoutMs,
+    resizeAckTimeoutMs: options.resizeAckTimeoutMs,
     maxPendingWriteBytes: options.maxPendingWriteBytes,
   })
 }
@@ -427,6 +429,42 @@ describe('WorkerBackedPtySupervisor', () => {
     worker.emit('exit', 1, null)
     await expect(interruptedResize).resolves.toBe(false)
     expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+  })
+
+  test('retires an indeterminate worker when a resize acknowledgement times out', async () => {
+    vi.useFakeTimers()
+    const supervisor = buildSupervisor(worker, { resizeAckTimeoutMs: 25 })
+    const spawning = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    const spawnRequest = worker.sent.at(-1) as SpawnRequest
+    worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: spawnRequest.requestId,
+      ok: true,
+      ptySessionId: spawnRequest.ptySessionId,
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    const spawned = await spawning
+    if (!spawned.ok) throw new Error(spawned.message)
+    const handle = spawned.handle
+    const onExit = vi.fn()
+    spawned.events.claim({ onData: vi.fn(), onExit }).activate()
+
+    const resize = supervisor.resize(handle, 100, 30)
+    await vi.advanceTimersByTimeAsync(25)
+
+    await expect(resize).resolves.toBe(false)
+    expect(worker.killed).toBe(true)
+    expect(onExit).toHaveBeenCalledWith(null, null)
+    expect(supervisor.getDiagnostics()).toMatchObject({
+      state: 'idle',
+      workerRunning: false,
+      pendingRequests: 0,
+      lastFailure: {
+        kind: 'timeout',
+        detail: `action=pty-resize ptySessionId=${handle.ptySessionId} timeoutMs=25`,
+      },
+    })
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   test('settles a pending write immediately when its PTY exits before acknowledgement', async () => {

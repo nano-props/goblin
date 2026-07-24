@@ -4,6 +4,7 @@ import {
   createWorkspacePaneTabModel,
   nextWorkspacePaneTabEntryAfterClose,
   materializedWorkspacePaneRuntimeTabSessionId,
+  workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
   type WorkspacePaneTabModelInput,
   type WorkspacePaneRuntimeTabStateInputByType,
@@ -47,6 +48,15 @@ describe('repo workspace pane tab model', () => {
     expect(model.tabEntries.map((entry) => entry.type)).toEqual(['status', 'files'])
     expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
     expect(model.renderedTab).toBe('status')
+    expect(workspacePaneTerminalBaseForTabModel(model)).toEqual({
+      target: {
+        kind: 'git-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        root: workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-worktree'),
+      },
+      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+    })
   })
 
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {

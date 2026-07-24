@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
-import type { ComponentProps } from 'react'
+import { StrictMode, type ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
@@ -21,7 +21,8 @@ import type {
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
-import { TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
+import { claimTerminalInputFocus, TERMINAL_INPUT_FOCUS_SINK_ID } from '#/web/terminal-focus.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -300,7 +301,7 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
-  test('attaches and fulfils focus for the explicit routed session before projection selection catches up', async () => {
+  test('retries precommitted focus after the StrictMode view reaches its stable mount', async () => {
     const focusSink = document.createElement('div')
     focusSink.id = TERMINAL_INPUT_FOCUS_SINK_ID
     focusSink.tabIndex = -1
@@ -345,8 +346,18 @@ describe('TerminalSessionView', () => {
         role: 'controller' as const,
       },
     }
-    const attach = vi.fn()
-    const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
+    let connected = false
+    const attach = vi.fn(() => {
+      connected = true
+    })
+    let currentFocusRequest: TerminalFocusRequest | undefined
+    const focusTerminal = vi.fn((_terminalSessionId: string, request?: TerminalFocusRequest) => {
+      currentFocusRequest = request
+      return connected
+    })
+    const detach = vi.fn(() => {
+      connected = false
+    })
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       selectTerminal: vi.fn(),
@@ -355,7 +366,7 @@ describe('TerminalSessionView', () => {
       clearBell: vi.fn(() => false),
       closeTerminalByDescriptor: vi.fn(async () => true),
       attach,
-      detach: vi.fn(),
+      detach,
       restart: vi.fn(),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
@@ -371,22 +382,31 @@ describe('TerminalSessionView', () => {
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
+    const presentationToken = beginPrimaryWindowPresentation()
+    const focusLease = claimTerminalInputFocus(presentationToken)
+    if (!focusLease) throw new Error('expected terminal input focus lease')
+    focusLease.commit('term-222222222222222222222', focusTerminal)
+    expect(focusTerminal).toHaveBeenCalledOnce()
+    expect(currentFocusRequest?.isCurrent()).toBe(false)
 
     const { unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
-            branch="feature"
-            worktreePath="/worktree"
-            selectedTerminalSessionId="term-222222222222222222222"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+      <StrictMode>
+        <TerminalSessionContext value={context}>
+          <TerminalSessionReadContext value={readContext}>
+            <TerminalSessionView
+              repoRoot="/repo"
+              workspaceRuntimeId={'repo-runtime-test'}
+              branch="feature"
+              worktreePath="/worktree"
+              selectedTerminalSessionId="term-222222222222222222222"
+            />
+          </TerminalSessionReadContext>
+        </TerminalSessionContext>
+      </StrictMode>,
     )
 
     try {
+      await vi.waitFor(() => expect(focusTerminal).toHaveBeenCalledTimes(2))
       expect(attach).toHaveBeenCalledWith(
         expect.objectContaining({
           terminalSessionId: 'term-222222222222222222222',
@@ -399,12 +419,14 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({ terminalSessionId: 'term-111111111111111111111' }),
         expect.any(HTMLDivElement),
       )
-      expect(focusTerminal).toHaveBeenCalledOnce()
-      expect(focusTerminal).toHaveBeenCalledWith(
+      expect(focusTerminal).toHaveBeenCalledTimes(2)
+      expect(focusTerminal).toHaveBeenLastCalledWith(
         'term-222222222222222222222',
         expect.objectContaining({ isCurrent: expect.any(Function), onSettled: expect.any(Function) }),
       )
+      expect(currentFocusRequest?.isCurrent()).toBe(true)
     } finally {
+      currentFocusRequest?.onSettled?.()
       unmount()
       focusSink.remove()
     }

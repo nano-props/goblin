@@ -14,14 +14,16 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   createRepoBranch,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { observedPrimaryWindowNavigationActionsForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import {
+  observedPrimaryWindowNavigationActionsForTest,
+  type ObservedPrimaryWindowNavigationActionsForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
@@ -201,7 +203,7 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
   }
 }
 
-function navigationWithStoreActions(): PrimaryWindowNavigationActions {
+function navigationWithStoreActions(): ObservedPrimaryWindowNavigationActionsForTest {
   return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),

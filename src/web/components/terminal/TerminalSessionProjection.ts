@@ -954,11 +954,7 @@ export class TerminalSessionProjection {
 
   focusTerminal = (terminalSessionId: string, request?: TerminalFocusRequest): boolean => {
     const session = this.sessions.get(terminalSessionId)
-    if (!session) {
-      return false
-    }
-    session.focus(request)
-    return true
+    return session ? session.focus(request) : false
   }
 
   snapshot = (terminalSessionId: string): TerminalSnapshot => {

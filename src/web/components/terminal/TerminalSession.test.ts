@@ -862,8 +862,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
@@ -911,8 +911,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushTerminalStart()
     const term = xtermMocks.terminals[0]!
 
@@ -933,7 +933,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('drops an automatic focus transfer invalidated by keyboard activity before fresh output', async () => {
+  test('drops an automatic focus transfer whose presentation lease expires before fresh output', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -942,8 +942,8 @@ describe('TerminalSession', () => {
     let focusIsCurrent = true
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => focusIsCurrent, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => focusIsCurrent, onSettled: settled })).toBe(true)
     await flushTerminalStart()
     const term = xtermMocks.terminals[0]!
     focusIsCurrent = false
@@ -956,7 +956,7 @@ describe('TerminalSession', () => {
     expect(settled).toHaveBeenCalledOnce()
   })
 
-  test('flushes current-generation stream output that arrives during the final render exactly once', async () => {
+  test('flushes split zsh output arriving after the presentation cutoff exactly once', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -968,7 +968,10 @@ describe('TerminalSession', () => {
     const term = xtermMocks.terminals[0]!
     await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
 
-    emitSessionOutput(session, 1, 'current prompt')
+    const promptEolMark = '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m    \r \r'
+    const prompt = '\r\x1b[0m\x1b[27m\x1b[24m\x1b[J~/project\r\n$ \x1b[K\x1b[?2004h'
+    emitSessionOutput(session, 1, promptEolMark)
+    emitSessionOutput(session, 1, prompt, 2)
     expect(term.write).not.toHaveBeenCalled()
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
 
@@ -976,7 +979,7 @@ describe('TerminalSession', () => {
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
     expect(term.write).toHaveBeenCalledTimes(1)
-    expect(term.write).toHaveBeenCalledWith('current prompt', expect.any(Function))
+    expect(term.write).toHaveBeenCalledWith(promptEolMark + prompt, expect.any(Function))
     await flushTerminalStart()
     expect(term.write).toHaveBeenCalledTimes(1)
   })
@@ -3450,15 +3453,19 @@ describe('TerminalSession', () => {
     expect(terminalOwnsKeyboardInput()).toBe(true)
   })
 
-  test('settles a focus lease only after the hidden xterm is fully presented', async () => {
+  test('keeps disconnected focus pending and accepts its retry after the view attaches', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
+    const request = { isCurrent: () => true, onSettled: settled }
+
+    expect(session.focus(request)).toBe(false)
+    expect(settled).not.toHaveBeenCalled()
     session.attach(host)
+    expect(session.focus(request)).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
 
@@ -3472,9 +3479,12 @@ describe('TerminalSession', () => {
   })
 
   test('settles a focus lease when its initial currency check throws', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
+    session.attach(host)
 
     expect(() =>
       session.focus({
@@ -3494,8 +3504,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     xtermMocks.terminals[0]!.focus.mockImplementationOnce(() => {
       throw new Error('focus failed')
@@ -3513,8 +3523,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     session.detach(host)
@@ -3531,8 +3541,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     session.handleIdentity({
@@ -3558,8 +3568,8 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
     const settled = vi.fn()
 
-    session.focus({ isCurrent: () => true, onSettled: settled })
     session.attach(host)
+    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
     await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     session.hydrate({
@@ -3920,13 +3930,18 @@ function restartResult(terminalRuntimeSessionId: string): Extract<TerminalRestar
   }
 }
 
-function emitSessionOutput(session: TerminalSession, terminalRuntimeGeneration: number, data = 'prompt'): void {
+function emitSessionOutput(
+  session: TerminalSession,
+  terminalRuntimeGeneration: number,
+  data = 'prompt',
+  seq = 1,
+): void {
   session.handleOutput({
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration,
     terminalSessionId: descriptor.terminalSessionId,
     data,
-    seq: 1,
+    seq,
     processName: 'zsh',
   })
 }

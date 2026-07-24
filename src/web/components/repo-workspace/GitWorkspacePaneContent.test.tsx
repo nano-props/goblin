@@ -52,6 +52,7 @@ import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
   observeWorkspacePaneRouteForTest,
   observedPrimaryWindowNavigationActionsForTest,
+  type PrimaryWindowNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -1728,7 +1729,7 @@ function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
+function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest): PrimaryWindowNavigationActions {
   return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),

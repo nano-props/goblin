@@ -177,11 +177,13 @@ import {
 import { dispatchSelectWorkspacePaneTabByIdentityAction as dispatchSelectWorkspacePaneTabByIdentityActionRaw } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchMoveWorkspacePaneTabAction as dispatchMoveWorkspacePaneTabActionRaw } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
+  observeWorkspacePaneRouteForTest,
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedPrimaryWindowNavigationActionsForTest,
+  type PrimaryWindowNavigationOverridesForTest,
   type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetPrimaryWindowPresentationForTest } from '#/web/primary-window-presentation.ts'
@@ -3378,9 +3380,9 @@ test('serializes open then move through exact route commits', async () => {
 })
 
 function navigationWith(
-  overrides: Partial<PrimaryWindowNavigationActions> = {},
+  overrides: PrimaryWindowNavigationOverridesForTest = {},
   options: { autoSeedInitialRoute?: boolean } = {},
-): PrimaryWindowNavigationActions {
+): ObservedPrimaryWindowNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
   return observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,

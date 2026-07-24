@@ -84,6 +84,9 @@ import {
   observeWorkspacePaneRouteForTest,
   observedPrimaryWindowNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedBranchRouteNavigationForTest,
+  type ObservedPrimaryWindowNavigationActionsForTest,
+  type PrimaryWindowNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
 let compactUi = false
@@ -1197,10 +1200,10 @@ describe('GitWorkspacePaneToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn<PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab']>(
-      () => true,
-    )
-    const showRepoBranchTerminalSession = vi.fn<PrimaryWindowNavigationActions['showRepoBranchTerminalSession']>(
+    const showRepoBranchWorkspacePaneTab = vi.fn<
+      ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab']
+    >(() => true)
+    const showRepoBranchTerminalSession = vi.fn<ObservedBranchRouteNavigationForTest['showRepoBranchTerminalSession']>(
       () => true,
     )
     const commitWorkspacePaneRoute: PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] = async (
@@ -1406,7 +1409,7 @@ describe('GitWorkspacePaneToolbar', () => {
 function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
-  navigation: PrimaryWindowNavigationActions
+  navigation: ObservedPrimaryWindowNavigationActionsForTest
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   workspacePaneTabs?: WorkspacePaneTabEntry[]
@@ -1694,7 +1697,9 @@ function workspacePaneRouteForPreferredTab(
   return isWorkspacePaneStaticTabType(preferredTab) ? { kind: 'static', tab: preferredTab } : null
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
+function navigationWith(
+  overrides: PrimaryWindowNavigationOverridesForTest,
+): ObservedPrimaryWindowNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest()
   return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: () => {},

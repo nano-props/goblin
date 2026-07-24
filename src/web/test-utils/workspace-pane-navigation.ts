@@ -14,11 +14,32 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 
+export interface ObservedBranchRouteNavigationForTest {
+  showRepoBranchEmptyWorkspacePane: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    options?: PrimaryWindowPresentationNavigationOptions,
+  ) => boolean
+  showRepoBranchWorkspacePaneTab: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    tab: Extract<WorkspacePaneRouteTarget, { kind: 'static' }>['tab'],
+    options?: PrimaryWindowPresentationNavigationOptions,
+  ) => boolean
+  showRepoBranchTerminalSession: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    terminalSessionId: string,
+    options?: PrimaryWindowPresentationNavigationOptions,
+  ) => boolean
+}
+
 type ObservedPrimaryWindowNavigationOverrides = Partial<PrimaryWindowNavigationActions> &
-  Pick<
-    PrimaryWindowNavigationActions,
-    'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
-  >
+  ObservedBranchRouteNavigationForTest
+export type PrimaryWindowNavigationOverridesForTest = Partial<PrimaryWindowNavigationActions> &
+  Partial<ObservedBranchRouteNavigationForTest>
+export type ObservedPrimaryWindowNavigationActionsForTest = PrimaryWindowNavigationActions &
+  ObservedBranchRouteNavigationForTest
 
 export interface ObservedWorkspacePaneRouteCommitOptions {
   observeAcceptedRoute?: (observation: WorkspacePaneNavigationObservation) => void
@@ -76,10 +97,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
 }
 
 export function observedWorkspacePaneRouteCommitForTest(
-  navigation: Pick<
-    PrimaryWindowNavigationActions,
-    'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
-  >,
+  navigation: Partial<ObservedBranchRouteNavigationForTest>,
   options: ObservedWorkspacePaneRouteCommitOptions = {},
 ): PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] {
   const observeAcceptedRoute = options.observeAcceptedRoute ?? (() => {})
@@ -109,6 +127,10 @@ export function observedWorkspacePaneRouteCommitForTest(
           observeCommittedRoute(repoId, branchName, route)
         },
       })
+  }
+  const { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession } = navigation
+  if (!showRepoBranchEmptyWorkspacePane || !showRepoBranchWorkspacePaneTab || !showRepoBranchTerminalSession) {
+    throw new Error('Observed workspace pane route commits require branch route callbacks')
   }
   const abandonCommit = (commitOptions: PrimaryWindowPresentationNavigationOptions | undefined) => {
     commitOptions?.onAbandon?.()
@@ -141,9 +163,9 @@ export function observedWorkspacePaneRouteCommitForTest(
     const routeOptions = commitOptions?.replace === undefined ? undefined : { replace: commitOptions.replace }
     const accepted = openResolvedWorkspacePaneRoute(
       {
-        openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-        openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-        openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        openRepoBranch: showRepoBranchEmptyWorkspacePane,
+        openRepoBranchTab: showRepoBranchWorkspacePaneTab,
+        openRepoBranchTerminal: showRepoBranchTerminalSession,
       },
       repoId,
       branchName,
@@ -164,12 +186,29 @@ export function observedWorkspacePaneRouteCommitForTest(
 export function observedPrimaryWindowNavigationActionsForTest(
   overrides: ObservedPrimaryWindowNavigationOverrides,
   options: ObservedWorkspacePaneRouteCommitOptions = {},
-): PrimaryWindowNavigationActions {
-  const navigation = primaryWindowNavigationActionsForTest(overrides)
-  if (overrides.commitWorkspacePaneRoute) return navigation
-  return {
+): ObservedPrimaryWindowNavigationActionsForTest {
+  const {
+    showRepoBranchEmptyWorkspacePane,
+    showRepoBranchWorkspacePaneTab,
+    showRepoBranchTerminalSession,
+    ...navigationOverrides
+  } = overrides
+  const navigation = primaryWindowNavigationActionsForTest(navigationOverrides)
+  const observedNavigation = {
     ...navigation,
-    commitWorkspacePaneRoute: vi.fn(observedWorkspacePaneRouteCommitForTest(navigation, options)),
+    showRepoBranchEmptyWorkspacePane,
+    showRepoBranchWorkspacePaneTab,
+    showRepoBranchTerminalSession,
+  }
+  if (overrides.commitWorkspacePaneRoute) return observedNavigation
+  return {
+    ...observedNavigation,
+    commitWorkspacePaneRoute: vi.fn(
+      observedWorkspacePaneRouteCommitForTest(
+        { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession },
+        options,
+      ),
+    ),
   }
 }
 

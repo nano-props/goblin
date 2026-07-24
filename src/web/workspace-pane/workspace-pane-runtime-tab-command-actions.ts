@@ -44,6 +44,7 @@ import {
 } from '#/web/primary-window-presentation.ts'
 import {
   claimTerminalInputFocus,
+  type TerminalInputFocusAdmission,
   type TerminalInputFocusLease,
   type TerminalPresentationFocusEffects,
 } from '#/web/terminal-focus.ts'
@@ -68,6 +69,7 @@ export interface WorkspacePaneRuntimeTabCommandContext {
       routeRequest: CreatedTerminalRouteRequest,
     ) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
+    inputFocusAdmission?: TerminalInputFocusAdmission
   }
 }
 
@@ -77,6 +79,7 @@ interface WorkspacePaneTerminalRuntimeCommandOptionsBase {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerCommitNavigation & CreatedTerminalNavigation
   t?: TerminalCreateTranslator
+  inputFocusAdmission?: TerminalInputFocusAdmission
 }
 
 export type WorkspacePaneTerminalRuntimeCommandOptions = WorkspacePaneTerminalRuntimeCommandOptionsBase &
@@ -115,6 +118,7 @@ async function terminalRuntimePrimaryAction({
   workspacePaneRoute,
   navigation,
   t,
+  inputFocusAdmission,
 }: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
   if (!workspaceId) return false
   return await runWorkspacePaneRuntimePrimaryAction(
@@ -150,6 +154,7 @@ async function terminalRuntimePrimaryAction({
           routeRequest,
         ),
       terminalCreateTranslator: t,
+      inputFocusAdmission,
     }),
   )
 }
@@ -171,6 +176,7 @@ function newTerminalRuntimeTabActionContext({
   workspacePaneRoute,
   navigation,
   t,
+  inputFocusAdmission,
 }: WorkspacePaneTerminalRuntimeCommandOptions & { workspaceId: WorkspaceId }): WorkspacePaneRuntimeTabCommandContext {
   return workspacePaneRuntimeTabCommandContext({
     workspaceId,
@@ -203,6 +209,7 @@ function newTerminalRuntimeTabActionContext({
         routeRequest,
       ),
     terminalCreateTranslator: t,
+    inputFocusAdmission,
   })
 }
 
@@ -340,7 +347,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
     const presentationToken = beginPrimaryWindowPresentation()
-    let ownedFocusLease = claimTerminalInputFocus(presentationToken)
+    let ownedFocusLease = claimTerminalInputFocus(presentationToken, terminal.inputFocusAdmission)
     try {
       return await runWorkspacePaneAction(target, async () => {
         const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
@@ -368,6 +375,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
     showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
       terminal.showCreatedTerminalSession(terminalSessionId, presentation, routeRequest),
     focusTerminal: bridge.focusTerminal,
+    inputFocusAdmission: terminal.inputFocusAdmission,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -387,6 +395,7 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
     showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
       terminal.showCreatedTerminalSession(terminalSessionId, presentation, routeRequest),
     focusTerminal: bridge.focusTerminal,
+    inputFocusAdmission: terminal.inputFocusAdmission,
     t: terminal.t,
   })
   return result.ok
