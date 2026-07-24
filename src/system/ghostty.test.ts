@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempDisposableSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -15,12 +15,8 @@ vi.mock('node:fs', async () => {
 // Importing after the mocks so the module under test picks up the mocked execa/fs.
 const { isGhosttyInstalled, openInGhostty, openRemoteInGhostty } = await import('#/system/ghostty.ts')
 
-const tempDirs: string[] = []
-
-function makeTempDir(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'goblin-ghostty-test-'))
-  tempDirs.push(dir)
-  return dir
+function makeTempDir() {
+  return mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-ghostty-test-'))
 }
 
 /** Route the mocked `execa` by command: osascript calls resolve/reject a
@@ -41,7 +37,6 @@ function mockOpenOnce(result: 'ok' | Error) {
 afterEach(() => {
   execaMock.mockReset()
   existsSyncMock.mockReset()
-  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
 describe('isGhosttyInstalled', () => {
@@ -61,15 +56,17 @@ describe('openInGhostty', () => {
   })
 
   test('returns not-installed when Ghostty.app is missing', async () => {
+    using temporaryDirectory = makeTempDir()
     existsSyncMock.mockReturnValue(false)
-    const result = await openInGhostty(makeTempDir())
+    const result = await openInGhostty(temporaryDirectory.path)
     expect(result).toEqual({ ok: false, message: 'error.ghostty-not-installed' })
     expect(execaMock).not.toHaveBeenCalled()
   })
 
   test('reuses a running instance via AppleScript when it opens a window', async () => {
+    using temporaryDirectory = makeTempDir()
     existsSyncMock.mockReturnValue(true)
-    const dir = makeTempDir()
+    const dir = temporaryDirectory.path
     mockOsascriptOnce({ stdout: 'opened' })
 
     const result = await openInGhostty(dir)
@@ -82,8 +79,9 @@ describe('openInGhostty', () => {
     ['the check reports Ghostty is not running', { stdout: 'not-running' }],
     ['the check itself fails (e.g. times out)', new Error('osascript timed out')],
   ] as const)('falls back to launching without -n when %s', async (_label, warmResult) => {
+    using temporaryDirectory = makeTempDir()
     existsSyncMock.mockReturnValue(true)
-    const dir = makeTempDir()
+    const dir = temporaryDirectory.path
     mockOsascriptOnce(warmResult)
     mockOpenOnce('ok')
 
@@ -102,11 +100,12 @@ describe('openInGhostty', () => {
   })
 
   test('returns the launch error when both the warm and cold paths fail', async () => {
+    using temporaryDirectory = makeTempDir()
     existsSyncMock.mockReturnValue(true)
     mockOsascriptOnce(new Error('osascript timed out'))
     mockOpenOnce(new Error('spawn open ENOENT'))
 
-    const result = await openInGhostty(makeTempDir())
+    const result = await openInGhostty(temporaryDirectory.path)
 
     expect(result).toEqual({ ok: false, message: 'spawn open ENOENT' })
   })

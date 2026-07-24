@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempDisposableSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -12,7 +12,6 @@ vi.mock('execa', () => ({
 const { openInFinder } = await import('#/system/finder.ts')
 
 const originalPlatform = process.platform
-const tempDirs: string[] = []
 
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   Object.defineProperty(process, 'platform', { value: platform, configurable: true })
@@ -23,15 +22,12 @@ function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   }
 }
 
-function makeTempDir(): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'goblin-finder-test-'))
-  tempDirs.push(dir)
-  return dir
+function makeTempDir() {
+  return mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-finder-test-'))
 }
 
 afterEach(() => {
   Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
-  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   execaMock.mockReset()
 })
 
@@ -54,7 +50,8 @@ describe('openInFinder', () => {
 
   test('opens an existing directory with Launch Services', async () => {
     await withPlatform('darwin', async () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       execaMock.mockResolvedValue({ stdout: '' })
 
       const result = await openInFinder(dir)
@@ -70,7 +67,8 @@ describe('openInFinder', () => {
 
   test('returns the spawn error message', async () => {
     await withPlatform('darwin', async () => {
-      const dir = makeTempDir()
+      using temporaryDirectory = makeTempDir()
+      const dir = temporaryDirectory.path
       execaMock.mockRejectedValue(new Error('launch services failed'))
 
       await expect(openInFinder(dir)).resolves.toEqual({ ok: false, message: 'launch services failed' })
