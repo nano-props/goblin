@@ -71,7 +71,7 @@ export async function handleTerminalRealtimeRequestMessage(
     } as TerminalSocketResponseMessage
   }
   socket.send(JSON.stringify(response))
-  return outputFlushBoundaryFromResponse(response)
+  return snapshotFlushBoundaryFromResponse(response)
 }
 
 // These responses establish an authoritative frame transition for a terminal
@@ -80,8 +80,8 @@ export async function handleTerminalRealtimeRequestMessage(
 //
 // Existing-session recovery attach returns snapshot hydration. Fresh attach
 // and restart both establish a new PTY generation and return a stream
-// handshake: ordering still keeps the response first, but its null flush
-// boundary deliberately drops nothing so sequence 1 reaches the fitted xterm.
+// handshake: ordering still keeps the response first, but streams have no
+// snapshot deduplication boundary, so sequence 1 reaches the fitted xterm.
 // `takeover` does not return a fresh snapshot, but its response is still
 // the authoritative identity/geometry handshake for the new controller;
 // the same socket must not observe the identity event before that
@@ -90,7 +90,7 @@ export function requiresRealtimeOrdering(action: TerminalSocketRequestAction): b
   return action === 'attach' || action === 'restart' || action === 'takeover'
 }
 
-function outputFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): TerminalOutputCheckpoint | null {
+function snapshotFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): TerminalOutputCheckpoint | null {
   if (!message.ok) return null
   if (message.action !== 'attach' && message.action !== 'restart') return null
   const payload = message.payload

@@ -66,7 +66,6 @@ describe('TerminalSessionRuntime', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       frame: 'stream',
-      streamSeq: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -115,7 +114,6 @@ describe('TerminalSessionRuntime', () => {
       terminalRuntimeGeneration: 1,
       identityRevision: 0,
       frame: 'stream',
-      streamSeq: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -582,7 +580,6 @@ describe('TerminalSessionRuntime restart generation activation', () => {
       phase: 'open',
       message: null,
       frame: 'stream',
-      streamSeq: 0,
       controller: { clientId: 'client_local', status: 'connected' },
       canonicalSize: { cols: 100, rows: 30 },
       role: 'controller',
@@ -619,7 +616,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
     }
     return terminalRuntimeGeneration === 1
       ? { ...metadata, frame: 'snapshot', snapshot: '', snapshotSeq: 0 }
-      : { ...metadata, frame: 'stream', streamSeq: 0 }
+      : { ...metadata, frame: 'stream' }
   }
 
   test('rejects a second restart while the admitted attempt is pending', () => {
@@ -695,7 +692,6 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     ok: true as const,
     ...hydration(terminalRuntimeGeneration),
     frame: 'stream' as const,
-    streamSeq: 0,
     phase: 'open' as const,
     message: null,
     controller: { clientId: 'client-authoritative', status: 'connected' as const },

@@ -71,26 +71,24 @@ geometry and the matching headless-render size.
 ### Input and automatic focus
 
 - A hidden, pending terminal presentation accepts no local user intent. User
-  input is discarded rather than buffered for later delivery. Xterm protocol
-  replies produced while parsing fresh live output are not user input and are
-  forwarded through the current generation; snapshot-replay side effects are
-  discarded.
+  input is discarded rather than buffered for later delivery. Fresh live output
+  is queued without being parsed until the view is presented; snapshot-replay
+  protocol side effects are discarded.
 - Fresh streams and recovery snapshots fulfil automatic focus at the same
-  presentation boundary: the fixed frame checkpoint has been parsed, the fitted
-  xterm has rendered its full viewport, and the final geometry check has passed.
-  A fresh stream uses the server-authored `streamSeq`; a recovery snapshot uses
-  `snapshotSeq`. The frame may be empty (`streamSeq: 0`), so a quiet process is
-  focused without waiting for output. Pending focus never moves the DOM to a
-  transition element and never consumes keyboard events.
+  presentation boundary: the fitted xterm has rendered its full viewport and
+  the final geometry check has passed. Recovery first parses the complete
+  server-authored `snapshot`/`snapshotSeq` frame. A fresh stream has no render
+  checkpoint and may therefore reveal and focus a quiet process without waiting
+  for output. Pending focus never moves the DOM to a transition element and
+  never consumes keyboard events.
 - Automatic focus is one presentation-generation-scoped intent. A subsequent
   pointer action or window blur retires it; programmatic popover cleanup and
   keyboard activity do not. The client deliberately keeps no global pressed-key
   registry or navigation-time keyboard gate; a physically held key may therefore
   repeat into a terminal that receives focus during the hold.
 - A presented controller forwards user input through the generation-bearing
-  write operation. A current controller may also forward xterm protocol replies
-  while its hidden view parses fresh live output. A viewer or stale generation
-  cannot write.
+  write operation. Xterm protocol replies from fresh output use that same path
+  after presentation. A viewer or stale generation cannot write.
 - A terminal write result has one narrow meaning: `accepted` confirms that
   the target PTY runtime `write()` call returned normally, `rejected` means
   the current authority/binding could not accept it, and `indeterminate`
@@ -502,13 +500,13 @@ Presentation and automatic focus are separate client-owned boundaries. While
 presentation is pending, the xterm is hidden and every local user-input path is
 discarded. The client does not buffer or replay startup user input. Recovery
 snapshot parsing cannot write protocol side effects back to the PTY; protocol
-replies produced by fresh live output retain their normal current-generation
-path. Attach/recovery data is rendered into the fitted xterm, and the frame is
-revealed only after it contains the response's fixed output checkpoint, a
-full-viewport render has completed, and the final synchronous fit proposal still
-matches. Output after that checkpoint belongs to the next live frame and does
-not move the presentation boundary. A fresh stream with `streamSeq: 0` therefore
-reveals without output so a quiet process cannot deadlock waiting for stdin.
+replies produced by fresh live output retain their normal presented,
+current-generation path. A recovery snapshot is rendered into the fitted xterm
+before reveal. A fresh stream has no replay frame: realtime output received
+while hidden is queued without parsing, the empty fitted viewport is revealed
+after a full-viewport render and final synchronous geometry check, and queued
+output is then flushed in transport order. A quiet process therefore cannot
+deadlock waiting for output before it can receive focus and stdin.
 
 Fresh streams and recovery snapshots fulfil a pending automatic focus intent
 when that presentation is revealed. The intent does not move DOM focus or
@@ -518,8 +516,7 @@ popover close do not. The user may still explicitly click or focus a presented
 terminal. The client does not track the origin of repeat events, so a physically
 held key may follow focus into that terminal. First output has no lifecycle,
 presentation, focus, or shell-readiness meaning. Local user intent requires a
-presented controller; fresh-output protocol replies require the same current
-controller binding but do not require reveal.
+presented controller; fresh-output protocol replies use the same boundary.
 
 ### Fresh stream and recovery frame contract
 
@@ -535,9 +532,8 @@ The protocol therefore distinguishes startup from recovery:
 - The client mounts its one real xterm, waits for a measurable host, fits it,
   and sends `attach` with the exact `cols`/`rows`.
 - If the session has no PTY history, attach starts the PTY and returns
-  `frame: 'stream'` with `streamSeq`, the last output sequence admitted before
-  the response was committed. The client does not reset or replay xterm; it
-  consumes realtime output through that finite checkpoint before presentation.
+  `frame: 'stream'`. The client does not reset or replay xterm and does not wait
+  for output before presentation.
 - If the PTY already exists, attach returns `frame: 'snapshot'` with
   `snapshot` and `snapshotSeq`. The client replays that recovery
   frame and then applies later realtime output.
@@ -547,15 +543,14 @@ The protocol therefore distinguishes startup from recovery:
 The realtime socket serializes attach, restart, and takeover transitions. While
 one transition is active, its realtime effects are buffered; its response is
 sent first, the effects are flushed, and only then may the next transition
-begin. A stream frame drops no buffered output. Every event through `streamSeq`
-is therefore delivered after the client has committed the binding metadata,
-and later output cannot extend that presentation checkpoint. For a snapshot
-frame, buffered output at or before the snapshot checkpoint is dropped and only
-later output is flushed. A concurrent attach that did not initiate the fresh
-spawn is recovery and receives a snapshot.
+begin. A stream frame drops no buffered output, so every event is delivered
+after the client has committed the binding metadata and is queued until the view
+is presented. For a snapshot frame, buffered output at or before the snapshot
+checkpoint is dropped and only later output is flushed. A concurrent attach
+that did not initiate the fresh spawn is recovery and receives a snapshot.
 
-Neither sequence checkpoint is a shell redraw transaction or a prompt-ready
-signal. It is only a transport-consistent, finite output boundary.
+`snapshotSeq` is not a shell redraw transaction or prompt-ready signal. It is
+only the transport-consistent boundary of an atomic recovery snapshot.
 
 The headless render chain serializes snapshot bytes and reads `snapshotSeq` in
 one ordered step. Output queued before that step is included in both; output

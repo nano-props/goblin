@@ -95,7 +95,6 @@ describe('terminal realtime handlers', () => {
         return {
           ok: true as const,
           frame: 'stream' as const,
-          streamSeq: 1,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 5 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 1,
@@ -131,7 +130,6 @@ describe('terminal realtime handlers', () => {
       payload: {
         ok: true,
         frame: 'stream',
-        streamSeq: 1,
         terminalProjectionEffect: { kind: 'delta', revision: 5 },
       },
     })
@@ -212,7 +210,6 @@ describe('terminal realtime handlers', () => {
         return {
           ok: true as const,
           frame: 'stream' as const,
-          streamSeq: 0,
           terminalProjectionEffect: { kind: 'delta' as const, revision: 6 },
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalRuntimeGeneration: 2,
@@ -245,7 +242,7 @@ describe('terminal realtime handlers', () => {
     expect(JSON.parse(sent[0] ?? '')).toMatchObject({
       type: 'response',
       action: 'restart',
-      payload: { frame: 'stream', streamSeq: 0, terminalProjectionEffect: { kind: 'delta', revision: 6 } },
+      payload: { frame: 'stream', terminalProjectionEffect: { kind: 'delta', revision: 6 } },
     })
     expect(sent[1]).toBe(sessionsChanged)
   })

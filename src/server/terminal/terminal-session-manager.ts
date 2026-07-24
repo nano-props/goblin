@@ -1143,13 +1143,11 @@ export class TerminalSessionManager<TUser extends string | number> {
   private streamAttachResult(
     session: TerminalSessionView<TUser>,
   ): Extract<TerminalAttachResult, { ok: true; frame: 'stream' }> | { ok: false; message: string } {
-    const bound = terminalPtyBoundState(session)
     const metadata = this.boundRuntimeMetadata(session)
-    if (!bound || !metadata || session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
+    if (!metadata || session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
     return {
       ok: true,
       frame: 'stream',
-      streamSeq: bound.render.sequence,
       terminalProjectionEffect: {
         kind: 'delta',
         revision: this.projectionRevision(session.userId, session.scope),

@@ -187,8 +187,6 @@ export interface TerminalBoundRuntimeMetadata extends Omit<TerminalRuntimeMetada
  */
 export interface TerminalStreamFrame {
   frame: 'stream'
-  /** Last output sequence already admitted before this stream response was committed. */
-  streamSeq: number
   phase: 'open'
 }
 

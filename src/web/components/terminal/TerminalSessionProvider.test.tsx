@@ -443,7 +443,6 @@ function restartResult() {
   return {
     ok: true as const,
     frame: 'stream' as const,
-    streamSeq: 0,
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 2,

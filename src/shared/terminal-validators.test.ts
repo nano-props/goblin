@@ -1217,7 +1217,6 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
-          streamSeq: 7,
           terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
@@ -1233,7 +1232,7 @@ describe('shared terminal validators', () => {
     ).toMatchObject({
       type: 'response',
       action: 'attach',
-      payload: { ok: true, frame: 'stream', streamSeq: 7 },
+      payload: { ok: true, frame: 'stream' },
     })
 
     expect(
@@ -1245,7 +1244,6 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
-          streamSeq: 0,
           terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
@@ -1275,7 +1273,6 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
-          streamSeq: 0,
           terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 2,
@@ -1383,7 +1380,6 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
-          streamSeq: 0,
           terminalProjectionEffect: { kind: 'none' },
           ...metadata,
         },
@@ -1463,40 +1459,6 @@ describe('shared terminal validators', () => {
           error: 'Invalid terminal socket response payload',
         })
       }
-    }
-  })
-
-  test('rejects missing or invalid stream sequence checkpoints', () => {
-    const payload = {
-      ok: true,
-      frame: 'stream',
-      streamSeq: 0,
-      terminalProjectionEffect: { kind: 'delta', revision: 2 },
-      terminalRuntimeSessionId: 'pty_1234567890abcdef',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      processName: 'zsh',
-      canonicalTitle: null,
-      phase: 'open',
-      message: null,
-      controller: { clientId: 'client_a', status: 'connected' },
-      canonicalSize: { cols: 120, rows: 40 },
-    } as const
-
-    for (const [index, streamSeq] of [undefined, -1, 0.5, Number.MAX_SAFE_INTEGER + 1].entries()) {
-      expect(
-        normalizeAppRealtimeSocketServerMessage({
-          type: 'response',
-          requestId: `invalid_stream_seq_${index}`,
-          ok: true,
-          action: 'attach',
-          payload: { ...payload, streamSeq },
-        }),
-      ).toMatchObject({
-        ok: false,
-        action: 'attach',
-        error: 'Invalid terminal socket response payload',
-      })
     }
   })
 

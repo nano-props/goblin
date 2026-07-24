@@ -191,7 +191,7 @@ function ensureSession(
   )
 }
 
-describe('TerminalSessionManager fresh stream boundary', () => {
+describe('TerminalSessionManager admission and frame lifecycle', () => {
   test('rejects target-incompatible presentation before committing prepared or existing sessions', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {
@@ -1226,7 +1226,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     await expect(freshAttach).resolves.toMatchObject({
       ok: true,
       frame: 'stream',
-      streamSeq: 1,
       terminalRuntimeGeneration: 1,
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       canonicalSize: { cols: 123, rows: 41 },
@@ -1377,7 +1376,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 120, 40, 'client-test-2')
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_concurrent_attach_123'))
 
-    await expect(first).resolves.toMatchObject({ ok: true, frame: 'stream', streamSeq: 0 })
+    await expect(first).resolves.toMatchObject({ ok: true, frame: 'stream' })
     await expect(second).resolves.toMatchObject({
       ok: true,
       frame: 'snapshot',

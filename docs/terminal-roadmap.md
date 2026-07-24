@@ -150,19 +150,19 @@ server headless snapshot with an explicit sequence boundary. See
 The implementation also closes the two gaps needed to make that split safe:
 the supervisor transfers early output/exit through a bounded single-owner event
 lease, and the realtime socket orders the attach/restart response before output
-for the new binding. A fresh response samples a finite `streamSeq`; client
-presentation remains hidden and rejects local user input until the fitted xterm
-has consumed output through that checkpoint and emitted one full-viewport
-`onRender`. Later output belongs to the next live frame instead of extending the
-presentation boundary. Snapshot-generated protocol replies are discarded;
-fresh live-output replies use the current generation. A `streamSeq: 0` frame can
-be revealed and focused for quiet-process access. Fresh
-streams and recovery snapshots fulfil the same presentation-scoped focus intent
-at that boundary. The intent does not move DOM focus or consume input while the
+for the new binding. A fresh response has no render checkpoint: the client
+reveals the fitted xterm after one full-viewport `onRender`, then flushes any
+ordered realtime output that arrived while the view was hidden. Hidden views
+reject local input and do not parse fresh output, so fresh-output protocol
+replies follow the ordinary presented, current-generation input path. Recovery
+still replays its atomic `snapshot`/`snapshotSeq` frame before the viewport
+render; snapshot-generated protocol replies are discarded. Fresh streams and
+recovery snapshots fulfil the same presentation-scoped focus intent when the
+view is revealed. The intent does not move DOM focus or consume input while the
 presentation is pending. A later pointer action or window blur retires it;
 keyboard activity does not. The client deliberately does not track held keys
 across focus targets, so a repeat may follow focus into the selected terminal.
-Neither the checkpoint nor first output has prompt or shell-readiness meaning.
+First output has no presentation, prompt, or shell-readiness meaning.
 
 ## P2: Further tighten client projection boundaries
 

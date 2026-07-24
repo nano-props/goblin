@@ -1122,7 +1122,6 @@ function restartResult(): Extract<TerminalRestartResult, { ok: true }> {
   return {
     ok: true,
     frame: 'stream',
-    streamSeq: 0,
     terminalProjectionEffect: { kind: 'delta', revision: 1 },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,

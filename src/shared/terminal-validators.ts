@@ -233,7 +233,6 @@ const TerminalAttachResultSchema = v.variant('ok', [
     v.object({
       ok: v.literal(true),
       frame: v.literal('stream'),
-      streamSeq: TerminalOutputSequenceSchema,
       terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
       ...TerminalRuntimeMetadataSchemaEntries,
       terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
@@ -260,7 +259,6 @@ const TerminalRestartResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     frame: v.literal('stream'),
-    streamSeq: TerminalOutputSequenceSchema,
     terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
     ...TerminalRuntimeMetadataSchemaEntries,
     terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,

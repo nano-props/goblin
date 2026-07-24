@@ -52,10 +52,6 @@ interface PendingOutputWrite {
   checkpoint: RenderedOutputCheckpoint
 }
 
-interface PendingPresentationOutputBoundary extends RenderedOutputCheckpoint {
-  resolve(): void
-}
-
 interface PendingInputWrite {
   binding: TerminalRuntimeBinding
   data: string
@@ -94,7 +90,6 @@ export class TerminalSession {
   private renderQueue: TerminalRenderQueue | null = null
   private inFlightStartOperation: InFlightTerminalStartOperation | null = null
   private pendingOutput: PendingOutputWrite[] = []
-  private pendingPresentationOutputBoundary: PendingPresentationOutputBoundary | null = null
   private pendingInputWrite: PendingInputWrite | null = null
   private inputFlushScheduled = false
   private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
@@ -213,7 +208,7 @@ export class TerminalSession {
   }
 
   private writeInput(data: string): void {
-    const binding = this.currentXtermInputBinding()
+    const binding = this.currentWritableInputBinding()
     if (binding) this.enqueueInput(binding, data)
   }
 
@@ -225,14 +220,6 @@ export class TerminalSession {
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
     if (!this.view.isPresented() || !this.view.currentTerminal() || !this.runtime.canSendInput()) return null
-    return this.runtime.currentRuntimeBinding()
-  }
-
-  private currentXtermInputBinding(): TerminalRuntimeBinding | null {
-    if (!this.view.currentTerminal() || !this.runtime.canSendInput()) return null
-    const renderSource = this.renderQueue?.activeRenderSource() ?? null
-    if (renderSource === 'snapshot') return null
-    if (!this.view.isPresented() && renderSource !== 'live-output') return null
     return this.runtime.currentRuntimeBinding()
   }
 
@@ -623,7 +610,6 @@ export class TerminalSession {
   private beginPendingPresentation(): AbortController {
     const controller = new AbortController()
     this.presentationAbortController?.abort()
-    this.settlePendingPresentationOutputBoundary()
     this.presentationAbortController = controller
     return controller
   }
@@ -647,17 +633,7 @@ export class TerminalSession {
           currentAttempt = this.runtime.startAttaching()
           continue
         }
-        if (result.frame === 'snapshot') {
-          await this.replayPhase(epoch, term, result)
-        } else {
-          await this.waitForPresentationOutputBoundary(
-            epoch,
-            term,
-            result,
-            result.streamSeq,
-            presentationAbortController.signal,
-          )
-        }
+        if (result.frame === 'snapshot') await this.replayPhase(epoch, term, result)
         this.assertCurrentStart(epoch, term)
         if (!this.runtime.isController()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -673,12 +649,6 @@ export class TerminalSession {
           continue
         }
         this.assertCurrentStart(epoch, term)
-        await this.commitPendingPresentationOutput(epoch, term)
-        const renderedBinding = this.runtime.currentRuntimeBinding()
-        const requiredOutputSeq = result.frame === 'snapshot' ? result.snapshotSeq : result.streamSeq
-        if (!renderedBinding || !this.presentationOutputIncludes(renderedBinding, requiredOutputSeq)) {
-          throw new StartCancelledError()
-        }
         const presentation = await this.view.present(term, presentationAbortController.signal)
         if (presentation === 'cancelled') throw new StartCancelledError()
         if (presentation === 'presented') break binding
@@ -979,7 +949,6 @@ export class TerminalSession {
   private queueOutput(data: string, checkpoint: RenderedOutputCheckpoint): void {
     if (!this.view.currentTerminal()) return
     this.pendingOutput.push({ data, checkpoint })
-    this.settlePresentationOutputBoundaryForCheckpoint(checkpoint)
     if (!this.view.isPresented()) return
     if (this.outputFlushFrame !== null) return
     this.outputFlushFrame = requestAnimationFrame(() => {
@@ -1006,91 +975,6 @@ export class TerminalSession {
     void this.enqueueRenderAppend(term, output, checkpoint).catch((error) => {
       this.recoverFromRenderFailure(term, error)
     })
-  }
-
-  private async commitPendingPresentationOutput(epoch: number, term: XTermTerminal): Promise<void> {
-    if (!this.isCurrentStart(epoch, term)) throw new StartCancelledError()
-    if (this.outputFlushFrame !== null) {
-      cancelScheduledAnimationFrame(this.outputFlushFrame)
-      this.outputFlushFrame = null
-    }
-    const binding = this.runtime.currentRuntimeBinding()
-    if (!binding) throw new StartCancelledError()
-    const cutoff = this.pendingOutput
-    this.pendingOutput = []
-    const output = cutoff.filter((entry) => sameRenderedBinding(entry.checkpoint, binding))
-    const checkpoint = latestCheckpoint(output.map((entry) => entry.checkpoint))
-    if (!checkpoint) return
-    let applied: boolean
-    try {
-      applied = await this.enqueueRenderAppend(term, output.map((entry) => entry.data).join(''), checkpoint)
-    } catch (error) {
-      this.recoverFromRenderFailure(term, error)
-      throw new StartCancelledError()
-    }
-    if (!applied || !this.isCurrentStart(epoch, term)) throw new StartCancelledError()
-  }
-
-  private presentationOutputIncludes(binding: TerminalRuntimeBinding, requiredSeq: number): boolean {
-    const current = this.runtime.currentRuntimeBinding()
-    if (!current || !sameRuntimeBinding(current, binding)) return false
-    if (requiredSeq === 0) return true
-    const rendered = this.renderedOutputCheckpoint
-    return !!rendered && sameRenderedBinding(rendered, binding) && rendered.seq >= requiredSeq
-  }
-
-  private presentationOutputBoundaryReached(boundary: RenderedOutputCheckpoint): boolean {
-    if (boundary.seq === 0) return true
-    const rendered = this.renderedOutputCheckpoint
-    if (rendered && sameRenderedBinding(rendered, boundary) && rendered.seq >= boundary.seq) return true
-    return this.pendingOutput.some(
-      (entry) => sameRenderedBinding(entry.checkpoint, boundary) && entry.checkpoint.seq >= boundary.seq,
-    )
-  }
-
-  private async waitForPresentationOutputBoundary(
-    epoch: number,
-    term: XTermTerminal,
-    binding: TerminalRuntimeBinding,
-    seq: number,
-    signal: AbortSignal,
-  ): Promise<void> {
-    const checkpoint = { ...binding, seq }
-    if (this.presentationOutputBoundaryReached(checkpoint)) return
-    if (this.pendingPresentationOutputBoundary) {
-      throw new Error('conflicting terminal presentation output boundaries')
-    }
-
-    const completion = Promise.withResolvers<void>()
-    const pending: PendingPresentationOutputBoundary = { ...checkpoint, resolve: completion.resolve }
-    const settleOnAbort = () => this.settlePendingPresentationOutputBoundary(pending)
-    this.pendingPresentationOutputBoundary = pending
-    signal.addEventListener('abort', settleOnAbort, { once: true })
-    if (signal.aborted || this.presentationOutputBoundaryReached(pending)) {
-      this.settlePendingPresentationOutputBoundary(pending)
-    }
-
-    try {
-      await completion.promise
-    } finally {
-      signal.removeEventListener('abort', settleOnAbort)
-      this.settlePendingPresentationOutputBoundary(pending)
-    }
-    this.assertCurrentStart(epoch, term)
-    if (signal.aborted || !this.presentationOutputBoundaryReached(checkpoint)) throw new StartCancelledError()
-  }
-
-  private settlePresentationOutputBoundaryForCheckpoint(checkpoint: RenderedOutputCheckpoint): void {
-    const pending = this.pendingPresentationOutputBoundary
-    if (!pending || !sameRenderedBinding(pending, checkpoint) || checkpoint.seq < pending.seq) return
-    this.settlePendingPresentationOutputBoundary(pending)
-  }
-
-  private settlePendingPresentationOutputBoundary(expected?: PendingPresentationOutputBoundary): void {
-    const pending = this.pendingPresentationOutputBoundary
-    if (!pending || (expected && pending !== expected)) return
-    this.pendingPresentationOutputBoundary = null
-    pending.resolve()
   }
 
   private clearPendingOutput(): void {
@@ -1170,7 +1054,6 @@ export class TerminalSession {
   private destroyActiveView(options?: { preserveTransientState?: boolean }): boolean {
     this.presentationAbortController?.abort()
     this.presentationAbortController = null
-    this.settlePendingPresentationOutputBoundary()
     this.cancelResizeDispatch()
     this.clearPendingOutput()
     if (this.pendingInputWrite && !this.isCurrentInputBinding(this.pendingInputWrite.binding)) {

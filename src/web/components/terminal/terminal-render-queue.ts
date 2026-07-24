@@ -6,7 +6,7 @@ export interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
   terminalRuntimeGeneration: number
 }
 
-export type TerminalRenderSource = 'snapshot' | 'live-output'
+type TerminalRenderSource = 'snapshot' | 'live-output'
 
 interface TerminalRenderQueueEntry {
   source: TerminalRenderSource
@@ -72,10 +72,6 @@ export class TerminalRenderQueue {
     this.revision += 1
     for (const entry of this.entries.splice(0)) this.settle(entry, false)
     if (this.active) this.settle(this.active, false)
-  }
-
-  activeRenderSource(): TerminalRenderSource | null {
-    return this.active && this.isCurrent(this.active) ? this.active.source : null
   }
 
   private pump(): void {

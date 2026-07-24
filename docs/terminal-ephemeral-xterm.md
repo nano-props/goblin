@@ -67,12 +67,12 @@ local rendering and fitted geometry while mounted. It is disposable.
      geometry, `snapshot`, and `snapshotSeq`; the client resets
      xterm and replays it.
    - Newly prepared session: the server starts the PTY at the fitted size and
-     returns `frame: 'stream'` with a finite `streamSeq`; the client keeps the
-     same xterm, consumes realtime output through that checkpoint, and does not
-     reset or replay it.
-7. After the checkpoint is parsed, one full-viewport render and the final
-   geometry check reveal the frame. Later output continues normally and does not
-   extend the presentation boundary.
+     returns `frame: 'stream'`; the client keeps the same xterm and does not
+     reset, replay, or wait for output before presentation.
+7. Recovery reveals after the snapshot is parsed, one full-viewport render, and
+   the final geometry check. A fresh stream reveals after the viewport render
+   and geometry check, then flushes output queued while hidden in transport
+   order.
 8. Realtime output writes to that selected controller xterm while also updating
    the server headless render state for future recovery.
 

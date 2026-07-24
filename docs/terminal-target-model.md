@@ -334,7 +334,7 @@ responsible for keeping that projection coherent with terminal runtime state.
 The target lifecycle is now implemented across the manager, PTY binding, client
 runtime, and presentation/navigation boundaries. There is no generic client
 authority coordinator: server generation/controller checks own mutations,
-while the client owns only local pending/presented admission and the focus
+while the client owns only its pending/presented view lifecycle and the focus
 handoff for the current presentation generation. See `terminal-takeover.md` for
 the control model.
 
