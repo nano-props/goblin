@@ -108,6 +108,9 @@ export interface TerminalFocusRequest {
  */
 export type TerminalInputWriter = (data: string) => boolean
 
+export type TerminalVirtualKey =
+  'tab' | 'arrow-up' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'escape' | 'interrupt'
+
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase
   message: string | null
@@ -198,6 +201,8 @@ export interface TerminalSessionContextValue {
   findPrevious: (terminalSessionId: string, term: string) => TerminalSearchResult
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
+  sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
+  pasteText: (terminalSessionId: string, data: string) => boolean
   takeover: (terminalSessionId: string) => Promise<boolean>
 }
 

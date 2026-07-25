@@ -150,7 +150,7 @@ function completeFilesystemTargetSnapshot(snapshot: TestFilesystemTargetSnapshot
   }
 }
 
-async function renderTerminalSession() {
+async function renderTerminalSession(contextOverrides: Partial<TerminalSessionContextValue> = {}) {
   const writeInput = vi.fn()
   const descriptor = {
     terminalSessionId: 'term-111111111111111111111',
@@ -203,6 +203,7 @@ async function renderTerminalSession() {
     },
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
+    ...contextOverrides,
   })
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
@@ -227,6 +228,7 @@ async function renderTerminalSession() {
   )
 
   return {
+    container,
     sessionRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
     writeInput,
     async cleanup() {
@@ -307,6 +309,35 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
+  test('reads clipboard text through the mobile toolbar and delegates paste to the selected xterm session', async () => {
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    const readText = vi.fn(async () => 'first line\nsecond line')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } })
+    const pasteText = vi.fn(() => true)
+    const focusTerminal = vi.fn(() => true)
+    const rendered = await renderTerminalSession({ pasteText, focusTerminal })
+
+    try {
+      const pasteButton = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'menu.edit.paste',
+      )
+      if (!pasteButton) throw new Error('expected mobile terminal Paste button')
+      await act(async () => {
+        pasteButton.click()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(readText).toHaveBeenCalledOnce()
+      expect(pasteText).toHaveBeenCalledWith('term-111111111111111111111', 'first line\nsecond line')
+      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
+    } finally {
+      await rendered.cleanup()
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   test('retries precommitted focus after the StrictMode view reaches its stable mount', async () => {
     resetTerminalAutoFocusForTest()
     const descriptor = {

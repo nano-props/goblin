@@ -397,6 +397,17 @@ export const ja: Record<DictKey, string> = {
   'terminal.paste-file-too-large':
     'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
   'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
+  'terminal.paste-text-failed': 'クリップボードのテキストをターミナルに貼り付けできませんでした。',
+  'terminal.mobile-toolbar': 'ターミナル入力補助',
+  'terminal.mobile-key-tab': 'Tab',
+  'terminal.mobile-key-arrow-up': '上矢印キー',
+  'terminal.mobile-key-arrow-down': '下矢印キー',
+  'terminal.mobile-key-arrow-left': '左矢印キー',
+  'terminal.mobile-key-arrow-right': '右矢印キー',
+  'terminal.mobile-key-escape': 'Esc',
+  'terminal.mobile-key-ctrl-c': 'Ctrl+C',
+  'terminal.mobile-key-page-up': '上へページ移動（ターミナルをスクロール）',
+  'terminal.mobile-key-page-down': '下へページ移動（ターミナルをスクロール）',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',

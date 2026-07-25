@@ -110,6 +110,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       findPrevious: projection.findPrevious,
       clearSearch: projection.clearSearch,
       captureInputWriter: projection.captureInputWriter,
+      sendVirtualKey: projection.sendVirtualKey,
+      pasteText: projection.pasteText,
       takeover: projection.takeover,
     }),
     [projection],

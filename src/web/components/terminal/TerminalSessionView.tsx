@@ -66,6 +66,8 @@ export function TerminalSessionView({
     findPrevious,
     clearSearch,
     captureInputWriter,
+    sendVirtualKey,
+    pasteText,
     takeover,
     restart,
     focusTerminal,
@@ -93,6 +95,19 @@ export function TerminalSessionView({
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey) > 0
   const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
+  const mobileToolbarLabels = {
+    toolbar: t('terminal.mobile-toolbar'),
+    tab: t('terminal.mobile-key-tab'),
+    arrowUp: t('terminal.mobile-key-arrow-up'),
+    arrowDown: t('terminal.mobile-key-arrow-down'),
+    arrowLeft: t('terminal.mobile-key-arrow-left'),
+    arrowRight: t('terminal.mobile-key-arrow-right'),
+    escape: t('terminal.mobile-key-escape'),
+    ctrlC: t('terminal.mobile-key-ctrl-c'),
+    paste: t('menu.edit.paste'),
+    pageUp: t('terminal.mobile-key-page-up'),
+    pageDown: t('terminal.mobile-key-page-down'),
+  }
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -400,6 +415,20 @@ export function TerminalSessionView({
     },
     [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
+  const handleToolbarPaste = useCallback(() => {
+    if (!terminalSessionId || !isController) return
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      toast.error(t('terminal.paste-text-failed'))
+      return
+    }
+    void clipboard.readText().then(
+      (text) => {
+        if (text && !pasteText(terminalSessionId, text)) toast.error(t('terminal.paste-text-failed'))
+      },
+      () => toast.error(t('terminal.paste-text-failed')),
+    )
+  }, [isController, pasteText, t, terminalSessionId])
 
   return (
     <div
@@ -460,7 +489,10 @@ export function TerminalSessionView({
       {isMobileDevice() && isController && terminalSessionId && (
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
-          onInput={(data) => captureInputWriter(terminalSessionId)?.(data)}
+          labels={mobileToolbarLabels}
+          onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
+          onPaste={handleToolbarPaste}
+          onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />
       )}
