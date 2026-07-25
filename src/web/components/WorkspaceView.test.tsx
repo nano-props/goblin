@@ -30,6 +30,9 @@ const restoreWorkspaceTabsMocks = vi.hoisted(() => ({
   useRestoreWorkspaceTabsOnView: vi.fn(),
   useRepoToasts: vi.fn(),
 }))
+const workspacePaneMocks = vi.hoisted(() => ({
+  scrollMemoryProbe: false,
+}))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useResponsiveUiMode: () => responsiveMocks.mode,
@@ -58,36 +61,57 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', () => ({
-  WorkspacePane: ({
-    currentBranchName,
-    workspacePaneRouteContext,
-    shortcutsEnabled = true,
-    toolbarTrafficLightOffset = false,
-  }: {
-    currentBranchName?: string | null
-    workspacePaneRouteContext?:
-      | { kind: 'workspace-root'; route: { kind: string } | null }
-      | { kind: 'routed'; route: { kind: string } | null }
-      | { kind: 'inactive' }
-    shortcutsEnabled?: boolean
-    toolbarTrafficLightOffset?: boolean
-  }) => (
-    <div
-      data-testid="workspace-pane"
-      data-current-branch-name={currentBranchName ?? ''}
-      data-workspace-pane-route-kind={
-        workspacePaneRouteContext?.kind === 'routed'
-          ? (workspacePaneRouteContext.route?.kind ?? 'bare')
-          : workspacePaneRouteContext?.kind === 'workspace-root'
-            ? (workspacePaneRouteContext.route?.kind ?? 'workspace-root')
-            : (workspacePaneRouteContext?.kind ?? 'inactive')
-      }
-      data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
-      data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
-    />
-  ),
-}))
+vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
+  // Vitest hoists mock factories before this test module's imports, so load
+  // the context hook inside the factory that defines the mock.
+  const { useWorkspacePaneTabStripScrollMemoryController } =
+    await import('#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx')
+  const scrollMemoryKey = 'runtime-1\0workspace-1\0branch\0feature-a'
+  return {
+    WorkspacePane: ({
+      currentBranchName,
+      workspacePaneRouteContext,
+      shortcutsEnabled = true,
+      toolbarTrafficLightOffset = false,
+    }: {
+      currentBranchName?: string | null
+      workspacePaneRouteContext?:
+        | { kind: 'workspace-root'; route: { kind: string } | null }
+        | { kind: 'routed'; route: { kind: string } | null }
+        | { kind: 'inactive' }
+      shortcutsEnabled?: boolean
+      toolbarTrafficLightOffset?: boolean
+    }) => {
+      const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
+      return (
+        <div
+          data-testid="workspace-pane"
+          data-current-branch-name={currentBranchName ?? ''}
+          data-workspace-pane-route-kind={
+            workspacePaneRouteContext?.kind === 'routed'
+              ? (workspacePaneRouteContext.route?.kind ?? 'bare')
+              : workspacePaneRouteContext?.kind === 'workspace-root'
+                ? (workspacePaneRouteContext.route?.kind ?? 'workspace-root')
+                : (workspacePaneRouteContext?.kind ?? 'inactive')
+          }
+          data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
+          data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
+        >
+          {workspacePaneMocks.scrollMemoryProbe ? (
+            <>
+              <button
+                type="button"
+                data-testid="workspace-pane-scroll-memory-write"
+                onClick={() => scrollMemory.write(scrollMemoryKey, 180)}
+              />
+              <span data-testid="workspace-pane-scroll-memory-value">{scrollMemory.read(scrollMemoryKey)}</span>
+            </>
+          ) : null}
+        </div>
+      )
+    },
+  }
+})
 
 vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
   CreateWorktreePagePane: ({
@@ -277,6 +301,7 @@ function branchWorkspaceView(branchName = 'feature/a') {
 
 beforeEach(() => {
   responsiveMocks.mode = 'default'
+  workspacePaneMocks.scrollMemoryProbe = false
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -297,6 +322,23 @@ afterEach(() => {
 })
 
 describe('WorkspaceView workspace navigation', () => {
+  test('keeps workspace pane scroll memory across a dashboard round trip', () => {
+    workspacePaneMocks.scrollMemoryProbe = true
+    const result = render(branchWorkspaceView())
+
+    buttonByTestId(result.container, 'workspace-pane-scroll-memory-write')?.click()
+    act(() => {
+      result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
+    })
+    act(() => {
+      result.rerender(branchWorkspaceView())
+    })
+
+    expect(result.container.querySelector('[data-testid="workspace-pane-scroll-memory-value"]')?.textContent).toBe(
+      '180',
+    )
+  })
+
   test('invalidates the Git snapshot once when leaving a terminal for a static pane', () => {
     const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
     const terminalRoute = {

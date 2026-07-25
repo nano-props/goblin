@@ -30,6 +30,7 @@ import {
   useWorkspacePaneTabStripAutoScroll,
   useWorkspacePaneTabStripScrollMemory,
 } from '#/web/components/workspace-pane/workspace-pane-tab-strip-mechanics.ts'
+import { useWorkspacePaneTabStripScrollMemoryController } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import {
   SortableWorkspacePaneTab,
   WorkspacePaneNewButton,
@@ -169,6 +170,8 @@ export function WorkspacePaneTabStrip({
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
   const newButtonRef = useRef<HTMLButtonElement>(null)
+  const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
+  const hasRememberedScrollPosition = scrollMemory.read(workspacePaneTabTargetKey) !== undefined
   const prefersReducedMotion = usePrefersReducedMotion()
   const scrollBehavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
@@ -211,6 +214,7 @@ export function WorkspacePaneTabStrip({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
     viewportRef,
+    memory: scrollMemory,
   })
 
   useWorkspacePaneTabStripAutoScroll({
@@ -222,6 +226,7 @@ export function WorkspacePaneTabStrip({
     newButtonRef,
     scrollBehavior,
     getTabElement: focusRegistry.getRef,
+    hasRememberedScrollPosition,
   })
 
   const handleSelect = useCallback(

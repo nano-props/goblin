@@ -94,7 +94,9 @@ function WorkspacePaneTargetToolbarContent({
     () => (target.kind === 'git-worktree' ? target.head : undefined),
     [branchName, target.kind],
   )
-  const targetKey = workspacePaneTabsTargetIdentityKey(persistenceTarget)
+  // Scroll memory is local to one runtime epoch. A reopened workspace can
+  // reuse the same durable target identity with a different tab projection.
+  const targetKey = `${target.workspaceRuntimeId}\0${workspacePaneTabsTargetIdentityKey(persistenceTarget)}`
   const showCreatedRuntimeTab = useCallback(
     (
       type: WorkspacePaneRuntimeTabType,

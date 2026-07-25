@@ -30,6 +30,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import { invalidateRepoSnapshotQueries } from '#/web/repo-query-runtime.ts'
+import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
 interface WorkspaceProjectionRestoreController {
   state: WorkspaceProjectionPromotionViewState
@@ -58,7 +59,15 @@ interface Props {
   onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
 }
 
-export function WorkspaceView({
+export function WorkspaceView(props: Props) {
+  return (
+    <WorkspacePaneTabStripScrollMemoryProvider>
+      <WorkspaceViewContent {...props} />
+    </WorkspacePaneTabStripScrollMemoryProvider>
+  )
+}
+
+function WorkspaceViewContent({
   workspaceId,
   routeView = null,
   onOpenSettings,
