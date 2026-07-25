@@ -17,29 +17,47 @@ import {
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneFilesystemRuntimeTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import type { RetiredTerminalWorkspacePaneTargetAdmission } from '#/web/workspace-pane/retired-terminal-workspace-pane-target-admission.ts'
 
 export function useTerminalRetirementWorkspacePanePresentation(input: {
   currentRouteTarget: WorkspacePaneTabsTarget | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
-  currentTarget: WorkspacePaneCommandTarget | null
+  targetAdmission: RetiredTerminalWorkspacePaneTargetAdmission
   navigation: PrimaryWindowNavigationActions
 }): void {
-  const { currentRouteTarget, currentWorkspacePaneRoute, currentTarget, navigation } = input
+  const { currentRouteTarget, currentWorkspacePaneRoute, targetAdmission, navigation } = input
   const projection = useTerminalSessionProjection()
   const pendingPlanRef = useRef<RetiredTerminalWorkspacePaneTabPresentationPlan | null>(null)
 
   const settlePendingPlan = useEffectEvent(() => {
     const plan = pendingPlanRef.current
     if (!plan) return
-    if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
+    const abandonPlan = () => {
       pendingPlanRef.current = null
       abandonRetiredTerminalWorkspacePaneTabPresentationPlan(plan)
+    }
+    if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
+      abandonPlan()
       return
     }
-    if (!currentTarget || !retiredTerminalPlanMatchesCommandTarget(plan, currentTarget)) {
+    if (
+      targetAdmission.workspaceRuntimeId !== null &&
+      targetAdmission.workspaceRuntimeId !== plan.target.workspaceRuntimeId
+    ) {
+      abandonPlan()
+      return
+    }
+    if (targetAdmission.kind === 'pending') {
       // The plan already owns the complete before-state transition. Hydration
       // is only an admission proof for its captured target; never recompute the
       // destination from the post-retirement projection here.
+      return
+    }
+    if (
+      targetAdmission.kind === 'unavailable' ||
+      !retiredTerminalPlanMatchesCommandTarget(plan, targetAdmission.target)
+    ) {
+      abandonPlan()
       return
     }
     pendingPlanRef.current = null
@@ -76,7 +94,7 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
     }
   }, [projection])
 
-  useEffect(() => settlePendingPlan(), [currentRouteTarget, currentTarget, currentWorkspacePaneRoute, navigation])
+  useEffect(() => settlePendingPlan(), [currentRouteTarget, currentWorkspacePaneRoute, navigation, targetAdmission])
 }
 
 function retiredTerminalPlanStillOwnsCurrentRoute(

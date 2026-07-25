@@ -198,8 +198,11 @@ runtime/filesystem coordinates, the router's exact source, and the ready
 canonical tab projection; it does not wait for the broader workspace command
 read model to rediscover those facts. If that read model is still hydrating, the
 workspace-pane layer retains only the immutable captured transition until the
-target can be admitted. It never replays the retirement event or reconstructs a
-destination from the post-removal projection. The passive transition reuses the
+target can be admitted. Admission distinguishes a genuinely pending read model
+from an unavailable or replacement runtime: only pending hydration retains the
+plan; a definitive mismatch abandons it and releases its presentation lease. It
+never replays the retirement event or reconstructs a destination from the
+post-removal projection. The passive transition reuses the
 current navigation generation only when it has no registered history-commit
 owner, and commits with an exact-route precondition. It therefore neither
 displaces an owned commit nor overrides a route that has already changed.
