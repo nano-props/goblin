@@ -186,6 +186,7 @@ export function createServerTerminalClient(options: {
             terminalSessionId: message.terminalSessionId,
             workspaceId: message.workspaceId,
             workspaceRuntimeId: message.workspaceRuntimeId,
+            catalogRevision: message.catalogRevision,
             retirementPresentation: message.retirementPresentation,
           })
         return

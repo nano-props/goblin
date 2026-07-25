@@ -3556,6 +3556,7 @@ describe('TerminalSession', () => {
         terminalSessionId: 'term-999999999999999999999',
         workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
+        catalogRevision: 1,
         retirementPresentation: null,
       }),
     ).toBe(false)
@@ -3566,6 +3567,7 @@ describe('TerminalSession', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
+        catalogRevision: 1,
         retirementPresentation: null,
       }),
     ).toBe(true)

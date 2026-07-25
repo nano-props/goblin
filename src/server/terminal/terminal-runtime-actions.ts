@@ -58,6 +58,7 @@ interface TerminalRuntimeActionDependencies {
     | 'closeSessionForUserOutcome'
     | 'getPhysicalWorktreeExecutionCapabilityForUser'
     | 'terminalSessionsSnapshotForUser'
+    | 'terminalSessionsChangedEventForScope'
   >
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
@@ -265,6 +266,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId, reason)
     if (outcome.kind === 'closed') {
       const session = outcome.session
+      const coordinates = terminalSessionCoordinates(session)
       // General repo/session-list invalidation is emitted by the
       // manager close lifecycle. This action owns only the targeted
       // sibling-window event; other users must not hear about this
@@ -274,8 +276,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         terminalRuntimeSessionId: input.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,
         terminalSessionId: session.terminalSessionId,
-        workspaceId: terminalSessionCoordinates(session).workspaceId,
-        workspaceRuntimeId: terminalSessionCoordinates(session).workspaceRuntimeId,
+        workspaceId: coordinates.workspaceId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
+        catalogRevision: outcome.catalogRevision,
         retirementPresentation: outcome.retirementPresentation,
       })
     }

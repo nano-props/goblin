@@ -50,6 +50,7 @@ describe('workspace pane tab target read model', () => {
         terminalBase: { target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } },
         retirementPresentation: {
           target,
+          terminalBase: { target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } },
           tabsBeforeRetirement: [
             workspacePaneStaticTabEntry('files'),
             workspacePaneRuntimeTabEntry('terminal', terminalSessionId),

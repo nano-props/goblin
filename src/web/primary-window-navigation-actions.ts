@@ -234,11 +234,13 @@ function workspaceRootPanePresentationOptions(
     ...options,
     navigationIntent,
     onCommit: () => {
-      if (!commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation)) {
-        options?.onAbandon?.()
-        return
+      const committed = commitPrimaryWindowNavigationEffect(
+        () => commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation),
+        options,
+      )
+      if (!committed) {
+        throw new Error('workspace-root pane presentation target changed before route commit')
       }
-      options?.onCommit?.()
     },
   }
 }

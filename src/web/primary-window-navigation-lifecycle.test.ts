@@ -43,7 +43,7 @@ describe('primary window navigation intent lifecycle', () => {
   test('passive admission waits for the current owner without superseding it', async () => {
     const user = beginPrimaryWindowNavigationIntent('user')
     const blocked = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(blocked).toMatchObject({ kind: 'occupied', ownerKind: 'user' })
+    expect(blocked).toMatchObject({ kind: 'occupied' })
     expect(user.isCurrent()).toBe(true)
 
     user.release()
@@ -186,6 +186,47 @@ describe('primary window navigation intent lifecycle', () => {
     blocked.reject(new Error('blocked'))
     await expect(intent.settled).resolves.toMatchObject({ status: 'failed', intendedStatus: 'committed' })
     expect(abandonEffect).toHaveBeenCalledOnce()
+  })
+
+  test('a released registration cannot start its queued navigation', async () => {
+    const intent = beginPrimaryWindowNavigationIntent('user')
+    const navigate = vi.fn(async () => {})
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        intent,
+        targetHref: '/released',
+        currentHref: '/start',
+        navigate,
+      }),
+    ).toBe(true)
+
+    intent.release()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    await expect(intent.settled).resolves.toEqual({ status: 'abandoned' })
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test('a superseded registration cannot start its queued navigation', async () => {
+    const first = beginPrimaryWindowNavigationIntent('user')
+    const navigate = vi.fn(async () => {})
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        intent: first,
+        targetHref: '/superseded',
+        currentHref: '/start',
+        navigate,
+      }),
+    ).toBe(true)
+
+    using current = beginPrimaryWindowNavigationIntent('user')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    await expect(first.settled).resolves.toEqual({ status: 'superseded' })
+    expect(current.isCurrent()).toBe(true)
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   test('same-target navigation commits synchronously without invoking the router', async () => {

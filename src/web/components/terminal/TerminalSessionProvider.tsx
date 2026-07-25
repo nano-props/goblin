@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react'
 
 import '#/web/components/terminal/terminal-session.css'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -19,6 +19,7 @@ interface TerminalSessionProviderProps {
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
+  const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
   const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
     (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
@@ -35,11 +36,16 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   const projection = useTerminalSessionProjection()
 
-  // Projection state sync
+  // Establish membership authority before descendant passive effects can
+  // commit a recovered terminal catalog or subscribe to realtime events.
+  useLayoutEffect(() => {
+    if (workspaceMembershipReady) projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
+    else projection.setRuntimeMembershipPending()
+  }, [projection, runtimeMembershipIndex, workspaceMembershipReady])
+
   useEffect(() => {
-    projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)
-  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalFilesystemTarget])
+  }, [projection, selectedTerminalSessionIdByTerminalFilesystemTarget])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
   // The projection is client-level; we only subscribe / unsubscribe client

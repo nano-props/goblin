@@ -619,6 +619,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-exit-1111111111111111',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
+          catalogRevision: 1,
           retirementPresentation: null,
         },
       },
@@ -651,6 +652,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-closed-11111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
+        catalogRevision: 1,
         retirementPresentation: null,
       },
     ]
@@ -1380,6 +1382,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
+        catalogRevision: 1,
         retirementPresentation: null,
       }),
     ).toEqual({
@@ -1389,6 +1392,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
+      catalogRevision: 1,
       retirementPresentation: null,
     })
     expect(
@@ -1399,6 +1403,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
+        catalogRevision: 1,
         retirementPresentation: null,
         worktreePath: '/repo/worktree',
       }),
@@ -1569,6 +1574,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        catalogRevision: 1,
         retirementPresentation: null,
       },
     }
@@ -1580,6 +1586,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        catalogRevision: 1,
         retirementPresentation: null,
       },
     })

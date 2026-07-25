@@ -73,6 +73,7 @@ admitted (user | passive)
 - Pane supplements and presentation effects execute inside the history commit settlement, never in an async continuation after it.
 - There are no timers, delays, watches, or post-retirement reconstruction caches in this protocol.
 - Terminal retirement presentation is admitted only from the manager's canonical, target-scoped before-state record. Natural exit and explicit close share that record; catalog after-state convergence never synthesizes presentation intent.
+- During workspace-membership hydration, validated retirement facts may wait in the ledger, but presentation remains blocked until complete exact membership and a causally covering terminal catalog establish authority.
 
 ## Invariants
 
@@ -100,7 +101,7 @@ admitted (user | passive)
 | Router leaves the repo/branch while a command waits | reject with no navigation                                             |
 | Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                              |
 | Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane            |
-| Session closes while its close response is lost     | consume the operation-held authoritative retirement and close back    |
+| Session closes while its close response is lost     | release the exact-binding ledger suppression lease and close back     |
 | One of two windows releases a shared runtime        | sibling remains current                                               |
 | Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed                |
 | Shell unmounts with a passive plan                  | release intent and abandon the plan; late completion has no effect    |

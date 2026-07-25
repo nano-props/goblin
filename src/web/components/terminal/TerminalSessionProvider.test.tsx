@@ -14,7 +14,10 @@ import {
 } from '#/shared/workspace-locator.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
-import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import {
+  TerminalSessionProjection,
+  setTerminalSessionProjectionForTests,
+} from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -335,6 +338,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalSessionId,
     workspaceId: REPO_ID,
     workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
+    catalogRevision: 1,
     retirementPresentation: null,
   }
 }
@@ -809,6 +813,32 @@ describe('TerminalSessionProvider', () => {
   afterEach(() => {
     setTerminalSessionProjectionForTests(null)
   })
+
+  test('commits pending and complete workspace membership before passive projection effects', async () => {
+    const projection = new TerminalSessionProjection()
+    const setPending = vi.spyOn(projection, 'setRuntimeMembershipPending')
+    const setComplete = vi.spyOn(projection, 'setRuntimeMembershipIndex')
+    setTerminalSessionProjectionForTests(projection)
+    const result = renderTerminalProvider(<div />, { currentWorkspaceId: null })
+
+    expect(setPending).toHaveBeenCalledOnce()
+    expect(setComplete).not.toHaveBeenCalled()
+
+    act(() => {
+      seedRepoWithReadModelForTest({
+        id: REPO_ID,
+        branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+        currentBranchName: BRANCH_NAME,
+      })
+    })
+
+    await waitFor(() => expect(setComplete).toHaveBeenCalledOnce())
+    expect(setComplete.mock.calls[0]?.[0].get(REPO_ID)?.workspaceRuntimeId).toBe(
+      useWorkspacesStore.getState().workspaces[REPO_ID]?.workspaceRuntimeId,
+    )
+    act(() => result.unmount())
+  })
+
   test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1275,6 +1305,7 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: REPO_ID,
           workspaceRuntimeId: 'repo-runtime-1',
+          catalogRevision: 1,
           retirementPresentation: null,
         })
       })

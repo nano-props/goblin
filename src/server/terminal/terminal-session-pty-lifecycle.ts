@@ -118,7 +118,7 @@ export type TerminalPtyState =
   | { kind: 'prepared' }
   | {
       kind: 'bound'
-      activity: 'active' | 'retained'
+      nativeState: 'active' | 'retiring' | 'exited'
       generation: number
       identityRevision: number
       cols: number
@@ -172,7 +172,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
     session: TSession,
     event: Omit<
       TerminalExitEvent,
-      'terminalSessionId' | 'workspaceId' | 'workspaceRuntimeId' | 'retirementPresentation'
+      'terminalSessionId' | 'workspaceId' | 'workspaceRuntimeId' | 'catalogRevision' | 'retirementPresentation'
     >,
   ): void | Promise<void>
 }
@@ -217,7 +217,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     const generation = 1
     const state: TerminalPtyBoundState = {
       kind: 'bound',
-      activity: 'active',
+      nativeState: 'active',
       generation,
       identityRevision: 0,
       cols,
@@ -248,7 +248,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     const generation = current.generation + 1
     const replacement: TerminalPtyBoundState = {
       kind: 'bound',
-      activity: 'active',
+      nativeState: 'active',
       generation,
       identityRevision: 0,
       cols,
@@ -427,7 +427,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       if (
         !handle ||
         !state ||
-        state.activity !== 'active' ||
+        state.nativeState !== 'active' ||
         state.generation !== terminalRuntimeGeneration ||
         !admission.validate()
       ) {
@@ -445,7 +445,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       if (
         this.handle !== handle ||
         terminalPtyBoundState(session) !== state ||
-        state.activity !== 'active' ||
+        state.nativeState !== 'active' ||
         state.generation !== terminalRuntimeGeneration
       ) {
         return { accepted: false, changed: false }
@@ -475,7 +475,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
 
       let changed = false
       if (geometry === 'resize') {
-        if (!handle || state.activity !== 'active') return { accepted: false, changed: false, snapshot: null }
+        if (!handle || state.nativeState !== 'active') return { accepted: false, changed: false, snapshot: null }
         if (state.cols !== cols || state.rows !== rows) {
           try {
             if (!(await this.supervisor.resize(handle, cols, rows))) {
@@ -488,7 +488,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           if (
             this.handle !== handle ||
             terminalPtyBoundState(session) !== state ||
-            state.activity !== 'active' ||
+            state.nativeState !== 'active' ||
             state.generation !== terminalRuntimeGeneration
           ) {
             return { accepted: false, changed: false, snapshot: null }
@@ -523,7 +523,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   }
 
   write(session: TSession, data: string): Promise<TerminalWriteResult> {
-    if (!this.handle || terminalPtyBoundState(session)?.activity !== 'active') {
+    if (!this.handle || terminalPtyBoundState(session)?.nativeState !== 'active') {
       return Promise.resolve({ status: 'rejected' })
     }
     return new Promise<TerminalWriteResult>((resolve) => {
@@ -710,7 +710,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       onExit: () => {
         if (!this.isCurrentBinding(session, generation, handle)) return
         this.handle = null
-        state.activity = 'retained'
+        state.nativeState = 'exited'
         try {
           void Promise.resolve(
             this.events.emitExit(session, {
@@ -849,7 +849,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.disposeListeners(session.id)
     if (this.handle) this.retainRetiringHandle(this.handle)
     const state = terminalPtyBoundState(session)
-    if (state) state.activity = 'retained'
+    if (state?.nativeState === 'active') state.nativeState = 'retiring'
     this.handle = null
     this.settleQueuedInput({ status: 'rejected' })
     for (const batch of Array.from(this.inFlightInputBatches)) {

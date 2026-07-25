@@ -32,18 +32,7 @@ interface WorkspacePaneCommandTargetProjectionInput {
   worktreeReadModel: WorktreeReadModelInput
 }
 
-interface WorkspacePaneCommandTargetProjection {
-  target: WorkspacePaneCommandTarget | null
-}
-
-export function resolveWorkspacePaneCommandTargetProjection(
-  input: WorkspacePaneCommandTargetProjectionInput,
-): WorkspacePaneCommandTargetProjection {
-  const target = resolveWorkspacePaneCommandTarget(input)
-  return { target }
-}
-
-function resolveWorkspacePaneCommandTarget(
+export function resolveWorkspacePaneCommandTarget(
   input: WorkspacePaneCommandTargetProjectionInput,
 ): WorkspacePaneCommandTarget | null {
   const { routeTarget, workspacePaneRoute, workspace } = input

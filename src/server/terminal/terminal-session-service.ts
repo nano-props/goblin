@@ -2,6 +2,7 @@ import { isValidCwd, isValidWorkspaceLocatorInput } from '#/shared/input-validat
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
+  terminalSessionBase,
   terminalSessionCoordinates,
   type TerminalRetirementPresentationContext,
   type TerminalSessionSummary,
@@ -280,7 +281,13 @@ class TerminalSessionService {
     const entry = snapshot.entries.find(
       (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === sessionTargetKey,
     )
-    return entry ? { target: entry.target, tabsBeforeRetirement: entry.tabs } : null
+    return entry
+      ? {
+          target: entry.target,
+          terminalBase: terminalSessionBase(session.target, session.presentation),
+          tabsBeforeRetirement: entry.tabs,
+        }
+      : null
   }
 
   async listWorkspaceTabs(

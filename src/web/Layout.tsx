@@ -60,7 +60,7 @@ import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/we
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { resolveWorkspacePaneCommandTargetProjection } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
+import { resolveWorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -171,7 +171,7 @@ function AuthenticatedWorkspaceShell() {
     (routeContext?.kind === 'branch' || routeContext?.kind === 'worktree') &&
       commandWorkspace?.capability.kind === 'git',
   )
-  const currentWorkspacePaneCommandProjection = resolveWorkspacePaneCommandTargetProjection({
+  const currentWorkspacePaneCommandTarget = resolveWorkspacePaneCommandTarget({
     routeTarget: currentWorkspacePaneRouteTarget,
     workspacePaneRoute: currentWorkspacePaneRoute,
     workspace: commandWorkspace ?? null,
@@ -184,7 +184,6 @@ function AuthenticatedWorkspaceShell() {
       worktrees: commandWorktreeStatus.data?.status ?? null,
     },
   })
-  const currentWorkspacePaneCommandTarget = currentWorkspacePaneCommandProjection.target
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),

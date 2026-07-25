@@ -7,7 +7,7 @@ declare module '@tanstack/history' {
 }
 
 export type PrimaryWindowNavigationGeneration = number
-export type PrimaryWindowNavigationIntentKind = 'user' | 'passive'
+type PrimaryWindowNavigationIntentKind = 'user' | 'passive'
 
 export const PRIMARY_WINDOW_NAVIGATION_STATE_KEY = '__goblinPrimaryWindowNavigationGeneration' as const
 
@@ -21,7 +21,7 @@ export type PrimaryWindowNavigationOutcome =
       error: unknown
     }
 
-export interface PrimaryWindowNavigationRegistration {
+interface PrimaryWindowNavigationRegistration {
   readonly settled: Promise<PrimaryWindowNavigationOutcome>
   [Symbol.dispose](): void
   release(): void
@@ -31,7 +31,6 @@ export interface PrimaryWindowNavigationRegistration {
 export interface PrimaryWindowNavigationIntent {
   /** Internal identity used by history state and presentation-focus ownership. */
   readonly generation: PrimaryWindowNavigationGeneration
-  readonly kind: PrimaryWindowNavigationIntentKind
   readonly settled: Promise<PrimaryWindowNavigationOutcome>
   isCurrent(): boolean
   outcome(): PrimaryWindowNavigationOutcome | null
@@ -48,13 +47,9 @@ export interface PrimaryWindowNavigationIntent {
   fail(error: unknown): void
 }
 
-export type PassivePrimaryWindowNavigationIntentAdmission =
+type PassivePrimaryWindowNavigationIntentAdmission =
   | { kind: 'admitted'; intent: PrimaryWindowNavigationIntent }
-  | {
-      kind: 'occupied'
-      ownerKind: PrimaryWindowNavigationIntentKind
-      settled: Promise<PrimaryWindowNavigationOutcome>
-    }
+  | { kind: 'occupied'; settled: Promise<PrimaryWindowNavigationOutcome> }
 
 export function commitPrimaryWindowNavigationEffect(
   commit: () => boolean,
@@ -82,7 +77,6 @@ export function commitPrimaryWindowNavigationEffect(
 
 interface PrimaryWindowNavigationIntentRecord {
   generation: PrimaryWindowNavigationGeneration
-  kind: PrimaryWindowNavigationIntentKind
   phase: 'admitted' | 'registered'
   targetHref: string | null
   commitEffect?: () => void
@@ -107,13 +101,13 @@ export function beginPrimaryWindowNavigationIntent(
     return admission.intent
   }
   supersedeCurrentPrimaryWindowNavigationIntent()
-  return createPrimaryWindowNavigationIntent('user')
+  return createPrimaryWindowNavigationIntent()
 }
 
 export function tryBeginPassivePrimaryWindowNavigationIntent(): PassivePrimaryWindowNavigationIntentAdmission {
   const current = currentPrimaryWindowNavigationIntentRecord
-  if (current) return { kind: 'occupied', ownerKind: current.kind, settled: current.settled }
-  return { kind: 'admitted', intent: createPrimaryWindowNavigationIntent('passive') }
+  if (current) return { kind: 'occupied', settled: current.settled }
+  return { kind: 'admitted', intent: createPrimaryWindowNavigationIntent() }
 }
 
 export function primaryWindowNavigationIsCurrent(generation: PrimaryWindowNavigationGeneration): boolean {
@@ -125,12 +119,17 @@ export function currentPrimaryWindowNavigationGeneration(): PrimaryWindowNavigat
 }
 
 export async function executePrimaryWindowNavigation(
-  generation: PrimaryWindowNavigationGeneration,
+  intent: PrimaryWindowNavigationIntent,
   navigate: () => Promise<unknown>,
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(generation)) return false
+  // Admission belongs to the presentation lease, not merely to its history
+  // generation. A released/superseded lease must not start work that was
+  // queued before settlement. After navigation starts, the generation remains
+  // the history/focus identity even though a matching history commit settles
+  // the lease itself.
+  if (!intent.isCurrent()) return false
   await navigate()
-  return primaryWindowNavigationIsCurrent(generation)
+  return primaryWindowNavigationIsCurrent(intent.generation)
 }
 
 export function primaryWindowNavigationState(
@@ -163,14 +162,13 @@ export function observePrimaryWindowHistoryNavigation(input: {
   observeExternalPrimaryWindowNavigation()
 }
 
-function createPrimaryWindowNavigationIntent(kind: PrimaryWindowNavigationIntentKind): PrimaryWindowNavigationIntent {
+function createPrimaryWindowNavigationIntent(): PrimaryWindowNavigationIntent {
   latestPrimaryWindowNavigationGeneration += 1
   const generation = latestPrimaryWindowNavigationGeneration
   const settlement = Promise.withResolvers<PrimaryWindowNavigationOutcome>()
   let record: PrimaryWindowNavigationIntentRecord
   const intent: PrimaryWindowNavigationIntent = {
     generation,
-    kind,
     settled: settlement.promise,
     isCurrent: () => currentPrimaryWindowNavigationIntentRecord === record,
     outcome: () => record.outcome,
@@ -184,7 +182,6 @@ function createPrimaryWindowNavigationIntent(kind: PrimaryWindowNavigationIntent
   }
   record = {
     generation,
-    kind,
     phase: 'admitted' as const,
     targetHref: null,
     settled: settlement.promise,

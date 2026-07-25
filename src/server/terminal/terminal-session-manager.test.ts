@@ -37,6 +37,10 @@ const WORKTREE_TARGET = {
 }
 const RETIREMENT_PRESENTATION = {
   target: WORKTREE_TARGET,
+  terminalBase: {
+    target: WORKTREE_TARGET,
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
+  },
   tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: TERMINAL_SESSION_ID }],
 } satisfies TerminalRetirementPresentationContext
 const ptyEventSinkById = new Map<string, PtyEventSink>()
@@ -1093,6 +1097,146 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     })
   })
 
+  test('fails explicit close before PTY ownership is revoked when presentation capture fails', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(supervisor.killAndWait)
+    const manager = createAlwaysOnlineManager(supervisor, {
+      captureRetirementPresentation: vi.fn(async () => {
+        throw new Error('canonical tabs unavailable')
+      }),
+    })
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).rejects.toThrow(
+      'canonical tabs unavailable',
+    )
+    expect(supervisor.killAndWait).not.toHaveBeenCalled()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(1)
+  })
+
+  test('detaches after explicit PTY cleanup fails without exposing a false-live binding', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(async () => {
+      throw new Error('PTY close timed out')
+    })
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+      session: { terminalRuntimeSessionId: created.terminalRuntimeSessionId },
+    })
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+    await expect(
+      manager.attachSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        80,
+        24,
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+    await expect(
+      manager.writeSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        'input',
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({ status: 'rejected' })
+    await expect(
+      manager.restartSession(
+        USER_ID,
+        created.terminalRuntimeSessionId,
+        created.terminalRuntimeGeneration,
+        80,
+        24,
+        CLIENT_ID,
+      ),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+
+    const admission = manager.prepareSession({
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+    })
+    expect(admission.ok).toBe(true)
+    if (!admission.ok) throw new Error(admission.message)
+    expect(admission.admission.kind).toBe('prepared')
+    expect(() =>
+      admission.admission.commit({
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      }),
+    ).not.toThrow()
+  })
+
+  test('commits natural retirement when the PTY exits while explicit-close capture fails', async () => {
+    const capture = Promise.withResolvers<TerminalRetirementPresentationContext | null>()
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(supervisor.killAndWait)
+    const onExit = vi.fn()
+    const captureRetirementPresentation = vi.fn(async () => await capture.promise)
+    const manager = createAlwaysOnlineManager(supervisor, {
+      onExit,
+      captureRetirementPresentation,
+    })
+    const created = await createSession(manager, supervisor)
+
+    const closing = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+    await vi.waitFor(() => expect(captureRetirementPresentation).toHaveBeenCalledOnce())
+    supervisor.emitExit('pty_initial_123456')
+    capture.reject(new Error('canonical tabs unavailable'))
+
+    await expect(closing).resolves.toMatchObject({
+      kind: 'closed',
+      retirementPresentation: null,
+    })
+    expect(supervisor.killAndWait).not.toHaveBeenCalled()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+    expect(onExit).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+        retirementPresentation: null,
+      }),
+    )
+  })
+
+  test('does not infer native exit from observer retirement when explicit-close capture fails', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(supervisor.killAndWait)
+    let captureFails = true
+    const manager = createAlwaysOnlineManager(supervisor, {
+      onOutput: () => {
+        throw new Error('output publication failed')
+      },
+      captureRetirementPresentation: vi.fn(async () => {
+        if (captureFails) throw new Error('canonical tabs unavailable')
+        return RETIREMENT_PRESENTATION
+      }),
+    })
+    const created = await createSession(manager, supervisor)
+
+    supervisor.emitData('pty_initial_123456', 'output')
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).rejects.toThrow(
+      'canonical tabs unavailable',
+    )
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(1)
+    expect(supervisor.killAndWait).not.toHaveBeenCalled()
+
+    captureFails = false
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+      retirementPresentation: RETIREMENT_PRESENTATION,
+    })
+    expect(supervisor.killAndWait).toHaveBeenCalledOnce()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+  })
+
   test('retains the exact workspace runtime until the terminal session is detached', async () => {
     const supervisor = createDeferredPtySupervisor()
     const release = vi.fn()
@@ -2109,12 +2253,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.unavailable' })
   })
 
-  test('keeps a timed-out PTY addressable and reports its user scope for retry', async () => {
+  test('detaches a timed-out PTY while retaining native cleanup ownership', async () => {
     const supervisor = createDeferredPtySupervisor()
+    const nativeExit = Promise.withResolvers<void>()
     const killAndWait = vi.fn(async (_handle: PtyHandle): Promise<void> => {
       throw new Error('PTY close timed out')
     })
     supervisor.killAndWait = killAndWait
+    supervisor.waitForExit = vi.fn(async () => await nativeExit.promise)
     const manager = createAlwaysOnlineManager(supervisor)
     const workspaceId = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
@@ -2130,26 +2276,56 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_quiescence_123456'))
     await pending
 
-    await expect(
-      manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
-    ).resolves.toEqual({
-      ok: false,
-      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
-      message: 'PTY close timed out',
-    })
-    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
-      expect.objectContaining({ phase: 'error', message: 'PTY close timed out' }),
-    ])
+    let quiesced = false
+    const quiescence = manager
+      .closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))
+      .then((result) => {
+        quiesced = true
+        return result
+      })
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledTimes(2))
+    expect(quiesced).toBe(false)
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
 
-    killAndWait.mockResolvedValueOnce(undefined)
-    await expect(
-      manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
-    ).resolves.toEqual({
+    nativeExit.resolve()
+    await expect(quiescence).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
-    expect(killAndWait).toHaveBeenCalledTimes(2)
+  })
+
+  test('joins cleanup detached by an earlier close before reporting physical quiescence', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const nativeExit = Promise.withResolvers<void>()
+    supervisor.killAndWait = vi.fn(async () => {
+      throw new Error('PTY close timed out')
+    })
+    supervisor.waitForExit = vi.fn(async () => await nativeExit.promise)
+    const manager = createAlwaysOnlineManager(supervisor)
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+    })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+
+    let quiesced = false
+    const quiescence = manager
+      .closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))
+      .then((result) => {
+        quiesced = true
+        return result
+      })
+    await Promise.resolve()
+    expect(quiesced).toBe(false)
+
+    nativeExit.resolve()
+    await expect(quiescence).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
+    })
   })
 
   test('returns stale on abort while quiescence waits for late spawn retirement', async () => {
@@ -2194,7 +2370,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
 
-  test('retains a late-spawn owner after the first retirement failure and retries cleanup', async () => {
+  test('retries late-spawn cleanup behind the detached session owner', async () => {
     const supervisor = createDeferredPtySupervisor()
     const killAndWait = vi.fn(async () => {})
     killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
@@ -2221,19 +2397,6 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
       expect.objectContaining({ phase: 'error', message: 'error.workspace-runtime-stale' }),
     ])
-    await expect(
-      manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
-    ).resolves.toEqual({
-      ok: false,
-      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
-      message: 'PTY close timed out',
-    })
-    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
-      expect.objectContaining({ phase: 'error', message: 'PTY close timed out' }),
-    ])
-    expect(killAndWait).toHaveBeenCalledOnce()
-    await Promise.resolve()
-
     await expect(
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({

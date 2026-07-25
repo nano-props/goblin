@@ -20,9 +20,26 @@ import {
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
 interface PendingRetiredTerminalPresentation {
-  plan: RetiredTerminalWorkspacePaneTabPresentationPlan
-  intent: PrimaryWindowNavigationIntent | null
-  waitingOn: Promise<PrimaryWindowNavigationOutcome> | null
+  retirement: AcceptedTerminalRetirement
+  phase:
+    | { kind: 'awaiting-target' }
+    | { kind: 'ready'; plan: RetiredTerminalWorkspacePaneTabPresentationPlan }
+    | {
+        kind: 'waiting-for-intent'
+        plan: RetiredTerminalWorkspacePaneTabPresentationPlan
+        settled: Promise<PrimaryWindowNavigationOutcome>
+      }
+    | {
+        kind: 'committing'
+        plan: RetiredTerminalWorkspacePaneTabPresentationPlan
+        intent: PrimaryWindowNavigationIntent
+      }
+    | {
+        kind: 'waiting-for-settlement'
+        plan: RetiredTerminalWorkspacePaneTabPresentationPlan
+        intent: PrimaryWindowNavigationIntent
+      }
+  invalidationListener: () => void
 }
 
 export function useTerminalRetirementWorkspacePanePresentation(input: {
@@ -34,70 +51,103 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
   const projection = useTerminalSessionProjection()
   const pendingRef = useRef<PendingRetiredTerminalPresentation | null>(null)
 
-  const abandonPending = useEffectEvent((pending: PendingRetiredTerminalPresentation) => {
-    if (pendingRef.current === pending) pendingRef.current = null
-    pending.intent?.release()
-  })
+  const finishPending = useEffectEvent(
+    (pending: PendingRetiredTerminalPresentation, disposition: 'settle' | 'release') => {
+      if (pendingRef.current === pending) pendingRef.current = null
+      pending.retirement.invalidationSignal.removeEventListener('abort', pending.invalidationListener)
+      if (pending.phase.kind === 'committing') pending.phase.intent.release()
+      if (disposition === 'release') pending.retirement.release()
+      else pending.retirement.settle()
+    },
+  )
 
   const attemptPending = useEffectEvent(() => {
     const pending = pendingRef.current
     if (!pending) return
-    if (!retiredTerminalPlanStillOwnsCurrentRoute(pending.plan, currentRouteTarget, currentWorkspacePaneRoute)) {
-      abandonPending(pending)
+    let plan: RetiredTerminalWorkspacePaneTabPresentationPlan
+    if (pending.phase.kind === 'awaiting-target') {
+      if (
+        currentWorkspacePaneRoute?.kind !== 'terminal' ||
+        currentWorkspacePaneRoute.terminalSessionId !== pending.retirement.terminalSessionId
+      ) {
+        finishPending(pending, 'settle')
+        return
+      }
+      if (!currentRouteTarget) return
+      const captured = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
+        routeTarget: currentRouteTarget,
+        workspacePaneRoute: currentWorkspacePaneRoute,
+        terminalSessionId: pending.retirement.terminalSessionId,
+        terminalBase: pending.retirement.base,
+        retirementPresentation: pending.retirement.retirementPresentation,
+      })
+      if (!captured) {
+        finishPending(pending, 'settle')
+        return
+      }
+      pending.phase = { kind: 'ready', plan: captured }
+      plan = captured
+    } else if (pending.phase.kind === 'ready') {
+      plan = pending.phase.plan
+    } else {
       return
     }
-    if (pending.intent || pending.waitingOn) return
+    if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
+      finishPending(pending, 'settle')
+      return
+    }
     const admission = tryBeginPassivePrimaryWindowNavigationIntent()
     if (admission.kind === 'occupied') {
-      pending.waitingOn = admission.settled
+      const waitingPhase = { kind: 'waiting-for-intent' as const, plan, settled: admission.settled }
+      pending.phase = waitingPhase
       void admission.settled.then(() => {
-        if (pendingRef.current !== pending || pending.waitingOn !== admission.settled) return
-        pending.waitingOn = null
+        if (pendingRef.current !== pending || pending.phase !== waitingPhase) return
+        pending.phase = { kind: 'ready', plan }
         attemptPending()
       })
       return
     }
     const intent = admission.intent
-    pending.intent = intent
-    void commitRetiredTerminalWorkspacePaneTabPresentationPlan(pending.plan, navigation, intent)
+    const committingPhase = { kind: 'committing' as const, plan, intent }
+    pending.phase = committingPhase
+    void commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, navigation, intent)
       .then(async (committed) => {
         intent.release()
+        const settlementPhase = { kind: 'waiting-for-settlement' as const, plan, intent }
+        if (pendingRef.current === pending && pending.phase === committingPhase) pending.phase = settlementPhase
         const outcome = await intent.settled
-        if (pendingRef.current !== pending || pending.intent !== intent) return
-        pending.intent = null
+        if (pendingRef.current !== pending || pending.phase !== settlementPhase) return
         if (committed && outcome.status === 'committed') {
-          pendingRef.current = null
+          finishPending(pending, 'settle')
           return
         }
         if (outcome.status === 'superseded') {
+          pending.phase = { kind: 'ready', plan }
           attemptPending()
           return
         }
-        abandonPending(pending)
+        finishPending(pending, 'settle')
       })
       .catch((err: unknown) => {
+        const settlementPhase = { kind: 'waiting-for-settlement' as const, plan, intent }
+        if (pendingRef.current === pending && pending.phase === committingPhase) pending.phase = settlementPhase
         intent.fail(err)
-        if (pendingRef.current === pending && pending.intent === intent) abandonPending(pending)
+        if (pendingRef.current === pending && pending.phase === settlementPhase) finishPending(pending, 'settle')
         terminalLog.warn('failed to present retired terminal close-back', {
-          terminalSessionId: pending.plan.terminalSessionId,
+          terminalSessionId: pending.retirement.terminalSessionId,
           err,
         })
       })
   })
 
   const handleAcceptedRetirement = useEffectEvent((retirement: AcceptedTerminalRetirement) => {
-    if (!currentRouteTarget) return
-    const plan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
-      routeTarget: currentRouteTarget,
-      workspacePaneRoute: currentWorkspacePaneRoute,
-      terminalSessionId: retirement.terminalSessionId,
-      terminalBase: retirement.base,
-      retirementPresentation: retirement.retirementPresentation,
-    })
-    if (!plan) return
-    const previous = pendingRef.current
-    if (previous) abandonPending(previous)
-    pendingRef.current = { plan, intent: null, waitingOn: null }
+    let pending: PendingRetiredTerminalPresentation
+    const invalidationListener = () => {
+      if (pendingRef.current === pending) finishPending(pending, 'settle')
+    }
+    pending = { retirement, phase: { kind: 'awaiting-target' }, invalidationListener }
+    pendingRef.current = pending
+    retirement.invalidationSignal.addEventListener('abort', invalidationListener, { once: true })
     attemptPending()
   })
 
@@ -106,7 +156,7 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
     return () => {
       unsubscribe()
       const pending = pendingRef.current
-      if (pending) abandonPending(pending)
+      if (pending) finishPending(pending, 'release')
     }
   }, [projection])
 

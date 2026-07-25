@@ -63,6 +63,7 @@ const TerminalIdentityRevisionSchema = v.pipe(
   v.minValue(0),
   v.maxValue(Number.MAX_SAFE_INTEGER),
 )
+const TerminalCatalogRevisionSchema = v.pipe(v.number(), v.integer(), v.minValue(0))
 const TerminalColsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS))
 const TerminalRowsSchema = v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS))
 const TerminalSizeSchema = v.strictObject({ cols: TerminalColsSchema, rows: TerminalRowsSchema })
@@ -343,9 +344,11 @@ const TerminalExitEventSchema = v.strictObject({
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  catalogRevision: TerminalCatalogRevisionSchema,
   retirementPresentation: v.nullable(
     v.strictObject({
       target: RuntimeWorkspacePaneTargetSchema,
+      terminalBase: TerminalSessionBaseSchema,
       tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
     }),
   ),
@@ -357,9 +360,11 @@ const TerminalSessionClosedEventSchema = v.strictObject({
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  catalogRevision: TerminalCatalogRevisionSchema,
   retirementPresentation: v.nullable(
     v.strictObject({
       target: RuntimeWorkspacePaneTargetSchema,
+      terminalBase: TerminalSessionBaseSchema,
       tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
     }),
   ),

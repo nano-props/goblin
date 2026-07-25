@@ -718,6 +718,7 @@ test('presents a naturally exited active terminal through the captured exact clo
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
     retirementPresentation: {
       target: runtimeTarget,
+      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('files'),
         workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
@@ -753,6 +754,7 @@ test('presents a naturally exited active terminal through the captured exact clo
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
     retirementPresentation: {
       target: runtimeTarget,
+      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('files'),
         workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
@@ -789,6 +791,7 @@ test('does not capture close-back when a background terminal exits naturally', (
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
     retirementPresentation: {
       target: runtimeTarget,
+      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('status'),
         workspacePaneRuntimeTabEntry('terminal', terminalSessionId),

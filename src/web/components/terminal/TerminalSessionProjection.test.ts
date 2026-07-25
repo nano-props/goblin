@@ -5,6 +5,7 @@ import {
   TerminalSessionProjection,
   getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
+  type AcceptedTerminalRetirement,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
@@ -55,9 +56,14 @@ const RUNTIME_TARGET = {
   workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
   root: WORKSPACE_ID,
 }
+const RETIREMENT_TERMINAL_BASE = {
+  target: RUNTIME_TARGET,
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+}
 const SESSION_CLOSED_SCOPE = {
   workspaceId: REPO_ROOT,
   workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+  catalogRevision: 1,
   retirementPresentation: null,
 }
 
@@ -259,7 +265,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('keeps an active exit terminal across repeated same-revision snapshots until authoritative absence', () => {
+    test('keeps an accepted presentation fact after absence until a consumer settles it', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
       const terminalSessionId = 'term-111111111111111111111'
@@ -276,7 +282,12 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: { target: RUNTIME_TARGET, tabsBeforeRetirement: [] },
+        catalogRevision: 11,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
       })
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
@@ -286,7 +297,7 @@ describe('TerminalSessionProjection', () => {
       expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
 
       projection.reconcileServerSessionsSnapshot(scope, { revision: 11, sessions: [] }, 'client_local')
-      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
     })
 
     test('does not turn a gapped partial session delta into full catalog coverage', () => {
@@ -342,6 +353,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 10,
         retirementPresentation: null,
       })
 
@@ -400,6 +412,450 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('event dispatch', () => {
+    test.each(['exit', 'session-closed'] as const)(
+      'replays a %s retirement accepted before a presentation subscriber mounts',
+      (transport) => {
+        projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+        const terminalSessionId = 'term-111111111111111111111'
+        const event = {
+          terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId,
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          catalogRevision: 1,
+          retirementPresentation: {
+            target: RUNTIME_TARGET,
+            terminalBase: RETIREMENT_TERMINAL_BASE,
+            tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }],
+          },
+        }
+
+        if (transport === 'exit') projection.handleExit(event)
+        else projection.handleSessionClosed(event)
+        projection.reconcileServerSessionsSnapshot(
+          { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+          { revision: 1, sessions: [] },
+          'client_local',
+        )
+
+        const retirement = vi.fn()
+        projection.subscribeAcceptedRetirement(retirement)
+        expect(retirement).toHaveBeenCalledOnce()
+        expect(retirement).toHaveBeenCalledWith(expect.objectContaining({ terminalSessionId }))
+      },
+    )
+
+    test('accepts a self-contained retirement that arrives after an authoritative empty catalog', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      expect(retirement).toHaveBeenCalledOnce()
+      retirement.mock.calls[0]![0].settle()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+    })
+
+    test('waits for a catalog revision that covers an unmaterialized retirement', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      expect(retirement).not.toHaveBeenCalled()
+
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 2, sessions: [] },
+        'client_local',
+      )
+      expect(retirement).toHaveBeenCalledOnce()
+    })
+
+    test('does not let an older different-binding snapshot contest a future retirement', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId, { terminalRuntimeGeneration: 1 })],
+        },
+        'client_local',
+      )
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(retirement).not.toHaveBeenCalled()
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
+      expect(retirement).toHaveBeenCalledOnce()
+    })
+
+    test('preserves a future retirement while a stale empty catalog evicts the older local binding', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId, { terminalRuntimeGeneration: 1 })],
+        },
+        'client_local',
+      )
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [] }, 'client_local')
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
+      expect(retirement).toHaveBeenCalledOnce()
+    })
+
+    test.each(['exit', 'session-closed'] as const)(
+      'does not retain a user-wide %s retirement for a workspace runtime this client does not own',
+      (transport) => {
+        projection.setRuntimeMembershipIndex(runtimeMembershipIndexFromEntries([]))
+        const event = {
+          terminalRuntimeSessionId: 'pty_unknown_runtime_aaaaaa',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-111111111111111111111',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          catalogRevision: 1,
+          retirementPresentation: {
+            target: RUNTIME_TARGET,
+            terminalBase: RETIREMENT_TERMINAL_BASE,
+            tabsBeforeRetirement: [],
+          },
+        }
+
+        if (transport === 'exit') projection.handleExit(event)
+        else projection.handleSessionClosed(event)
+
+        expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+      },
+    )
+
+    test('retains a retirement through membership hydration and resolves it against the first complete catalog', () => {
+      const terminalSessionId = 'term-111111111111111111111'
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_pending_membership_aaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+
+      expect(retirement).toHaveBeenCalledWith(expect.objectContaining({ terminalSessionId }))
+    })
+
+    test('discards a pending-membership retirement when complete membership selects another runtime', () => {
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_pending_old_runtime_aaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      })
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex('repo-runtime-replacement'))
+
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+    })
+
+    test('invalidates accepted retirement ownership when membership returns to pending', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      const retirements: AcceptedTerminalRetirement[] = []
+      projection.subscribeAcceptedRetirement((retirement) => retirements.push(retirement))
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_membership_reset_aaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      })
+
+      projection.setRuntimeMembershipPending()
+
+      expect(retirements[0]?.invalidationSignal.aborted).toBe(true)
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+    })
+
+    test('continues presentation dispatch after reconciliation invalidates the active claim', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const firstTerminalSessionId = 'term-111111111111111111111'
+      const secondTerminalSessionId = 'term-222222222222222222222'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [makeServerSession('pty_session_1_aaaaaaaaa', firstTerminalSessionId)],
+        },
+        'client_local',
+      )
+      const retirements: AcceptedTerminalRetirement[] = []
+      projection.subscribeAcceptedRetirement((retirement) => retirements.push(retirement))
+      const retirementPresentation = {
+        target: RUNTIME_TARGET,
+        terminalBase: RETIREMENT_TERMINAL_BASE,
+        tabsBeforeRetirement: [],
+      }
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: firstTerminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation,
+      })
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: secondTerminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation,
+      })
+      expect(retirements.map((retirement) => retirement.terminalSessionId)).toEqual([firstTerminalSessionId])
+
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 2,
+          sessions: [makeServerSession('pty_replacement_aaaaaaaa', firstTerminalSessionId)],
+        },
+        'client_local',
+      )
+
+      expect(retirements[0]?.invalidationSignal.aborted).toBe(true)
+      expect(retirements.map((retirement) => retirement.terminalSessionId)).toEqual([
+        firstTerminalSessionId,
+        secondTerminalSessionId,
+      ])
+    })
+
+    test('does not resurrect an older binding from a snapshot before the accepted retirement revision', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessions(
+        scope,
+        [makeServerSession('pty_session_2_aaaaaaaaa', terminalSessionId, { terminalRuntimeGeneration: 2 })],
+        'client_local',
+      )
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId, { terminalRuntimeGeneration: 1 })],
+        },
+        'client_local',
+      )
+
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('returns an unmounted consumer claim to the ledger for the next consumer', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+
+      const claims: AcceptedTerminalRetirement[] = []
+      const unsubscribe = projection.subscribeAcceptedRetirement((retirement) => {
+        claims.push(retirement)
+      })
+      unsubscribe()
+      const claim = claims[0]
+      if (!claim) throw new Error('missing accepted terminal retirement')
+      claim.release()
+
+      const replacement = vi.fn()
+      projection.subscribeAcceptedRetirement(replacement)
+      expect(replacement).toHaveBeenCalledOnce()
+    })
+
+    test('delivers accepted retirement presentations one at a time', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      const retirements: AcceptedTerminalRetirement[] = []
+      projection.subscribeAcceptedRetirement((retirement) => retirements.push(retirement))
+      const retirementPresentation = {
+        target: RUNTIME_TARGET,
+        terminalBase: RETIREMENT_TERMINAL_BASE,
+        tabsBeforeRetirement: [],
+      }
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation,
+      })
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-222222222222222222222',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation,
+      })
+
+      expect(retirements.map((retirement) => retirement.terminalSessionId)).toEqual(['term-111111111111111111111'])
+      retirements[0]!.settle()
+      expect(retirements.map((retirement) => retirement.terminalSessionId)).toEqual([
+        'term-111111111111111111111',
+        'term-222222222222222222222',
+      ])
+    })
+
     test('publishes an accepted PTY exit before removing its local session projection', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const terminalSessionId = 'term-111111111111111111111'
@@ -421,7 +877,12 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: { target: RUNTIME_TARGET, tabsBeforeRetirement: [] },
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
       })
 
       expect(observedCounts).toEqual([1])
@@ -470,6 +931,7 @@ describe('TerminalSessionProjection', () => {
         ...contradictoryIdentity,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: null,
       })
       projection.handleIdentity({
@@ -683,6 +1145,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-unroutedunroutedroute',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: null,
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
@@ -694,6 +1157,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-unroutedunroutedroute',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: null,
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
@@ -749,6 +1213,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: null,
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
@@ -806,9 +1271,9 @@ describe('TerminalSessionProjection', () => {
       const retirement = vi.fn()
       projection.subscribeAcceptedRetirement(retirement)
 
-      projection.reconcileServerSessions(
+      projection.reconcileServerSessionsSnapshot(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [],
+        { revision: 1, sessions: [] },
         'client_local',
       )
 
@@ -851,7 +1316,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('keeps command-closing sessions visible when server reconciliation removes them before close settles', async () => {
+    test('applies authoritative catalog eviction while a command close is still settling', async () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -880,7 +1345,7 @@ describe('TerminalSessionProjection', () => {
 
       expect(
         projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
-      ).toEqual([terminalSessionId])
+      ).toEqual([])
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
@@ -908,6 +1373,11 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         ...SESSION_CLOSED_SCOPE,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId,
@@ -945,6 +1415,7 @@ describe('TerminalSessionProjection', () => {
         ...SESSION_CLOSED_SCOPE,
         retirementPresentation: {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
         },
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -958,7 +1429,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       expect(retirement).not.toHaveBeenCalled()
-      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
       serverClose.reject(new Error('response lost after server close'))
       await expect(closePromise).resolves.toBe(false)
@@ -971,7 +1442,85 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('transfers a future retirement confirmed by catalog absence to the pending close operation', async () => {
+    test('suppresses a close event that arrives after catalog eviction while command close succeeds', async () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        { revision: 0, sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)] },
+        'client_local',
+      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      })
+      await Promise.resolve()
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [] }, 'client_local')
+      projection.handleSessionClosed({
+        ...SESSION_CLOSED_SCOPE,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+      })
+
+      expect(retirement).not.toHaveBeenCalled()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
+      await expect(closePromise).resolves.toBe(true)
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+    })
+
+    test('releases a close event that arrives after catalog eviction when the close response is lost', async () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        { revision: 0, sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)] },
+        'client_local',
+      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
+      const retirements: AcceptedTerminalRetirement[] = []
+      projection.subscribeAcceptedRetirement((retirement) => retirements.push(retirement))
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      })
+      await Promise.resolve()
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [] }, 'client_local')
+      projection.handleSessionClosed({
+        ...SESSION_CLOSED_SCOPE,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+      })
+
+      expect(retirements).toHaveLength(0)
+      serverClose.reject(new Error('response lost after authoritative close'))
+      await expect(closePromise).resolves.toBe(false)
+      expect(retirements).toHaveLength(1)
+      expect(retirements[0]).toMatchObject({ terminalSessionId })
+    })
+
+    test('does not let an older pending close suppress a future binding retirement', async () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const terminalSessionId = 'term-111111111111111111111'
       projection.reconcileServerSessions(
@@ -985,6 +1534,7 @@ describe('TerminalSessionProjection', () => {
       projection.subscribeAcceptedRetirement(retirement)
       const retirementPresentation = {
         target: RUNTIME_TARGET,
+        terminalBase: RETIREMENT_TERMINAL_BASE,
         tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }],
       }
 
@@ -999,16 +1549,17 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation,
       })
-      projection.reconcileServerSessions(
+      projection.reconcileServerSessionsSnapshot(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [],
+        { revision: 1, sessions: [] },
         'client_local',
       )
 
-      expect(retirement).not.toHaveBeenCalled()
-      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(retirement).toHaveBeenCalledOnce()
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
       serverClose.reject(new Error('response lost after authoritative absence'))
       await expect(closePromise).resolves.toBe(false)
@@ -1019,9 +1570,12 @@ describe('TerminalSessionProjection', () => {
 
     test('ignores a stale session-closed event after the durable terminal rebinds', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      projection.reconcileServerSessions(
+      projection.reconcileServerSessionsSnapshot(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        {
+          revision: 2,
+          sessions: [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        },
         'client_local',
       )
 
@@ -1042,7 +1596,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('does not use an unresolved stale binding retirement to present later catalog absence', () => {
+    test('keeps a conflicting retirement unresolved until a causally covering catalog arrives', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const terminalSessionId = 'term-111111111111111111111'
       projection.reconcileServerSessions(
@@ -1058,8 +1612,10 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
         },
       })
@@ -1072,7 +1628,57 @@ describe('TerminalSessionProjection', () => {
 
       expect(retirement).not.toHaveBeenCalled()
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      expect(retirement).not.toHaveBeenCalled()
       expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+    })
+
+    test('keeps a future retirement authoritative across an older already-closed command effect', async () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+        },
+        'client_local',
+      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+
+      const close = projection.closeTerminalByDescriptor(terminalSessionId, RETIREMENT_TERMINAL_BASE)
+      await Promise.resolve()
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+      serverClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, null))
+
+      await expect(close).resolves.toBe(true)
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
+      expect(retirement).toHaveBeenCalledOnce()
     })
 
     test('publishes sibling explicit-close presentation from its manager-captured before-state', () => {
@@ -1090,6 +1696,7 @@ describe('TerminalSessionProjection', () => {
         ...SESSION_CLOSED_SCOPE,
         retirementPresentation: {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
         },
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -1118,9 +1725,12 @@ describe('TerminalSessionProjection', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
-      projection.reconcileServerSessions(
+      projection.reconcileServerSessionsSnapshot(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        {
+          revision: 2,
+          sessions: [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        },
         'client_local',
       )
 
@@ -1165,6 +1775,7 @@ describe('TerminalSessionProjection', () => {
         )
         const retirementPresentation = {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }],
         }
         const event = {
@@ -1173,6 +1784,7 @@ describe('TerminalSessionProjection', () => {
           terminalSessionId,
           workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          catalogRevision: 1,
           retirementPresentation,
         }
         const retirement = vi.fn()
@@ -1180,9 +1792,9 @@ describe('TerminalSessionProjection', () => {
 
         if (transport === 'exit') projection.handleExit(event)
         else projection.handleSessionClosed(event)
-        projection.reconcileServerSessions(
+        projection.reconcileServerSessionsSnapshot(
           { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-          [],
+          { revision: 1, sessions: [] },
           'client_local',
         )
 
@@ -1202,6 +1814,7 @@ describe('TerminalSessionProjection', () => {
         ...SESSION_CLOSED_SCOPE,
         retirementPresentation: {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
         },
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -1278,8 +1891,10 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
         retirementPresentation: {
           target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
           tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
         },
       })
@@ -1370,6 +1985,43 @@ describe('TerminalSessionProjection', () => {
       secondServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_2_aaaaaaaaa'))
       await expect(secondClose).resolves.toBe(true)
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('does not accept a late retirement after its pending-close runtime membership retires', async () => {
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessions(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+        'client_local',
+      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
+      const close = projection.closeTerminalByDescriptor(terminalSessionId, {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      })
+      await Promise.resolve()
+
+      projection.setRuntimeMembershipIndex(runtimeMembershipIndexFromEntries([]))
+      projection.handleSessionClosed({
+        ...SESSION_CLOSED_SCOPE,
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal', runtimeSessionId: terminalSessionId }],
+        },
+      })
+      serverClose.reject(new Error('response lost after runtime retirement'))
+
+      await expect(close).resolves.toBe(false)
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
     })
 
     test('closeTerminalByDescriptor selects an adjacent terminal after server close settles', async () => {
@@ -1770,6 +2422,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      catalogRevision: 1,
       retirementPresentation: null,
     })
 
@@ -1802,6 +2455,52 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     localProjection.destroy()
   })
+
+  test.each(['exit', 'session-closed'] as const)(
+    'retains an authoritative %s for a retiring binding until a covering empty catalog arrives',
+    (transport) => {
+      const localProjection = new TerminalSessionProjection()
+      localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      localProjection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 1,
+          sessions: [
+            makeServerSession('pty_generation_race_aaaa', terminalSessionId, { terminalRuntimeGeneration: 1 }),
+          ],
+        },
+        'client_local',
+      )
+      requiredTerminalSession(localProjection, terminalSessionId).restart()
+      const retirement = vi.fn()
+      localProjection.subscribeAcceptedRetirement(retirement)
+      const event = {
+        terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }],
+        },
+      }
+
+      if (transport === 'exit') localProjection.handleExit(event)
+      else localProjection.handleSessionClosed(event)
+
+      expect(retirement).not.toHaveBeenCalled()
+      expect(terminalSessionProjectionAccess(localProjection).terminalRetirements.size()).toBe(1)
+
+      localProjection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
+      expect(retirement).toHaveBeenCalledOnce()
+      localProjection.destroy()
+    },
+  )
 
   test('does not apply or retain a bell from the retiring runtime during restart', () => {
     const localProjection = new TerminalSessionProjection()
@@ -1868,6 +2567,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      catalogRevision: 1,
       retirementPresentation: null,
     })
 
@@ -1902,6 +2602,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      catalogRevision: 1,
       retirementPresentation: null,
     })
     localProjection.reconcileServerSessions(
@@ -1935,6 +2636,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      catalogRevision: 1,
       retirementPresentation: null,
     })
     localProjection.reconcileServerSessions(
@@ -2002,7 +2704,12 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     terminalSessionId,
     workspaceId: REPO_ROOT,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    retirementPresentation: { target: RUNTIME_TARGET, tabsBeforeRetirement: [] },
+    catalogRevision: 1,
+    retirementPresentation: {
+      target: RUNTIME_TARGET,
+      terminalBase: RETIREMENT_TERMINAL_BASE,
+      tabsBeforeRetirement: [],
+    },
   })
 
   function transitioningProjection(): { projection: TerminalSessionProjection; session: any } {
@@ -2082,11 +2789,17 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     )
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
-    expect(retirement).toHaveBeenCalledWith({
-      terminalSessionId,
-      base: expect.objectContaining({ target: RUNTIME_TARGET }),
-      retirementPresentation: { target: RUNTIME_TARGET, tabsBeforeRetirement: [] },
-    })
+    expect(retirement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        terminalSessionId,
+        base: expect.objectContaining({ target: RUNTIME_TARGET }),
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      }),
+    )
     projection.destroy()
   })
 
@@ -2132,7 +2845,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     projection.destroy()
   })
 
-  test('preserves a generation 3 exit across generation 2 activation', () => {
+  test('does not resurrect generation 2 after a generation 3 exit has arrived', () => {
     const { projection } = transitioningProjection()
     projection.handleExit({ ...exitFor(lineageA), terminalRuntimeGeneration: 3 })
 
@@ -2141,7 +2854,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
     )
-    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },

@@ -59,6 +59,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
       message: null,
       canonicalSize: { cols: 80, rows: 24 },
     },
+    catalogRevision: 1,
     retirementPresentation: null,
   }
 }
@@ -95,6 +96,11 @@ function makeActions(
     resizeSession: vi.fn(async () => ({ ok: false as const, message: 'resize not configured' })),
     takeoverSession: vi.fn(),
     terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
+    terminalSessionsChangedEventForScope: vi.fn((_userId, workspaceId, workspaceRuntimeId) => ({
+      workspaceId,
+      workspaceRuntimeId,
+      revision: 1,
+    })),
   }
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
@@ -270,10 +276,17 @@ describe('terminal-runtime-actions close broadcast', () => {
     // event that lets clients drop the local entry immediately.
     const retirementPresentation = {
       target: worktreeTarget(WORKSPACE_RUNTIME_ID),
+      terminalBase: {
+        target: worktreeTarget(WORKSPACE_RUNTIME_ID),
+        presentation: {
+          kind: 'git-worktree' as const,
+          head: { kind: 'branch' as const, branchName: 'feature/worktree' },
+        },
+      },
       tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: 'term-111111111111111111111' }],
     }
-    const close = vi.fn(() => ({ ...terminalCloseOutcome(), retirementPresentation }))
-    const { actions, broadcasts } = makeActions({
+    const close = vi.fn(() => ({ ...terminalCloseOutcome(), catalogRevision: 7, retirementPresentation }))
+    const { actions, broadcasts, manager } = makeActions({
       closeSessionForUserOutcome: close,
     })
 
@@ -289,8 +302,10 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      catalogRevision: 7,
       retirementPresentation,
     })
+    expect(manager.terminalSessionsChangedEventForScope).not.toHaveBeenCalled()
   })
 
   test('emits NEITHER broadcast when the close returns false (session not owned)', async () => {

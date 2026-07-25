@@ -778,7 +778,7 @@ export function runOwnedPrimaryWindowNavigation(input: {
     }
   })
   void Promise.resolve()
-    .then(async () => await executePrimaryWindowNavigation(generation, async () => await input.navigate(generation)))
+    .then(async () => await executePrimaryWindowNavigation(intent, async () => await input.navigate(generation)))
     .then(() => registration.release())
     .catch((error: unknown) => {
       registration.fail(error)
@@ -822,7 +822,7 @@ export async function settleOwnedPrimaryWindowRouteCommit(input: {
   }
   let routeCommitted = false
   const execution: Promise<PrimaryWindowNavigationExecutionOutcome> = executePrimaryWindowNavigation(
-    generation,
+    intent,
     async () => {
       routeCommitted = await settlePrimaryWindowRouteCommit({
         targetHref: input.targetHref,

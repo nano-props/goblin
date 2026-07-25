@@ -402,6 +402,8 @@ export interface TerminalRetirementEvent {
   terminalSessionId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  /** Catalog revision committed by the authoritative session removal. */
+  catalogRevision: number
   retirementPresentation: TerminalRetirementPresentationContext | null
 }
 
@@ -410,6 +412,8 @@ export type TerminalExitEvent = TerminalRetirementEvent
 /** Minimal canonical pane before-state needed to present a committed retirement. */
 export interface TerminalRetirementPresentationContext {
   target: RuntimeWorkspacePaneTarget
+  /** Self-contained transport form; the decoder enforces target/presentation agreement. */
+  terminalBase: { target: TerminalExecutionTarget; presentation: TerminalPresentation }
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 

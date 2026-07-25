@@ -171,6 +171,7 @@ const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 const SESSION_CLOSED_SCOPE = {
   workspaceId: REPO_ROOT,
   workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+  catalogRevision: 1,
   retirementPresentation: null,
 }
 const WORKTREE_PATH = '/repo'

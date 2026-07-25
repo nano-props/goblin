@@ -396,7 +396,7 @@ describe('TerminalPtyBinding geometry boundary', () => {
 
     nativeResize.resolve(true)
     await expect(resize).resolves.toEqual({ accepted: false, changed: false })
-    expect(session.ptyState).toMatchObject({ kind: 'bound', activity: 'retained', cols: 80, rows: 24 })
+    expect(session.ptyState).toMatchObject({ kind: 'bound', nativeState: 'retiring', cols: 80, rows: 24 })
   })
 })
 
@@ -433,7 +433,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
@@ -472,7 +472,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
@@ -514,7 +514,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
     })
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
   })
@@ -597,7 +597,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
       result: { ok: false, message: 'error.unavailable' },
     })
 
-    expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 2, activity: 'retained' })
+    expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 2, nativeState: 'exited' })
     expect(previousRender.screen.disposed).toBe(true)
     expect(events.emitExit).toHaveBeenCalledWith(session, {
       terminalRuntimeSessionId: session.id,

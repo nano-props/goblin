@@ -105,9 +105,12 @@ Runtime creation follows three responsibility layers:
    are query snapshots with their own terminal projection revision; clients
    apply terminal and tabs snapshots independently, so neither model borrows
    the other's revision as a freshness proxy.
-   Terminal close itself is a manager-owned, idempotent promise: concurrent
-   tab close, prune, runtime cleanup, and worktree quiescence join the same PTY
-   termination acknowledgement before the session leaves authoritative state.
+   Terminal close itself is a manager-owned, idempotent promise. Presentation
+   capture is its last reversible boundary; after native ownership is revoked,
+   the logical session leaves Directory authority and incomplete physical
+   cleanup moves to a detached resource owner. Destructive worktree quiescence
+   joins that owner's native-exit completion before crossing the Git removal
+   commit point.
 3. The client command/projection owns only admission/dedupe, revision-gated
    cache projection, opener facts, cancellation, and exact route completion.
    It does not order server resources or infer session liveness from its cache.
