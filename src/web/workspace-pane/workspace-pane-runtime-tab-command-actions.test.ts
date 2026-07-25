@@ -28,7 +28,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowNavigation,
+  beginPrimaryWindowNavigationIntent,
   primaryWindowNavigationIsCurrent,
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
@@ -219,7 +219,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
       expect.objectContaining({
-        navigationGeneration: expect.any(Number),
+        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -339,7 +339,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).not.toHaveBeenCalled()
 
     sessions = [terminalSession('term-222222222222222222222', true)]
-    beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigationIntent('user').generation
     releaseCoordinator()
     await coordinatorBlocker
 
@@ -347,7 +347,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-222222222222222222222',
       expect.objectContaining({
-        navigationGeneration: expect.any(Number),
+        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -376,7 +376,7 @@ describe('workspace pane runtime tab command actions', () => {
       focusTerminal: vi.fn(),
     }
 
-    const pendingCreatePresentation = beginPrimaryWindowNavigation()
+    const pendingCreatePresentation = beginPrimaryWindowNavigationIntent('user').generation
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
@@ -429,7 +429,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-111111111111111111111',
       expect.objectContaining({
-        navigationGeneration: expect.any(Number),
+        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
         onCommit: expect.any(Function),
         onAbandon: expect.any(Function),
       }),
@@ -553,5 +553,5 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginPrimaryWindowNavigation(), routeTarget: terminalRouteTarget }
+  return { navigationIntent: beginPrimaryWindowNavigationIntent('user'), routeTarget: terminalRouteTarget }
 }

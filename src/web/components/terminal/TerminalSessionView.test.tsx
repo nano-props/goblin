@@ -22,7 +22,7 @@ import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/work
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
-import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginPrimaryWindowNavigationIntent } from '#/web/primary-window-navigation-lifecycle.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -385,7 +385,7 @@ describe('TerminalSessionView', () => {
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
-    const navigationGeneration = beginPrimaryWindowNavigation()
+    const navigationGeneration = beginPrimaryWindowNavigationIntent('user').generation
     const focusLease = claimTerminalAutoFocus(navigationGeneration)
     if (!focusLease) throw new Error('expected terminal automatic-focus lease')
     focusLease.commit('term-222222222222222222222', focusTerminal)

@@ -3,6 +3,7 @@ import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
   terminalSessionCoordinates,
+  type TerminalRetirementPresentationContext,
   type TerminalSessionSummary,
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
@@ -20,7 +21,10 @@ import {
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  restorableWorkspacePaneTargetFromRuntime,
+  runtimeWorkspacePaneTargetKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { bindWorkspacePaneTarget, type RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import {
   canonicalWorkspaceLocator,
@@ -255,6 +259,28 @@ class TerminalSessionService {
       scope,
       worktreePath: terminalExecutionPath(session.target),
     })
+  }
+
+  /**
+   * Captures the canonical presentation before-set while terminal provider
+   * membership still contains the retiring session. The exit lifecycle waits
+   * for this read before it detaches that membership.
+   */
+  async captureTerminalRetirementPresentation(
+    userId: string,
+    session: TerminalSessionSummary,
+  ): Promise<TerminalRetirementPresentationContext | null> {
+    const coordinates = terminalSessionCoordinates(session)
+    const snapshot = await this.workspaceTabsCoordinator.snapshot({
+      userId,
+      workspaceId: coordinates.workspaceId,
+      scope: terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId),
+    })
+    const sessionTargetKey = runtimeWorkspacePaneTargetKey(session.target)
+    const entry = snapshot.entries.find(
+      (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === sessionTargetKey,
+    )
+    return entry ? { target: entry.target, tabsBeforeRetirement: entry.tabs } : null
   }
 
   async listWorkspaceTabs(

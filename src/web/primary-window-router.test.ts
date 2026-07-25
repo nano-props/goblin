@@ -60,7 +60,7 @@ import {
 } from '#/web/Layout.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigation,
+  beginPrimaryWindowNavigationIntent,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationIsCurrent,
   resetPrimaryWindowNavigationForTest,
@@ -469,7 +469,7 @@ describe('primary window route callback facades', () => {
   ])('browser traversal supersedes independently of conditional shell mode at %s', (pathname, bootstrapState) => {
     resetPrimaryWindowNavigationForTest()
     authenticatedAppShellMode(pathname, bootstrapState as AuthenticatedAppBootstrapState)
-    const generation = beginPrimaryWindowNavigation()
+    const generation = beginPrimaryWindowNavigationIntent('user').generation
 
     observePrimaryWindowHistoryNavigation({ href: '/', state: {}, action: { type: 'BACK' } })
 

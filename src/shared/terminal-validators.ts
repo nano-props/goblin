@@ -21,7 +21,9 @@ import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
+  RuntimeWorkspacePaneTargetSchema,
   WorkspacePaneFilesystemExecutionTargetSchema,
+  WorkspacePaneTabEntrySchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
@@ -341,6 +343,12 @@ const TerminalExitEventSchema = v.strictObject({
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  retirementPresentation: v.nullable(
+    v.strictObject({
+      target: RuntimeWorkspacePaneTargetSchema,
+      tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
+    }),
+  ),
 })
 const TerminalSessionClosedEventSchema = v.strictObject({
   type: v.literal('session-closed'),
@@ -348,6 +356,13 @@ const TerminalSessionClosedEventSchema = v.strictObject({
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   workspaceId: WorkspaceIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  retirementPresentation: v.nullable(
+    v.strictObject({
+      target: RuntimeWorkspacePaneTargetSchema,
+      tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
+    }),
+  ),
 })
 
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {

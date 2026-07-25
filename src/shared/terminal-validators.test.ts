@@ -619,6 +619,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-exit-1111111111111111',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
+          retirementPresentation: null,
         },
       },
     ]
@@ -649,6 +650,8 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-closed-11111111111111',
         workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        retirementPresentation: null,
       },
     ]
     for (const message of topLevelEvents) {
@@ -1376,6 +1379,8 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        retirementPresentation: null,
       }),
     ).toEqual({
       type: 'session-closed',
@@ -1383,6 +1388,8 @@ describe('shared terminal validators', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      retirementPresentation: null,
     })
     expect(
       normalizeTerminalSocketServerMessage({
@@ -1391,6 +1398,8 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        retirementPresentation: null,
         worktreePath: '/repo/worktree',
       }),
     ).toBeNull()
@@ -1560,6 +1569,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        retirementPresentation: null,
       },
     }
     expect(normalizeTerminalRealtimeMessage(message)).toEqual({
@@ -1570,6 +1580,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        retirementPresentation: null,
       },
     })
     expect(

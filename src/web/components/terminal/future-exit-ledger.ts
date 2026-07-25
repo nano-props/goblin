@@ -1,4 +1,5 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalRetirementPresentationContext } from '#/shared/terminal-types.ts'
 
 export interface FutureExitBinding {
   terminalSessionId: string
@@ -6,6 +7,7 @@ export interface FutureExitBinding {
   terminalRuntimeGeneration: number
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  retirementPresentation?: TerminalRetirementPresentationContext | null
 }
 
 interface FutureExitLedgerOptions {
@@ -58,8 +60,12 @@ export class FutureExitLedger {
   }
 
   blocksActivation(binding: FutureExitBinding): boolean {
+    return this.matchingExit(binding) !== null
+  }
+
+  matchingExit(binding: FutureExitBinding): FutureExitBinding | null {
     this.pruneExpired(this.now())
-    return this.entries.has(bindingKey(binding))
+    return this.entries.get(bindingKey(binding))?.binding ?? null
   }
 
   removeSession(terminalSessionId: string): void {

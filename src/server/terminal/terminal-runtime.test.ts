@@ -885,9 +885,10 @@ describe('server terminal runtime', () => {
     })
 
     mockPtys[0]?.emitExit()
-    const exitMessage = socket.send.mock.calls
-      .map(([payload]) => JSON.parse(String(payload)))
-      .find((message) => message.type === 'exit')
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socket).some((message) => message.type === 'exit')).toBe(true)
+    })
+    const exitMessage = sentSocketMessages(socket).find((message) => message.type === 'exit')
     expect(exitMessage).toMatchObject({
       type: 'exit',
       event: {
@@ -895,9 +896,12 @@ describe('server terminal runtime', () => {
         terminalSessionId: expect.any(String),
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        retirementPresentation: expect.objectContaining({
+          tabsBeforeRetirement: expect.arrayContaining([expect.objectContaining({ type: 'terminal' })]),
+        }),
       },
     })
-    expect(host.getDiagnostics().terminal.pty.state).toBe('idle')
+    await vi.waitFor(() => expect(host.getDiagnostics().terminal.pty.state).toBe('idle'))
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

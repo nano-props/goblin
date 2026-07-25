@@ -492,7 +492,7 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/no-worktree',
       { kind: 'static', tab: 'status' },
-      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+      expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
     )
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
@@ -1234,7 +1234,7 @@ describe('workspace commands', () => {
       },
       openerIdentity: 'workspace-pane:files',
       showCreatedTerminalTab: (terminalSessionId, _presentation, routeRequest) => {
-        expect(routeRequest.navigationGeneration).toEqual(expect.any(Number))
+        expect(routeRequest.navigationIntent.isCurrent()).toBe(true)
         return showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId)
       },
       focusTerminal: secondFocusTerminal,

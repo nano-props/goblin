@@ -8,6 +8,7 @@ import type {
   TerminalOutputEvent,
   TerminalTestNotificationInput,
   TerminalSessionsChangedEvent,
+  TerminalSessionClosedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
@@ -29,14 +30,7 @@ export function createServerTerminalClient(options: {
   const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
   const sessionsChangedSubscribers = new Set<(event: TerminalSessionsChangedEvent) => void>()
-  const sessionClosedSubscribers = new Set<
-    (event: {
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: TerminalExitEvent['workspaceId']
-    }) => void
-  >()
+  const sessionClosedSubscribers = new Set<(event: TerminalSessionClosedEvent) => void>()
 
   let realtimeUnsubscribe: (() => void) | null = null
 
@@ -191,6 +185,8 @@ export function createServerTerminalClient(options: {
             terminalRuntimeGeneration: message.terminalRuntimeGeneration,
             terminalSessionId: message.terminalSessionId,
             workspaceId: message.workspaceId,
+            workspaceRuntimeId: message.workspaceRuntimeId,
+            retirementPresentation: message.retirementPresentation,
           })
         return
       case 'identity': {

@@ -48,22 +48,16 @@ function resolveProjection(overrides: Partial<Parameters<typeof resolveWorkspace
 }
 
 describe('resolveWorkspacePaneCommandTargetProjection', () => {
-  test('keeps admission pending while the workspace capability is unresolved', () => {
+  test('does not project a target while the workspace capability is unresolved', () => {
     const projection = resolveProjection({ workspace: probingWorkspace() })
 
     expect(projection.target).toBeNull()
-    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'pending', workspaceRuntimeId: 'runtime-1' })
   })
 
   test('resolves a workspace-root target without waiting for disabled repo queries', () => {
     const projection = resolveProjection()
 
     expect(projection.target?.routeTarget).toEqual(ROOT_ROUTE_TARGET)
-    expect(projection.filesystemTargetAdmission).toEqual({
-      kind: 'ready',
-      workspaceRuntimeId: 'runtime-1',
-      target: projection.target,
-    })
   })
 
   test('keeps a branch target pending until both authoritative repo read models resolve', () => {
@@ -76,7 +70,6 @@ describe('resolveWorkspacePaneCommandTargetProjection', () => {
     })
 
     expect(projection.target).toEqual({ routeTarget, workspacePaneRoute: null, filesystemTarget: null })
-    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'pending', workspaceRuntimeId: 'runtime-1' })
   })
 
   test('atomically resolves a branch command target from matching branch and worktree read models', () => {
@@ -99,7 +92,6 @@ describe('resolveWorkspacePaneCommandTargetProjection', () => {
     const filesystemTarget = projection.target?.filesystemTarget
     if (!filesystemTarget) throw new Error('missing projected branch filesystem target')
     expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
-    expect(projection.filesystemTargetAdmission.kind).toBe('ready')
   })
 
   test('resolves a direct worktree target from the worktree read model alone', () => {
@@ -117,10 +109,9 @@ describe('resolveWorkspacePaneCommandTargetProjection', () => {
     const filesystemTarget = projection.target?.filesystemTarget
     if (!filesystemTarget) throw new Error('missing projected worktree filesystem target')
     expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
-    expect(projection.filesystemTargetAdmission.kind).toBe('ready')
   })
 
-  test('rejects a definitively unresolved target after its required read models settle', () => {
+  test('leaves an unresolved branch without a filesystem target after its read models settle', () => {
     const projection = resolveProjection({
       routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature' },
       workspace: gitWorkspace(),
@@ -128,7 +119,7 @@ describe('resolveWorkspacePaneCommandTargetProjection', () => {
       worktreeReadModel: { status: 'success', worktrees: [] },
     })
 
-    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'unavailable', workspaceRuntimeId: 'runtime-1' })
+    expect(projection.target?.filesystemTarget).toBeNull()
   })
 
   test('rejects a route target owned by a different workspace projection', () => {
@@ -136,6 +127,5 @@ describe('resolveWorkspacePaneCommandTargetProjection', () => {
     const projection = resolveProjection({ workspace: emptyWorkspace(differentWorkspaceId, 'different', 'runtime-1') })
 
     expect(projection.target).toBeNull()
-    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'unavailable', workspaceRuntimeId: 'runtime-1' })
   })
 })

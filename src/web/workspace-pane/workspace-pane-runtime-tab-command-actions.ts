@@ -39,8 +39,8 @@ import {
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
-  beginPrimaryWindowNavigation,
-  type PrimaryWindowNavigationGeneration,
+  beginPrimaryWindowNavigationIntent,
+  type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import {
   claimTerminalAutoFocus,
@@ -49,7 +49,7 @@ import {
 } from '#/web/terminal-focus.ts'
 
 export interface ExistingTerminalPresentationRouteRequest extends TerminalPresentationFocusEffects {
-  navigationGeneration: PrimaryWindowNavigationGeneration
+  navigationIntent: PrimaryWindowNavigationIntent
 }
 
 export interface WorkspacePaneRuntimeTabCommandContext {
@@ -125,7 +125,7 @@ async function terminalRuntimePrimaryAction({
       branchName,
       filesystemTarget,
       workspacePaneRoute,
-      showRuntimeTab: (type, sessionId, navigationGeneration) =>
+      showRuntimeTab: (type, sessionId, routeRequest) =>
         showTerminalRuntimeTab(
           type,
           sessionId,
@@ -134,7 +134,7 @@ async function terminalRuntimePrimaryAction({
           filesystemTarget,
           workspacePaneRoute,
           navigation,
-          navigationGeneration,
+          routeRequest,
         ),
       showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, routeRequest) =>
         showCreatedTerminalRuntimeTab(
@@ -178,7 +178,7 @@ function newTerminalRuntimeTabActionContext({
     branchName,
     filesystemTarget,
     workspacePaneRoute,
-    showRuntimeTab: (type, sessionId, navigationGeneration) =>
+    showRuntimeTab: (type, sessionId, routeRequest) =>
       showTerminalRuntimeTab(
         type,
         sessionId,
@@ -187,7 +187,7 @@ function newTerminalRuntimeTabActionContext({
         filesystemTarget,
         workspacePaneRoute,
         navigation,
-        navigationGeneration,
+        routeRequest,
       ),
     showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, routeRequest) =>
       showCreatedTerminalRuntimeTab(
@@ -251,7 +251,7 @@ async function showTerminalRuntimeTab(
     )
     return tab
       ? await selectWorkspacePaneControllerTab(target, tab, navigation, {
-          navigationGeneration: routeRequest.navigationGeneration,
+          navigationIntent: routeRequest.navigationIntent,
           focusEffects: routeRequest,
         })
       : abandonExistingTerminalPresentation(routeRequest)
@@ -261,7 +261,7 @@ async function showTerminalRuntimeTab(
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
     routeRequest,
-    routeRequest.navigationGeneration,
+    routeRequest.navigationIntent,
   )
 }
 
@@ -321,7 +321,7 @@ function showCreatedTerminalRuntimeTab(
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
     undefined,
-    routeRequest.navigationGeneration,
+    routeRequest.navigationIntent,
   )
 }
 
@@ -339,15 +339,15 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (worktree.count > 0) {
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
-    const navigationGeneration = beginPrimaryWindowNavigation()
-    let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
+    using navigationIntent = beginPrimaryWindowNavigationIntent('user')
+    let ownedFocusLease = claimTerminalAutoFocus(navigationIntent.generation)
     try {
       return await runWorkspacePaneAction(target, async () => {
         const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
         const firstSession = nextWorktree.sessions[0]
         if (!firstSession) return nextWorktree.createPending
         const routeRequest = existingTerminalPresentationRouteRequest(
-          navigationGeneration,
+          navigationIntent,
           firstSession.terminalSessionId,
           ownedFocusLease,
           bridge.focusTerminal,
@@ -404,14 +404,14 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
 }
 
 function existingTerminalPresentationRouteRequest(
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationIntent: PrimaryWindowNavigationIntent,
   terminalSessionId: string,
   focusLease: TerminalAutoFocusLease | null,
   focusTerminal: TerminalSessionCommandBridge['focusTerminal'],
 ): ExistingTerminalPresentationRouteRequest {
   let settled = false
   return {
-    navigationGeneration,
+    navigationIntent,
     onCommit() {
       if (settled) return
       settled = true

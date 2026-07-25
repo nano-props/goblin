@@ -13,6 +13,7 @@ import type {
   TerminalRestartResult,
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
+  TerminalSessionClosedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -42,13 +43,7 @@ export type TerminalRealtimeMessage =
   // this to drop the local session immediately, without waiting for
   // a full list-rescan. The workspace identity lets the client route
   // the event without a manager lookup.
-  | {
-      type: 'session-closed'
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: WorkspaceId
-    }
+  | ({ type: 'session-closed' } & TerminalSessionClosedEvent)
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput

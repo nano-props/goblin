@@ -55,6 +55,7 @@ import type {
   TerminalAttachResult,
   TerminalOutputEvent,
   TerminalSessionSummary,
+  TerminalSessionClosedEvent,
   TerminalSessionsChangedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
@@ -334,6 +335,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalSessionId,
     workspaceId: REPO_ID,
     workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
+    retirementPresentation: null,
   }
 }
 
@@ -346,14 +348,7 @@ let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null =
 let sessionsChangedHandler: ((event: TerminalSessionsChangedEvent) => void) | null = null
 let sessionsChangedRevision = 0
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
-let sessionClosedHandler:
-  | ((event: {
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: typeof REPO_ID
-    }) => void)
-  | null = null
+let sessionClosedHandler: ((event: TerminalSessionClosedEvent) => void) | null = null
 type OptionalIdentityRevision<T> = T extends unknown
   ? Omit<T, 'identityRevision'> & { identityRevision?: number }
   : never
@@ -772,21 +767,12 @@ beforeEach(() => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
         }
       }),
-      onSessionClosed: vi.fn(
-        (
-          cb: (event: {
-            terminalRuntimeSessionId: string
-            terminalRuntimeGeneration: number
-            terminalSessionId: string
-            workspaceId: typeof REPO_ID
-          }) => void,
-        ) => {
-          sessionClosedHandler = cb
-          return () => {
-            if (sessionClosedHandler === cb) sessionClosedHandler = null
-          }
-        },
-      ),
+      onSessionClosed: vi.fn((cb: (event: TerminalSessionClosedEvent) => void) => {
+        sessionClosedHandler = cb
+        return () => {
+          if (sessionClosedHandler === cb) sessionClosedHandler = null
+        }
+      }),
     }),
     workspacePaneTabs: () => ({
       replace: vi.fn(async () => ({ revision: 1, entries: [] })),
@@ -1288,6 +1274,8 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: REPO_ID,
+          workspaceRuntimeId: 'repo-runtime-1',
+          retirementPresentation: null,
         })
       })
 

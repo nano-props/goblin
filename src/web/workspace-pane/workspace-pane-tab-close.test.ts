@@ -45,9 +45,8 @@ import {
   resetTerminalAutoFocusForTest,
 } from '#/web/terminal-focus.ts'
 import {
-  beginPrimaryWindowNavigation,
+  beginPrimaryWindowNavigationIntent,
   primaryWindowNavigationIsCurrent,
-  registerPrimaryWindowNavigation,
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
@@ -106,7 +105,7 @@ test('commits active close-back route through command-owned navigation', async (
     REPO_ID,
     BRANCH_NAME,
     { kind: 'static', tab: 'status' },
-    expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
   )
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
 })
@@ -290,7 +289,7 @@ test('releases terminal focus when active close lifecycle fails', async () => {
   await expect(close).resolves.toBe(false)
 
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-  const nextPresentation = beginPrimaryWindowNavigation()
+  const nextPresentation = beginPrimaryWindowNavigationIntent('user').generation
   const nextFocusLease = claimTerminalAutoFocus(nextPresentation)
   expect(nextFocusLease).not.toBeNull()
   nextFocusLease?.release()
@@ -717,10 +716,22 @@ test('presents a naturally exited active terminal through the captured exact clo
     routeTarget: paneTarget,
     terminalSessionId,
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+    retirementPresentation: {
+      target: runtimeTarget,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('files'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+      ],
+    },
   })
   if (!plan) throw new Error('missing retired terminal presentation plan')
+  using passiveIntent = beginPrimaryWindowNavigationIntent('passive')
   await expect(
-    commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, navigationWith({ commitFilesystemWorkspacePaneRoute })),
+    commitRetiredTerminalWorkspacePaneTabPresentationPlan(
+      plan,
+      navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      passiveIntent,
+    ),
   ).resolves.toBe(true)
 
   expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -730,18 +741,29 @@ test('presents a naturally exited active terminal through the captured exact clo
   )
 
   resetPrimaryWindowNavigationForTest()
-  const explicitGeneration = beginPrimaryWindowNavigation()
-  const explicitNavigation = registerPrimaryWindowNavigation(explicitGeneration, '/pending-explicit-navigation')
+  const explicitIntent = beginPrimaryWindowNavigationIntent('user')
+  const explicitGeneration = explicitIntent.generation
+  const explicitNavigation = explicitIntent.register('/pending-explicit-navigation')
   if (!explicitNavigation) throw new Error('missing explicit navigation registration')
 
-  const rejectedPlan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
+  const concurrentlyCapturedPlan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
     workspacePaneRoute: sourceRoute,
     routeTarget: paneTarget,
     terminalSessionId,
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+    retirementPresentation: {
+      target: runtimeTarget,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('files'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+      ],
+    },
   })
 
-  expect(rejectedPlan).toBeNull()
+  // Capturing the immutable before-state is independent of presentation
+  // ownership. The hook retains this plan and retries passive admission after
+  // the explicit navigation settles, so blocker failure cannot lose close-back.
+  expect(concurrentlyCapturedPlan).not.toBeNull()
   expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
   explicitNavigation.release()
 })
@@ -765,6 +787,13 @@ test('does not capture close-back when a background terminal exits naturally', (
     routeTarget: paneTarget,
     terminalSessionId,
     terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+    retirementPresentation: {
+      target: runtimeTarget,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+      ],
+    },
   })
 
   expect(plan).toBeNull()

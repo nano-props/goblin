@@ -59,6 +59,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
       message: null,
       canonicalSize: { cols: 80, rows: 24 },
     },
+    retirementPresentation: null,
   }
 }
 
@@ -267,7 +268,11 @@ describe('terminal-runtime-actions close broadcast', () => {
     // Repo/session-list invalidation is owned by the manager close
     // lifecycle. The action owns only the targeted sibling-window
     // event that lets clients drop the local entry immediately.
-    const close = vi.fn(terminalCloseOutcome)
+    const retirementPresentation = {
+      target: worktreeTarget(WORKSPACE_RUNTIME_ID),
+      tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: 'term-111111111111111111111' }],
+    }
+    const close = vi.fn(() => ({ ...terminalCloseOutcome(), retirementPresentation }))
     const { actions, broadcasts } = makeActions({
       closeSessionForUserOutcome: close,
     })
@@ -283,6 +288,8 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      retirementPresentation,
     })
   })
 

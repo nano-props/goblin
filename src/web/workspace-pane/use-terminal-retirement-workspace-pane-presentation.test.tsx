@@ -6,16 +6,18 @@ import type { AcceptedTerminalRetirement } from '#/web/components/terminal/Termi
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 import type { RetiredTerminalWorkspacePaneTabPresentationPlan } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
-import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import type { WorkspacePaneFilesystemTargetAdmission } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
+import {
+  beginPrimaryWindowNavigationIntent,
+  resetPrimaryWindowNavigationForTest,
+  tryBeginPassivePrimaryWindowNavigationIntent,
+  type PrimaryWindowNavigationIntent,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
   unsubscribe: vi.fn(),
   capturePresentation: vi.fn(),
-  commitPresentation: vi.fn(async () => true),
-  abandonPresentation: vi.fn(),
+  commitPresentation: vi.fn(),
   projection: {
     subscribeAcceptedRetirement: vi.fn(),
   },
@@ -28,56 +30,65 @@ vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
 vi.mock('#/web/workspace-pane/workspace-pane-tab-close-action.ts', () => ({
   captureRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.capturePresentation,
   commitRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.commitPresentation,
-  abandonRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.abandonPresentation,
 }))
 
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-workspace')
-const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-other')
+const TERMINAL_SESSION_ID = 'term-111111111111111111111'
+const ROUTE_TARGET = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
+const TERMINAL_ROUTE = { kind: 'terminal' as const, terminalSessionId: TERMINAL_SESSION_ID }
 
-function presentationPlanForTest(
-  terminalSessionId: string,
-  routeTarget: { kind: 'workspace-root'; workspaceId: typeof WORKSPACE_ID },
-): RetiredTerminalWorkspacePaneTabPresentationPlan {
+function presentationPlanForTest(): RetiredTerminalWorkspacePaneTabPresentationPlan {
   return {
-    terminalSessionId,
+    terminalSessionId: TERMINAL_SESSION_ID,
     target: {
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-1',
-      routeTarget,
-      paneTarget: routeTarget,
+      routeTarget: ROUTE_TARGET,
+      paneTarget: ROUTE_TARGET,
     },
   } as RetiredTerminalWorkspacePaneTabPresentationPlan
 }
 
-function workspaceRootCommandTargetForTest(
-  workspaceRuntimeId: string,
-  routeTarget: { kind: 'workspace-root'; workspaceId: typeof WORKSPACE_ID },
-  workspacePaneRoute: { kind: 'terminal'; terminalSessionId: string },
-): WorkspacePaneCommandTarget {
+function retirementForTest(): AcceptedTerminalRetirement {
   return {
-    routeTarget,
-    workspacePaneRoute,
-    filesystemTarget: workspaceRootPaneFilesystemTarget({
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId,
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: false },
-        git: { status: 'unavailable' },
-      },
-    }),
+    terminalSessionId: TERMINAL_SESSION_ID,
+    base: {
+      target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
+      presentation: { kind: 'workspace-root' },
+    },
+    retirementPresentation: {
+      target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
+      tabsBeforeRetirement: [],
+    },
   }
 }
 
+async function flushPresentation(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
 beforeEach(() => {
+  resetPrimaryWindowNavigationForTest()
   mocks.listener = null
   mocks.unsubscribe.mockReset()
   mocks.capturePresentation.mockReset()
+  mocks.capturePresentation.mockReturnValue(presentationPlanForTest())
   mocks.commitPresentation.mockReset()
-  mocks.commitPresentation.mockResolvedValue(true)
-  mocks.abandonPresentation.mockReset()
+  mocks.commitPresentation.mockImplementation(
+    async (
+      _plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
+      _navigation: unknown,
+      intent: PrimaryWindowNavigationIntent,
+    ) => {
+      intent.commit()
+      return true
+    },
+  )
   mocks.projection.subscribeAcceptedRetirement.mockReset()
   mocks.projection.subscribeAcceptedRetirement.mockImplementation(
     (listener: (retirement: AcceptedTerminalRetirement) => void) => {
@@ -87,250 +98,138 @@ beforeEach(() => {
   )
 })
 
-test('retains a captured retirement plan until the hydrated command target can validate it', async () => {
-  const navigation = primaryWindowNavigationActionsForTest()
-  const terminalSessionId = 'term-111111111111111111111'
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId }
-  const descriptor = {
-    terminalSessionId,
-    index: 1,
-    target: { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-    presentation: { kind: 'workspace-root' as const },
-  }
-  const plan = presentationPlanForTest(terminalSessionId, routeTarget)
-  mocks.capturePresentation.mockReturnValue(plan)
-  const { rerender, unmount } = renderHook(
-    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
+function renderPresentationHook() {
+  return renderHook(
+    ({ route }: { route: typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' } }) =>
       useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: routeTarget,
-        currentWorkspacePaneRoute: workspacePaneRoute,
-        targetAdmission,
-        navigation,
+        currentRouteTarget: ROUTE_TARGET,
+        currentWorkspacePaneRoute: route,
+        navigation: primaryWindowNavigationActionsForTest(),
       }),
-    {
-      initialProps: {
-        targetAdmission: {
-          kind: 'pending',
-          workspaceRuntimeId: 'runtime-1',
-        } as WorkspacePaneFilesystemTargetAdmission,
-      },
-    },
+    { initialProps: { route: TERMINAL_ROUTE as typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' } } },
   )
+}
+
+test('captures and commits an accepted active-terminal retirement', async () => {
+  const { unmount } = renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
-  await act(async () => {
-    listener({ terminalSessionId: descriptor.terminalSessionId, base: descriptor })
-    await Promise.resolve()
-  })
+  if (!listener) throw new Error('missing accepted-retirement listener')
+
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
 
   expect(mocks.capturePresentation).toHaveBeenCalledWith({
-    routeTarget,
-    workspacePaneRoute,
-    terminalSessionId,
-    terminalBase: descriptor,
+    routeTarget: ROUTE_TARGET,
+    workspacePaneRoute: TERMINAL_ROUTE,
+    terminalSessionId: TERMINAL_SESSION_ID,
+    terminalBase: retirementForTest().base,
+    retirementPresentation: retirementForTest().retirementPresentation,
   })
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-
-  const hydratedTarget = workspaceRootCommandTargetForTest('runtime-1', routeTarget, workspacePaneRoute)
-  rerender({ targetAdmission: { kind: 'ready', workspaceRuntimeId: 'runtime-1', target: hydratedTarget } })
-  await act(async () => await Promise.resolve())
-
-  expect(mocks.commitPresentation).toHaveBeenCalledWith(plan, navigation)
+  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
 
   unmount()
   expect(mocks.unsubscribe).toHaveBeenCalledOnce()
-  expect(mocks.abandonPresentation).not.toHaveBeenCalled()
 })
 
-test('abandons a captured retirement plan when the workspace runtime is replaced', async () => {
-  const navigation = primaryWindowNavigationActionsForTest()
-  const terminalSessionId = 'term-111111111111111111111'
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId }
-  const plan = presentationPlanForTest(terminalSessionId, routeTarget)
-  mocks.capturePresentation.mockReturnValue(plan)
-  const { rerender } = renderHook(
-    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: routeTarget,
-        currentWorkspacePaneRoute: workspacePaneRoute,
-        targetAdmission,
-        navigation,
-      }),
-    {
-      initialProps: {
-        targetAdmission: {
-          kind: 'pending',
-          workspaceRuntimeId: 'runtime-1',
-        } as WorkspacePaneFilesystemTargetAdmission,
-      },
-    },
-  )
+test('waits for an admitted user command before admitting passive close-back', async () => {
+  const userIntent = beginPrimaryWindowNavigationIntent('user')
+  renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
+  if (!listener) throw new Error('missing accepted-retirement listener')
 
-  act(() => {
-    listener({
-      terminalSessionId,
-      base: {
-        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-        presentation: { kind: 'workspace-root' },
-      },
-    })
-  })
-  const replacementTarget = workspaceRootCommandTargetForTest('runtime-2', routeTarget, workspacePaneRoute)
-  rerender({
-    targetAdmission: { kind: 'ready', workspaceRuntimeId: 'runtime-2', target: replacementTarget },
-  })
-  await act(async () => await Promise.resolve())
-
-  expect(mocks.abandonPresentation).toHaveBeenCalledOnce()
-  expect(mocks.abandonPresentation).toHaveBeenCalledWith(plan)
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
   expect(mocks.commitPresentation).not.toHaveBeenCalled()
+
+  act(() => userIntent.release())
+  await flushPresentation()
+  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
 })
 
-test('abandons a captured retirement plan when target hydration finishes unavailable', async () => {
-  const navigation = primaryWindowNavigationActionsForTest()
-  const terminalSessionId = 'term-111111111111111111111'
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId }
-  const plan = presentationPlanForTest(terminalSessionId, routeTarget)
-  mocks.capturePresentation.mockReturnValue(plan)
-  const { rerender } = renderHook(
-    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: routeTarget,
-        currentWorkspacePaneRoute: workspacePaneRoute,
-        targetAdmission,
-        navigation,
-      }),
-    {
-      initialProps: {
-        targetAdmission: {
-          kind: 'pending',
-          workspaceRuntimeId: 'runtime-1',
-        } as WorkspacePaneFilesystemTargetAdmission,
-      },
-    },
-  )
+test('abandons a waiting plan immediately when its exact source route changes', async () => {
+  using userIntent = beginPrimaryWindowNavigationIntent('user')
+  const { rerender } = renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
+  if (!listener) throw new Error('missing accepted-retirement listener')
 
-  act(() => {
-    listener({
-      terminalSessionId,
-      base: {
-        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-        presentation: { kind: 'workspace-root' },
-      },
-    })
-  })
-  rerender({ targetAdmission: { kind: 'unavailable', workspaceRuntimeId: 'runtime-1' } })
-  await act(async () => await Promise.resolve())
-
-  expect(mocks.abandonPresentation).toHaveBeenCalledOnce()
-  expect(mocks.abandonPresentation).toHaveBeenCalledWith(plan)
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-})
-
-test('abandons a captured retirement plan when the router leaves its exact source', () => {
-  const navigation = primaryWindowNavigationActionsForTest()
-  const terminalSessionId = 'term-111111111111111111111'
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId }
-  const plan = presentationPlanForTest(terminalSessionId, routeTarget)
-  mocks.capturePresentation.mockReturnValue(plan)
-  const { rerender } = renderHook(
-    ({ route }: { route: typeof workspacePaneRoute | { kind: 'static'; tab: 'files' } }) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: routeTarget,
-        currentWorkspacePaneRoute: route,
-        targetAdmission: { kind: 'pending', workspaceRuntimeId: 'runtime-1' },
-        navigation,
-      }),
-    {
-      initialProps: {
-        route: workspacePaneRoute as typeof workspacePaneRoute | { kind: 'static'; tab: 'files' },
-      },
-    },
-  )
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
-
-  act(() => {
-    listener({
-      terminalSessionId,
-      base: {
-        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-        presentation: { kind: 'workspace-root' },
-      },
-    })
-  })
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
   rerender({ route: { kind: 'static', tab: 'files' } })
 
-  expect(mocks.abandonPresentation).toHaveBeenCalledOnce()
-  expect(mocks.abandonPresentation).toHaveBeenCalledWith(plan)
   expect(mocks.commitPresentation).not.toHaveBeenCalled()
 })
 
-test('abandons a retained retirement plan on unmount', () => {
-  const terminalSessionId = 'term-111111111111111111111'
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId }
-  const plan = presentationPlanForTest(terminalSessionId, routeTarget)
-  mocks.capturePresentation.mockReturnValue(plan)
-  const { unmount } = renderHook(() =>
-    useTerminalRetirementWorkspacePanePresentation({
-      currentRouteTarget: routeTarget,
-      currentWorkspacePaneRoute: workspacePaneRoute,
-      targetAdmission: { kind: 'pending', workspaceRuntimeId: 'runtime-1' },
-      navigation: primaryWindowNavigationActionsForTest(),
-    }),
-  )
+test('retries a passive presentation superseded by a user intent after that user settles', async () => {
+  const firstCommit = Promise.withResolvers<boolean>()
+  mocks.commitPresentation.mockImplementationOnce(async () => await firstCommit.promise)
+  renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
+  if (!listener) throw new Error('missing accepted-retirement listener')
 
-  act(() => {
-    listener({
-      terminalSessionId,
-      base: {
-        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-        presentation: { kind: 'workspace-root' },
-      },
-    })
-  })
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
+  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
+
+  const userIntent = beginPrimaryWindowNavigationIntent('user')
+  firstCommit.resolve(false)
+  await flushPresentation()
+  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
+
+  act(() => userIntent.release())
+  await flushPresentation()
+  expect(mocks.commitPresentation).toHaveBeenCalledTimes(2)
+})
+
+test('does not retry a passive navigation that failed without being superseded', async () => {
+  mocks.commitPresentation.mockImplementationOnce(
+    async (
+      _plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
+      _navigation: unknown,
+      intent: PrimaryWindowNavigationIntent,
+    ) => {
+      intent.fail(new Error('blocked'))
+      return false
+    },
+  )
+  renderPresentationHook()
+  const listener = mocks.listener
+  if (!listener) throw new Error('missing accepted-retirement listener')
+
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
+
+  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
+  const next = tryBeginPassivePrimaryWindowNavigationIntent()
+  expect(next.kind).toBe('admitted')
+  if (next.kind === 'admitted') next.intent.release()
+})
+
+test('unmount abandons an active passive intent and ignores its late completion', async () => {
+  const commit = Promise.withResolvers<boolean>()
+  mocks.commitPresentation.mockImplementationOnce(async () => await commit.promise)
+  const { unmount } = renderPresentationHook()
+  const listener = mocks.listener
+  if (!listener) throw new Error('missing accepted-retirement listener')
+
+  act(() => listener(retirementForTest()))
+  await flushPresentation()
   unmount()
+  commit.resolve(true)
+  await flushPresentation()
 
-  expect(mocks.abandonPresentation).toHaveBeenCalledOnce()
-  expect(mocks.abandonPresentation).toHaveBeenCalledWith(plan)
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
+  const next = tryBeginPassivePrimaryWindowNavigationIntent()
+  expect(next.kind).toBe('admitted')
+  if (next.kind === 'admitted') next.intent.release()
 })
 
-test('ignores an accepted exit from a background workspace', () => {
+test('ignores an accepted retirement that cannot produce an active-route plan', () => {
   mocks.capturePresentation.mockReturnValue(null)
-  const routeTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-  renderHook(() =>
-    useTerminalRetirementWorkspacePanePresentation({
-      currentRouteTarget: routeTarget,
-      currentWorkspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-      targetAdmission: { kind: 'pending', workspaceRuntimeId: 'runtime-1' },
-      navigation: primaryWindowNavigationActionsForTest(),
-    }),
-  )
+  renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-exit listener')
+  if (!listener) throw new Error('missing accepted-retirement listener')
 
-  act(() => {
-    listener({
-      terminalSessionId: 'term-222222222222222222222',
-      base: {
-        target: { kind: 'workspace-root', workspaceId: OTHER_WORKSPACE_ID, workspaceRuntimeId: 'runtime-2' },
-        presentation: { kind: 'workspace-root' },
-      },
-    })
-  })
+  act(() => listener(retirementForTest()))
 
-  expect(mocks.capturePresentation).toHaveBeenCalled()
+  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
   expect(mocks.commitPresentation).not.toHaveBeenCalled()
 })

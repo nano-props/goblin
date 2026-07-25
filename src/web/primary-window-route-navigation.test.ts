@@ -8,7 +8,7 @@ import {
   workspacePaneRouteFromBranchHref,
 } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigation,
+  beginPrimaryWindowNavigationIntent,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
 } from '#/web/primary-window-navigation-lifecycle.ts'
@@ -27,7 +27,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigationIntent('user').generation
 
     await expect(committed).resolves.toBe(false)
     navigation.resolve()
@@ -56,6 +56,22 @@ describe('primary window route navigation helpers', () => {
     await expect(committed).rejects.toThrow('commit effect failed')
   })
 
+  test('propagates a same-target commit effect failure through the awaited transaction', async () => {
+    const navigate = vi.fn(async () => {})
+
+    await expect(
+      settleOwnedPrimaryWindowRouteCommit({
+        targetHref: '/target',
+        currentHref: () => '/target',
+        commitEffect: () => {
+          throw new Error('commit effect failed')
+        },
+        navigate,
+      }),
+    ).rejects.toThrow('commit effect failed')
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
   test('propagates an abandon effect failure after a newer presentation supersedes the route', async () => {
     const navigation = Promise.withResolvers<void>()
     const started = Promise.withResolvers<void>()
@@ -72,7 +88,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigationIntent('user').generation
 
     await expect(committed).rejects.toThrow('abandon effect failed')
     navigation.resolve()

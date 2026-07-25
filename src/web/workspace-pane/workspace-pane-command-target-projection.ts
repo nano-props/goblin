@@ -32,24 +32,15 @@ interface WorkspacePaneCommandTargetProjectionInput {
   worktreeReadModel: WorktreeReadModelInput
 }
 
-export type WorkspacePaneFilesystemTargetAdmission =
-  | { kind: 'pending'; workspaceRuntimeId: string | null }
-  | { kind: 'ready'; workspaceRuntimeId: string; target: WorkspacePaneCommandTarget }
-  | { kind: 'unavailable'; workspaceRuntimeId: string | null }
-
 interface WorkspacePaneCommandTargetProjection {
   target: WorkspacePaneCommandTarget | null
-  filesystemTargetAdmission: WorkspacePaneFilesystemTargetAdmission
 }
 
 export function resolveWorkspacePaneCommandTargetProjection(
   input: WorkspacePaneCommandTargetProjectionInput,
 ): WorkspacePaneCommandTargetProjection {
   const target = resolveWorkspacePaneCommandTarget(input)
-  return {
-    target,
-    filesystemTargetAdmission: resolveWorkspacePaneFilesystemTargetAdmission(input, target),
-  }
+  return { target }
 }
 
 function resolveWorkspacePaneCommandTarget(
@@ -135,31 +126,4 @@ function resolveBranchFilesystemTarget(input: {
     head: gitHead(routeTarget.branchName),
     capabilities: workspace.capability.probe.capabilities,
   })
-}
-
-function resolveWorkspacePaneFilesystemTargetAdmission(
-  input: WorkspacePaneCommandTargetProjectionInput,
-  target: WorkspacePaneCommandTarget | null,
-): WorkspacePaneFilesystemTargetAdmission {
-  const { routeTarget, workspace } = input
-  const workspaceRuntimeId = workspace?.workspaceRuntimeId ?? null
-  if (!routeTarget) return { kind: 'unavailable', workspaceRuntimeId }
-  if (workspace && workspace.id !== routeTarget.workspaceId) return { kind: 'unavailable', workspaceRuntimeId }
-  if (!workspace || workspace.capability.kind === 'probing') return { kind: 'pending', workspaceRuntimeId }
-  if (workspace.capability.kind === 'unavailable') return { kind: 'unavailable', workspaceRuntimeId }
-  if (routeTarget.kind === 'workspace-root') {
-    return target?.filesystemTarget
-      ? { kind: 'ready', workspaceRuntimeId: workspace.workspaceRuntimeId, target }
-      : { kind: 'unavailable', workspaceRuntimeId }
-  }
-  if (workspace.capability.kind !== 'git') return { kind: 'unavailable', workspaceRuntimeId }
-  const requiredStatuses =
-    routeTarget.kind === 'git-branch'
-      ? [input.branchReadModel.status, input.worktreeReadModel.status]
-      : [input.worktreeReadModel.status]
-  if (requiredStatuses.includes('error')) return { kind: 'unavailable', workspaceRuntimeId }
-  if (requiredStatuses.some((status) => status !== 'success')) return { kind: 'pending', workspaceRuntimeId }
-  return target?.filesystemTarget
-    ? { kind: 'ready', workspaceRuntimeId: workspace.workspaceRuntimeId, target }
-    : { kind: 'unavailable', workspaceRuntimeId }
 }

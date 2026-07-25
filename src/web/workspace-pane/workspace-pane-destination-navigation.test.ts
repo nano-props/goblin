@@ -21,11 +21,9 @@ import {
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigation,
+  beginPrimaryWindowNavigationIntent,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
-  primaryWindowNavigationIsCurrent,
-  registerPrimaryWindowNavigation,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-destination-navigation-repo')
@@ -162,7 +160,7 @@ describe('workspace pane destination navigation', () => {
     })
     await Promise.resolve()
 
-    beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigationIntent('user')
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
@@ -222,14 +220,14 @@ describe('workspace pane destination navigation', () => {
     const { actions, routeNavigation } = primaryNavigationActions()
     vi.mocked(routeNavigation.commitWorkspacePaneRoute).mockImplementation(
       async (_repoId, _branchName, _route, options) => {
-        const generation = options?.navigationGeneration
-        if (!generation) return false
+        const intent = options?.navigationIntent
+        if (!intent) return false
         const href = '/workspace/destination/tab/status'
-        const registration = registerPrimaryWindowNavigation(generation, href, options.onCommit)
+        const registration = intent.register(href, options.onCommit)
         if (!registration) return false
         observePrimaryWindowHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, generation),
+          state: primaryWindowNavigationState({}, intent.generation),
           action: { type: 'PUSH' },
         })
         return true
@@ -277,7 +275,7 @@ function beginPresentation(branchName: string) {
 function acceptedRouteCommit() {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
-      if (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration)) {
+      if (!options?.navigationIntent || options.navigationIntent.isCurrent()) {
         options?.onCommit?.()
       }
       return true
@@ -289,10 +287,7 @@ function deferredRouteCommit(completion: Promise<boolean>) {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       const accepted = await completion
-      if (
-        accepted &&
-        (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration))
-      ) {
+      if (accepted && (!options?.navigationIntent || options.navigationIntent.isCurrent())) {
         options?.onCommit?.()
       }
       return accepted

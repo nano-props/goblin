@@ -31,7 +31,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginPrimaryWindowNavigationIntent } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
@@ -134,7 +134,7 @@ describe('workspace pane tab controller transactions', () => {
         authority: { kind: 'workspace-runtime' },
       },
       { kind: 'static', tab: 'files' },
-      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+      expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
@@ -167,7 +167,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         {
-          navigationGeneration: beginPrimaryWindowNavigation(),
+          navigationIntent: beginPrimaryWindowNavigationIntent('user'),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -187,7 +187,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => false) }),
         {
-          navigationGeneration: beginPrimaryWindowNavigation(),
+          navigationIntent: beginPrimaryWindowNavigationIntent('user'),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -198,15 +198,15 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons provided terminal focus before rejecting a stale presentation', async () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const staleIntent = beginPrimaryWindowNavigationIntent('user')
+    beginPrimaryWindowNavigationIntent('user')
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const navigation = controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => true) })
 
     await expect(
       selectWorkspacePaneControllerTab(workspacePaneTarget(), terminalTab(), navigation, {
-        navigationGeneration: staleGeneration,
+        navigationIntent: staleIntent,
         focusEffects: { onCommit, onAbandon },
       }),
     ).resolves.toBe(false)
@@ -217,8 +217,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('does not create a replacement worktree presentation after the queued generation is superseded', async () => {
-    const supersededGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const supersededIntent = beginPrimaryWindowNavigationIntent('user')
+    beginPrimaryWindowNavigationIntent('user')
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const target = {
       ...workspacePaneTarget(),
@@ -237,7 +237,7 @@ describe('workspace pane tab controller transactions', () => {
         target,
         workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
-        supersededGeneration,
+        supersededIntent,
       ),
     ).resolves.toBe(false)
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
@@ -351,8 +351,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons a stale navigation generation exactly once without invoking navigation', async () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const staleIntent = beginPrimaryWindowNavigationIntent('user')
+    beginPrimaryWindowNavigationIntent('user')
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const commitWorkspacePaneRoute = vi.fn(async () => true)
@@ -364,7 +364,7 @@ describe('workspace pane tab controller transactions', () => {
         TARGET_ROUTE,
         { commitWorkspacePaneRoute },
         { onCommit, onAbandon },
-        staleGeneration,
+        staleIntent,
       ),
     ).resolves.toBe(false)
 

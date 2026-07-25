@@ -37,16 +37,9 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab target read model', () => {
-  test('captures a retired worktree terminal target before command read models hydrate', () => {
+  test('captures a retired worktree terminal target while the canonical tabs query is pending', () => {
     const workspaceRuntimeId = 'repo-runtime-workspace-pane-retirement'
     const terminalSessionId = 'term-111111111111111111111'
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'git-worktree',
-      workspaceId: REPO_ID,
-      workspaceRuntimeId,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-    })
     const target = gitWorktreeFilesystemExecutionTarget(REPO_ID, workspaceRuntimeId, WORKTREE_PATH)
     if (!target || target.kind !== 'git-worktree') throw new Error('missing terminal worktree target')
 
@@ -55,6 +48,13 @@ describe('workspace pane tab target read model', () => {
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         workspacePaneRoute: { kind: 'terminal', terminalSessionId },
         terminalBase: { target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } },
+        retirementPresentation: {
+          target,
+          tabsBeforeRetirement: [
+            workspacePaneStaticTabEntry('files'),
+            workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+          ],
+        },
       }),
     ).toMatchObject({
       kind: 'ready',

@@ -24,6 +24,7 @@ import type {
   TerminalWriteResult,
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
+  TerminalSessionClosedEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
@@ -71,14 +72,7 @@ export interface ClientTerminal {
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSessionClosed: (
-    cb: (event: {
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: WorkspaceId
-    }) => void,
-  ) => () => void
+  onSessionClosed: (cb: (event: TerminalSessionClosedEvent) => void) => () => void
 }
 
 export interface ClientWorkspacePaneTabs {

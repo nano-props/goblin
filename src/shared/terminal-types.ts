@@ -1,7 +1,8 @@
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneFilesystemExecutionPath,
   type WorkspacePaneFilesystemExecutionTarget,
+  type RuntimeWorkspacePaneTarget,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
@@ -401,6 +402,22 @@ export interface TerminalExitEvent {
   terminalSessionId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  retirementPresentation: TerminalRetirementPresentationContext | null
+}
+
+/** Minimal canonical pane before-state needed to present a committed retirement. */
+export interface TerminalRetirementPresentationContext {
+  target: RuntimeWorkspacePaneTarget
+  tabsBeforeRetirement: WorkspacePaneTabEntry[]
+}
+
+export interface TerminalSessionClosedEvent {
+  terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
+  terminalSessionId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  retirementPresentation: TerminalRetirementPresentationContext | null
 }
 
 /**

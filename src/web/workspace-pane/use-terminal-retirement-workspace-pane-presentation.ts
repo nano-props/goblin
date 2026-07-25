@@ -1,72 +1,88 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import {
-  abandonRetiredTerminalWorkspacePaneTabPresentationPlan,
   captureRetiredTerminalWorkspacePaneTabPresentationPlan,
   commitRetiredTerminalWorkspacePaneTabPresentationPlan,
   type RetiredTerminalWorkspacePaneTabPresentationPlan,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
-  workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import { workspacePaneFilesystemRuntimeTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import type { WorkspacePaneFilesystemTargetAdmission } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
+import {
+  tryBeginPassivePrimaryWindowNavigationIntent,
+  type PrimaryWindowNavigationIntent,
+  type PrimaryWindowNavigationOutcome,
+} from '#/web/primary-window-navigation-lifecycle.ts'
+
+interface PendingRetiredTerminalPresentation {
+  plan: RetiredTerminalWorkspacePaneTabPresentationPlan
+  intent: PrimaryWindowNavigationIntent | null
+  waitingOn: Promise<PrimaryWindowNavigationOutcome> | null
+}
 
 export function useTerminalRetirementWorkspacePanePresentation(input: {
   currentRouteTarget: WorkspacePaneTabsTarget | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
-  targetAdmission: WorkspacePaneFilesystemTargetAdmission
   navigation: PrimaryWindowNavigationActions
 }): void {
-  const { currentRouteTarget, currentWorkspacePaneRoute, targetAdmission, navigation } = input
+  const { currentRouteTarget, currentWorkspacePaneRoute, navigation } = input
   const projection = useTerminalSessionProjection()
-  const pendingPlanRef = useRef<RetiredTerminalWorkspacePaneTabPresentationPlan | null>(null)
+  const pendingRef = useRef<PendingRetiredTerminalPresentation | null>(null)
 
-  const settlePendingPlan = useEffectEvent(() => {
-    const plan = pendingPlanRef.current
-    if (!plan) return
-    const abandonPlan = () => {
-      pendingPlanRef.current = null
-      abandonRetiredTerminalWorkspacePaneTabPresentationPlan(plan)
-    }
-    if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
-      abandonPlan()
+  const abandonPending = useEffectEvent((pending: PendingRetiredTerminalPresentation) => {
+    if (pendingRef.current === pending) pendingRef.current = null
+    pending.intent?.release()
+  })
+
+  const attemptPending = useEffectEvent(() => {
+    const pending = pendingRef.current
+    if (!pending) return
+    if (!retiredTerminalPlanStillOwnsCurrentRoute(pending.plan, currentRouteTarget, currentWorkspacePaneRoute)) {
+      abandonPending(pending)
       return
     }
-    if (
-      targetAdmission.workspaceRuntimeId !== null &&
-      targetAdmission.workspaceRuntimeId !== plan.target.workspaceRuntimeId
-    ) {
-      abandonPlan()
-      return
-    }
-    if (targetAdmission.kind === 'pending') {
-      // The plan already owns the complete before-state transition. Hydration
-      // is only an admission proof for its captured target; never recompute the
-      // destination from the post-retirement projection here.
-      return
-    }
-    if (
-      targetAdmission.kind === 'unavailable' ||
-      !retiredTerminalPlanMatchesCommandTarget(plan, targetAdmission.target)
-    ) {
-      abandonPlan()
-      return
-    }
-    pendingPlanRef.current = null
-    void commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, navigation).catch((err: unknown) => {
-      terminalLog.warn('failed to present retired terminal close-back', {
-        terminalSessionId: plan.terminalSessionId,
-        err,
+    if (pending.intent || pending.waitingOn) return
+    const admission = tryBeginPassivePrimaryWindowNavigationIntent()
+    if (admission.kind === 'occupied') {
+      pending.waitingOn = admission.settled
+      void admission.settled.then(() => {
+        if (pendingRef.current !== pending || pending.waitingOn !== admission.settled) return
+        pending.waitingOn = null
+        attemptPending()
       })
-    })
+      return
+    }
+    const intent = admission.intent
+    pending.intent = intent
+    void commitRetiredTerminalWorkspacePaneTabPresentationPlan(pending.plan, navigation, intent)
+      .then(async (committed) => {
+        intent.release()
+        const outcome = await intent.settled
+        if (pendingRef.current !== pending || pending.intent !== intent) return
+        pending.intent = null
+        if (committed && outcome.status === 'committed') {
+          pendingRef.current = null
+          return
+        }
+        if (outcome.status === 'superseded') {
+          attemptPending()
+          return
+        }
+        abandonPending(pending)
+      })
+      .catch((err: unknown) => {
+        intent.fail(err)
+        if (pendingRef.current === pending && pending.intent === intent) abandonPending(pending)
+        terminalLog.warn('failed to present retired terminal close-back', {
+          terminalSessionId: pending.plan.terminalSessionId,
+          err,
+        })
+      })
   })
 
   const handleAcceptedRetirement = useEffectEvent((retirement: AcceptedTerminalRetirement) => {
@@ -76,25 +92,25 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
       workspacePaneRoute: currentWorkspacePaneRoute,
       terminalSessionId: retirement.terminalSessionId,
       terminalBase: retirement.base,
+      retirementPresentation: retirement.retirementPresentation,
     })
     if (!plan) return
-    const previous = pendingPlanRef.current
-    pendingPlanRef.current = plan
-    if (previous) abandonRetiredTerminalWorkspacePaneTabPresentationPlan(previous)
-    settlePendingPlan()
+    const previous = pendingRef.current
+    if (previous) abandonPending(previous)
+    pendingRef.current = { plan, intent: null, waitingOn: null }
+    attemptPending()
   })
 
   useEffect(() => {
     const unsubscribe = projection.subscribeAcceptedRetirement(handleAcceptedRetirement)
     return () => {
       unsubscribe()
-      const plan = pendingPlanRef.current
-      pendingPlanRef.current = null
-      if (plan) abandonRetiredTerminalWorkspacePaneTabPresentationPlan(plan)
+      const pending = pendingRef.current
+      if (pending) abandonPending(pending)
     }
   }, [projection])
 
-  useEffect(() => settlePendingPlan(), [currentRouteTarget, currentWorkspacePaneRoute, navigation, targetAdmission])
+  useEffect(() => attemptPending(), [currentRouteTarget, currentWorkspacePaneRoute, navigation])
 }
 
 function retiredTerminalPlanStillOwnsCurrentRoute(
@@ -110,29 +126,5 @@ function retiredTerminalPlanStillOwnsCurrentRoute(
       workspacePaneTabsTargetIdentityKey(capturedRouteTarget) &&
     currentWorkspacePaneRoute?.kind === 'terminal' &&
     currentWorkspacePaneRoute.terminalSessionId === plan.terminalSessionId
-  )
-}
-
-function retiredTerminalPlanMatchesCommandTarget(
-  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-  target: WorkspacePaneCommandTarget,
-): boolean {
-  const capturedRouteTarget = plan.target.routeTarget
-  if (
-    capturedRouteTarget.kind === 'inactive' ||
-    workspacePaneTabsTargetIdentityKey(target.routeTarget) !== workspacePaneTabsTargetIdentityKey(capturedRouteTarget)
-  ) {
-    return false
-  }
-  if (!target.filesystemTarget) return false
-  const expectedRuntime = workspacePaneFilesystemRuntimeTarget(target.filesystemTarget)
-  const expectedPaneTarget = workspacePaneTabsTargetFromRuntime(expectedRuntime)
-  const capturedPaneTarget = plan.target.paneTarget
-  return (
-    expectedPaneTarget !== null &&
-    capturedPaneTarget.kind !== 'inactive' &&
-    plan.target.workspaceId === expectedRuntime.workspaceId &&
-    plan.target.workspaceRuntimeId === expectedRuntime.workspaceRuntimeId &&
-    workspacePaneTabsTargetIdentityKey(capturedPaneTarget) === workspacePaneTabsTargetIdentityKey(expectedPaneTarget)
   )
 }

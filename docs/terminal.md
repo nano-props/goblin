@@ -189,25 +189,33 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
-Natural PTY exit and a sibling window's successful terminal close are already
-committed resource retirements, so they must not issue a second close command.
-When the client accepts either retirement for the current runtime binding, it
-captures the close-back transition from the complete pre-removal tab projection
-and then removes the local session. Capture uses the retirement's authoritative
-runtime/filesystem coordinates, the router's exact source, and the ready
-canonical tab projection; it does not wait for the broader workspace command
-read model to rediscover those facts. If that read model is still hydrating, the
-workspace-pane layer retains only the immutable captured transition until the
-target can be admitted. Admission distinguishes a genuinely pending read model
-from an unavailable or replacement runtime: only pending hydration retains the
-plan; a definitive mismatch abandons it and releases its presentation lease. It
-never replays the retirement event or reconstructs a destination from the
-post-removal projection. The passive transition reuses the
-current navigation generation only when it has no registered history-commit
-owner, and commits with an exact-route precondition. It therefore neither
-displaces an owned commit nor overrides a route that has already changed.
-Recovery from an unexplained missing route still renders an empty pane; it does
-not invent close-back state.
+Natural PTY exit and a sibling window's explicit close are already committed
+resource retirements, so they must not issue a second close command. Both enter
+the same manager-owned, single-flight retirement operation. Admission changes
+to `retiring` synchronously; retaining Directory/provider membership while the
+operation captures presentation cannot make the dead PTY reusable.
+
+Before provider membership is detached, the operation reads the canonical tabs
+snapshot and immediately narrows it to `TerminalRetirementPresentationContext`:
+the exact runtime target and that pane's ordered tabs. The full workspace
+snapshot does not cross the terminal boundary. Natural `exit` and explicit
+`session-closed` are only transports for this same immutable record. The client
+combines it with the local opener and exact source route to derive close-back;
+it never depends on the independently hydrating React Query projection or
+reconstructs a destination from a later after-state snapshot.
+
+If `session-closed` arrives while that client still owns an explicit close
+request, the close operation retains the event until its response settles. A
+successful response leaves presentation to the composed close; a lost or
+failed response consumes the already-confirmed retirement instead of discarding
+its before-state.
+
+Catalog reconciliation has no before-state and therefore only converges
+membership. A future exit retains its original retirement context, so delayed
+activation consumes the same fact. The passive transition uses a passive
+navigation intent and an exact-route precondition; it neither displaces an
+owned user commit nor overrides a route that has changed. Recovery from an
+unexplained missing route still renders an empty pane.
 
 Addressable close sources use one idempotent session-close promise. The session
 remains in the authoritative Directory until pending spawns settle and PTY

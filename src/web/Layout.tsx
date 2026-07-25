@@ -60,10 +60,7 @@ import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/we
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import {
-  resolveWorkspacePaneCommandTargetProjection,
-  type WorkspacePaneFilesystemTargetAdmission,
-} from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
+import { resolveWorkspacePaneCommandTargetProjection } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -188,7 +185,6 @@ function AuthenticatedWorkspaceShell() {
     },
   })
   const currentWorkspacePaneCommandTarget = currentWorkspacePaneCommandProjection.target
-  const retiredTerminalWorkspacePaneTargetAdmission = currentWorkspacePaneCommandProjection.filesystemTargetAdmission
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
@@ -224,7 +220,6 @@ function AuthenticatedWorkspaceShell() {
         hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
         currentBranchName={currentBranchName}
         currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
-        retiredTerminalWorkspacePaneTargetAdmission={retiredTerminalWorkspacePaneTargetAdmission}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         currentWorkspacePaneRouteTarget={currentWorkspacePaneRouteTarget}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
@@ -463,7 +458,6 @@ function AuthenticatedWorkspaceSideEffects({
   hydratedRouteWorkspaceId,
   currentBranchName,
   currentWorkspacePaneCommandTarget,
-  retiredTerminalWorkspacePaneTargetAdmission,
   currentWorkspacePaneRoute,
   currentWorkspacePaneRouteTarget,
   routeContext,
@@ -481,7 +475,6 @@ function AuthenticatedWorkspaceSideEffects({
   hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
-  retiredTerminalWorkspacePaneTargetAdmission: WorkspacePaneFilesystemTargetAdmission
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   currentWorkspacePaneRouteTarget: WorkspacePaneTabsTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
@@ -499,7 +492,6 @@ function AuthenticatedWorkspaceSideEffects({
   useTerminalRetirementWorkspacePanePresentation({
     currentRouteTarget: currentWorkspacePaneRouteTarget,
     currentWorkspacePaneRoute,
-    targetAdmission: retiredTerminalWorkspacePaneTargetAdmission,
     navigation,
   })
   useClientEffectIntentRouter({

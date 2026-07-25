@@ -3,6 +3,7 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -36,8 +37,12 @@ const terminalSessionViewMocks = vi.hoisted(() => ({
   props: [] as CapturedTerminalSessionViewProps[],
 }))
 
+interface TerminalCreateCommandInputForTest {
+  commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown> | unknown
+}
+
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({
+  runCreateTerminalTabCommand: vi.fn(async (_input: TerminalCreateCommandInputForTest) => ({
     ok: true as const,
     terminalSessionId: 'term-111111111111111111111',
   })),
@@ -119,6 +124,16 @@ describe('workspace pane runtime tab panel', () => {
     const { navigation } = renderPanel({
       terminalContext,
     })
+    terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementationOnce(async (input) => {
+      await input.commitCreatedTerminalTab({
+        terminalSessionId: 'term-111111111111111111111',
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        requestRole: 'leader',
+        resourceDisposition: 'created',
+        runtimeProjectionApplied: true,
+      })
+      return { ok: true as const, terminalSessionId: 'term-111111111111111111111' }
+    })
 
     const base: TerminalSessionBase = {
       target: {
@@ -142,26 +157,6 @@ describe('workspace pane runtime tab panel', () => {
         logMessage: 'workspace pane terminal create failed',
       }),
     )
-    const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [
-        {
-          commitCreatedTerminalTab: (admission: {
-            terminalSessionId: string
-            presentation: { kind: 'git-worktree'; head: { kind: 'branch'; branchName: string } }
-            requestRole: 'leader'
-            resourceDisposition: 'created'
-            runtimeProjectionApplied: boolean
-          }) => Promise<unknown>
-        },
-      ]
-    >
-    await commandCalls[0]?.[0].commitCreatedTerminalTab({
-      terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
-      requestRole: 'leader',
-      resourceDisposition: 'created',
-      runtimeProjectionApplied: true,
-    })
     expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).not.toHaveBeenCalled()
     expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',

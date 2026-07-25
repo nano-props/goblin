@@ -23,9 +23,8 @@ import {
   workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  type PrimaryWindowNavigationGeneration,
+  beginPrimaryWindowNavigationIntent,
+  type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal-focus.ts'
 
@@ -64,7 +63,7 @@ export function workspacePaneControllerRouteForEntry(
 }
 
 export interface WorkspacePaneControllerPresentationLease {
-  navigationGeneration: PrimaryWindowNavigationGeneration
+  navigationIntent: PrimaryWindowNavigationIntent
   target: WorkspacePaneControllerTarget
   fromRoute: WorkspacePaneTabControllerRoute
   toRoute: WorkspacePaneTabControllerRoute
@@ -76,7 +75,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   closingEntry: WorkspacePaneTabEntry
   nextEntry: WorkspacePaneTabEntry | null
   workspacePaneRoute: ParsedWorkspacePaneRouteTarget | undefined
-  navigationGeneration?: PrimaryWindowNavigationGeneration
+  navigationIntent?: PrimaryWindowNavigationIntent
 }): WorkspacePaneControllerPresentationLease | null {
   const fromRoute =
     workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
@@ -85,7 +84,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   const toRoute = input.nextEntry ? workspacePaneControllerRouteForEntry(input.nextEntry) : null
   if (toRoute === undefined) return null
   if (input.target.routeTarget.kind === 'inactive') return null
-  const navigationGeneration = input.navigationGeneration ?? beginPrimaryWindowNavigation()
+  const navigationIntent = input.navigationIntent ?? beginPrimaryWindowNavigationIntent('user')
   const target: WorkspacePaneControllerTarget = {
     workspaceId: input.target.workspaceId,
     workspaceRuntimeId: input.target.workspaceRuntimeId,
@@ -95,19 +94,19 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
     paneTarget: input.target.paneTarget,
   }
   return {
-    navigationGeneration,
+    navigationIntent,
     target,
     fromRoute,
     toRoute,
     focusEffects:
       toRoute?.kind === 'terminal'
-        ? claimTerminalPresentationFocus(navigationGeneration, toRoute.terminalSessionId)
+        ? claimTerminalPresentationFocus(navigationIntent.generation, toRoute.terminalSessionId)
         : null,
   }
 }
 
 export interface SelectWorkspacePaneControllerTabOptions {
-  navigationGeneration?: PrimaryWindowNavigationGeneration
+  navigationIntent?: PrimaryWindowNavigationIntent
   focusEffects?: TerminalPresentationFocusEffects
 }
 
@@ -117,32 +116,37 @@ export async function selectWorkspacePaneControllerTab(
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options: SelectWorkspacePaneControllerTabOptions = {},
 ): Promise<boolean> {
-  const navigationGeneration = options.navigationGeneration ?? beginPrimaryWindowNavigation()
-  const providedFocusEffects = options.focusEffects
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
-    providedFocusEffects?.onAbandon()
-    return false
+  const ownsNavigationIntent = options.navigationIntent === undefined
+  const navigationIntent = options.navigationIntent ?? beginPrimaryWindowNavigationIntent('user')
+  try {
+    const providedFocusEffects = options.focusEffects
+    if (!navigationIntent.isCurrent()) {
+      providedFocusEffects?.onAbandon()
+      return false
+    }
+    const focusEffects =
+      isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal'
+        ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationIntent.generation, tab.sessionId))
+        : null
+    if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') {
+      focusEffects?.onAbandon()
+      return false
+    }
+    const route = workspacePaneControllerRouteForTab(tab)
+    if (route === undefined) {
+      focusEffects?.onAbandon()
+      return false
+    }
+    return await commitWorkspacePaneControllerTargetRoute(
+      target,
+      route,
+      navigation,
+      focusEffects ?? undefined,
+      navigationIntent,
+    )
+  } finally {
+    if (ownsNavigationIntent) navigationIntent.release()
   }
-  const focusEffects =
-    isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal'
-      ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationGeneration, tab.sessionId))
-      : null
-  if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') {
-    focusEffects?.onAbandon()
-    return false
-  }
-  const route = workspacePaneControllerRouteForTab(tab)
-  if (route === undefined) {
-    focusEffects?.onAbandon()
-    return false
-  }
-  return await commitWorkspacePaneControllerTargetRoute(
-    target,
-    route,
-    navigation,
-    focusEffects ?? undefined,
-    navigationGeneration,
-  )
 }
 
 /** Selects canonical tab authority without requiring a live presentation view. */
@@ -150,26 +154,32 @@ export async function selectWorkspacePaneControllerTabEntry(
   target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) return false
-  const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
-  if (materialized) {
-    return await selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationGeneration })
+  const ownsNavigationIntent = providedNavigationIntent === undefined
+  const navigationIntent = providedNavigationIntent ?? beginPrimaryWindowNavigationIntent('user')
+  try {
+    if (!navigationIntent.isCurrent()) return false
+    const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
+    if (materialized) {
+      return await selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationIntent })
+    }
+    if (!isWorkspacePaneRuntimeTabEntry(entry) || entry.type !== 'terminal') return false
+    const focusEffects = claimTerminalPresentationFocus(navigationIntent.generation, entry.runtimeSessionId)
+    if (!workspacePaneTabControllerTargetIsCurrent(target)) {
+      focusEffects?.onAbandon()
+      return false
+    }
+    return await commitWorkspacePaneControllerTargetRoute(
+      target,
+      { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
+      navigation,
+      focusEffects ?? undefined,
+      navigationIntent,
+    )
+  } finally {
+    if (ownsNavigationIntent) navigationIntent.release()
   }
-  if (!isWorkspacePaneRuntimeTabEntry(entry) || entry.type !== 'terminal') return false
-  const focusEffects = claimTerminalPresentationFocus(navigationGeneration, entry.runtimeSessionId)
-  if (!workspacePaneTabControllerTargetIsCurrent(target)) {
-    focusEffects?.onAbandon()
-    return false
-  }
-  return await commitWorkspacePaneControllerTargetRoute(
-    target,
-    { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
-    navigation,
-    focusEffects ?? undefined,
-    navigationGeneration,
-  )
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(
@@ -181,7 +191,7 @@ export function commitWorkspacePaneControllerCloseBackTarget(
     lease.toRoute,
     navigation,
     lease.focusEffects ?? undefined,
-    lease.navigationGeneration,
+    lease.navigationIntent,
     lease.fromRoute,
   )
 }
@@ -191,7 +201,7 @@ async function commitWorkspacePaneControllerTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationIntent: PrimaryWindowNavigationIntent,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
 ): Promise<boolean> {
   if (target.routeTarget.kind === 'inactive') {
@@ -200,10 +210,10 @@ async function commitWorkspacePaneControllerTargetRoute(
   }
   if (target.routeTarget.kind === 'git-branch') {
     return fromRoute === undefined
-      ? await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, options, navigationGeneration)
-      : await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, navigationGeneration)
+      ? await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, options, navigationIntent)
+      : await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, navigationIntent)
   }
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!navigationIntent.isCurrent()) {
     options?.onAbandon?.()
     return false
   }
@@ -214,7 +224,7 @@ async function commitWorkspacePaneControllerTargetRoute(
   }
   return await navigation.commitFilesystemWorkspacePaneRoute(lease, route, {
     replace: options?.replace,
-    navigationGeneration,
+    navigationIntent,
     onCommit: options?.onCommit,
     onAbandon: options?.onAbandon,
     routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
@@ -228,14 +238,14 @@ export async function commitWorkspacePaneControllerRoute(
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: {
     replace?: boolean
-    navigationGeneration?: PrimaryWindowNavigationGeneration
+    navigationIntent?: PrimaryWindowNavigationIntent
     routePrecondition?:
       { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
   },
 ): Promise<boolean> {
   return await navigation.commitWorkspacePaneRoute(workspaceId, branchName, route, {
     replace: options?.replace,
-    navigationGeneration: options?.navigationGeneration,
+    navigationIntent: options?.navigationIntent,
     routePrecondition: options?.routePrecondition,
   })
 }
@@ -245,18 +255,24 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
-  return await commitWorkspacePaneValidatedTargetRoute(
-    target,
-    route,
-    navigation,
-    workspacePaneTabControllerTargetIsCurrent,
-    commitWorkspacePaneRouteSupplement,
-    true,
-    options,
-    navigationGeneration,
-  )
+  const ownsNavigationIntent = providedNavigationIntent === undefined
+  const navigationIntent = providedNavigationIntent ?? beginPrimaryWindowNavigationIntent('user')
+  try {
+    return await commitWorkspacePaneValidatedTargetRoute(
+      target,
+      route,
+      navigation,
+      workspacePaneTabControllerTargetIsCurrent,
+      commitWorkspacePaneRouteSupplement,
+      true,
+      options,
+      navigationIntent,
+    )
+  } finally {
+    if (ownsNavigationIntent) navigationIntent.release()
+  }
 }
 
 export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
@@ -264,25 +280,31 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
-  return await commitWorkspacePaneValidatedTargetRoute(
-    target,
-    route,
-    navigation,
-    (candidate) =>
-      candidate.branchName !== null &&
-      workspacePaneCommittedRuntimeTargetIsCurrent({
-        workspaceId: candidate.workspaceId,
-        workspaceRuntimeId: candidate.workspaceRuntimeId,
-        branchName: candidate.branchName,
-        worktreePath: candidate.worktreePath,
-      }),
-    commitWorkspacePaneCommittedRuntimeRouteSupplement,
-    false,
-    options,
-    navigationGeneration,
-  )
+  const ownsNavigationIntent = providedNavigationIntent === undefined
+  const navigationIntent = providedNavigationIntent ?? beginPrimaryWindowNavigationIntent('user')
+  try {
+    return await commitWorkspacePaneValidatedTargetRoute(
+      target,
+      route,
+      navigation,
+      (candidate) =>
+        candidate.branchName !== null &&
+        workspacePaneCommittedRuntimeTargetIsCurrent({
+          workspaceId: candidate.workspaceId,
+          workspaceRuntimeId: candidate.workspaceRuntimeId,
+          branchName: candidate.branchName,
+          worktreePath: candidate.worktreePath,
+        }),
+      commitWorkspacePaneCommittedRuntimeRouteSupplement,
+      false,
+      options,
+      navigationIntent,
+    )
+  } finally {
+    if (ownsNavigationIntent) navigationIntent.release()
+  }
 }
 
 async function commitWorkspacePaneValidatedTargetRoute(
@@ -293,9 +315,9 @@ async function commitWorkspacePaneValidatedTargetRoute(
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
   useCurrentTargetPrecondition: boolean,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationIntent: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!navigationIntent.isCurrent()) {
     options?.onAbandon?.()
     return false
   }
@@ -308,7 +330,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
   try {
     const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
       replace: options?.replace,
-      navigationGeneration,
+      navigationIntent,
       ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
     })
     const supplementCommitted =
@@ -323,10 +345,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
         route,
       )
     completed =
-      committed &&
-      supplementCommitted &&
-      primaryWindowNavigationIsCurrent(navigationGeneration) &&
-      targetIsCurrent(target)
+      committed && supplementCommitted && navigationIntent.outcome()?.status !== 'superseded' && targetIsCurrent(target)
   } catch (error) {
     options?.onAbandon?.()
     throw error
@@ -345,50 +364,56 @@ export async function commitWorkspacePaneExactTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
-    options?.onAbandon?.()
-    return false
-  }
-  const branchName = target.branchName
-  if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
-    options?.onAbandon?.()
-    return false
-  }
-  let completed = false
+  const ownsNavigationIntent = providedNavigationIntent === undefined
+  const navigationIntent = providedNavigationIntent ?? beginPrimaryWindowNavigationIntent('user')
   try {
-    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-      replace: options?.replace,
-      navigationGeneration,
-      routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
-    })
-    const supplementCommitted =
-      committed &&
-      commitWorkspacePaneRouteSupplement(
-        {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          branchName,
-          worktreePath: target.worktreePath,
-        },
-        route,
-      )
-    completed =
-      committed &&
-      supplementCommitted &&
-      primaryWindowNavigationIsCurrent(navigationGeneration) &&
-      workspacePaneTabControllerTargetIsCurrent(target)
-  } catch (error) {
-    options?.onAbandon?.()
-    throw error
+    if (!navigationIntent.isCurrent()) {
+      options?.onAbandon?.()
+      return false
+    }
+    const branchName = target.branchName
+    if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+      options?.onAbandon?.()
+      return false
+    }
+    let completed = false
+    try {
+      const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
+        replace: options?.replace,
+        navigationIntent,
+        routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
+      })
+      const supplementCommitted =
+        committed &&
+        commitWorkspacePaneRouteSupplement(
+          {
+            workspaceId: target.workspaceId,
+            workspaceRuntimeId: target.workspaceRuntimeId,
+            branchName,
+            worktreePath: target.worktreePath,
+          },
+          route,
+        )
+      completed =
+        committed &&
+        supplementCommitted &&
+        navigationIntent.outcome()?.status !== 'superseded' &&
+        workspacePaneTabControllerTargetIsCurrent(target)
+    } catch (error) {
+      options?.onAbandon?.()
+      throw error
+    }
+    if (!completed) {
+      options?.onAbandon?.()
+      return false
+    }
+    options?.onCommit?.()
+    return true
+  } finally {
+    if (ownsNavigationIntent) navigationIntent.release()
   }
-  if (!completed) {
-    options?.onAbandon?.()
-    return false
-  }
-  options?.onCommit?.()
-  return true
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {

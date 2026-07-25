@@ -13,6 +13,7 @@ import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pan
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
+  runtimeWorkspacePaneTargetKey,
   workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
@@ -22,7 +23,12 @@ import {
   workspaceRootFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import { getSuccessfulRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalSessionCoordinates,
+  type TerminalRetirementPresentationContext,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 
 export type FilesystemWorkspacePaneTargetLease =
   | {
@@ -344,6 +350,7 @@ export function resolveRetiredTerminalWorkspacePaneTabTarget(input: {
   routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null
   terminalBase: TerminalSessionBase
+  retirementPresentation: TerminalRetirementPresentationContext
 }): RetiredTerminalWorkspacePaneTabTargetResolution {
   const coordinates = terminalSessionCoordinates(input.terminalBase)
   const paneTarget: WorkspacePaneTabsTarget =
@@ -356,7 +363,9 @@ export function resolveRetiredTerminalWorkspacePaneTabTarget(input: {
         }
   if (
     input.routeTarget.workspaceId !== coordinates.workspaceId ||
-    !retiredTerminalRouteTargetMatchesBase(input.routeTarget, paneTarget, input.terminalBase)
+    !retiredTerminalRouteTargetMatchesBase(input.routeTarget, paneTarget, input.terminalBase) ||
+    runtimeWorkspacePaneTargetKey(input.retirementPresentation.target) !==
+      runtimeWorkspacePaneTargetKey(input.terminalBase.target)
   ) {
     return { kind: 'unavailable', paneTarget }
   }
@@ -365,11 +374,7 @@ export function resolveRetiredTerminalWorkspacePaneTabTarget(input: {
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     filesystemTarget: input.terminalBase.target,
   })
-  const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
-    ...paneTarget,
-    workspaceRuntimeId: coordinates.workspaceRuntimeId,
-  })
-  if (tabsProjection.phase !== 'ready') return { kind: 'unavailable', paneTarget }
+  const tabEntries = input.retirementPresentation.tabsBeforeRetirement
   return {
     kind: 'ready',
     paneTarget,
@@ -384,8 +389,8 @@ export function resolveRetiredTerminalWorkspacePaneTabTarget(input: {
       // by the caller, so it does not need hydrated workspace preferences.
       preferredTab: 'terminal',
       allowPreferredTabFallback: false,
-      tabEntries: tabsProjection.tabs,
-      tabEntriesProjectionPhase: tabsProjection.phase,
+      tabEntries,
+      tabEntriesProjectionPhase: 'ready',
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
       requestedSessionIdByRuntimeType:

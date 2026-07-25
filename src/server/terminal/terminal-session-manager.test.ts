@@ -3,6 +3,7 @@ import { SerializeAddon } from '@xterm/addon-serialize'
 import {
   terminalExecutionPath,
   type TerminalAttachResult,
+  type TerminalRetirementPresentationContext,
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import {
@@ -34,6 +35,10 @@ const WORKTREE_TARGET = {
   workspaceRuntimeId: 'repo-runtime-test',
   root: WORKSPACE_ID,
 }
+const RETIREMENT_PRESENTATION = {
+  target: WORKTREE_TARGET,
+  tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: TERMINAL_SESSION_ID }],
+} satisfies TerminalRetirementPresentationContext
 const ptyEventSinkById = new Map<string, PtyEventSink>()
 const LINKED_WORKTREE_TARGET = {
   ...WORKTREE_TARGET,
@@ -974,7 +979,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     ).toThrow('error.unavailable')
     admission.admission.publishCommittedEffects()
     expect(onIdentity).not.toHaveBeenCalled()
-    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+    await vi.waitFor(() => expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([]))
   })
 
   test('detaches and disposes a naturally exited session when lifecycle publication throws', async () => {
@@ -991,7 +996,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
 
     expect(() => supervisor.emitExit('pty_initial_123456')).not.toThrow()
 
-    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    await vi.waitFor(async () => await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([]))
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId, phase: 'closed' }),
@@ -1036,6 +1041,56 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     finishRetirement?.()
     await expect(retirement).resolves.toBe(true)
     await expect(manager.requestSessionRetirement(created.terminalRuntimeSessionId)).resolves.toBe(false)
+  })
+
+  test('rejects admission synchronously while natural retirement captures its before-state', async () => {
+    const capture = Promise.withResolvers<TerminalRetirementPresentationContext | null>()
+    const onExit = vi.fn()
+    const supervisor = createDeferredPtySupervisor()
+    const isolatedManager = createAlwaysOnlineManager(supervisor, {
+      onExit,
+      captureRetirementPresentation: vi.fn(async () => await capture.promise),
+    })
+    await createSession(isolatedManager, supervisor)
+
+    supervisor.emitExit('pty_initial_123456')
+
+    expect(
+      isolatedManager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: TERMINAL_SESSION_ID,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toEqual({ ok: false, message: 'error.unavailable' })
+    expect(isolatedManager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(1)
+
+    capture.resolve(RETIREMENT_PRESENTATION)
+    await vi.waitFor(() => expect(isolatedManager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([]))
+    expect(onExit).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ retirementPresentation: RETIREMENT_PRESENTATION }),
+    )
+  })
+
+  test('captures explicit-close presentation before revoking PTY ownership', async () => {
+    const capture = Promise.withResolvers<TerminalRetirementPresentationContext | null>()
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(supervisor.killAndWait)
+    const captureRetirementPresentation = vi.fn(async () => await capture.promise)
+    const manager = createAlwaysOnlineManager(supervisor, { captureRetirementPresentation })
+    const created = await createSession(manager, supervisor)
+
+    const closing = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+    await vi.waitFor(() => expect(captureRetirementPresentation).toHaveBeenCalledOnce())
+    expect(supervisor.killAndWait).not.toHaveBeenCalled()
+
+    capture.resolve(RETIREMENT_PRESENTATION)
+    await expect(closing).resolves.toMatchObject({
+      kind: 'closed',
+      retirementPresentation: RETIREMENT_PRESENTATION,
+    })
   })
 
   test('retains the exact workspace runtime until the terminal session is detached', async () => {
@@ -1962,8 +2017,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 
     const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))
     const directClose = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
-    await Promise.resolve()
-    expect(killAndWait).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
     expect(onSessionClosed).not.toHaveBeenCalled()
     await expect(
       ensureSession(manager, {

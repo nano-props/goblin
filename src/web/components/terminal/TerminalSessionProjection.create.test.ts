@@ -168,6 +168,11 @@ function workspaceIdFixture(input: string) {
 }
 
 const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
+const SESSION_CLOSED_SCOPE = {
+  workspaceId: REPO_ROOT,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+  retirementPresentation: null,
+}
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${REPO_ROOT}`
@@ -598,6 +603,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
     projection.handleSessionClosed({
+      ...SESSION_CLOSED_SCOPE,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 0,
       terminalSessionId: 'term-111111111111111111111',
@@ -612,6 +618,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
     projection.handleSessionClosed({
+      ...SESSION_CLOSED_SCOPE,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 0,
       terminalSessionId: 'term-111111111111111111111',
@@ -623,6 +630,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('session-closed with a runtime mismatch preserves the local session', async () => {
     await projection.createTerminal(terminalBase())
     projection.handleSessionClosed({
+      ...SESSION_CLOSED_SCOPE,
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
@@ -679,6 +687,7 @@ describe('TerminalSessionProjection create flow', () => {
     )
 
     projection.handleSessionClosed({
+      ...SESSION_CLOSED_SCOPE,
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
@@ -704,6 +713,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
 
     projection.handleSessionClosed({
+      ...SESSION_CLOSED_SCOPE,
       terminalRuntimeSessionId: 'pty_session_stale_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
@@ -781,6 +791,7 @@ describe('TerminalSessionProjection create flow', () => {
       expect(projection.workspaceBellCount(REPO_ROOT)).toBe(1)
 
       projection.handleSessionClosed({
+        ...SESSION_CLOSED_SCOPE,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 0,
         terminalSessionId,

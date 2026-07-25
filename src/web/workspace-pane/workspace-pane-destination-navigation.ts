@@ -5,10 +5,9 @@ import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
+  beginPrimaryWindowNavigationIntent,
   resetPrimaryWindowNavigationForTest,
-  type PrimaryWindowNavigationGeneration,
+  type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
@@ -23,22 +22,22 @@ import {
 export type WorkspacePaneDestinationNavigation = Pick<PrimaryWindowNavigationActions, 'commitWorkspacePaneRoute'>
 
 export interface WorkspacePaneDestinationPresentation {
-  generation: PrimaryWindowNavigationGeneration
+  intent: PrimaryWindowNavigationIntent
   lease: WorkspacePaneDestinationTargetLease
+  [Symbol.dispose](): void
 }
 
 export function beginWorkspacePaneDestinationPresentation(
   lease: WorkspacePaneDestinationTargetLease,
 ): WorkspacePaneDestinationPresentation {
-  return { generation: beginPrimaryWindowNavigation(), lease }
+  const intent = beginPrimaryWindowNavigationIntent('user')
+  return { intent, lease, [Symbol.dispose]: () => intent.release() }
 }
 
 export function workspacePaneDestinationPresentationIsCurrent(
   presentation: WorkspacePaneDestinationPresentation,
 ): boolean {
-  return (
-    primaryWindowNavigationIsCurrent(presentation.generation) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
-  )
+  return presentation.intent.isCurrent() && workspacePaneTargetLeaseIsCurrent(presentation.lease)
 }
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {
@@ -57,7 +56,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   if (!workspacePaneDestinationRouteSupported(lease, input.route)) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  const presentation = beginWorkspacePaneDestinationPresentation(lease)
+  using presentation = beginWorkspacePaneDestinationPresentation(lease)
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: lease.workspaceId,
@@ -89,7 +88,7 @@ export async function commitWorkspacePaneDestinationRoute(
   try {
     accepted = await navigation.commitWorkspacePaneRoute(lease.workspaceId, lease.branchName, route, {
       ...options,
-      navigationGeneration: presentation.generation,
+      navigationIntent: presentation.intent,
       onCommit: () => {
         supplementCommitted = commitWorkspacePaneRouteSupplement(lease, route)
       },
@@ -98,7 +97,7 @@ export async function commitWorkspacePaneDestinationRoute(
     return { kind: 'navigation-rejected' }
   }
   if (!accepted) return { kind: 'navigation-rejected' }
-  if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
+  if (!workspacePaneTargetLeaseIsCurrent(presentation.lease)) return { kind: 'superseded' }
   if (!supplementCommitted) return { kind: 'superseded' }
   return { kind: 'completed', changed: true, presentation: 'router-settled' }
 }

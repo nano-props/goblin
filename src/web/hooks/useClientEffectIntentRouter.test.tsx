@@ -350,7 +350,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
+    await waitFor(() => expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined())
   })
 
   test('close-repo menu action reports shared membership write failures', async () => {
@@ -369,8 +369,8 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.workspace-close-failed'))
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {

@@ -93,7 +93,7 @@ beforeEach(() => {
 })
 
 const presentationOptions = (options: { replace?: boolean } = {}) =>
-  expect.objectContaining({ ...options, navigationGeneration: expect.any(Number) })
+  expect.objectContaining({ ...options, navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) })
 
 const historyRestoreOptions = () => expect.objectContaining({ onCommit: expect.any(Function) })
 
@@ -236,7 +236,7 @@ describe('WorkspacePane', () => {
         workspaceId,
         repo.workspaceRuntimeId,
         'term-111111111111111111111',
-        expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+        expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
       ),
     )
   })

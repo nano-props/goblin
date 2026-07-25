@@ -129,6 +129,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onExit(userId, event) {
         broker.broadcastToUser(userId, { type: 'exit', event })
       },
+      captureRetirementPresentation(userId, session) {
+        return sessionService.captureTerminalRetirementPresentation(userId, session)
+      },
       onSessionClosed(userId, session, reason) {
         return handleSessionClosed(userId, session, reason)
       },

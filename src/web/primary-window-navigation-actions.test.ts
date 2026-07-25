@@ -32,7 +32,7 @@ const REPO_C_ID = workspaceIdForTest('goblin+file:///tmp/repo-c')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/other-workspace')
 const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
-  expect.objectContaining({ ...options, navigationGeneration: expect.any(Number) })
+  expect.objectContaining({ ...options, navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) })
 const historyRestoreOptions = (options: { returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, onCommit: expect.any(Function) })
 const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
@@ -58,7 +58,10 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(
       REPO_ID,
       'files',
-      expect.objectContaining({ navigationGeneration: expect.any(Number), onCommit: expect.any(Function) }),
+      expect.objectContaining({
+        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
+        onCommit: expect.any(Function),
+      }),
     )
     expect(
       preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
