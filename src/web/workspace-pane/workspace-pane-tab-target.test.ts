@@ -17,7 +17,7 @@ import {
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForCreatedRuntime,
-  workspacePaneTabTargetForRetiredTerminal,
+  resolveRetiredTerminalWorkspacePaneTabTarget,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -51,16 +51,20 @@ describe('workspace pane tab target read model', () => {
     if (!target || target.kind !== 'git-worktree') throw new Error('missing terminal worktree target')
 
     expect(
-      workspacePaneTabTargetForRetiredTerminal({
+      resolveRetiredTerminalWorkspacePaneTabTarget({
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         workspacePaneRoute: { kind: 'terminal', terminalSessionId },
         terminalBase: { target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } },
       }),
     ).toMatchObject({
-      workspaceRuntimeId,
-      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      kind: 'ready',
       paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-      selectedIdentity: `terminal:${terminalSessionId}`,
+      target: {
+        workspaceRuntimeId,
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        selectedIdentity: `terminal:${terminalSessionId}`,
+      },
     })
   })
 

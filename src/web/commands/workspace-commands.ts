@@ -4,11 +4,7 @@ import {
   dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
-  abandonRetiredTerminalWorkspacePaneTabPresentationPlan,
-  captureRetiredTerminalWorkspacePaneTabPresentationPlan,
-  commitRetiredTerminalWorkspacePaneTabPresentationPlan,
   type ConfirmedTerminalWorkspacePaneTabClose,
-  type RetiredTerminalWorkspacePaneTabPresentationPlan,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
@@ -17,10 +13,7 @@ import {
   dispatchSelectWorkspacePaneTabByIndexAction,
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import {
-  workspacePaneFilesystemRuntimeTarget,
-  type WorkspacePaneFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { isWorkspacePaneStaticTabProvider, workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneActionOutcomeHandled } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {
@@ -30,7 +23,6 @@ import {
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
-  workspacePaneTabsTargetIdentityKey,
   workspacePaneTabsTargetFromRuntime,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
@@ -42,11 +34,7 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import {
-  terminalExecutionCoordinates,
-  terminalSessionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -94,13 +82,6 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
-}
-
-interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
-  routeTarget: WorkspacePaneTabsTarget
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null
-  terminalSessionId: string
-  terminalBase: TerminalSessionBase
 }
 
 type CloseCurrentWorkspacePaneTabCommandOptions = Omit<CloseWorkspacePaneTabCommandOptions, 'targetIdentity'>
@@ -241,43 +222,6 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
         ? options.confirmedTerminal.base.presentation.head
         : undefined,
   })
-}
-
-export function captureRetiredTerminalWorkspacePaneTabPresentationCommand(
-  options: RetiredTerminalWorkspacePaneTabPresentationCommandOptions,
-): RetiredTerminalWorkspacePaneTabPresentationPlan | null {
-  return captureRetiredTerminalWorkspacePaneTabPresentationPlan(options)
-}
-
-export function commitRetiredTerminalWorkspacePaneTabPresentationCommand(
-  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-  navigation: PrimaryWindowNavigationActions,
-): Promise<boolean> {
-  return commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, navigation)
-}
-
-export function abandonRetiredTerminalWorkspacePaneTabPresentationCommand(
-  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-): void {
-  abandonRetiredTerminalWorkspacePaneTabPresentationPlan(plan)
-}
-
-export function retiredTerminalWorkspacePaneTabPresentationPlanMatchesCommandTarget(
-  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-  target: WorkspacePaneCommandTarget,
-): boolean {
-  if (workspacePaneTabsTargetIdentityKey(target.routeTarget) !== workspacePaneTabsTargetIdentityKey(plan.routeTarget)) {
-    return false
-  }
-  const filesystemTarget = target.filesystemTarget
-  if (!filesystemTarget) return false
-  const actual = terminalSessionCoordinates(plan.terminalBase)
-  const expected = terminalExecutionCoordinates(workspacePaneFilesystemRuntimeTarget(filesystemTarget))
-  return (
-    actual.workspaceId === expected.workspaceId &&
-    actual.workspaceRuntimeId === expected.workspaceRuntimeId &&
-    actual.executionRootId === expected.executionRootId
-  )
 }
 
 export async function runSelectWorkspacePaneTabByIndexCommand(

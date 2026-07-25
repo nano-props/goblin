@@ -336,13 +336,16 @@ export function workspacePaneTabTargetForPaneTarget(input: {
  * so capture must not wait for the broader command-target read models to
  * rediscover those coordinates.
  */
-export function workspacePaneTabTargetForRetiredTerminal(input: {
+export type RetiredTerminalWorkspacePaneTabTargetResolution =
+  | { kind: 'ready'; paneTarget: WorkspacePaneTabsTarget; target: WorkspacePaneTabModel }
+  | { kind: 'unavailable'; paneTarget: WorkspacePaneTabsTarget }
+
+export function resolveRetiredTerminalWorkspacePaneTabTarget(input: {
   routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null
   terminalBase: TerminalSessionBase
-}): WorkspacePaneTabModel | null {
+}): RetiredTerminalWorkspacePaneTabTargetResolution {
   const coordinates = terminalSessionCoordinates(input.terminalBase)
-  if (input.routeTarget.workspaceId !== coordinates.workspaceId) return null
   const paneTarget: WorkspacePaneTabsTarget =
     input.terminalBase.target.kind === 'workspace-root'
       ? { kind: 'workspace-root', workspaceId: coordinates.workspaceId }
@@ -351,7 +354,12 @@ export function workspacePaneTabTargetForRetiredTerminal(input: {
           workspaceId: coordinates.workspaceId,
           worktreePath: terminalExecutionPath(input.terminalBase.target),
         }
-  if (!retiredTerminalRouteTargetMatchesBase(input.routeTarget, paneTarget, input.terminalBase)) return null
+  if (
+    input.routeTarget.workspaceId !== coordinates.workspaceId ||
+    !retiredTerminalRouteTargetMatchesBase(input.routeTarget, paneTarget, input.terminalBase)
+  ) {
+    return { kind: 'unavailable', paneTarget }
+  }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
@@ -361,27 +369,31 @@ export function workspacePaneTabTargetForRetiredTerminal(input: {
     ...paneTarget,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
   })
-  if (tabsProjection.phase !== 'ready') return null
-  return createWorkspacePaneTabModel({
-    workspaceId: coordinates.workspaceId,
-    workspaceRuntimeId: coordinates.workspaceRuntimeId,
-    routeTarget: input.routeTarget,
+  if (tabsProjection.phase !== 'ready') return { kind: 'unavailable', paneTarget }
+  return {
+    kind: 'ready',
     paneTarget,
-    worktreeHead:
-      input.terminalBase.presentation.kind === 'git-worktree' ? input.terminalBase.presentation.head : undefined,
-    // Retirement capture is only valid for the exact terminal route checked
-    // by the caller, so it does not need hydrated workspace preferences.
-    preferredTab: 'terminal',
-    allowPreferredTabFallback: false,
-    tabEntries: tabsProjection.tabs,
-    tabEntriesProjectionPhase: tabsProjection.phase,
-    runtimeTabViews: runtimeProjection.runtimeTabViews,
-    runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-    requestedSessionIdByRuntimeType:
-      input.workspacePaneRoute?.kind === 'terminal'
-        ? { terminal: input.workspacePaneRoute.terminalSessionId }
-        : undefined,
-  })
+    target: createWorkspacePaneTabModel({
+      workspaceId: coordinates.workspaceId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
+      routeTarget: input.routeTarget,
+      paneTarget,
+      worktreeHead:
+        input.terminalBase.presentation.kind === 'git-worktree' ? input.terminalBase.presentation.head : undefined,
+      // Retirement capture is only valid for the exact terminal route checked
+      // by the caller, so it does not need hydrated workspace preferences.
+      preferredTab: 'terminal',
+      allowPreferredTabFallback: false,
+      tabEntries: tabsProjection.tabs,
+      tabEntriesProjectionPhase: tabsProjection.phase,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType:
+        input.workspacePaneRoute?.kind === 'terminal'
+          ? { terminal: input.workspacePaneRoute.terminalSessionId }
+          : undefined,
+    }),
+  }
 }
 
 function retiredTerminalRouteTargetMatchesBase(

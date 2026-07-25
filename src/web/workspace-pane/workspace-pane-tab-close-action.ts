@@ -2,11 +2,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import {
-  terminalExecutionCoordinates,
-  terminalExecutionPath,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import { terminalExecutionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   isWorkspacePaneRuntimeTab,
   nextWorkspacePaneTabEntryAfterClose,
@@ -31,9 +27,9 @@ import {
   type ConfirmedWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
+  resolveRetiredTerminalWorkspacePaneTabTarget,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
-  workspacePaneTabTargetForRetiredTerminal,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
@@ -93,9 +89,6 @@ export interface RetiredTerminalWorkspacePaneTabPresentationOptions extends Pick
 
 export interface RetiredTerminalWorkspacePaneTabPresentationPlan {
   readonly terminalSessionId: string
-  readonly terminalBase: TerminalSessionBase
-  readonly routeTarget: WorkspacePaneTabsTarget
-  readonly sourceRoute: ParsedWorkspacePaneRoute
   readonly target: WorkspacePaneTabModel
   readonly transition: WorkspacePaneCloseTransition
 }
@@ -189,27 +182,27 @@ export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
 ): RetiredTerminalWorkspacePaneTabPresentationPlan | null {
   const coordinates = terminalExecutionCoordinates(options.terminalBase.target)
   if (options.routeTarget.workspaceId !== coordinates.workspaceId) return null
-  const paneTarget = retiredTerminalPaneTarget(options.terminalBase)
   const closingIdentity = workspacePaneRuntimeTabConfirmedCloseIdentity({
     type: 'terminal',
     sessionId: options.terminalSessionId,
     target: options.terminalBase,
   })
-  const target = workspacePaneTabTargetForRetiredTerminal({
+  const resolution = resolveRetiredTerminalWorkspacePaneTabTarget({
     routeTarget: options.routeTarget,
     workspacePaneRoute: options.workspacePaneRoute ?? null,
     terminalBase: options.terminalBase,
   })
-  clearWorkspacePaneTabOpener(paneTarget, coordinates.workspaceRuntimeId, closingIdentity)
+  clearWorkspacePaneTabOpener(resolution.paneTarget, coordinates.workspaceRuntimeId, closingIdentity)
   const sourceRoute = options.workspacePaneRoute
   if (
-    !target ||
+    resolution.kind !== 'ready' ||
     sourceRoute?.kind !== 'terminal' ||
     sourceRoute.terminalSessionId !== options.terminalSessionId ||
-    target.selectedIdentity !== closingIdentity
+    resolution.target.selectedIdentity !== closingIdentity
   ) {
     return null
   }
+  const target = resolution.target
   const navigationGeneration = captureUnownedPrimaryWindowNavigationGeneration()
   if (navigationGeneration === null) {
     // A registered history commit already owns the visible route. Retirement
@@ -231,9 +224,6 @@ export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
   if (!transition.wasActive) return null
   return {
     terminalSessionId: options.terminalSessionId,
-    terminalBase: options.terminalBase,
-    routeTarget: options.routeTarget,
-    sourceRoute,
     target,
     transition,
   }
@@ -412,17 +402,6 @@ function workspacePaneCloseTransition(
       })
     : null
   return { wasActive, nextEntry, presentationLease }
-}
-
-function retiredTerminalPaneTarget(base: TerminalSessionBase): WorkspacePaneTabsTarget {
-  const coordinates = terminalExecutionCoordinates(base.target)
-  return base.target.kind === 'workspace-root'
-    ? { kind: 'workspace-root', workspaceId: coordinates.workspaceId }
-    : {
-        kind: 'git-worktree',
-        workspaceId: coordinates.workspaceId,
-        worktreePath: terminalExecutionPath(base.target),
-      }
 }
 
 function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {
