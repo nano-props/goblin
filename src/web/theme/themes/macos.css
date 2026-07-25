@@ -3,8 +3,9 @@ html[data-theme='light']:not([data-color-theme]),
 html[data-color-theme='macos'][data-theme='light'] {
   color-scheme: light;
 
-  --goblin-surface-canvas: #fbfbfd;
+  --goblin-surface-canvas: #ffffff;
   --goblin-surface-base: #f2f2f7;
+  --goblin-surface-navigation: #f9f9fb;
   --goblin-surface-raised: #ffffff;
   --goblin-surface-overlay: #ffffff;
   --goblin-surface-muted: #f1f1f5;
@@ -88,6 +89,7 @@ html[data-color-theme='macos'][data-theme='dark'] {
 
   --goblin-surface-canvas: #1c1c1e;
   --goblin-surface-base: #242426;
+  --goblin-surface-navigation: #2c2c2e;
   --goblin-surface-raised: #2c2c2e;
   --goblin-surface-overlay: #323236;
   --goblin-surface-muted: #252528;

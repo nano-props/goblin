@@ -47,7 +47,7 @@ export function SettingsSidebar<TPage extends string>({
   return (
     <aside
       className={cn(
-        'flex h-full shrink-0 flex-col border-r border-border/60 bg-card pb-3',
+        'flex h-full shrink-0 flex-col border-r border-border/60 bg-navigation pb-3',
         compact ? 'w-16 px-2' : 'w-64 px-3',
       )}
     >

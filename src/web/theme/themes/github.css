@@ -1,8 +1,9 @@
 html[data-color-theme='github'][data-theme='light'] {
   color-scheme: light;
 
-  --goblin-surface-canvas: #f6f8fa;
+  --goblin-surface-canvas: #ffffff;
   --goblin-surface-base: #f6f8fa;
+  --goblin-surface-navigation: #fafbfc;
   --goblin-surface-raised: #ffffff;
   --goblin-surface-overlay: #ffffff;
   --goblin-surface-muted: #f6f8fa;
@@ -84,6 +85,7 @@ html[data-color-theme='github'][data-theme='dark'] {
 
   --goblin-surface-canvas: #0d1117;
   --goblin-surface-base: #161b22;
+  --goblin-surface-navigation: #1c2128;
   --goblin-surface-raised: #1c2128;
   --goblin-surface-overlay: #262a31;
   --goblin-surface-muted: #21262d;

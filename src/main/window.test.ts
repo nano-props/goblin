@@ -348,7 +348,7 @@ describe('primary window navigation boundaries', () => {
     expect(mocks.windowOptions[0]).toMatchObject({
       titleBarStyle: 'hidden',
       titleBarOverlay: {
-        color: '#fbfbfd',
+        color: '#ffffff',
         symbolColor: '#000000',
         height: 40,
       },

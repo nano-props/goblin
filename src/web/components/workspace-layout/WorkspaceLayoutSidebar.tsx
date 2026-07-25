@@ -19,7 +19,7 @@ import type { GitWorkspaceProjection } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const NOOP = () => {}
-const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
+const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-navigation text-sm'
 type WorkspaceShellSidebarChromeRegion = 'drag' | 'none'
 
 interface WorkspaceShellSidebarProps {
@@ -58,7 +58,7 @@ export function WorkspaceLayoutSidebar({
   const t = useT()
   const navigatorTitleKey = git ? 'tab.branches' : 'workspace.navigation-title'
   return (
-    <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+    <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-navigation">
       {!compact &&
         (chromeRegion === 'drag' ? (
           <TitleBarDragRegion
@@ -88,7 +88,7 @@ export function WorkspaceLayoutSidebar({
             title={t(navigatorTitleKey)}
             gitAvailable={git !== null}
           />
-          <div className="flex min-h-0 flex-1 bg-card">
+          <div className="flex min-h-0 flex-1 bg-navigation">
             {branchContent ??
               (git ? (
                 <BranchNavigator
@@ -106,7 +106,7 @@ export function WorkspaceLayoutSidebar({
           </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 bg-card" />
+        <div className="flex min-h-0 flex-1 bg-navigation" />
       )}
       <SidebarSettingsButton onOpenSettings={onOpenSettings} />
     </aside>
@@ -195,5 +195,5 @@ function SidebarSettingsButton({ onOpenSettings }: { onOpenSettings?: () => void
       {t('app-chrome.settings-tooltip')}
     </SidebarRowButton>
   )
-  return <div className="relative z-10 shrink-0 bg-card p-2">{button}</div>
+  return <div className="relative z-10 shrink-0 bg-navigation p-2">{button}</div>
 }

@@ -21,6 +21,10 @@
   --color-primary-foreground: var(--goblin-action-primary-foreground);
   --color-secondary: var(--goblin-surface-base);
   --color-secondary-foreground: var(--goblin-text-secondary-strong);
+  /* Persistent navigation chrome is a role surface, not an elevated card.
+   * Keeping it distinct lets light themes place navigation below a white
+   * content canvas while dark themes retain their lighter sidebar chrome. */
+  --color-navigation: var(--goblin-surface-navigation, var(--goblin-surface-base));
   --color-muted: var(--goblin-surface-muted);
   --color-muted-foreground: var(--goblin-text-secondary);
   --color-accent: var(--goblin-surface-hover);

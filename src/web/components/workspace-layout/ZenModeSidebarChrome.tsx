@@ -473,7 +473,7 @@ function ZenModeSidebarReveal({
         data-state={panelState}
         aria-hidden={panelInteractive ? undefined : true}
         inert={panelInteractive ? undefined : true}
-        className="goblin-zen-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-card"
+        className="goblin-zen-reveal-panel absolute inset-y-0 left-0 flex min-w-0 overflow-hidden bg-navigation"
         style={style}
         onMouseEnter={panelInteractive ? onSurfaceEnter : undefined}
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}

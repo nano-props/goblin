@@ -3,8 +3,7 @@ import { cn } from '#/web/lib/cn.ts'
 
 export type DashboardTone = 'default' | 'attention' | 'success'
 
-export const DASHBOARD_CARD_CLASS_NAME =
-  'rounded-lg border border-border/60 bg-card shadow-[var(--shadow-inset-highlight)]'
+export const DASHBOARD_CARD_CLASS_NAME = 'rounded-lg border border-border/60 bg-card shadow-xs'
 
 export function DashboardMetricCard({
   icon: Icon,

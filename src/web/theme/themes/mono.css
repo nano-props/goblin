@@ -1,8 +1,9 @@
 html[data-color-theme='mono'][data-theme='light'] {
   color-scheme: light;
 
-  --goblin-surface-canvas: #f5f5f5;
+  --goblin-surface-canvas: #ffffff;
   --goblin-surface-base: #f4f4f5;
+  --goblin-surface-navigation: #fafafa;
   --goblin-surface-raised: #ffffff;
   --goblin-surface-overlay: #ffffff;
   --goblin-surface-muted: #f4f4f5;
@@ -17,7 +18,7 @@ html[data-color-theme='mono'][data-theme='light'] {
   --goblin-border-subtle: rgb(9 9 11 / 0.1);
   --goblin-border-default: #e4e4e7;
   --goblin-border-strong: #d4d4d8;
-  --goblin-focus-ring: #a1a1aa;
+  --goblin-focus-ring: #71717a;
   --goblin-action-primary: #18181b;
   --goblin-action-primary-foreground: #fafafa;
   --goblin-action-danger: #ef4444;
@@ -73,7 +74,7 @@ html[data-color-theme='mono'][data-theme='light'] {
   --color-terminal-ansi-bright-blue: #3b82f6;
   --color-terminal-ansi-bright-magenta: #a855f7;
   --color-terminal-ansi-bright-cyan: #06b6d4;
-  --color-terminal-ansi-bright-white: #fafafa;
+  --color-terminal-ansi-bright-white: #09090b;
   --color-terminal-search-match: #facc15;
   --color-terminal-search-active-match: #fb923c;
   --color-terminal-search-active-border: #09090b;
@@ -84,6 +85,7 @@ html[data-color-theme='mono'][data-theme='dark'] {
 
   --goblin-surface-canvas: #09090b;
   --goblin-surface-base: #18181b;
+  --goblin-surface-navigation: #1d1d20;
   --goblin-surface-raised: #1d1d20;
   --goblin-surface-overlay: #262629;
   --goblin-surface-muted: #27272a;
