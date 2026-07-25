@@ -263,31 +263,38 @@ class TerminalSessionService {
   }
 
   /**
-   * Captures the canonical presentation before-set while terminal provider
-   * membership still contains the retiring session. The exit lifecycle waits
-   * for this read before it detaches that membership.
+   * Runs a retirement commit against the canonical presentation before-set.
+   * The callback is synchronous, so no tabs mutation can enter the workspace
+   * layout queue between this snapshot and Directory detach.
    */
-  async captureTerminalRetirementPresentation(
+  async withTerminalRetirementPresentation<T>(
     userId: string,
     session: TerminalSessionSummary,
-  ): Promise<TerminalRetirementPresentationContext | null> {
+    commit: (presentation: TerminalRetirementPresentationContext | null) => T,
+  ): Promise<T> {
     const coordinates = terminalSessionCoordinates(session)
-    const snapshot = await this.workspaceTabsCoordinator.snapshot({
-      userId,
-      workspaceId: coordinates.workspaceId,
-      scope: terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId),
-    })
-    const sessionTargetKey = runtimeWorkspacePaneTargetKey(session.target)
-    const entry = snapshot.entries.find(
-      (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === sessionTargetKey,
+    return await this.workspaceTabsCoordinator.withExclusiveSnapshot(
+      {
+        userId,
+        workspaceId: coordinates.workspaceId,
+        scope: terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId),
+      },
+      (snapshot) => {
+        const sessionTargetKey = runtimeWorkspacePaneTargetKey(session.target)
+        const entry = snapshot.entries.find(
+          (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === sessionTargetKey,
+        )
+        return commit(
+          entry
+            ? {
+                target: entry.target,
+                terminalBase: terminalSessionBase(session.target, session.presentation),
+                tabsBeforeRetirement: entry.tabs,
+              }
+            : null,
+        )
+      },
     )
-    return entry
-      ? {
-          target: entry.target,
-          terminalBase: terminalSessionBase(session.target, session.presentation),
-          tabsBeforeRetirement: entry.tabs,
-        }
-      : null
   }
 
   async listWorkspaceTabs(

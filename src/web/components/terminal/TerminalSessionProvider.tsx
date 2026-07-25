@@ -20,6 +20,7 @@ interface TerminalSessionProviderProps {
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
   const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
+  const sessionRestoreError = useWorkspacesStore((s) => s.sessionRestoreError)
   const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
     (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
@@ -40,8 +41,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // commit a recovered terminal catalog or subscribe to realtime events.
   useLayoutEffect(() => {
     if (workspaceMembershipReady) projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
+    else if (sessionRestoreError !== null) projection.failRuntimeMembershipHydration()
     else projection.setRuntimeMembershipPending()
-  }, [projection, runtimeMembershipIndex, workspaceMembershipReady])
+  }, [projection, runtimeMembershipIndex, sessionRestoreError, workspaceMembershipReady])
 
   useEffect(() => {
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)

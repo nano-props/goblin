@@ -839,6 +839,21 @@ describe('TerminalSessionProvider', () => {
     act(() => result.unmount())
   })
 
+  test('ends pending terminal retirement ownership when workspace membership restore fails', () => {
+    const projection = new TerminalSessionProjection()
+    const setFailed = vi.spyOn(projection, 'failRuntimeMembershipHydration')
+    setTerminalSessionProjectionForTests(projection)
+    useWorkspacesStore.setState({
+      workspaceMembershipReady: false,
+      sessionRestoreError: 'workspace restore failed',
+    })
+
+    const result = renderTerminalProvider(<div />, { currentWorkspaceId: null })
+
+    expect(setFailed).toHaveBeenCalledOnce()
+    act(() => result.unmount())
+  })
+
   test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

@@ -167,9 +167,10 @@ export class TerminalSessionProjection {
   // Empty membership is authoritative only after workspace restore completes.
   // Before that boundary, user-wide realtime retirement facts wait in the
   // ledger and cannot be accepted or discarded from an empty local store.
-  private runtimeMembership: { kind: 'pending' } | { kind: 'complete'; index: TerminalRuntimeMembershipIndex } = {
-    kind: 'pending',
-  }
+  private runtimeMembership:
+    | { kind: 'pending' }
+    | { kind: 'complete'; index: TerminalRuntimeMembershipIndex }
+    | { kind: 'failed' } = { kind: 'pending' }
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
     WorkspaceId,
@@ -248,10 +249,19 @@ export class TerminalSessionProjection {
     this.dispatchAcceptedRetirements()
   }
 
-  /** Starts a new membership hydration boundary and invalidates prior authority. */
+  /** Enters a membership hydration boundary and invalidates prior authority. */
   setRuntimeMembershipPending(): void {
     if (this.runtimeMembership.kind === 'pending') return
     this.runtimeMembership = { kind: 'pending' }
+    this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
+    this.terminalRetirements.clear()
+    this.pruneSessionsMissingFromRuntimeMembership()
+  }
+
+  /** Ends a failed hydration epoch; realtime facts cannot outlive it. */
+  failRuntimeMembershipHydration(): void {
+    if (this.runtimeMembership.kind === 'failed') return
+    this.runtimeMembership = { kind: 'failed' }
     this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
     this.terminalRetirements.clear()
     this.pruneSessionsMissingFromRuntimeMembership()
@@ -410,6 +420,7 @@ export class TerminalSessionProjection {
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
       return null
     }
+    if (this.runtimeMembership.kind === 'failed') return null
     const currentMembership = this.runtimeMembership.index.get(event.workspaceId)
     if (currentMembership?.workspaceRuntimeId !== event.workspaceRuntimeId) return null
     const pendingClose = this.pendingCloseForRetirement(event)

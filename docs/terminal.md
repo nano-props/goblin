@@ -206,6 +206,11 @@ combines it with the local opener and exact source route to derive close-back;
 it never depends on the independently hydrating React Query projection or
 reconstructs a destination from a later after-state snapshot.
 
+The final snapshot read and Terminal Directory detach run in one workspace-tabs
+exclusive turn with no intervening await. Explicit close may validate that read
+before revoking PTY ownership, but it resamples inside the final commit; native
+cleanup never holds the workspace-tabs queue.
+
 If `session-closed` arrives while that client still owns an explicit close
 request, the retirement ledger grants that close operation a suppression lease
 for the exact runtime binding. A successful response settles the lease because
@@ -227,12 +232,14 @@ retirement. When several binding retirements precede the same complete absence,
 the greatest catalog revision wins before presentation state is considered; an
 older command suppression never owns a newer binding.
 
-Workspace runtime membership has an explicit `pending` versus `complete`
-boundary. Realtime retirement can arrive while startup membership is pending;
+Workspace runtime membership has explicit `pending`, `complete`, and `failed`
+states. Realtime retirement can arrive while startup membership is pending;
 the ledger retains the validated scoped fact without accepting presentation.
 The first complete membership keeps only exact runtime scopes, and the first
-covering catalog then confirms or rejects the fact. Runtime replacement and a
-return to pending membership invalidate the old scope and any active
+covering catalog then confirms or rejects the fact. A failed hydration ends
+that pending ownership epoch, clears its facts, and rejects later retirement
+events until retry enters a new pending epoch. Runtime replacement and a return
+to pending membership likewise invalidate the old scope and any active
 presentation claim. Facts otherwise retire only through complete catalog
 evidence or explicit presentation settlement; there is no timer or capacity
 eviction that can lose a delayed authoritative fact. Catalog absence with no
@@ -257,7 +264,10 @@ A bounded kill failure therefore does not recreate the session, expose a stale
 recovery snapshot, or start a logical close retry loop. The detached resource
 owner follows the supervisor's durable native-exit completion until the PTY
 exits, or until process shutdown transfers all remaining processes to supervisor
-shutdown. It owns cleanup capability only; it is not a second session authority.
+shutdown. While it owns that cleanup, its durable terminal identity remains an
+admission barrier, so recovery cannot start a replacement PTY before the old
+one is confirmed dead. It owns cleanup capability and this minimal identity
+barrier only; it is not a second session authority.
 
 This distinction matters for destructive worktree operations. The client sends
 one repository-removal intent; it does not close tabs first. The server

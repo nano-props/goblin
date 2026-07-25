@@ -129,12 +129,15 @@ function createManagerWithPresence(
   sink: Partial<TerminalEventSink<string>>,
   isClientOnline: (clientId: string) => boolean,
 ) {
+  const withRetirementPresentation: TerminalEventSink<string>['withRetirementPresentation'] =
+    sink.withRetirementPresentation ?? (async (_userId, _session, commit) => commit(null))
   return new TerminalSessionManager<string>(
     supervisor,
     {
       onOutput: vi.fn(),
       onExit: vi.fn(),
       ...sink,
+      withRetirementPresentation,
     },
     (_userId, clientId) => isClientOnline(clientId),
     createWorkspaceRuntimeRetentionHost(),
@@ -1053,7 +1056,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const supervisor = createDeferredPtySupervisor()
     const isolatedManager = createAlwaysOnlineManager(supervisor, {
       onExit,
-      captureRetirementPresentation: vi.fn(async () => await capture.promise),
+      withRetirementPresentation: vi.fn(async (_userId, _session, commit) => commit(await capture.promise)),
     })
     await createSession(isolatedManager, supervisor)
 
@@ -1082,12 +1085,12 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const capture = Promise.withResolvers<TerminalRetirementPresentationContext | null>()
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(supervisor.killAndWait)
-    const captureRetirementPresentation = vi.fn(async () => await capture.promise)
-    const manager = createAlwaysOnlineManager(supervisor, { captureRetirementPresentation })
+    const withRetirementPresentation = vi.fn(async (_userId, _session, commit) => commit(await capture.promise))
+    const manager = createAlwaysOnlineManager(supervisor, { withRetirementPresentation })
     const created = await createSession(manager, supervisor)
 
     const closing = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
-    await vi.waitFor(() => expect(captureRetirementPresentation).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(withRetirementPresentation).toHaveBeenCalledOnce())
     expect(supervisor.killAndWait).not.toHaveBeenCalled()
 
     capture.resolve(RETIREMENT_PRESENTATION)
@@ -1097,11 +1100,28 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     })
   })
 
+  test('commits explicit close with the latest tabs before-state at Directory detach', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const latestPresentation = { ...RETIREMENT_PRESENTATION, tabsBeforeRetirement: [] }
+    let captureCount = 0
+    const manager = createAlwaysOnlineManager(supervisor, {
+      withRetirementPresentation: vi.fn(async (_userId, _session, commit) =>
+        commit(captureCount++ === 0 ? RETIREMENT_PRESENTATION : latestPresentation),
+      ),
+    })
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+      retirementPresentation: latestPresentation,
+    })
+  })
+
   test('fails explicit close before PTY ownership is revoked when presentation capture fails', async () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(supervisor.killAndWait)
     const manager = createAlwaysOnlineManager(supervisor, {
-      captureRetirementPresentation: vi.fn(async () => {
+      withRetirementPresentation: vi.fn(async () => {
         throw new Error('canonical tabs unavailable')
       }),
     })
@@ -1164,14 +1184,42 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: '/tmp',
     })
-    expect(admission.ok).toBe(true)
-    if (!admission.ok) throw new Error(admission.message)
-    expect(admission.admission.kind).toBe('prepared')
-    expect(() =>
-      admission.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    expect(admission).toEqual({ ok: false, message: 'error.unavailable' })
+  })
+
+  test('releases detached durable admission after native exit is confirmed', async () => {
+    const nativeExit = Promise.withResolvers<void>()
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(async () => {
+      throw new Error('PTY close timed out')
+    })
+    supervisor.waitForExit = vi.fn(async () => await nativeExit.promise)
+    const manager = createAlwaysOnlineManager(supervisor)
+    const created = await createSession(manager, supervisor)
+
+    await manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
+    expect(
+      manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: TERMINAL_SESSION_ID,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
       }),
-    ).not.toThrow()
+    ).toEqual({ ok: false, message: 'error.unavailable' })
+
+    nativeExit.resolve()
+    await vi.waitFor(() => {
+      const admission = manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: TERMINAL_SESSION_ID,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      })
+      expect(admission.ok).toBe(true)
+      if (admission.ok) admission.admission.abort()
+    })
   })
 
   test('commits natural retirement when the PTY exits while explicit-close capture fails', async () => {
@@ -1179,15 +1227,15 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(supervisor.killAndWait)
     const onExit = vi.fn()
-    const captureRetirementPresentation = vi.fn(async () => await capture.promise)
+    const withRetirementPresentation = vi.fn(async (_userId, _session, commit) => commit(await capture.promise))
     const manager = createAlwaysOnlineManager(supervisor, {
       onExit,
-      captureRetirementPresentation,
+      withRetirementPresentation,
     })
     const created = await createSession(manager, supervisor)
 
     const closing = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
-    await vi.waitFor(() => expect(captureRetirementPresentation).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(withRetirementPresentation).toHaveBeenCalledOnce())
     supervisor.emitExit('pty_initial_123456')
     capture.reject(new Error('canonical tabs unavailable'))
 
@@ -1214,9 +1262,9 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
       onOutput: () => {
         throw new Error('output publication failed')
       },
-      captureRetirementPresentation: vi.fn(async () => {
+      withRetirementPresentation: vi.fn(async (_userId, _session, commit) => {
         if (captureFails) throw new Error('canonical tabs unavailable')
-        return RETIREMENT_PRESENTATION
+        return commit(RETIREMENT_PRESENTATION)
       }),
     })
     const created = await createSession(manager, supervisor)

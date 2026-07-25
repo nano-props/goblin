@@ -117,6 +117,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
 }
 
 interface DetachedTerminalResourceRetirement<TUser extends string | number> {
+  terminalSessionId: string
   physicalWorktreeKey: string
   scope: TerminalPhysicalWorktreeScope<TUser>
   completion: Promise<void>
@@ -127,10 +128,11 @@ export interface TerminalEventSink<TUser extends string | number> {
   onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
   onTitle?(userId: TUser, event: TerminalTitleEvent): void
   onExit(userId: TUser, event: TerminalExitEvent): void | Promise<void>
-  captureRetirementPresentation?(
+  withRetirementPresentation?<T>(
     userId: TUser,
     session: TerminalSessionSummary,
-  ): Promise<TerminalRetirementPresentationContext | null>
+    commit: (presentation: TerminalRetirementPresentationContext | null) => T,
+  ): Promise<T>
   onSessionClosed?(
     userId: TUser,
     session: TerminalSessionSummary,
@@ -187,9 +189,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     Promise<TerminalSessionRetirementResult>
   >()
   // Scope invalidation removes addressability and render ownership
-  // synchronously. Only the native PTY retirement completion survives here
-  // until exit is confirmed or forceShutdown transfers observation to the
-  // supervisor shutdown boundary.
+  // synchronously. Only native PTY retirement and its durable-identity
+  // admission barrier survive here until exit is confirmed or forceShutdown
+  // transfers observation to the supervisor shutdown boundary.
   private readonly detachedSessionResourceRetirements = new Map<string, DetachedTerminalResourceRetirement<TUser>>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
@@ -213,6 +215,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (this.hasDetachedTerminalResourceRetirement(userId, input.terminalSessionId)) {
+      return { ok: false, message: 'error.unavailable' }
+    }
     const coordinates = terminalExecutionCoordinates(input.target)
     const scope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
     const existing = this.directory.getByDurableId(userId, input.terminalSessionId)
@@ -769,15 +774,18 @@ export class TerminalSessionManager<TUser extends string | number> {
         { terminalRuntimeSessionId: session.id, err: error },
         'native PTY cleanup remains pending after terminal close commit',
       )
-      const catalogRevision = this.detachSessionWithEffects(session, reason)
-      this.adoptDetachedSessionResourceRetirement(session)
-      return { outcome: 'detached', catalogRevision, retirementPresentation }
+      return await this.commitSessionDetachWithCanonicalPresentation(session, reason, retirementPresentation, () =>
+        this.directory.get(session.id) === session
+          ? this.detachSessionWithPendingNativeRetirement(session, reason)
+          : null,
+      )
     }
     if (this.directory.get(session.id) !== session) {
       return { outcome: 'already-detached', retirementPresentation }
     }
-    const catalogRevision = this.detachSessionWithEffects(session, reason)
-    return { outcome: 'detached', catalogRevision, retirementPresentation }
+    return await this.commitSessionDetachWithCanonicalPresentation(session, reason, retirementPresentation, () =>
+      this.directory.get(session.id) === session ? this.detachSessionWithEffects(session, reason) : null,
+    )
   }
 
   private async captureRetirementPresentation(
@@ -785,9 +793,38 @@ export class TerminalSessionManager<TUser extends string | number> {
     reason: TerminalSessionCloseReason,
   ): Promise<TerminalRetirementPresentationContext | null> {
     if (reason !== 'session' && reason !== 'workspace-pane') return null
-    if (!this.sink.captureRetirementPresentation) return null
+    if (!this.sink.withRetirementPresentation) return null
     const summary = this.sessionSummary(session)
-    return await this.sink.captureRetirementPresentation(session.userId, summary)
+    return await this.sink.withRetirementPresentation(session.userId, summary, (presentation) => presentation)
+  }
+
+  private async commitSessionDetachWithCanonicalPresentation(
+    session: TerminalSessionView<TUser>,
+    reason: TerminalSessionCloseReason,
+    fallbackPresentation: TerminalRetirementPresentationContext | null,
+    commitDetach: () => number | null,
+  ): Promise<TerminalSessionRetirementResult> {
+    const commit = (retirementPresentation: TerminalRetirementPresentationContext | null) => {
+      const catalogRevision = commitDetach()
+      if (catalogRevision === null) return { outcome: 'already-detached' as const, retirementPresentation }
+      return { outcome: 'detached' as const, catalogRevision, retirementPresentation }
+    }
+    if ((reason !== 'session' && reason !== 'workspace-pane') || !this.sink.withRetirementPresentation) {
+      return commit(fallbackPresentation)
+    }
+    const summary = this.sessionSummary(session)
+    try {
+      return await this.sink.withRetirementPresentation(session.userId, summary, commit)
+    } catch (error) {
+      // Native ownership has already ended at this point. Retirement cannot be
+      // rolled back, but it must not transport a snapshot that was captured
+      // before an intervening tabs mutation.
+      terminalSessionManagerLogger.warn(
+        { terminalRuntimeSessionId: session.id, err: error },
+        'failed to commit terminal retirement with canonical tabs before-state',
+      )
+      return commit(null)
+    }
   }
 
   private detachSessionWithEffects(session: TerminalSessionView<TUser>, reason: TerminalSessionCloseReason): number {
@@ -795,6 +832,26 @@ export class TerminalSessionManager<TUser extends string | number> {
     let detached: { summary: TerminalSessionSummary | null; lifecycleChanged: boolean; catalogRevision: number }
     try {
       detached = this.detachSessionAuthority(session)
+    } catch (error) {
+      closeEffectsRetention?.release()
+      throw error
+    }
+    this.publishDetachedSessionEffects(session, detached, reason, closeEffectsRetention)
+    return detached.catalogRevision
+  }
+
+  private detachSessionWithPendingNativeRetirement(
+    session: TerminalSessionView<TUser>,
+    reason: TerminalSessionCloseReason,
+  ): number {
+    const closeEffectsRetention = reason === 'session' ? this.takeWorkspaceRuntimeRetention(session) : null
+    let detached: { summary: TerminalSessionSummary | null; lifecycleChanged: boolean; catalogRevision: number }
+    try {
+      detached = this.detachSessionAuthority(session)
+      // The cleanup owner acquires the durable identity before close effects
+      // can synchronously re-enter admission. Directory authority remains
+      // detached; only native retirement and its admission barrier survive.
+      this.adoptDetachedSessionResourceRetirement(session)
     } catch (error) {
       closeEffectsRetention?.release()
       throw error
@@ -946,7 +1003,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const terminalRuntimeSessionId = session.id
     if (this.detachedSessionResourceRetirements.has(terminalRuntimeSessionId)) return
     const coordinates = terminalExecutionCoordinates(session.target)
+    const completion = Promise.withResolvers<void>()
     const retirement = {
+      terminalSessionId: session.terminalSessionId,
       physicalWorktreeKey: physicalWorktreeIdentityKey(session.physicalWorktreeCapability.identity),
       scope: {
         userId: session.userId,
@@ -954,7 +1013,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         scope: session.scope,
       },
-      completion: session.ptyBinding.disposeDetachedAndWait(session),
+      completion: completion.promise,
     }
     this.detachedSessionResourceRetirements.set(terminalRuntimeSessionId, retirement)
     void retirement.completion.then(
@@ -971,6 +1030,18 @@ export class TerminalSessionManager<TUser extends string | number> {
         )
       },
     )
+    try {
+      void session.ptyBinding.disposeDetachedAndWait(session).then(completion.resolve, completion.reject)
+    } catch (error) {
+      completion.reject(error)
+    }
+  }
+
+  private hasDetachedTerminalResourceRetirement(userId: TUser, terminalSessionId: string): boolean {
+    for (const retirement of this.detachedSessionResourceRetirements.values()) {
+      if (retirement.scope.userId === userId && retirement.terminalSessionId === terminalSessionId) return true
+    }
+    return false
   }
 
   private async waitForDetachedPhysicalWorktreeResources(physicalWorktreeKey: string): Promise<string | null> {
@@ -1451,19 +1522,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     session: TerminalSessionView<TUser>,
     terminalRuntimeGeneration: number,
   ): Promise<TerminalSessionRetirementResult> {
-    let retirementPresentation: TerminalRetirementPresentationContext | null = null
-    try {
-      retirementPresentation = await this.captureRetirementPresentation(session, 'session')
-    } catch (error) {
-      // The PTY has already exited, so this boundary cannot reject retirement.
-      // Explicit close calls the same authority before killing the PTY and
-      // propagates this failure instead.
-      terminalSessionManagerLogger.warn(
-        { terminalRuntimeSessionId: session.id, err: error },
-        'failed to capture terminal retirement tabs before-state after PTY exit',
-      )
-    }
-    return await this.commitSessionRetirementAfterPtyExit(session, terminalRuntimeGeneration, retirementPresentation)
+    return await this.commitSessionRetirementAfterPtyExit(session, terminalRuntimeGeneration, null)
   }
 
   private async commitSessionRetirementAfterPtyExit(
@@ -1471,12 +1530,18 @@ export class TerminalSessionManager<TUser extends string | number> {
     terminalRuntimeGeneration: number,
     retirementPresentation: TerminalRetirementPresentationContext | null,
   ): Promise<TerminalSessionRetirementResult> {
-    if (this.directory.get(session.id) !== session || terminalPtyGeneration(session) !== terminalRuntimeGeneration) {
-      return { outcome: 'already-detached', retirementPresentation }
-    }
     const coordinates = terminalExecutionCoordinates(session.target)
     try {
-      const catalogRevision = this.detachSessionWithEffects(session, 'session')
+      const retirement = await this.commitSessionDetachWithCanonicalPresentation(
+        session,
+        'session',
+        retirementPresentation,
+        () =>
+          this.directory.get(session.id) === session && terminalPtyGeneration(session) === terminalRuntimeGeneration
+            ? this.detachSessionWithEffects(session, 'session')
+            : null,
+      )
+      if (retirement.outcome !== 'detached') return retirement
       try {
         await this.sink.onExit(session.userId, {
           terminalRuntimeSessionId: session.id,
@@ -1484,8 +1549,8 @@ export class TerminalSessionManager<TUser extends string | number> {
           ...this.terminalSessionIdentity(session),
           workspaceId: coordinates.workspaceId,
           workspaceRuntimeId: coordinates.workspaceRuntimeId,
-          catalogRevision,
-          retirementPresentation,
+          catalogRevision: retirement.catalogRevision,
+          retirementPresentation: retirement.retirementPresentation,
         })
       } catch (error) {
         terminalSessionManagerLogger.warn(
@@ -1493,7 +1558,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           'failed to publish terminal exit',
         )
       }
-      return { outcome: 'detached', catalogRevision, retirementPresentation }
+      return retirement
     } finally {
       session.ptyBinding.disposeAfterConfirmedExit(session)
     }

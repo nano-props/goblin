@@ -687,6 +687,45 @@ describe('TerminalSessionProjection', () => {
       expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
     })
 
+    test('discards retirement facts after membership hydration fails', () => {
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_failed_hydration_aaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      })
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+
+      projection.failRuntimeMembershipHydration()
+      const retirementAfterFailure = {
+        terminalRuntimeSessionId: 'pty_failed_hydration_bbbb',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-222222222222222222222',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 2,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      }
+      projection.handleSessionClosed(retirementAfterFailure)
+
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(0)
+
+      projection.setRuntimeMembershipPending()
+      projection.handleSessionClosed(retirementAfterFailure)
+      expect(terminalSessionProjectionAccess(projection).terminalRetirements.size()).toBe(1)
+    })
+
     test('continues presentation dispatch after reconciliation invalidates the active claim', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
