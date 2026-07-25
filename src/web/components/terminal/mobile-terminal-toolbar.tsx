@@ -122,12 +122,7 @@ export function MobileTerminalToolbar({
   className,
 }: MobileTerminalToolbarProps) {
   return (
-    <div
-      className={cn('goblin-terminal-mobile-toolbar', className)}
-      role="toolbar"
-      aria-label={labels.toolbar}
-      aria-orientation="vertical"
-    >
+    <div className={cn('goblin-terminal-mobile-toolbar', className)} role="toolbar" aria-label={labels.toolbar}>
       <div className="goblin-terminal-mobile-toolbar__row">
         {KEY_GROUPS.map((group) => (
           <div key={group.id} className="goblin-terminal-mobile-toolbar__group">
