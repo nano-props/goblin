@@ -138,6 +138,24 @@ describe('primary window navigation intent lifecycle', () => {
     if (next.kind === 'admitted') next.intent.release()
   })
 
+  test('records admission-abandon effect failure without retaining ownership', async () => {
+    const intent = beginPrimaryWindowNavigationIntent('user')
+
+    expect(
+      intent.abandonAdmission(() => {
+        throw new Error('admission abandon effect failed')
+      }),
+    ).toBe(false)
+    await expect(intent.settled).resolves.toMatchObject({
+      status: 'failed',
+      intendedStatus: 'abandoned',
+      error: expect.objectContaining({ message: 'admission abandon effect failed' }),
+    })
+    const next = tryBeginPassivePrimaryWindowNavigationIntent()
+    expect(next.kind).toBe('admitted')
+    if (next.kind === 'admitted') next.intent.release()
+  })
+
   test.each(['BACK', 'FORWARD'] as const)('%s supersedes the current intent', async (type) => {
     const intent = beginPrimaryWindowNavigationIntent('user')
     observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type } })

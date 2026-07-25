@@ -803,8 +803,7 @@ export async function settleOwnedPrimaryWindowRouteCommit(input: {
   const generation = intent.generation
   const currentHref = input.currentHref()
   if (!primaryWindowRoutePreconditionMatches(currentHref, input.expectedCurrentHref)) {
-    input.abandonEffect?.()
-    intent.release()
+    settleAdmittedPrimaryWindowRouteAbandon(intent, input.abandonEffect)
     return false
   }
   if (currentHref === input.targetHref) {
@@ -870,9 +869,19 @@ function committedPrimaryWindowNavigationOutcome(outcome: PrimaryWindowNavigatio
 }
 
 function abandonPrimaryWindowRoute(options: PrimaryWindowRouteNavigationOptions | undefined): false {
-  options?.onAbandon?.()
-  options?.navigationIntent?.release()
+  const intent = options?.navigationIntent
+  if (intent?.isCurrent()) settleAdmittedPrimaryWindowRouteAbandon(intent, options?.onAbandon)
+  else options?.onAbandon?.()
   return false
+}
+
+function settleAdmittedPrimaryWindowRouteAbandon(
+  intent: PrimaryWindowNavigationIntent,
+  abandonEffect: (() => void) | undefined,
+): void {
+  intent.abandonAdmission(abandonEffect)
+  const outcome = intent.outcome()
+  if (outcome?.status === 'failed') throw outcome.error
 }
 
 export async function settlePrimaryWindowRouteCommit(input: {

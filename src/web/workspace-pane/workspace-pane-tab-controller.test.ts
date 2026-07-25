@@ -185,7 +185,12 @@ describe('workspace pane tab controller transactions', () => {
       selectWorkspacePaneControllerTab(
         workspacePaneTarget(),
         terminalTab(),
-        controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => false) }),
+        controllerNavigation({
+          commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
+            options?.onAbandon?.()
+            return false
+          }),
+        }),
         {
           navigationIntent: beginPrimaryWindowNavigationIntent('user'),
           focusEffects: { onCommit, onAbandon },
@@ -288,9 +293,11 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
-      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
-        options?.onCommit?.()
-        return commit.promise
+      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
+        const committed = await commit.promise
+        if (committed) options?.onCommit?.()
+        else options?.onAbandon?.()
+        return committed
       }),
     }
     const completion = commitWorkspacePaneExactTargetRoute(
@@ -317,7 +324,8 @@ describe('workspace pane tab controller transactions', () => {
         SOURCE_ROUTE,
         TARGET_ROUTE,
         {
-          commitWorkspacePaneRoute: vi.fn(async () => {
+          commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
+            options?.onAbandon?.()
             throw new Error('router failed')
           }),
         },
@@ -376,9 +384,11 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects completion when the target worktree changes while navigation settles', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
-      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
-        options?.onCommit?.()
-        return commit.promise
+      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
+        const committed = await commit.promise
+        if (committed) options?.onCommit?.()
+        else options?.onAbandon?.()
+        return committed
       }),
     }
     const completion = commitWorkspacePaneExactTargetRoute(
@@ -396,6 +406,31 @@ describe('workspace pane tab controller transactions', () => {
     commit.resolve(true)
 
     await expect(completion).resolves.toBe(false)
+  })
+
+  test('commits pane presentation inside navigation-intent settlement', async () => {
+    const sequence: string[] = []
+    const intent = beginPrimaryWindowNavigationIntent('user')
+    const navigation: WorkspacePaneRouteCommitNavigation = {
+      commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
+        options?.navigationIntent?.commit(options.onCommit)
+        sequence.push('new navigation')
+        beginPrimaryWindowNavigationIntent('user').release()
+        return true
+      }),
+    }
+
+    await expect(
+      commitWorkspacePaneExactTargetRoute(
+        workspacePaneTarget(),
+        SOURCE_ROUTE,
+        TARGET_ROUTE,
+        navigation,
+        { onCommit: () => sequence.push('presentation') },
+        intent,
+      ),
+    ).resolves.toBe(true)
+    expect(sequence).toEqual(['presentation', 'new navigation'])
   })
 
   test('invalidates a worktree target when Git capability is removed from the same runtime', () => {

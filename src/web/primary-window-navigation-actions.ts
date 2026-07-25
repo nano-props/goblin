@@ -21,6 +21,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   beginPrimaryWindowNavigationIntent,
+  commitPrimaryWindowNavigationEffect,
   type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
@@ -275,35 +276,24 @@ async function commitFilesystemWorkspacePaneRoute(
       options?.onAbandon?.()
       return false
     }
-    let effectsSettled = false
-    try {
-      const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
-        replace: options?.replace,
-        navigationIntent: intent,
-        routePrecondition: options?.routePrecondition,
-      })
-      const presentationCommitted =
-        committed &&
-        intent.outcome()?.status !== 'superseded' &&
-        filesystemWorkspacePaneCommitTargetIsCurrent(target) &&
-        (route === null
-          ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
-          : commitFilesystemWorkspacePanePresentation(target.routeTarget, route))
-      if (!presentationCommitted) {
-        effectsSettled = true
-        options?.onAbandon?.()
-        return false
-      }
-      effectsSettled = true
-      options?.onCommit?.()
-      return true
-    } catch (error) {
-      if (!effectsSettled) {
-        effectsSettled = true
-        options?.onAbandon?.()
-      }
-      throw error
-    }
+    let presentationCommitted = false
+    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
+      replace: options?.replace,
+      navigationIntent: intent,
+      routePrecondition: options?.routePrecondition,
+      onCommit: () => {
+        presentationCommitted = commitPrimaryWindowNavigationEffect(
+          () =>
+            filesystemWorkspacePaneCommitTargetIsCurrent(target) &&
+            (route === null
+              ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
+              : commitFilesystemWorkspacePanePresentation(target.routeTarget, route)),
+          options,
+        )
+      },
+      onAbandon: options?.onAbandon,
+    })
+    return committed && presentationCommitted
   } finally {
     if (ownsIntent) intent.release()
   }

@@ -69,6 +69,8 @@ admitted (user | passive)
 - `isCurrent()` is an admission check before registration/commit. After settlement, callers use the route result and `outcome()`; a committed intent is no longer current but is not stale work.
 - Lexically owned intents use `using`. React/unmount, history registration, and explicit route handoff release at their actual lifecycle boundary instead.
 - Release, failure, supersede, and disposal are idempotent. A stale lease cannot settle a newer owner.
+- Route admission abandonment and its effect settle atomically; an effect failure records `failed` after releasing presentation ownership.
+- Pane supplements and presentation effects execute inside the history commit settlement, never in an async continuation after it.
 - There are no timers, delays, watches, or post-retirement reconstruction caches in this protocol.
 - Terminal retirement presentation is admitted only from the manager's canonical, target-scoped before-state record. Natural exit and explicit close share that record; catalog after-state convergence never synthesizes presentation intent.
 

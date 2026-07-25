@@ -13,8 +13,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
+  beginPrimaryWindowNavigationIntent,
   observePrimaryWindowHistoryNavigation,
   resetPrimaryWindowNavigationForTest,
+  tryBeginPassivePrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
@@ -110,6 +112,26 @@ describe('filesystem workspace pane route navigation', () => {
     expect(harness.navigate).not.toHaveBeenCalled()
     expect(harness.currentHref()).toBe(filesystemRouteHref(target, currentRoute))
     expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('releases owned admission when route resolution abandonment throws', () => {
+    const harness = routeNavigationHarness('/')
+    routerMock.current = harness.router
+    const { result } = renderHook(() => usePrimaryWindowRouteNavigation())
+    const navigationIntent = beginPrimaryWindowNavigationIntent('user')
+
+    expect(() =>
+      result.current.openWorkspaceRootPane(workspaceIdForTest('goblin+file:///missing-workspace'), {
+        navigationIntent,
+        onAbandon: () => {
+          throw new Error('route resolution abandon failed')
+        },
+      }),
+    ).toThrow('route resolution abandon failed')
+
+    const next = tryBeginPassivePrimaryWindowNavigationIntent()
+    expect(next.kind).toBe('admitted')
+    if (next.kind === 'admitted') next.intent.release()
   })
 })
 

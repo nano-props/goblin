@@ -41,6 +41,8 @@ export interface PrimaryWindowNavigationIntent {
     abandonEffect?: () => void,
   ): PrimaryWindowNavigationRegistration | null
   commit(commitEffect?: () => void): boolean
+  /** Atomically settles an unregistered route admission and its abandonment effect. */
+  abandonAdmission(abandonEffect?: () => void): boolean
   [Symbol.dispose](): void
   release(): void
   fail(error: unknown): void
@@ -53,6 +55,30 @@ export type PassivePrimaryWindowNavigationIntentAdmission =
       ownerKind: PrimaryWindowNavigationIntentKind
       settled: Promise<PrimaryWindowNavigationOutcome>
     }
+
+export function commitPrimaryWindowNavigationEffect(
+  commit: () => boolean,
+  effects: { onCommit?: () => void; onAbandon?: () => void } | undefined,
+): boolean {
+  let committed: boolean
+  try {
+    committed = commit()
+  } catch (error) {
+    effects?.onAbandon?.()
+    throw error
+  }
+  if (!committed) {
+    effects?.onAbandon?.()
+    return false
+  }
+  try {
+    effects?.onCommit?.()
+    return true
+  } catch (error) {
+    effects?.onAbandon?.()
+    throw error
+  }
+}
 
 interface PrimaryWindowNavigationIntentRecord {
   generation: PrimaryWindowNavigationGeneration
@@ -151,6 +177,7 @@ function createPrimaryWindowNavigationIntent(kind: PrimaryWindowNavigationIntent
     register: (targetHref, commitEffect, abandonEffect) =>
       registerPrimaryWindowNavigationIntent(record, targetHref, commitEffect, abandonEffect),
     commit: (commitEffect) => commitPrimaryWindowNavigationIntent(record, commitEffect),
+    abandonAdmission: (abandonEffect) => abandonPrimaryWindowNavigationIntentAdmission(record, abandonEffect),
     [Symbol.dispose]: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
     release: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
     fail: (error) => failPrimaryWindowNavigationIntent(record, error),
@@ -196,6 +223,16 @@ function commitPrimaryWindowNavigationIntent(
   record.commitEffect = commitEffect
   settlePrimaryWindowNavigationIntent(record, 'committed')
   return record.outcome?.status === 'committed'
+}
+
+function abandonPrimaryWindowNavigationIntentAdmission(
+  record: PrimaryWindowNavigationIntentRecord,
+  abandonEffect?: () => void,
+): boolean {
+  if (currentPrimaryWindowNavigationIntentRecord !== record || record.phase !== 'admitted') return false
+  record.abandonEffect = abandonEffect
+  settlePrimaryWindowNavigationIntent(record, 'abandoned')
+  return record.outcome?.status === 'abandoned'
 }
 
 function failPrimaryWindowNavigationIntent(record: PrimaryWindowNavigationIntentRecord, error: unknown): void {

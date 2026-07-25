@@ -24,6 +24,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   beginPrimaryWindowNavigationIntent,
+  commitPrimaryWindowNavigationEffect,
   type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal-focus.ts'
@@ -239,6 +240,8 @@ export async function commitWorkspacePaneControllerRoute(
   options?: {
     replace?: boolean
     navigationIntent?: PrimaryWindowNavigationIntent
+    onCommit?: () => void
+    onAbandon?: () => void
     routePrecondition?:
       { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
   },
@@ -246,6 +249,8 @@ export async function commitWorkspacePaneControllerRoute(
   return await navigation.commitWorkspacePaneRoute(workspaceId, branchName, route, {
     replace: options?.replace,
     navigationIntent: options?.navigationIntent,
+    onCommit: options?.onCommit,
+    onAbandon: options?.onAbandon,
     routePrecondition: options?.routePrecondition,
   })
 }
@@ -326,36 +331,30 @@ async function commitWorkspacePaneValidatedTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  let completed = false
-  try {
-    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-      replace: options?.replace,
-      navigationIntent,
-      ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
-    })
-    const supplementCommitted =
-      committed &&
-      commitSupplement(
-        {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          branchName,
-          worktreePath: target.worktreePath,
-        },
-        route,
+  let presentationCommitted = false
+  const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
+    replace: options?.replace,
+    navigationIntent,
+    ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
+    onCommit: () => {
+      presentationCommitted = commitPrimaryWindowNavigationEffect(
+        () =>
+          targetIsCurrent(target) &&
+          commitSupplement(
+            {
+              workspaceId: target.workspaceId,
+              workspaceRuntimeId: target.workspaceRuntimeId,
+              branchName,
+              worktreePath: target.worktreePath,
+            },
+            route,
+          ),
+        options,
       )
-    completed =
-      committed && supplementCommitted && navigationIntent.outcome()?.status !== 'superseded' && targetIsCurrent(target)
-  } catch (error) {
-    options?.onAbandon?.()
-    throw error
-  }
-  if (!completed) {
-    options?.onAbandon?.()
-    return false
-  }
-  options?.onCommit?.()
-  return true
+    },
+    onAbandon: options?.onAbandon,
+  })
+  return committed && presentationCommitted
 }
 
 export async function commitWorkspacePaneExactTargetRoute(
@@ -378,39 +377,30 @@ export async function commitWorkspacePaneExactTargetRoute(
       options?.onAbandon?.()
       return false
     }
-    let completed = false
-    try {
-      const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-        replace: options?.replace,
-        navigationIntent,
-        routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
-      })
-      const supplementCommitted =
-        committed &&
-        commitWorkspacePaneRouteSupplement(
-          {
-            workspaceId: target.workspaceId,
-            workspaceRuntimeId: target.workspaceRuntimeId,
-            branchName,
-            worktreePath: target.worktreePath,
-          },
-          route,
+    let presentationCommitted = false
+    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
+      replace: options?.replace,
+      navigationIntent,
+      routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
+      onCommit: () => {
+        presentationCommitted = commitPrimaryWindowNavigationEffect(
+          () =>
+            workspacePaneTabControllerTargetIsCurrent(target) &&
+            commitWorkspacePaneRouteSupplement(
+              {
+                workspaceId: target.workspaceId,
+                workspaceRuntimeId: target.workspaceRuntimeId,
+                branchName,
+                worktreePath: target.worktreePath,
+              },
+              route,
+            ),
+          options,
         )
-      completed =
-        committed &&
-        supplementCommitted &&
-        navigationIntent.outcome()?.status !== 'superseded' &&
-        workspacePaneTabControllerTargetIsCurrent(target)
-    } catch (error) {
-      options?.onAbandon?.()
-      throw error
-    }
-    if (!completed) {
-      options?.onAbandon?.()
-      return false
-    }
-    options?.onCommit?.()
-    return true
+      },
+      onAbandon: options?.onAbandon,
+    })
+    return committed && presentationCommitted
   } finally {
     if (ownsNavigationIntent) navigationIntent.release()
   }

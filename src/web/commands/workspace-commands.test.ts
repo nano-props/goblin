@@ -3082,7 +3082,7 @@ function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-test('rebases the latest queued absolute selection after an earlier route commit', async () => {
+test('preserves an earlier committed selection while the latest queued absolute selection wins the final route', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -3122,7 +3122,7 @@ test('rebases the latest queued absolute selection after an earlier route commit
     identity: 'workspace-pane:history',
     navigation,
   })
-  await expect(selectFiles).resolves.toBe(false)
+  await expect(selectFiles).resolves.toBe(true)
   await expect(selectHistory).resolves.toBe(true)
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
