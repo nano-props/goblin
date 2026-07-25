@@ -14,6 +14,7 @@ import {
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
 import { createPtyEventChannel } from '#/server/terminal/pty-event-lease.ts'
+import { MAX_PENDING_TERMINAL_RENDER_BYTES } from '#/server/terminal/terminal-render-state.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
 const ACCEPT_BINDING_FOR_TEST: TerminalPtyBindingAdmission = {
@@ -401,6 +402,46 @@ describe('TerminalPtyBinding geometry boundary', () => {
 })
 
 describe('TerminalPtyBinding adoption boundary', () => {
+  test('fails a committed binding closed when pending render output exceeds capacity', async () => {
+    const channel = createPtyEventChannel()
+    const handle = createPtyHandle('pty_render_capacity_123456')
+    const supervisor = createChannelSupervisor(channel.lease, handle)
+    const emitLifecycle = vi.fn()
+    const binding = new TerminalPtyBinding(supervisor, {
+      isSessionLive: () => true,
+      emitLifecycle,
+      emitOutput: vi.fn(),
+      emitBell: vi.fn(),
+      emitTitle: vi.fn(),
+      emitExit: vi.fn(),
+      confirmedExit: vi.fn(),
+    })
+    const session: TerminalPtySessionState<string> = {
+      id: 'pty_runtime_render_capacity_123456',
+      userId: 'user-test',
+      cwd: '/repo/worktree',
+      phase: 'opening',
+      message: null,
+      ptyState: { kind: 'prepared' },
+    }
+
+    await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
+      result: { ok: true },
+    })
+    expect(() =>
+      channel.sink.data({ data: 'x'.repeat(MAX_PENDING_TERMINAL_RENDER_BYTES + 1), processName: 'zsh' }),
+    ).not.toThrow()
+
+    expect(session).toMatchObject({
+      phase: 'error',
+      message: 'error.unavailable',
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
+    })
+    expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
+    expect(supervisor.kill).toHaveBeenCalledWith(handle)
+    expect(emitLifecycle).toHaveBeenLastCalledWith(session)
+  })
+
   test('fails a committed binding closed when output publication throws', async () => {
     const channel = createPtyEventChannel()
     const handle = createPtyHandle('pty_observer_failure_123456')

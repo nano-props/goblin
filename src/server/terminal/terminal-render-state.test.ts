@@ -6,6 +6,8 @@ import {
   applyTerminalTitle,
   createEmptyTerminalRenderState,
   disposeRender,
+  MAX_PENDING_TERMINAL_RENDER_BYTES,
+  MAX_PENDING_TERMINAL_RENDER_ENTRIES,
   replaySnapshot,
   resizeRender,
   type TerminalRenderState,
@@ -58,6 +60,66 @@ describe('terminal-render-state', () => {
       expect(state.title).toBeNull()
       applyTerminalTitle(state, 'deferred')
       expect(state.title).toBe('deferred')
+    })
+
+    test('rejects output before mutating sequence state when pending bytes exceed capacity', () => {
+      const state = createState()
+
+      expect(() => appendOutput(state, 'x'.repeat(MAX_PENDING_TERMINAL_RENDER_BYTES + 1))).toThrow(
+        'terminal render queue capacity exceeded',
+      )
+
+      expect(state.sequence).toBe(0)
+      expect(state.screen.pendingWriteBytes).toBe(0)
+      expect(state.screen.pendingWriteEntries).toBe(0)
+    })
+
+    test('releases pending capacity as headless writes complete', async () => {
+      const state = createState()
+      const callbacks: Array<() => void> = []
+      const write = vi.spyOn(state.screen.terminal, 'write').mockImplementation((_data, callback) => {
+        if (callback) callbacks.push(callback)
+      })
+
+      appendOutput(state, 'first')
+      appendOutput(state, 'second')
+      expect(state.screen.pendingWriteBytes).toBe(11)
+      expect(state.screen.pendingWriteEntries).toBe(2)
+
+      await vi.waitFor(() => expect(write).toHaveBeenCalledOnce())
+      callbacks.shift()?.()
+      await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2))
+      expect(state.screen.pendingWriteBytes).toBe(6)
+      expect(state.screen.pendingWriteEntries).toBe(1)
+
+      callbacks.shift()?.()
+      await vi.waitFor(() => expect(state.screen.pendingWriteEntries).toBe(0))
+      expect(state.screen.pendingWriteBytes).toBe(0)
+    })
+
+    test('clears pending capacity on disposal while writes are blocked', async () => {
+      const state = createState()
+      const write = vi.spyOn(state.screen.terminal, 'write').mockImplementation(() => {})
+
+      appendOutput(state, 'blocked')
+      await vi.waitFor(() => expect(write).toHaveBeenCalledOnce())
+      disposeRender(state)
+
+      expect(state.screen.pendingWriteBytes).toBe(0)
+      expect(state.screen.pendingWriteEntries).toBe(0)
+    })
+
+    test('bounds the number of pending write entries', () => {
+      const state = createState()
+      vi.spyOn(state.screen.terminal, 'write').mockImplementation(() => {})
+
+      for (let index = 0; index < MAX_PENDING_TERMINAL_RENDER_ENTRIES; index += 1) {
+        appendOutput(state, '')
+      }
+
+      expect(() => appendOutput(state, '')).toThrow('terminal render queue capacity exceeded')
+      expect(state.sequence).toBe(MAX_PENDING_TERMINAL_RENDER_ENTRIES)
+      expect(state.screen.pendingWriteEntries).toBe(MAX_PENDING_TERMINAL_RENDER_ENTRIES)
     })
   })
 

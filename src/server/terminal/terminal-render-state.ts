@@ -26,7 +26,17 @@ import { serverLogger } from '#/server/logger.ts'
 // the async visual screen/snapshot authority.
 
 const HEADLESS_SCROLLBACK_ROWS = 10_000
+// Bytes bound retained output, while entries bound the Promise/closure overhead
+// of highly fragmented PTY output. Crossing either limit fails the binding at
+// its existing observer boundary instead of accumulating an unbounded chain.
+export const MAX_PENDING_TERMINAL_RENDER_BYTES = 16 * 1024 * 1024
+export const MAX_PENDING_TERMINAL_RENDER_ENTRIES = 16_384
 const terminalRenderStateLogger = serverLogger.child({ module: 'terminal-render-state' })
+
+interface TerminalScreenWriteReservation {
+  byteLength: number
+  released: boolean
+}
 
 interface TerminalScreenState {
   terminal: HeadlessTerminalInstance
@@ -35,6 +45,8 @@ interface TerminalScreenState {
   disposePromise: Promise<void>
   resolveDisposed: () => void
   appliedSeq: number
+  pendingWriteBytes: number
+  pendingWriteEntries: number
   disposed: boolean
   failure: unknown | null
 }
@@ -76,13 +88,19 @@ export interface AppendTerminalOutputResult {
 // ownership aligned with event ordering, while headless remains the async
 // visual screen authority used for snapshots.
 export function appendOutput(state: TerminalRenderState, data: string): AppendTerminalOutputResult {
-  state.sequence += 1
-  const seq = state.sequence
-  const control = scanTerminalControlSequences(data, state.controlScanner)
-  queueScreenWrite(state.screen, data, seq)
-  return {
-    seq,
-    controlEvents: control.events,
+  const reservation = reserveScreenWrite(state.screen, data)
+  try {
+    state.sequence += 1
+    const seq = state.sequence
+    const control = scanTerminalControlSequences(data, state.controlScanner)
+    if (reservation) queueScreenWrite(state.screen, data, seq, reservation)
+    return {
+      seq,
+      controlEvents: control.events,
+    }
+  } catch (error) {
+    if (reservation) releaseScreenWrite(state.screen, reservation)
+    throw error
   }
 }
 
@@ -155,12 +173,41 @@ function createScreenState(cols: number, rows: number): TerminalScreenState {
     disposePromise,
     resolveDisposed,
     appliedSeq: 0,
+    pendingWriteBytes: 0,
+    pendingWriteEntries: 0,
     disposed: false,
     failure: null,
   }
 }
 
-function queueScreenWrite(screen: TerminalScreenState, data: string, seq: number): void {
+function reserveScreenWrite(screen: TerminalScreenState, data: string): TerminalScreenWriteReservation | null {
+  if (screen.disposed) return null
+  const byteLength = Buffer.byteLength(data, 'utf8')
+  if (
+    screen.pendingWriteEntries >= MAX_PENDING_TERMINAL_RENDER_ENTRIES ||
+    byteLength > MAX_PENDING_TERMINAL_RENDER_BYTES - screen.pendingWriteBytes
+  ) {
+    throw new Error('terminal render queue capacity exceeded')
+  }
+  screen.pendingWriteBytes += byteLength
+  screen.pendingWriteEntries += 1
+  return { byteLength, released: false }
+}
+
+function releaseScreenWrite(screen: TerminalScreenState, reservation: TerminalScreenWriteReservation): void {
+  if (reservation.released) return
+  reservation.released = true
+  if (screen.disposed) return
+  screen.pendingWriteBytes -= reservation.byteLength
+  screen.pendingWriteEntries -= 1
+}
+
+function queueScreenWrite(
+  screen: TerminalScreenState,
+  data: string,
+  seq: number,
+  reservation: TerminalScreenWriteReservation,
+): void {
   queueScreenStep(screen, (current) => {
     return Promise.race([
       new Promise<void>((resolve) => {
@@ -170,7 +217,7 @@ function queueScreenWrite(screen: TerminalScreenState, data: string, seq: number
         })
       }),
       current.disposePromise,
-    ])
+    ]).finally(() => releaseScreenWrite(current, reservation))
   })
 }
 
@@ -193,6 +240,8 @@ function queueScreenStep(
 function disposeScreenState(screen: TerminalScreenState): void {
   if (screen.disposed) return
   screen.disposed = true
+  screen.pendingWriteBytes = 0
+  screen.pendingWriteEntries = 0
   screen.resolveDisposed()
   try {
     screen.serializer.dispose()
