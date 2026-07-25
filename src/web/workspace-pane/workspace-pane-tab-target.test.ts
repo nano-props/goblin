@@ -7,7 +7,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
@@ -17,6 +17,7 @@ import {
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForCreatedRuntime,
+  workspacePaneTabTargetForRetiredTerminal,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -25,6 +26,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
@@ -35,6 +37,33 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab target read model', () => {
+  test('captures a retired worktree terminal target before command read models hydrate', () => {
+    const workspaceRuntimeId = 'repo-runtime-workspace-pane-retirement'
+    const terminalSessionId = 'term-111111111111111111111'
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    const target = gitWorktreeFilesystemExecutionTarget(REPO_ID, workspaceRuntimeId, WORKTREE_PATH)
+    if (!target || target.kind !== 'git-worktree') throw new Error('missing terminal worktree target')
+
+    expect(
+      workspacePaneTabTargetForRetiredTerminal({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId },
+        terminalBase: { target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } },
+      }),
+    ).toMatchObject({
+      workspaceRuntimeId,
+      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      selectedIdentity: `terminal:${terminalSessionId}`,
+    })
+  })
+
   test('models the workspace root as a workspace target rather than an empty branch', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     setWorkspacePaneTabsForTargetQueryData({

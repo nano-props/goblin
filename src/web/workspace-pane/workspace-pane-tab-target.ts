@@ -22,6 +22,7 @@ import {
   workspaceRootFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import { getSuccessfulRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 export type FilesystemWorkspacePaneTargetLease =
   | {
@@ -327,6 +328,75 @@ export function workspacePaneTabTargetForPaneTarget(input: {
     requestedSessionIdByRuntimeType:
       workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
   })
+}
+
+/**
+ * Reads the complete pane projection at an accepted terminal-retirement
+ * boundary. The terminal base already owns the runtime and filesystem target,
+ * so capture must not wait for the broader command-target read models to
+ * rediscover those coordinates.
+ */
+export function workspacePaneTabTargetForRetiredTerminal(input: {
+  routeTarget: WorkspacePaneTabsTarget
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null
+  terminalBase: TerminalSessionBase
+}): WorkspacePaneTabModel | null {
+  const coordinates = terminalSessionCoordinates(input.terminalBase)
+  if (input.routeTarget.workspaceId !== coordinates.workspaceId) return null
+  const paneTarget: WorkspacePaneTabsTarget =
+    input.terminalBase.target.kind === 'workspace-root'
+      ? { kind: 'workspace-root', workspaceId: coordinates.workspaceId }
+      : {
+          kind: 'git-worktree',
+          workspaceId: coordinates.workspaceId,
+          worktreePath: terminalExecutionPath(input.terminalBase.target),
+        }
+  if (!retiredTerminalRouteTargetMatchesBase(input.routeTarget, paneTarget, input.terminalBase)) return null
+  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
+    workspaceId: coordinates.workspaceId,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
+    filesystemTarget: input.terminalBase.target,
+  })
+  const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
+    ...paneTarget,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
+  })
+  if (tabsProjection.phase !== 'ready') return null
+  return createWorkspacePaneTabModel({
+    workspaceId: coordinates.workspaceId,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
+    routeTarget: input.routeTarget,
+    paneTarget,
+    worktreeHead:
+      input.terminalBase.presentation.kind === 'git-worktree' ? input.terminalBase.presentation.head : undefined,
+    // Retirement capture is only valid for the exact terminal route checked
+    // by the caller, so it does not need hydrated workspace preferences.
+    preferredTab: 'terminal',
+    allowPreferredTabFallback: false,
+    tabEntries: tabsProjection.tabs,
+    tabEntriesProjectionPhase: tabsProjection.phase,
+    runtimeTabViews: runtimeProjection.runtimeTabViews,
+    runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+    requestedSessionIdByRuntimeType:
+      input.workspacePaneRoute?.kind === 'terminal'
+        ? { terminal: input.workspacePaneRoute.terminalSessionId }
+        : undefined,
+  })
+}
+
+function retiredTerminalRouteTargetMatchesBase(
+  routeTarget: WorkspacePaneTabsTarget,
+  paneTarget: WorkspacePaneTabsTarget,
+  terminalBase: TerminalSessionBase,
+): boolean {
+  if (paneTarget.kind === 'workspace-root') return routeTarget.kind === 'workspace-root'
+  if (paneTarget.kind !== 'git-worktree' || terminalBase.presentation.kind !== 'git-worktree') return false
+  if (routeTarget.kind === 'git-worktree') return routeTarget.worktreePath === paneTarget.worktreePath
+  return (
+    routeTarget.kind === 'git-branch' &&
+    terminalBase.presentation.head.kind === 'branch' &&
+    routeTarget.branchName === terminalBase.presentation.head.branchName
+  )
 }
 
 export function workspacePaneTabInteractionBlockedForBranch(

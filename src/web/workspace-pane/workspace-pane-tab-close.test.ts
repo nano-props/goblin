@@ -713,10 +713,8 @@ test('presents a naturally exited active terminal through the captured exact clo
 
   await expect(
     dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspaceId: REPO_ID,
       workspacePaneRoute: sourceRoute,
       routeTarget: paneTarget,
-      paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
       terminalSessionId,
       terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
@@ -737,10 +735,8 @@ test('presents a naturally exited active terminal through the captured exact clo
 
   await expect(
     dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspaceId: REPO_ID,
       workspacePaneRoute: sourceRoute,
       routeTarget: paneTarget,
-      paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute: passiveCommit }),
       terminalSessionId,
       terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
@@ -771,10 +767,8 @@ test('does not navigate when a background terminal exits naturally', async () =>
 
   await expect(
     dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'status' },
       routeTarget: paneTarget,
-      paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
       terminalSessionId,
       terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },

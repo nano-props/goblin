@@ -350,8 +350,11 @@ local entry, and the server has already killed the PTY).
 Before an accepted natural exit or sibling-window close removes the local
 session projection, it publishes one client-local retirement boundary. The
 workspace-pane layer captures the exact close-back target from the complete
-before projection and commits it only when the retired terminal is still the
-current route. The originating window suppresses this passive path while its
+before projection. Retirement coordinates and router state are sufficient for
+capture even when the broader workspace command read model is still hydrating;
+that read model is used only to admit the immutable plan before commit. The plan
+is abandoned if its exact source route changes and is never recomputed from the
+after projection. The originating window suppresses this passive path while its
 composed close is pending, because that command already owns close-back.
 
 This handles the case where window A's close drops the socket

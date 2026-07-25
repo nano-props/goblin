@@ -65,6 +65,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -161,6 +162,7 @@ function AuthenticatedWorkspaceShell() {
   )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const currentWorkspacePaneRoute = currentWorkspacePaneRouteFromContext(routeContext)
+  const currentWorkspacePaneRouteTarget = workspacePaneRouteTargetFromContext(routeContext, routedWorkspaceId)
   const commandCapabilities =
     commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
       ? commandWorkspace.capability.probe.capabilities
@@ -296,6 +298,8 @@ function AuthenticatedWorkspaceShell() {
         hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
         currentBranchName={currentBranchName}
         currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
+        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
+        currentWorkspacePaneRouteTarget={currentWorkspacePaneRouteTarget}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
@@ -393,6 +397,21 @@ type WorkspaceRouteContext =
       worktreePath: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
+
+export function workspacePaneRouteTargetFromContext(
+  routeContext: WorkspaceRouteContext | null,
+  workspaceId: WorkspaceId | null,
+): WorkspacePaneTabsTarget | null {
+  if (!routeContext || !workspaceId) return null
+  if (routeContext.kind === 'workspace-root') return { kind: 'workspace-root', workspaceId }
+  if (routeContext.kind === 'branch') {
+    return { kind: 'git-branch', workspaceId, branchName: routeContext.branchName }
+  }
+  if (routeContext.kind === 'worktree') {
+    return { kind: 'git-worktree', workspaceId, worktreePath: routeContext.worktreePath }
+  }
+  return null
+}
 
 export function currentWorkspacePaneRouteFromContext(
   routeContext: WorkspaceRouteContext | null,
@@ -517,6 +536,8 @@ function AuthenticatedWorkspaceSideEffects({
   hydratedRouteWorkspaceId,
   currentBranchName,
   currentWorkspacePaneCommandTarget,
+  currentWorkspacePaneRoute,
+  currentWorkspacePaneRouteTarget,
   routeContext,
   navigation,
   closeAllOverlays,
@@ -532,6 +553,8 @@ function AuthenticatedWorkspaceSideEffects({
   hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
+  currentWorkspacePaneRouteTarget: WorkspacePaneTabsTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
@@ -545,7 +568,8 @@ function AuthenticatedWorkspaceSideEffects({
 }): null {
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useTerminalRetirementWorkspacePanePresentation({
-    currentWorkspaceId: hydratedRouteWorkspaceId,
+    currentRouteTarget: currentWorkspacePaneRouteTarget,
+    currentWorkspacePaneRoute,
     currentTarget: currentWorkspacePaneCommandTarget,
     navigation,
   })

@@ -33,6 +33,7 @@ import {
 import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
+  workspacePaneTabTargetForRetiredTerminal,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
@@ -84,10 +85,19 @@ export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends Close
 
 export interface RetiredTerminalWorkspacePaneTabPresentationOptions extends Pick<
   CloseWorkspacePaneTabActionOptions,
-  'workspaceId' | 'workspacePaneRoute' | 'routeTarget' | 'paneTarget' | 'worktreeHead' | 'navigation'
+  'workspacePaneRoute' | 'routeTarget' | 'navigation'
 > {
   terminalSessionId: string
   terminalBase: TerminalSessionBase
+}
+
+export interface RetiredTerminalWorkspacePaneTabPresentationPlan {
+  readonly terminalSessionId: string
+  readonly terminalBase: TerminalSessionBase
+  readonly routeTarget: WorkspacePaneTabsTarget
+  readonly sourceRoute: ParsedWorkspacePaneRoute
+  readonly target: WorkspacePaneTabModel
+  readonly transition: WorkspacePaneCloseTransition
 }
 
 type CloseWorkspacePaneTabActionStart =
@@ -164,27 +174,76 @@ async function closeWorkspacePaneTabAction(
 export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   options: RetiredTerminalWorkspacePaneTabPresentationOptions,
 ): Promise<boolean> {
-  const target = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
-  if (!target || !terminalBaseMatchesPaneTarget(options.terminalBase, target)) return Promise.resolve(false)
+  const plan = captureRetiredTerminalWorkspacePaneTabPresentationPlan(options)
+  return plan ? commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, options.navigation) : Promise.resolve(true)
+}
+
+/**
+ * Captures every close-back fact synchronously from the complete before
+ * projection. A caller may retain this immutable plan while broader command
+ * read models hydrate; it must never re-derive the destination from the later
+ * after projection.
+ */
+export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
+  options: Omit<RetiredTerminalWorkspacePaneTabPresentationOptions, 'navigation'>,
+): RetiredTerminalWorkspacePaneTabPresentationPlan | null {
+  const coordinates = terminalExecutionCoordinates(options.terminalBase.target)
+  if (options.routeTarget.workspaceId !== coordinates.workspaceId) return null
+  const paneTarget = retiredTerminalPaneTarget(options.terminalBase)
   const closingIdentity = workspacePaneRuntimeTabConfirmedCloseIdentity({
     type: 'terminal',
     sessionId: options.terminalSessionId,
     target: options.terminalBase,
   })
+  const target = workspacePaneTabTargetForRetiredTerminal({
+    routeTarget: options.routeTarget,
+    workspacePaneRoute: options.workspacePaneRoute ?? null,
+    terminalBase: options.terminalBase,
+  })
+  clearWorkspacePaneTabOpener(paneTarget, coordinates.workspaceRuntimeId, closingIdentity)
+  const sourceRoute = options.workspacePaneRoute
+  if (
+    !target ||
+    sourceRoute?.kind !== 'terminal' ||
+    sourceRoute.terminalSessionId !== options.terminalSessionId ||
+    target.selectedIdentity !== closingIdentity
+  ) {
+    return null
+  }
   const navigationGeneration = captureUnownedPrimaryWindowNavigationGeneration()
   if (navigationGeneration === null) {
-    completeWorkspacePaneTabClose(target, closingIdentity)
-    return Promise.resolve(true)
+    // A registered history commit already owns the visible route. Retirement
+    // must not queue a replay after that owner settles: exact-transition
+    // failures intentionally leave the committed resource closed and the stale
+    // URL as an empty pane (docs/workspace-pane-command-invariants.md). This is
+    // true even if the owned navigation later rejects; its settlement does not
+    // make this retirement retryable. This is a safety rejection, not a lost
+    // navigation intent.
+    return null
   }
   const transition = workspacePaneCloseTransition(
     target,
     closingIdentity,
-    options.workspacePaneRoute,
+    sourceRoute,
     target.selectedIdentity,
     navigationGeneration,
   )
-  completeWorkspacePaneTabClose(target, closingIdentity)
-  if (!transition.wasActive) return Promise.resolve(true)
+  if (!transition.wasActive) return null
+  return {
+    terminalSessionId: options.terminalSessionId,
+    terminalBase: options.terminalBase,
+    routeTarget: options.routeTarget,
+    sourceRoute,
+    target,
+    transition,
+  }
+}
+
+export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
+  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
+  navigation: PrimaryWindowNavigationActions,
+): Promise<boolean> {
+  const { target, transition } = plan
   const queueTarget = workspacePaneActionTargetFromCoordinates({
     workspaceId: target.workspaceId,
     workspaceRuntimeId: target.workspaceRuntimeId,
@@ -193,10 +252,16 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   })
   return runWorkspacePaneAction(queueTarget, async () => {
     return await runWorkspacePaneCloseTransition(transition.presentationLease, async () => {
-      await completeCommittedWorkspacePaneClosePresentation(target, transition, options.navigation)
+      await completeCommittedWorkspacePaneClosePresentation(target, transition, navigation)
       return true
     })
   })
+}
+
+export function abandonRetiredTerminalWorkspacePaneTabPresentationPlan(
+  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
+): void {
+  abandonWorkspacePaneCloseTransition(plan.transition.presentationLease)
 }
 
 export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
@@ -349,16 +414,15 @@ function workspacePaneCloseTransition(
   return { wasActive, nextEntry, presentationLease }
 }
 
-function terminalBaseMatchesPaneTarget(base: TerminalSessionBase, target: WorkspacePaneTabModel): boolean {
-  const targetBase = workspacePaneTerminalBaseForTabModel(target)
-  if (!targetBase) return false
-  const actual = terminalExecutionCoordinates(base.target)
-  const expected = terminalExecutionCoordinates(targetBase.target)
-  return (
-    actual.workspaceId === expected.workspaceId &&
-    actual.workspaceRuntimeId === expected.workspaceRuntimeId &&
-    actual.executionRootId === expected.executionRootId
-  )
+function retiredTerminalPaneTarget(base: TerminalSessionBase): WorkspacePaneTabsTarget {
+  const coordinates = terminalExecutionCoordinates(base.target)
+  return base.target.kind === 'workspace-root'
+    ? { kind: 'workspace-root', workspaceId: coordinates.workspaceId }
+    : {
+        kind: 'git-worktree',
+        workspaceId: coordinates.workspaceId,
+        worktreePath: terminalExecutionPath(base.target),
+      }
 }
 
 function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {

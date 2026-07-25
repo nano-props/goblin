@@ -8,10 +8,12 @@ import {
   runConfirmCloseTerminalWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand as runMoveWorkspacePaneTabCommandRaw,
   runNewTerminalTabCommand as runNewTerminalTabCommandRaw,
+  retiredTerminalWorkspacePaneTabPresentationPlanMatchesCommandTarget,
   runSelectWorkspacePaneTabByIndexCommand as runSelectWorkspacePaneTabByIndexCommandRaw,
   runShowWorkspacePaneTabCommand as runShowWorkspacePaneTabCommandRaw,
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
+import type { RetiredTerminalWorkspacePaneTabPresentationPlan } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import {
   setTerminalSessionCommandBridgeForTest as setExactTerminalSessionCommandBridge,
@@ -245,6 +247,31 @@ afterEach(() => {
 })
 
 describe('workspace commands', () => {
+  test('validates a retired terminal target by coordinates without requiring terminal capability', () => {
+    const workspaceRuntimeId = 'runtime-retired-terminal-presentation'
+    const routeTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+    const terminalBase = {
+      target: { kind: 'workspace-root' as const, workspaceId: REPO_ID, workspaceRuntimeId },
+      presentation: { kind: 'workspace-root' as const },
+    }
+    const plan = { routeTarget, terminalBase } as RetiredTerminalWorkspacePaneTabPresentationPlan
+    const target: WorkspacePaneCommandTarget = {
+      routeTarget,
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      filesystemTarget: workspaceRootPaneFilesystemTarget({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId,
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: false },
+          git: { status: 'unavailable' },
+        },
+      }),
+    }
+
+    expect(retiredTerminalWorkspacePaneTabPresentationPlanMatchesCommandTarget(plan, target)).toBe(true)
+  })
+
   test('show workspace pane tab command opens status as a branch static tab when a worktree exists', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
