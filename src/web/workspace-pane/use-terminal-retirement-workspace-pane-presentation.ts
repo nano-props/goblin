@@ -17,12 +17,12 @@ import {
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneFilesystemRuntimeTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import type { RetiredTerminalWorkspacePaneTargetAdmission } from '#/web/workspace-pane/retired-terminal-workspace-pane-target-admission.ts'
+import type { WorkspacePaneFilesystemTargetAdmission } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
 
 export function useTerminalRetirementWorkspacePanePresentation(input: {
   currentRouteTarget: WorkspacePaneTabsTarget | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
-  targetAdmission: RetiredTerminalWorkspacePaneTargetAdmission
+  targetAdmission: WorkspacePaneFilesystemTargetAdmission
   navigation: PrimaryWindowNavigationActions
 }): void {
   const { currentRouteTarget, currentWorkspacePaneRoute, targetAdmission, navigation } = input

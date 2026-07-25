@@ -1,0 +1,141 @@
+import { describe, expect, test } from 'vitest'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { createBranchSnapshot, createGitWorkspaceProbeForTest } from '#/web/test-utils/bridge.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { workspacePaneFilesystemRootPath } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { resolveWorkspacePaneCommandTargetProjection } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/project')
+const ROOT_ROUTE_TARGET = { kind: 'workspace-root', workspaceId: WORKSPACE_ID } satisfies WorkspacePaneTabsTarget
+
+function probingWorkspace(workspaceRuntimeId = 'runtime-1') {
+  return emptyWorkspace(WORKSPACE_ID, 'project', workspaceRuntimeId)
+}
+
+function filesystemWorkspace(workspaceRuntimeId = 'runtime-1') {
+  const workspace = probingWorkspace(workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'ready',
+    name: 'project',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
+  return workspace
+}
+
+function gitWorkspace(workspaceRuntimeId = 'runtime-1') {
+  const workspace = probingWorkspace(workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, createGitWorkspaceProbeForTest('project'))
+  return workspace
+}
+
+function resolveProjection(overrides: Partial<Parameters<typeof resolveWorkspacePaneCommandTargetProjection>[0]> = {}) {
+  return resolveWorkspacePaneCommandTargetProjection({
+    routeTarget: ROOT_ROUTE_TARGET,
+    workspacePaneRoute: null,
+    workspace: filesystemWorkspace(),
+    branchReadModel: { status: 'pending', snapshot: null },
+    worktreeReadModel: { status: 'pending', worktrees: null },
+    ...overrides,
+  })
+}
+
+describe('resolveWorkspacePaneCommandTargetProjection', () => {
+  test('keeps admission pending while the workspace capability is unresolved', () => {
+    const projection = resolveProjection({ workspace: probingWorkspace() })
+
+    expect(projection.target).toBeNull()
+    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'pending', workspaceRuntimeId: 'runtime-1' })
+  })
+
+  test('resolves a workspace-root target without waiting for disabled repo queries', () => {
+    const projection = resolveProjection()
+
+    expect(projection.target?.routeTarget).toEqual(ROOT_ROUTE_TARGET)
+    expect(projection.filesystemTargetAdmission).toEqual({
+      kind: 'ready',
+      workspaceRuntimeId: 'runtime-1',
+      target: projection.target,
+    })
+  })
+
+  test('keeps a branch target pending until both authoritative repo read models resolve', () => {
+    const routeTarget = { kind: 'git-branch' as const, workspaceId: WORKSPACE_ID, branchName: 'feature' }
+    const projection = resolveProjection({
+      routeTarget,
+      workspace: gitWorkspace(),
+      branchReadModel: { status: 'success', snapshot: { branches: [], current: 'main' } },
+      worktreeReadModel: { status: 'pending', worktrees: null },
+    })
+
+    expect(projection.target).toEqual({ routeTarget, workspacePaneRoute: null, filesystemTarget: null })
+    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'pending', workspaceRuntimeId: 'runtime-1' })
+  })
+
+  test('atomically resolves a branch command target from matching branch and worktree read models', () => {
+    const routeTarget = { kind: 'git-branch' as const, workspaceId: WORKSPACE_ID, branchName: 'feature' }
+    const worktreePath = '/workspace/project-feature'
+    const snapshot: RepoSnapshot = {
+      branches: [createBranchSnapshot('feature', { worktree: { path: worktreePath } })],
+      current: 'main',
+    }
+    const projection = resolveProjection({
+      routeTarget,
+      workspace: gitWorkspace(),
+      branchReadModel: { status: 'success', snapshot },
+      worktreeReadModel: {
+        status: 'success',
+        worktrees: [{ path: worktreePath, branch: 'feature', isMain: false, entries: [] }],
+      },
+    })
+
+    const filesystemTarget = projection.target?.filesystemTarget
+    if (!filesystemTarget) throw new Error('missing projected branch filesystem target')
+    expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
+    expect(projection.filesystemTargetAdmission.kind).toBe('ready')
+  })
+
+  test('resolves a direct worktree target from the worktree read model alone', () => {
+    const worktreePath = '/workspace/project-worktree'
+    const projection = resolveProjection({
+      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath },
+      workspace: gitWorkspace(),
+      branchReadModel: { status: 'pending', snapshot: null },
+      worktreeReadModel: {
+        status: 'success',
+        worktrees: [{ path: worktreePath, branch: 'feature', isMain: false, entries: [] }],
+      },
+    })
+
+    const filesystemTarget = projection.target?.filesystemTarget
+    if (!filesystemTarget) throw new Error('missing projected worktree filesystem target')
+    expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
+    expect(projection.filesystemTargetAdmission.kind).toBe('ready')
+  })
+
+  test('rejects a definitively unresolved target after its required read models settle', () => {
+    const projection = resolveProjection({
+      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature' },
+      workspace: gitWorkspace(),
+      branchReadModel: { status: 'success', snapshot: { branches: [], current: 'main' } },
+      worktreeReadModel: { status: 'success', worktrees: [] },
+    })
+
+    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'unavailable', workspaceRuntimeId: 'runtime-1' })
+  })
+
+  test('rejects a route target owned by a different workspace projection', () => {
+    const differentWorkspaceId = workspaceIdForTest('goblin+file:///workspace/different')
+    const projection = resolveProjection({ workspace: emptyWorkspace(differentWorkspaceId, 'different', 'runtime-1') })
+
+    expect(projection.target).toBeNull()
+    expect(projection.filesystemTargetAdmission).toEqual({ kind: 'unavailable', workspaceRuntimeId: 'runtime-1' })
+  })
+})

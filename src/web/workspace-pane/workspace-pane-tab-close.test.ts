@@ -9,9 +9,10 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
+  captureRetiredTerminalWorkspacePaneTabPresentationPlan,
+  commitRetiredTerminalWorkspacePaneTabPresentationPlan,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
-  dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -711,14 +712,15 @@ test('presents a naturally exited active terminal through the captured exact clo
     return true
   })
 
+  const plan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
+    workspacePaneRoute: sourceRoute,
+    routeTarget: paneTarget,
+    terminalSessionId,
+    terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+  })
+  if (!plan) throw new Error('missing retired terminal presentation plan')
   await expect(
-    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspacePaneRoute: sourceRoute,
-      routeTarget: paneTarget,
-      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
-      terminalSessionId,
-      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-    }),
+    commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, navigationWith({ commitFilesystemWorkspacePaneRoute })),
   ).resolves.toBe(true)
 
   expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -731,24 +733,20 @@ test('presents a naturally exited active terminal through the captured exact clo
   const explicitGeneration = beginPrimaryWindowNavigation()
   const explicitNavigation = registerPrimaryWindowNavigation(explicitGeneration, '/pending-explicit-navigation')
   if (!explicitNavigation) throw new Error('missing explicit navigation registration')
-  const passiveCommit = vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
 
-  await expect(
-    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspacePaneRoute: sourceRoute,
-      routeTarget: paneTarget,
-      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute: passiveCommit }),
-      terminalSessionId,
-      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-    }),
-  ).resolves.toBe(true)
+  const rejectedPlan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
+    workspacePaneRoute: sourceRoute,
+    routeTarget: paneTarget,
+    terminalSessionId,
+    terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+  })
 
-  expect(passiveCommit).not.toHaveBeenCalled()
+  expect(rejectedPlan).toBeNull()
   expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
   explicitNavigation.release()
 })
 
-test('does not navigate when a background terminal exits naturally', async () => {
+test('does not capture close-back when a background terminal exits naturally', () => {
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
@@ -762,20 +760,14 @@ test('does not navigate when a background terminal exits naturally', async () =>
     workspaceRuntimeId: repo.workspaceRuntimeId,
     tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
   })
-  const commitFilesystemWorkspacePaneRoute =
-    vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
+  const plan = captureRetiredTerminalWorkspacePaneTabPresentationPlan({
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    routeTarget: paneTarget,
+    terminalSessionId,
+    terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
+  })
 
-  await expect(
-    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
-      workspacePaneRoute: { kind: 'static', tab: 'status' },
-      routeTarget: paneTarget,
-      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
-      terminalSessionId,
-      terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-    }),
-  ).resolves.toBe(true)
-
-  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  expect(plan).toBeNull()
 })
 
 function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {

@@ -79,9 +79,9 @@ export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends Close
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
 
-export interface RetiredTerminalWorkspacePaneTabPresentationOptions extends Pick<
+interface RetiredTerminalWorkspacePaneTabPresentationCaptureOptions extends Pick<
   CloseWorkspacePaneTabActionOptions,
-  'workspacePaneRoute' | 'routeTarget' | 'navigation'
+  'workspacePaneRoute' | 'routeTarget'
 > {
   terminalSessionId: string
   terminalBase: TerminalSessionBase
@@ -159,26 +159,13 @@ async function closeWorkspacePaneTabAction(
 }
 
 /**
- * Completes only the presentation half of a terminal retirement. The server
- * has already committed the resource transition, so this captures the exact
- * close-back plan from the still-complete before projection and never issues a
- * second terminal close.
- */
-export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
-  options: RetiredTerminalWorkspacePaneTabPresentationOptions,
-): Promise<boolean> {
-  const plan = captureRetiredTerminalWorkspacePaneTabPresentationPlan(options)
-  return plan ? commitRetiredTerminalWorkspacePaneTabPresentationPlan(plan, options.navigation) : Promise.resolve(true)
-}
-
-/**
  * Captures every close-back fact synchronously from the complete before
  * projection. A caller may retain this immutable plan while broader command
  * read models hydrate; it must never re-derive the destination from the later
  * after projection.
  */
 export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
-  options: Omit<RetiredTerminalWorkspacePaneTabPresentationOptions, 'navigation'>,
+  options: RetiredTerminalWorkspacePaneTabPresentationCaptureOptions,
 ): RetiredTerminalWorkspacePaneTabPresentationPlan | null {
   const coordinates = terminalExecutionCoordinates(options.terminalBase.target)
   if (options.routeTarget.workspaceId !== coordinates.workspaceId) return null

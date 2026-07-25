@@ -8,7 +8,7 @@ import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-
 import type { RetiredTerminalWorkspacePaneTabPresentationPlan } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import type { RetiredTerminalWorkspacePaneTargetAdmission } from '#/web/workspace-pane/retired-terminal-workspace-pane-target-admission.ts'
+import type { WorkspacePaneFilesystemTargetAdmission } from '#/web/workspace-pane/workspace-pane-command-target-projection.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -101,7 +101,7 @@ test('retains a captured retirement plan until the hydrated command target can v
   const plan = presentationPlanForTest(terminalSessionId, routeTarget)
   mocks.capturePresentation.mockReturnValue(plan)
   const { rerender, unmount } = renderHook(
-    ({ targetAdmission }: { targetAdmission: RetiredTerminalWorkspacePaneTargetAdmission }) =>
+    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: routeTarget,
         currentWorkspacePaneRoute: workspacePaneRoute,
@@ -113,7 +113,7 @@ test('retains a captured retirement plan until the hydrated command target can v
         targetAdmission: {
           kind: 'pending',
           workspaceRuntimeId: 'runtime-1',
-        } as RetiredTerminalWorkspacePaneTargetAdmission,
+        } as WorkspacePaneFilesystemTargetAdmission,
       },
     },
   )
@@ -151,7 +151,7 @@ test('abandons a captured retirement plan when the workspace runtime is replaced
   const plan = presentationPlanForTest(terminalSessionId, routeTarget)
   mocks.capturePresentation.mockReturnValue(plan)
   const { rerender } = renderHook(
-    ({ targetAdmission }: { targetAdmission: RetiredTerminalWorkspacePaneTargetAdmission }) =>
+    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: routeTarget,
         currentWorkspacePaneRoute: workspacePaneRoute,
@@ -163,7 +163,7 @@ test('abandons a captured retirement plan when the workspace runtime is replaced
         targetAdmission: {
           kind: 'pending',
           workspaceRuntimeId: 'runtime-1',
-        } as RetiredTerminalWorkspacePaneTargetAdmission,
+        } as WorkspacePaneFilesystemTargetAdmission,
       },
     },
   )
@@ -198,7 +198,7 @@ test('abandons a captured retirement plan when target hydration finishes unavail
   const plan = presentationPlanForTest(terminalSessionId, routeTarget)
   mocks.capturePresentation.mockReturnValue(plan)
   const { rerender } = renderHook(
-    ({ targetAdmission }: { targetAdmission: RetiredTerminalWorkspacePaneTargetAdmission }) =>
+    ({ targetAdmission }: { targetAdmission: WorkspacePaneFilesystemTargetAdmission }) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: routeTarget,
         currentWorkspacePaneRoute: workspacePaneRoute,
@@ -210,7 +210,7 @@ test('abandons a captured retirement plan when target hydration finishes unavail
         targetAdmission: {
           kind: 'pending',
           workspaceRuntimeId: 'runtime-1',
-        } as RetiredTerminalWorkspacePaneTargetAdmission,
+        } as WorkspacePaneFilesystemTargetAdmission,
       },
     },
   )
