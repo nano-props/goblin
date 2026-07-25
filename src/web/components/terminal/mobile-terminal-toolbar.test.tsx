@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import { act, fireEvent } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
@@ -94,6 +93,8 @@ describe('MobileTerminalToolbar', () => {
 
   test('orders the compact two-column groups by navigation then terminal actions', () => {
     const { container } = render()
+    const toolbarGroup = container.querySelector('[role="group"]')
+    expect(toolbarGroup?.getAttribute('aria-label')).toBe(LABELS.toolbar)
     const accessibleNames = Array.from(container.querySelectorAll('button')).map(
       (button) => button.querySelector('.sr-only')?.textContent,
     )
@@ -154,7 +155,7 @@ describe('MobileTerminalToolbar', () => {
     expect(onVirtualKey).not.toHaveBeenCalled()
   })
 
-  test('preserves the current focus during pointer activation', async () => {
+  test('prevents pointer activation from taking the current focus', () => {
     const input = document.createElement('textarea')
     document.body.appendChild(input)
     try {
@@ -165,7 +166,7 @@ describe('MobileTerminalToolbar', () => {
       )
       if (!tabButton) throw new Error('expected Tab button')
 
-      await userEvent.setup().click(tabButton)
+      expect(fireEvent.pointerDown(tabButton)).toBe(false)
       expect(document.activeElement).toBe(input)
     } finally {
       input.remove()

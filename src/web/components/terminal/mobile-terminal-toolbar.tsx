@@ -122,7 +122,7 @@ export function MobileTerminalToolbar({
   className,
 }: MobileTerminalToolbarProps) {
   return (
-    <div className={cn('goblin-terminal-mobile-toolbar', className)} role="toolbar" aria-label={labels.toolbar}>
+    <div className={cn('goblin-terminal-mobile-toolbar', className)} role="group" aria-label={labels.toolbar}>
       <div className="goblin-terminal-mobile-toolbar__row">
         {KEY_GROUPS.map((group) => (
           <div key={group.id} className="goblin-terminal-mobile-toolbar__group">
@@ -144,7 +144,7 @@ export function MobileTerminalToolbar({
                   key.compactPriority === 'low' && 'goblin-terminal-mobile-toolbar__btn--low-priority',
                   key.compactPriority === 'horizontal-arrow' && 'goblin-terminal-mobile-toolbar__btn--horizontal-arrow',
                 )}
-                onMouseDown={(event) => event.preventDefault()}
+                onPointerDown={(event) => event.preventDefault()}
                 onClick={() => {
                   if (key.type === 'paste') {
                     onPaste()
