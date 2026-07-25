@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { watch } from 'node:fs'
 import path from 'node:path'
+import electron from 'electron'
 import { omit } from 'es-toolkit'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
 import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
@@ -12,16 +13,9 @@ const webDevPort = parsePort(process.env.GOBLIN_WEB_DEV_PORT) ?? 5173
 const webDevUrl = `http://${webDevHost}:${webDevPort}/`
 const embeddedServerPort = await chooseEmbeddedServerPort(webDevHost)
 const viteArgs = [localBin('vite'), '--host', webDevHost, '--port', String(webDevPort), '--strictPort']
-const electronArgs = [
-  localBin('electron'),
-  '.',
-  // Optional Chrome DevTools Protocol port for agent-browser. Off
-  // by default; `AGENT_BROWSER_CDP_PORT=9222 bun run dev` enables
-  // it. Only used for end-to-end testing.
-  ...(process.env.AGENT_BROWSER_CDP_PORT ? [`--remote-debugging-port=${process.env.AGENT_BROWSER_CDP_PORT}`] : []),
-]
-const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'src/system', 'vite.config.ts'].map((target) =>
-  path.join(repoRoot, target),
+const electronCommand = createElectronCommand()
+const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'src/system', 'vite.config.ts'].map(
+  (target) => path.join(repoRoot, target),
 )
 
 let shuttingDown = false
@@ -118,7 +112,7 @@ function launchElectron(): Bun.Subprocess {
   // embedded server child process still re-applies it via
   // embedded-server-lifecycle.ts to spawn Node for the worker entry.
   const electronEnv = omit(process.env, ['ELECTRON_RUN_AS_NODE'])
-  const proc = Bun.spawn(electronArgs, {
+  const proc = Bun.spawn(electronCommand, {
     cwd: repoRoot,
     stdin: 'inherit',
     stdout: 'inherit',
@@ -143,11 +137,28 @@ function launchElectron(): Bun.Subprocess {
   return proc
 }
 
+function createElectronCommand(): string[] {
+  const executable: unknown = electron
+  if (typeof executable !== 'string') throw new Error('Electron executable path is unavailable')
+  const command = [executable, '.']
+  const userDataDir = process.env.GOBLIN_ELECTRON_USER_DATA_DIR?.trim()
+  if (userDataDir) command.push(`--user-data-dir=${userDataDir}`)
+  const remoteDebuggingPortInput = process.env.AGENT_BROWSER_CDP_PORT?.trim()
+  if (remoteDebuggingPortInput) {
+    const remoteDebuggingPort = parsePort(remoteDebuggingPortInput)
+    if (remoteDebuggingPort === null) throw new Error('AGENT_BROWSER_CDP_PORT must be a valid TCP port')
+    command.push(`--remote-debugging-port=${remoteDebuggingPort}`)
+  }
+  return command
+}
+
 async function restartElectron(): Promise<void> {
   if (!electronProc || restartPending) return
   restartPending = true
   log('main/preload/server/shared config changed; restarting Electron')
-  electronProc.kill()
+  // The native host converts SIGTERM into app.quit(), so `exited` resolves
+  // only after its embedded server and PTY worker have stopped.
+  electronProc.kill('SIGTERM')
 }
 
 async function shutdown(code: number): Promise<never> {

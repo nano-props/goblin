@@ -2,6 +2,11 @@ import { describe, expect, test } from 'vitest'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
+  test('accepts tab close without a window-close variant', () => {
+    expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-requested' })).toBe(true)
+    expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-or-window-requested' })).toBe(false)
+  })
+
   test('accepts workspace pane tab intents with a known tab type', () => {
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(true)
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })).toBe(true)
@@ -42,9 +47,7 @@ describe('isClientEffectIntent', () => {
         key: 'term-111111111111111111111',
       }),
     ).toBe(false)
-    expect(
-      isClientEffectIntent({ type: 'terminal-bell-click', terminalSessionId: 1 }),
-    ).toBe(false)
+    expect(isClientEffectIntent({ type: 'terminal-bell-click', terminalSessionId: 1 })).toBe(false)
     expect(
       isClientEffectIntent({
         type: 'terminal-bell-click',
@@ -69,9 +72,7 @@ describe('isClientEffectIntent', () => {
       }),
     ).toBe(true)
     expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: '' } })).toBe(false)
-    expect(
-      isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: 'remote:repo' } }),
-    ).toBe(false)
+    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { id: 'remote:repo' } })).toBe(false)
     expect(
       isClientEffectIntent({
         type: 'open-recent-workspace-requested',

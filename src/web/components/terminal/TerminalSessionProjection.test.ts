@@ -23,11 +23,18 @@ import {
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
 }))
+const workspacePaneTabsCommitMocks = vi.hoisted(() => ({
+  writeCanonicalSnapshot: vi.fn(() => true),
+}))
 
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     close: workspacePaneRuntimeMocks.close,
   },
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
+  writeCanonicalWorkspacePaneTabsSnapshot: workspacePaneTabsCommitMocks.writeCanonicalSnapshot,
 }))
 
 function workspaceIdFixture(input: string) {
@@ -73,19 +80,20 @@ function makeServerSession(
   terminalSessionId: string,
   overrides: Partial<{
     terminalRuntimeGeneration: number
+    identityRevision: number
     controller: { clientId: string; status: 'connected' }
     processName: string
     canonicalTitle: string | null
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
-    cols: number
-    rows: number
+    canonicalSize: { cols: number; rows: number } | null
     workspaceRuntimeId: string
   }> = {},
 ): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? 1,
+    identityRevision: overrides.identityRevision ?? 0,
     terminalSessionId,
     target: { ...RUNTIME_TARGET, workspaceRuntimeId: overrides.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID },
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
@@ -94,8 +102,7 @@ function makeServerSession(
     canonicalTitle: overrides.canonicalTitle ?? null,
     phase: overrides.phase ?? 'open',
     message: overrides.message ?? null,
-    cols: overrides.cols ?? 80,
-    rows: overrides.rows ?? 24,
+    canonicalSize: overrides.canonicalSize ?? { cols: 80, rows: 24 },
   }
 }
 
@@ -106,6 +113,7 @@ function successfulRuntimeCloseSnapshot(
   return {
     ok: true as const,
     runtimeType: 'terminal' as const,
+    paneTabsSnapshot: { revision: 7, entries: [] },
     runtime:
       terminalRuntimeSessionId === null
         ? { action: 'already-closed' as const, terminalSessionId }
@@ -126,6 +134,7 @@ describe('TerminalSessionProjection', () => {
     resetWorkspacesStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
+    workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockClear()
     selectedChanges = []
     projection = new TerminalSessionProjection((terminalFilesystemTargetKey, terminalSessionId) =>
       selectedChanges.push({ terminalFilesystemTargetKey, terminalSessionId }),
@@ -163,6 +172,24 @@ describe('TerminalSessionProjection', () => {
 
     expect(reconciled).toBe(false)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
+  test('returns the session focus admission result', () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+      'client_local',
+    )
+    const session = requiredTerminalSession(projection, terminalSessionId)
+    const request = { isCurrent: () => true, onSettled: vi.fn() }
+    const focus = vi.spyOn(session, 'focus').mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    expect(projection.focusTerminal(terminalSessionId, request)).toBe(false)
+    expect(projection.focusTerminal(terminalSessionId, request)).toBe(true)
+    expect(focus).toHaveBeenNthCalledWith(1, request)
+    expect(focus).toHaveBeenNthCalledWith(2, request)
   })
 
   describe('versioned terminal session snapshots', () => {
@@ -390,7 +417,6 @@ describe('TerminalSessionProjection', () => {
         ...contradictoryIdentity,
         data: 'must not be routed',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       projection.handleServerBell({
@@ -411,16 +437,15 @@ describe('TerminalSessionProjection', () => {
       })
       projection.handleIdentity({
         ...contradictoryIdentity,
+        identityRevision: 1,
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       })
       projection.handleLifecycle({
         ...contradictoryIdentity,
         phase: 'open',
         message: null,
-        takeoverPending: false,
       })
       projection.handleSessionClosed(contradictoryIdentity)
 
@@ -452,7 +477,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -463,7 +487,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -489,7 +512,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       vi.advanceTimersByTime(5000)
@@ -499,7 +521,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: '',
         seq: 2,
-        outputEra: 0,
         processName: 'bash',
       })
 
@@ -525,7 +546,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'stale output',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
 
@@ -660,7 +680,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
-        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -668,11 +687,11 @@ describe('TerminalSessionProjection', () => {
       projection.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        identityRevision: 1,
         terminalSessionId: 'term-111111111111111111111',
         role: 'controller',
         controllerStatus: 'connected',
-        canonicalCols: 100,
-        canonicalRows: 30,
+        canonicalSize: { cols: 100, rows: 30 },
       })
       expect(handleIdentitySpy).toHaveBeenCalledTimes(1)
 
@@ -682,7 +701,6 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         phase: 'open',
         message: null,
-        takeoverPending: false,
       })
       expect(handleLifecycleSpy).toHaveBeenCalledTimes(1)
 
@@ -1068,7 +1086,7 @@ describe('TerminalSessionProjection', () => {
       expect(closedSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
     })
 
-    test('applies the exact close effect after refreshing workspace tabs', async () => {
+    test('commits the close response snapshot before applying its exact terminal effect', async () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -1089,6 +1107,11 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
+      expect(workspacePaneTabsCommitMocks.writeCanonicalSnapshot).toHaveBeenCalledWith(
+        REPO_ROOT,
+        WORKSPACE_RUNTIME_ID,
+        { revision: 7, entries: [] },
+      )
       expect(
         projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual(['term-222222222222222222222'])
@@ -1568,7 +1591,9 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
     const session = requiredTerminalSession(localProjection, terminalSessionId)
-    terminalSessionRuntimeAccess(session).runtime.failRuntime('error.restart-failed')
+    const restartAttempt = terminalSessionRuntimeAccess(session).runtime.prepareRestart()
+    if (!restartAttempt) throw new Error('expected restart attempt')
+    terminalSessionRuntimeAccess(session).runtime.failStartAttempt(restartAttempt, 'error.restart-failed')
 
     localProjection.handleExit({
       terminalRuntimeSessionId,
@@ -1615,17 +1640,14 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
       terminalRuntimeGeneration: 2,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
@@ -1667,17 +1689,14 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: lineageB,
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1735,17 +1754,14 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     session.hydrate({
       terminalRuntimeSessionId: lineageC,
       terminalRuntimeGeneration: 0,
+      identityRevision: 0,
       phase: 'open',
       message: null,
       processName: 'zsh',
       canonicalTitle: null,
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 80,
-      canonicalRows: 24,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: { cols: 80, rows: 24 },
     })
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)

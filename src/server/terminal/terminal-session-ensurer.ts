@@ -20,9 +20,6 @@ import {
 export interface TerminalSessionEnsureInput {
   terminalSessionId?: string
   startupShellCommand?: string
-  cols?: number
-  rows?: number
-  clientId?: string
   target: TerminalExecutionTarget
 }
 
@@ -56,9 +53,6 @@ export interface TerminalSessionEnsureManagerInput {
   terminalSessionId: string
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   cwd: string
-  cols: number
-  rows: number
-  clientId?: string
   command?: string
   args?: string[]
   startupShellCommand?: string
@@ -80,8 +74,6 @@ export interface TerminalSessionEnsurerOptions {
 
 export interface TerminalSessionEnsureContext {
   terminalSessionId: string
-  cols: number
-  rows: number
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   signal: AbortSignal
 }
@@ -111,24 +103,15 @@ class TerminalSessionEnsurer {
   ): Promise<TerminalSessionEnsureResult> {
     const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'remote') return { ok: false, message: 'error.invalid-worktree-capability' }
-    const invocation = buildRemoteTerminalInvocation(
-      execution.target,
-      execution.canonicalWorktreePath,
-      {
-        cols: context.cols,
-        rows: context.rows,
-      },
-      { startupShellCommand: input.startupShellCommand },
-    )
+    const invocation = buildRemoteTerminalInvocation(execution.target, execution.canonicalWorktreePath, {
+      startupShellCommand: input.startupShellCommand,
+    })
     const coordinates = terminalExecutionCoordinates(input.target)
     const result = await this.options.manager.prepareSession({
       userId,
       terminalSessionId: context.terminalSessionId,
       physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: process.cwd(),
-      cols: context.cols,
-      rows: context.rows,
-      clientId: input.clientId,
       command: invocation.command,
       args: invocation.args,
       signal: context.signal,
@@ -156,9 +139,6 @@ class TerminalSessionEnsurer {
       terminalSessionId: context.terminalSessionId,
       physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: worktreePath,
-      cols: context.cols,
-      rows: context.rows,
-      clientId: input.clientId,
       startupShellCommand: input.startupShellCommand,
       env,
       signal: context.signal,

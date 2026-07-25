@@ -56,7 +56,8 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -158,55 +159,99 @@ function AuthenticatedWorkspaceShell() {
     hydratedRouteWorkspaceId ? s.workspaces[hydratedRouteWorkspaceId] : undefined,
   )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
-  const currentWorkspacePaneRoute =
-    routeContext?.kind === 'branch' || routeContext?.kind === 'workspace-root'
-      ? (routeContext.workspacePaneRoute ?? null)
-      : null
+  const currentWorkspacePaneRoute = currentWorkspacePaneRouteFromContext(routeContext)
   const commandCapabilities =
     commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
       ? commandWorkspace.capability.probe.capabilities
       : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
+  const commandBranchProjection = useRepoProjectionReadModel(
+    commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
+    commandWorkspace?.workspaceRuntimeId ?? '',
+    routeContext?.kind === 'branch' ? routeContext.branchName : null,
+    'full',
+    routeContext?.kind === 'branch' && commandWorkspace?.capability.kind === 'git',
+  )
+  const commandWorktreeStatus = useRepoWorktreeStatusReadModel(
+    commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
+    commandWorkspace?.workspaceRuntimeId ?? '',
+    (routeContext?.kind === 'branch' || routeContext?.kind === 'worktree') &&
+      commandWorkspace?.capability.kind === 'git',
+  )
+  const commandWorktree =
+    routeContext?.kind === 'worktree' && commandWorktreePath && commandWorktreeStatus.isSuccess
+      ? (commandWorktreeStatus.data?.status.find((worktree) => worktree.path === commandWorktreePath) ?? null)
+      : null
   const commandBranch =
-    commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
-      ? (readRepoBranchSnapshotQueryProjection(commandWorkspace)?.branches.find(
+    commandWorkspace &&
+    routeContext?.kind === 'branch' &&
+    routeContext.branchName &&
+    commandBranchProjection.isSuccess &&
+    commandWorktreeStatus.isSuccess &&
+    commandBranchProjection.data?.snapshot &&
+    commandWorktreeStatus.data
+      ? (repoBranchSnapshotDataFromSnapshot(commandBranchProjection.data.snapshot).branches.find(
           (branch) => branch.name === routeContext.branchName,
         ) ?? null)
       : null
+  const commandBranchCandidateWorktreePath = commandBranch?.worktree?.path ?? null
+  const commandBranchWorktreePath =
+    routeContext?.kind === 'branch' &&
+    commandBranchCandidateWorktreePath &&
+    commandWorktreeStatus.data?.status.some(
+      (worktree) => worktree.path === commandBranchCandidateWorktreePath && worktree.branch === routeContext.branchName,
+    )
+      ? commandBranchCandidateWorktreePath
+      : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
-    routeContext?.kind === 'branch' && routeContext.branchName
-      ? commandWorkspace?.capability.kind === 'git' && commandBranch?.worktree?.path
+    routeContext?.kind === 'branch' && routeContext.branchName && commandWorkspace
+      ? commandWorkspace?.capability.kind === 'git' && commandBranchWorktreePath
         ? {
-            kind: 'git-worktree',
+            routeTarget: {
+              kind: 'git-branch',
+              workspaceId: commandWorkspace.id,
+              branchName: routeContext.branchName,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
-              worktreePath: commandBranch.worktree.path,
-              head: gitHead(commandBranch.name),
+              worktreePath: commandBranchWorktreePath,
+              head: gitHead(routeContext.branchName),
               capabilities: commandWorkspace.capability.probe.capabilities,
             }),
           }
         : {
-            kind: 'git-branch',
-            branchName: routeContext.branchName,
+            routeTarget: {
+              kind: 'git-branch',
+              workspaceId: commandWorkspace.id,
+              branchName: routeContext.branchName,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: null,
           }
-      : routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git' && commandWorktreePath
+      : routeContext?.kind === 'worktree' &&
+          commandWorkspace?.capability.kind === 'git' &&
+          commandWorktreePath &&
+          commandWorktree
         ? {
-            kind: 'git-worktree',
+            routeTarget: {
+              kind: 'git-worktree',
+              workspaceId: commandWorkspace.id,
+              worktreePath: commandWorktreePath,
+            },
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
               worktreePath: commandWorktreePath,
-              head: { kind: 'detached' },
+              head: gitHead(commandWorktree.branch ?? null),
               capabilities: commandWorkspace.capability.probe.capabilities,
             }),
           }
         : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities
           ? {
-              kind: 'workspace-root',
+              routeTarget: { kind: 'workspace-root', workspaceId: commandWorkspace.id },
               workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
               filesystemTarget: workspaceRootPaneFilesystemTarget({
                 workspaceId: commandWorkspace.id,
@@ -347,6 +392,12 @@ type WorkspaceRouteContext =
       worktreePath: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
+
+export function currentWorkspacePaneRouteFromContext(
+  routeContext: WorkspaceRouteContext | null,
+): ParsedWorkspacePaneRoute | null {
+  return routeContext && 'workspacePaneRoute' in routeContext ? routeContext.workspacePaneRoute : null
+}
 
 export function workspaceRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
@@ -535,28 +586,11 @@ function workspaceNavigationRouteContext(
   if (!routeContext) return null
   const workspaceId = workspaceIdFromSlug(routeContext.workspaceSlug)
   if (!workspaceId) return null
-  if (routeContext.kind === 'branch') {
+  if (routeContext.kind === 'branch' || routeContext.kind === 'workspace-root' || routeContext.kind === 'worktree') {
     return null
-  }
-  if (routeContext.kind === 'worktree') {
-    return {
-      kind: 'worktree',
-      workspaceId,
-      worktreePath: routeContext.worktreePath,
-      workspacePaneRoute:
-        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
-    }
   }
   if (routeContext.kind === 'newWorktree') {
     return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
-  }
-  if (routeContext.kind === 'workspace-root') {
-    return {
-      kind: 'workspace-root',
-      workspaceId,
-      workspacePaneRoute:
-        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
-    }
   }
   return { kind: routeContext.kind, workspaceId }
 }

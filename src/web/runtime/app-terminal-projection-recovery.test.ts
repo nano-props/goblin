@@ -24,12 +24,12 @@ describe('AppTerminalProjectionRecovery', () => {
       beginHydration: vi.fn(),
       markReady,
       markFailed: vi.fn(),
-      shouldRefresh: () => true,
+      isFocusRefreshDue: () => true,
       logFailure: vi.fn(),
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope)
+    recovery.request(scope, { kind: 'minimum-revision', revision: 0 })
 
     await vi.waitFor(() => expect(markReady).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId))
     expect(reconcile).toHaveBeenCalledWith(TARGET, { revision: 2, sessions: [] }, 'client-test')
@@ -50,11 +50,11 @@ describe('AppTerminalProjectionRecovery', () => {
       beginHydration: vi.fn(),
       markReady: vi.fn(),
       markFailed,
-      shouldRefresh: () => true,
+      isFocusRefreshDue: () => true,
       logFailure: vi.fn(),
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true))
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 0 })
 
     await vi.waitFor(() =>
       expect(markFailed).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId, failure.message),
@@ -75,11 +75,11 @@ describe('AppTerminalProjectionRecovery', () => {
       beginHydration: vi.fn(),
       markReady: vi.fn(),
       markFailed: vi.fn(),
-      shouldRefresh: () => true,
+      isFocusRefreshDue: () => true,
       logFailure: vi.fn(),
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { resynchronizeConnectedViews: true })
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'reconnect' })
 
     await vi.waitFor(() =>
       expect(resynchronizeConnectedViews).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId),

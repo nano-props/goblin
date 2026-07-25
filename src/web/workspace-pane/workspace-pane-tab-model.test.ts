@@ -4,6 +4,7 @@ import {
   createWorkspacePaneTabModel,
   nextWorkspacePaneTabEntryAfterClose,
   materializedWorkspacePaneRuntimeTabSessionId,
+  workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
   type WorkspacePaneTabModelInput,
   type WorkspacePaneRuntimeTabStateInputByType,
@@ -35,6 +36,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
       paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
       worktreeHead: { kind: 'detached' },
       preferredTab: 'history',
@@ -46,6 +48,15 @@ describe('repo workspace pane tab model', () => {
     expect(model.tabEntries.map((entry) => entry.type)).toEqual(['status', 'files'])
     expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
     expect(model.renderedTab).toBe('status')
+    expect(workspacePaneTerminalBaseForTabModel(model)).toEqual({
+      target: {
+        kind: 'git-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        root: workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-worktree'),
+      },
+      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+    })
   })
 
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
@@ -53,6 +64,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
+      routeTarget: { kind: 'workspace-root', workspaceId },
       paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'files',
       tabEntries: [workspacePaneStaticTabEntry('files')],
@@ -70,6 +82,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
+      routeTarget: { kind: 'workspace-root', workspaceId },
       paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'terminal',
       tabEntries: [
@@ -100,6 +113,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
+      routeTarget: { kind: 'workspace-root', workspaceId },
       paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'terminal',
       allowPreferredTabFallback: false,
@@ -316,6 +330,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/model' },
       paneTarget: requiredGitWorkspacePaneTabsTarget(WORKSPACE_ID, 'feature/model', WORKTREE_PATH),
       worktreeHead: { kind: 'branch', branchName: 'feature/model' },
       preferredTab: 'status',
@@ -643,9 +658,9 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('keeps runtime-host while create is pending after the last tab was closed', () => {
-    // Creating a terminal from an empty strip must still mount the terminal
-    // host; otherwise the projection waits for host geometry until it times
-    // out with error.terminal-host-not-measurable.
+    // Creating from an empty strip must preserve the runtime presentation
+    // surface. The prepared session can then mount and fit its real xterm
+    // before attach; this host is not a create-time geometry provider.
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -914,7 +929,7 @@ describe('repo workspace pane tab model', () => {
 
 type WorkspacePaneTabModelTestInput = Omit<
   WorkspacePaneTabModelInput,
-  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'paneTarget' | 'worktreeHead'
+  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'routeTarget' | 'paneTarget' | 'worktreeHead'
 > & {
   branchName: string | null
   worktreePath: string | null
@@ -945,6 +960,11 @@ function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePaneTabMod
   return createWorkspacePaneTabModel({
     workspaceRuntimeId: workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
     ...modelInput,
+    routeTarget: branchName
+      ? { kind: 'git-branch', workspaceId: modelInput.workspaceId, branchName }
+      : worktreePath === modelInput.workspaceId
+        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
+        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
     paneTarget: branchName
       ? requiredGitWorkspacePaneTabsTarget(modelInput.workspaceId, branchName, worktreePath)
       : worktreePath === modelInput.workspaceId

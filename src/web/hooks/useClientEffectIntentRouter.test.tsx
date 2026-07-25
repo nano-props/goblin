@@ -21,15 +21,17 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
+  observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
+  type ObservedPrimaryWindowNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   terminalExecutionPath,
   terminalPresentationBranch,
@@ -50,6 +52,7 @@ import {
   type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -69,6 +72,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
 
 const ipcEventListeners = new Set<(event: IpcEvent) => void>()
 const intentListeners = new Set<(event: any) => void>()
+let nativeIntentSubscriptionStarts = 0
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
@@ -76,7 +80,7 @@ let currentWorkspaceId: WorkspaceId | null = null
 let currentBranchName: string | null = null
 let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
 let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null
-let navigation!: PrimaryWindowNavigationActions
+let navigation!: ObservedPrimaryWindowNavigationActionsForTest
 const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
@@ -103,8 +107,9 @@ beforeEach(() => {
   currentBranchName = null
   currentWorkspacePaneRoute = null
   currentFilesystemTarget = null
+  nativeIntentSubscriptionStarts = 0
   setTerminalSessionCommandBridge(null)
-  navigation = {
+  navigation = observedPrimaryWindowNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: (repoId) => {
       activateWorkspaceSpy(repoId)
@@ -130,13 +135,11 @@ beforeEach(() => {
       showWorkspaceRootPaneTabSpy(workspaceId, presentation)
       return true
     },
-    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
-  }
-  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  })
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: currentNativeBridge({
@@ -149,6 +152,7 @@ beforeEach(() => {
         }
       }),
       onIntent: vi.fn((cb: (event: any) => void) => {
+        nativeIntentSubscriptionStarts += 1
         intentListeners.add(cb)
         return () => {
           intentListeners.delete(cb)
@@ -172,6 +176,34 @@ afterEach(() => {
 })
 
 describe('useClientEffectIntentRouter', () => {
+  test('keeps one ingress subscription across route renders and reads the latest route state', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    const host = await renderHookHost()
+
+    expect(nativeIntentSubscriptionStarts).toBe(1)
+    expect(intentListeners.size).toBe(1)
+
+    currentWorkspaceId = repo.id
+    await act(async () => {
+      host.rerender(<HookHost />)
+    })
+
+    expect(nativeIntentSubscriptionStarts).toBe(1)
+    expect(intentListeners.size).toBe(1)
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
+      await Promise.resolve()
+    })
+
+    expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
+  })
+
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -509,6 +541,17 @@ describe('useClientEffectIntentRouter', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
+      setWorkspacePaneTabsForTargetQueryData({
+        workspaceId: repo.id,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        branchName: 'main',
+        worktreePath: '/tmp/repo-worktree',
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+          ...visibleSessionIds.map((id) => workspacePaneRuntimeTabEntry('terminal', id)),
+        ],
+      })
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
@@ -566,7 +609,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-or-window-requested' })
+      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-requested' })
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -582,7 +625,9 @@ describe('useClientEffectIntentRouter', () => {
         }),
       )
     })
-    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
+    await waitFor(() => {
+      expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
+    })
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 
@@ -663,7 +708,7 @@ function preferredWorkspacePaneTab(repoId: string) {
 }
 
 async function renderHookHost() {
-  renderInJsdom(<HookHost />)
+  return renderInJsdom(<HookHost />)
 }
 
 function HookHost() {
@@ -671,17 +716,11 @@ function HookHost() {
     navigation,
     currentWorkspaceId,
     currentWorkspacePaneCommandTarget: currentBranchName
-      ? currentFilesystemTarget?.kind === 'git-worktree'
-        ? {
-            kind: 'git-worktree',
-            workspacePaneRoute: currentWorkspacePaneRoute,
-            filesystemTarget: currentFilesystemTarget,
-          }
-        : {
-            kind: 'git-branch',
-            branchName: currentBranchName,
-            workspacePaneRoute: currentWorkspacePaneRoute,
-          }
+      ? {
+          routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId!, branchName: currentBranchName },
+          workspacePaneRoute: currentWorkspacePaneRoute,
+          filesystemTarget: currentFilesystemTarget?.kind === 'git-worktree' ? currentFilesystemTarget : null,
+        }
       : null,
     closeAllOverlays,
     openWorkspacePathDialog: () => {},

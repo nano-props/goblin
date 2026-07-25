@@ -13,7 +13,7 @@ import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/Workspa
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -21,6 +21,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
+  routeTarget: WorkspacePaneTabsTarget
   runtimeTarget: RuntimeWorkspacePaneTarget
   presentation: TerminalPresentation
 }
@@ -69,22 +70,22 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   runtimeState,
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
-  const { createTerminalWithAdmission } = useTerminalSessionContext()
+  const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
-      const presentationToken = beginPrimaryWindowPresentation()
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        routeTarget: target.routeTarget,
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId, presentation) => {
+        showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) => {
           if (base.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
             return showCreatedTerminalWorkspacePaneRuntimeTab(
               { target: base.target, presentation },
               terminalSessionId,
               navigation,
-              presentationToken,
+              routeRequest,
             )
           }
           if (base.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
@@ -92,16 +93,17 @@ function TerminalWorkspacePaneRuntimeTabPanel({
               { target: base.target, presentation },
               terminalSessionId,
               navigation,
-              presentationToken,
+              routeRequest,
             )
           }
           return false
         },
+        focusTerminal,
         t,
         logMessage: 'workspace pane terminal create failed',
       })
     },
-    [createTerminalWithAdmission, navigation, t],
+    [createTerminalWithAdmission, focusTerminal, navigation, t, target.routeTarget],
   )
 
   const { runtimeTarget, presentation } = target

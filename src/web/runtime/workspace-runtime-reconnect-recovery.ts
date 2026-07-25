@@ -41,7 +41,7 @@ export class WorkspaceRuntimeReconnectRecovery {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
         const scope = this.dependencies.scopeRegistry.scopeFor(target)
         this.dependencies.terminalRecovery.begin(scope)
-        this.dependencies.terminalRecovery.request(scope, { resynchronizeConnectedViews: true })
+        this.dependencies.terminalRecovery.request(scope, { kind: 'reconnect' })
         this.dependencies.workspaceTabsRecovery.request(scope)
       }
     } catch (error) {

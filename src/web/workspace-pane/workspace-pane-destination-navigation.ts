@@ -5,11 +5,11 @@ import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
-  beginPrimaryWindowPresentation,
-  primaryWindowPresentationIsCurrent,
-  resetPrimaryWindowPresentationForTest,
-  type PrimaryWindowPresentationToken,
-} from '#/web/primary-window-presentation.ts'
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  resetPrimaryWindowNavigationForTest,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
   workspacePaneTargetLeaseIsCurrent,
@@ -23,24 +23,26 @@ import {
 export type WorkspacePaneDestinationNavigation = Pick<PrimaryWindowNavigationActions, 'commitWorkspacePaneRoute'>
 
 export interface WorkspacePaneDestinationPresentation {
-  token: PrimaryWindowPresentationToken
+  generation: PrimaryWindowNavigationGeneration
   lease: WorkspacePaneDestinationTargetLease
 }
 
 export function beginWorkspacePaneDestinationPresentation(
   lease: WorkspacePaneDestinationTargetLease,
 ): WorkspacePaneDestinationPresentation {
-  return { token: beginPrimaryWindowPresentation(), lease }
+  return { generation: beginPrimaryWindowNavigation(), lease }
 }
 
 export function workspacePaneDestinationPresentationIsCurrent(
   presentation: WorkspacePaneDestinationPresentation,
 ): boolean {
-  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
+  return (
+    primaryWindowNavigationIsCurrent(presentation.generation) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
+  )
 }
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {
-  resetPrimaryWindowPresentationForTest()
+  resetPrimaryWindowNavigationForTest()
 }
 
 export async function dispatchWorkspacePaneDestinationRoute(input: {
@@ -87,7 +89,7 @@ export async function commitWorkspacePaneDestinationRoute(
   try {
     accepted = await navigation.commitWorkspacePaneRoute(lease.workspaceId, lease.branchName, route, {
       ...options,
-      presentationToken: presentation.token,
+      navigationGeneration: presentation.generation,
       onCommit: () => {
         supplementCommitted = commitWorkspacePaneRouteSupplement(lease, route)
       },

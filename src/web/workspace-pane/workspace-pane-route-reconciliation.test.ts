@@ -7,9 +7,9 @@ import {
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
-  reconcileGitWorkspacePaneRoute,
-  gitWorkspacePaneRouteHistoryResolution,
-} from '#/web/components/repo-workspace/git-workspace-pane-route-reconciliation.ts'
+  reconcileWorkspacePaneRoute,
+  workspacePaneRouteHistoryResolution,
+} from '#/web/workspace-pane/workspace-pane-route-reconciliation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-route-reconciliation-repo')
@@ -17,7 +17,7 @@ const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
-type RouteModelInput = Omit<WorkspacePaneTabModelInput, 'paneTarget' | 'worktreeHead'> & {
+type RouteModelInput = Omit<WorkspacePaneTabModelInput, 'routeTarget' | 'paneTarget' | 'worktreeHead'> & {
   branchName: string | null
   worktreePath: string | null
 }
@@ -26,6 +26,11 @@ function createWorkspacePaneTabModel(input: RouteModelInput) {
   const { branchName, worktreePath, ...modelInput } = input
   return createWorkspacePaneTabModelCore({
     ...modelInput,
+    routeTarget: branchName
+      ? { kind: 'git-branch', workspaceId: input.workspaceId, branchName }
+      : worktreePath === input.workspaceId
+        ? { kind: 'workspace-root', workspaceId: input.workspaceId }
+        : { kind: 'inactive', workspaceId: input.workspaceId },
     paneTarget: branchName
       ? requiredGitWorkspacePaneTabsTarget(input.workspaceId, branchName, worktreePath)
       : worktreePath === input.workspaceId
@@ -40,21 +45,21 @@ describe('workspace pane route reconciliation', () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'ready' })
 
     expect(
-      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'none',
     })
   })
 
-  test('waits for terminal projection before replacing a missing routed terminal session', () => {
+  test('waits for terminal projection before declaring a routed terminal session missing', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'pending' })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'pending',
     })
   })
 
-  test('waits for tab entries before replacing a routed terminal session', () => {
+  test('waits for tab entries before validating a routed terminal session', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -75,7 +80,7 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(
-      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'pending',
     })
@@ -85,7 +90,7 @@ describe('workspace pane route reconciliation', () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'pending' })
 
     expect(
-      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'pending',
     })
@@ -94,7 +99,7 @@ describe('workspace pane route reconciliation', () => {
   test('leaves a routed terminal session unverified while terminal projection has failed', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'failed' })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'unverified',
     })
   })
@@ -120,33 +125,33 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(
-      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'unverified',
     })
   })
 
-  test('waits for terminal creation before replacing a missing routed terminal session', () => {
+  test('waits for terminal creation before declaring a routed terminal session missing', () => {
     const model = terminalModel({
       routedSessionId: 'missing-session',
       terminalProjectionPhase: 'ready',
       createPending: true,
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'pending',
     })
   })
 
-  test('replaces a stale terminal route with the bare branch route', () => {
+  test('reports a stale terminal route as missing', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
-      kind: 'replace-empty-pane',
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+      kind: 'missing',
     })
   })
 
-  test('waits for tab entries before replacing a missing routed static tab', () => {
+  test('waits for tab entries before validating a routed static tab', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -162,7 +167,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
   test('leaves a static route unverified while tab-entry projection has failed', () => {
@@ -181,7 +186,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
   test('does not verify a materialized static route while tab-entry projection has failed', () => {
@@ -200,16 +205,22 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
   test('defers history while a route is unverified', () => {
-    expect(gitWorkspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
+    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
       kind: 'defer',
     })
   })
 
-  test('waits for terminal creation before replacing a missing routed static tab', () => {
+  test('defers history for a missing route instead of predicting a replacement navigation', () => {
+    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'missing' })).toEqual({
+      kind: 'defer',
+    })
+  })
+
+  test('waits for terminal creation before declaring a routed static tab missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -225,10 +236,10 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('replaces an unmaterialized static route with the bare branch route', () => {
+  test('reports an unmaterialized static route as missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -244,12 +255,12 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
-      kind: 'replace-empty-pane',
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+      kind: 'missing',
     })
   })
 
-  test('replaces an invalid static route with the bare branch route', () => {
+  test('reports an invalid static route as missing', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -265,8 +276,8 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
-      kind: 'replace-empty-pane',
+    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
+      kind: 'missing',
     })
   })
 
@@ -286,12 +297,12 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
       kind: 'unverified',
     })
   })
 
-  test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
+  test('reports an unmaterialized route as missing when the pane is empty', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -307,8 +318,8 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
-      kind: 'replace-empty-pane',
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+      kind: 'missing',
     })
   })
 })

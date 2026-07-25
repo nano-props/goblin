@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { PtyWorkerRuntime } from '#/server/terminal/pty-worker-runtime.ts'
-import type { PtyWorkerMessage } from '#/server/terminal/pty-worker-protocol.ts'
+import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
 
 interface MockPty {
   write: ReturnType<typeof vi.fn>
@@ -78,22 +78,92 @@ function buildRuntime(options: { spawnPty?: ConstructorParameters<typeof PtyWork
   return { runtime, emitted }
 }
 
+function spawnRequest(requestId: string): PtyWorkerRequest {
+  return {
+    type: 'pty-spawn',
+    requestId,
+    ptySessionId: `pty_${requestId}`,
+    input: { cwd: '/repo', cols: 80, rows: 24 },
+  }
+}
+
 beforeEach(() => {
   mockPtys.length = 0
   vi.clearAllMocks()
 })
 
 describe('PtyWorkerRuntime', () => {
+  test('forwards synchronous spawn-time data before publishing the control capability', () => {
+    const ownership = { disposeData: vi.fn(), dispose: vi.fn() }
+    const terminal = {
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      processName: vi.fn(() => 'zsh'),
+    }
+    const { runtime, emitted } = buildRuntime({
+      spawnPty: (_input, observer) => {
+        observer.onData('early output', 'zsh')
+        return { ok: true, runtime: terminal, events: ownership }
+      },
+    })
+
+    runtime.handleMessage(spawnRequest('sync_data'))
+
+    expect(emitted).toEqual([
+      { type: 'pty-process-name-changed', ptySessionId: 'pty_sync_data', processName: 'zsh' },
+      { type: 'pty-data', ptySessionId: 'pty_sync_data', data: 'early output' },
+      {
+        type: 'pty-spawn-result',
+        requestId: 'sync_data',
+        ok: true,
+        ptySessionId: 'pty_sync_data',
+        processName: 'terminal',
+      },
+    ])
+  })
+
+  test('forwards a synchronous spawn-time exit without retaining the exited runtime', () => {
+    const terminal = {
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      processName: vi.fn(() => 'zsh'),
+    }
+    const { runtime, emitted } = buildRuntime({
+      spawnPty: (_input, observer) => {
+        observer.onExit()
+        return { ok: true, runtime: terminal, events: { disposeData: vi.fn(), dispose: vi.fn() } }
+      },
+    })
+
+    runtime.handleMessage(spawnRequest('sync_exit'))
+    runtime.handleMessage({ type: 'pty-write', requestId: 'late_write', ptySessionId: 'pty_sync_exit', data: 'x' })
+
+    expect(emitted).toContainEqual({
+      type: 'pty-exit',
+      ptySessionId: 'pty_sync_exit',
+      code: null,
+      signal: null,
+    })
+    expect(emitted).toContainEqual({ type: 'pty-write-result', requestId: 'late_write', status: 'rejected' })
+  })
+
   test('pty-spawn returns a ptySessionId and a placeholder process name', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req_1', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage({
+      type: 'pty-spawn',
+      requestId: 'req_1',
+      ptySessionId: 'pty_req_1',
+      input: { cwd: '/repo', cols: 80, rows: 24 },
+    })
 
     const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req_1')
     expect(result).toMatchObject({
       type: 'pty-spawn-result',
       requestId: 'req_1',
       ok: true,
-      ptySessionId: expect.stringMatching(/^pty-/),
+      ptySessionId: 'pty_req_1',
       // The initial processName is a placeholder; the real name is
       // sampled on the first onData chunk so the macOS spawn-helper
       // comm never leaks. See "samples the real process name on the
@@ -104,7 +174,7 @@ describe('PtyWorkerRuntime', () => {
 
   test('samples the real process name on the first onData chunk', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
     const ptySessionId = (
@@ -120,7 +190,7 @@ describe('PtyWorkerRuntime', () => {
 
   test('does not re-sample on subsequent plain chunks when the title is unchanged', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
 
@@ -138,7 +208,7 @@ describe('PtyWorkerRuntime', () => {
     const { runtime, emitted } = buildRuntime({
       spawnPty: () => ({ ok: false, message: 'posix_spawnp failed' }),
     })
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req')
     expect(result).toEqual({
       type: 'pty-spawn-result',
@@ -153,7 +223,7 @@ describe('PtyWorkerRuntime', () => {
     const { runtime, emitted } = buildRuntime({
       spawnPty: () => ({ ok: false, message: 'shell not found' }),
     })
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const result = emitted.find((m) => m.type === 'pty-spawn-result' && m.requestId === 'req')
     expect(result).toEqual({
       type: 'pty-spawn-result',
@@ -166,7 +236,7 @@ describe('PtyWorkerRuntime', () => {
 
   test('pty-write, pty-resize, pty-kill route to the matching pty', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const pty = mockPtys[0]
     expect(pty).toBeDefined()
     if (!pty) return
@@ -176,12 +246,13 @@ describe('PtyWorkerRuntime', () => {
     expect(ptySessionId).toBeDefined()
     if (!ptySessionId) return
     runtime.handleMessage({ type: 'pty-write', requestId: 'write_1', ptySessionId, data: 'ls\n' })
-    runtime.handleMessage({ type: 'pty-resize', ptySessionId, cols: 100, rows: 30 })
+    runtime.handleMessage({ type: 'pty-resize', requestId: 'resize_1', ptySessionId, cols: 100, rows: 30 })
     runtime.handleMessage({ type: 'pty-kill', ptySessionId })
 
     expect(pty.write).toHaveBeenCalledWith('ls\n')
     expect(emitted).toContainEqual({ type: 'pty-write-result', requestId: 'write_1', status: 'accepted' })
     expect(pty.resize).toHaveBeenCalledWith(100, 30)
+    expect(emitted).toContainEqual({ type: 'pty-resize-result', requestId: 'resize_1', accepted: true })
     expect(pty.kill).toHaveBeenCalledTimes(1)
   })
 
@@ -195,7 +266,7 @@ describe('PtyWorkerRuntime', () => {
 
   test('marks a throwing PTY write as indeterminate', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'spawn_1', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('spawn_1'))
     const pty = mockPtys[0]
     if (!pty) throw new Error('missing PTY')
     const spawn = emitted.find((message) => message.type === 'pty-spawn-result' && message.ok)
@@ -214,9 +285,35 @@ describe('PtyWorkerRuntime', () => {
     expect(emitted).toContainEqual({ type: 'pty-write-result', requestId: 'write_1', status: 'indeterminate' })
   })
 
+  test('rejects throwing resize and contains throwing kill inside the worker boundary', () => {
+    const { runtime, emitted } = buildRuntime()
+    runtime.handleMessage(spawnRequest('spawn_1'))
+    const pty = mockPtys[0]
+    const spawn = emitted.find((message) => message.type === 'pty-spawn-result' && message.ok)
+    if (!pty || !spawn || spawn.type !== 'pty-spawn-result' || !spawn.ok) throw new Error('missing PTY')
+    pty.resize.mockImplementationOnce(() => {
+      throw new Error('resize failed')
+    })
+    pty.kill.mockImplementationOnce(() => {
+      throw new Error('kill failed')
+    })
+
+    expect(() =>
+      runtime.handleMessage({
+        type: 'pty-resize',
+        requestId: 'resize_1',
+        ptySessionId: spawn.ptySessionId,
+        cols: 100,
+        rows: 30,
+      }),
+    ).not.toThrow()
+    expect(() => runtime.handleMessage({ type: 'pty-kill', ptySessionId: spawn.ptySessionId })).not.toThrow()
+    expect(emitted).toContainEqual({ type: 'pty-resize-result', requestId: 'resize_1', accepted: false })
+  })
+
   test('emits pty-data and pty-exit for live sessions', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
     const ptySessionId = (
@@ -236,7 +333,7 @@ describe('PtyWorkerRuntime', () => {
 
   test('emits a title-OSC-driven process-name change on subsequent data chunks', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('req'))
     const ptySessionId = (
       emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { ptySessionId: string } | undefined
     )?.ptySessionId
@@ -256,8 +353,8 @@ describe('PtyWorkerRuntime', () => {
 
   test('shutdown kills every live pty', () => {
     const { runtime, emitted } = buildRuntime()
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'a', input: { cwd: '/repo', cols: 80, rows: 24 } })
-    runtime.handleMessage({ type: 'pty-spawn', requestId: 'b', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    runtime.handleMessage(spawnRequest('a'))
+    runtime.handleMessage(spawnRequest('b'))
     runtime.handleMessage({ type: 'shutdown' })
 
     for (const pty of mockPtys) expect(pty.kill).toHaveBeenCalled()

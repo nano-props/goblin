@@ -10,7 +10,7 @@ export type TerminalProjectionRecoveryAcceptance =
 interface TerminalProjectionRecoveryRequest {
   scope: RuntimeProjectionScope
   minimumRevision: number
-  refresh?: boolean
+  freshness: 'join-current' | 'after-current'
   recover: () => Promise<TerminalSessionsSnapshot>
   accept: (snapshot: TerminalSessionsSnapshot) => TerminalProjectionRecoveryAcceptance
   complete: () => void
@@ -21,8 +21,7 @@ interface TerminalProjectionRecoveryRequest {
 interface PendingTerminalProjectionRecovery {
   workspaceRuntimeId: string
   minimumRevision: number
-  running: boolean
-  refreshAfterCurrent: boolean
+  freshReadAfterCurrentRequired: boolean
   latestRequest: TerminalProjectionRecoveryRequest
 }
 
@@ -40,58 +39,63 @@ export class TerminalProjectionRecoveryCoordinator {
     if (!input.scope.isActive()) return
     const { workspaceId, workspaceRuntimeId } = input.scope.target
     const currentObligation = this.freshObligationByWorkspaceId.get(workspaceId)
-    if (currentObligation?.workspaceRuntimeId !== workspaceRuntimeId) this.freshObligationByWorkspaceId.delete(workspaceId)
+    if (currentObligation?.workspaceRuntimeId !== workspaceRuntimeId)
+      this.freshObligationByWorkspaceId.delete(workspaceId)
     if (input.afterAccept && !this.freshObligationByWorkspaceId.has(workspaceId)) {
       this.freshObligationByWorkspaceId.set(workspaceId, { workspaceRuntimeId, afterAccept: input.afterAccept })
     }
-    let pending = this.pendingByWorkspaceId.get(workspaceId)
-    if (pending?.workspaceRuntimeId !== workspaceRuntimeId) {
-      pending = {
-        workspaceRuntimeId,
-        minimumRevision: input.minimumRevision,
-        running: false,
-        refreshAfterCurrent: false,
-        latestRequest: input,
-      }
-      this.pendingByWorkspaceId.set(workspaceId, pending)
-    } else {
+    const pending = this.pendingByWorkspaceId.get(workspaceId)
+    if (pending?.workspaceRuntimeId === workspaceRuntimeId) {
       pending.minimumRevision = Math.max(pending.minimumRevision, input.minimumRevision)
       pending.latestRequest = input
-    }
-    if (pending.running) {
-      if (input.refresh) pending.refreshAfterCurrent = true
+      if (input.freshness === 'after-current') pending.freshReadAfterCurrentRequired = true
       return
     }
-    pending.running = true
-    void this.run(input, pending)
+    const admitted: PendingTerminalProjectionRecovery = {
+      workspaceRuntimeId,
+      minimumRevision: input.minimumRevision,
+      freshReadAfterCurrentRequired: false,
+      latestRequest: input,
+    }
+    this.pendingByWorkspaceId.set(workspaceId, admitted)
+    void this.run(workspaceId, admitted)
   }
 
-  private async run(
-    input: TerminalProjectionRecoveryRequest,
-    pending: PendingTerminalProjectionRecovery,
-  ): Promise<void> {
+  private async run(workspaceId: string, pending: PendingTerminalProjectionRecovery): Promise<void> {
     try {
-      let staleAttempts = 0
-      let supersededAttempts = 0
+      let retriedStaleRevision: number | null = null
+      let retriedSupersededRevision: number | null = null
       for (;;) {
         const request = pending.latestRequest
+        const minimumRevisionAtReadStart = pending.minimumRevision
         let snapshot: TerminalSessionsSnapshot
         try {
           snapshot = await request.recover()
         } catch (error) {
           if (!this.isCurrent(pending.latestRequest.scope, pending)) return
-          if (pending.refreshAfterCurrent) {
-            pending.refreshAfterCurrent = false
-            staleAttempts = 0
+          if (pending.freshReadAfterCurrentRequired) {
+            pending.freshReadAfterCurrentRequired = false
+            retriedStaleRevision = null
+            retriedSupersededRevision = null
             continue
           }
+          if (pending.minimumRevision > minimumRevisionAtReadStart) continue
           pending.latestRequest.reject(error)
           return
         }
         if (!this.isCurrent(pending.latestRequest.scope, pending)) return
+        // A reconnect request that arrived while this read was running needs a
+        // snapshot whose read began after that reconnect. The current snapshot
+        // is valid historical data, but it cannot satisfy that freshness
+        // boundary and must not be published as an intermediate projection.
+        if (pending.freshReadAfterCurrentRequired) {
+          pending.freshReadAfterCurrentRequired = false
+          retriedStaleRevision = null
+          retriedSupersededRevision = null
+          continue
+        }
         if (snapshot.revision < pending.minimumRevision) {
-          staleAttempts += 1
-          if (staleAttempts >= 2) {
+          if (retriedStaleRevision === pending.minimumRevision) {
             pending.latestRequest.reject(
               new Error(
                 `Terminal sessions recovery did not reach required revision ${pending.minimumRevision}; received ${snapshot.revision}`,
@@ -99,9 +103,9 @@ export class TerminalProjectionRecoveryCoordinator {
             )
             return
           }
+          retriedStaleRevision = pending.minimumRevision
           // The retry required by the newer revision is itself the fresh read
           // requested while this snapshot was in flight.
-          pending.refreshAfterCurrent = false
           continue
         }
         const acceptedRequest = pending.latestRequest
@@ -113,8 +117,7 @@ export class TerminalProjectionRecoveryCoordinator {
           return
         }
         if (acceptance.kind === 'superseded') {
-          supersededAttempts += 1
-          if (supersededAttempts >= 2) {
+          if (retriedSupersededRevision === acceptance.localRevision) {
             acceptedRequest.reject(
               new Error(
                 `Terminal sessions recovery was repeatedly superseded at local revision ${acceptance.localRevision}`,
@@ -122,30 +125,24 @@ export class TerminalProjectionRecoveryCoordinator {
             )
             return
           }
+          retriedSupersededRevision = acceptance.localRevision
           pending.minimumRevision = Math.max(pending.minimumRevision, acceptance.localRevision)
-          pending.refreshAfterCurrent = false
-          staleAttempts = 0
+          retriedStaleRevision = null
           continue
         }
-        if (!pending.refreshAfterCurrent) {
-          acceptedRequest.complete()
-          const obligation = this.freshObligationByWorkspaceId.get(acceptedRequest.scope.target.workspaceId)
-          if (obligation?.workspaceRuntimeId === pending.workspaceRuntimeId) {
-            this.freshObligationByWorkspaceId.delete(acceptedRequest.scope.target.workspaceId)
-            obligation.afterAccept()
-          }
-          return
+        const obligation = this.freshObligationByWorkspaceId.get(acceptedRequest.scope.target.workspaceId)
+        if (obligation?.workspaceRuntimeId === pending.workspaceRuntimeId) {
+          obligation.afterAccept()
+          this.freshObligationByWorkspaceId.delete(acceptedRequest.scope.target.workspaceId)
         }
-        pending.refreshAfterCurrent = false
-        staleAttempts = 0
+        acceptedRequest.complete()
+        return
       }
     } catch (error) {
       const request = pending.latestRequest
       if (this.isCurrent(request.scope, pending)) request.reject(error)
     } finally {
-      if (this.pendingByWorkspaceId.get(input.scope.target.workspaceId) === pending) {
-        this.pendingByWorkspaceId.delete(input.scope.target.workspaceId)
-      }
+      if (this.pendingByWorkspaceId.get(workspaceId) === pending) this.pendingByWorkspaceId.delete(workspaceId)
     }
   }
 

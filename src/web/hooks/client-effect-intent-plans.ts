@@ -20,7 +20,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'terminal-new-tab-requested' }
-  | { type: 'workspace-pane-close-tab-or-window-requested' }
+  | { type: 'workspace-pane-close-tab-requested' }
   | { type: 'close-workspace-requested' }
   | { type: 'cycle-workspace-requested' }
   | { type: 'workspace-refresh-requested' }
@@ -64,9 +64,8 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
-  | { kind: 'close-workspace-pane-tab-or-window'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
+  | { kind: 'close-workspace-pane-tab'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace'; workspaceId: WorkspaceId }
-  | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
   | { kind: 'refresh-workspace'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | {
@@ -167,11 +166,11 @@ export function createWorkspaceIntentPlan(
   context: WorkspaceIntentPlanContext,
 ): WorkspaceIntentPlan | null {
   if (!isClientWorkspaceIntent(event)) return null
-  if (event.type === 'workspace-pane-close-tab-or-window-requested') {
-    if (!context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget) return { kind: 'close-window' }
+  if (event.type === 'workspace-pane-close-tab-requested') {
+    if (!context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget) return { kind: 'noop' }
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
     return {
-      kind: 'close-workspace-pane-tab-or-window',
+      kind: 'close-workspace-pane-tab',
       workspaceId: context.currentWorkspaceId,
       target: context.currentWorkspacePaneCommandTarget,
     }
@@ -213,7 +212,7 @@ export function createWorkspaceIntentPlan(
       if (context.workspaceShortcutSuppressed) return { kind: 'noop' }
       return context.currentWorkspaceId
         ? { kind: 'close-workspace', workspaceId: context.currentWorkspaceId }
-        : { kind: 'close-window' }
+        : { kind: 'noop' }
     case 'cycle-workspace-requested':
       return context.workspaceShortcutSuppressed
         ? { kind: 'noop' }
@@ -283,7 +282,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'clone-repo-requested' ||
     event.type === 'create-worktree-requested' ||
     event.type === 'terminal-new-tab-requested' ||
-    event.type === 'workspace-pane-close-tab-or-window-requested' ||
+    event.type === 'workspace-pane-close-tab-requested' ||
     event.type === 'close-workspace-requested' ||
     event.type === 'cycle-workspace-requested' ||
     event.type === 'workspace-refresh-requested' ||

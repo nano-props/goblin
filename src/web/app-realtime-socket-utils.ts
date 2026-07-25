@@ -1,7 +1,10 @@
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import type { AppRealtimeClientMessage, AppRealtimeSocketServerMessage } from '#/shared/app-realtime-socket.ts'
-import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-validators.ts'
+import {
+  isAppRealtimeWsMessageWithinLimit,
+  normalizeAppRealtimeSocketServerMessage,
+} from '#/shared/app-realtime-validators.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 
 export function createAppRealtimeWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
@@ -23,7 +26,9 @@ export function parseAppRealtimeSocketServerMessage(data: unknown): AppRealtimeS
 }
 
 export function encodeAppRealtimeClientMessage(message: AppRealtimeClientMessage): string {
-  return JSON.stringify(message)
+  const encoded = JSON.stringify(message)
+  if (!isAppRealtimeWsMessageWithinLimit(encoded)) throw new Error('App realtime message exceeds transport limit')
+  return encoded
 }
 
 export function createAppRealtimeRequestId(): string {

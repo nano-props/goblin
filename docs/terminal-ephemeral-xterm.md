@@ -59,17 +59,21 @@ local rendering and fitted geometry while mounted. It is disposable.
 
 1. User selects a terminal session.
 2. Client creates a fresh terminal host and xterm view.
-3. Client waits for the visible host to become measurable.
+3. Client keeps the presentation hidden until its mounted host is measurable.
 4. Client fits the live xterm and sends attach/restart with its `cols`/`rows`.
 5. Server validates attachment and control rules.
 6. Server returns exactly one frame protocol:
    - Existing PTY: `frame: 'snapshot'`, role, lifecycle state, canonical
-     geometry, `snapshot`, `snapshotSeq`, and `outputEra`; the client resets
+     geometry, `snapshot`, and `snapshotSeq`; the client resets
      xterm and replays it.
    - Newly prepared session: the server starts the PTY at the fitted size and
-     returns `frame: 'stream'`; the client keeps the same empty xterm and does
-     not reset or replay it.
-7. Realtime output writes to that selected controller xterm while also updating
+     returns `frame: 'stream'`; the client keeps the same xterm and does not
+     reset, replay, or wait for output before presentation.
+7. Recovery reveals after the snapshot is parsed, one full-viewport render, and
+   the final geometry check. A fresh stream reveals after the viewport render
+   and geometry check, then flushes output queued while hidden in transport
+   order.
+8. Realtime output writes to that selected controller xterm while also updating
    the server headless render state for future recovery.
 
 The user may see a blank terminal until snapshot replay completes.

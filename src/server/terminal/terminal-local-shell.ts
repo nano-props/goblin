@@ -51,8 +51,8 @@ export function resolveLocalShellWithStartupShellCommand(
   if (!commandLine) return resolveLocalShell({}, env)
   if (process.platform === 'win32') return { command: env.COMSPEC?.trim() || 'cmd.exe', args: ['/K', commandLine] }
   const shell = resolveLocalShell({}, env).command
-  // Runs before the browser-side terminal can attach and send its first real resize;
-  // width-sensitive startup output may be formatted with only the create-time size hint.
+  // The PTY is spawned only after the mounted client xterm has fitted its host,
+  // so width-sensitive startup output begins at canonical geometry.
   return { command: shell, args: ['-ilc', `${commandLine}\nexec ${quotePosixShellArg(shell)} -l`] }
 }
 

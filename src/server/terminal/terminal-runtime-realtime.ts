@@ -1,15 +1,11 @@
 import type {
-  AppRealtimeOutputFlushBoundary,
-  AppRealtimeOutputFlushBoundaryContext,
-  BufferedAppRealtimeSocket,
-} from '#/server/realtime/buffered-app-realtime-socket.ts'
-import type {
   TerminalSocketRequestAction,
   TerminalSocketRequestInputs,
   TerminalSocketRequestMessage,
   TerminalSocketResponseMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
+import type { TerminalOutputCheckpoint } from '#/shared/terminal-types.ts'
 import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import { invokeRealtimeRpcHandler, type RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
@@ -53,9 +49,8 @@ export async function handleTerminalRealtimeRequestMessage(
   clientId: string,
   userId: string,
   socket: RealtimeSocket,
-  bufferedSocket: BufferedAppRealtimeSocket | undefined,
   message: TerminalSocketRequestMessage,
-): Promise<void> {
+): Promise<TerminalOutputCheckpoint | null> {
   let response: TerminalSocketResponseMessage
   try {
     const payload = await invokeRealtimeRpcHandler(handlers, clientId, userId, message.action, message.input)
@@ -75,42 +70,27 @@ export async function handleTerminalRealtimeRequestMessage(
       error: error instanceof Error ? error.message : String(error),
     } as TerminalSocketResponseMessage
   }
-  if (!sendRealtimeResponse(socket, response)) {
-    bufferedSocket?.deactivate()
-  }
-  if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume(outputFlushBoundaryFromResponse(response))
+  socket.send(JSON.stringify(response))
+  return snapshotFlushBoundaryFromResponse(response)
 }
 
-function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketResponseMessage): boolean {
-  try {
-    socket.send(JSON.stringify(message))
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Pause the buffered socket while an action's response is being prepared
-// when the action's response carries the authoritative frame transition
-// for a terminal view. Without this, live realtime messages that arrive
-// during the request can race ahead of the authoritative response and
-// split the client's transition across two sources.
+// These responses establish an authoritative frame transition for a terminal
+// view. The socket serializes them and keeps realtime effects behind the
+// response so the client never observes one transition from two sources.
 //
-// Existing-session `attach` and every `restart` return snapshot hydration
-// data that the client applies as one boundary. Fresh attach returns a
-// stream handshake instead: pausing still orders the response before output,
-// but resume deliberately drops nothing so sequence 1 reaches the xterm.
+// Existing-session recovery attach returns snapshot hydration. Fresh attach
+// and restart both establish a new PTY generation and return a stream
+// handshake: ordering still keeps the response first, but streams have no
+// snapshot deduplication boundary, so sequence 1 reaches the fitted xterm.
 // `takeover` does not return a fresh snapshot, but its response is still
 // the authoritative identity/geometry handshake for the new controller;
 // the same socket must not observe the identity event before that
 // response settles.
-export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
+export function requiresRealtimeOrdering(action: TerminalSocketRequestAction): boolean {
   return action === 'attach' || action === 'restart' || action === 'takeover'
 }
 
-function outputFlushBoundaryFromResponse(
-  message: TerminalSocketResponseMessage,
-): AppRealtimeOutputFlushBoundaryContext | null {
+function snapshotFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): TerminalOutputCheckpoint | null {
   if (!message.ok) return null
   if (message.action !== 'attach' && message.action !== 'restart') return null
   const payload = message.payload
@@ -119,7 +99,6 @@ function outputFlushBoundaryFromResponse(
   return {
     terminalRuntimeSessionId: payload.terminalRuntimeSessionId,
     terminalRuntimeGeneration: payload.terminalRuntimeGeneration,
-    outputEra: payload.outputEra,
     seq: payload.snapshotSeq,
   }
 }

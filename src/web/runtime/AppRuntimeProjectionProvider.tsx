@@ -56,8 +56,8 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
           useTerminalProjectionHydrationStore
             .getState()
             .markProjectionFailed(workspaceId, workspaceRuntimeId, errorMessage),
-        shouldRefresh: (workspaceId) =>
-          useTerminalProjectionHydrationStore.getState().shouldRefreshProjection(workspaceId),
+        isFocusRefreshDue: (workspaceId, workspaceRuntimeId) =>
+          useTerminalProjectionHydrationStore.getState().isProjectionFocusRefreshDue(workspaceId, workspaceRuntimeId),
         logFailure: (error) =>
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error }),
       }),
@@ -136,14 +136,14 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     const scope = scopeRegistry.scopeFor(target)
     refreshCurrentWorkspaceStatus()
     terminalRecovery.begin(scope)
-    terminalRecovery.request(scope)
+    terminalRecovery.request(scope, { kind: 'minimum-revision', revision: 0 })
 
     const handleFocus = () => {
       refreshCurrentWorkspaceStatus()
       const currentScope = scopeRegistry.scopeFor(target)
       currentScope.commit(() => {
-        if (!terminalRecovery.shouldRefresh(currentScope.target.workspaceId)) return
-        terminalRecovery.request(currentScope)
+        if (!terminalRecovery.isFocusRefreshDue(currentScope.target)) return
+        terminalRecovery.request(currentScope, { kind: 'minimum-revision', revision: 0 })
       })
     }
     window.addEventListener('focus', handleFocus)
@@ -171,7 +171,7 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
         const ready = hydration?.workspaceRuntimeId === event.workspaceRuntimeId && hydration.phase === 'ready'
         const localRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target) ?? -1
         if (ready && localRevision >= event.revision) return
-        terminalRecovery.request(scope, { minimumRevision: event.revision })
+        terminalRecovery.request(scope, { kind: 'minimum-revision', revision: event.revision })
       }),
     )
     const offRecovered = scopeRegistry.track(appRealtimeClient.onRecovered(() => reconnectRecovery.request()))

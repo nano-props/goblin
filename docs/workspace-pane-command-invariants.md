@@ -12,7 +12,7 @@ Normative rules for workspace-pane commands, queues, routing, and tests.
 - Server aggregate: layout commands, target repair/retirement, and deterministic canonical projection.
 - Router: visible repo, branch, and pane route.
 - React Query: canonical-tab projection. Repo store: restorable preferences, selection, and opener facts.
-- Action queue: ordering only. Presentation token: permission to publish one navigation result only.
+- Action queue: ordering only. Navigation generation: only the latest absolute navigation may publish a route result.
 
 Never mirror router currentness or infer server runtime validity from client timing.
 
@@ -43,14 +43,14 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 
 ## Commands
 
-| Class                                          | Capture                                             | Execute/commit                                                                                                    |
-| ---------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Absolute current-target: identity/index/open   | intent and presentation token before queue          | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
-| Relative current-target: next/previous         | `direction` before queue                            | resolve route, projection, adjacent tab, and token at execution; every queued step runs                           |
-| Exact transition: active close-back            | source, destination, opener, and token before write | never rebase; commit only while router still equals the source                                                    |
-| Absolute destination                           | destination and target lease before queue           | independent of source route; destination lease must remain current                                                |
-| Resource command: create/close/open membership | write input and operation facts                     | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
-| Recovery/reconciliation                        | canonical server/runtime snapshot                   | converge after server state; never repair or reclassify a user command                                            |
+| Class                                          | Capture                                                  | Execute/commit                                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Absolute current-target: identity/index/open   | intent and navigation generation before queue            | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
+| Relative current-target: next/previous         | `direction` before queue                                 | resolve route, projection, adjacent tab, and generation at execution; every queued step runs                      |
+| Exact transition: active close-back            | source, destination, opener, and generation before write | never rebase; commit only while router still equals the source                                                    |
+| Absolute destination                           | destination and target lease before queue                | independent of source route; destination lease must remain current                                                |
+| Resource command: create/close/open membership | write input and operation facts                          | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
+| Recovery/reconciliation                        | canonical server/runtime snapshot                        | converge after server state; never repair or reclassify a user command                                            |
 
 ## Invariants
 
@@ -59,7 +59,7 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 3. Router currentness comes from the router capability, never store supplements. Only an accepted router commit writes route supplements.
 4. Server write, projection acceptance, and route commit are separate outcomes; later failure cannot undo or report failure as success for an earlier fact.
 5. Exact transitions never rebase. A failed route CAS does not undo an already committed resource write.
-6. Reconciliation may canonicalize external stale state, but cannot invent command success.
+6. Reconciliation validates external route state, but neither navigates nor invents command success.
 7. Rejection, replacement, cleanup, and unmount leave no pending intent or operation-owned listener.
 8. Equal canonical revision implies equal normalized entries; durable-layout, repo-target-projection, overlay, and provider-only changes share one monotonic epoch clock.
 9. Runtime close clears only its epoch overlay/index/clock. Durable layout survives the next epoch and server restart.
@@ -73,7 +73,7 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 | Relative move queued behind open/active-close       | resolve from the post-operation route and projection                |
 | Router leaves the repo/branch while a command waits | reject with no navigation                                           |
 | Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                            |
-| Close write commits, then source CAS fails          | resource stays closed; reconciliation may fix the URL               |
+| Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane          |
 | One of two windows releases a shared runtime        | sibling remains current                                             |
 | Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed              |
 

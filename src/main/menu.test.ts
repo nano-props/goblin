@@ -18,7 +18,7 @@ function defaultMenuRuntimeState(): MockMenuRuntimeState {
 
 const mocks = vi.hoisted(() => {
   const template: any[] = []
-  const win = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } }
+  const win = { close: vi.fn(), isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } }
   return {
     appGetPath: vi.fn<(name: string) => string>((name: string) => (name === 'home' ? '/home/user' : '/data')),
     openHttpExternal: vi.fn(() => Promise.resolve(true)),
@@ -143,7 +143,7 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
+    clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
     clickMenuItem('menu.file', 'menu.file.close-workspace')
     await Promise.resolve()
 
@@ -151,17 +151,17 @@ describe('app menu actions', () => {
     expect(mocks.sendClientEffectIntent).not.toHaveBeenCalled()
   })
 
-  test('sends close workspace tab or window to an existing window', async () => {
+  test('sends close workspace tab to an existing window', async () => {
     mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
+    clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'workspace-pane-close-tab-or-window-requested',
+      type: 'workspace-pane-close-tab-requested',
     })
   })
 
@@ -225,6 +225,9 @@ describe('app menu actions', () => {
 
     const helpMenu = mocks.template.find((entry) => entry.label === 'menu.help')
     const shortcutsItem = helpMenu?.submenu?.find((entry: any) => entry.label === 'menu.help.shortcuts')
+    const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
+    expect(closeWindowItem?.accelerator).toBeUndefined()
     expect(shortcutsItem?.enabled).not.toBe(false)
     shortcutsItem.click()
     await Promise.resolve()
@@ -284,7 +287,8 @@ describe('app menu actions', () => {
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 
-  test('wires fixed workspace tab, repository, and window close actions', async () => {
+  test('keeps tab and window close shortcuts separate', async () => {
+    mocks.focusedRegisteredSurface.mockReturnValue({ window: mocks.win })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -293,15 +297,17 @@ describe('app menu actions', () => {
     const newTerminalItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'terminal.new')
     const createWorktreeItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.create-worktree')
     const closeWorkspaceTabItem = fileMenu?.submenu?.find(
-      (entry: any) => entry.label === 'menu.file.close-workspace-tab-or-window',
+      (entry: any) => entry.label === 'menu.file.close-workspace-tab',
     )
-    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-workspace')
+    const closeWorkspaceItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-workspace')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
     expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+T')
     expect(createWorktreeItem?.accelerator).toBe('CmdOrCtrl+N')
     expect(closeWorkspaceTabItem?.accelerator).toBe('CmdOrCtrl+W')
-    expect(closeViewItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
-    expect(closeWindowItem?.accelerator).toBeUndefined()
+    expect(closeWorkspaceItem?.accelerator).toBeUndefined()
+    expect(closeWindowItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
+    closeWindowItem.click()
+    expect(mocks.win.close).toHaveBeenCalledOnce()
   })
 
   test('keeps workspace view menu clicks and removes fixed view accelerators', async () => {

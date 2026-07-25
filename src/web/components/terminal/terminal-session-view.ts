@@ -20,15 +20,11 @@ import {
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
-import {
-  terminalEmulatorInput,
-  userTerminalInput,
-  type TerminalInput,
-} from '#/web/components/terminal/terminal-input.ts'
-import { subscribeToXtermUserInput } from '#/web/components/terminal/xterm-user-input-attribution.ts'
 import { terminalLog } from '#/web/logger.ts'
-const RESIZE_DEBOUNCE_MS = 80
-const FONT_REMEASURE_DEBOUNCE_MS = 80
+import { constrainTerminalSize } from '#/shared/terminal-validators.ts'
+import type { TerminalSize } from '#/shared/terminal-types.ts'
+import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
@@ -39,15 +35,15 @@ export class TerminalSessionView {
   private disposables: Array<{ dispose: () => void }> = []
   private disposeThemeObserver: (() => void) | null = null
   private disposeFontObserver: (() => void) | null = null
-  private fitFlushTimer: number | null = null
-  private fontFitTimer: number | null = null
   private host: HTMLElement | null = null
+  private presentationState: 'pending' | 'presented' = 'pending'
+  private pendingFocusRequest: TerminalFocusRequest | null = null
   private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
-  private pendingCoreUserInput = 0
 
   constructor(handlers: {
-    onInput: (input: TerminalInput) => void
+    onInput: (data: string) => void
     onResize: (size: { cols: number; rows: number }) => void
+    onLayout: () => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
     onProgress: (state: number, value: number) => void
     onOpenExternalLink: (uri: string) => void
@@ -61,8 +57,9 @@ export class TerminalSessionView {
   }
 
   private readonly handlers: {
-    onInput: (input: TerminalInput) => void
+    onInput: (data: string) => void
     onResize: (size: { cols: number; rows: number }) => void
+    onLayout: () => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
     onProgress: (state: number, value: number) => void
     onOpenExternalLink: (uri: string) => void
@@ -71,10 +68,8 @@ export class TerminalSessionView {
   attach(host: HTMLElement): void {
     this.host = host
     host.replaceChildren(this.frame)
-    if (this.term) {
-      this.installResizeObserver()
-      this.fitSoon()
-    }
+    this.installResizeObserver()
+    this.handlers.onLayout()
   }
 
   isConnected(): boolean {
@@ -84,46 +79,83 @@ export class TerminalSessionView {
   detach(host: HTMLElement): boolean {
     if (this.host !== host) return false
     this.host = null
+    this.markPresentationPending()
     this.blurIfFocused()
     this.disconnectResizeObserver()
-    this.cancelFitFlush()
     this.frame.remove()
     return true
   }
 
   disposeFrame(): void {
+    this.host = null
+    this.markPresentationPending()
+    this.blurIfFocused()
+    this.disconnectResizeObserver()
     this.frame.remove()
   }
 
-  isTerminalFocusTarget(target: EventTarget | null): boolean {
-    return target instanceof Node && !!this.term?.element?.contains(target)
+  isVisible(): boolean {
+    return this.presentationState === 'presented' && !!this.host?.isConnected
   }
 
-  isVisible(): boolean {
-    return !!this.host?.isConnected
+  canOpenTerminal(): boolean {
+    return this.term === null && !!this.host?.isConnected && hasMeasurableBox(this.xtermHost)
+  }
+
+  private markPresentationPending(): void {
+    this.presentationState = 'pending'
+    this.frame.style.visibility = 'hidden'
+  }
+
+  isPresented(): boolean {
+    return this.presentationState === 'presented'
+  }
+
+  takeFocusRequestForRebuild(): TerminalFocusRequest | null {
+    const pending = this.pendingFocusRequest
+    if (pending) {
+      let isCurrent: boolean
+      try {
+        isCurrent = pending.isCurrent()
+      } catch (error) {
+        this.settleFocusRequest()
+        throw error
+      }
+      if (!isCurrent) {
+        this.settleFocusRequest()
+        return null
+      }
+      this.pendingFocusRequest = null
+      return pending
+    }
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement) || !this.frame.contains(activeElement)) return null
+    const ownerDocument = this.frame.ownerDocument
+    return transferredTerminalFocusRequest(ownerDocument)
+  }
+
+  async present(term: XTermTerminal, signal: AbortSignal): Promise<'presented' | 'layout-changed' | 'cancelled'> {
+    if (this.term !== term || !this.host?.isConnected) return 'cancelled'
+    if (!(await waitForFullViewportRender(term, signal))) return 'cancelled'
+    if (this.term !== term || !this.host?.isConnected) return 'cancelled'
+    const dimensions = this.proposedProtocolSize()
+    if (!dimensions || dimensions.cols !== term.cols || dimensions.rows !== term.rows) return 'layout-changed'
+    this.presentationState = 'presented'
+    this.frame.style.visibility = ''
+    this.commitFocusRequest(term)
+    return 'presented'
   }
 
   blurIfFocused(): void {
+    this.settleFocusRequest()
     blurElementIfFocused(this.frame)
   }
 
-  /**
-   * Exposes the xterm DOM host so the orchestrator can wait until a real
-   * view box exists. Startup geometry before open is only a hint; after
-   * open, this mounted xterm and its FitAddon are the client-side authority
-   * for fitted view geometry.
-   */
-  measurableHost(): HTMLElement {
-    return this.xtermHost
-  }
-
-  openTerminal(
-    geometry: { cols: number; rows: number },
-    onMacOptionInput: (input: TerminalInput) => void,
-  ): XTermTerminal {
+  openTerminal(onMacOptionInput: (data: string) => void): XTermTerminal {
+    this.markPresentationPending()
     const theme = terminalThemeForCurrentDocument()
     const term = new Terminal({
-      ...createTerminalSizingOptions(geometry),
+      ...createTerminalSizingOptions(),
       cursorBlink: true,
       cursorStyle: 'bar',
       minimumContrastRatio: 4.5,
@@ -142,12 +174,10 @@ export class TerminalSessionView {
     this.disposeThemeObserver = observeTerminalTheme((nextTheme) => {
       this.applyTerminalTheme(term, nextTheme)
     })
-    this.installCoreUserInputAttribution(term)
-    this.disposables.push(term.onData((data) => this.handlers.onInput(this.inputFromXtermData(data, 'data'))))
-    this.disposables.push(term.onBinary((data) => this.handlers.onInput(this.inputFromXtermData(data, 'binary'))))
+    this.disposables.push(term.onData((data) => this.handlers.onInput(data)))
+    this.disposables.push(term.onBinary((data) => this.handlers.onInput(data)))
     this.disposables.push(term.onResize((size) => this.handlers.onResize(size)))
     term.open(this.xtermHost)
-    this.installResizeObserver()
     this.installFontObserver(term)
     return term
   }
@@ -156,14 +186,20 @@ export class TerminalSessionView {
     return this.term
   }
 
-  focus(): void {
-    this.term?.focus()
-  }
-
-  resizeTo(cols: number, rows: number): void {
-    if (!this.term) return
-    if (this.term.cols === cols && this.term.rows === rows) return
-    this.term.resize(cols, rows)
+  focus(request?: TerminalFocusRequest): void {
+    this.settleFocusRequest()
+    const next = request ?? { isCurrent: () => true }
+    try {
+      if (!next.isCurrent()) {
+        next.onSettled?.()
+        return
+      }
+    } catch (error) {
+      next.onSettled?.()
+      throw error
+    }
+    this.pendingFocusRequest = next
+    if (this.term && this.presentationState === 'presented') this.commitFocusRequest(this.term)
   }
 
   clearSearch(): void {
@@ -188,37 +224,30 @@ export class TerminalSessionView {
       : this.searchAddon.findPrevious(term, terminalSearchOptions())
   }
 
-  fitSoon(): void {
-    if (!this.needsRefit()) return
-    this.cancelFitFlush()
-    this.fitFlushTimer = window.setTimeout(() => {
-      this.fitFlushTimer = null
-      this.fitNow()
-    }, RESIZE_DEBOUNCE_MS)
-  }
-
-  fitNow(): void {
-    if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
-    this.fitAddon.fit()
-  }
-
-  private needsRefit(): boolean {
+  fitNow(): boolean {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return false
-    const dimensions = this.fitAddon.proposeDimensions()
-    return !!dimensions && (dimensions.cols !== this.term.cols || dimensions.rows !== this.term.rows)
+    const dimensions = this.proposedProtocolSize()
+    if (!dimensions) return false
+    if (this.term.cols !== dimensions.cols || this.term.rows !== dimensions.rows) {
+      this.term.resize(dimensions.cols, dimensions.rows)
+    }
+    return this.term.cols === dimensions.cols && this.term.rows === dimensions.rows
+  }
+
+  private proposedProtocolSize(): TerminalSize | null {
+    const dimensions = this.fitAddon?.proposeDimensions()
+    return dimensions ? constrainTerminalSize(dimensions.cols, dimensions.rows) : null
   }
 
   destroyTerminal(): void {
-    this.disconnectResizeObserver()
-    this.cancelFitFlush()
+    this.markPresentationPending()
+    this.settleFocusRequest()
     for (const disposable of this.disposables.splice(0)) disposable.dispose()
     this.disposeThemeObserver?.()
     this.disposeThemeObserver = null
     this.disposeFontObserver?.()
     this.disposeFontObserver = null
-    this.cancelFontFit()
     this.safariShiftKeyResolver.reset()
-    this.pendingCoreUserInput = 0
     this.fitAddon = null
     this.searchAddon = null
     this.term?.dispose()
@@ -227,7 +256,7 @@ export class TerminalSessionView {
     if (!this.frame.contains(this.xtermHost)) this.frame.appendChild(this.xtermHost)
   }
 
-  private installKeyboardHandlers(term: XTermTerminal, onInput: (input: TerminalInput) => void): void {
+  private installKeyboardHandlers(term: XTermTerminal, onInput: (data: string) => void): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
     const safariShiftKeyResolver = this.safariShiftKeyResolver
     term.attachCustomKeyEventHandler((event) => {
@@ -252,31 +281,9 @@ export class TerminalSessionView {
     })
   }
 
-  private sendInterceptedKeyboardInput(
-    term: XTermTerminal,
-    data: string,
-    onInput: (input: TerminalInput) => void,
-  ): void {
+  private sendInterceptedKeyboardInput(term: XTermTerminal, data: string, onInput: (data: string) => void): void {
     if (term.options.scrollOnUserInput) term.scrollToBottom()
-    onInput(userTerminalInput(data, 'keyboard'))
-  }
-
-  private installCoreUserInputAttribution(term: XTermTerminal): void {
-    this.disposables.push(
-      subscribeToXtermUserInput(term, () => {
-        this.pendingCoreUserInput += 1
-      }),
-    )
-  }
-
-  private inputFromXtermData(data: string, source: 'data' | 'binary'): TerminalInput {
-    // xterm uses onBinary for DEFAULT mouse reports and does not pair it with onUserInput.
-    if (source === 'binary') return userTerminalInput(data, 'xterm')
-    if (source === 'data' && this.pendingCoreUserInput > 0) {
-      this.pendingCoreUserInput -= 1
-      return userTerminalInput(data, 'xterm')
-    }
-    return terminalEmulatorInput(data, source)
+    onInput(data)
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
@@ -353,7 +360,7 @@ export class TerminalSessionView {
 
   private installResizeObserver(): void {
     this.disconnectResizeObserver()
-    this.resizeObserver = new ResizeObserver(() => this.fitSoon())
+    this.resizeObserver = new ResizeObserver(() => this.handlers.onLayout())
     this.resizeObserver.observe(this.xtermHost)
   }
 
@@ -362,7 +369,9 @@ export class TerminalSessionView {
     this.disposeFontObserver = null
     const fonts = document.fonts
     if (!fonts) return
-    const refit = () => this.scheduleFontFit(term)
+    const refit = () => {
+      if (this.term === term) this.handlers.onLayout()
+    }
     fonts.ready.then(refit).catch(() => {})
     fonts.addEventListener?.('loadingdone', refit)
     this.disposeFontObserver = () => {
@@ -375,31 +384,42 @@ export class TerminalSessionView {
     this.resizeObserver = null
   }
 
-  private scheduleFontFit(term: XTermTerminal): void {
-    if (this.term !== term) return
-    this.cancelFontFit()
-    this.fontFitTimer = window.setTimeout(() => {
-      this.fontFitTimer = null
-      this.fitForFontLoad(term)
-    }, FONT_REMEASURE_DEBOUNCE_MS)
+  private settleFocusRequest(): void {
+    const pending = this.pendingFocusRequest
+    this.pendingFocusRequest = null
+    pending?.onSettled?.()
   }
 
-  private cancelFontFit(): void {
-    if (this.fontFitTimer === null) return
-    window.clearTimeout(this.fontFitTimer)
-    this.fontFitTimer = null
+  private commitFocusRequest(term: XTermTerminal): void {
+    const pending = this.pendingFocusRequest
+    if (!pending) return
+    this.pendingFocusRequest = null
+    try {
+      if (pending.isCurrent()) term.focus()
+    } finally {
+      pending.onSettled?.()
+    }
   }
+}
 
-  private fitForFontLoad(term: XTermTerminal): void {
-    if (this.term !== term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
-    this.fitAddon.fit()
-  }
-
-  private cancelFitFlush(): void {
-    if (this.fitFlushTimer === null) return
-    window.clearTimeout(this.fitFlushTimer)
-    this.fitFlushTimer = null
-  }
+function waitForFullViewportRender(term: XTermTerminal, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (rendered: boolean) => {
+      if (settled) return
+      settled = true
+      disposable.dispose()
+      signal.removeEventListener('abort', onAbort)
+      resolve(rendered)
+    }
+    const onAbort = () => finish(false)
+    const disposable = term.onRender(({ start, end }) => {
+      if (start === 0 && end >= term.rows - 1) finish(true)
+    })
+    signal.addEventListener('abort', onAbort, { once: true })
+    term.refresh(0, term.rows - 1)
+  })
 }
 
 function terminalSearchOptions(incremental?: boolean): ISearchOptions {
@@ -413,6 +433,50 @@ function terminalSearchOptions(incremental?: boolean): ISearchOptions {
 function blurElementIfFocused(element: HTMLElement): void {
   const activeElement = document.activeElement
   if (activeElement instanceof HTMLElement && element.contains(activeElement)) activeElement.blur()
+}
+
+function documentFocusIsNeutral(ownerDocument: Document): boolean {
+  return (
+    ownerDocument.activeElement === null ||
+    ownerDocument.activeElement === ownerDocument.body ||
+    ownerDocument.activeElement === ownerDocument.documentElement
+  )
+}
+
+function transferredTerminalFocusRequest(ownerDocument: Document): TerminalFocusRequest {
+  let current = true
+  let observing = false
+  const ownerWindow = ownerDocument.defaultView
+  const abandon = () => {
+    current = false
+  }
+  const abandonForKeyboardNavigation = (event: KeyboardEvent) => {
+    if (event.key === 'Tab') abandon()
+  }
+  const stopObserving = () => {
+    if (!observing) return
+    observing = false
+    ownerDocument.removeEventListener('pointerdown', abandon, true)
+    ownerDocument.removeEventListener('keydown', abandonForKeyboardNavigation, true)
+    ownerWindow?.removeEventListener('blur', abandon)
+  }
+  const startObserving = () => {
+    if (observing) return
+    observing = true
+    ownerDocument.addEventListener('pointerdown', abandon, true)
+    ownerDocument.addEventListener('keydown', abandonForKeyboardNavigation, true)
+    ownerWindow?.addEventListener('blur', abandon)
+  }
+  return {
+    isCurrent: () => {
+      startObserving()
+      return current && documentFocusIsNeutral(ownerDocument)
+    },
+    onSettled: () => {
+      current = false
+      stopObserving()
+    },
+  }
 }
 
 function hasMeasurableBox(element: HTMLElement): boolean {

@@ -48,6 +48,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
     session: {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalRuntimeGeneration: 1,
+      identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
       target: worktreeTarget(WORKSPACE_RUNTIME_ID),
       presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
@@ -56,8 +57,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
       canonicalTitle: null,
       phase: 'open',
       message: null,
-      cols: 80,
-      rows: 24,
+      canonicalSize: { cols: 80, rows: 24 },
     },
   }
 }
@@ -91,7 +91,7 @@ function makeActions(
       projectionChanged: null,
     })),
     writeSession: vi.fn(async () => ({ status: 'rejected' as const })),
-    resizeSession: vi.fn(() => false),
+    resizeSession: vi.fn(async () => ({ ok: false as const, message: 'resize not configured' })),
     takeoverSession: vi.fn(),
     terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
   }
@@ -158,14 +158,13 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 1 },
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
-      terminalRuntimeGeneration: 1,
-      processName: 'zsh',
+      terminalRuntimeGeneration: 0,
+      processName: '',
       canonicalTitle: null,
-      phase: 'open',
+      phase: 'opening',
       message: null,
       controller: null,
-      canonicalCols: 80,
-      canonicalRows: 24,
+      canonicalSize: null,
     })
 
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
@@ -401,41 +400,86 @@ describe('terminal-runtime-actions catalog recovery', () => {
 })
 
 describe('terminal-runtime-actions clientId gate', () => {
+  test('rejects unbound generations before write, resize, or takeover reach the manager', async () => {
+    const { actions, manager } = makeActions()
+
+    await expect(
+      actions.write(CLIENT_ID, USER_ID, {
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 0,
+        data: 'x',
+      }),
+    ).resolves.toEqual({ status: 'rejected' })
+    await expect(
+      actions.resize(CLIENT_ID, USER_ID, {
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 0,
+        cols: 80,
+        rows: 24,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+    await expect(
+      actions.takeover(CLIENT_ID, USER_ID, {
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 0,
+        cols: 80,
+        rows: 24,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+
+    expect(manager.writeSession).not.toHaveBeenCalled()
+    expect(manager.resizeSession).not.toHaveBeenCalled()
+    expect(manager.takeoverSession).not.toHaveBeenCalled()
+  })
+
   test('write / resize / takeover / restart / attach use the authenticated connection clientId', async () => {
     const { actions, manager } = makeActions({ closeSessionForUserOutcome: () => ({ kind: 'already-closed' }) })
 
-    await actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
-    actions.resize(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, cols: 80, rows: 24 } as never)
+    await actions.write(CLIENT_ID, USER_ID, {
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
+      data: 'x',
+    })
+    actions.resize(CLIENT_ID, USER_ID, {
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
+      cols: 80,
+      rows: 24,
+    })
     actions.takeover(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
       cols: 80,
       rows: 24,
-    } as never)
+    })
     await actions.restart(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
       cols: 80,
       rows: 24,
-    } as never)
+    })
     await actions.attach(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
       cols: 80,
       rows: 24,
-    } as never)
+    })
 
     // Each call crossed the gate and reached the manager, passing
     // the outer CLIENT_ID as the session-level clientId.
-    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 'x', CLIENT_ID)
-    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 1, 'x', CLIENT_ID)
+    expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 1, 80, 24, CLIENT_ID)
+    expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 1, 80, 24, CLIENT_ID)
     expect(manager.restartSessionWithProjectionOutcome).toHaveBeenCalledWith(
       USER_ID,
       RUNTIME_SESSION_ID,
+      1,
       80,
       24,
       CLIENT_ID,
       expect.any(AbortSignal),
     )
-    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 1, 80, 24, CLIENT_ID)
   })
 
   test('restart rejects invalid arguments before looking up the session scope', async () => {
@@ -450,9 +494,10 @@ describe('terminal-runtime-actions clientId gate', () => {
     await expect(
       actions.restart('not_a_client', USER_ID, {
         terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
         cols: 80,
         rows: 24,
-      } as never),
+      }),
     ).resolves.toEqual({
       ok: false,
       message: 'error.invalid-arguments',
@@ -460,9 +505,10 @@ describe('terminal-runtime-actions clientId gate', () => {
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
         terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
         cols: 0,
         rows: 24,
-      } as never),
+      }),
     ).resolves.toEqual({
       ok: false,
       message: 'error.invalid-arguments',
@@ -490,9 +536,10 @@ describe('terminal-runtime-actions clientId gate', () => {
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
         terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
         cols: 80,
         rows: 24,
-      } as never),
+      }),
     ).resolves.toEqual({ ok: false, message: 'error.worktree-removal-in-progress' })
     expect(manager.restartSessionWithProjectionOutcome).not.toHaveBeenCalled()
     releaseRemoval.resolve()
@@ -511,9 +558,10 @@ describe('terminal-runtime-actions clientId gate', () => {
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
         terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
         cols: 80,
         rows: 24,
-      } as never),
+      }),
     ).resolves.toEqual({ ok: false, message: 'restart rejected' })
 
     expect(broadcasts).not.toHaveBeenCalledWith(USER_ID, expect.objectContaining({ type: 'sessions-changed' }))
@@ -534,9 +582,10 @@ describe('terminal-runtime-actions clientId gate', () => {
     manager.restartSessionWithProjectionOutcome.mockImplementation(async () => await restartResult.promise)
     const restart = actions.restart(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      terminalRuntimeGeneration: 1,
       cols: 80,
       rows: 24,
-    } as never)
+    })
     await vi.waitFor(() => expect(manager.restartSessionWithProjectionOutcome).toHaveBeenCalledOnce())
     const removalTask = vi.fn(async () => undefined)
     const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, removalTask)

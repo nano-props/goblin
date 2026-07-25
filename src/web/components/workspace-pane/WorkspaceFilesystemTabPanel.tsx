@@ -24,9 +24,15 @@ import {
   workspacePaneFilesystemTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
-import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
-export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneFilesystemTarget }) {
+export function WorkspaceFilesystemTabPanel({
+  routeTarget,
+  target,
+}: {
+  routeTarget: WorkspacePaneTabsTarget
+  target: WorkspacePaneFilesystemTarget
+}) {
   const workspaceId = target.workspaceId
   const workspaceRuntimeId = target.workspaceRuntimeId
   const rootPath = workspacePaneFilesystemRootPath(target)
@@ -36,7 +42,7 @@ export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneF
   )
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminalWithAdmission } = useTerminalSessionContext()
+  const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((state) => state.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(workspaceId, rootPath), [rootPath, workspaceId])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -109,23 +115,24 @@ export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneF
       if (node.kind !== 'file') return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
-      const presentationToken = beginPrimaryWindowPresentation()
       try {
         const openerIdentity = workspacePaneStaticTabId('files')
         const base = workspacePaneFilesystemTerminalBase(target)
         if (!base) throw new Error('error.workspace-tabs-target-invalid')
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+          routeTarget,
           base,
           createTerminal: createTerminalWithAdmission,
           openerIdentity,
-          showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
+          showCreatedTerminalTab: (terminalSessionId, canonicalBranch, routeRequest) =>
             showCreatedWorkspacePaneFilesystemTerminal(
               target,
               terminalSessionId,
               canonicalBranch,
               navigation,
-              presentationToken,
+              routeRequest,
             ),
+          focusTerminal,
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
@@ -145,8 +152,10 @@ export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneF
       createTerminalWithAdmission,
       endOpeningFile,
       executionTarget,
+      focusTerminal,
       navigation,
       openingFileKeyPrefix,
+      routeTarget,
       t,
       target,
     ],

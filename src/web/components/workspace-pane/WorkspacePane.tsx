@@ -54,6 +54,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
 
 export type WorkspacePaneRouteContext =
   | { kind: 'workspace-root'; route: ParsedWorkspacePaneRoute | null }
@@ -294,9 +295,8 @@ function GitWorktreeFilesystemPaneReady({
 }) {
   const t = useT()
   const worktreePath = target.worktreePath
-  const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
-  const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
-  const model = useGitWorktreeWorkspacePaneTabModel(workspaceRuntime, target, head, requestedTab, requestedSessionId)
+  const model = useGitWorktreeWorkspacePaneTabModel(workspaceRuntime, target, head, route)
+  useFilesystemWorkspacePaneRouteController({ route, model })
   const runtimeTarget = runtimeWorkspacePaneTarget(target, workspaceRuntime.workspaceRuntimeId)
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
@@ -329,7 +329,7 @@ function GitWorktreeFilesystemPaneReady({
         </WorkspacePanePanelFrame>
       ) : model.selection?.tab === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <WorkspaceFilesystemTabPanel target={surfaceTarget} />
+          <WorkspaceFilesystemTabPanel routeTarget={target} target={surfaceTarget} />
         </WorkspacePanePanelFrame>
       ) : model.selection?.tab === 'terminal' && runtimeTarget ? (
         renderWorkspacePaneRuntimeTabPanel({
@@ -337,6 +337,7 @@ function GitWorktreeFilesystemPaneReady({
           workspacePaneId,
           panelLabel: { label: t('tab.terminal') },
           target: {
+            routeTarget: target,
             runtimeTarget,
             presentation: { kind: 'git-worktree', head },
           },
@@ -477,16 +478,11 @@ function WorkspaceRootPane({
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
-  const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
-  const model = useWorkspaceRootTabModel(workspace, requestedTab, requestedSessionId)
-  const target = useMemo(
-    () => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }),
-    [workspace.id],
-  )
+  const model = useWorkspaceRootTabModel(workspace, route)
+  useFilesystemWorkspacePaneRouteController({ route, model })
+  const target = useMemo(() => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }), [workspace.id])
   const runtimeTarget = runtimeWorkspacePaneTarget(target, workspace.workspaceRuntimeId)
-  const terminalAvailable = workspace.probe.capabilities.terminal.available
-  const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
+  const activePanel = model.selection?.tab ?? null
   const overviewReadModel = useWorkspaceDirectoryOverview(
     workspace.id,
     workspace.workspaceRuntimeId,
@@ -504,6 +500,7 @@ function WorkspaceRootPane({
   const openFilesTab = useCallback(() => {
     void dispatchOpenWorkspacePaneTargetStaticTabAction({
       workspaceId: workspace.id,
+      routeTarget: target,
       paneTarget: target,
       type: 'files',
       workspacePaneRoute: { kind: 'static', tab: 'status' },
@@ -540,7 +537,7 @@ function WorkspaceRootPane({
         </WorkspacePanePanelFrame>
       ) : activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <WorkspaceFilesystemTabPanel target={surfaceTarget} />
+          <WorkspaceFilesystemTabPanel routeTarget={target} target={surfaceTarget} />
         </WorkspacePanePanelFrame>
       ) : activePanel === 'terminal' && runtimeTarget ? (
         renderWorkspacePaneRuntimeTabPanel({
@@ -548,6 +545,7 @@ function WorkspaceRootPane({
           workspacePaneId,
           panelLabel: { label: t('tab.terminal') },
           target: {
+            routeTarget: target,
             runtimeTarget,
             presentation: { kind: 'workspace-root' },
           },

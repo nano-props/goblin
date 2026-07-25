@@ -62,7 +62,6 @@ describe('workspace pane runtime realtime', () => {
         action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
         input,
       },
-      undefined,
     )
 
     expect(JSON.parse(socket.send.mock.calls[0]?.[0] ?? '')).toEqual({
@@ -77,33 +76,34 @@ describe('workspace pane runtime realtime', () => {
   test('sends the open response before flushing committed realtime effects', async () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     const buffered = new BufferedAppRealtimeSocket(socket)
-    buffered.pause()
-    await handleWorkspacePaneRuntimeRealtimeRequestMessage(
-      {
-        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open]: async () => {
-          buffered.send(
-            JSON.stringify({
-              type: 'sessions-changed',
-              workspaceId: workspaceId,
-              workspaceRuntimeId: 'repo-runtime-test',
-              revision: 1,
-            }),
-          )
-          return { ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' }
+    buffered.enqueueTransition(() =>
+      handleWorkspacePaneRuntimeRealtimeRequestMessage(
+        {
+          [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open]: async () => {
+            buffered.send(
+              JSON.stringify({
+                type: 'sessions-changed',
+                workspaceId: workspaceId,
+                workspaceRuntimeId: 'repo-runtime-test',
+                revision: 1,
+              }),
+            )
+            return { ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' }
+          },
+          [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close]: vi.fn(),
         },
-        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close]: vi.fn(),
-      },
-      'client_a',
-      'user_a',
-      socket,
-      {
-        type: 'request',
-        requestId: 'request_order',
-        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
-        input,
-      },
-      buffered,
+        'client_a',
+        'user_a',
+        socket,
+        {
+          type: 'request',
+          requestId: 'request_order',
+          action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+          input,
+        },
+      ),
     )
+    await vi.waitFor(() => expect(socket.send).toHaveBeenCalledTimes(2))
 
     expect(JSON.parse(socket.send.mock.calls[0]?.[0] ?? '')).toMatchObject({
       type: 'response',

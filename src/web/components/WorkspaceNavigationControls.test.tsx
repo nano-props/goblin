@@ -7,6 +7,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -116,23 +117,14 @@ function renderControls({
   )
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
-  return {
-    activateWorkspace: () => {},
-    closeWorkspace: async () => ({ ok: true }),
-    cycleWorkspace: () => {},
-    selectRepoBranch: () => true,
-    showRepoBranchEmptyWorkspacePane: () => true,
-    showRepoBranchWorkspacePaneTab: () => true,
-    showRepoBranchTerminalSession: () => true,
-    commitWorkspacePaneRoute: () => true,
+function navigationWith(
+  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'goBack' | 'goForward'>> = {},
+): PrimaryWindowNavigationActions {
+  return primaryWindowNavigationActionsForTest({
     goBack: () => {},
     goForward: () => {},
-    openSettings: () => {},
-    openCreateWorktree: () => {},
     ...overrides,
-    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
-  }
+  })
 }
 
 function workspaceNavigationControls(container: HTMLElement): HTMLElement | null {

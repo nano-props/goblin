@@ -1,4 +1,3 @@
-import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
@@ -23,22 +22,17 @@ import {
   projectCreateResultForClient,
   projectServerTerminalSession,
 } from '#/web/components/terminal/terminal-session-projection.ts'
-import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-import {
-  captureTerminalHostGeometry,
-  resolveTerminalStartupGeometryHint,
-} from '#/web/components/terminal/terminal-session-geometry.ts'
 import {
   TerminalSessionLifecycleQueues,
   type TerminalCreateQueueEntry,
 } from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
-import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/terminal/terminal-geometry.ts'
 import { resolveAdjacentTerminalSelectionAfterRemoval } from '#/web/components/terminal/terminal-session-eviction.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
+  TerminalFocusRequest,
   TerminalIdentityRealtimeEvent,
   TerminalLifecycleRealtimeEvent,
   TerminalRuntimeMembershipIndex,
@@ -76,7 +70,6 @@ interface TerminalCreateQueueRequest {
   createOptions: TerminalCreateOptions
   dedupeKey: string | null
   placement: WorkspacePaneRuntimeTabPlacement
-  geometry: { cols: number; rows: number }
 }
 
 type TerminalCreateQueueResult = Omit<TerminalCreateAdmissionResult, 'requestRole'>
@@ -103,8 +96,8 @@ interface ResolvedTerminalCreateOptions {
  * `terminal-roadmap.md` P1.7.
  *
  * **Why singleton**: the terminal feature owns cross-cutting state
- * (per-filesystem-target session lists, bell controller, startup geometry hints,
- * selector snapshot caches, pending create/close queues) that has no
+ * (per-filesystem-target session lists, bell controller, selector snapshot
+ * caches, pending creates, and close-operation single-flight) that has no
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
@@ -173,8 +166,6 @@ export class TerminalSessionProjection {
   // each client chooses which terminal to present for a filesystem target.
   private readonly selectedTerminalSessionIdByTerminalFilesystemTarget = new Map<string, string>()
   private readonly preferredSelectedTerminalSessionIdByTerminalFilesystemTarget = new Map<string, string>()
-  private readonly hostByFilesystemTarget = new Map<string, HTMLElement>()
-  private readonly startupGeometryHintByFilesystemTarget = new Map<string, { cols: number; rows: number }>()
   // Owns pending create promises; server-owned composed commands own close.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<
     TerminalSessionBase,
@@ -261,15 +252,12 @@ export class TerminalSessionProjection {
    * stop — the singleton already outlives that effect.
    */
   destroy(): void {
-    setTerminalFocused(false)
     this.lifecycleQueues.rejectAll(new Error('terminal session projection destroyed'))
     for (const session of this.sessions.values()) session.dispose()
     this.sessions.clear()
     this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
     this.selectedTerminalSessionIdByTerminalFilesystemTarget.clear()
     this.preferredSelectedTerminalSessionIdByTerminalFilesystemTarget.clear()
-    this.hostByFilesystemTarget.clear()
-    this.startupGeometryHintByFilesystemTarget.clear()
     this.closeOperationByRuntimeBindingKey.clear()
     this.snapshotCache.clear()
     this.filesystemTargetSnapshotCache.clear()
@@ -588,7 +576,7 @@ export class TerminalSessionProjection {
       const session = this.ensureSession(descriptor)
       session.hydrate(projected.hydrateInput, options.hydrationSource ?? 'snapshot')
       if (!this.sessions.has(descriptor.terminalSessionId)) continue
-      if (projected.controlsTerminal)
+      if (session.controlsTerminal())
         controllerTerminalSessionIdByFilesystemTarget.set(
           projected.terminalFilesystemTargetKey,
           descriptor.terminalSessionId,
@@ -672,7 +660,6 @@ export class TerminalSessionProjection {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
       placement: {},
-      geometry: this.startupGeometryHint(terminalFilesystemTargetKey),
     })
     const existing = this.terminalSessionIdPromiseByCreatePromise.get(admission.promise)
     if (existing) return existing
@@ -694,7 +681,6 @@ export class TerminalSessionProjection {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
       placement,
-      geometry: this.startupGeometryHint(terminalFilesystemTargetKey),
     })
     const result = await admission.promise
     return {
@@ -703,33 +689,17 @@ export class TerminalSessionProjection {
     }
   }
 
-  registerHost = (terminalFilesystemTargetKey: string, host: HTMLElement): void => {
-    this.hostByFilesystemTarget.set(terminalFilesystemTargetKey, host)
-    captureTerminalHostGeometry({
-      terminalFilesystemTargetKey,
-      hostByFilesystemTarget: this.hostByFilesystemTarget,
-      startupGeometryHintByFilesystemTarget: this.startupGeometryHintByFilesystemTarget,
-    })
-  }
-
-  unregisterHost = (terminalFilesystemTargetKey: string, host: HTMLElement): void => {
-    if (this.hostByFilesystemTarget.get(terminalFilesystemTargetKey) !== host) return
-    this.hostByFilesystemTarget.delete(terminalFilesystemTargetKey)
-  }
-
   private async performCreateTerminal(
     base: TerminalSessionBase,
-    geometry: { cols: number; rows: number },
     terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
     createOptions: ResolvedTerminalCreateOptions,
   ): Promise<TerminalCreateQueueResult> {
-    return await this.performCreateTerminalNow(base, geometry, terminalFilesystemTargetKey, pending, createOptions)
+    return await this.performCreateTerminalNow(base, terminalFilesystemTargetKey, pending, createOptions)
   }
 
   private async performCreateTerminalNow(
     base: TerminalSessionBase,
-    geometry: { cols: number; rows: number },
     terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
     createOptions: ResolvedTerminalCreateOptions,
@@ -748,8 +718,6 @@ export class TerminalSessionProjection {
       request: {
         kind: createKind,
         ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
-        cols: geometry.cols,
-        rows: geometry.rows,
         target: base.target,
       },
       ...request.placement,
@@ -797,18 +765,6 @@ export class TerminalSessionProjection {
     }
   }
 
-  private startupGeometryHint(terminalFilesystemTargetKey: string): { cols: number; rows: number } {
-    return (
-      resolveTerminalStartupGeometryHint({
-        terminalFilesystemTargetKey,
-        hostByFilesystemTarget: this.hostByFilesystemTarget,
-        startupGeometryHintByFilesystemTarget: this.startupGeometryHintByFilesystemTarget,
-        selectedDescriptor: this.selectedDescriptor(terminalFilesystemTargetKey),
-        getAttachmentSnapshot: (terminalSessionId) => this.snapshot(terminalSessionId).attachment,
-      }) ?? { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }
-    )
-  }
-
   private enqueueCreateRequest(
     base: TerminalSessionBase,
     terminalFilesystemTargetKey: string,
@@ -830,8 +786,8 @@ export class TerminalSessionProjection {
   private async flushCreateRequest(terminalFilesystemTargetKey: string): Promise<void> {
     const pending = this.lifecycleQueues.getCreate(terminalFilesystemTargetKey)
     if (!pending || pending.flushing) return
-    // Synchronous claim: enqueueCreateRequest, registerHost, and a
-    // StrictMode double-invoke can all arrive here while a prior flush
+    // Synchronous claim: enqueueCreateRequest and a StrictMode double-invoke
+    // can both arrive here while a prior flush
     // is still awaiting. The first one through sets the flag; the rest
     // bail and observe the same pending promise.
     pending.flushing = true
@@ -859,13 +815,7 @@ export class TerminalSessionProjection {
     }
     const createOptions = await this.resolveCurrentCreateOptions(terminalFilesystemTargetKey, pending)
     this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
-    return await this.performCreateTerminal(
-      pending.base,
-      pending.options.geometry,
-      terminalFilesystemTargetKey,
-      pending,
-      createOptions,
-    )
+    return await this.performCreateTerminal(pending.base, terminalFilesystemTargetKey, pending, createOptions)
   }
 
   private async resolveCurrentCreateOptions(
@@ -1002,8 +952,9 @@ export class TerminalSessionProjection {
     }
   }
 
-  focusTerminal = (terminalSessionId: string): void => {
-    this.sessions.get(terminalSessionId)?.focus()
+  focusTerminal = (terminalSessionId: string, request?: TerminalFocusRequest): boolean => {
+    const session = this.sessions.get(terminalSessionId)
+    return session ? session.focus(request) : false
   }
 
   snapshot = (terminalSessionId: string): TerminalSnapshot => {
@@ -1018,10 +969,6 @@ export class TerminalSessionProjection {
 
   subscribeSnapshot = (terminalSessionId: string, listener: () => void): (() => void) => {
     return this.subscribeToKeyedListeners(this.snapshotListeners, terminalSessionId, listener)
-  }
-
-  isTerminalFocusTarget = (terminalSessionId: string, target: EventTarget | null): boolean => {
-    return this.sessions.get(terminalSessionId)?.isTerminalFocusTarget(target) ?? false
   }
 
   findNext = (terminalSessionId: string, term: string, incremental?: boolean) => {
@@ -1042,8 +989,8 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.clearSearch()
   }
 
-  writeInput = (terminalSessionId: string, data: string, source: TerminalUserInputSource = 'command'): void => {
-    this.sessions.get(terminalSessionId)?.writeInput(userTerminalInput(data, source))
+  captureInputWriter = (terminalSessionId: string) => {
+    return this.sessions.get(terminalSessionId)?.captureInputWriter() ?? null
   }
 
   takeover = (terminalSessionId: string): Promise<boolean> => {
@@ -1146,7 +1093,7 @@ export class TerminalSessionProjection {
 
   /**
    * Single commit barrier for bindings activated by either a direct response
-   * response or full reconciliation. No binding is published before a queued
+   * or full reconciliation. No binding is published before a queued
    * future exit is checked and its exact pending bell is consumed.
    */
   private activateRuntimeBinding(session: TerminalSession): boolean {
@@ -1272,6 +1219,11 @@ export class TerminalSessionProjection {
       return false
     }
     if (!result.ok) return false
+    writeCanonicalWorkspacePaneTabsSnapshot(
+      terminalSessionCoordinates(base).workspaceId,
+      terminalSessionCoordinates(base).workspaceRuntimeId,
+      result.paneTabsSnapshot,
+    )
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
     return true
   }

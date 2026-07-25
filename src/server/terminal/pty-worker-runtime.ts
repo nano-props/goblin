@@ -8,20 +8,25 @@
 // of the foreground process — even after a child exits without
 // emitting a title-OSC.
 
-import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import {
+  spawnTerminalPtyRuntime,
+  type SpawnTerminalPtyRuntimeResult,
+  type TerminalPtyRuntime,
+  type TerminalPtyRuntimeEventObserver,
+  type TerminalPtyRuntimeEventOwnership,
+} from '#/server/terminal/terminal-pty-runtime.ts'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
 import type {
   PtyWorkerMessage,
   PtyWorkerRequest,
   PtyWorkerSpawnFailureCode,
 } from '#/server/terminal/pty-worker-protocol.ts'
-import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 /** The return shape from a PtySupervisor-style spawn call. The worker
  *  runtime's spawnPty fn returns this same shape so the failure path
  *  (a structured `{ ok: false, message }` instead of a throw) is
  *  expressible from the start. */
-type PtySpawnOutcome = { ok: true; runtime: TerminalPtyRuntime } | { ok: false; message: string }
+type PtySpawnOutcome = SpawnTerminalPtyRuntimeResult
 
 export interface PtyWorkerRuntimeOptions {
   emit(message: PtyWorkerMessage): void
@@ -32,18 +37,18 @@ export interface PtyWorkerRuntimeOptions {
    * than dying. Tests pass a stub to exercise the failure path
    * without faking `node-pty` at the module level.
    */
-  spawnPty?: (input: PtySpawnInput) => PtySpawnOutcome
+  spawnPty?: (input: PtySpawnInput, observer: TerminalPtyRuntimeEventObserver) => PtySpawnOutcome
 }
 
 interface PtyEntry {
   runtime: TerminalPtyRuntime
-  processName: string
+  events: TerminalPtyRuntimeEventOwnership
 }
 
 export class PtyWorkerRuntime {
   private readonly options: PtyWorkerRuntimeOptions
   private readonly ptys = new Map<string, PtyEntry>()
-  private readonly spawnPty: (input: PtySpawnInput) => PtySpawnOutcome
+  private readonly spawnPty: (input: PtySpawnInput, observer: TerminalPtyRuntimeEventObserver) => PtySpawnOutcome
 
   constructor(options: PtyWorkerRuntimeOptions) {
     this.options = options
@@ -54,16 +59,18 @@ export class PtyWorkerRuntime {
     if (!message || typeof message !== 'object') return
     switch (message.type) {
       case 'pty-spawn':
-        this.handleSpawn(message.requestId, message.input)
+        this.handleSpawn(message.requestId, message.ptySessionId, message.input)
         return
       case 'pty-write':
         this.handleWrite(message.requestId, message.ptySessionId, message.data)
         return
       case 'pty-resize':
-        this.ptys.get(message.ptySessionId)?.runtime.resize(message.cols, message.rows)
+        this.handleResize(message.requestId, message.ptySessionId, message.cols, message.rows)
         return
       case 'pty-kill':
-        this.ptys.get(message.ptySessionId)?.runtime.kill()
+        try {
+          this.ptys.get(message.ptySessionId)?.runtime.kill()
+        } catch {}
         return
       case 'shutdown':
         this.shutdown()
@@ -85,8 +92,39 @@ export class PtyWorkerRuntime {
     }
   }
 
-  private handleSpawn(requestId: string, input: PtySpawnInput): void {
-    const result = this.spawnPty(input)
+  private handleResize(requestId: string, ptySessionId: string, cols: number, rows: number): void {
+    const entry = this.ptys.get(ptySessionId)
+    if (!entry) {
+      this.options.emit({ type: 'pty-resize-result', requestId, accepted: false })
+      return
+    }
+    try {
+      entry.runtime.resize(cols, rows)
+      this.options.emit({ type: 'pty-resize-result', requestId, accepted: true })
+    } catch {
+      this.options.emit({ type: 'pty-resize-result', requestId, accepted: false })
+    }
+  }
+
+  private handleSpawn(requestId: string, ptySessionId: string, input: PtySpawnInput): void {
+    let exited = false
+    let processName = 'terminal'
+    const result = this.spawnPty(input, {
+      onData: (data, nextProcessName) => {
+        if (exited) return
+        if (nextProcessName && nextProcessName !== processName) {
+          processName = nextProcessName
+          this.options.emit({ type: 'pty-process-name-changed', ptySessionId, processName })
+        }
+        this.options.emit({ type: 'pty-data', ptySessionId, data })
+      },
+      onExit: () => {
+        if (exited) return
+        exited = true
+        this.ptys.delete(ptySessionId)
+        this.options.emit({ type: 'pty-exit', ptySessionId, code: null, signal: null })
+      },
+    })
     if (!result.ok) {
       this.options.emit({
         type: 'pty-spawn-result',
@@ -97,13 +135,12 @@ export class PtyWorkerRuntime {
       })
       return
     }
-    const ptySessionId = createPtySessionId()
     // Defer the initial sample to the first onData chunk: node-pty's
     // macOS spawn-helper briefly holds the PTY before exec'ing the
     // shell, so term.process read in the same tick as pty.spawn returns
     // the helper's comm. By the time the shell has produced output,
     // the helper is gone and the comm is the real name.
-    this.ptys.set(ptySessionId, { runtime: result.runtime, processName: 'terminal' })
+    if (!exited) this.ptys.set(ptySessionId, { runtime: result.runtime, events: result.events })
     this.options.emit({
       type: 'pty-spawn-result',
       requestId,
@@ -111,31 +148,11 @@ export class PtyWorkerRuntime {
       ptySessionId,
       processName: 'terminal',
     })
-    this.wireDataAndExitEvents(ptySessionId, result.runtime)
-  }
-
-  private wireDataAndExitEvents(ptySessionId: string, runtime: TerminalPtyRuntime): void {
-    runtime.onData((data) => {
-      // Always sample process name so the native host has a fresh view
-      // of the foreground process, even after a child exits without
-      // setting a title-OSC. Emit the name-change BEFORE pty-data so
-      // the native host's cache is updated when it processes this chunk.
-      const nextName = safeProcessName(runtime)
-      const entry = this.ptys.get(ptySessionId)
-      if (entry && nextName && nextName !== entry.processName) {
-        entry.processName = nextName
-        this.options.emit({ type: 'pty-process-name-changed', ptySessionId, processName: nextName })
-      }
-      this.options.emit({ type: 'pty-data', ptySessionId, data })
-    })
-    runtime.onExit(() => {
-      this.options.emit({ type: 'pty-exit', ptySessionId, code: null, signal: null })
-      this.ptys.delete(ptySessionId)
-    })
   }
 
   shutdown(): void {
     for (const entry of Array.from(this.ptys.values())) {
+      entry.events.dispose()
       try {
         entry.runtime.kill()
       } catch {}
@@ -144,12 +161,8 @@ export class PtyWorkerRuntime {
   }
 }
 
-function createPtySessionId(): string {
-  return createOpaqueId('pty')
-}
-
-function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {
-  return spawnTerminalPtyRuntime(input)
+function defaultSpawnPty(input: PtySpawnInput, observer: TerminalPtyRuntimeEventObserver): PtySpawnOutcome {
+  return spawnTerminalPtyRuntime(input, observer)
 }
 
 function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailureCode; recoverable: boolean } {
@@ -157,12 +170,4 @@ function classifyPtySpawnFailure(message: string): { code: PtyWorkerSpawnFailure
     return { code: 'native-pty-spawn-failed', recoverable: true }
   }
   return { code: 'unknown', recoverable: false }
-}
-
-function safeProcessName(runtime: TerminalPtyRuntime): string {
-  try {
-    return runtime.processName()
-  } catch {
-    return 'terminal'
-  }
 }

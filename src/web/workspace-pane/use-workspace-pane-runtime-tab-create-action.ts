@@ -5,6 +5,7 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
+  type CreatedTerminalRouteRequest,
   type WorkspacePaneRuntimeTabCreateAction,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
@@ -12,10 +13,13 @@ import {
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
-import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
+import {
+  workspacePaneTabsTargetFromRuntime,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
+  routeTarget: WorkspacePaneTabsTarget
   base: TerminalSessionBase | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
@@ -24,19 +28,20 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
     sessionId: string,
     presentation: TerminalPresentation,
     target: RuntimeWorkspacePaneTarget,
-    presentationToken: PrimaryWindowPresentationToken,
+    routeRequest: CreatedTerminalRouteRequest,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
 
 export function useWorkspacePaneRuntimeTabCreateAction({
+  routeTarget,
   base,
   runtimeTabStateByType,
   workspacePaneRoute,
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
-  const { createTerminalWithAdmission } = useTerminalSessionContext()
+  const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const terminalBase = base
   const captureOpenerIdentity = useCallback(() => {
     if (!terminalBase) return null
@@ -52,17 +57,28 @@ export function useWorkspacePaneRuntimeTabCreateAction({
     () =>
       workspacePaneRuntimeTabCreateAction('terminal', {
         runtimeTabStateByType,
-        showCreatedRuntimeTab: (type, sessionId, presentation, presentationToken) =>
+        showCreatedRuntimeTab: (type, sessionId, presentation, routeRequest) =>
           terminalBase?.target
-            ? showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target, presentationToken)
+            ? showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target, routeRequest)
             : false,
         t,
         terminal: {
+          routeTarget,
           base: terminalBase,
           createTerminal: createTerminalWithAdmission,
           captureOpenerIdentity,
+          focusTerminal,
         },
       }),
-    [captureOpenerIdentity, createTerminalWithAdmission, runtimeTabStateByType, showCreatedRuntimeTab, t, terminalBase],
+    [
+      captureOpenerIdentity,
+      createTerminalWithAdmission,
+      focusTerminal,
+      runtimeTabStateByType,
+      routeTarget,
+      showCreatedRuntimeTab,
+      t,
+      terminalBase,
+    ],
   )
 }

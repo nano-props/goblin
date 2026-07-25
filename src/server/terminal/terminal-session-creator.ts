@@ -72,7 +72,6 @@ class TerminalSessionCreator {
               input.userId,
               {
                 ...input.request,
-                clientId: input.clientId,
                 terminalSessionId,
               },
               input.physicalWorktreeCapability,

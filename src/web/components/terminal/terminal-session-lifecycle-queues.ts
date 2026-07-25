@@ -1,12 +1,12 @@
 /**
- * Per-worktree lifecycle queues for terminal create/close orchestration.
+ * Per-filesystem-target queue for terminal creation.
  *
- * Create requests are serialized by terminal worktree. A second create for the
- * same worktree either dedupes onto an existing active/queued promise when
- * `isSameRequest(existing, next)` is true, or waits in the same visible queue
- * when it is a distinct request. Same-request dedupe must therefore resolve to
- * the same terminalSessionId; distinct requests must get their own later create
- * attempt.
+ * Create requests are serialized by terminal filesystem target. A second
+ * create for the same target either dedupes onto an existing active/queued
+ * promise when `isSameRequest(existing, next)` is true, or waits in the same
+ * visible queue when it is a distinct request. Same-request dedupe must
+ * therefore resolve to the same terminalSessionId; distinct requests must get
+ * their own later create attempt.
  *
  */
 export interface TerminalCreateQueueEntry<TBase, TOptions, TResult = string> {

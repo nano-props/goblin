@@ -21,6 +21,8 @@ import {
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { workspacePaneTabTargetBlocksInteraction } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -55,6 +57,33 @@ describe('commitWorkspacePaneTabs', () => {
     serverTabs.resolve([workspacePaneStaticTabEntry('status')])
     await expect(commit).resolves.toMatchObject({ ok: true, projectionApplied: true })
     expect(workspacePaneTabsInteractionBlocked()).toBe(false)
+  })
+
+  test('blocks detached worktree interaction against the model pane target', async () => {
+    const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs: async () => await serverTabs.promise })
+    const model = createWorkspacePaneTabModel({
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ROOT, worktreePath: WORKTREE_PATH },
+      paneTarget: { kind: 'git-worktree', workspaceId: REPO_ROOT, worktreePath: WORKTREE_PATH },
+      worktreeHead: { kind: 'detached' },
+      preferredTab: 'status',
+      tabEntries: [workspacePaneStaticTabEntry('status')],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+
+    const commit = commitWorkspacePaneTabs({
+      ...target(),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    expect(model.branchName).toBeNull()
+    expect(workspacePaneTabTargetBlocksInteraction(model)).toBe(true)
+    serverTabs.resolve([workspacePaneStaticTabEntry('status')])
+    await expect(commit).resolves.toMatchObject({ ok: true })
+    expect(workspacePaneTabTargetBlocksInteraction(model)).toBe(false)
   })
 
   test('writes the complete canonical server snapshot after a successful commit', async () => {

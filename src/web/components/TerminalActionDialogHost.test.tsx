@@ -9,8 +9,8 @@ import {
   useTerminalActionDialogsStore,
 } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
+import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
@@ -49,13 +49,14 @@ describe('TerminalActionDialogHost', () => {
       <TerminalActionDialogHost
         currentWorkspaceId={WORKSPACE_ID}
         currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }}
-        navigation={{} as PrimaryWindowNavigationActions}
+        navigation={primaryWindowNavigationActionsForTest()}
       />,
     )
 
     act(() => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
         workspaceId: WORKSPACE_ID,
+        routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'main' },
         targetIdentity: 'terminal:term-111111111111111111111',
         selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },

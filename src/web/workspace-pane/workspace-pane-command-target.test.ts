@@ -4,7 +4,10 @@ import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspacePaneFilesystemRootPath,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const filesystemTarget = gitWorktreePaneFilesystemTarget({
   workspaceId: workspaceIdForTest('goblin+file:///tmp/command-target-repo'),
@@ -21,7 +24,11 @@ const filesystemTarget = gitWorktreePaneFilesystemTarget({
 describe('workspace pane command target', () => {
   test('derives the worktree branch presentation from its single Git head authority', () => {
     const target: WorkspacePaneCommandTarget = {
-      kind: 'git-worktree',
+      routeTarget: {
+        kind: 'git-worktree',
+        workspaceId: filesystemTarget.workspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+      },
       workspacePaneRoute: null,
       filesystemTarget,
     }
@@ -31,7 +38,11 @@ describe('workspace pane command target', () => {
 
   test('derives a detached presentation without a parallel nullable branch field', () => {
     const target: WorkspacePaneCommandTarget = {
-      kind: 'git-worktree',
+      routeTarget: {
+        kind: 'git-worktree',
+        workspaceId: filesystemTarget.workspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+      },
       workspacePaneRoute: null,
       filesystemTarget: { ...filesystemTarget, head: { kind: 'detached' } },
     }
@@ -41,7 +52,11 @@ describe('workspace pane command target', () => {
 
   test('does not admit a contradictory worktree branch field', () => {
     const target: WorkspacePaneCommandTarget = {
-      kind: 'git-worktree',
+      routeTarget: {
+        kind: 'git-worktree',
+        workspaceId: filesystemTarget.workspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+      },
       workspacePaneRoute: null,
       filesystemTarget,
       // @ts-expect-error A worktree branch is derived exclusively from filesystemTarget.head.

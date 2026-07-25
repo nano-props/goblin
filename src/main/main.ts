@@ -21,7 +21,11 @@ import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
-import { startNativeSettingsProjectionSync, stopNativeSettingsProjectionSync } from '#/main/native-settings-projection-sync.ts'
+import {
+  startNativeSettingsProjectionSync,
+  stopNativeSettingsProjectionSync,
+} from '#/main/native-settings-projection-sync.ts'
+import { registerNativeHostTerminationSignals } from '#/main/native-host-termination.ts'
 
 function activatePrimaryWindowFromEvent(): void {
   void activationBarrier
@@ -184,6 +188,8 @@ async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot
   )
   await setGlobalShortcutState(globalShortcutRegistered)
 }
+
+registerNativeHostTerminationSignals(() => app.quit())
 
 void main().catch((err) => {
   if (exitIntent === 'normal') return

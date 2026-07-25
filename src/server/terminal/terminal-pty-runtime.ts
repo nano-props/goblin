@@ -5,9 +5,19 @@ export interface TerminalPtyRuntime {
   write(data: string): void
   resize(cols: number, rows: number): void
   kill(): void
-  onData(listener: (data: string) => void): { dispose(): void }
-  onExit(listener: () => void): { dispose(): void }
   processName(): string
+}
+
+export interface TerminalPtyRuntimeEventObserver {
+  onData(data: string, processName: string): void
+  onExit(): void
+}
+
+export interface TerminalPtyRuntimeEventOwnership {
+  /** Stops output delivery while retaining the exit observer used by kill-and-wait. */
+  disposeData(): void
+  /** Releases every native observer. Used only after exit or supervisor shutdown. */
+  dispose(): void
 }
 
 export interface SpawnTerminalPtyRuntimeInput {
@@ -20,9 +30,26 @@ export interface SpawnTerminalPtyRuntimeInput {
   env?: Record<string, string>
 }
 
-export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRuntime } | { ok: false; message: string }
+export type SpawnTerminalPtyRuntimeResult =
+  { ok: true; runtime: TerminalPtyRuntime; events: TerminalPtyRuntimeEventOwnership } | { ok: false; message: string }
 
-export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): SpawnTerminalPtyRuntimeResult {
+export function spawnTerminalPtyRuntime(
+  input: SpawnTerminalPtyRuntimeInput,
+  observer: TerminalPtyRuntimeEventObserver,
+): SpawnTerminalPtyRuntimeResult {
+  let term: pty.IPty | null = null
+  let dataDisposable: { dispose(): void } | null = null
+  let exitDisposable: { dispose(): void } | null = null
+  let exited = false
+  const disposeData = (): void => {
+    dataDisposable?.dispose()
+    dataDisposable = null
+  }
+  const dispose = (): void => {
+    disposeData()
+    exitDisposable?.dispose()
+    exitDisposable = null
+  }
   try {
     if (input.startupShellCommand && (input.command?.trim() || (input.args?.length ?? 0) > 0)) {
       return { ok: false, message: 'startupShellCommand cannot be combined with command or args' }
@@ -31,15 +58,33 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
       ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
       : resolveLocalShell(input)
     const env = userShellEnvironment(input.env)
-    const term = pty.spawn(shell.command, shell.args, {
+    term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',
       cols: input.cols,
       rows: input.rows,
       cwd: input.cwd,
       env,
     })
-    return { ok: true, runtime: new NodePtyTerminalRuntime(term) }
+    const runtime = new NodePtyTerminalRuntime(term)
+    // Native event ownership is installed before the control capability can
+    // cross a supervisor or process boundary.
+    dataDisposable = term.onData((data) => {
+      if (!exited) observer.onData(data, readTerminalProcessName(term!))
+    })
+    const nextExitDisposable = term.onExit(() => {
+      if (exited) return
+      exited = true
+      dispose()
+      observer.onExit()
+    })
+    if (exited) nextExitDisposable.dispose()
+    else exitDisposable = nextExitDisposable
+    return { ok: true, runtime, events: { disposeData, dispose } }
   } catch (error) {
+    dispose()
+    try {
+      term?.kill()
+    } catch {}
     return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
   }
 }
@@ -68,14 +113,6 @@ class NodePtyTerminalRuntime implements TerminalPtyRuntime {
 
   kill(): void {
     this.term.kill()
-  }
-
-  onData(listener: (data: string) => void): { dispose(): void } {
-    return this.term.onData(listener)
-  }
-
-  onExit(listener: () => void): { dispose(): void } {
-    return this.term.onExit(listener)
   }
 
   processName(): string {

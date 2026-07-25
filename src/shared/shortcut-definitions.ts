@@ -15,7 +15,7 @@ export type ClientMenuCommandId =
   | 'file-open-local-workspace-path'
   | 'file-clone-repo'
   | 'file-open-remote-workspace'
-  | 'file-close-workspace-tab-or-window'
+  | 'file-close-workspace-tab'
   | 'file-close-workspace'
   | 'file-settings'
   | 'view-status'
@@ -94,8 +94,8 @@ export const SETTINGS_SHORTCUT_MAC = 'Cmd+,'
 export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
 export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+T'
 export const CREATE_WORKTREE_SHORTCUT = 'CmdOrCtrl+N'
-export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
-export const CLOSE_WORKSPACE_SHORTCUT = 'CmdOrCtrl+Shift+W'
+export const CLOSE_WORKSPACE_TAB_SHORTCUT = 'CmdOrCtrl+W'
+export const CLOSE_WINDOW_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
 export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
@@ -155,23 +155,15 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-close-workspace-tab-or-window',
-    'menu.file.close-workspace-tab-or-window',
-    { type: 'workspace-pane-close-tab-or-window-requested' },
+    'file-close-workspace-tab',
+    'menu.file.close-workspace-tab',
+    { type: 'workspace-pane-close-tab-requested' },
     {
-      helpLabelKey: 'help.row.close-workspace-tab-or-window',
-      accelerator: CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT,
+      helpLabelKey: 'help.row.close-workspace-tab',
+      accelerator: CLOSE_WORKSPACE_TAB_SHORTCUT,
     },
   ),
-  clientMenuCommand(
-    'file-close-workspace',
-    'menu.file.close-workspace',
-    { type: 'close-workspace-requested' },
-    {
-      helpLabelKey: 'help.row.close-workspace',
-      accelerator: CLOSE_WORKSPACE_SHORTCUT,
-    },
-  ),
+  clientMenuCommand('file-close-workspace', 'menu.file.close-workspace', { type: 'close-workspace-requested' }),
   clientMenuCommand(
     'file-settings',
     'menu.file.settings',
@@ -258,6 +250,7 @@ export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAccelera
   'file-create-worktree',
   'file-open-local-workspace',
   'file-clone-repo',
+  'file-close-workspace-tab',
   'view-refresh',
 ]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])
 

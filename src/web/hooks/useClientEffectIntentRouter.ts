@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -51,46 +51,35 @@ export function useClientEffectIntentRouter({
     useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
-  const navigationRef = useRef(navigation)
-  const currentWorkspaceIdRef = useRef(currentWorkspaceId)
-  const currentWorkspacePaneCommandTargetRef = useRef(currentWorkspacePaneCommandTarget)
-  const isOverlayOpenRef = useRef(isOverlayOpen)
-  const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
-  const tRef = useRef(t)
-  const ensureWorkspaceOpenRef = useRef(ensureWorkspaceOpen)
-  navigationRef.current = navigation
-  currentWorkspaceIdRef.current = currentWorkspaceId
-  currentWorkspacePaneCommandTargetRef.current = currentWorkspacePaneCommandTarget
-  isOverlayOpenRef.current = isOverlayOpen
-  isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
-  tRef.current = t
-  ensureWorkspaceOpenRef.current = ensureWorkspaceOpen
+  const readCommittedDeps = useEffectEvent(() => ({
+    navigation,
+    currentWorkspaceId,
+    currentWorkspacePaneCommandTarget,
+    closeAllOverlays,
+    openWorkspacePathDialog,
+    openCloneRepo,
+    openRemoteWorkspace,
+    openCreateWorktree,
+    isOverlayOpen,
+    isWorkspaceShortcutSuppressed,
+    ensureWorkspaceOpen: async (input: string | WorkspaceSessionEntry) => await ensureWorkspaceOpen(input),
+    resetLayout,
+    toggleZenMode,
+    t: (key: string) => t(key),
+  }))
 
   useEffect(() => {
     const externalOpenDrainer = createExternalOpenIntentDrainer({
-      ensureWorkspaceOpen: async (path) => await ensureWorkspaceOpenRef.current(path),
-      activateWorkspace: (workspaceId) => navigationRef.current.activateWorkspace(workspaceId),
-      t: (key) => tRef.current(key),
+      ensureWorkspaceOpen: async (path) => await readCommittedDeps().ensureWorkspaceOpen(path),
+      activateWorkspace: (workspaceId) => readCommittedDeps().navigation.activateWorkspace(workspaceId),
+      t: (key) => readCommittedDeps().t(key),
     })
     let disposed = false
     let intentQueue = Promise.resolve()
 
-    const sharedDeps = () => ({
-      navigation: navigationRef.current,
-      currentWorkspaceId: currentWorkspaceIdRef.current,
-      currentWorkspacePaneCommandTarget: currentWorkspacePaneCommandTargetRef.current,
-      closeAllOverlays,
-      openWorkspacePathDialog,
-      openCloneRepo,
-      openRemoteWorkspace,
-      openCreateWorktree,
-      isOverlayOpen: () => isOverlayOpenRef.current(),
-      isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
-      ensureWorkspaceOpen: async (input: string | WorkspaceSessionEntry) => await ensureWorkspaceOpenRef.current(input),
-      resetLayout,
-      toggleZenMode,
-      t: (key: string) => tRef.current(key),
-    })
+    const sharedDeps = () => {
+      return readCommittedDeps()
+    }
 
     // One dispatch closure fed by both ingresses. Adding a new
     // producer (Electron IPC, server WS, future transports) is a
@@ -133,19 +122,9 @@ export function useClientEffectIntentRouter({
       offServerIntent()
       offLocalBellClick()
     }
-  }, [
-    closeAllOverlays,
-    navigation,
-    currentWorkspaceId,
-    isOverlayOpen,
-    isWorkspaceShortcutSuppressed,
-    ensureWorkspaceOpen,
-    openCloneRepo,
-    openRemoteWorkspace,
-    openCreateWorktree,
-    openWorkspacePathDialog,
-    resetLayout,
-    toggleZenMode,
-    t,
-  ])
+    // The ingress sockets and intent queue belong to the mounted application,
+    // not to an individual route render. Every changing dependency above is
+    // read through the Effect Event so navigation cannot churn the WebSockets
+    // or publish values from a render that React did not commit.
+  }, [])
 }

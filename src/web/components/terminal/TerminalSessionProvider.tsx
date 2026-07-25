@@ -77,6 +77,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
+      focusTerminal: projection.focusTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
     })
 
@@ -96,8 +97,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     () => ({
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
-      registerHost: projection.registerHost,
-      unregisterHost: projection.unregisterHost,
       selectTerminal: projection.selectTerminal,
       scrollToBottom: projection.scrollToBottom,
       scrollLines: projection.scrollLines,
@@ -107,11 +106,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       detach: projection.detach,
       restart: projection.restart,
       focusTerminal: projection.focusTerminal,
-      isTerminalFocusTarget: projection.isTerminalFocusTarget,
       findNext: projection.findNext,
       findPrevious: projection.findPrevious,
       clearSearch: projection.clearSearch,
-      writeInput: projection.writeInput,
+      captureInputWriter: projection.captureInputWriter,
       takeover: projection.takeover,
     }),
     [projection],

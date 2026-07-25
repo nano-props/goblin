@@ -66,6 +66,7 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
         terminalSessionId: v.pipe(v.string(), v.minLength(1)),
       }),
     ]),
+    paneTabsSnapshot: WorkspacePaneTabsSnapshotSchema,
   }),
   v.strictObject({
     ok: v.literal(false),
@@ -113,5 +114,13 @@ export function normalizeWorkspacePaneRuntimeOpenResult(
 
 export function normalizeWorkspacePaneRuntimeCloseResult(value: unknown): WorkspacePaneRuntimeCloseResult | null {
   const parsed = v.safeParse(WorkspacePaneRuntimeCloseResultSchema, value)
-  return parsed.success ? parsed.output : null
+  if (!parsed.success) return null
+  if (!parsed.output.ok) return parsed.output
+  const paneTabsSnapshot = normalizeWorkspacePaneTabsSnapshot(parsed.output.paneTabsSnapshot)
+  if (!paneTabsSnapshot) return null
+  const closedTerminalSessionId = parsed.output.runtime.terminalSessionId
+  const stillOwned = paneTabsSnapshot.entries.some((entry) =>
+    entry.tabs.some((tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === closedTerminalSessionId),
+  )
+  return stillOwned ? null : { ...parsed.output, paneTabsSnapshot }
 }

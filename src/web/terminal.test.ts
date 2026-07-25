@@ -38,6 +38,7 @@ describe('terminal web host client', () => {
     expect(socket?.url).toBe(`ws://127.0.0.1:32100/ws/app?t=secret&clientId=${readClientPageId()}`)
     const attachPromise = terminalClient.attach({
       terminalRuntimeSessionId: 'pty_1234567890123456',
+      terminalRuntimeGeneration: 0,
       cols: 100,
       rows: 30,
     })
@@ -49,6 +50,7 @@ describe('terminal web host client', () => {
       action: 'attach',
       input: {
         terminalRuntimeSessionId: 'pty_1234567890123456',
+        terminalRuntimeGeneration: 0,
         cols: 100,
         rows: 30,
       },
@@ -65,16 +67,15 @@ describe('terminal web host client', () => {
           terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           snapshot: '',
           snapshotSeq: 0,
-          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
           message: null,
           controller: null,
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       }),
     )
@@ -91,6 +92,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
       terminalRuntimeSessionId: 'pty_1234567890123456',
+      terminalRuntimeGeneration: 0,
       cols: 100,
       rows: 30,
     })
@@ -109,16 +111,15 @@ describe('terminal web host client', () => {
           terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
+          identityRevision: 0,
           snapshot: '',
           snapshotSeq: 0,
-          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
           message: null,
           controller: null,
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       }),
     )
@@ -144,10 +145,10 @@ describe('terminal web host client', () => {
         event: {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-111111111111111111111',
           controller: { clientId, status: 'connected' },
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       }),
     )
@@ -156,11 +157,11 @@ describe('terminal web host client', () => {
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'controller',
       controllerStatus: 'connected',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
     dispose()
   })
@@ -172,6 +173,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
       terminalRuntimeSessionId: 'pty_1234567890123456',
+      terminalRuntimeGeneration: 0,
       cols: 100,
       rows: 30,
     })
@@ -190,6 +192,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const writePromise = terminalClient.write({
       terminalRuntimeSessionId: 'pty_1234567890123456',
+      terminalRuntimeGeneration: 1,
       data: 'pwd',
     })
 
@@ -457,7 +460,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
-          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -493,12 +495,12 @@ describe('terminal web host client', () => {
         event: {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
+          identityRevision: 1,
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
           controller: null,
-          canonicalCols: 100,
-          canonicalRows: 30,
+          canonicalSize: { cols: 100, rows: 30 },
         },
       }),
     )
@@ -511,7 +513,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-111111111111111111111',
           phase: 'open',
           message: null,
-          takeoverPending: false,
         },
       }),
     )
@@ -537,7 +538,6 @@ describe('terminal web host client', () => {
       terminalSessionId: 'term-111111111111111111111',
       data: 'hello',
       seq: 1,
-      outputEra: 0,
       processName: 'zsh',
     })
     expect(onBell).toHaveBeenCalledWith({
@@ -565,11 +565,11 @@ describe('terminal web host client', () => {
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalRuntimeGeneration: 1,
+      identityRevision: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'unowned',
       controllerStatus: 'none',
-      canonicalCols: 100,
-      canonicalRows: 30,
+      canonicalSize: { cols: 100, rows: 30 },
     })
     expect(onLifecycle).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
@@ -577,7 +577,6 @@ describe('terminal web host client', () => {
       terminalSessionId: 'term-111111111111111111111',
       phase: 'open',
       message: null,
-      takeoverPending: false,
     })
     expect(onSessionsChanged).toHaveBeenCalledWith({
       type: 'sessions-changed',
@@ -732,7 +731,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
-          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -766,7 +764,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-oldoldoldoldoldoldold',
           data: 'stale',
           seq: 1,
-          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -780,7 +777,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-newnewnewnewnewnewnew',
           data: 'fresh',
           seq: 2,
-          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -793,7 +789,6 @@ describe('terminal web host client', () => {
       terminalSessionId: 'term-newnewnewnewnewnewnew',
       data: 'fresh',
       seq: 2,
-      outputEra: 0,
       processName: 'zsh',
     })
     dispose()

@@ -49,8 +49,11 @@ import {
   workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
-import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import {
+  observeWorkspacePaneRouteForTest,
+  observedPrimaryWindowNavigationActionsForTest,
+  type PrimaryWindowNavigationOverridesForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import {
@@ -187,7 +190,10 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
-  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
+  useTerminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
@@ -540,7 +546,7 @@ describe('GitWorkspacePaneContent', () => {
       await runCloseWorkspacePaneTabCommand({
         workspaceId: REPO_ID,
         target: {
-          kind: 'git-worktree',
+          routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/status-links' },
           workspacePaneRoute: { kind: 'static', tab: 'files' },
           filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, 'feature/status-links'),
         },
@@ -870,7 +876,7 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
-  test('selects the first authoritative tab on a bare branch route without a saved preference', () => {
+  test('renders an empty pane on an explicit bare branch route without a saved preference', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -897,8 +903,8 @@ describe('GitWorkspacePaneContent', () => {
       </TerminalSessionReadContext>,
     )
 
-    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
-    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('#workspace-status-panel')).toBeNull()
+    expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
   test('shows the workspace empty state when the status tab is closed', () => {
@@ -965,7 +971,7 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
-  test('hook falls back to status for a bare-branch stale preferred terminal tab', () => {
+  test('does not apply a stale preference to an explicit bare branch route', () => {
     const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -990,9 +996,9 @@ describe('GitWorkspacePaneContent', () => {
       </TerminalSessionReadContext>,
     )
 
-    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.querySelector('#workspace-status-panel')).toBeNull()
     expect(container.querySelector('#workspace-terminal-panel')).toBeNull()
-    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
   test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
@@ -1041,7 +1047,6 @@ describe('GitWorkspacePaneContent', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
-    const registerHost = vi.fn()
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalFilesystemTargetKey,
@@ -1053,7 +1058,7 @@ describe('GitWorkspacePaneContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+      <TerminalSessionContext value={terminalCommandContextWith()}>
         <TerminalSessionReadContext value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
@@ -1071,7 +1076,6 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container.textContent).toContain('terminal.opening')
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
-    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
@@ -1088,7 +1092,6 @@ describe('GitWorkspacePaneContent', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.workspaceRuntimeId)
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
-    const registerHost = vi.fn()
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalFilesystemTargetKey,
@@ -1100,7 +1103,7 @@ describe('GitWorkspacePaneContent', () => {
     }
 
     renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+      <TerminalSessionContext value={terminalCommandContextWith()}>
         <TerminalSessionReadContext value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
@@ -1113,7 +1116,6 @@ describe('GitWorkspacePaneContent', () => {
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
-    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
@@ -1128,7 +1130,6 @@ describe('GitWorkspacePaneContent', () => {
     })
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
-    const registerHost = vi.fn()
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalFilesystemTargetKey,
@@ -1140,7 +1141,7 @@ describe('GitWorkspacePaneContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, registerHost })}>
+      <TerminalSessionContext value={terminalCommandContextWith({ createTerminal })}>
         <TerminalSessionReadContext value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
@@ -1159,7 +1160,6 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.textContent).not.toContain('terminal.new')
     expect(container.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('labels terminal panels from the mixed tab list, not runtime session list', () => {
@@ -1180,7 +1180,6 @@ describe('GitWorkspacePaneContent', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
-    const registerHost = vi.fn()
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalFilesystemTargetKey,
@@ -1196,7 +1195,7 @@ describe('GitWorkspacePaneContent', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
+      <TerminalSessionContext value={terminalCommandContextWith()}>
         <TerminalSessionReadContext value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
@@ -1210,7 +1209,6 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-workspace-pane-tab',
     )
-    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
@@ -1259,7 +1257,6 @@ describe('GitWorkspacePaneContent', () => {
         }
       },
     )
-    const writeInput = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
@@ -1275,7 +1272,7 @@ describe('GitWorkspacePaneContent', () => {
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission, writeInput })}>
+          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
                 <GitWorkspacePaneContentHarness
@@ -1351,7 +1348,6 @@ describe('GitWorkspacePaneContent', () => {
     expect(resolvedStartupShellCommand).toBe(
       "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
     )
-    expect(writeInput).not.toHaveBeenCalled()
 
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
@@ -1391,7 +1387,7 @@ describe('GitWorkspacePaneContent', () => {
       executionRoot: '/Users/example/Workspace/sample-project',
     })
     let startupShellCommand: string | null = null
-    const showWorkspaceRootPaneTab = vi.fn(() => true)
+    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
       async (base, options) => {
         startupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
@@ -1415,9 +1411,10 @@ describe('GitWorkspacePaneContent', () => {
 
     renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({ showWorkspaceRootPaneTab })}>
+        <PrimaryWindowNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
+              routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -1452,10 +1449,11 @@ describe('GitWorkspacePaneContent', () => {
       { resolveStartupShellCommand: expect.any(Function) },
       { insertAfterIdentity: 'workspace-pane:files' },
     )
-    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
+    expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
       workspaceId,
-      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-      expect.objectContaining({ presentationToken: expect.any(Object) }),
+      repo.workspaceRuntimeId,
+      'term-111111111111111111111',
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",
@@ -1485,6 +1483,7 @@ describe('GitWorkspacePaneContent', () => {
         <PrimaryWindowNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
+              routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -1699,8 +1698,6 @@ function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, bra
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
@@ -1709,11 +1706,9 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput: vi.fn(),
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
     ...overrides,
@@ -1734,8 +1729,8 @@ function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
-  const navigation: PrimaryWindowNavigationActions = {
+function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest): PrimaryWindowNavigationActions {
+  return observedPrimaryWindowNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},
@@ -1743,16 +1738,12 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
-  }
-  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
-  return navigation
+  })
 }
 
 function terminalSession(

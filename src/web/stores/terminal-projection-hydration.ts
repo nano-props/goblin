@@ -19,23 +19,28 @@ export interface TerminalProjectionHydrationEntry {
   errorMessage?: string
 }
 
+interface TerminalProjectionSuccessfulRecovery {
+  workspaceRuntimeId: string
+  completedAt: number
+}
+
 interface TerminalProjectionHydrationState {
   /** Minimum gap between focus-triggered projection refreshes. */
   refreshCooldownMs: number
   /** workspaceId -> hydration state for the current terminal projection runtime. */
   hydrationByWorkspace: Map<string, TerminalProjectionHydrationEntry>
-  /** workspaceId -> ms-since-epoch recorded by the latest successful projection hydrate. */
-  refreshedAtByWorkspace: Map<string, number>
+  /** workspaceId -> latest accepted recovery for a specific runtime epoch. */
+  lastSuccessfulRecoveryByWorkspace: Map<string, TerminalProjectionSuccessfulRecovery>
   beginProjectionHydration: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
   markProjectionReady: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
   markProjectionFailed: (workspaceId: WorkspaceId, workspaceRuntimeId: string, errorMessage?: string) => void
-  shouldRefreshProjection: (workspaceId: WorkspaceId) => boolean
+  isProjectionFocusRefreshDue: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => boolean
 }
 
 export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydrationState>((set, get) => ({
   refreshCooldownMs: DEFAULT_REFRESH_COOLDOWN_MS,
   hydrationByWorkspace: new Map(),
-  refreshedAtByWorkspace: new Map(),
+  lastSuccessfulRecoveryByWorkspace: new Map(),
   beginProjectionHydration: (workspaceId, workspaceRuntimeId) => {
     const current = get().hydrationByWorkspace.get(workspaceId)
     if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'pending') return
@@ -46,14 +51,12 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
     })
   },
   markProjectionReady: (workspaceId, workspaceRuntimeId) => {
-    const current = get().hydrationByWorkspace.get(workspaceId)
-    if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'ready') return
     set((s) => {
       const hydrationByWorkspace = new Map(s.hydrationByWorkspace)
       hydrationByWorkspace.set(workspaceId, { workspaceRuntimeId, phase: 'ready' })
-      const refreshedAtByWorkspace = new Map(s.refreshedAtByWorkspace)
-      refreshedAtByWorkspace.set(workspaceId, Date.now())
-      return { hydrationByWorkspace, refreshedAtByWorkspace }
+      const lastSuccessfulRecoveryByWorkspace = new Map(s.lastSuccessfulRecoveryByWorkspace)
+      lastSuccessfulRecoveryByWorkspace.set(workspaceId, { workspaceRuntimeId, completedAt: Date.now() })
+      return { hydrationByWorkspace, lastSuccessfulRecoveryByWorkspace }
     })
   },
   markProjectionFailed: (workspaceId, workspaceRuntimeId, errorMessage) => {
@@ -70,9 +73,11 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
       return { hydrationByWorkspace }
     })
   },
-  shouldRefreshProjection: (workspaceId) => {
-    const last = get().refreshedAtByWorkspace.get(workspaceId) ?? 0
-    return Date.now() - last >= get().refreshCooldownMs
+  isProjectionFocusRefreshDue: (workspaceId, workspaceRuntimeId) => {
+    const state = get()
+    const lastSuccessfulRecovery = state.lastSuccessfulRecoveryByWorkspace.get(workspaceId)
+    if (lastSuccessfulRecovery?.workspaceRuntimeId !== workspaceRuntimeId) return true
+    return Date.now() - lastSuccessfulRecovery.completedAt >= state.refreshCooldownMs
   },
 }))
 

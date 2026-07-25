@@ -12,9 +12,8 @@ The answer to that question is what this document is about.
 This is a principles-level document. It does not describe fields,
 methods, timers, or flags. It describes the _shape_ of the answer
 and the _constraints_ the answer has to respect. Implementation
-lives in `src/server/terminal/terminal-controller.ts`,
-`src/web/components/terminal/authority-gate.ts`, and the
-`TerminalSession` glue.
+lives in `src/server/terminal/terminal-controller.ts` and the
+generation-bearing attach/write/resize/takeover paths in `TerminalSession`.
 
 ## The product premise
 
@@ -30,8 +29,8 @@ The user expects to roam:
 - Switch to a laptop, open the same terminal in the browser.
 - Switch back to the desktop.
 
-The shell must keep running. The user expects their **most recent
-intent to win**, without ceremony.
+The shell must keep running, while control changes remain explicit and
+server-authoritative.
 
 ## What "control" means
 
@@ -51,60 +50,36 @@ keystrokes are echoed back? where does my Ctrl+C go?
 So the design is: **at any instant, at most one attachment is the
 effective controller.**
 
-## The principle: intent-recent, user-scoped
+## The principle: explicit attachment control
 
-Control is bound to the **user's most recent write intent**, not
-to any specific window. From the user's point of view, the
-following all mean the same thing:
+Control belongs to one online attachment, not to a device class or a local
+focus guess. Attach auto-claims only when no effective controller exists. An
+unrelated active controller is preserved; a viewer cannot turn ordinary input
+into an implicit control mutation.
 
-- I just typed.
-- I just opened this terminal on another device.
-- I just clicked 接管 because the cursor was stuck elsewhere.
+## The takeover button
 
-Each of those is a clear signal that the user wants _this window_
-to be the one in control. The system must honor that signal
-without requiring the user to first close the previous window.
+Goblin's 接管 / Take over action is the explicit handoff path. It sends the
+view's fitted geometry and current server generation. The server validates
+the authenticated page presence and generation, resizes the PTY, then
+atomically admits that page as an attachment and commits controller intent.
+It returns the authoritative controller frame. Hidden or viewer input is
+discarded rather than queued behind that round trip.
 
-Crucially, the system has no business distinguishing "another
-device of mine" from "another tab of mine" from "another Electron
-window of mine". They're all the same user. The boundary that
-matters is _write intent just happened_, not _what kind of
-attachment produced that intent_.
+## Controller intent and presence
 
-## The button, demoted
-
-Goblin's UI exposes a 接管 / Take over button. Its role is a
-**shortcut** — a low-frequency path for the rare moment when the
-user can see the terminal but cannot, for whatever reason, issue
-a normal keystroke (e.g. a frozen tab they want to revive without
-reloading).
-
-The main path is simple: a window attaches, the server projects the
-current effective controller, and the next write intent either flows
-through or promotes that attachment first. The user sees the same rule
-everywhere: type where you are, and that window becomes the writer when
-it is safe to do so.
-
-The button is no longer load-bearing. It exists for accessibility
-and for the rare "I want control without typing" case.
-
-## The control flag, lifted to the user
-
-The server remembers, for the lifetime of a session, that **this
-user has touched this session**. That single bit of sticky
-memory is what makes the roam scenarios work:
+The server stores controller intent as a `clientId`; broker presence determines
+whether that intent currently projects to an effective controller:
 
 - User closes the controller attachment/socket. Broker presence marks
   that `(userId, clientId)` offline, so the stored controller intent
   projects to no effective controller at once.
 - User opens a new window elsewhere, attached to the same session.
-- The server sees: "user has been here before, no effective
-  controller, new attachment wants in" → grants control.
+- A new online attachment sees no effective controller and may claim during
+  attach.
 
-This is why "I closed Electron, then opened a new Electron window,
-and the previous terminal state was still mine" works. The user
-sticky bit carries the claim across window lifetimes. The window
-identity is ephemeral; the user identity is durable.
+There is no sticky-user flag or controller grace timer. User identity scopes
+session visibility; attachment identity owns control.
 
 ## Server output is shared; rendered output is not
 
@@ -126,8 +101,9 @@ When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: broker presence marks
 the attachment offline, its stored controller intent temporarily
 projects to no effective controller, and the reattach re-claims through
-the user-sticky path. Because the reconnect and the reclaim happen
-back-to-back, the user sees their next keystroke flow as expected.
+the ordinary attach rule when no other online attachment has claimed control.
+Because the reconnect and the reclaim normally happen back-to-back, the user
+sees their next keystroke flow as expected.
 
 This works because **page identity is held by the loaded renderer module, which
 survives a socket-level reconnect within the same page**, and
@@ -151,21 +127,15 @@ case is a small but real race:
 4. A's network comes back. A reconnects, but the effective controller is B.
    A is now a viewer.
 
-This is intentional. The "most recent write intent wins" rule
-is the only rule the system can apply without keeping a grace
-timer (which would reintroduce the 30-second ambiguity this
-model exists to remove). The user's recovery path is the
-AuthorityGate: the next keystroke A types fires a takeover
-round-trip, A becomes the controller, and the keystroke flows.
-The user perceives the same "I typed and it worked" experience
-they get in the friendly case — the only difference is one
-extra round-trip on the first keystroke after A returns.
+This is intentional. Attach never steals control from an online attachment,
+and ordinary input never doubles as an implicit control mutation. A remains a
+viewer until the user explicitly chooses Take over. Input produced while A is
+a viewer is discarded at the local admission boundary; the server independently
+rejects any stale or unauthorized write that reaches it.
 
-In practice the window between A going offline and B's attach is
-much smaller than the time it takes a human to switch windows
-and reattach, so this case is rare. When it does bite, the
-recovery path is the same as the friendly case: type, get
-control.
+In practice the window between A going offline and B's attach is often small,
+but the behavior does not depend on timing. When B claims first, the UI must
+project A as a viewer and offer the explicit takeover action.
 
 ## Why a crashed controller is non-disruptive
 
@@ -177,12 +147,13 @@ the effective controller would stay pinned to the dead client,
 and every sibling viewer would be stranded in viewer mode with
 no path to auto-claim.
 
-A per-`clientId` heartbeat closes this gap. The client emits a small
-heartbeat while its realtime socket is open; the broker treats the
-server receipt time as the presence clock. If that clock goes stale,
-the broker closes the stale sockets and marks the attachment offline.
-Stored controller intent is not erased, but it no longer projects to an
-effective controller, so the next attach can auto-claim the session.
+Each realtime socket owns its own heartbeat clock. The client emits a small
+heartbeat while that socket is open; if its receipt time goes stale, the broker
+closes that exact transport. A healthy replacement socket with the same
+`clientId` cannot keep an obsolete socket alive. Client presence turns offline
+only after its last socket is gone. Stored controller intent is not erased, but
+it no longer projects to an effective controller, so the next attach can
+auto-claim the session.
 
 ## Known behavior: self-reconnect mid-flight
 
@@ -199,20 +170,19 @@ The server never pretends an offline attachment can still write.
 ## Boundaries this model respects
 
 - **One writer at a time.** The shell sees one input stream.
-- **Output fans out to everyone.** No window loses its view of the
-  shell.
+- **Server output has one shared history.** The active controller consumes live
+  output. A viewer is hydrated from the server-owned render state when it takes
+  control; no browser buffer becomes output authority.
 - **User-scoped, never device-scoped.** Two devices of the same
   user are not "competing clients" — they are one user with two
   viewpoints.
 - **Server-authoritative for who is currently writing.** The
   client's local cache is best-effort; the server is the source
-  of truth. If the client is wrong about who controls, the next
-  keystroke will be auto-promoted or dropped, never silently sent
-  to the wrong place.
+  of truth. If the client is wrong about who controls, the server
+  rejects the mutation; the client never auto-promotes a keystroke.
 - **No "first to blink wins".** A new window opening cannot
   accidentally steal control from an already-active controller.
-  The user has to either type into the new window (which fires
-  the auto-promote) or click 接管.
+  The user has to click 接管 / Take over.
 
 ## What this is not
 
@@ -221,22 +191,28 @@ operational transform, no simultaneous-cursor reconciliation. Two
 windows literally cannot both be writing. The model chooses
 **which one** and the loser becomes a viewer.
 
-This is also not a security boundary. A malicious local script
-with access to the client could bypass the gate. The gate
-protects the user's mental model, not their secrets.
+This is also not an authentication boundary. Client-side controller/viewer
+gating protects the local interaction model, while authenticated server-side
+attachment, generation, and controller validation remains authoritative for
+every PTY mutation.
+
+The server validates takeover both before and after the native PTY resize. A
+native resize that has already succeeded cannot be rolled back honestly. If the
+requesting attachment goes offline while that call is in flight, the server
+publishes the acknowledged size as the canonical physical geometry, rejects
+the takeover, and leaves controller intent unchanged. This records one PTY fact;
+it does not create a second geometry authority or a compensating resize.
 
 ## Rules of thumb
 
-- If a design decision is "should this user action require manual
-  takeover", the answer is almost always no. The user typed;
-  honor it.
+- Ordinary input is data, not a controller command. Never turn a keystroke into
+  an implicit takeover or buffer it pending a control transition.
 - If a design decision is "should a new window auto-claim", the
   answer is: only when there is no effective controller. If there is
-  one, the new window is a viewer until the user types (or until
-  they take over via the button).
+  one, the new window is a viewer until the user explicitly takes over.
 - If a design decision is "should the user see a 'takeover
-  required' modal", the answer is: only when the takeover button
-  is the _only_ way to make progress. In normal use it is not.
+  required' modal", prefer the existing viewer projection and takeover action
+  over a second blocking interaction model.
 - If a design decision is "does this distinguish between user
   devices", the answer is no. Two devices of the same user are
   one user.

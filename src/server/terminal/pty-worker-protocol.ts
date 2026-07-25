@@ -11,9 +11,9 @@
 // Protocol surface:
 //
 //   main → worker:
-//     pty-spawn    (request)            → pty-spawn-result (with ptySessionId)
+//     pty-spawn    (request with id)    → pty-spawn-result
 //     pty-write    (request)            → pty-write-result
-//     pty-resize   (fire-and-forget)
+//     pty-resize   (request)            → pty-resize-result
 //     pty-kill     (fire-and-forget)
 //     shutdown     (fire-and-forget)
 //
@@ -26,9 +26,9 @@ import * as v from 'valibot'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
 
 export type PtyWorkerRequest =
-  | { type: 'pty-spawn'; requestId: string; input: PtySpawnInput }
+  | { type: 'pty-spawn'; requestId: string; ptySessionId: string; input: PtySpawnInput }
   | { type: 'pty-write'; requestId: string; ptySessionId: string; data: string }
-  | { type: 'pty-resize'; ptySessionId: string; cols: number; rows: number }
+  | { type: 'pty-resize'; requestId: string; ptySessionId: string; cols: number; rows: number }
   | { type: 'pty-kill'; ptySessionId: string }
   | { type: 'shutdown' }
 
@@ -57,6 +57,7 @@ export type PtyWorkerMessage =
   | PtyWorkerSpawnSuccess
   | PtyWorkerSpawnFailure
   | { type: 'pty-write-result'; requestId: string; status: 'accepted' | 'rejected' | 'indeterminate' }
+  | { type: 'pty-resize-result'; requestId: string; accepted: boolean }
   | { type: 'pty-data'; ptySessionId: string; data: string }
   | { type: 'pty-exit'; ptySessionId: string; code: number | null; signal: NodeJS.Signals | null }
   | { type: 'pty-process-name-changed'; ptySessionId: string; processName: string }
@@ -97,6 +98,11 @@ const PtyWriteResultMessageSchema = v.object({
   requestId: PtySessionIdStringSchema,
   status: v.picklist(['accepted', 'rejected', 'indeterminate']),
 })
+const PtyResizeResultMessageSchema = v.object({
+  type: v.literal('pty-resize-result'),
+  requestId: PtySessionIdStringSchema,
+  accepted: v.boolean(),
+})
 const PtyExitMessageSchema = v.object({
   type: v.literal('pty-exit'),
   ptySessionId: PtySessionIdStringSchema,
@@ -112,6 +118,7 @@ export const PtyWorkerMessageSchema = v.variant('type', [
   PtySpawnResultSuccessSchema,
   PtySpawnResultFailureSchema,
   PtyWriteResultMessageSchema,
+  PtyResizeResultMessageSchema,
   PtyDataMessageSchema,
   PtyExitMessageSchema,
   PtyProcessNameChangedMessageSchema,

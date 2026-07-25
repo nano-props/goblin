@@ -141,7 +141,7 @@ describe('remote ssh command builders', () => {
     process.env.PATH = dir
     process.env.PATHEXT = '.EXE'
 
-    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo', { cols: 80, rows: 24 })
+    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo')
 
     expect(invocation.command).toBe(executable)
   })
@@ -150,7 +150,7 @@ describe('remote ssh command builders', () => {
     process.env.PATH = path.join(os.tmpdir(), 'definitely-not-on-path-' + process.pid)
     delete process.env.PATHEXT
 
-    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo', { cols: 80, rows: 24 })
+    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo')
 
     expect(invocation.command).toBe('ssh')
   })
@@ -169,7 +169,7 @@ describe('remote ssh command builders', () => {
     process.env.PATH = dir
     process.env.PATHEXT = '.EXE'
 
-    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo', { cols: 80, rows: 24 })
+    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo')
 
     expect(invocation.command).toBe('ssh')
   })
@@ -200,7 +200,7 @@ describe('remote ssh command builders', () => {
     )
     const captured = { ...remote, sshConnection }
     const command = buildRemoteCommandInvocation(captured, { type: 'printHome' })
-    const terminal = buildRemoteTerminalInvocation(captured, '/srv/repo', { cols: 80, rows: 24 })
+    const terminal = buildRemoteTerminalInvocation(captured, '/srv/repo')
 
     for (const invocation of [command, terminal]) {
       expect(invocation.args).toEqual(
@@ -212,12 +212,9 @@ describe('remote ssh command builders', () => {
   })
 
   test('remote terminal startup shell command runs before returning to an interactive shell', () => {
-    const invocation = buildRemoteTerminalInvocation(
-      target(),
-      '/srv/repo worktree',
-      { cols: 80, rows: 24 },
-      { startupShellCommand: "  bat '/srv/repo worktree/README.md'\r" },
-    )
+    const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo worktree', {
+      startupShellCommand: "  bat '/srv/repo worktree/README.md'\r",
+    })
 
     expect(invocation.script).toContain(
       `cd '/srv/repo worktree' && exec "\${SHELL:-/bin/sh}" -ilc '  bat '\\''/srv/repo worktree/README.md'\\''`,
@@ -500,7 +497,6 @@ describe('remote ssh command builders', () => {
     }
   })
 })
-
 
 async function initRepoWithWorktrees(
   specs: Array<{ branch: string; files: Array<[string, string]> }>,

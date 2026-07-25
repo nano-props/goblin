@@ -29,7 +29,6 @@ export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
   terminalFilesystemTargetKey: string
   hydrateInput: TerminalSessionHydrationInput
-  controlsTerminal: boolean
 }
 
 export interface ProjectedCreateTerminalSession {
@@ -85,19 +84,15 @@ export function projectServerTerminalSession(input: {
     hydrateInput: {
       terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
       terminalRuntimeGeneration: input.serverSession.terminalRuntimeGeneration,
+      identityRevision: input.serverSession.identityRevision,
       processName: input.serverSession.processName,
       canonicalTitle: input.serverSession.canonicalTitle,
       phase: input.serverSession.phase,
       message: input.serverSession.message,
       role: controller.role,
       controllerStatus: controller.controllerStatus,
-      canonicalCols: input.serverSession.cols,
-      canonicalRows: input.serverSession.rows,
-      snapshot: null,
-      snapshotSeq: 0,
-      outputEra: 0,
+      canonicalSize: input.serverSession.canonicalSize,
     },
-    controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
   }
 }
 
@@ -109,14 +104,14 @@ function createSessionSummaryFromCreate(
   const common = {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalRuntimeGeneration: result.terminalRuntimeGeneration,
+    identityRevision: result.identityRevision,
     terminalSessionId: result.terminalSessionId,
     controller: result.controller,
     processName: result.processName,
     canonicalTitle: result.canonicalTitle,
     phase: result.phase,
     message: result.message,
-    cols: result.canonicalCols,
-    rows: result.canonicalRows,
+    canonicalSize: result.canonicalSize,
   }
   const target = base.target
   if (target.kind === 'workspace-root' && result.presentation.kind === 'workspace-root') {

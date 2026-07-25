@@ -70,6 +70,7 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       panelLabel: input.panelLabel,
       selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
+        routeTarget: { kind: 'git-branch', workspaceId: input.repo.id, branchName },
         runtimeTarget,
         presentation: terminalGitWorktreePresentation(branchName),
       },
@@ -145,6 +146,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <WorkspaceFilesystemTabPanel
+        routeTarget={{ kind: 'git-branch', workspaceId: repo.id, branchName: branch.name }}
         target={gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,

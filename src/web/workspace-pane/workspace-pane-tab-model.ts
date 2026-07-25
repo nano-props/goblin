@@ -12,11 +12,13 @@ import {
   type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import {
+  runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
@@ -46,6 +48,14 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export type WorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
+
+/** Stable identity for presentation targets; excludes projected tab/view metadata. */
+export function workspacePaneModelTargetIdentityKey(target: WorkspacePaneModelTarget): string {
+  if (target.kind === 'inactive') return `inactive\0${target.workspaceId}`
+  if (target.kind === 'workspace-root') return `workspace-root\0${target.workspaceId}`
+  if (target.kind === 'git-branch') return `git-branch\0${target.workspaceId}\0${target.branchName}`
+  return `git-worktree\0${target.workspaceId}\0${target.worktreePath}`
+}
 
 export type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
 
@@ -122,6 +132,9 @@ export type WorkspacePaneSelection =
 export interface WorkspacePaneTabModel {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  /** URL family owned by the current pane. Kept separate from paneTarget because
+   * a branch route may persist tabs against its checked-out worktree target. */
+  routeTarget: WorkspacePaneModelTarget
   branchName: string | null
   worktreePath: string | null
   paneTarget: WorkspacePaneModelTarget
@@ -151,17 +164,32 @@ export interface WorkspacePaneTabModel {
   selectedIdentity: string | null
 }
 
+/** Derives terminal execution from the model's authoritative pane target. */
+export function workspacePaneTerminalBaseForTabModel(
+  model: Pick<WorkspacePaneTabModel, 'workspaceRuntimeId' | 'paneTarget' | 'branchName'>,
+): TerminalSessionBase | null {
+  if (model.paneTarget.kind === 'inactive' || model.paneTarget.kind === 'git-branch') return null
+  const target = runtimeWorkspacePaneTarget(model.paneTarget, model.workspaceRuntimeId)
+  if (!target) return null
+  if (target.kind === 'workspace-root') return { target, presentation: { kind: 'workspace-root' } }
+  if (target.kind === 'git-worktree') {
+    return { target, presentation: terminalGitWorktreePresentation(model.branchName) }
+  }
+  return null
+}
+
 export interface WorkspacePaneTabModelInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  routeTarget: WorkspacePaneModelTarget
   paneTarget: WorkspacePaneModelTarget
   worktreeHead?: GitHead
   preferredTab: WorkspacePaneTabType | null
   /**
    * Persisted preferences may fall back to the first materialized tab when
    * their preferred tab no longer has backing state. Explicit route requests
-   * must not: a route miss is an empty pane until reconciliation replaces the
-   * URL with the bare branch route.
+   * must not: a route miss is an empty pane until an explicit command changes
+   * the URL.
    */
   allowPreferredTabFallback?: boolean
   tabEntries: readonly WorkspacePaneTabEntry[]
@@ -253,6 +281,7 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
   return {
     workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
+    routeTarget: input.routeTarget,
     branchName,
     worktreePath,
     paneTarget: input.paneTarget,
@@ -365,7 +394,7 @@ function nextSelectableWorkspacePaneTab(
   return null
 }
 
-function isMaterializedWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneMaterializedTab {
+export function isMaterializedWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneMaterializedTab {
   return tab.kind !== 'pending'
 }
 

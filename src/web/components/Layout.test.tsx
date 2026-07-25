@@ -45,7 +45,6 @@ vi.mock('#/web/components/TokenGate.tsx', () => ({
   TokenGate: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
 
-
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
   useAuthenticatedAppBootstrap: () => ({ state: { status: 'ready' }, retry: vi.fn() }),
 }))
@@ -92,8 +91,6 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
       runtimeProjectionApplied: false,
       requestRole: 'leader',
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],
-    registerHost: vi.fn(),
-    unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
@@ -103,11 +100,10 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     detach: vi.fn(),
     restart: vi.fn(),
     focusTerminal: vi.fn(),
-    isTerminalFocusTarget: vi.fn(() => false),
     findNext: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: 0, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    writeInput: vi.fn(),
+    captureInputWriter: vi.fn(() => null),
     takeover: vi.fn(async () => false),
   }
   return {

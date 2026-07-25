@@ -1,4 +1,8 @@
-import type { TerminalCreateOptions, TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type {
+  TerminalCreateOptions,
+  TerminalFilesystemTargetSnapshot,
+  TerminalFocusRequest,
+} from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
@@ -12,6 +16,7 @@ export interface TerminalSessionCommandBridge {
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateAdmissionResult>
   selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
+  focusTerminal: (terminalSessionId: string, request?: TerminalFocusRequest) => boolean
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
 }
 

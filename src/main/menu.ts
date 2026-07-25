@@ -29,6 +29,7 @@ import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
   clientMenuCommandById,
+  CLOSE_WINDOW_SHORTCUT,
   resolveClientMenuCommandAccelerator,
   resolveClientMenuCommandEnabled,
   resolveClientMenuCommandIntent,
@@ -148,12 +149,15 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       createClientCommandMenuItem(state, 'file-open-remote-workspace'),
       { label: t('menu.file.open-recent'), submenu: createRecentWorkspacesMenu(state.recentWorkspaces) },
       separator(),
-      // Repeated close accelerators can arrive after the last window has
-      // closed. Close commands are scoped to an existing surface and must
-      // never recreate one just to deliver the intent.
-      createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window', { missingWindow: 'ignore' }),
+      // Close commands are scoped to an existing surface and must never
+      // recreate a window merely to deliver an intent.
+      createClientCommandMenuItem(state, 'file-close-workspace-tab', { missingWindow: 'ignore' }),
       createClientCommandMenuItem(state, 'file-close-workspace', { missingWindow: 'ignore' }),
-      { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
+      {
+        label: t('menu.file.close-window'),
+        accelerator: accelerator(state, CLOSE_WINDOW_SHORTCUT),
+        click: () => focusedRegisteredSurface()?.window.close(),
+      },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
       // Pick the OS-specific copy so Windows users see "in Explorer"

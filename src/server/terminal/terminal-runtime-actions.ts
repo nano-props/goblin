@@ -9,6 +9,7 @@ import type {
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalResizeInput,
+  TerminalResizeResult,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalSessionsSnapshot,
@@ -18,9 +19,13 @@ import type {
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
-import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
+import {
+  isValidTerminalRuntimeSessionId,
+  isValidTerminalSize,
+  isValidTerminalWriteData,
+} from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
-import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import type { TerminalSessionCloseReason, TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -85,6 +90,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const result = await manager.attachSession(
         userId,
         input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
         input.cols,
         input.rows,
         clientId,
@@ -112,6 +118,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           await manager.restartSessionWithProjectionOutcome(
             userId,
             terminalRuntimeSessionId,
+            input.terminalRuntimeGeneration,
             input.cols,
             input.rows,
             clientId,
@@ -149,25 +156,43 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
       if (!isValidTerminalClientId(clientId)) return { status: 'rejected' }
-      if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalWriteData(input?.data)) {
-        return { status: 'rejected' }
-      }
-      return await manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, clientId)
-    },
-
-    resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
-      if (!isValidTerminalClientId(clientId)) return false
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
+        !isValidTerminalWriteData(input?.data)
+      ) {
+        return { status: 'rejected' }
+      }
+      return await manager.writeSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.data,
+        clientId,
+      )
+    },
+
+    async resize(clientId: string, userId: string, input: TerminalResizeInput): Promise<TerminalResizeResult> {
+      if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (
+        !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
-        return false
+        return { ok: false, message: 'error.invalid-arguments' }
       }
-      return manager.resizeSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
+      return await manager.resizeSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.cols,
+        input.rows,
+        clientId,
+      )
     },
 
     async close(clientId: string, userId: string, input: TerminalSessionInput): Promise<TerminalMutationResult> {
-      return (await closeOutcome(clientId, userId, input)).kind === 'closed'
+      return (await closeOutcome(clientId, userId, input, 'session')).kind === 'closed'
     },
 
     async closeForWorkspacePane(
@@ -175,19 +200,27 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalSessionInput,
     ): Promise<TerminalCloseOutcome> {
-      const outcome = await closeOutcome(clientId, userId, input)
+      const outcome = await closeOutcome(clientId, userId, input, 'workspace-pane')
       return { kind: outcome.kind }
     },
 
-    takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
+    async takeover(clientId: string, userId: string, input: TerminalTakeoverInput): Promise<TerminalTakeoverResult> {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, clientId)
+      return await manager.takeoverSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.terminalRuntimeGeneration,
+        input.cols,
+        input.rows,
+        clientId,
+      )
     },
 
     async recoverSessions(
@@ -225,10 +258,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     clientId: string,
     userId: string,
     input: TerminalSessionInput,
+    reason: TerminalSessionCloseReason,
   ): Promise<TerminalSessionCloseOutcome> {
     if (!isValidTerminalClientId(clientId)) return { kind: 'failed' }
     if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)) return { kind: 'failed' }
-    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId)
+    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId, reason)
     if (outcome.kind === 'closed') {
       const session = outcome.session
       // General repo/session-list invalidation is emitted by the
@@ -253,4 +287,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       }
     }
   }
+}
+
+function isBoundTerminalRuntimeGeneration(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }

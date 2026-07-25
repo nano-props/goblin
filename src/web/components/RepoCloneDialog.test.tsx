@@ -9,6 +9,7 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -116,23 +117,13 @@ describe('RepoCloneDialog', () => {
   })
 })
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
-  return {
+function navigationWith(
+  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'activateWorkspace'>>,
+): PrimaryWindowNavigationActions {
+  return primaryWindowNavigationActionsForTest({
     activateWorkspace: () => {},
-    closeWorkspace: async () => ({ ok: true }),
-    cycleWorkspace: () => {},
-    selectRepoBranch: () => true,
-    showRepoBranchEmptyWorkspacePane: () => true,
-    showRepoBranchWorkspacePaneTab: () => true,
-    showRepoBranchTerminalSession: () => true,
-    commitWorkspacePaneRoute: () => true,
-    goBack: () => {},
-    goForward: () => {},
-    openSettings: () => {},
-    openCreateWorktree: () => {},
     ...overrides,
-    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
-  }
+  })
 }
 
 function input(selector: string): HTMLInputElement {

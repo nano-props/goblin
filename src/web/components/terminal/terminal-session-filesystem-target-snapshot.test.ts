@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
-import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
 
@@ -18,31 +19,11 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
 function makeSession(
   descriptor: TerminalDescriptor,
   snapshot: TerminalSnapshot,
-): TerminalSessionLike & { snapshotSpy: ReturnType<typeof vi.fn> } {
+): { descriptor: TerminalDescriptor; snapshot: () => TerminalSnapshot; snapshotSpy: Mock<() => TerminalSnapshot> } {
   const snapshotSpy = vi.fn(() => snapshot)
   return {
     descriptor,
-    updateDescriptor: vi.fn(),
-    attach: vi.fn(),
-    detach: vi.fn(),
-    restart: vi.fn(),
-    focus: vi.fn(),
-    dispose: vi.fn(),
-    disposeAndWait: vi.fn(async () => {}),
     snapshot: snapshotSpy,
-    isTerminalFocusTarget: vi.fn(() => false),
-    findNext: vi.fn(),
-    findPrevious: vi.fn(),
-    clearSearch: vi.fn(),
-    scrollToBottom: vi.fn(),
-    scrollLines: vi.fn(),
-    writeInput: vi.fn(),
-    takeover: vi.fn(),
-    handleIdentity: vi.fn(),
-    handleLifecycle: vi.fn(),
-    handleOutput: vi.fn(),
-    handleServerTitle: vi.fn(),
-    handleExit: vi.fn(() => false),
     snapshotSpy,
   }
 }
