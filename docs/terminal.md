@@ -210,12 +210,22 @@ successful response leaves presentation to the composed close; a lost or
 failed response consumes the already-confirmed retirement instead of discarding
 its before-state.
 
-Catalog reconciliation has no before-state and therefore only converges
-membership. A future exit retains its original retirement context, so delayed
-activation consumes the same fact. The passive transition uses a passive
-navigation intent and an exact-route precondition; it neither displaces an
-owned user commit nor overrides a route that has changed. Recovery from an
-unexplained missing route still renders an empty pane.
+The client records both retirement transports in one binding-aware retirement
+ledger. A complete catalog then resolves the same fact in either direction: an
+exact present binding remains blocked behind a durable activation tombstone,
+while authoritative absence transfers the fact to retirement acceptance before
+generic membership eviction can destroy the local before-state. A fact known to
+describe a successor binding can be confirmed by absence; an unresolved
+foreign fact must first match an exact catalog binding, so a delayed stale event
+cannot lend old before-state to a newer session retirement. Unresolved facts
+are bounded, while facts accepted for an active binding remain durable until
+absence is confirmed. Catalog absence with no correlated retirement fact still
+only converges membership and renders an unexplained missing route as an empty
+pane.
+
+The passive transition uses a passive navigation intent and an exact-route
+precondition; it neither displaces an owned user commit nor overrides a route
+that has changed.
 
 Addressable close sources use one idempotent session-close promise. The session
 remains in the authoritative Directory until pending spawns settle and PTY

@@ -13,6 +13,7 @@ import type {
   TerminalExitEvent,
   TerminalOutputEvent,
   TerminalProjectionEffect,
+  TerminalRetirementEvent,
   TerminalRetirementPresentationContext,
   TerminalSessionClosedEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
@@ -56,7 +57,10 @@ import type {
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
+import {
+  TerminalRetirementLedger,
+  type TerminalRetirementFact,
+} from '#/web/components/terminal/terminal-retirement-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -125,7 +129,7 @@ interface TerminalRuntimeBindingIdentity {
 interface TerminalCloseOperation {
   binding: TerminalRuntimeBindingIdentity
   promise: Promise<boolean>
-  authoritativeRetirement: TerminalSessionClosedEvent | null
+  authoritativeRetirement: TerminalRetirementFact | null
 }
 
 function terminalRuntimeBindingKey(binding: TerminalRuntimeBindingIdentity): string {
@@ -207,7 +211,7 @@ export class TerminalSessionProjection {
   private readonly acceptedRetirementListeners = new Set<AcceptedTerminalRetirementListener>()
   private readonly terminalSessionIdsByTerminalFilesystemTarget = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
-  private readonly futureExitOrphans = new FutureExitLedger()
+  private readonly terminalRetirements = new TerminalRetirementLedger()
   private readonly bellState = createTerminalBellState(
     (terminalSessionId) => {
       if (terminalSessionId) {
@@ -239,7 +243,7 @@ export class TerminalSessionProjection {
       this.runtimeMembershipIndex,
       runtimeMembershipIndex,
     )) {
-      this.futureExitOrphans.retireSnapshotScope(retiredScopeKey)
+      this.terminalRetirements.retireSnapshotScope(retiredScopeKey)
     }
     this.runtimeMembershipIndex = runtimeMembershipIndex
     this.pruneSessionsMissingFromRuntimeMembership()
@@ -281,7 +285,7 @@ export class TerminalSessionProjection {
     this.acceptedRetirementListeners.clear()
     this.terminalSessionIdsByTerminalFilesystemTarget.clear()
     this.pendingServerBellByRuntimeBindingKey.clear()
-    this.futureExitOrphans.clear()
+    this.terminalRetirements.clear()
     this.bellState.reset()
     this.outputActivityState.reset()
     if (projectionInstance === this) projectionInstance = null
@@ -357,44 +361,9 @@ export class TerminalSessionProjection {
   }
 
   handleExit(event: TerminalExitEvent): void {
-    const classified = this.classifyRealtimeEvent(event)
-    if (!classified) {
-      this.futureExitOrphans.record(event)
-      this.pendingServerBellByRuntimeBindingKey.delete(terminalRealtimeEventBindingKey(event))
-      return
-    }
-    if (
-      terminalSessionCoordinates(classified.session.descriptor).workspaceId !== event.workspaceId ||
-      terminalSessionCoordinates(classified.session.descriptor).workspaceRuntimeId !== event.workspaceRuntimeId
-    ) {
-      return
-    }
-    if (classified.classification === 'future' || classified.classification === 'foreign') {
-      this.futureExitOrphans.record(event)
-      this.pendingServerBellByRuntimeBindingKey.delete(terminalRealtimeEventBindingKey(event))
-      return
-    }
-    if (classified.classification === 'retiring') return
-    const { session } = classified
-    const terminalSessionId = session.descriptor.terminalSessionId
-    const binding = this.runtimeBindingForSession(
-      session,
-      event.terminalRuntimeSessionId,
-      event.terminalRuntimeGeneration,
-    )
-    this.futureExitOrphans.record(event, 'durable')
-    if (session.handleExit(event)) {
-      // Local runtime accepted the exit. Gating the discard on the
-      // runtime's accept (rather than evicting eagerly on a session
-      // match) avoids discarding a live local session during a race
-      // where the session has moved to a new terminalRuntimeSessionId (e.g. after
-      // a server-side restart) but a stale runtime event arrives for the
-      // old binding of the same durable session.
-      this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor, binding, {
-        preserveFutureExits: true,
-        retirementPresentation: event.retirementPresentation,
-      })
-      return
+    const session = this.recordRealtimeRetirement(event)
+    if (session?.handleExit(event)) {
+      this.acceptExactTerminalRetirement(session, event)
     }
   }
 
@@ -403,39 +372,19 @@ export class TerminalSessionProjection {
     return () => this.acceptedRetirementListeners.delete(listener)
   }
 
-  // Targeted drop on a server-side `session-closed` broadcast. Mirrors
-  // `handleExit` but for the close path: the originating window has
-  // already disposed the local entry, so the no-op case is the
-  // common one. Sibling windows with a stale local entry get
-  // consistent state within one network roundtrip instead of waiting
-  // for the broader `sessions-changed` list-rescan. We route through
-  // `discardLocalSessionAndDismissDetailIfLast` (rather than
-  // `closeTerminal`) because the server has already killed the PTY
-  // — calling `close` again would no-op the server close-authority check
-  // on the server and add a useless WS roundtrip.
+  // A targeted close and a PTY exit are transports for the same retirement
+  // fact. Neither issues another server close; both enter the shared ledger
+  // and acceptance boundary below.
   handleSessionClosed(event: TerminalSessionClosedEvent): void {
-    const session = this.activeSessionForClosedEvent(event)
-    if (!session) return
-    // The originating window owns its explicit composed close transition.
-    // Siblings consume the same manager-captured retirement context carried
-    // by this targeted transport; no preceding PTY exit is assumed.
-    const pendingClose = this.pendingCloseForClosedEvent(session, event)
-    if (pendingClose) {
-      pendingClose.authoritativeRetirement = event
-      return
-    }
-    this.commitSessionClosedEvent(session, event)
+    const session = this.recordRealtimeRetirement(event)
+    if (session) this.acceptExactTerminalRetirement(session, event)
   }
 
-  private consumeDeferredSessionClosedEvent(event: TerminalSessionClosedEvent): void {
-    const session = this.activeSessionForClosedEvent(event)
-    if (session) this.commitSessionClosedEvent(session, event)
-  }
-
-  private activeSessionForClosedEvent(event: TerminalSessionClosedEvent): TerminalSession | null {
+  private recordRealtimeRetirement(event: TerminalRetirementEvent): TerminalSession | null {
     const bindingKey = terminalRealtimeEventBindingKey(event)
     const classified = this.classifyRealtimeEvent(event)
-    if (!classified || classified.classification !== 'active') {
+    if (!classified) {
+      this.terminalRetirements.record(event)
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
       return null
     }
@@ -444,17 +393,24 @@ export class TerminalSessionProjection {
     if (coordinates.workspaceId !== event.workspaceId || coordinates.workspaceRuntimeId !== event.workspaceRuntimeId) {
       return null
     }
+    if (classified.classification === 'future' || classified.classification === 'foreign') {
+      this.terminalRetirements.record(event, classified.classification === 'future' ? 'successor' : 'unresolved')
+      this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
+      return null
+    }
+    if (classified.classification === 'retiring') return null
     this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
+    this.terminalRetirements.record(event, 'durable')
     return session
   }
 
-  private commitSessionClosedEvent(session: TerminalSession, event: TerminalSessionClosedEvent): void {
-    this.discardLocalSessionAndDismissDetailIfLast(
-      session.descriptor.terminalSessionId,
-      session.descriptor,
-      this.runtimeBindingForSession(session, event.terminalRuntimeSessionId, event.terminalRuntimeGeneration),
-      { retirementPresentation: event.retirementPresentation },
-    )
+  private consumeDeferredTerminalRetirement(fact: TerminalRetirementFact): void {
+    const session = this.sessions.get(fact.terminalSessionId)
+    if (!session) return
+    const coordinates = terminalSessionCoordinates(session.descriptor)
+    if (coordinates.workspaceId !== fact.workspaceId || coordinates.workspaceRuntimeId !== fact.workspaceRuntimeId)
+      return
+    this.commitTerminalRetirement(session, fact, false)
   }
 
   handleIdentity(event: TerminalIdentityRealtimeEvent): void {
@@ -485,8 +441,7 @@ export class TerminalSessionProjection {
       )
     })
     const serverTerminalSessionIds = new Set(authoritativeServerSessions.map((session) => session.terminalSessionId))
-    this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
-    this.futureExitOrphans.confirmAuthoritativeSnapshot(
+    const absentRetirements = this.terminalRetirements.reconcileAuthoritativeSnapshot(
       terminalRuntimeMembershipKey(scope.workspaceId, scope.workspaceRuntimeId),
       authoritativeServerSessions.map((session) => ({
         terminalSessionId: session.terminalSessionId,
@@ -496,6 +451,15 @@ export class TerminalSessionProjection {
         workspaceRuntimeId: scope.workspaceRuntimeId,
       })),
     )
+    for (const retirement of absentRetirements) {
+      const session = this.sessions.get(retirement.terminalSessionId)
+      if (!session) continue
+      const coordinates = terminalSessionCoordinates(session.descriptor)
+      if (coordinates.workspaceId !== scope.workspaceId || coordinates.workspaceRuntimeId !== scope.workspaceRuntimeId)
+        continue
+      this.acceptAbsentTerminalRetirement(session, retirement)
+    }
+    this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
 
     this.resolveSelectedTerminalSessionIdsForTouchedFilesystemTargets(
       touchedFilesystemTargets,
@@ -665,7 +629,8 @@ export class TerminalSessionProjection {
     for (const terminalSessionId of orphanedTerminalSessionIds) {
       const session = this.sessions.get(terminalSessionId)
       if (!session) continue
-      this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
+      if (this.hasPendingCloseForCurrentBinding(session)) continue
+      this.removeSession(terminalSessionId, { dispose: true })
     }
     return orphanedTerminalSessionIds.length
   }
@@ -1164,7 +1129,7 @@ export class TerminalSessionProjection {
   /**
    * Single commit barrier for bindings activated by either a direct response
    * or full reconciliation. No binding is published before a queued
-   * future exit is checked and its exact pending bell is consumed.
+   * retirement fact is checked and its exact pending bell is consumed.
    */
   private activateRuntimeBinding(session: TerminalSession): boolean {
     const pendingBinding = session.pendingAuthoritativeRuntimeBinding()
@@ -1176,14 +1141,10 @@ export class TerminalSessionProjection {
         ...pendingBinding,
       }
       const pendingBindingKey = terminalRealtimeEventBindingKey(pendingEventBinding)
-      const exited = this.futureExitOrphans.matchingExit(pendingEventBinding)
-      if (exited) {
+      const retirement = this.terminalRetirements.matchingRetirement(pendingEventBinding)
+      if (retirement) {
         this.pendingServerBellByRuntimeBindingKey.delete(pendingBindingKey)
-        this.removeSession(session.descriptor.terminalSessionId, {
-          dispose: true,
-          preserveFutureExits: true,
-          retirementPresentation: exited.retirementPresentation,
-        })
+        this.acceptExactTerminalRetirement(session, retirement)
         return false
       }
       if (!session.commitPendingAuthoritativeHydration(pendingBinding)) return false
@@ -1197,14 +1158,10 @@ export class TerminalSessionProjection {
       ...binding,
     }
     const bindingKey = terminalRealtimeEventBindingKey(eventBinding)
-    const exited = this.futureExitOrphans.matchingExit(eventBinding)
-    if (exited) {
+    const retirement = this.terminalRetirements.matchingRetirement(eventBinding)
+    if (retirement) {
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
-      this.removeSession(session.descriptor.terminalSessionId, {
-        dispose: true,
-        preserveFutureExits: true,
-        retirementPresentation: exited.retirementPresentation,
-      })
+      this.acceptExactTerminalRetirement(session, retirement)
       return false
     }
     const pendingBell = this.pendingServerBellByRuntimeBindingKey.get(bindingKey)
@@ -1212,11 +1169,48 @@ export class TerminalSessionProjection {
     return true
   }
 
+  private acceptExactTerminalRetirement(session: TerminalSession, fact: TerminalRetirementFact): void {
+    const pendingClose = this.pendingCloseForExactRetirement(session, fact)
+    if (pendingClose) {
+      this.transferRetirementToPendingClose(pendingClose, fact)
+      return
+    }
+    this.commitTerminalRetirement(session, fact, true)
+  }
+
+  private acceptAbsentTerminalRetirement(session: TerminalSession, fact: TerminalRetirementFact): void {
+    const pendingClose = this.pendingCloseForSessionRetirement(session, fact)
+    if (pendingClose) {
+      this.transferRetirementToPendingClose(pendingClose, fact)
+      return
+    }
+    this.commitTerminalRetirement(session, fact, false)
+  }
+
+  private transferRetirementToPendingClose(pendingClose: TerminalCloseOperation, fact: TerminalRetirementFact): void {
+    if (!pendingClose.authoritativeRetirement?.retirementPresentation || fact.retirementPresentation) {
+      pendingClose.authoritativeRetirement = fact
+    }
+  }
+
+  private commitTerminalRetirement(
+    session: TerminalSession,
+    fact: TerminalRetirementFact,
+    preserveLedger: boolean,
+  ): void {
+    if (this.sessions.get(fact.terminalSessionId) !== session) return
+    this.removeSession(fact.terminalSessionId, {
+      dispose: true,
+      preserveRetirements: preserveLedger,
+      retirementPresentation: fact.retirementPresentation,
+    })
+  }
+
   private removeSession(
     terminalSessionId: string,
     options: {
       dispose: boolean
-      preserveFutureExits?: boolean
+      preserveRetirements?: boolean
       retirementPresentation?: TerminalRetirementPresentationContext | null
     },
   ): boolean {
@@ -1237,7 +1231,7 @@ export class TerminalSessionProjection {
         terminalRealtimeEventBindingKey({ terminalSessionId, ...runtimeBinding }),
       )
     }
-    if (!options.preserveFutureExits) this.futureExitOrphans.removeSession(terminalSessionId)
+    if (!options.preserveRetirements) this.terminalRetirements.removeSession(terminalSessionId)
     this.sessions.delete(terminalSessionId)
     this.snapshotCache.delete(terminalSessionId)
     this.removeTerminalSessionIdFromFilesystemTargetList(terminalFilesystemTargetKey, terminalSessionId)
@@ -1279,14 +1273,14 @@ export class TerminalSessionProjection {
       (closed) => {
         cleanup()
         if (!closed && operation.authoritativeRetirement) {
-          this.consumeDeferredSessionClosedEvent(operation.authoritativeRetirement)
+          this.consumeDeferredTerminalRetirement(operation.authoritativeRetirement)
         }
         resolve(closed)
       },
       (error: unknown) => {
         cleanup()
         if (operation.authoritativeRetirement) {
-          this.consumeDeferredSessionClosedEvent(operation.authoritativeRetirement)
+          this.consumeDeferredTerminalRetirement(operation.authoritativeRetirement)
         }
         reject(error)
       },
@@ -1392,23 +1386,6 @@ export class TerminalSessionProjection {
     }
   }
 
-  private runtimeBindingForSession(
-    session: TerminalSession,
-    terminalRuntimeSessionId: string,
-    terminalRuntimeGeneration: number | null = session.currentRuntimeBinding()?.terminalRuntimeGeneration ?? null,
-  ): TerminalRuntimeBindingIdentity | null {
-    const workspaceRuntimeId = terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
-    if (!workspaceRuntimeId) return null
-    return {
-      workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
-      workspaceRuntimeId,
-      executionRootId: terminalSessionCoordinates(session.descriptor).executionRootId,
-      terminalSessionId: session.descriptor.terminalSessionId,
-      terminalRuntimeSessionId,
-      terminalRuntimeGeneration,
-    }
-  }
-
   private sessionMatchesRuntimeBinding(session: TerminalSession, binding: TerminalRuntimeBindingIdentity): boolean {
     return (
       terminalSessionCoordinates(session.descriptor).workspaceId === binding.workspaceId &&
@@ -1420,8 +1397,8 @@ export class TerminalSessionProjection {
     )
   }
 
-  private hasPendingCloseForSession(session: TerminalSession): boolean {
-    const addressableTerminalRuntimeSessionId = session.addressableRuntimeBinding()?.terminalRuntimeSessionId ?? null
+  private hasPendingCloseForCurrentBinding(session: TerminalSession): boolean {
+    const addressableBinding = session.addressableRuntimeBinding()
     for (const operation of this.closeOperationByRuntimeBindingKey.values()) {
       const binding = operation.binding
       if (
@@ -1433,8 +1410,9 @@ export class TerminalSessionProjection {
         continue
       }
       if (
-        addressableTerminalRuntimeSessionId === binding.terminalRuntimeSessionId ||
-        addressableTerminalRuntimeSessionId === null
+        !addressableBinding ||
+        (addressableBinding.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
+          addressableBinding.terminalRuntimeGeneration === binding.terminalRuntimeGeneration)
       ) {
         return true
       }
@@ -1442,9 +1420,28 @@ export class TerminalSessionProjection {
     return false
   }
 
-  private pendingCloseForClosedEvent(
+  private pendingCloseForExactRetirement(
     session: TerminalSession,
-    event: TerminalSessionClosedEvent,
+    fact: TerminalRetirementFact,
+  ): TerminalCloseOperation | null {
+    const coordinates = terminalSessionCoordinates(session.descriptor)
+    return (
+      this.closeOperationByRuntimeBindingKey.get(
+        terminalRuntimeBindingKey({
+          workspaceId: coordinates.workspaceId,
+          workspaceRuntimeId: coordinates.workspaceRuntimeId,
+          executionRootId: coordinates.executionRootId,
+          terminalSessionId: fact.terminalSessionId,
+          terminalRuntimeSessionId: fact.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: fact.terminalRuntimeGeneration,
+        }),
+      ) ?? null
+    )
+  }
+
+  private pendingCloseForSessionRetirement(
+    session: TerminalSession,
+    fact: TerminalRetirementFact,
   ): TerminalCloseOperation | null {
     const coordinates = terminalSessionCoordinates(session.descriptor)
     for (const operation of this.closeOperationByRuntimeBindingKey.values()) {
@@ -1452,35 +1449,12 @@ export class TerminalSessionProjection {
         operation.binding.workspaceId === coordinates.workspaceId &&
         operation.binding.workspaceRuntimeId === coordinates.workspaceRuntimeId &&
         operation.binding.executionRootId === coordinates.executionRootId &&
-        operation.binding.terminalSessionId === event.terminalSessionId &&
-        operation.binding.terminalRuntimeSessionId === event.terminalRuntimeSessionId &&
-        operation.binding.terminalRuntimeGeneration === event.terminalRuntimeGeneration
+        operation.binding.terminalSessionId === fact.terminalSessionId
       ) {
         return operation
       }
     }
     return null
-  }
-
-  private discardLocalSessionAndDismissDetailIfLast(
-    terminalSessionId: string,
-    base: TerminalSessionBase,
-    binding?: TerminalRuntimeBindingIdentity | null,
-    options: {
-      preserveFutureExits?: boolean
-      retirementPresentation?: TerminalRetirementPresentationContext | null
-    } = {},
-  ): void {
-    if (binding && this.closeOperationByRuntimeBindingKey.has(terminalRuntimeBindingKey(binding))) return
-    const candidateSession = this.sessions.get(terminalSessionId)
-    if (candidateSession && this.hasPendingCloseForSession(candidateSession)) return
-    const session = this.sessions.get(terminalSessionId)
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
-      terminalSessionCoordinates(base).workspaceId,
-      terminalSessionCoordinates(base).executionRootId,
-    )
-    if (!session || terminalDescriptorFilesystemTargetKey(session.descriptor) !== terminalFilesystemTargetKey) return
-    this.removeSession(terminalSessionId, { dispose: true, ...options })
   }
 
   private pruneSessionsMissingFromRuntimeMembership(): void {

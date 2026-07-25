@@ -396,7 +396,7 @@ export interface TerminalTitleEvent {
   canonicalTitle: string | null
 }
 
-export interface TerminalExitEvent {
+export interface TerminalRetirementEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
@@ -404,6 +404,8 @@ export interface TerminalExitEvent {
   workspaceRuntimeId: string
   retirementPresentation: TerminalRetirementPresentationContext | null
 }
+
+export type TerminalExitEvent = TerminalRetirementEvent
 
 /** Minimal canonical pane before-state needed to present a committed retirement. */
 export interface TerminalRetirementPresentationContext {
@@ -411,14 +413,7 @@ export interface TerminalRetirementPresentationContext {
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
-export interface TerminalSessionClosedEvent {
-  terminalRuntimeSessionId: string
-  terminalRuntimeGeneration: TerminalRuntimeGeneration
-  terminalSessionId: string
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  retirementPresentation: TerminalRetirementPresentationContext | null
-}
+export type TerminalSessionClosedEvent = TerminalRetirementEvent
 
 /**
  * Realtime identity-change event (controller crash, controller
