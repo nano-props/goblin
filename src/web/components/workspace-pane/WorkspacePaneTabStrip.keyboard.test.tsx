@@ -64,7 +64,8 @@ afterEach(() => {
 describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
   test('keeps selected styling while the active tab is dragging', async () => {
     sortableDragging = true
-    const workspacePaneTabStripModule = await import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx')
+    const { workspacePaneTabStripModule, WorkspacePaneTabStripScrollMemoryProvider } =
+      await loadWorkspacePaneTabStripTestModules()
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
 
     renderInJsdom(
@@ -79,6 +80,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         onClose={() => {}}
         onReorder={() => {}}
       />,
+      { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
     )
 
     const tabChrome = document.body.querySelector(
@@ -91,7 +93,8 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
   })
 
   test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
-    const workspacePaneTabStripModule = await import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx')
+    const { workspacePaneTabStripModule, WorkspacePaneTabStripScrollMemoryProvider } =
+      await loadWorkspacePaneTabStripTestModules()
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
 
     renderInJsdom(
@@ -108,6 +111,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         onClose={() => {}}
         onReorder={() => {}}
       />,
+      { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
     )
 
     expect(useSensorMock).toHaveBeenCalledWith(pointerSensorToken, { activationConstraint: { distance: 6 } })
@@ -147,6 +151,19 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
   })
 })
+
+async function loadWorkspacePaneTabStripTestModules() {
+  // These tests reset the module graph before installing DnD mocks. Load the
+  // provider from that same graph so the tab strip and wrapper share one context.
+  const [workspacePaneTabStripModule, scrollMemoryModule] = await Promise.all([
+    import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'),
+    import('#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'),
+  ])
+  return {
+    workspacePaneTabStripModule,
+    WorkspacePaneTabStripScrollMemoryProvider: scrollMemoryModule.WorkspacePaneTabStripScrollMemoryProvider,
+  }
+}
 
 function makeWorkspacePaneTabStrip(
   workspacePaneTabStripModule: typeof import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'),

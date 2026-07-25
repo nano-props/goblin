@@ -19,10 +19,9 @@ export function WorkspacePaneTabStripScrollMemoryProvider({ children }: { childr
 }
 
 export function useWorkspacePaneTabStripScrollMemoryController(): WorkspacePaneTabStripScrollMemory {
-  const inheritedMemory = useContext(WorkspacePaneTabStripScrollMemoryContext)
-  const localMemoryRef = useRef<WorkspacePaneTabStripScrollMemory | null>(null)
-  if (!localMemoryRef.current) localMemoryRef.current = createWorkspacePaneTabStripScrollMemory()
-  return inheritedMemory ?? localMemoryRef.current
+  const memory = useContext(WorkspacePaneTabStripScrollMemoryContext)
+  if (!memory) throw new Error('WorkspacePaneTabStripScrollMemoryProvider is required')
+  return memory
 }
 
 function createWorkspacePaneTabStripScrollMemory(): WorkspacePaneTabStripScrollMemory {

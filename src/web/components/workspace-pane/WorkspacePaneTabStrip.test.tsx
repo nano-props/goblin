@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
@@ -1580,7 +1581,7 @@ function TestWorkspacePaneTabStrip(props: {
 let lastRender: RenderResult | null = null
 
 function render(element: ReactNode): RenderResult {
-  lastRender = renderInJsdom(element)
+  lastRender = renderInJsdom(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
   return lastRender
 }
 
