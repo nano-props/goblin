@@ -393,6 +393,34 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('event dispatch', () => {
+    test('publishes an accepted PTY exit before removing its local session projection', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.reconcileServerSessions(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [makeServerSession('pty_session_a_aaaaaaaaa', terminalSessionId)],
+        'client_local',
+      )
+      const observedCounts: number[] = []
+      const offExit = projection.subscribeAcceptedRetirement((retirement) => {
+        expect(retirement.terminalSessionId).toBe(terminalSessionId)
+        expect(retirement.base.target).toEqual(RUNTIME_TARGET)
+        observedCounts.push(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count)
+      })
+
+      projection.handleExit({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      })
+
+      expect(observedCounts).toEqual([1])
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+      offExit()
+    })
+
     test('does not route realtime events through another session runtime binding', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
@@ -860,6 +888,8 @@ describe('TerminalSessionProjection', () => {
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
+      const retirement = vi.fn()
+      projection.subscribeAcceptedRetirement(retirement)
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -870,6 +900,7 @@ describe('TerminalSessionProjection', () => {
       expect(
         projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId),
       ).toEqual([terminalSessionId])
+      expect(retirement).not.toHaveBeenCalled()
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
@@ -906,12 +937,17 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
+      const countsAtRetirement: number[] = []
+      projection.subscribeAcceptedRetirement(() => {
+        countsAtRetirement.push(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count)
+      })
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
 
+      expect(countsAtRetirement).toEqual([1])
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 

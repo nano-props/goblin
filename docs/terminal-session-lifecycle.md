@@ -347,6 +347,13 @@ The projection drops the matching local session without issuing a
 second server close (the originating window already disposed the
 local entry, and the server has already killed the PTY).
 
+Before an accepted natural exit or sibling-window close removes the local
+session projection, it publishes one client-local retirement boundary. The
+workspace-pane layer captures the exact close-back target from the complete
+before projection and commits it only when the retired terminal is still the
+current route. The originating window suppresses this passive path while its
+composed close is pending, because that command already owns close-back.
+
 This handles the case where window A's close drops the socket
 mid-flight and window B's server-side close still emits the broadcast
 — both windows end up consistent.

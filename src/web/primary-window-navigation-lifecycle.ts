@@ -47,6 +47,16 @@ export function currentPrimaryWindowNavigationGeneration(): PrimaryWindowNavigat
   return latestPrimaryWindowNavigationGeneration
 }
 
+/**
+ * Captures the current generation only when no history commit is registered
+ * against it. The caller may use that generation for a passive transition
+ * without displacing the registered commit owner. A later navigation still
+ * invalidates the captured generation through the normal currentness check.
+ */
+export function captureUnownedPrimaryWindowNavigationGeneration(): PrimaryWindowNavigationGeneration | null {
+  return ownedPrimaryWindowNavigation ? null : latestPrimaryWindowNavigationGeneration
+}
+
 export async function executePrimaryWindowNavigation(
   generation: PrimaryWindowNavigationGeneration,
   navigate: () => Promise<unknown>,

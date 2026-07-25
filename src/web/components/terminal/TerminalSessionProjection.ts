@@ -41,6 +41,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import {
   terminalPresentationBranch,
+  terminalSessionBase,
   terminalSessionCoordinates,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
@@ -77,6 +78,13 @@ type TerminalCreateQueueResult = Omit<TerminalCreateAdmissionResult, 'requestRol
 interface ResolvedTerminalCreateOptions {
   startupShellCommand?: string
 }
+
+export interface AcceptedTerminalRetirement {
+  terminalSessionId: string
+  base: TerminalSessionBase
+}
+
+type AcceptedTerminalRetirementListener = (retirement: AcceptedTerminalRetirement) => void
 
 /**
  * Client-level owner of the local terminal view projection.
@@ -192,6 +200,7 @@ export class TerminalSessionProjection {
   // wake the workspace picker.
   private readonly lastPublishedWorkspaceBellCount = new Map<WorkspaceId, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
+  private readonly acceptedRetirementListeners = new Set<AcceptedTerminalRetirementListener>()
   private readonly terminalSessionIdsByTerminalFilesystemTarget = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
   private readonly futureExitOrphans = new FutureExitLedger()
@@ -265,6 +274,7 @@ export class TerminalSessionProjection {
     this.workspaceBellCountListeners.clear()
     this.lastPublishedWorkspaceBellCount.clear()
     this.snapshotListeners.clear()
+    this.acceptedRetirementListeners.clear()
     this.terminalSessionIdsByTerminalFilesystemTarget.clear()
     this.pendingServerBellByRuntimeBindingKey.clear()
     this.futureExitOrphans.clear()
@@ -376,9 +386,15 @@ export class TerminalSessionProjection {
       // where the session has moved to a new terminalRuntimeSessionId (e.g. after
       // a server-side restart) but a stale runtime event arrives for the
       // old binding of the same durable session.
+      this.notifyAcceptedRetirement(this.acceptedRetirement(session.descriptor))
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor, binding, true)
       return
     }
+  }
+
+  subscribeAcceptedRetirement = (listener: AcceptedTerminalRetirementListener): (() => void) => {
+    this.acceptedRetirementListeners.add(listener)
+    return () => this.acceptedRetirementListeners.delete(listener)
   }
 
   // Targeted drop on a server-side `session-closed` broadcast. Mirrors
@@ -404,6 +420,11 @@ export class TerminalSessionProjection {
     }
     const { session } = classified
     this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
+    // The originating window owns an explicit composed close transition.
+    // Only sibling windows, which have no pending close for this session,
+    // need the passive retirement presentation.
+    if (this.hasPendingCloseForSession(session)) return
+    this.notifyAcceptedRetirement(this.acceptedRetirement(session.descriptor))
     this.discardLocalSessionAndDismissDetailIfLast(
       session.descriptor.terminalSessionId,
       session.descriptor,
@@ -1030,6 +1051,26 @@ export class TerminalSessionProjection {
   private notifyAllFilesystemTargets(): void {
     for (const terminalFilesystemTargetKey of Array.from(this.filesystemTargetListeners.keys()))
       this.notifyFilesystemTarget(terminalFilesystemTargetKey)
+  }
+
+  private notifyAcceptedRetirement(retirement: AcceptedTerminalRetirement): void {
+    for (const listener of Array.from(this.acceptedRetirementListeners)) {
+      try {
+        listener(retirement)
+      } catch (err) {
+        terminalSessionProviderLog.warn('accepted terminal retirement listener threw', {
+          terminalSessionId: retirement.terminalSessionId,
+          err,
+        })
+      }
+    }
+  }
+
+  private acceptedRetirement(descriptor: TerminalDescriptor): AcceptedTerminalRetirement {
+    return {
+      terminalSessionId: descriptor.terminalSessionId,
+      base: terminalSessionBase(descriptor.target, descriptor.presentation),
+    }
   }
 
   private notifyWorkspaceBellCountIfChanged(workspaceId: WorkspaceId): void {

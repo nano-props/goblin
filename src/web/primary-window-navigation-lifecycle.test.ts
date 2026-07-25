@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginPrimaryWindowNavigation,
+  captureUnownedPrimaryWindowNavigationGeneration,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
   primaryWindowNavigationIsCurrent,
@@ -13,6 +14,20 @@ import { runOwnedPrimaryWindowNavigation } from '#/web/primary-window-route-navi
 beforeEach(() => resetPrimaryWindowNavigationForTest())
 
 describe('primary window navigation lifecycle', () => {
+  test('captures the current generation only while it has no registered history commit owner', () => {
+    const unownedGeneration = captureUnownedPrimaryWindowNavigationGeneration()
+    expect(unownedGeneration).toBe(0)
+
+    const explicitGeneration = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(explicitGeneration, '/pending')
+    if (!registration) throw new Error('missing navigation registration')
+
+    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBeNull()
+    expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
+    registration.release()
+    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBe(explicitGeneration)
+  })
+
   test('allows one history commit owner per generation and settles it when superseded', async () => {
     const generation = beginPrimaryWindowNavigation()
     const effects: string[] = []
