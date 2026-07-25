@@ -4,6 +4,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import type { WorkspacePaneTabStripScrollMemory } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
 const WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR = '[data-workspace-pane-tab-scroll-target]'
 
@@ -13,24 +14,33 @@ function resolveWorkspacePaneTabAutoScroll({
   currentTargetKey,
   awaitingTargetBaseline,
   lastScrolledActiveIdentity,
+  hasRememberedScrollPosition,
 }: {
   activeTabIdentity: string | null
   previousTargetKey: string | null
   currentTargetKey: string
   awaitingTargetBaseline: boolean
   lastScrolledActiveIdentity: string | null
-}): { shouldScroll: boolean; nextScrolledActiveIdentity: string | null; nextAwaitingTargetBaseline: boolean } {
-  const targetChanged = previousTargetKey !== null && previousTargetKey !== currentTargetKey
+  hasRememberedScrollPosition: boolean
+}): {
+  shouldScroll: boolean
+  baseline: boolean
+  nextScrolledActiveIdentity: string | null
+  nextAwaitingTargetBaseline: boolean
+} {
+  const targetChanged = previousTargetKey !== currentTargetKey
   if (!activeTabIdentity) {
     return {
       shouldScroll: false,
+      baseline: false,
       nextScrolledActiveIdentity: null,
       nextAwaitingTargetBaseline: awaitingTargetBaseline || targetChanged,
     }
   }
   if (targetChanged || awaitingTargetBaseline) {
     return {
-      shouldScroll: false,
+      shouldScroll: !hasRememberedScrollPosition,
+      baseline: true,
       nextScrolledActiveIdentity: activeTabIdentity,
       nextAwaitingTargetBaseline: false,
     }
@@ -38,11 +48,17 @@ function resolveWorkspacePaneTabAutoScroll({
   if (lastScrolledActiveIdentity === activeTabIdentity) {
     return {
       shouldScroll: false,
+      baseline: false,
       nextScrolledActiveIdentity: lastScrolledActiveIdentity,
       nextAwaitingTargetBaseline: false,
     }
   }
-  return { shouldScroll: true, nextScrolledActiveIdentity: activeTabIdentity, nextAwaitingTargetBaseline: false }
+  return {
+    shouldScroll: true,
+    baseline: false,
+    nextScrolledActiveIdentity: activeTabIdentity,
+    nextAwaitingTargetBaseline: false,
+  }
 }
 
 export function usePrefersReducedMotion(): boolean {
@@ -71,6 +87,7 @@ export function useWorkspacePaneTabStripAutoScroll({
   newButtonRef,
   scrollBehavior,
   getTabElement,
+  hasRememberedScrollPosition,
 }: {
   workspacePaneTabTargetKey: string
   activeTabIdentity: string | null
@@ -80,6 +97,7 @@ export function useWorkspacePaneTabStripAutoScroll({
   newButtonRef: RefObject<HTMLButtonElement | null>
   scrollBehavior: ScrollBehavior
   getTabElement: (identity: string) => HTMLButtonElement | null
+  hasRememberedScrollPosition: boolean
 }): void {
   const activeRenderableTabIdentity = activeTabIdentity
     ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ??
@@ -90,9 +108,16 @@ export function useWorkspacePaneTabStripAutoScroll({
   const lastScrolledActiveIdentityRef = useRef<string | null>(null)
   const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
   const awaitingTargetBaselineRef = useRef(false)
+  const targetHadRememberedScrollPositionRef = useRef(false)
 
   useLayoutEffect(() => {
     const previousWorkspacePaneTabTargetKey = lastWorkspacePaneTabTargetKeyRef.current
+    if (previousWorkspacePaneTabTargetKey !== workspacePaneTabTargetKey) {
+      // Latch what existed before entering this target. Strict Mode replays
+      // cleanup and can write the viewport's default zero into memory; that
+      // synthetic write must not turn an unseen target into a restored one.
+      targetHadRememberedScrollPositionRef.current = hasRememberedScrollPosition
+    }
     lastWorkspacePaneTabTargetKeyRef.current = workspacePaneTabTargetKey
     const autoScroll = resolveWorkspacePaneTabAutoScroll({
       activeTabIdentity: enabled ? activeRenderableTabIdentity : null,
@@ -100,6 +125,7 @@ export function useWorkspacePaneTabStripAutoScroll({
       currentTargetKey: workspacePaneTabTargetKey,
       awaitingTargetBaseline: awaitingTargetBaselineRef.current,
       lastScrolledActiveIdentity: lastScrolledActiveIdentityRef.current,
+      hasRememberedScrollPosition: targetHadRememberedScrollPositionRef.current,
     })
     awaitingTargetBaselineRef.current = autoScroll.nextAwaitingTargetBaseline
 
@@ -116,11 +142,16 @@ export function useWorkspacePaneTabStripAutoScroll({
       activeRenderableTabIdentity === lastRenderableTabIdentity && newButtonRef.current
         ? newButtonRef.current
         : tabScrollTarget
-    scrollWorkspacePaneTabTargetIntoView({ viewport, target, behavior: scrollBehavior })
+    scrollWorkspacePaneTabTargetIntoView({
+      viewport,
+      target,
+      behavior: autoScroll.baseline ? 'auto' : scrollBehavior,
+    })
   }, [
     activeRenderableTabIdentity,
     enabled,
     getTabElement,
+    hasRememberedScrollPosition,
     lastRenderableTabIdentity,
     newButtonRef,
     scrollBehavior,
@@ -133,37 +164,30 @@ export function useWorkspacePaneTabStripScrollMemory({
   workspacePaneTabTargetKey,
   enabled,
   viewportRef,
+  memory,
 }: {
   workspacePaneTabTargetKey: string
   enabled: boolean
   viewportRef: RefObject<HTMLDivElement | null>
+  memory: WorkspacePaneTabStripScrollMemory
 }): UIEventHandler<HTMLDivElement> {
   // This is ephemeral UI memory, not persisted workspace state. A single
   // viewport is reused across branch/worktree tab targets, and browsers can
   // clamp that viewport's scrollLeft when the rendered tab content changes.
-  const scrollPositionsRef = useRef(new Map<string, number>())
-  const activeWorkspacePaneTabTargetKeyRef = useRef(workspacePaneTabTargetKey)
-
   const handleScroll = useCallback<UIEventHandler<HTMLDivElement>>(
     (event) => {
-      scrollPositionsRef.current.set(workspacePaneTabTargetKey, event.currentTarget.scrollLeft)
+      memory.write(workspacePaneTabTargetKey, event.currentTarget.scrollLeft)
     },
-    [workspacePaneTabTargetKey],
+    [memory, workspacePaneTabTargetKey],
   )
 
   useLayoutEffect(() => {
     if (!enabled) return
     const viewport = viewportRef.current
     if (!viewport) return
-    const previousWorkspacePaneTabTargetKey = activeWorkspacePaneTabTargetKeyRef.current
-    if (previousWorkspacePaneTabTargetKey === workspacePaneTabTargetKey) return
-
-    if (!scrollPositionsRef.current.has(previousWorkspacePaneTabTargetKey)) {
-      scrollPositionsRef.current.set(previousWorkspacePaneTabTargetKey, viewport.scrollLeft)
-    }
-    activeWorkspacePaneTabTargetKeyRef.current = workspacePaneTabTargetKey
-    viewport.scrollLeft = scrollPositionsRef.current.get(workspacePaneTabTargetKey) ?? 0
-  }, [enabled, workspacePaneTabTargetKey, viewportRef])
+    viewport.scrollLeft = memory.read(workspacePaneTabTargetKey) ?? 0
+    return () => memory.write(workspacePaneTabTargetKey, viewport.scrollLeft)
+  }, [enabled, memory, workspacePaneTabTargetKey, viewportRef])
 
   return handleScroll
 }

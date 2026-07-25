@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
@@ -694,7 +695,7 @@ describe('WorkspacePaneTabStrip', () => {
     })
   })
 
-  test('scrolls the active tab into view on initial mount', () => {
+  test('positions the active tab without animation on initial mount', () => {
     setTabStripScrollGeometry({
       viewport: { left: 0, right: 200 },
       tabs: {
@@ -723,7 +724,7 @@ describe('WorkspacePaneTabStrip', () => {
     const activeTab = workspacePaneTabScrollTarget('workspace-workspace-pane-tab')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeTab)
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
   test('scrolls a left-clipped active tab to the start edge', () => {
@@ -880,7 +881,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  test('does not auto-scroll when the workspace tab target changes', () => {
+  test('positions an unseen workspace tab target without animation', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
@@ -924,10 +925,13 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    expect(scrollIntoView).not.toHaveBeenCalled()
+    const newButton = document.body.querySelector('[data-workspace-pane-new-button]')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(newButton)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
-  test('does not auto-scroll when target active tab appears after target change', () => {
+  test('positions a delayed active tab without animation after the target changes', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
@@ -986,7 +990,10 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    expect(scrollIntoView).not.toHaveBeenCalled()
+    const newButton = document.body.querySelector('[data-workspace-pane-new-button]')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(newButton)
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
   test('restores horizontal scroll position for each workspace tab target', () => {
@@ -1574,7 +1581,7 @@ function TestWorkspacePaneTabStrip(props: {
 let lastRender: RenderResult | null = null
 
 function render(element: ReactNode): RenderResult {
-  lastRender = renderInJsdom(element)
+  lastRender = renderInJsdom(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
   return lastRender
 }
 

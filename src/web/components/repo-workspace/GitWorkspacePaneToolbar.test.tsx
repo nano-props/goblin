@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, waitFor } from '@testing-library/react'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -75,7 +75,8 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { renderInJsdom as renderInJsdomWithoutWorkspaceView } from '#/test-utils/render.tsx'
+import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
@@ -148,6 +149,10 @@ vi.mock('sonner', () => ({
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-toolbar-worktree'
 compactUi = false
+
+function renderInJsdom(element: ReactNode) {
+  return renderInJsdomWithoutWorkspaceView(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
+}
 
 function defaultRuntimeExternalAppSettings() {
   return {
