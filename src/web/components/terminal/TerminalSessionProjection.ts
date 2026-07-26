@@ -767,7 +767,7 @@ export class TerminalSessionProjection {
   ): Promise<ResolvedTerminalCreateOptions> {
     this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     const request = pending.options
-    const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(request.createOptions, pending.promise)
+    const createOptions = await resolveTerminalCreateOptions(request.createOptions)
     this.requireCurrentCreateRequest(terminalFilesystemTargetKey, pending)
     return createOptions
   }
@@ -1439,21 +1439,6 @@ async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Pro
     : options.startupShellCommand
   return {
     ...(startupShellCommand ? { startupShellCommand } : {}),
-  }
-}
-
-async function resolveTerminalCreateOptionsUntilCreateSettles(
-  options: TerminalCreateOptions,
-  createPromise: Promise<unknown>,
-): Promise<ResolvedTerminalCreateOptions> {
-  const resolution = resolveTerminalCreateOptions(options)
-  const cancellation = new Promise<never>((_, reject) => {
-    void createPromise.catch(reject)
-  })
-  try {
-    return await Promise.race([resolution, cancellation])
-  } finally {
-    void resolution.catch(() => {})
   }
 }
 
