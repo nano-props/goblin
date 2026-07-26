@@ -4,7 +4,7 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 
-type TabOpenerActions = Pick<WorkspacesStore, 'setTabOpener' | 'clearTabOpener' | 'consumeTabOpener'>
+type TabOpenerActions = Pick<WorkspacesStore, 'setTabOpener' | 'clearTabOpener'>
 
 // Opener identities (e.g. `workspace-pane:changes`) are shared string
 // constants across *every* workspace pane target, unlike terminal identities
@@ -35,19 +35,6 @@ export function createTabOpenerActions(set: WorkspacesSet): TabOpenerActions {
       set((s) => {
         const scope = s.tabOpenerIdentityByScope[scopeKey]
         if (!scope || !(childIdentity in scope)) return s
-        const nextScope = { ...scope }
-        delete nextScope[childIdentity]
-        const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
-        if (Object.keys(nextScope).length === 0) delete tabOpenerIdentityByScope[scopeKey]
-        else tabOpenerIdentityByScope[scopeKey] = nextScope
-        return { tabOpenerIdentityByScope }
-      })
-    },
-
-    consumeTabOpener(scopeKey: string, childIdentity: string, openerIdentity: string) {
-      set((s) => {
-        const scope = s.tabOpenerIdentityByScope[scopeKey]
-        if (scope?.[childIdentity] !== openerIdentity) return s
         const nextScope = { ...scope }
         delete nextScope[childIdentity]
         const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }

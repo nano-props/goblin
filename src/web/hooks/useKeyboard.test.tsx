@@ -42,7 +42,7 @@ import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
@@ -126,7 +126,7 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
     })
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigationIntent('user').generation)
+    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const keydown = new KeyboardEvent('keydown', {
       key: 'p',

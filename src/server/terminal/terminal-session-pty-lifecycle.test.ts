@@ -396,7 +396,7 @@ describe('TerminalPtyBinding geometry boundary', () => {
 
     nativeResize.resolve(true)
     await expect(resize).resolves.toEqual({ accepted: false, changed: false })
-    expect(session.ptyState).toMatchObject({ kind: 'bound', nativeState: 'retiring', cols: 80, rows: 24 })
+    expect(session.ptyState).toMatchObject({ kind: 'bound', activity: 'retained', cols: 80, rows: 24 })
   })
 })
 
@@ -433,7 +433,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
@@ -472,7 +472,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
@@ -514,12 +514,12 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session).toMatchObject({
       phase: 'error',
       message: 'error.unavailable',
-      ptyState: { kind: 'bound', generation: 1, nativeState: 'retiring' },
+      ptyState: { kind: 'bound', generation: 1, activity: 'retained' },
     })
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
   })
 
-  test('contains a synchronous retirement-boundary failure at the native observer', async () => {
+  test('contains a synchronous exit handler failure', async () => {
     const channel = createPtyEventChannel()
     const handle = createPtyHandle('pty_exit_publication_failure_123456')
     const supervisor = createChannelSupervisor(channel.lease, handle)
@@ -546,6 +546,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
       result: { ok: true },
     })
     expect(() => channel.sink.exit(0, null)).not.toThrow()
+    expect(session).toMatchObject({ phase: 'error', message: 'error.unavailable' })
   })
 
   test('does not roll a replacement back after its buffered exit is published', async () => {
@@ -597,7 +598,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
       result: { ok: false, message: 'error.unavailable' },
     })
 
-    expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 2, nativeState: 'exited' })
+    expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 2, activity: 'retained' })
     expect(previousRender.screen.disposed).toBe(true)
     expect(events.emitExit).toHaveBeenCalledWith(session, {
       terminalRuntimeSessionId: session.id,

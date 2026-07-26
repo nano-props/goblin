@@ -12,23 +12,22 @@ import {
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/workspace-navigation-history.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseCurrentness,
+  filesystemWorkspacePaneTargetLeaseIsCurrent,
   workspaceRootPaneTargetLease,
   type FilesystemWorkspacePaneTargetLease,
-  type WorkspacePaneTargetCurrentness,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
-  commitPrimaryWindowNavigationEffect,
-  type PrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  type PrimaryWindowNavigationGeneration,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
 export interface PrimaryWindowNavigationOptions {
   replace?: boolean
-  navigationIntent?: PrimaryWindowNavigationIntent
+  navigationGeneration?: PrimaryWindowNavigationGeneration
   /**
    * Once an action receives these effects, it owns their normal settlement:
    * accepted navigation invokes `onCommit`, rejected/abandoned navigation
@@ -36,10 +35,6 @@ export interface PrimaryWindowNavigationOptions {
    */
   onCommit?: () => void
   onAbandon?: () => void
-  /** Reports a transient authority loss to the transaction that owns this commit. */
-  onTargetPending?: () => void
-  /** Additional authority admitted before navigation and used to scope its local commit supplement. */
-  presentationCurrentness?: () => WorkspacePaneTargetCurrentness
   routePrecondition?:
     { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
@@ -114,63 +109,47 @@ export function createPrimaryWindowNavigationActions({
       return routeNavigation.currentWorkspacePaneRoute(workspaceId, branchName)
     },
     activateWorkspace(workspaceId) {
-      const navigationIntent = beginPrimaryWindowNavigationIntent('user')
-      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationIntent, {
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
         onBlocked: 'stay',
       })
     },
     async closeWorkspace(workspaceId) {
       const nextWorkspaceId =
         workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
-      const navigationIntent = workspaceId === currentWorkspaceId ? beginPrimaryWindowNavigationIntent('user') : null
-      let handedOffNavigation = false
-      try {
-        const result = await closeWorkspace(workspaceId)
-        if (!result.ok || workspaceId !== currentWorkspaceId || !navigationIntent) return result
-        handedOffNavigation = true
-        if (nextWorkspaceId)
-          restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, navigationIntent, {
-            onBlocked: 'dashboard',
-          })
-        else
-          routeNavigation.openHome({
-            navigationIntent,
-          })
-        return result
-      } finally {
-        if (!handedOffNavigation) navigationIntent?.release()
-      }
+      const navigationGeneration = workspaceId === currentWorkspaceId ? beginPrimaryWindowNavigation() : null
+      const result = await closeWorkspace(workspaceId)
+      if (!result.ok || workspaceId !== currentWorkspaceId) return result
+      if (nextWorkspaceId)
+        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, navigationGeneration!, {
+          onBlocked: 'dashboard',
+        })
+      else routeNavigation.openHome({ navigationGeneration: navigationGeneration! })
+      return result
     },
     cycleWorkspace(direction) {
       const workspaceId = nextNavigationWorkspaceId(workspaceOrder, currentWorkspaceId, direction)
       if (workspaceId) {
-        const navigationIntent = beginPrimaryWindowNavigationIntent('user')
-        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationIntent, {
+        const navigationGeneration = beginPrimaryWindowNavigation()
+        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
           onBlocked: 'stay',
         })
       }
     },
     selectRepoBranch(workspaceId, branch, options) {
-      const navigationIntent = beginPrimaryWindowNavigationIntent('user')
-      const accepted = openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, navigationIntent })
-      if (!accepted) navigationIntent.release()
-      return accepted
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, navigationGeneration })
     },
     showRepoWorktreeTerminalSession(workspaceId, worktreePath, terminalSessionId, options) {
-      const navigationIntent = options?.navigationIntent ?? beginPrimaryWindowNavigationIntent('user')
+      const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
       return routeNavigation.openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, {
         ...options,
-        navigationIntent,
+        navigationGeneration: generation,
       })
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
-      const navigationIntent = options?.navigationIntent ?? beginPrimaryWindowNavigationIntent('user')
-      const navigationOptions = workspaceRootPanePresentationOptions(
-        workspaceId,
-        presentation,
-        options,
-        navigationIntent,
-      )
+      const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+      const navigationOptions = workspaceRootPanePresentationOptions(workspaceId, presentation, options, generation)
       return presentation.kind === 'terminal'
         ? routeNavigation.openWorkspaceRootTerminal(workspaceId, presentation.terminalSessionId, navigationOptions)
         : routeNavigation.openWorkspaceRootTab(workspaceId, presentation.tab, navigationOptions)
@@ -218,13 +197,13 @@ export function createPrimaryWindowNavigationActions({
       })
     },
     openSettings(page) {
-      const navigationIntent = beginPrimaryWindowNavigationIntent('user')
-      routeNavigation.openSettings(page, { navigationIntent })
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      routeNavigation.openSettings(page, { navigationGeneration })
     },
     openCreateWorktree() {
       if (!currentWorkspaceId) return
-      const navigationIntent = beginPrimaryWindowNavigationIntent('user')
-      routeNavigation.openRepoNewWorktree(currentWorkspaceId, { navigationIntent })
+      const navigationGeneration = beginPrimaryWindowNavigation()
+      routeNavigation.openRepoNewWorktree(currentWorkspaceId, { navigationGeneration })
     },
   }
 }
@@ -233,19 +212,17 @@ function workspaceRootPanePresentationOptions(
   workspaceId: WorkspaceId,
   presentation: WorkspaceRootPanePresentation,
   options: PrimaryWindowNavigationOptions | undefined,
-  navigationIntent: PrimaryWindowNavigationIntent,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
 ): PrimaryWindowNavigationOptions {
   return {
     ...options,
-    navigationIntent,
+    navigationGeneration,
     onCommit: () => {
-      const committed = commitPrimaryWindowNavigationEffect(
-        () => commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation),
-        options,
-      )
-      if (!committed) {
-        throw new Error('workspace-root pane presentation target changed before route commit')
+      if (!commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation)) {
+        options?.onAbandon?.()
+        return
       }
+      options?.onCommit?.()
     },
   }
 }
@@ -276,54 +253,44 @@ async function commitFilesystemWorkspacePaneRoute(
   route: WorkspacePaneRouteTarget,
   options?: PrimaryWindowNavigationOptions,
 ): Promise<boolean> {
-  const ownsIntent = options?.navigationIntent === undefined
-  const intent = resolvePrimaryWindowNavigationIntent(options)
+  const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+  if (!primaryWindowNavigationIsCurrent(generation) || !filesystemWorkspacePaneCommitTargetIsCurrent(target)) {
+    options?.onAbandon?.()
+    return false
+  }
+  let effectsSettled = false
   try {
-    if (
-      !intent.isCurrent() ||
-      !filesystemWorkspacePaneCommitTargetIsCurrent(target, options?.onTargetPending, options?.presentationCurrentness)
-    ) {
+    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
+      replace: options?.replace,
+      navigationGeneration: generation,
+      routePrecondition: options?.routePrecondition,
+    })
+    const presentationCommitted =
+      committed &&
+      primaryWindowNavigationIsCurrent(generation) &&
+      filesystemWorkspacePaneCommitTargetIsCurrent(target) &&
+      (route === null
+        ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
+        : commitFilesystemWorkspacePanePresentation(target.routeTarget, route))
+    if (!presentationCommitted) {
+      effectsSettled = true
       options?.onAbandon?.()
       return false
     }
-    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
-      replace: options?.replace,
-      navigationIntent: intent,
-      routePrecondition: options?.routePrecondition,
-      onCommit: () => {
-        commitPrimaryWindowNavigationEffect(() => {
-          // History is already committed. Currentness now scopes only the
-          // local supplement; it must not redefine the navigation outcome.
-          if (filesystemWorkspacePaneCommitTargetIsCurrent(target, undefined, options?.presentationCurrentness)) {
-            if (route === null) commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
-            else commitFilesystemWorkspacePanePresentation(target.routeTarget, route)
-          }
-          return true
-        }, options)
-      },
-      onAbandon: options?.onAbandon,
-    })
-    return committed
-  } finally {
-    if (ownsIntent) intent.release()
+    effectsSettled = true
+    options?.onCommit?.()
+    return true
+  } catch (error) {
+    if (!effectsSettled) {
+      effectsSettled = true
+      options?.onAbandon?.()
+    }
+    throw error
   }
 }
 
-function filesystemWorkspacePaneCommitTargetIsCurrent(
-  target: FilesystemWorkspacePaneCommitTarget,
-  onTargetPending?: () => void,
-  presentationCurrentness?: () => WorkspacePaneTargetCurrentness,
-): boolean {
-  const targetCurrentness = filesystemWorkspacePaneTargetLeaseCurrentness(target)
-  const presentation = presentationCurrentness?.() ?? 'current'
-  const currentness =
-    targetCurrentness === 'stale' || presentation === 'stale'
-      ? 'stale'
-      : targetCurrentness === 'pending' || presentation === 'pending'
-        ? 'pending'
-        : 'current'
-  if (currentness === 'pending') onTargetPending?.()
-  return currentness === 'current'
+function filesystemWorkspacePaneCommitTargetIsCurrent(target: FilesystemWorkspacePaneCommitTarget): boolean {
+  return filesystemWorkspacePaneTargetLeaseIsCurrent(target)
 }
 
 function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneRouteTarget): boolean {
@@ -340,37 +307,25 @@ async function commitWorkspacePaneRoute(
   route: WorkspacePaneRouteTarget,
   options?: PrimaryWindowNavigationOptions,
 ): Promise<boolean> {
-  const ownsIntent = options?.navigationIntent === undefined
-  const intent = resolvePrimaryWindowNavigationIntent(options)
-  try {
-    if (!intent.isCurrent()) {
-      options?.onAbandon?.()
-      return false
-    }
-    const routeOptions = {
-      replace: options?.replace,
-      navigationIntent: intent,
-      onCommit: options?.onCommit,
-      onAbandon: options?.onAbandon,
-      routePrecondition: options?.routePrecondition,
-    }
-    return await routeNavigation.commitWorkspacePaneRoute(workspaceId, branchName, route, routeOptions)
-  } finally {
-    if (ownsIntent) intent.release()
+  const generation = options?.navigationGeneration ?? beginPrimaryWindowNavigation()
+  if (!primaryWindowNavigationIsCurrent(generation)) {
+    options?.onAbandon?.()
+    return false
   }
-}
-
-function resolvePrimaryWindowNavigationIntent(
-  options: PrimaryWindowNavigationOptions | undefined,
-): PrimaryWindowNavigationIntent {
-  if (options?.navigationIntent) return options.navigationIntent
-  return beginPrimaryWindowNavigationIntent('user')
+  const routeOptions = {
+    replace: options?.replace,
+    navigationGeneration: generation,
+    onCommit: options?.onCommit,
+    onAbandon: options?.onAbandon,
+    routePrecondition: options?.routePrecondition,
+  }
+  return await routeNavigation.commitWorkspacePaneRoute(workspaceId, branchName, route, routeOptions)
 }
 
 function restoreWorkspacePresentationOrOpenDashboard(
   workspaceId: WorkspaceId,
   routeNavigation: PrimaryWindowRouteNavigation,
-  navigationIntent: PrimaryWindowNavigationIntent,
+  navigationGeneration: PrimaryWindowNavigationGeneration,
   options: { onBlocked: 'stay' | 'dashboard' },
 ): void {
   const state = useWorkspacesStore.getState()
@@ -384,15 +339,10 @@ function restoreWorkspacePresentationOrOpenDashboard(
     entry.route.kind !== 'newWorktree' &&
     (workspace?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
-    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { navigationIntent })
-    if (result.kind === 'accepted') return
-    if (result.kind === 'blocked' && options.onBlocked === 'stay') {
-      navigationIntent.release()
-      return
-    }
+    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { navigationGeneration })
+    if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
   }
-  const fallbackIntent = navigationIntent.isCurrent() ? navigationIntent : beginPrimaryWindowNavigationIntent('user')
-  routeNavigation.openWorkspaceDashboard(workspaceId, { navigationIntent: fallbackIntent })
+  routeNavigation.openWorkspaceDashboard(workspaceId, { navigationGeneration })
 }
 
 function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: WorkspaceId): WorkspaceId | null {

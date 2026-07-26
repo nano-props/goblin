@@ -486,7 +486,6 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
-          catalogRevision: 1,
           retirementPresentation: null,
         },
       }),
@@ -563,7 +562,6 @@ describe('terminal web host client', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///tmp/repo',
       workspaceRuntimeId: 'repo-runtime-1',
-      catalogRevision: 1,
       retirementPresentation: null,
     })
     expect(onIdentity).toHaveBeenCalledWith({

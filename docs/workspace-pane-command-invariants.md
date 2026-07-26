@@ -12,7 +12,7 @@ Normative rules for workspace-pane commands, queues, routing, and tests.
 - Server aggregate: layout commands, target repair/retirement, and deterministic canonical projection.
 - Router: visible repo, branch, and pane route.
 - React Query: canonical-tab projection. Repo store: restorable preferences, selection, and opener facts.
-- Action queue: target-scoped ordering only. The primary-window navigation-intent arbiter owns presentation admission from command acceptance through history registration and settlement.
+- Action queue: ordering only. Navigation generation: only the latest absolute navigation may publish a route result.
 
 Never mirror router currentness or infer server runtime validity from client timing.
 
@@ -43,38 +43,14 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 
 ## Commands
 
-| Class                                          | Capture                                                 | Execute/commit                                                                                                    |
-| ---------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Absolute current-target: identity/index/open   | user navigation intent before queue                     | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
-| Relative current-target: next/previous         | `direction` before queue                                | resolve route, projection, adjacent tab, and user intent at execution; every queued step runs                     |
-| Exact transition: active close-back            | source, destination, opener, and immutable before-state | never rebase; admit passive intent and commit only while router still equals the source                           |
-| Absolute destination                           | destination and target lease before queue               | independent of source route; destination lease must remain current                                                |
-| Resource command: create/close/open membership | write input and operation facts                         | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
-| Recovery/reconciliation                        | canonical server/runtime snapshot                       | converge after server state; never repair or reclassify a user command                                            |
-
-## Primary-window navigation intent
-
-A navigation intent is presentation ownership, not resource-write ownership. It closes the lifecycle gap between accepting a command and registering its browser-history commit. Its generation is an internal history/focus identity; command and pane APIs pass the intent capability itself.
-
-```text
-admitted (user | passive)
-  -> registered
-  -> committed | abandoned | superseded | failed
-```
-
-- Exactly one intent is current. A new user intent supersedes the current user or passive intent.
-- Passive admission never supersedes an owner. It receives that owner's settlement and may retry only if its immutable exact-route plan still owns the visible source.
-- Superseding an intent removes only presentation ownership. A resource write already accepted by its authoritative owner may still finish.
-- History registration belongs to the same intent; it is not a parallel owner or a second global set.
-- `isCurrent()` is an admission check before registration/commit. After settlement, callers use the route result and `outcome()`; a committed intent is no longer current but is not stale work.
-- Lexically owned intents use `using`. React/unmount, history registration, and explicit route handoff release at their actual lifecycle boundary instead.
-- Release, failure, supersede, and disposal are idempotent. A stale lease cannot settle a newer owner.
-- Route admission abandonment and its effect settle atomically; an effect failure records `failed` after releasing presentation ownership.
-- Pane supplements and presentation effects execute inside the history commit settlement, never in an async continuation after it.
-- There are no timers, delays, watches, or post-retirement reconstruction caches in this protocol.
-- Terminal retirement presentation is admitted only from the manager's canonical, target-scoped before-state record. Natural exit and explicit close share that record; catalog after-state convergence never synthesizes presentation intent.
-- During workspace-membership hydration, validated retirement facts may wait in the ledger, but presentation remains blocked until complete exact membership and a causally covering terminal catalog establish authority.
-- Retirement close-back currentness is tri-state. Only actively loading workspace capability, repo, worktree, and pane-tabs reads retain the captured plan. Failed or unavailable authority fails closed and settles the retirement. Pane-tabs publication explicitly wakes a plan retained during loading.
+| Class                                          | Capture                                                  | Execute/commit                                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Absolute current-target: identity/index/open   | intent and navigation generation before queue            | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
+| Relative current-target: next/previous         | `direction` before queue                                 | resolve route, projection, adjacent tab, and generation at execution; every queued step runs                      |
+| Exact transition: active close-back            | source, destination, opener, and generation before write | never rebase; commit only while router still equals the source                                                    |
+| Absolute destination                           | destination and target lease before queue                | independent of source route; destination lease must remain current                                                |
+| Resource command: create/close/open membership | write input and operation facts                          | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
+| Recovery/reconciliation                        | canonical server/runtime snapshot                        | converge after server state; never repair or reclassify a user command                                            |
 
 ## Invariants
 
@@ -90,21 +66,15 @@ admitted (user | passive)
 
 ## Required concurrency tests
 
-| Sequence                                            | Result                                                                |
-| --------------------------------------------------- | --------------------------------------------------------------------- |
-| Absolute A→B, then A→C before B settles             | C rebases within the target and finishes final; B may be superseded   |
-| User intent waits in a pane queue, then newer user  | newer user owns presentation; stale release cannot affect it          |
-| Passive close-back arrives while user intent exists | retain immutable plan; retry after settlement if exact source holds   |
-| User supersedes an admitted passive close-back      | passive settles superseded, waits for user, then rechecks exact route |
-| Passive route commit is blocked or fails            | abandon once; do not retry-loop                                       |
-| Relative next, next across `[A,B,C]`                | A→B→C; neither step is superseded                                     |
-| Relative move queued behind open/active-close       | resolve from the post-operation route and projection                  |
-| Router leaves the repo/branch while a command waits | reject with no navigation                                             |
-| Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                              |
-| Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane            |
-| Session closes while its close response is lost     | release the exact-binding ledger suppression lease and close back     |
-| One of two windows releases a shared runtime        | sibling remains current                                               |
-| Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed                |
-| Shell unmounts with a passive plan                  | release intent and abandon the plan; late completion has no effect    |
+| Sequence                                            | Result                                                              |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| Absolute A→B, then A→C before B settles             | C rebases within the target and finishes final; B may be superseded |
+| Relative next, next across `[A,B,C]`                | A→B→C; neither step is superseded                                   |
+| Relative move queued behind open/active-close       | resolve from the post-operation route and projection                |
+| Router leaves the repo/branch while a command waits | reject with no navigation                                           |
+| Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                            |
+| Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane          |
+| One of two windows releases a shared runtime        | sibling remains current                                             |
+| Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed              |
 
 Queue tests must block between capture and execution. Router substitutes must track the observed route and enforce production preconditions. Assert command outcomes, final route, and zero effects on rejected targets; never encode a partial side effect as success.

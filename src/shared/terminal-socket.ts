@@ -21,7 +21,6 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RealtimeRpcRequestMessage, RealtimeRpcResponseMessage } from '#/shared/realtime-rpc.ts'
 
 export type TerminalRealtimeMessage =

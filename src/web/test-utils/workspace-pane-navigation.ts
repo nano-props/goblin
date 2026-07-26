@@ -123,8 +123,8 @@ export function observedWorkspacePaneRouteCommitForTest(
       options.commitRoute!(repoId, branchName, route, {
         ...commitOptions,
         onCommit: () => {
-          observeCommittedRoute(repoId, branchName, route)
           commitOptions?.onCommit?.()
+          observeCommittedRoute(repoId, branchName, route)
         },
       })
   }
@@ -141,8 +141,8 @@ export function observedWorkspacePaneRouteCommitForTest(
       const currentRoute = observedWorkspacePaneRouteForTarget(repoId, branchName)
       if (currentRoute === undefined) return abandonCommit(commitOptions)
       if (workspacePaneRoutesEqual(currentRoute, route)) {
-        observeCommittedRoute(repoId, branchName, route)
         commitOptions.onCommit?.()
+        observeCommittedRoute(repoId, branchName, route)
         return true
       }
     }
@@ -155,8 +155,8 @@ export function observedWorkspacePaneRouteCommitForTest(
         return abandonCommit(commitOptions)
       }
       if (workspacePaneRoutesEqual(currentRoute, route)) {
-        observeCommittedRoute(repoId, branchName, route)
         commitOptions.onCommit?.()
+        observeCommittedRoute(repoId, branchName, route)
         return true
       }
     }
@@ -174,8 +174,8 @@ export function observedWorkspacePaneRouteCommitForTest(
     )
     const observeIfAccepted = (didAccept: boolean): boolean => {
       if (!didAccept) return abandonCommit(commitOptions)
-      observeCommittedRoute(repoId, branchName, route)
       commitOptions?.onCommit?.()
+      observeCommittedRoute(repoId, branchName, route)
       return true
     }
     return observeIfAccepted(accepted)

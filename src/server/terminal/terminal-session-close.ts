@@ -6,7 +6,6 @@ export type TerminalSessionCloseOutcome =
   | {
       kind: 'closed'
       session: TerminalSessionSummary
-      catalogRevision: number
       retirementPresentation: TerminalRetirementPresentationContext | null
     }
   | { kind: 'already-closed' }

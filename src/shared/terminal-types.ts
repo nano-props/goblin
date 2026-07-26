@@ -1,8 +1,8 @@
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneFilesystemExecutionPath,
-  type WorkspacePaneFilesystemExecutionTarget,
   type RuntimeWorkspacePaneTarget,
+  type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
@@ -396,28 +396,23 @@ export interface TerminalTitleEvent {
   canonicalTitle: string | null
 }
 
-export interface TerminalRetirementEvent {
+export interface TerminalExitEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  /** Catalog revision committed by the authoritative session removal. */
-  catalogRevision: number
   retirementPresentation: TerminalRetirementPresentationContext | null
 }
 
-export type TerminalExitEvent = TerminalRetirementEvent
-
-/** Minimal canonical pane before-state needed to present a committed retirement. */
+/** Canonical pane state captured before terminal membership is retired. */
 export interface TerminalRetirementPresentationContext {
   target: RuntimeWorkspacePaneTarget
-  /** Self-contained transport form; the decoder enforces target/presentation agreement. */
-  terminalBase: { target: TerminalExecutionTarget; presentation: TerminalPresentation }
+  terminalBase: TerminalSessionBase
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
-export type TerminalSessionClosedEvent = TerminalRetirementEvent
+export type TerminalSessionClosedEvent = TerminalExitEvent
 
 /**
  * Realtime identity-change event (controller crash, controller

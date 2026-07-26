@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -24,8 +24,8 @@ export interface WorkspacePaneTabsTargetProjection {
 type WorkspacePaneTabsReadTarget =
   WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
 
-let workspacePaneTabsProjectionVersion = 0
-const workspacePaneTabsProjectionListeners = new Set<() => void>()
+let workspacePaneTabsPersistenceVersion = 0
+const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 
 export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return ['workspace-pane-tabs', workspaceId, workspaceRuntimeId] as const
@@ -55,7 +55,7 @@ export function useWorkspacePaneTabsQuery(
     enabled: options.enabled !== false,
   })
   useEffect(() => {
-    if (query.status === 'success') notifyWorkspacePaneTabsProjectionChanged()
+    if (query.status === 'success') notifyWorkspacePaneTabsPersistenceChanged()
   }, [query.dataUpdatedAt, query.status])
   return query
 }
@@ -117,7 +117,7 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
       return next
     },
   )
-  if (accepted) notifyWorkspacePaneTabsProjectionChanged()
+  if (accepted) notifyWorkspacePaneTabsPersistenceChanged()
   return accepted
 }
 
@@ -145,7 +145,6 @@ export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, 
     queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     exact: true,
   })
-  notifyWorkspacePaneTabsProjectionChanged()
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -163,25 +162,18 @@ export function workspacePaneTabsByTargetFromQueryData(
   return byTarget
 }
 
-export function subscribeWorkspacePaneTabsProjectionChanges(onStoreChange: () => void): () => void {
-  workspacePaneTabsProjectionListeners.add(onStoreChange)
+export function subscribeWorkspacePaneTabsPersistenceChanges(onStoreChange: () => void): () => void {
+  workspacePaneTabsPersistenceListeners.add(onStoreChange)
   return () => {
-    workspacePaneTabsProjectionListeners.delete(onStoreChange)
+    workspacePaneTabsPersistenceListeners.delete(onStoreChange)
   }
 }
 
-export function workspacePaneTabsProjectionSnapshot(): number {
-  return workspacePaneTabsProjectionVersion
+export function workspacePaneTabsPersistenceSnapshot(): number {
+  return workspacePaneTabsPersistenceVersion
 }
 
-export function useWorkspacePaneTabsProjectionVersion(): number {
-  return useSyncExternalStore(subscribeWorkspacePaneTabsProjectionChanges, workspacePaneTabsProjectionSnapshot)
-}
-
-export function workspacePaneTabsProjectionRevision(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-): number | null {
+export function workspacePaneTabsProjectionRevision(workspaceId: WorkspaceId, workspaceRuntimeId: string): number | null {
   return (
     primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
       workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
@@ -189,9 +181,9 @@ export function workspacePaneTabsProjectionRevision(
   )
 }
 
-function notifyWorkspacePaneTabsProjectionChanged(): void {
-  workspacePaneTabsProjectionVersion += 1
-  for (const listener of workspacePaneTabsProjectionListeners) listener()
+function notifyWorkspacePaneTabsPersistenceChanged(): void {
+  workspacePaneTabsPersistenceVersion += 1
+  for (const listener of workspacePaneTabsPersistenceListeners) listener()
 }
 
 async function fetchWorkspacePaneTabsSnapshot(

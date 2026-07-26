@@ -179,102 +179,40 @@ close command that joins resource cleanup with canonical tab projection. The
 client projection only applies the returned snapshot and local presentation.
 
 Closing a terminal tab is a sequential operation. The command may compute the
-close-back tab before it starts the close, but it does not optimistically hide
-the terminal or expose a compensating `closingSessionIds` state. A complete
-server catalog remains authoritative while the command is pending: if that
-catalog already confirms removal, the client applies the removal immediately
-and lets the command's immutable close transition settle independently. A
-failed command leaves the session present only when no authoritative removal
-has occurred. A successful command commits the planned close-back navigation.
+close-back tab before it starts the close, but `TerminalSessionProjection` must
+keep the terminal session visible until the server/runtime close succeeds. Do
+not optimistically hide the session from the tab strip, clear selected terminal
+state, or expose a compensating `closingSessionIds` state for normal tab close.
+Those patterns make the UI render a state that is neither the old tab nor the
+planned close-back tab, and then force route reconciliation or render logic to
+repair it. On failure, the session should still be present because the close did
+not complete. On success, the close path removes the session and commits the
+planned close-back navigation.
 
-Natural PTY exit and a sibling window's explicit close are already committed
-resource retirements, so they must not issue a second close command. Both enter
-the same manager-owned, single-flight retirement operation. Admission changes
-to `retiring` synchronously; retaining Directory/provider membership while the
-operation captures presentation cannot make the dead PTY reusable.
-If an explicit-close capture fails before PTY termination, the operation fails
-without changing membership. If the PTY naturally exits while that capture is
-pending, the exit is no longer reversible: the same operation commits natural
-retirement instead of rolling the dead binding back to active.
+Natural PTY exit and a sibling window's successful terminal close are already
+committed resource retirements, so they must not issue a second close command.
+The server captures the canonical pane tabs before removing terminal membership
+and includes that before-state in either retirement event. When the client
+accepts the event for the current runtime binding, it makes one close-back
+attempt. The passive transition reuses the current navigation generation only
+when it has no registered history-commit owner, uses `REPLACE`, and commits with
+an exact-route precondition. Missing target authority, an owned navigation, a
+changed route, or a failed navigation ends the presentation attempt without
+replay or compensation.
 
-Before provider membership is detached, the operation reads the canonical tabs
-snapshot and immediately narrows it to `TerminalRetirementPresentationContext`:
-the exact runtime target and that pane's ordered tabs. The full workspace
-snapshot does not cross the terminal boundary. Natural `exit` and explicit
-`session-closed` are only transports for this same immutable record. The client
-combines it with the local opener and exact source route to derive close-back;
-it never depends on the independently hydrating React Query projection or
-reconstructs a destination from a later after-state snapshot.
+Addressable close sources use one idempotent session-close promise. The session
+remains in the authoritative Directory until pending spawns settle and PTY
+termination is acknowledged. Direct close, prune, detached-user cleanup, and
+physical-worktree quiescence join that promise; a bounded termination failure
+leaves the session addressable in `error` state for an explicit later retry.
 
-The final snapshot read and Terminal Directory detach run in one workspace-tabs
-exclusive turn with no intervening await. Explicit close may validate that read
-before revoking PTY ownership, but it resamples inside the final commit; native
-cleanup never holds the workspace-tabs queue.
-
-If `session-closed` arrives while that client still owns an explicit close
-request, the retirement ledger grants that close operation a suppression lease
-for the exact runtime binding. A successful response settles the lease because
-the composed close owns presentation. A lost or failed response releases the
-same fact for passive presentation. Runtime replacement invalidates the lease,
-so a late close result cannot republish an old-runtime retirement.
-
-The client records both retirement transports in one binding-aware retirement
-ledger. Each fact carries the catalog revision committed by its authoritative
-removal. A complete catalog at or beyond that revision resolves the same fact
-in either direction: an exact present binding remains blocked behind a durable activation tombstone,
-while authoritative absence transfers the fact to retirement acceptance before
-generic membership eviction can destroy the local before-state. A fact known to
-describe a future or not-yet-materialized binding remains unresolved until an
-exact binding or a causally covering absence confirms it. A fact observed
-against a conflicting local binding cannot borrow authority from later absence,
-so a delayed stale event cannot lend old before-state to a newer session
-retirement. When several binding retirements precede the same complete absence,
-the greatest catalog revision wins before presentation state is considered; an
-older command suppression never owns a newer binding.
-
-Workspace runtime membership has explicit `pending`, `complete`, and `failed`
-states. Realtime retirement can arrive while startup membership is pending;
-the ledger retains the validated scoped fact without accepting presentation.
-The first complete membership keeps only exact runtime scopes, and the first
-covering catalog then confirms or rejects the fact. A failed hydration ends
-that pending ownership epoch, clears its facts, and rejects later retirement
-events until retry enters a new pending epoch. Runtime replacement and a return
-to pending membership likewise invalidate the old scope and any active
-presentation claim. Facts otherwise retire only through complete catalog
-evidence or explicit presentation settlement; there is no timer or capacity
-eviction that can lose a delayed authoritative fact. Catalog absence with no
-correlated retirement fact still only converges membership and renders an
-unexplained missing route as an empty pane.
-
-Accepted presentation is globally single-flight. Its consumer either settles
-the current fact or releases it during lifecycle teardown before the ledger
-delivers another. The passive transition uses a passive navigation intent and
-an exact-route precondition; it neither displaces an owned user commit nor
-overrides a route that has changed. Pre-navigation target validation preserves
-`ready`, `pending`, and `stale` as distinct authority states. Only actively
-loading workspace capability, repo, worktree, or workspace-pane tabs authority
-retains the immutable plan. Failed or unavailable authority, a complete
-projection without the target, runtime replacement, or route change settles it.
-Once history commits, later currentness changes cannot redefine that navigation
-as pending. Canonical tabs publication wakes a plan retained during loading
-without polling or reconstructing its destination.
-
-Addressable close sources use one idempotent session-close promise. Presentation
-capture is the last reversible boundary: if it fails while the PTY is still
-active, Directory membership remains unchanged. Once native ownership is
-revoked, the close cannot restore that binding. The manager detaches Directory
-authority and moves any incomplete native cleanup into the detached-session
-resource owner. Direct close, prune, detached-user cleanup, physical-worktree
-quiescence, and workspace-runtime invalidation all obey this boundary.
-
-A bounded kill failure therefore does not recreate the session, expose a stale
-recovery snapshot, or start a logical close retry loop. The detached resource
-owner follows the supervisor's durable native-exit completion until the PTY
-exits, or until process shutdown transfers all remaining processes to supervisor
-shutdown. While it owns that cleanup, its durable terminal identity remains an
-admission barrier, so recovery cannot start a replacement PTY before the old
-one is confirmed dead. It owns cleanup capability and this minimal identity
-barrier only; it is not a second session authority.
+Workspace-runtime invalidation is different because the entire lookup scope has
+already become invalid. It removes Directory authority synchronously and moves
+the detached binding into a resource-retirement registry. A bounded kill timeout
+does not recreate the session or start a retry loop: the registry follows the
+supervisor's durable native-exit completion until the PTY exits, or until process
+shutdown transfers all remaining processes to supervisor shutdown. This registry
+owns cleanup capability only; it is not a second session authority.
 
 This distinction matters for destructive worktree operations. The client sends
 one repository-removal intent; it does not close tabs first. The server

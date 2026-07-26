@@ -262,29 +262,24 @@ class TerminalSessionService {
     })
   }
 
-  /**
-   * Runs a retirement commit against the canonical presentation before-set.
-   * The callback is synchronous, so no tabs mutation can enter the workspace
-   * layout queue between this snapshot and Directory detach.
-   */
-  async withTerminalRetirementPresentation<T>(
+  async withTerminalRetirementPresentation(
     userId: string,
     session: TerminalSessionSummary,
-    commit: (presentation: TerminalRetirementPresentationContext | null) => T,
-  ): Promise<T> {
+    commit: (presentation: TerminalRetirementPresentationContext | null) => void,
+  ): Promise<void> {
     const coordinates = terminalSessionCoordinates(session)
-    return await this.workspaceTabsCoordinator.withExclusiveSnapshot(
+    await this.workspaceTabsCoordinator.withExclusiveSnapshot(
       {
         userId,
         workspaceId: coordinates.workspaceId,
         scope: terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId),
       },
       (snapshot) => {
-        const sessionTargetKey = runtimeWorkspacePaneTargetKey(session.target)
+        const targetKey = runtimeWorkspacePaneTargetKey(session.target)
         const entry = snapshot.entries.find(
-          (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === sessionTargetKey,
+          (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === targetKey,
         )
-        return commit(
+        commit(
           entry
             ? {
                 target: entry.target,

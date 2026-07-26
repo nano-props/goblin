@@ -42,8 +42,9 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
-  type PrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  type PrimaryWindowNavigationGeneration,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
 export interface OpenWorkspacePaneTargetStaticTabActionOptions {
@@ -75,7 +76,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   if (!provider.canOpen({ hasWorktree: hasFilesystemRoot })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  using navigationIntent = beginPrimaryWindowNavigationIntent('user')
+  const navigationGeneration = beginPrimaryWindowNavigation()
   const actionTarget = workspacePaneActionTargetFromCoordinates({
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
@@ -83,7 +84,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
     worktreePath,
   })
   return await runWorkspacePaneAction(actionTarget, async () => {
-    if (!navigationIntent.isCurrent()) return { kind: 'superseded' }
+    if (!primaryWindowNavigationIsCurrent(navigationGeneration)) return { kind: 'superseded' }
     const target = { ...input.paneTarget, workspaceRuntimeId }
     const currentTabs = readWorkspacePaneTabsForTarget(target)
     const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
@@ -105,7 +106,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
       worktreeHead: input.worktreeHead,
     })
     const tab = model?.tabs.find((candidate) => candidate.type === input.type)
-    if (!model || !tab || !navigationIntent.isCurrent()) {
+    if (!model || !tab || !primaryWindowNavigationIsCurrent(navigationGeneration)) {
       return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
     }
     if (openerIdentity) {
@@ -116,7 +117,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
         openerIdentity,
       )
     }
-    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, { navigationIntent })
+    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, { navigationGeneration })
     return presented
       ? { kind: 'completed', changed: !alreadyOpen, presentation: 'observed' }
       : { kind: 'navigation-rejected' }
@@ -172,7 +173,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.workspaceRuntimeId, {
     workspacePaneRoute,
   })
-  using presentation = beginWorkspacePaneDestinationPresentation(lease)
+  const presentation = beginWorkspacePaneDestinationPresentation(lease)
   const input: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
     workspaceId,
     workspaceRuntimeId: lease.workspaceRuntimeId,
@@ -221,7 +222,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     placement,
     navigation: input.navigation,
   }
-  using navigationIntent = beginPrimaryWindowNavigationIntent('user')
+  const navigationGeneration = beginPrimaryWindowNavigation()
   const outcome = await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: input.workspaceId,
@@ -232,7 +233,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     () =>
       openWorkspacePaneStaticTabAction(resolvedInput, {
         kind: 'current',
-        navigationIntent,
+        navigationGeneration,
       }),
   )
   return workspacePaneActionOutcomeSucceeded(outcome)
@@ -241,7 +242,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
 type WorkspacePaneStaticTabRouteTransaction =
   | {
       kind: 'current'
-      navigationIntent: PrimaryWindowNavigationIntent
+      navigationGeneration: PrimaryWindowNavigationGeneration
     }
   | {
       kind: 'destination'
@@ -259,7 +260,7 @@ async function openWorkspacePaneStaticTabAction(
   if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
     return { kind: 'superseded' }
   }
-  if (transaction.kind === 'current' && !transaction.navigationIntent.isCurrent()) {
+  if (transaction.kind === 'current' && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'superseded' }
   }
   if (
@@ -312,7 +313,7 @@ async function openWorkspacePaneStaticTabAction(
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(target, input.workspaceRuntimeId, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  if (transaction.kind === 'current' && !transaction.navigationIntent.isCurrent()) {
+  if (transaction.kind === 'current' && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
   if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
@@ -351,9 +352,9 @@ async function commitWorkspacePaneStaticTab(
     route,
     input.navigation,
     undefined,
-    transaction.navigationIntent,
+    transaction.navigationGeneration,
   )
-  if (!committed && transaction.navigationIntent.outcome()?.status === 'superseded') {
+  if (!committed && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'completed', changed: true, presentation: 'superseded' }
   }
   return committed ? { kind: 'completed', changed: true, presentation: 'observed' } : { kind: 'navigation-rejected' }

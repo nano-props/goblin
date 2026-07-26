@@ -23,11 +23,7 @@ import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/worksp
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import {
-  beginPrimaryWindowNavigationIntent,
-  currentPrimaryWindowNavigationGeneration,
-  tryBeginPassivePrimaryWindowNavigationIntent,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { currentPrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/navigation-actions-repo')
 const REPO_A_ID = workspaceIdForTest('goblin+file:///tmp/repo-a')
@@ -36,7 +32,7 @@ const REPO_C_ID = workspaceIdForTest('goblin+file:///tmp/repo-c')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/other-workspace')
 const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
-  expect.objectContaining({ ...options, navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) })
+  expect.objectContaining({ ...options, navigationGeneration: expect.any(Number) })
 const historyRestoreOptions = (options: { returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, onCommit: expect.any(Function) })
 const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
@@ -62,10 +58,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(
       REPO_ID,
       'files',
-      expect.objectContaining({
-        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
-        onCommit: expect.any(Function),
-      }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number), onCommit: expect.any(Function) }),
     )
     expect(
       preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
@@ -118,16 +111,11 @@ describe('createPrimaryWindowNavigationActions', () => {
     },
   )
 
-  test('does not reinterpret committed history when its workspace runtime changes in flight', async () => {
+  test('commits a filesystem route only while its workspace runtime remains current', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
-      const committed = await routeCommit.promise
-      if (committed) options?.onCommit?.()
-      else options?.onAbandon?.()
-      return committed
-    })
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
     const actions = createPrimaryWindowNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
@@ -158,8 +146,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     }))
     routeCommit.resolve(true)
 
-    await expect(commit).resolves.toBe(true)
-    expect(onAbandon).not.toHaveBeenCalled()
+    await expect(commit).resolves.toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
     expect(
       preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
@@ -168,70 +156,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     ).toBe(previousPreference)
   })
 
-  test('commits filesystem presentation inside navigation-intent settlement', async () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    const sequence: string[] = []
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
-      options?.navigationIntent?.commit(options.onCommit)
-      sequence.push('new navigation')
-      beginPrimaryWindowNavigationIntent('user').release()
-      return true
-    })
-    const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: REPO_ID,
-      workspaceOrder: [REPO_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-
-    await expect(
-      actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          authority: { kind: 'workspace-runtime' },
-        },
-        { kind: 'static', tab: 'files' },
-        { navigationIntent: intent, onCommit: () => sequence.push('presentation') },
-      ),
-    ).resolves.toBe(true)
-    expect(sequence).toEqual(['presentation', 'new navigation'])
-  })
-
-  test('does not reinterpret committed history when retained presentation authority changes in flight', async () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    let presentationCurrentness: 'current' | 'pending' = 'current'
-    const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
-      presentationCurrentness = 'pending'
-      options?.onCommit?.()
-      return true
-    })
-    const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: REPO_ID,
-      workspaceOrder: [REPO_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-    const onTargetPending = vi.fn()
-
-    await expect(
-      actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          authority: { kind: 'workspace-runtime' },
-        },
-        { kind: 'static', tab: 'files' },
-        { presentationCurrentness: () => presentationCurrentness, onTargetPending },
-      ),
-    ).resolves.toBe(true)
-    expect(onTargetPending).not.toHaveBeenCalled()
-  })
-
-  test('does not reinterpret committed history when its authoritative worktree disappears in flight', async () => {
+  test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -240,12 +165,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
-      const committed = await routeCommit.promise
-      if (committed) options?.onCommit?.()
-      else options?.onAbandon?.()
-      return committed
-    })
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
     const actions = createPrimaryWindowNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
@@ -269,20 +189,14 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     routeCommit.resolve(true)
 
-    await expect(commit).resolves.toBe(true)
-    expect(onAbandon).not.toHaveBeenCalled()
+    await expect(commit).resolves.toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
   })
 
   test('abandons exactly once when filesystem presentation projection commit throws', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    const intent = beginPrimaryWindowNavigationIntent('user')
     const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
-      const committed = options?.navigationIntent?.commit(options.onCommit) ?? false
-      const outcome = options?.navigationIntent?.outcome()
-      if (outcome?.status === 'failed') throw outcome.error
-      return committed
-    })
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const actions = createPrimaryWindowNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
@@ -302,14 +216,10 @@ describe('createPrimaryWindowNavigationActions', () => {
           authority: { kind: 'workspace-runtime' },
         },
         { kind: 'static', tab: 'files' },
-        { navigationIntent: intent, onAbandon },
+        { onAbandon },
       ),
     ).rejects.toThrow('projection commit failed')
     expect(onAbandon).toHaveBeenCalledOnce()
-    await expect(intent.settled).resolves.toMatchObject({ status: 'failed', intendedStatus: 'committed' })
-    const next = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(next.kind).toBe('admitted')
-    if (next.kind === 'admitted') next.intent.release()
   })
 
   test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', () => {

@@ -267,11 +267,9 @@ failure indistinguishable from successful membership removal.
 
 The public direct terminal-close socket action and client durable-close queue
 are removed. User close goes through the composed Workspace runtime command,
-which preserves `closeOperationByRuntimeBindingKey` until the runtime close
-response settles. The manager captures canonical presentation before revoking
-PTY ownership, then kills and awaits the PTY. Capture failure rejects before
-commit unless the PTY has concurrently exited, in which case natural retirement
-is already irreversible and completes through the same operation. Successful
+which preserves `closeOperationByRuntimeBindingKey` until retirement and
+close-back navigation settle. The manager kills and awaits the PTY first; a
+failure preserves Directory membership and the visible tab. Successful
 retirement removes Directory membership exactly once, and canonical tabs
 converge by projection.
 
@@ -345,19 +343,16 @@ terminalClient.onSessionClosed((event) => {
 })
 ```
 
-The projection records the matching authoritative retirement without issuing a
-second server close. Catalog membership, the retirement fact, and presentation
-settlement remain separate authorities.
+The projection drops the matching local session without issuing a
+second server close (the originating window already disposed the
+local entry, and the server has already killed the PTY).
 
-Before an accepted natural exit or sibling-window close removes the local
-session projection, it publishes one client-local retirement boundary. The
-server event already carries the canonical, target-scoped tabs before-state and
-the catalog revision committed by removal. The workspace-pane layer combines
-that immutable record with the exact source route; it never reconstructs the
-destination from an after-state projection. The plan is abandoned if its exact
-source route changes. The originating window holds an exact-binding suppression
-lease while its composed close is pending, because that command already owns
-close-back; a failed or lost response releases the fact for passive presentation.
+Before terminal membership is retired, the server captures the canonical pane
+tabs and includes that before-state in the natural-exit or sibling-window close
+event. The client makes one close-back attempt only when the retired terminal is
+still the exact current route and no navigation commit is already owned. If the
+target projection is unavailable or the route has moved, presentation fails
+fast; the committed terminal retirement is not retried.
 
 This handles the case where window A's close drops the socket
 mid-flight and window B's server-side close still emits the broadcast
@@ -540,10 +535,8 @@ order would have been:
   tests prove the attach response precedes sequence 1 without dropping it.
   Client tests prove a stream frame performs no xterm reset or snapshot write.
 - **R1**: manager tests cover retirement single-flight, preserving Directory
-  membership when presentation capture fails before native revocation,
-  detaching it exactly once after the commit boundary, retaining incomplete
-  native cleanup without exposing a false-live binding, and rejecting admission
-  while retirement is in progress.
+  membership after a failed close, removing it exactly once after confirmed
+  retirement, and rejecting admission while retirement is in progress.
   Workspace runtime application tests cover the composed terminal-close and
   tab-commit boundary. Projection tests cover removing only the exact runtime
   binding named by `session-closed`.
@@ -590,17 +583,16 @@ any individual implementation:
    PTY before any output exists may receive `frame: 'stream'`. Any view that may
    have missed history receives `frame: 'snapshot'`.
 3. **Close is durable and server-owned.** Client view disposal never closes a
-   PTY. Presentation capture is reversible; native ownership revocation is not.
-   After revocation, Directory authority is detached and any incomplete physical
-   cleanup moves to the detached-session resource owner.
+   PTY. Requested retirement keeps Directory membership until kill/wait
+   succeeds; confirmed exit removes membership before post-exit cleanup.
 4. **Close is a broadcast event.** When the server confirms a user
    close, other windows learn about it through `session-closed`, not
    through a full reconcile.
 5. **Close/create coordination stays at the authoritative server boundary.**
-   Before native revocation, Directory/retirement state rejects concurrent
-   admission. After revocation, the retired identity is no longer Directory
-   authority; only its physical cleanup capability remains. The client must not
-   recreate a durable-close queue to compensate.
+   A closing session remains represented by Directory/retirement state until
+   its physical outcome is known. A later admission must reject that retiring
+   identity rather than restoring it, and the client must not recreate a
+   durable-close queue to compensate.
 6. **Empty-state UI is part of the contract.** A terminal session with
    zero sessions must show the affordance to open one.
 7. **Treat React/provider lifetime concerns separately from terminal

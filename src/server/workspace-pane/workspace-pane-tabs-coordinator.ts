@@ -408,13 +408,21 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     workspaceId: WorkspaceId
     scope: string
   }): Promise<WorkspacePaneTabsSnapshot> {
-    return await this.withExclusiveSnapshot(input, (snapshot) => snapshot)
+    return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
+      const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
+      const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
+      return await layout.snapshot({
+        scope: aggregateScope(input.userId, input.workspaceId, input.scope),
+        validTargets,
+        providerSnapshots: providers,
+      })
+    })
   }
 
-  async withExclusiveSnapshot<T>(
+  async withExclusiveSnapshot(
     input: { userId: string; workspaceId: WorkspaceId; scope: string },
-    commit: (snapshot: WorkspacePaneTabsSnapshot) => T,
-  ): Promise<T> {
+    commit: (snapshot: WorkspacePaneTabsSnapshot) => void,
+  ): Promise<void> {
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
@@ -423,7 +431,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         validTargets,
         providerSnapshots: providers,
       })
-      return commit(snapshot)
+      commit(snapshot)
     })
   }
 

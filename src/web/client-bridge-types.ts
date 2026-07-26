@@ -16,6 +16,7 @@ import type {
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionInput,
+  TerminalSessionClosedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
@@ -24,7 +25,6 @@ import type {
   TerminalWriteResult,
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
-  TerminalSessionClosedEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {

@@ -16,7 +16,7 @@ import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
   primaryWindowNavigationIsCurrent,
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
@@ -210,7 +210,7 @@ describe('workspace pane runtime tab create action', () => {
         head: { kind: 'branch', branchName: BRANCH_NAME },
       },
       expect.objectContaining({
-        navigationIntent: expect.objectContaining({ generation: expect.any(Number) }),
+        navigationGeneration: expect.any(Number),
       }),
     )
   })
@@ -234,7 +234,7 @@ describe('workspace pane runtime tab create action', () => {
 
     action?.onCreate()
     await vi.waitFor(() => expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce())
-    beginPrimaryWindowNavigationIntent('user').generation
+    beginPrimaryWindowNavigation()
     const commandInput = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls[0]?.[0] as {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
@@ -249,7 +249,7 @@ describe('workspace pane runtime tab create action', () => {
     const createButton = document.createElement('button')
     document.body.appendChild(createButton)
     createButton.focus()
-    const previousPresentation = beginPrimaryWindowNavigationIntent('user').generation
+    const previousPresentation = beginPrimaryWindowNavigation()
     const heldCommand = holdTerminalCreateCommand()
     const navigation = Promise.withResolvers<boolean>()
     const routeStarted = Promise.withResolvers<CreatedTerminalRouteRequest>()
@@ -273,7 +273,7 @@ describe('workspace pane runtime tab create action', () => {
     const commit = commandInput.commitCreatedTerminalTab(createAdmission())
     const routeRequest = await routeStarted.promise
 
-    expect(routeRequest.navigationIntent.isCurrent()).toBe(true)
+    expect(primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration)).toBe(true)
     expect(focusTerminal).not.toHaveBeenCalled()
     navigation.resolve(true)
     await expect(commit).resolves.toEqual({ status: 'committed' })
@@ -377,7 +377,7 @@ describe('workspace pane runtime tab create action', () => {
     })
     const commandInput = await heldCommand.input.promise
 
-    beginPrimaryWindowNavigationIntent('user').generation
+    beginPrimaryWindowNavigation()
     await expect(commandInput.commitCreatedTerminalTab(createAdmission())).resolves.toEqual({ status: 'committed' })
     heldCommand.result.resolve(committedCreateCommandResult())
     await dispatch
@@ -504,7 +504,7 @@ function translate(key: string): string {
 function createdTerminalRouteRequest(
   routeTarget: CreatedTerminalRouteRequest['routeTarget'] = BRANCH_ROUTE_TARGET,
 ): CreatedTerminalRouteRequest {
-  return { navigationIntent: beginPrimaryWindowNavigationIntent('user'), routeTarget }
+  return { navigationGeneration: beginPrimaryWindowNavigation(), routeTarget }
 }
 
 interface HeldTerminalCreateCommandInput {

@@ -8,10 +8,9 @@ import {
   workspacePaneRouteFromBranchHref,
 } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
-  tryBeginPassivePrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
 describe('primary window route navigation helpers', () => {
@@ -28,7 +27,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigationIntent('user').generation
+    beginPrimaryWindowNavigation()
 
     await expect(committed).resolves.toBe(false)
     navigation.resolve()
@@ -57,22 +56,6 @@ describe('primary window route navigation helpers', () => {
     await expect(committed).rejects.toThrow('commit effect failed')
   })
 
-  test('propagates a same-target commit effect failure through the awaited transaction', async () => {
-    const navigate = vi.fn(async () => {})
-
-    await expect(
-      settleOwnedPrimaryWindowRouteCommit({
-        targetHref: '/target',
-        currentHref: () => '/target',
-        commitEffect: () => {
-          throw new Error('commit effect failed')
-        },
-        navigate,
-      }),
-    ).rejects.toThrow('commit effect failed')
-    expect(navigate).not.toHaveBeenCalled()
-  })
-
   test('propagates an abandon effect failure after a newer presentation supersedes the route', async () => {
     const navigation = Promise.withResolvers<void>()
     const started = Promise.withResolvers<void>()
@@ -89,7 +72,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigationIntent('user').generation
+    beginPrimaryWindowNavigation()
 
     await expect(committed).rejects.toThrow('abandon effect failed')
     navigation.resolve()
@@ -151,24 +134,6 @@ describe('primary window route navigation helpers', () => {
     expect(navigate).not.toHaveBeenCalled()
     expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
-  })
-
-  test('releases owned admission when a stale source-route abandon effect fails', async () => {
-    await expect(
-      settleOwnedPrimaryWindowRouteCommit({
-        targetHref: '/target',
-        expectedCurrentHref: '/expected',
-        currentHref: () => '/actual',
-        abandonEffect: () => {
-          throw new Error('early abandon effect failed')
-        },
-        navigate: async () => {},
-      }),
-    ).rejects.toThrow('early abandon effect failed')
-
-    const next = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(next.kind).toBe('admitted')
-    if (next.kind === 'admitted') next.intent.release()
   })
 
   test('reads the current workspace pane route only for the exact repo branch', () => {

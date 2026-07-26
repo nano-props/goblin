@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
+import type {
+  TerminalCreateResult,
+  TerminalRetirementPresentationContext,
+  TerminalSessionClosedEvent,
+} from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
@@ -168,15 +172,25 @@ function workspaceIdFixture(input: string) {
 }
 
 const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
-const SESSION_CLOSED_SCOPE = {
-  workspaceId: REPO_ROOT,
-  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-  catalogRevision: 1,
-  retirementPresentation: null,
-}
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${REPO_ROOT}`
+
+function sessionClosedEvent(
+  terminalRuntimeSessionId: string,
+  terminalRuntimeGeneration: number,
+  terminalSessionId: string,
+  retirementPresentation: TerminalRetirementPresentationContext | null = null,
+): TerminalSessionClosedEvent {
+  return {
+    terminalRuntimeSessionId,
+    terminalRuntimeGeneration,
+    terminalSessionId,
+    workspaceId: REPO_ROOT,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    retirementPresentation,
+  }
+}
 
 function makeRuntimeMembershipIndex() {
   return runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }])
@@ -603,12 +617,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed({
-      ...SESSION_CLOSED_SCOPE,
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 0,
-      terminalSessionId: 'term-111111111111111111111',
-    })
+    projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, 'term-111111111111111111111'))
 
     // The local session is gone; the filesystem target snapshot is empty.
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
@@ -618,24 +627,14 @@ describe('TerminalSessionProjection create flow', () => {
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
-    projection.handleSessionClosed({
-      ...SESSION_CLOSED_SCOPE,
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 0,
-      terminalSessionId: 'term-111111111111111111111',
-    })
+    projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, 'term-111111111111111111111'))
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
   test('session-closed with a runtime mismatch preserves the local session', async () => {
     await projection.createTerminal(terminalBase())
-    projection.handleSessionClosed({
-      ...SESSION_CLOSED_SCOPE,
-      terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-111111111111111111111',
-    })
+    projection.handleSessionClosed(sessionClosedEvent('pty_session_missing_aaaaaaaaa', 1, 'term-111111111111111111111'))
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
@@ -687,12 +686,7 @@ describe('TerminalSessionProjection create flow', () => {
       }),
     )
 
-    projection.handleSessionClosed({
-      ...SESSION_CLOSED_SCOPE,
-      terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-unknownunknownunknown',
-    })
+    projection.handleSessionClosed(sessionClosedEvent('pty_session_unknown_aaaaaaaaa', 1, 'term-unknownunknownunknown'))
 
     expect(Array.from(pendingBells.values())).not.toContainEqual(
       expect.objectContaining({
@@ -713,12 +707,7 @@ describe('TerminalSessionProjection create flow', () => {
       canonicalTitle: null,
     })
 
-    projection.handleSessionClosed({
-      ...SESSION_CLOSED_SCOPE,
-      terminalRuntimeSessionId: 'pty_session_stale_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-unknownunknownunknown',
-    })
+    projection.handleSessionClosed(sessionClosedEvent('pty_session_stale_aaaaaaaaa', 1, 'term-unknownunknownunknown'))
 
     const pendingBells = terminalSessionProjectionAccess(projection).pendingServerBellByRuntimeBindingKey as Map<
       string,
@@ -791,12 +780,7 @@ describe('TerminalSessionProjection create flow', () => {
     try {
       expect(projection.workspaceBellCount(REPO_ROOT)).toBe(1)
 
-      projection.handleSessionClosed({
-        ...SESSION_CLOSED_SCOPE,
-        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 0,
-        terminalSessionId,
-      })
+      projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, terminalSessionId))
 
       expect(projection.workspaceBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)

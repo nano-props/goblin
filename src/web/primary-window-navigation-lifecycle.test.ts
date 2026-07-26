@@ -1,273 +1,344 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  beginPrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
+  captureUnownedPrimaryWindowNavigationGeneration,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationState,
+  primaryWindowNavigationIsCurrent,
+  registerPrimaryWindowNavigation,
   resetPrimaryWindowNavigationForTest,
-  tryBeginPassivePrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 import { runOwnedPrimaryWindowNavigation } from '#/web/primary-window-route-navigation.ts'
 
 beforeEach(() => resetPrimaryWindowNavigationForTest())
 
-describe('primary window navigation intent lifecycle', () => {
-  test('a newer user intent supersedes the current user intent', async () => {
-    const first = beginPrimaryWindowNavigationIntent('user')
-    const second = beginPrimaryWindowNavigationIntent('user')
+describe('primary window navigation lifecycle', () => {
+  test('captures the current generation only while it has no registered history commit owner', () => {
+    const unownedGeneration = captureUnownedPrimaryWindowNavigationGeneration()
+    expect(unownedGeneration).toBe(0)
 
-    await expect(first.settled).resolves.toEqual({ status: 'superseded' })
-    expect(first.isCurrent()).toBe(false)
-    expect(second.isCurrent()).toBe(true)
+    const explicitGeneration = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(explicitGeneration, '/pending')
+    if (!registration) throw new Error('missing navigation registration')
+
+    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBeNull()
+    expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
+    registration.release()
+    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBe(explicitGeneration)
   })
 
-  test('a stale release cannot settle the current intent', async () => {
-    const first = beginPrimaryWindowNavigationIntent('user')
-    const second = beginPrimaryWindowNavigationIntent('user')
+  test('allows one history commit owner per generation and settles it when superseded', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const effects: string[] = []
+    const failed = registerPrimaryWindowNavigation(generation, '/failed', undefined, () => {
+      effects.push('failed')
+      throw new Error('abandon failed')
+    })
+    if (!failed) throw new Error('expected owned navigation registration')
 
-    first.release()
-    expect(second.isCurrent()).toBe(true)
-    second.commit()
-    await expect(second.settled).resolves.toEqual({ status: 'committed' })
+    expect(() => registerPrimaryWindowNavigation(generation, '/duplicate')).toThrow(
+      'primary window navigation generation already owns a history commit',
+    )
+
+    expect(() => beginPrimaryWindowNavigation()).not.toThrow()
+    expect(effects).toEqual(['failed'])
+    await expect(failed.settled).resolves.toMatchObject({
+      status: 'failed',
+      intendedStatus: 'abandoned',
+      error: expect.objectContaining({ message: 'abandon failed' }),
+    })
   })
 
-  test('lexical disposal abandons an unsettled intent', async () => {
-    let settlement: Promise<unknown>
-    {
-      using intent = beginPrimaryWindowNavigationIntent('user')
-      settlement = intent.settled
-    }
-
-    await expect(settlement).resolves.toEqual({ status: 'abandoned' })
+  test('an unknown same-href PUSH supersedes the current navigation', () => {
+    const generation = beginPrimaryWindowNavigation()
+    observePrimaryWindowHistoryNavigation({ href: '/same', state: {}, action: { type: 'PUSH' } })
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
   })
 
-  test('passive admission waits for the current owner without superseding it', async () => {
-    const user = beginPrimaryWindowNavigationIntent('user')
-    const blocked = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(blocked).toMatchObject({ kind: 'occupied' })
-    expect(user.isCurrent()).toBe(true)
-
-    user.release()
-    if (blocked.kind !== 'occupied') throw new Error('expected occupied admission')
-    await expect(blocked.settled).resolves.toEqual({ status: 'abandoned' })
-
-    const admitted = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(admitted.kind).toBe('admitted')
-    if (admitted.kind === 'admitted') admitted.intent.release()
-  })
-
-  test('a user intent supersedes a current passive intent', async () => {
-    const admission = tryBeginPassivePrimaryWindowNavigationIntent()
-    if (admission.kind !== 'admitted') throw new Error('expected passive admission')
-
-    const user = beginPrimaryWindowNavigationIntent('user')
-    await expect(admission.intent.settled).resolves.toEqual({ status: 'superseded' })
-    expect(user.isCurrent()).toBe(true)
-  })
-
-  test('registration is part of the same intent and commits at history observation', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
+  test('treats a late PUSH from an abandoned registration as the new external presentation', () => {
+    const staleGeneration = beginPrimaryWindowNavigation()
     const commitEffect = vi.fn()
-    const registration = intent.register('/owned', commitEffect)
-    if (!registration) throw new Error('expected navigation registration')
+    const registration = registerPrimaryWindowNavigation(staleGeneration, '/owned', commitEffect)
+    if (!registration) throw new Error('missing navigation registration')
+    const currentGeneration = beginPrimaryWindowNavigation()
 
     observePrimaryWindowHistoryNavigation({
       href: '/owned',
-      state: primaryWindowNavigationState({}, intent.generation),
+      state: primaryWindowNavigationState({}, staleGeneration),
       action: { type: 'PUSH' },
     })
 
-    await expect(intent.settled).resolves.toEqual({ status: 'committed' })
-    expect(registration.settled).toBe(intent.settled)
-    expect(commitEffect).toHaveBeenCalledOnce()
+    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
+    expect(commitEffect).not.toHaveBeenCalled()
   })
 
-  test('an intent can register at most one history commit', () => {
-    using intent = beginPrimaryWindowNavigationIntent('user')
-    expect(intent.register('/first')).not.toBeNull()
-    expect(intent.register('/second')).toBeNull()
-  })
-
-  test('a mismatched history event supersedes the registration', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    const abandonEffect = vi.fn()
-    intent.register('/expected', undefined, abandonEffect)
+  test('advances navigation generation even when mismatched navigation cleanup fails', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(generation, '/expected', undefined, () => {
+      throw new Error('abandon effect failed')
+    })
+    if (!registration) throw new Error('missing navigation registration')
 
     observePrimaryWindowHistoryNavigation({
       href: '/actual',
-      state: primaryWindowNavigationState({}, intent.generation),
+      state: primaryWindowNavigationState({}, generation),
       action: { type: 'PUSH' },
     })
 
-    await expect(intent.settled).resolves.toEqual({ status: 'superseded' })
-    expect(abandonEffect).toHaveBeenCalledOnce()
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    await expect(registration.settled).resolves.toMatchObject({
+      status: 'failed',
+      intendedStatus: 'abandoned',
+      error: expect.objectContaining({ message: 'abandon effect failed' }),
+    })
   })
 
-  test('records commit-effect failure as a failed committed intent', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    intent.register('/owned', () => {
+  test('records a committed navigation effect failure without throwing from history observation', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(generation, '/owned', () => {
       throw new Error('commit effect failed')
     })
+    if (!registration) throw new Error('missing navigation registration')
 
     observePrimaryWindowHistoryNavigation({
       href: '/owned',
-      state: primaryWindowNavigationState({}, intent.generation),
-      action: { type: 'REPLACE' },
+      state: primaryWindowNavigationState({}, generation),
+      action: { type: 'PUSH' },
     })
-
-    await expect(intent.settled).resolves.toMatchObject({
+    await expect(registration.settled).resolves.toMatchObject({
       status: 'failed',
       intendedStatus: 'committed',
       error: expect.objectContaining({ message: 'commit effect failed' }),
     })
   })
 
-  test('records abandon-effect failure without retaining ownership', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    intent.register('/owned', undefined, () => {
-      throw new Error('abandon effect failed')
-    })
-    intent.release()
-
-    await expect(intent.settled).resolves.toMatchObject({
-      status: 'failed',
-      intendedStatus: 'abandoned',
-      error: expect.objectContaining({ message: 'abandon effect failed' }),
-    })
-    const next = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(next.kind).toBe('admitted')
-    if (next.kind === 'admitted') next.intent.release()
-  })
-
-  test('records admission-abandon effect failure without retaining ownership', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-
-    expect(
-      intent.abandonAdmission(() => {
-        throw new Error('admission abandon effect failed')
-      }),
-    ).toBe(false)
-    await expect(intent.settled).resolves.toMatchObject({
-      status: 'failed',
-      intendedStatus: 'abandoned',
-      error: expect.objectContaining({ message: 'admission abandon effect failed' }),
-    })
-    const next = tryBeginPassivePrimaryWindowNavigationIntent()
-    expect(next.kind).toBe('admitted')
-    if (next.kind === 'admitted') next.intent.release()
-  })
-
-  test.each(['BACK', 'FORWARD'] as const)('%s supersedes the current intent', async (type) => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type } })
-    await expect(intent.settled).resolves.toEqual({ status: 'superseded' })
-  })
-
-  test('GO supersedes the current intent', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
-    await expect(intent.settled).resolves.toEqual({ status: 'superseded' })
-  })
-
-  test('an async navigation rejection abandons ownership without committing', async () => {
-    const blocked = Promise.withResolvers<void>()
+  test('a newer presentation abandons an owned navigation exactly once', async () => {
+    const navigation = Promise.withResolvers<void>()
+    const commitEffect = vi.fn()
     const abandonEffect = vi.fn()
-    const intent = beginPrimaryWindowNavigationIntent('user')
+
     expect(
       runOwnedPrimaryWindowNavigation({
-        intent,
-        targetHref: '/blocked',
+        targetHref: '/owned',
         currentHref: '/start',
-        commitEffect: vi.fn(),
+        commitEffect,
         abandonEffect,
-        navigate: async () => await blocked.promise,
+        navigate: async () => await navigation.promise,
       }),
     ).toBe(true)
+    await Promise.resolve()
 
-    blocked.reject(new Error('blocked'))
-    await expect(intent.settled).resolves.toMatchObject({ status: 'failed', intendedStatus: 'committed' })
+    beginPrimaryWindowNavigation()
+    expect(commitEffect).not.toHaveBeenCalled()
+    expect(abandonEffect).toHaveBeenCalledOnce()
+
+    navigation.resolve()
+    await navigation.promise
+    await Promise.resolve()
+    expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
   })
 
-  test('a released registration cannot start its queued navigation', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    const navigate = vi.fn(async () => {})
+  test('does not let an unsettled prior router promise block the current navigation', async () => {
+    const firstEntered = Promise.withResolvers<void>()
+    const releaseFirst = Promise.withResolvers<void>()
+    const secondCommitted = Promise.withResolvers<void>()
+    const committed: string[] = []
+    let href = '/start'
+
+    runOwnedPrimaryWindowNavigation({
+      targetHref: '/first',
+      currentHref: href,
+      commitEffect: () => committed.push('first'),
+      navigate: async (navigationGeneration) => {
+        firstEntered.resolve()
+        href = '/first'
+        observePrimaryWindowHistoryNavigation({
+          href,
+          state: primaryWindowNavigationState({}, navigationGeneration),
+          action: { type: 'PUSH' },
+        })
+        await releaseFirst.promise
+      },
+    })
+    await firstEntered.promise
+
+    runOwnedPrimaryWindowNavigation({
+      targetHref: '/second',
+      currentHref: href,
+      commitEffect: () => {
+        committed.push('second')
+        secondCommitted.resolve()
+      },
+      navigate: async (navigationGeneration) => {
+        href = '/second'
+        observePrimaryWindowHistoryNavigation({
+          href,
+          state: primaryWindowNavigationState({}, navigationGeneration),
+          action: { type: 'PUSH' },
+        })
+      },
+    })
+
+    await secondCommitted.promise
+    expect(href).toBe('/second')
+    expect(committed).toEqual(['first', 'second'])
+
+    releaseFirst.resolve()
+    await releaseFirst.promise
+    await Promise.resolve()
+
+    expect(href).toBe('/second')
+    expect(committed).toEqual(['first', 'second'])
+  })
+
+  test('a current owned observation commits its effect exactly once', () => {
+    const generation = beginPrimaryWindowNavigation()
+    const commitEffect = vi.fn()
+    const registration = registerPrimaryWindowNavigation(generation, '/owned', commitEffect)
+    if (!registration) throw new Error('missing navigation registration')
+    const state = primaryWindowNavigationState({}, generation)
+
+    observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
+    observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
+
+    expect(commitEffect).toHaveBeenCalledOnce()
+  })
+
+  test('a settled registration cannot release a later owner in the same generation', async () => {
+    const generation = beginPrimaryWindowNavigation()
+    const first = registerPrimaryWindowNavigation(generation, '/first')
+    if (!first) throw new Error('missing first navigation registration')
+    observePrimaryWindowHistoryNavigation({
+      href: '/first',
+      state: primaryWindowNavigationState({}, generation),
+      action: { type: 'PUSH' },
+    })
+    await expect(first.settled).resolves.toEqual({ status: 'committed' })
+
+    const secondAbandon = vi.fn()
+    const second = registerPrimaryWindowNavigation(generation, '/second', undefined, secondAbandon)
+    if (!second) throw new Error('missing second navigation registration')
+
+    first.release()
+
+    expect(secondAbandon).not.toHaveBeenCalled()
+    second.release()
+    expect(secondAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('releasing a rejected navigation makes its later history event external', () => {
+    const rejectedGeneration = beginPrimaryWindowNavigation()
+    const registration = registerPrimaryWindowNavigation(rejectedGeneration, '/rejected')
+    if (!registration) throw new Error('missing navigation registration')
+    registration.release()
+    const currentGeneration = beginPrimaryWindowNavigation()
+
+    observePrimaryWindowHistoryNavigation({
+      href: '/rejected',
+      state: primaryWindowNavigationState({}, rejectedGeneration),
+      action: { type: 'PUSH' },
+    })
+
+    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
+  })
+
+  test.each(['BACK', 'FORWARD'] as const)('%s supersedes at the history callback boundary', (type) => {
+    const generation = beginPrimaryWindowNavigation()
+    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type } })
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+  })
+
+  test('GO supersedes at the history callback boundary', () => {
+    const generation = beginPrimaryWindowNavigation()
+    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
+    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+  })
+
+  test('an async blocker rejection releases ownership without committing its effect', async () => {
+    const blocked = Promise.withResolvers<void>()
+    const navigationStarted = Promise.withResolvers<void>()
+    const navigationReleased = Promise.withResolvers<void>()
+    let navigationGeneration: PrimaryWindowNavigationGeneration | null = null
+    const commitEffect = vi.fn()
+    const abandonEffect = vi.fn(() => navigationReleased.resolve())
     expect(
       runOwnedPrimaryWindowNavigation({
-        intent,
-        targetHref: '/released',
+        targetHref: '/blocked',
         currentHref: '/start',
-        navigate,
+        commitEffect,
+        abandonEffect,
+        navigate: async (ownedNavigationGeneration) => {
+          navigationGeneration = ownedNavigationGeneration
+          navigationStarted.resolve()
+          return await blocked.promise
+        },
       }),
     ).toBe(true)
 
-    intent.release()
-    await Promise.resolve()
-    await Promise.resolve()
+    await navigationStarted.promise
+    blocked.reject(new Error('blocked'))
+    await blocked.promise.catch(() => {})
+    await navigationReleased.promise
+    if (navigationGeneration === null) throw new Error('missing navigation generation')
+    observePrimaryWindowHistoryNavigation({
+      href: '/blocked',
+      state: primaryWindowNavigationState({}, navigationGeneration),
+      action: { type: 'PUSH' },
+    })
 
-    await expect(intent.settled).resolves.toEqual({ status: 'abandoned' })
-    expect(navigate).not.toHaveBeenCalled()
+    expect(commitEffect).not.toHaveBeenCalled()
+    expect(abandonEffect).toHaveBeenCalledOnce()
   })
 
-  test('a superseded registration cannot start its queued navigation', async () => {
-    const first = beginPrimaryWindowNavigationIntent('user')
-    const navigate = vi.fn(async () => {})
-    expect(
-      runOwnedPrimaryWindowNavigation({
-        intent: first,
-        targetHref: '/superseded',
-        currentHref: '/start',
-        navigate,
-      }),
-    ).toBe(true)
-
-    using current = beginPrimaryWindowNavigationIntent('user')
-    await Promise.resolve()
-    await Promise.resolve()
-
-    await expect(first.settled).resolves.toEqual({ status: 'superseded' })
-    expect(current.isCurrent()).toBe(true)
-    expect(navigate).not.toHaveBeenCalled()
-  })
-
-  test('same-target navigation commits synchronously without invoking the router', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
+  test('commits a same-target presentation without waiting for a no-op router event', () => {
     const commitEffect = vi.fn()
     const navigate = vi.fn(async () => {})
 
     expect(
       runOwnedPrimaryWindowNavigation({
-        intent,
         targetHref: '/workspace',
         currentHref: '/workspace',
         commitEffect,
         navigate,
       }),
     ).toBe(true)
-    await expect(intent.settled).resolves.toEqual({ status: 'committed' })
+
     expect(commitEffect).toHaveBeenCalledOnce()
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  test('same-target navigation reports a synchronous commit-effect failure', async () => {
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    const navigate = vi.fn(async () => {})
+  test('rejects a stale same-target presentation without committing', () => {
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
+    const commitEffect = vi.fn()
 
     expect(
       runOwnedPrimaryWindowNavigation({
-        intent,
+        generation: staleGeneration,
         targetHref: '/workspace',
         currentHref: '/workspace',
-        commitEffect: () => {
-          throw new Error('commit effect failed')
-        },
-        navigate,
+        commitEffect,
+        navigate: vi.fn(async () => {}),
       }),
     ).toBe(false)
-    await expect(intent.settled).resolves.toMatchObject({
-      status: 'failed',
-      intendedStatus: 'committed',
-      error: expect.objectContaining({ message: 'commit effect failed' }),
+    expect(commitEffect).not.toHaveBeenCalled()
+  })
+
+  test('accepts a same-target commit whose effect starts the next presentation', () => {
+    const commitEffect = vi.fn(() => {
+      beginPrimaryWindowNavigation()
     })
-    expect(navigate).not.toHaveBeenCalled()
+
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        targetHref: '/workspace',
+        currentHref: '/workspace',
+        commitEffect,
+        navigate: vi.fn(async () => {}),
+      }),
+    ).toBe(true)
+    expect(commitEffect).toHaveBeenCalledOnce()
   })
 })

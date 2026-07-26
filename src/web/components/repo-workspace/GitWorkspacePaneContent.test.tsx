@@ -554,9 +554,7 @@ describe('GitWorkspacePaneContent', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'status')
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
@@ -1455,7 +1453,7 @@ describe('GitWorkspacePaneContent', () => {
       workspaceId,
       repo.workspaceRuntimeId,
       'term-111111111111111111111',
-      expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",

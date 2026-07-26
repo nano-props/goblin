@@ -55,12 +55,11 @@ import {
   authenticatedAppShellMode,
   currentWorkspacePaneRouteFromContext,
   primaryWindowLayoutRouteCallbacks,
-  workspacePaneRouteTargetFromContext,
   workspaceRouteContextFromMatches,
 } from '#/web/Layout.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
   observePrimaryWindowHistoryNavigation,
   primaryWindowNavigationIsCurrent,
   resetPrimaryWindowNavigationForTest,
@@ -384,20 +383,6 @@ function navigateBrowser(pathname: string) {
 }
 
 describe('workspace route context derivation', () => {
-  test('derives the pane route target without waiting for workspace command hydration', () => {
-    expect(
-      workspacePaneRouteTargetFromContext(
-        {
-          kind: 'worktree',
-          workspaceSlug: 'L3JlcG8',
-          worktreePath: '/tmp/detached-worktree',
-          workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-        },
-        WORKSPACE_A_ID,
-      ),
-    ).toEqual({ kind: 'git-worktree', workspaceId: WORKSPACE_A_ID, worktreePath: '/tmp/detached-worktree' })
-  })
-
   test('preserves the active pane route for a detached worktree context', () => {
     const workspacePaneRoute = { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' }
 
@@ -469,7 +454,7 @@ describe('primary window route callback facades', () => {
   ])('browser traversal supersedes independently of conditional shell mode at %s', (pathname, bootstrapState) => {
     resetPrimaryWindowNavigationForTest()
     authenticatedAppShellMode(pathname, bootstrapState as AuthenticatedAppBootstrapState)
-    const generation = beginPrimaryWindowNavigationIntent('user').generation
+    const generation = beginPrimaryWindowNavigation()
 
     observePrimaryWindowHistoryNavigation({ href: '/', state: {}, action: { type: 'BACK' } })
 

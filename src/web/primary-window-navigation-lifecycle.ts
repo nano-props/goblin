@@ -7,107 +7,36 @@ declare module '@tanstack/history' {
 }
 
 export type PrimaryWindowNavigationGeneration = number
-type PrimaryWindowNavigationIntentKind = 'user' | 'passive'
 
 export const PRIMARY_WINDOW_NAVIGATION_STATE_KEY = '__goblinPrimaryWindowNavigationGeneration' as const
+
+interface PrimaryWindowOwnedNavigation {
+  generation: PrimaryWindowNavigationGeneration
+  targetHref: string
+  commitEffect?: () => void
+  abandonEffect?: () => void
+  resolveSettlement: (outcome: PrimaryWindowNavigationOutcome) => void
+}
 
 export type PrimaryWindowNavigationOutcome =
   | { status: 'committed' }
   | { status: 'abandoned' }
-  | { status: 'superseded' }
-  | {
-      status: 'failed'
-      intendedStatus: 'committed' | 'abandoned' | 'superseded'
-      error: unknown
-    }
+  | { status: 'failed'; intendedStatus: 'committed' | 'abandoned'; error: unknown }
 
-interface PrimaryWindowNavigationRegistration {
-  readonly settled: Promise<PrimaryWindowNavigationOutcome>
-  [Symbol.dispose](): void
-  release(): void
-  fail(error: unknown): void
-}
-
-export interface PrimaryWindowNavigationIntent {
-  /** Internal identity used by history state and presentation-focus ownership. */
-  readonly generation: PrimaryWindowNavigationGeneration
-  readonly settled: Promise<PrimaryWindowNavigationOutcome>
-  isCurrent(): boolean
-  outcome(): PrimaryWindowNavigationOutcome | null
-  register(
-    targetHref: string,
-    commitEffect?: () => void,
-    abandonEffect?: () => void,
-  ): PrimaryWindowNavigationRegistration | null
-  commit(commitEffect?: () => void): boolean
-  /** Atomically settles an unregistered route admission and its abandonment effect. */
-  abandonAdmission(abandonEffect?: () => void): boolean
-  [Symbol.dispose](): void
-  release(): void
-  fail(error: unknown): void
-}
-
-type PassivePrimaryWindowNavigationIntentAdmission =
-  | { kind: 'admitted'; intent: PrimaryWindowNavigationIntent }
-  | { kind: 'occupied'; settled: Promise<PrimaryWindowNavigationOutcome> }
-
-export function commitPrimaryWindowNavigationEffect(
-  commit: () => boolean,
-  effects: { onCommit?: () => void; onAbandon?: () => void } | undefined,
-): boolean {
-  let committed: boolean
-  try {
-    committed = commit()
-  } catch (error) {
-    effects?.onAbandon?.()
-    throw error
-  }
-  if (!committed) {
-    effects?.onAbandon?.()
-    return false
-  }
-  try {
-    effects?.onCommit?.()
-    return true
-  } catch (error) {
-    effects?.onAbandon?.()
-    throw error
-  }
-}
-
-interface PrimaryWindowNavigationIntentRecord {
-  generation: PrimaryWindowNavigationGeneration
-  phase: 'admitted' | 'registered'
-  targetHref: string | null
-  commitEffect?: () => void
-  abandonEffect?: () => void
+export interface PrimaryWindowNavigationRegistration {
   settled: Promise<PrimaryWindowNavigationOutcome>
-  resolveSettlement: (outcome: PrimaryWindowNavigationOutcome) => void
-  outcome: PrimaryWindowNavigationOutcome | null
-  intent: PrimaryWindowNavigationIntent
+  release(): void
 }
 
 let latestPrimaryWindowNavigationGeneration = 0
-let currentPrimaryWindowNavigationIntentRecord: PrimaryWindowNavigationIntentRecord | null = null
+let ownedPrimaryWindowNavigation: PrimaryWindowOwnedNavigation | null = null
 
-export function beginPrimaryWindowNavigationIntent(
-  kind: PrimaryWindowNavigationIntentKind = 'user',
-): PrimaryWindowNavigationIntent {
-  if (kind === 'passive') {
-    const admission = tryBeginPassivePrimaryWindowNavigationIntent()
-    if (admission.kind === 'occupied') {
-      throw new Error('passive primary-window navigation requires unowned presentation')
-    }
-    return admission.intent
-  }
-  supersedeCurrentPrimaryWindowNavigationIntent()
-  return createPrimaryWindowNavigationIntent()
-}
-
-export function tryBeginPassivePrimaryWindowNavigationIntent(): PassivePrimaryWindowNavigationIntentAdmission {
-  const current = currentPrimaryWindowNavigationIntentRecord
-  if (current) return { kind: 'occupied', settled: current.settled }
-  return { kind: 'admitted', intent: createPrimaryWindowNavigationIntent() }
+export function beginPrimaryWindowNavigation(): PrimaryWindowNavigationGeneration {
+  latestPrimaryWindowNavigationGeneration += 1
+  const generation = latestPrimaryWindowNavigationGeneration
+  const superseded = takeOwnedPrimaryWindowNavigation()
+  if (superseded) settlePrimaryWindowNavigationEffect(superseded, 'abandoned')
+  return generation
 }
 
 export function primaryWindowNavigationIsCurrent(generation: PrimaryWindowNavigationGeneration): boolean {
@@ -118,18 +47,52 @@ export function currentPrimaryWindowNavigationGeneration(): PrimaryWindowNavigat
   return latestPrimaryWindowNavigationGeneration
 }
 
+/**
+ * Captures the current generation only when no history commit is registered
+ * against it. The caller may use that generation for a passive transition
+ * without displacing the registered commit owner. A later navigation still
+ * invalidates the captured generation through the normal currentness check.
+ */
+export function captureUnownedPrimaryWindowNavigationGeneration(): PrimaryWindowNavigationGeneration | null {
+  return ownedPrimaryWindowNavigation ? null : latestPrimaryWindowNavigationGeneration
+}
+
 export async function executePrimaryWindowNavigation(
-  intent: PrimaryWindowNavigationIntent,
+  generation: PrimaryWindowNavigationGeneration,
   navigate: () => Promise<unknown>,
 ): Promise<boolean> {
-  // Admission belongs to the presentation lease, not merely to its history
-  // generation. A released/superseded lease must not start work that was
-  // queued before settlement. After navigation starts, the generation remains
-  // the history/focus identity even though a matching history commit settles
-  // the lease itself.
-  if (!intent.isCurrent()) return false
+  if (!primaryWindowNavigationIsCurrent(generation)) return false
   await navigate()
-  return primaryWindowNavigationIsCurrent(intent.generation)
+  return primaryWindowNavigationIsCurrent(generation)
+}
+
+export function registerPrimaryWindowNavigation(
+  generation: PrimaryWindowNavigationGeneration,
+  targetHref: string,
+  commitEffect?: () => void,
+  abandonEffect?: () => void,
+): PrimaryWindowNavigationRegistration | null {
+  if (!primaryWindowNavigationIsCurrent(generation)) return null
+  if (ownedPrimaryWindowNavigation) {
+    throw new Error('primary window navigation generation already owns a history commit')
+  }
+  const settlement = Promise.withResolvers<PrimaryWindowNavigationOutcome>()
+  const owned: PrimaryWindowOwnedNavigation = {
+    generation,
+    targetHref,
+    commitEffect,
+    abandonEffect,
+    resolveSettlement: settlement.resolve,
+  }
+  ownedPrimaryWindowNavigation = owned
+  return {
+    settled: settlement.promise,
+    release() {
+      if (ownedPrimaryWindowNavigation !== owned) return
+      ownedPrimaryWindowNavigation = null
+      settlePrimaryWindowNavigationEffect(owned, 'abandoned')
+    },
+  }
 }
 
 export function primaryWindowNavigationState(
@@ -145,136 +108,48 @@ export function observePrimaryWindowHistoryNavigation(input: {
   action: { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number }
 }): void {
   if (input.action.type === 'BACK' || input.action.type === 'FORWARD' || input.action.type === 'GO') {
-    observeExternalPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     return
   }
   const generation = input.state?.[PRIMARY_WINDOW_NAVIGATION_STATE_KEY]
-  const current = currentPrimaryWindowNavigationIntentRecord
-  if (current?.phase === 'registered' && current.generation === generation) {
-    if (current.targetHref === input.href && primaryWindowNavigationIsCurrent(current.generation)) {
-      settlePrimaryWindowNavigationIntent(current, 'committed')
+  const owned = generation === undefined ? null : takeOwnedPrimaryWindowNavigation(generation)
+  if (owned) {
+    if (owned.targetHref === input.href && primaryWindowNavigationIsCurrent(owned.generation)) {
+      settlePrimaryWindowNavigationEffect(owned, 'committed')
       return
     }
-    observeExternalPrimaryWindowNavigation()
-    settlePrimaryWindowNavigationIntent(current, 'superseded')
+    // The browser location has already changed. Advance navigation ownership
+    // before settling the superseded effect.
+    beginPrimaryWindowNavigation()
+    settlePrimaryWindowNavigationEffect(owned, 'abandoned')
     return
   }
-  observeExternalPrimaryWindowNavigation()
+  beginPrimaryWindowNavigation()
 }
 
-function createPrimaryWindowNavigationIntent(): PrimaryWindowNavigationIntent {
-  latestPrimaryWindowNavigationGeneration += 1
-  const generation = latestPrimaryWindowNavigationGeneration
-  const settlement = Promise.withResolvers<PrimaryWindowNavigationOutcome>()
-  let record: PrimaryWindowNavigationIntentRecord
-  const intent: PrimaryWindowNavigationIntent = {
-    generation,
-    settled: settlement.promise,
-    isCurrent: () => currentPrimaryWindowNavigationIntentRecord === record,
-    outcome: () => record.outcome,
-    register: (targetHref, commitEffect, abandonEffect) =>
-      registerPrimaryWindowNavigationIntent(record, targetHref, commitEffect, abandonEffect),
-    commit: (commitEffect) => commitPrimaryWindowNavigationIntent(record, commitEffect),
-    abandonAdmission: (abandonEffect) => abandonPrimaryWindowNavigationIntentAdmission(record, abandonEffect),
-    [Symbol.dispose]: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
-    release: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
-    fail: (error) => failPrimaryWindowNavigationIntent(record, error),
-  }
-  record = {
-    generation,
-    phase: 'admitted' as const,
-    targetHref: null,
-    settled: settlement.promise,
-    resolveSettlement: settlement.resolve,
-    outcome: null,
-    intent,
-  }
-  currentPrimaryWindowNavigationIntentRecord = record
-  return intent
+function takeOwnedPrimaryWindowNavigation(
+  generation?: PrimaryWindowNavigationGeneration,
+): PrimaryWindowOwnedNavigation | null {
+  const owned = ownedPrimaryWindowNavigation
+  if (!owned || (generation !== undefined && owned.generation !== generation)) return null
+  ownedPrimaryWindowNavigation = null
+  return owned
 }
 
-function registerPrimaryWindowNavigationIntent(
-  record: PrimaryWindowNavigationIntentRecord,
-  targetHref: string,
-  commitEffect?: () => void,
-  abandonEffect?: () => void,
-): PrimaryWindowNavigationRegistration | null {
-  if (currentPrimaryWindowNavigationIntentRecord !== record || record.phase !== 'admitted') return null
-  record.phase = 'registered'
-  record.targetHref = targetHref
-  record.commitEffect = commitEffect
-  record.abandonEffect = abandonEffect
-  return {
-    settled: record.settled,
-    [Symbol.dispose]: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
-    release: () => settlePrimaryWindowNavigationIntent(record, 'abandoned'),
-    fail: (error) => failPrimaryWindowNavigationIntent(record, error),
-  }
-}
-
-function commitPrimaryWindowNavigationIntent(
-  record: PrimaryWindowNavigationIntentRecord,
-  commitEffect?: () => void,
-): boolean {
-  if (currentPrimaryWindowNavigationIntentRecord !== record || record.phase !== 'admitted') return false
-  record.commitEffect = commitEffect
-  settlePrimaryWindowNavigationIntent(record, 'committed')
-  return record.outcome?.status === 'committed'
-}
-
-function abandonPrimaryWindowNavigationIntentAdmission(
-  record: PrimaryWindowNavigationIntentRecord,
-  abandonEffect?: () => void,
-): boolean {
-  if (currentPrimaryWindowNavigationIntentRecord !== record || record.phase !== 'admitted') return false
-  record.abandonEffect = abandonEffect
-  settlePrimaryWindowNavigationIntent(record, 'abandoned')
-  return record.outcome?.status === 'abandoned'
-}
-
-function failPrimaryWindowNavigationIntent(record: PrimaryWindowNavigationIntentRecord, error: unknown): void {
-  if (currentPrimaryWindowNavigationIntentRecord !== record) return
-  settlePrimaryWindowNavigationIntent(
-    record,
-    'failed',
-    error,
-    record.phase === 'registered' ? 'committed' : 'abandoned',
-  )
-}
-
-function supersedeCurrentPrimaryWindowNavigationIntent(): void {
-  const current = currentPrimaryWindowNavigationIntentRecord
-  if (current) settlePrimaryWindowNavigationIntent(current, 'superseded')
-}
-
-function observeExternalPrimaryWindowNavigation(): void {
-  supersedeCurrentPrimaryWindowNavigationIntent()
-  latestPrimaryWindowNavigationGeneration += 1
-}
-
-function settlePrimaryWindowNavigationIntent(
-  record: PrimaryWindowNavigationIntentRecord,
-  status: 'committed' | 'abandoned' | 'superseded' | 'failed',
-  error?: unknown,
-  failedIntendedStatus: 'committed' | 'abandoned' | 'superseded' = 'abandoned',
+function settlePrimaryWindowNavigationEffect(
+  owned: PrimaryWindowOwnedNavigation,
+  settlement: 'committed' | 'abandoned',
 ): void {
-  if (currentPrimaryWindowNavigationIntentRecord !== record) return
-  currentPrimaryWindowNavigationIntentRecord = null
-  const intendedStatus = status === 'failed' ? failedIntendedStatus : status
   try {
-    if (status === 'committed') record.commitEffect?.()
-    else record.abandonEffect?.()
-    const outcome: PrimaryWindowNavigationOutcome = status === 'failed' ? { status, intendedStatus, error } : { status }
-    record.outcome = outcome
-    record.resolveSettlement(outcome)
-  } catch (effectError) {
-    const outcome: PrimaryWindowNavigationOutcome = { status: 'failed', intendedStatus, error: effectError }
-    record.outcome = outcome
-    record.resolveSettlement(outcome)
+    if (settlement === 'committed') owned.commitEffect?.()
+    else owned.abandonEffect?.()
+    owned.resolveSettlement({ status: settlement })
+  } catch (error) {
+    owned.resolveSettlement({ status: 'failed', intendedStatus: settlement, error })
   }
 }
 
 export function resetPrimaryWindowNavigationForTest(): void {
   latestPrimaryWindowNavigationGeneration = 0
-  currentPrimaryWindowNavigationIntentRecord = null
+  ownedPrimaryWindowNavigation = null
 }

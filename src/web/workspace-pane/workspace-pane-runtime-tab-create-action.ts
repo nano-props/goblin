@@ -33,14 +33,14 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowNavigationIntent,
-  type PrimaryWindowNavigationIntent,
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
 export interface CreatedTerminalRouteRequest {
-  navigationIntent: PrimaryWindowNavigationIntent
+  navigationGeneration: PrimaryWindowNavigationGeneration
   routeTarget: WorkspacePaneTabsTarget
 }
 
@@ -135,8 +135,8 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   const base = options.base
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  using navigationIntent = beginPrimaryWindowNavigationIntent('user')
-  let ownedFocusLease = claimTerminalAutoFocus(navigationIntent.generation)
+  const navigationGeneration = beginPrimaryWindowNavigation()
+  let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
   try {
     return await runWorkspacePaneAction(
       target,
@@ -155,7 +155,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
               openerIdentity: options.openerIdentity,
               showCreatedTerminalTab: async (terminalSessionId, presentation) => {
                 const accepted = await options.showCreatedTerminalTab(terminalSessionId, presentation, {
-                  navigationIntent,
+                  navigationGeneration,
                   routeTarget: options.routeTarget,
                 })
                 if (accepted) ownedFocusLease?.commit(terminalSessionId, options.focusTerminal)
@@ -220,7 +220,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
     { kind: 'terminal', terminalSessionId },
     navigation,
     undefined,
-    routeRequest.navigationIntent,
+    routeRequest.navigationGeneration,
   )
 }
 

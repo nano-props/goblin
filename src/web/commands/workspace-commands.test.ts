@@ -492,7 +492,7 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/no-worktree',
       { kind: 'static', tab: 'status' },
-      expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
@@ -674,9 +674,7 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
   })
 
@@ -793,7 +791,6 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/worktree',
       'term-111111111111111111111',
-      { replace: true },
     )
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
@@ -882,9 +879,7 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
     expect(closeEvents).toEqual(['close-terminal', 'navigate:status'])
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
@@ -931,9 +926,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
   })
@@ -1241,7 +1234,7 @@ describe('workspace commands', () => {
       },
       openerIdentity: 'workspace-pane:files',
       showCreatedTerminalTab: (terminalSessionId, _presentation, routeRequest) => {
-        expect(routeRequest.navigationIntent.isCurrent()).toBe(true)
+        expect(routeRequest.navigationGeneration).toEqual(expect.any(Number))
         return showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId)
       },
       focusTerminal: secondFocusTerminal,
@@ -1700,9 +1693,7 @@ describe('workspace commands', () => {
     resolveClose(true)
     await expect(closePromise).resolves.toBe(true)
     expect(settled).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
@@ -1778,14 +1769,11 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/worktree',
       'term-222222222222222222222',
-      { replace: true },
     )
     expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', expectedTerminalBase())
     closeResolvers[1]?.(true)
     await expect(secondClose).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
   })
 
   test('close workspace tab command closes the selected terminal when it is not the first terminal', async () => {
@@ -1854,7 +1842,6 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/worktree',
       'term-111111111111111111111',
-      { replace: true },
     )
   })
 
@@ -2176,9 +2163,7 @@ describe('workspace commands', () => {
 
     await expect(closePromise).resolves.toBe(true)
     await expect(movePromise).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
   })
 
@@ -2326,7 +2311,6 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/worktree',
       'term-111111111111111111111',
-      { replace: true },
     )
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -2369,9 +2353,7 @@ describe('workspace commands', () => {
         targetIdentity: 'terminal:term-111111111111111111111',
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(preferredWorkspacePaneTab()).toBe('changes')
   })
 
@@ -2437,9 +2419,7 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
@@ -2553,9 +2533,7 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status', {
-      replace: true,
-    })
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
@@ -3104,7 +3082,7 @@ function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-test('preserves an earlier committed selection while the latest queued absolute selection wins the final route', async () => {
+test('rebases the latest queued absolute selection after an earlier route commit', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -3144,7 +3122,7 @@ test('preserves an earlier committed selection while the latest queued absolute 
     identity: 'workspace-pane:history',
     navigation,
   })
-  await expect(selectFiles).resolves.toBe(true)
+  await expect(selectFiles).resolves.toBe(false)
   await expect(selectHistory).resolves.toBe(true)
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')

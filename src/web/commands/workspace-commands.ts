@@ -4,6 +4,7 @@ import {
   dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
+  dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
   type ConfirmedTerminalWorkspacePaneTabClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
@@ -34,7 +35,7 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalRetirementPresentationContext } from '#/shared/terminal-types.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -82,6 +83,14 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
+}
+
+interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
+  workspaceId: WorkspaceId | null
+  target: WorkspacePaneCommandTarget
+  navigation: PrimaryWindowNavigationActions
+  terminalSessionId: string
+  retirementPresentation: TerminalRetirementPresentationContext
 }
 
 type CloseCurrentWorkspacePaneTabCommandOptions = Omit<CloseWorkspacePaneTabCommandOptions, 'targetIdentity'>
@@ -221,6 +230,19 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
       options.confirmedTerminal.base.presentation.kind === 'git-worktree'
         ? options.confirmedTerminal.base.presentation.head
         : undefined,
+  })
+}
+
+export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
+  options: RetiredTerminalWorkspacePaneTabPresentationCommandOptions,
+): Promise<boolean> {
+  if (!options.workspaceId) return Promise.resolve(false)
+  return dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
+    ...options,
+    ...workspacePaneCommandCoordinates(options.target),
+    routeTarget: workspacePaneCommandRouteTarget(options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
+    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
   })
 }
 

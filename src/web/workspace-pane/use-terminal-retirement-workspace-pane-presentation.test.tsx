@@ -5,391 +5,111 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
-import type { RetiredTerminalWorkspacePaneTabPresentationPlan } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
-import {
-  beginPrimaryWindowNavigationIntent,
-  resetPrimaryWindowNavigationForTest,
-  tryBeginPassivePrimaryWindowNavigationIntent,
-  type PrimaryWindowNavigationIntent,
-} from '#/web/primary-window-navigation-lifecycle.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
   unsubscribe: vi.fn(),
-  capturePresentation: vi.fn(),
-  commitPresentation: vi.fn(),
-  settlePresentation: vi.fn(),
-  projection: {
-    subscribeAcceptedRetirement: vi.fn(),
-  },
+  runPresentation: vi.fn(async () => true),
 }))
 
 vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
-  useTerminalSessionProjection: () => mocks.projection,
+  useTerminalSessionProjection: () => ({
+    subscribeAcceptedRetirement(listener: (retirement: AcceptedTerminalRetirement) => void) {
+      mocks.listener = listener
+      return mocks.unsubscribe
+    },
+  }),
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tab-close-action.ts', () => ({
-  captureRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.capturePresentation,
-  commitRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.commitPresentation,
-  settleRetiredTerminalWorkspacePaneTabPresentationPlan: mocks.settlePresentation,
+vi.mock('#/web/commands/workspace-commands.ts', () => ({
+  runRetiredTerminalWorkspacePaneTabPresentationCommand: mocks.runPresentation,
 }))
 
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-workspace')
-const TERMINAL_SESSION_ID = 'term-111111111111111111111'
-const ROUTE_TARGET = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
-const TERMINAL_ROUTE = { kind: 'terminal' as const, terminalSessionId: TERMINAL_SESSION_ID }
-
-function presentationPlanForTest(): RetiredTerminalWorkspacePaneTabPresentationPlan {
-  return {
-    terminalSessionId: TERMINAL_SESSION_ID,
-    target: {
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: 'runtime-1',
-      routeTarget: ROUTE_TARGET,
-      paneTarget: ROUTE_TARGET,
-    },
-  } as RetiredTerminalWorkspacePaneTabPresentationPlan
-}
-
-function retirementForTest(invalidation = new AbortController()): AcceptedTerminalRetirement {
-  return {
-    terminalSessionId: TERMINAL_SESSION_ID,
-    base: {
-      target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-      presentation: { kind: 'workspace-root' },
-    },
-    retirementPresentation: {
-      target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-      terminalBase: {
-        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-        presentation: { kind: 'workspace-root' },
-      },
-      tabsBeforeRetirement: [],
-    },
-    invalidationSignal: invalidation.signal,
-    settle: vi.fn(),
-    release: vi.fn(),
-    [Symbol.dispose]: vi.fn(),
-  }
-}
-
-async function flushPresentation(): Promise<void> {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-other')
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
-  resetPrimaryWindowNavigationForTest()
   mocks.listener = null
   mocks.unsubscribe.mockReset()
-  mocks.capturePresentation.mockReset()
-  mocks.capturePresentation.mockReturnValue(presentationPlanForTest())
-  mocks.commitPresentation.mockReset()
-  mocks.settlePresentation.mockReset()
-  mocks.commitPresentation.mockImplementation(
-    async (
-      _plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-      _navigation: unknown,
-      intent: PrimaryWindowNavigationIntent,
-    ) => {
-      intent.commit()
-      return { kind: 'committed' }
-    },
-  )
-  mocks.projection.subscribeAcceptedRetirement.mockReset()
-  mocks.projection.subscribeAcceptedRetirement.mockImplementation(
-    (listener: (retirement: AcceptedTerminalRetirement) => void) => {
-      mocks.listener = listener
-      return mocks.unsubscribe
-    },
-  )
+  mocks.runPresentation.mockReset()
+  mocks.runPresentation.mockResolvedValue(true)
 })
 
-function renderPresentationHook() {
-  return renderHook(
-    ({ route }: { route: typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' } }) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: ROUTE_TARGET,
-        currentRouteAuthority: 'ready',
-        currentWorkspacePaneRoute: route,
-        navigation: primaryWindowNavigationActionsForTest(),
-      }),
-    { initialProps: { route: TERMINAL_ROUTE as typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' } } },
-  )
-}
-
-function renderHydratingPresentationHook() {
-  type Props = {
-    target: typeof ROUTE_TARGET | null
-    route: typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' }
+test('routes an accepted current-workspace exit into the presentation command and unsubscribes', async () => {
+  const navigation = primaryWindowNavigationActionsForTest()
+  const target = {
+    routeTarget: {
+      kind: 'git-branch' as const,
+      workspaceId: WORKSPACE_ID,
+      branchName: 'feature/terminal-exit',
+    },
+    workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' },
+    filesystemTarget: null,
   }
-  return renderHook(
-    ({ target, route }: Props) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: target,
-        currentRouteAuthority: 'ready',
-        currentWorkspacePaneRoute: route,
-        navigation: primaryWindowNavigationActionsForTest(),
-      }),
-    { initialProps: { target: null, route: TERMINAL_ROUTE } as Props },
+  const { unmount } = renderHook(() =>
+    useTerminalRetirementWorkspacePanePresentation({
+      currentWorkspaceId: WORKSPACE_ID,
+      currentTarget: target,
+      navigation,
+    }),
   )
-}
-
-function renderAuthorityPresentationHook() {
-  return renderHook(
-    ({ authority }: { authority: 'pending' | 'ready' | 'stale' }) =>
-      useTerminalRetirementWorkspacePanePresentation({
-        currentRouteTarget: ROUTE_TARGET,
-        currentRouteAuthority: authority,
-        currentWorkspacePaneRoute: TERMINAL_ROUTE,
-        navigation: primaryWindowNavigationActionsForTest(),
-      }),
-    { initialProps: { authority: 'pending' as 'pending' | 'ready' | 'stale' } },
-  )
-}
-
-test('captures and commits an accepted active-terminal retirement', async () => {
-  const { unmount } = renderPresentationHook()
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
+  if (!listener) throw new Error('missing accepted-exit listener')
+  const descriptor = {
+    terminalSessionId: 'term-111111111111111111111',
+    index: 1,
+    target: { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
+    presentation: { kind: 'workspace-root' as const },
+  }
+  const retirementPresentation = {
+    target: descriptor.target,
+    terminalBase: { target: descriptor.target, presentation: descriptor.presentation },
+    tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: descriptor.terminalSessionId }],
+  }
 
-  act(() => listener(retirementForTest()))
-  await flushPresentation()
-
-  expect(mocks.capturePresentation).toHaveBeenCalledWith({
-    routeTarget: ROUTE_TARGET,
-    workspacePaneRoute: TERMINAL_ROUTE,
-    terminalSessionId: TERMINAL_SESSION_ID,
-    terminalBase: retirementForTest().base,
-    retirementPresentation: retirementForTest().retirementPresentation,
+  await act(async () => {
+    listener({ terminalSessionId: descriptor.terminalSessionId, retirementPresentation })
+    await Promise.resolve()
   })
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
+
+  expect(mocks.runPresentation).toHaveBeenCalledWith({
+    workspaceId: WORKSPACE_ID,
+    target,
+    navigation,
+    terminalSessionId: descriptor.terminalSessionId,
+    retirementPresentation,
+  })
 
   unmount()
   expect(mocks.unsubscribe).toHaveBeenCalledOnce()
 })
 
-test('retains an accepted retirement until its exact route target hydrates', async () => {
-  const { rerender } = renderHydratingPresentationHook()
+test('ignores an accepted exit from a background workspace', () => {
+  renderHook(() =>
+    useTerminalRetirementWorkspacePanePresentation({
+      currentWorkspaceId: WORKSPACE_ID,
+      currentTarget: null,
+      navigation: primaryWindowNavigationActionsForTest(),
+    }),
+  )
   const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  expect(mocks.capturePresentation).not.toHaveBeenCalled()
-  expect(retirement.settle).not.toHaveBeenCalled()
-
-  rerender({ target: ROUTE_TARGET, route: TERMINAL_ROUTE })
-  await flushPresentation()
-
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-  expect(retirement.settle).toHaveBeenCalledOnce()
-  expect(mocks.settlePresentation).toHaveBeenCalledOnce()
-})
-
-test('retains one captured plan until target authority hydrates', async () => {
-  const { rerender } = renderAuthorityPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-  expect(retirement.settle).not.toHaveBeenCalled()
-
-  rerender({ authority: 'ready' })
-  await flushPresentation()
-
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-  expect(retirement.settle).toHaveBeenCalledOnce()
-  expect(mocks.settlePresentation).toHaveBeenCalledOnce()
-})
-
-test('settles a retained plan only after route authority becomes definitively stale', () => {
-  const { rerender } = renderAuthorityPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-
-  rerender({ authority: 'stale' })
-
-  expect(retirement.settle).toHaveBeenCalledOnce()
-  expect(mocks.settlePresentation).toHaveBeenCalledOnce()
-})
-
-test('retains a plan when tabs authority becomes pending and retries when its projection publishes', async () => {
-  mocks.commitPresentation.mockImplementationOnce(async () => ({ kind: 'pending' }))
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  await flushPresentation()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-  expect(retirement.settle).not.toHaveBeenCalled()
+  if (!listener) throw new Error('missing accepted-exit listener')
 
   act(() => {
-    writeWorkspacePaneTabsSnapshotQueryData(WORKSPACE_ID, 'runtime-1', { revision: 1, entries: [] })
+    listener({
+      terminalSessionId: 'term-222222222222222222222',
+      retirementPresentation: {
+        target: { kind: 'workspace-root', workspaceId: OTHER_WORKSPACE_ID, workspaceRuntimeId: 'runtime-2' },
+        terminalBase: {
+          target: { kind: 'workspace-root', workspaceId: OTHER_WORKSPACE_ID, workspaceRuntimeId: 'runtime-2' },
+          presentation: { kind: 'workspace-root' },
+        },
+        tabsBeforeRetirement: [],
+      },
+    })
   })
-  await flushPresentation()
 
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).toHaveBeenCalledTimes(2)
-  expect(retirement.settle).toHaveBeenCalledOnce()
-})
-
-test('settles an awaiting-target retirement when the route definitively leaves its terminal', () => {
-  const { rerender } = renderHydratingPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  rerender({ target: null, route: { kind: 'static', tab: 'files' } })
-
-  expect(mocks.capturePresentation).not.toHaveBeenCalled()
-  expect(retirement.settle).toHaveBeenCalledOnce()
-})
-
-test('waits for an admitted user command before admitting passive close-back', async () => {
-  const userIntent = beginPrimaryWindowNavigationIntent('user')
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-
-  act(() => listener(retirementForTest()))
-  await flushPresentation()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-
-  act(() => userIntent.release())
-  await flushPresentation()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-})
-
-test('abandons a waiting retirement when catalog reconciliation invalidates its lease', async () => {
-  const userIntent = beginPrimaryWindowNavigationIntent('user')
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const invalidation = new AbortController()
-  const retirement = retirementForTest(invalidation)
-
-  act(() => listener(retirement))
-  await flushPresentation()
-  act(() => invalidation.abort())
-
-  expect(retirement.settle).not.toHaveBeenCalled()
-  expect(mocks.settlePresentation).not.toHaveBeenCalled()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-  act(() => userIntent.release())
-  await flushPresentation()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-})
-
-test('abandons a waiting plan immediately when its exact source route changes', async () => {
-  const userIntent = beginPrimaryWindowNavigationIntent('user')
-  const { rerender } = renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  await flushPresentation()
-  rerender({ route: { kind: 'static', tab: 'files' } })
-
-  expect(retirement.settle).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-  act(() => userIntent.release())
-  await flushPresentation()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
-})
-
-test('retries a passive presentation superseded by a user intent after that user settles', async () => {
-  const firstCommit = Promise.withResolvers<{ kind: 'abandoned' }>()
-  mocks.commitPresentation.mockImplementationOnce(async () => await firstCommit.promise)
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-
-  act(() => listener(retirementForTest()))
-  await flushPresentation()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-
-  const userIntent = beginPrimaryWindowNavigationIntent('user')
-  firstCommit.resolve({ kind: 'abandoned' })
-  await flushPresentation()
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-
-  act(() => userIntent.release())
-  await flushPresentation()
-  expect(mocks.commitPresentation).toHaveBeenCalledTimes(2)
-})
-
-test('does not retry a passive navigation that failed without being superseded', async () => {
-  mocks.commitPresentation.mockImplementationOnce(
-    async (
-      _plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-      _navigation: unknown,
-      intent: PrimaryWindowNavigationIntent,
-    ) => {
-      intent.fail(new Error('blocked'))
-      return { kind: 'abandoned' }
-    },
-  )
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-
-  act(() => listener(retirementForTest()))
-  await flushPresentation()
-
-  expect(mocks.commitPresentation).toHaveBeenCalledOnce()
-  const next = tryBeginPassivePrimaryWindowNavigationIntent()
-  expect(next.kind).toBe('admitted')
-  if (next.kind === 'admitted') next.intent.release()
-})
-
-test('unmount abandons an active passive intent and ignores its late completion', async () => {
-  const commit = Promise.withResolvers<{ kind: 'committed' }>()
-  mocks.commitPresentation.mockImplementationOnce(async () => await commit.promise)
-  const { unmount } = renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-
-  act(() => listener(retirementForTest()))
-  await flushPresentation()
-  unmount()
-  commit.resolve({ kind: 'committed' })
-  await flushPresentation()
-
-  const next = tryBeginPassivePrimaryWindowNavigationIntent()
-  expect(next.kind).toBe('admitted')
-  if (next.kind === 'admitted') next.intent.release()
-})
-
-test('ignores an accepted retirement that cannot produce an active-route plan', () => {
-  mocks.capturePresentation.mockReturnValue(null)
-  renderPresentationHook()
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-
-  act(() => listener(retirementForTest()))
-
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).not.toHaveBeenCalled()
+  expect(mocks.runPresentation).not.toHaveBeenCalled()
 })

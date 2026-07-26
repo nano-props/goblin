@@ -28,19 +28,6 @@ import {
 } from '#/shared/app-realtime-validators.ts'
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
-function terminalRetirementPresentationForTest() {
-  const target = {
-    kind: 'workspace-root' as const,
-    workspaceId: 'goblin+file:///workspace',
-    workspaceRuntimeId: 'workspace-runtime-test',
-  }
-  return {
-    target,
-    terminalBase: { target, presentation: { kind: 'workspace-root' as const } },
-    tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: 'term-retiring' }],
-  }
-}
-
 describe('shared terminal validators', () => {
   test('constrains trusted terminal measurements to protocol bounds', () => {
     expect(constrainTerminalSize(700, 400)).toEqual({ cols: 500, rows: 300 })
@@ -632,7 +619,6 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-exit-1111111111111111',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
-          catalogRevision: 1,
           retirementPresentation: null,
         },
       },
@@ -665,7 +651,6 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-closed-11111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        catalogRevision: 1,
         retirementPresentation: null,
       },
     ]
@@ -1395,7 +1380,6 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        catalogRevision: 1,
         retirementPresentation: null,
       }),
     ).toEqual({
@@ -1405,7 +1389,6 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      catalogRevision: 1,
       retirementPresentation: null,
     })
     expect(
@@ -1415,84 +1398,51 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: 'repo-runtime-test',
-        catalogRevision: 1,
-        retirementPresentation: null,
         worktreePath: '/repo/worktree',
       }),
     ).toBeNull()
   })
 
-  test('rejects exit retirement presentations whose target or event scope disagrees with the terminal base', () => {
-    const retirementPresentation = terminalRetirementPresentationForTest()
-    const message = {
-      type: 'exit' as const,
-      event: {
-        terminalRuntimeSessionId: 'pty_retirement_exit',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-retirement-exit',
-        workspaceId: retirementPresentation.terminalBase.target.workspaceId,
-        workspaceRuntimeId: retirementPresentation.terminalBase.target.workspaceRuntimeId,
-        catalogRevision: 1,
-        retirementPresentation,
+  test('rejects retirement presentation target mismatches', () => {
+    const retirementPresentation = {
+      target: {
+        kind: 'workspace-root',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
       },
+      terminalBase: {
+        target: {
+          kind: 'workspace-root',
+          workspaceId: 'goblin+file:///other',
+          workspaceRuntimeId: 'other-runtime-test',
+        },
+        presentation: { kind: 'workspace-root' },
+      },
+      tabsBeforeRetirement: [],
     }
-
-    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
     expect(
       normalizeTerminalRealtimeMessage({
-        ...message,
+        type: 'exit',
         event: {
-          ...message.event,
-          retirementPresentation: {
-            ...retirementPresentation,
-            target: { ...retirementPresentation.target, workspaceId: 'goblin+file:///different-workspace' },
-          },
+          terminalRuntimeSessionId: 'pty_retirement_mismatch',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-retirement-mismatch',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          retirementPresentation,
         },
       }),
     ).toBeNull()
     expect(
       normalizeTerminalRealtimeMessage({
-        ...message,
-        event: { ...message.event, workspaceId: 'goblin+file:///different-workspace' },
+        type: 'session-closed',
+        terminalRuntimeSessionId: 'pty_retirement_mismatch',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-retirement-mismatch',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        retirementPresentation,
       }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalRealtimeMessage({
-        ...message,
-        event: { ...message.event, workspaceRuntimeId: 'different-workspace-runtime' },
-      }),
-    ).toBeNull()
-  })
-
-  test('rejects session-closed retirement presentations whose target or event scope disagrees with the terminal base', () => {
-    const retirementPresentation = terminalRetirementPresentationForTest()
-    const message = {
-      type: 'session-closed' as const,
-      terminalRuntimeSessionId: 'pty_retirement_close',
-      terminalRuntimeGeneration: 1,
-      terminalSessionId: 'term-retirement-close',
-      workspaceId: retirementPresentation.terminalBase.target.workspaceId,
-      workspaceRuntimeId: retirementPresentation.terminalBase.target.workspaceRuntimeId,
-      catalogRevision: 1,
-      retirementPresentation,
-    }
-
-    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
-    expect(
-      normalizeTerminalRealtimeMessage({
-        ...message,
-        retirementPresentation: {
-          ...retirementPresentation,
-          target: { ...retirementPresentation.target, workspaceId: 'goblin+file:///different-workspace' },
-        },
-      }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalRealtimeMessage({ ...message, workspaceId: 'goblin+file:///different-workspace' }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalRealtimeMessage({ ...message, workspaceRuntimeId: 'different-workspace-runtime' }),
     ).toBeNull()
   })
 
@@ -1660,7 +1610,6 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
-        catalogRevision: 1,
         retirementPresentation: null,
       },
     }
@@ -1672,7 +1621,6 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
-        catalogRevision: 1,
         retirementPresentation: null,
       },
     })

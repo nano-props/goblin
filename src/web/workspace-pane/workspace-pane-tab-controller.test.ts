@@ -3,7 +3,6 @@ import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneControllerCloseBackTarget,
-  commitWorkspacePaneControllerCloseBackTargetOutcome,
   commitWorkspacePaneControllerRoute,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
@@ -32,9 +31,8 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { beginPrimaryWindowNavigationIntent } from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
@@ -136,7 +134,7 @@ describe('workspace pane tab controller transactions', () => {
         authority: { kind: 'workspace-runtime' },
       },
       { kind: 'static', tab: 'files' },
-      expect.objectContaining({ navigationIntent: expect.objectContaining({ generation: expect.any(Number) }) }),
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
@@ -169,7 +167,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         {
-          navigationIntent: beginPrimaryWindowNavigationIntent('user'),
+          navigationGeneration: beginPrimaryWindowNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -187,14 +185,9 @@ describe('workspace pane tab controller transactions', () => {
       selectWorkspacePaneControllerTab(
         workspacePaneTarget(),
         terminalTab(),
-        controllerNavigation({
-          commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
-            options?.onAbandon?.()
-            return false
-          }),
-        }),
+        controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => false) }),
         {
-          navigationIntent: beginPrimaryWindowNavigationIntent('user'),
+          navigationGeneration: beginPrimaryWindowNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -205,15 +198,15 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons provided terminal focus before rejecting a stale presentation', async () => {
-    const staleIntent = beginPrimaryWindowNavigationIntent('user')
-    beginPrimaryWindowNavigationIntent('user')
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const navigation = controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => true) })
 
     await expect(
       selectWorkspacePaneControllerTab(workspacePaneTarget(), terminalTab(), navigation, {
-        navigationIntent: staleIntent,
+        navigationGeneration: staleGeneration,
         focusEffects: { onCommit, onAbandon },
       }),
     ).resolves.toBe(false)
@@ -224,8 +217,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('does not create a replacement worktree presentation after the queued generation is superseded', async () => {
-    const supersededIntent = beginPrimaryWindowNavigationIntent('user')
-    beginPrimaryWindowNavigationIntent('user')
+    const supersededGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const target = {
       ...workspacePaneTarget(),
@@ -244,7 +237,7 @@ describe('workspace pane tab controller transactions', () => {
         target,
         workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
-        supersededIntent,
+        supersededGeneration,
       ),
     ).resolves.toBe(false)
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
@@ -292,14 +285,12 @@ describe('workspace pane tab controller transactions', () => {
     ).toBe('terminal')
   })
 
-  test('keeps a completed history navigation committed after its runtime is replaced', async () => {
+  test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
-      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
-        const committed = await commit.promise
-        if (committed) options?.onCommit?.()
-        else options?.onAbandon?.()
-        return committed
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+        options?.onCommit?.()
+        return commit.promise
       }),
     }
     const completion = commitWorkspacePaneExactTargetRoute(
@@ -315,7 +306,7 @@ describe('workspace pane tab controller transactions', () => {
       },
     }))
     commit.resolve(true)
-    await expect(completion).resolves.toBe(true)
+    await expect(completion).resolves.toBe(false)
   })
 
   test('propagates an unexpected navigation failure', async () => {
@@ -326,8 +317,7 @@ describe('workspace pane tab controller transactions', () => {
         SOURCE_ROUTE,
         TARGET_ROUTE,
         {
-          commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
-            options?.onAbandon?.()
+          commitWorkspacePaneRoute: vi.fn(async () => {
             throw new Error('router failed')
           }),
         },
@@ -361,8 +351,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons a stale navigation generation exactly once without invoking navigation', async () => {
-    const staleIntent = beginPrimaryWindowNavigationIntent('user')
-    beginPrimaryWindowNavigationIntent('user')
+    const staleGeneration = beginPrimaryWindowNavigation()
+    beginPrimaryWindowNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const commitWorkspacePaneRoute = vi.fn(async () => true)
@@ -374,7 +364,7 @@ describe('workspace pane tab controller transactions', () => {
         TARGET_ROUTE,
         { commitWorkspacePaneRoute },
         { onCommit, onAbandon },
-        staleIntent,
+        staleGeneration,
       ),
     ).resolves.toBe(false)
 
@@ -383,14 +373,12 @@ describe('workspace pane tab controller transactions', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('keeps a completed history navigation committed when the target worktree changes in flight', async () => {
+  test('rejects completion when the target worktree changes while navigation settles', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
-      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
-        const committed = await commit.promise
-        if (committed) options?.onCommit?.()
-        else options?.onAbandon?.()
-        return committed
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+        options?.onCommit?.()
+        return commit.promise
       }),
     }
     const completion = commitWorkspacePaneExactTargetRoute(
@@ -407,32 +395,7 @@ describe('workspace pane tab controller transactions', () => {
     })
     commit.resolve(true)
 
-    await expect(completion).resolves.toBe(true)
-  })
-
-  test('commits pane presentation inside navigation-intent settlement', async () => {
-    const sequence: string[] = []
-    const intent = beginPrimaryWindowNavigationIntent('user')
-    const navigation: WorkspacePaneRouteCommitNavigation = {
-      commitWorkspacePaneRoute: vi.fn(async (_workspaceId, _branchName, _route, options) => {
-        options?.navigationIntent?.commit(options.onCommit)
-        sequence.push('new navigation')
-        beginPrimaryWindowNavigationIntent('user').release()
-        return true
-      }),
-    }
-
-    await expect(
-      commitWorkspacePaneExactTargetRoute(
-        workspacePaneTarget(),
-        SOURCE_ROUTE,
-        TARGET_ROUTE,
-        navigation,
-        { onCommit: () => sequence.push('presentation') },
-        intent,
-      ),
-    ).resolves.toBe(true)
-    expect(sequence).toEqual(['presentation', 'new navigation'])
+    await expect(completion).resolves.toBe(false)
   })
 
   test('invalidates a worktree target when Git capability is removed from the same runtime', () => {
@@ -466,66 +429,7 @@ describe('workspace pane tab controller transactions', () => {
       workspacePaneRoute: SOURCE_ROUTE,
     })
     if (!lease) throw new Error('missing presentation lease')
-    const navigation = committingNavigation()
-    await expect(commitWorkspacePaneControllerCloseBackTarget(lease, navigation)).resolves.toBe(true)
-    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      WORKSPACE_ID,
-      'feature/a',
-      { kind: 'static', tab: 'status' },
-      expect.objectContaining({ replace: true, routePrecondition: { kind: 'exact-route', route: SOURCE_ROUTE } }),
-    )
-  })
-
-  test('does not navigate when authority becomes pending before close-back admission', async () => {
-    const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
-      target: workspacePaneTarget(),
-      closingEntry: workspacePaneStaticTabEntry('files'),
-      nextEntry: workspacePaneStaticTabEntry('status'),
-      workspacePaneRoute: SOURCE_ROUTE,
-    })
-    if (!lease) throw new Error('missing presentation lease')
-    const queryKey = repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', null, 'full')
-    const projection = primaryWindowQueryClient.getQueryData(queryKey)
-    if (!projection) throw new Error('missing repo projection fixture')
-    const originalIsCurrent = lease.navigationIntent.isCurrent.bind(lease.navigationIntent)
-    lease.navigationIntent.isCurrent = () => {
-      primaryWindowQueryClient.removeQueries({ queryKey })
-      return originalIsCurrent()
-    }
-    const navigation = committingNavigation()
-    const outcome = commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)
-    primaryWindowQueryClient.setQueryData(queryKey, projection)
-
-    await expect(outcome).resolves.toEqual({ kind: 'pending' })
-    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    lease.navigationIntent.release()
-  })
-
-  test('does not reinterpret committed history when presentation authority changes in flight', async () => {
-    let presentationCurrentness: 'current' | 'pending' = 'current'
-    let currentHref = '/workspace/example/branch/feature-a/terminal/term-1'
-    const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
-      target: workspacePaneTarget(),
-      closingEntry: workspacePaneStaticTabEntry('files'),
-      nextEntry: workspacePaneStaticTabEntry('status'),
-      workspacePaneRoute: SOURCE_ROUTE,
-      presentationCurrentness: () => presentationCurrentness,
-    })
-    if (!lease) throw new Error('missing presentation lease')
-    const navigation = controllerNavigation({
-      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
-        currentHref = '/workspace/example/branch/feature-a/tab/status'
-        presentationCurrentness = 'pending'
-        options?.onCommit?.()
-        return true
-      }),
-    })
-
-    await expect(commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)).resolves.toEqual({
-      kind: 'committed',
-    })
-    expect(currentHref).toBe('/workspace/example/branch/feature-a/tab/status')
-    lease.navigationIntent.release()
+    await expect(commitWorkspacePaneControllerCloseBackTarget(lease, committingNavigation())).resolves.toBe(true)
   })
 })
 
