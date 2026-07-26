@@ -1,5 +1,5 @@
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
@@ -35,7 +35,6 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import type { TerminalRetirementPresentationContext } from '#/shared/terminal-types.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -86,11 +85,10 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
 }
 
 interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
-  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   terminalSessionId: string
-  retirementPresentation: TerminalRetirementPresentationContext
+  tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
 type CloseCurrentWorkspacePaneTabCommandOptions = Omit<CloseWorkspacePaneTabCommandOptions, 'targetIdentity'>
@@ -236,12 +234,12 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
 export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
   options: RetiredTerminalWorkspacePaneTabPresentationCommandOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId) return Promise.resolve(false)
   return dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
     ...options,
+    workspaceId: options.target.routeTarget.workspaceId,
     ...workspacePaneCommandCoordinates(options.target),
     routeTarget: workspacePaneCommandRouteTarget(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.target.routeTarget.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
   })
 }

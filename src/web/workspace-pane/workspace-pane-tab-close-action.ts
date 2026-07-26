@@ -5,7 +5,6 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
-  type TerminalRetirementPresentationContext,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import {
@@ -40,7 +39,6 @@ import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/works
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
-  runtimeWorkspacePaneTargetKey,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import {
@@ -86,14 +84,14 @@ export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends Close
 }
 
 export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
-  workspaceId: WorkspaceId | null
+  workspaceId: WorkspaceId
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   navigation: PrimaryWindowNavigationActions
   terminalSessionId: string
-  retirementPresentation: TerminalRetirementPresentationContext
+  tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
 type CloseWorkspacePaneTabActionStart =
@@ -170,7 +168,6 @@ async function closeWorkspacePaneTabAction(
 export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   options: RetiredTerminalWorkspacePaneTabPresentationOptions,
 ): Promise<boolean> {
-  const { terminalBase, tabsBeforeRetirement } = options.retirementPresentation
   if (
     options.workspacePaneRoute?.kind !== 'terminal' ||
     options.workspacePaneRoute.terminalSessionId !== options.terminalSessionId
@@ -178,11 +175,10 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
     return Promise.resolve(false)
   }
   const target = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
-  if (!target || !terminalBaseMatchesPaneTarget(terminalBase, target)) return Promise.resolve(false)
-  const closingIdentity = workspacePaneRuntimeTabConfirmedCloseIdentity({
+  if (!target) return Promise.resolve(false)
+  const closingIdentity = workspacePaneTabEntryIdentity({
     type: 'terminal',
-    sessionId: options.terminalSessionId,
-    target: terminalBase,
+    runtimeSessionId: options.terminalSessionId,
   })
   const navigationGeneration = captureUnownedPrimaryWindowNavigationGeneration()
   if (navigationGeneration === null) {
@@ -195,7 +191,7 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
     options.workspacePaneRoute,
     closingIdentity,
     navigationGeneration,
-    tabsBeforeRetirement,
+    options.tabsBeforeRetirement,
   )
   completeWorkspacePaneTabClose(target, closingIdentity)
   const presentationLease = transition.presentationLease
@@ -366,12 +362,6 @@ function workspacePaneCloseTransition(
       })
     : null
   return { wasActive, nextEntry, presentationLease }
-}
-
-function terminalBaseMatchesPaneTarget(base: TerminalSessionBase, target: WorkspacePaneTabModel): boolean {
-  const targetBase = workspacePaneTerminalBaseForTabModel(target)
-  if (!targetBase) return false
-  return runtimeWorkspacePaneTargetKey(base.target) === runtimeWorkspacePaneTargetKey(targetBase.target)
 }
 
 function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {

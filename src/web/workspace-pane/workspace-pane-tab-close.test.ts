@@ -667,7 +667,7 @@ test('presents a naturally exited terminal from the server-captured before-state
     ...paneTarget,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     // The local query may already contain the reconciled after-state. The
-    // close-back decision comes from retirementPresentation below.
+    // close-back decision comes from tabsBeforeRetirement below.
     tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
   })
   const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID)
@@ -717,15 +717,11 @@ test('presents a naturally exited terminal from the server-captured before-state
       paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
       terminalSessionId,
-      retirementPresentation: {
-        target: runtimeTarget,
-        terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-        tabsBeforeRetirement: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
-          workspacePaneStaticTabEntry('files'),
-        ],
-      },
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('files'),
+      ],
     }),
   ).resolves.toBe(true)
 
@@ -752,15 +748,11 @@ test('presents a naturally exited terminal from the server-captured before-state
       paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute: passiveCommit }),
       terminalSessionId,
-      retirementPresentation: {
-        target: runtimeTarget,
-        terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-        tabsBeforeRetirement: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
-          workspacePaneStaticTabEntry('files'),
-        ],
-      },
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('files'),
+      ],
     }),
   ).resolves.toBe(false)
 
@@ -794,14 +786,10 @@ test('does not navigate when a background terminal exits naturally', async () =>
       paneTarget,
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
       terminalSessionId,
-      retirementPresentation: {
-        target: runtimeTarget,
-        terminalBase: { target: runtimeTarget, presentation: { kind: 'workspace-root' } },
-        tabsBeforeRetirement: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
-        ],
-      },
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+      ],
     }),
   ).resolves.toBe(false)
 

@@ -28,7 +28,6 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
 import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-workspace')
-const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/terminal-exit-presentation-other')
 
 beforeEach(() => {
   mocks.listener = null
@@ -50,46 +49,34 @@ test('routes an accepted current-workspace exit into the presentation command an
   }
   const { unmount } = renderHook(() =>
     useTerminalRetirementWorkspacePanePresentation({
-      currentWorkspaceId: WORKSPACE_ID,
       currentTarget: target,
       navigation,
     }),
   )
   const listener = mocks.listener
   if (!listener) throw new Error('missing accepted-exit listener')
-  const descriptor = {
-    terminalSessionId: 'term-111111111111111111111',
-    index: 1,
-    target: { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-1' },
-    presentation: { kind: 'workspace-root' as const },
-  }
-  const retirementPresentation = {
-    target: descriptor.target,
-    terminalBase: { target: descriptor.target, presentation: descriptor.presentation },
-    tabsBeforeRetirement: [{ type: 'terminal' as const, runtimeSessionId: descriptor.terminalSessionId }],
-  }
+  const terminalSessionId = 'term-111111111111111111111'
+  const tabsBeforeRetirement = [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }]
 
   await act(async () => {
-    listener({ terminalSessionId: descriptor.terminalSessionId, retirementPresentation })
+    listener({ terminalSessionId, tabsBeforeRetirement })
     await Promise.resolve()
   })
 
   expect(mocks.runPresentation).toHaveBeenCalledWith({
-    workspaceId: WORKSPACE_ID,
     target,
     navigation,
-    terminalSessionId: descriptor.terminalSessionId,
-    retirementPresentation,
+    terminalSessionId,
+    tabsBeforeRetirement,
   })
 
   unmount()
   expect(mocks.unsubscribe).toHaveBeenCalledOnce()
 })
 
-test('ignores an accepted exit from a background workspace', () => {
+test('ignores an accepted exit without a current command target', () => {
   renderHook(() =>
     useTerminalRetirementWorkspacePanePresentation({
-      currentWorkspaceId: WORKSPACE_ID,
       currentTarget: null,
       navigation: primaryWindowNavigationActionsForTest(),
     }),
@@ -100,14 +87,7 @@ test('ignores an accepted exit from a background workspace', () => {
   act(() => {
     listener({
       terminalSessionId: 'term-222222222222222222222',
-      retirementPresentation: {
-        target: { kind: 'workspace-root', workspaceId: OTHER_WORKSPACE_ID, workspaceRuntimeId: 'runtime-2' },
-        terminalBase: {
-          target: { kind: 'workspace-root', workspaceId: OTHER_WORKSPACE_ID, workspaceRuntimeId: 'runtime-2' },
-          presentation: { kind: 'workspace-root' },
-        },
-        tabsBeforeRetirement: [],
-      },
+      tabsBeforeRetirement: [],
     })
   })
 

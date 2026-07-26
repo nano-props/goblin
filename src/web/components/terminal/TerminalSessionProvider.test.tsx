@@ -334,7 +334,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalSessionId,
     workspaceId: REPO_ID,
     workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
-    retirementPresentation: null,
+    tabsBeforeRetirement: null,
   }
 }
 
@@ -1274,7 +1274,7 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: REPO_ID,
           workspaceRuntimeId: 'repo-runtime-test',
-          retirementPresentation: null,
+          tabsBeforeRetirement: null,
         })
       })
 

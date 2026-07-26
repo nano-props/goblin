@@ -3556,7 +3556,7 @@ describe('TerminalSession', () => {
         terminalSessionId: 'term-999999999999999999999',
         workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       }),
     ).toBe(false)
     expect(
@@ -3566,7 +3566,7 @@ describe('TerminalSession', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       }),
     ).toBe(true)
     session.dispose()

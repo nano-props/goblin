@@ -1,7 +1,6 @@
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneFilesystemExecutionPath,
-  type RuntimeWorkspacePaneTarget,
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -402,14 +401,8 @@ export interface TerminalExitEvent {
   terminalSessionId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  retirementPresentation: TerminalRetirementPresentationContext | null
-}
-
-/** Canonical pane state captured before terminal membership is retired. */
-export interface TerminalRetirementPresentationContext {
-  target: RuntimeWorkspacePaneTarget
-  terminalBase: TerminalSessionBase
-  tabsBeforeRetirement: WorkspacePaneTabEntry[]
+  /** Canonical pane membership captured before terminal retirement. */
+  tabsBeforeRetirement: WorkspacePaneTabEntry[] | null
 }
 
 export type TerminalSessionClosedEvent = TerminalExitEvent

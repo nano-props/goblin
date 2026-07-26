@@ -276,7 +276,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         terminalSessionId: session.terminalSessionId,
         workspaceId: terminalSessionCoordinates(session).workspaceId,
         workspaceRuntimeId: terminalSessionCoordinates(session).workspaceRuntimeId,
-        retirementPresentation: outcome.retirementPresentation,
+        tabsBeforeRetirement: outcome.tabsBeforeRetirement,
       })
     }
     return outcome

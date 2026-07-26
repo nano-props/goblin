@@ -545,7 +545,6 @@ function AuthenticatedWorkspaceSideEffects({
 }): null {
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useTerminalRetirementWorkspacePanePresentation({
-    currentWorkspaceId: hydratedRouteWorkspaceId,
     currentTarget: currentWorkspacePaneCommandTarget,
     navigation,
   })

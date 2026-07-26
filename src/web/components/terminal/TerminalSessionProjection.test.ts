@@ -10,10 +10,10 @@ import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
 import type {
-  TerminalRetirementPresentationContext,
   TerminalSessionClosedEvent,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -64,7 +64,7 @@ function sessionClosedEvent(
   terminalRuntimeSessionId: string,
   terminalRuntimeGeneration: number,
   terminalSessionId: string,
-  retirementPresentation: TerminalRetirementPresentationContext | null = null,
+  tabsBeforeRetirement: WorkspacePaneTabEntry[] | null = null,
 ): TerminalSessionClosedEvent {
   return {
     terminalRuntimeSessionId,
@@ -72,22 +72,15 @@ function sessionClosedEvent(
     terminalSessionId,
     workspaceId: REPO_ROOT,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    retirementPresentation,
+    tabsBeforeRetirement,
   }
 }
 
-function retirementPresentation(terminalSessionId: string) {
-  return {
-    target: RUNTIME_TARGET,
-    terminalBase: {
-      target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
-    },
-    tabsBeforeRetirement: [
-      { type: 'files' as const, tabId: 'workspace-pane:files' as const },
-      { type: 'terminal' as const, runtimeSessionId: terminalSessionId },
-    ],
-  }
+function tabsBeforeRetirement(terminalSessionId: string) {
+  return [
+    { type: 'files' as const, tabId: 'workspace-pane:files' as const },
+    { type: 'terminal' as const, runtimeSessionId: terminalSessionId },
+  ]
 }
 
 function requiredWorkspaceLocator(input: string) {
@@ -305,7 +298,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
       expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
@@ -371,7 +364,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
 
       projection.reconcileServerSessionsSnapshot(
@@ -429,10 +422,11 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('event dispatch', () => {
-    test('publishes server retirement before-state when the local session is already absent', () => {
+    test('does not publish retirement presentation without an active local binding', () => {
       const terminalSessionId = 'term-111111111111111111111'
       const listener = vi.fn()
       projection.subscribeAcceptedRetirement(listener)
+      const presentation = tabsBeforeRetirement(terminalSessionId)
 
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_absent_aaaaaa',
@@ -440,13 +434,13 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: retirementPresentation(terminalSessionId),
+        tabsBeforeRetirement: presentation,
       })
+      projection.handleSessionClosed(
+        sessionClosedEvent('pty_session_absent_aaaaaa', 1, terminalSessionId, presentation),
+      )
 
-      expect(listener).toHaveBeenCalledWith({
-        terminalSessionId,
-        retirementPresentation: retirementPresentation(terminalSessionId),
-      })
+      expect(listener).not.toHaveBeenCalled()
     })
 
     test('publishes an accepted PTY exit before removing its local session projection', () => {
@@ -460,7 +454,7 @@ describe('TerminalSessionProjection', () => {
       const observedCounts: number[] = []
       const offExit = projection.subscribeAcceptedRetirement((retirement) => {
         expect(retirement.terminalSessionId).toBe(terminalSessionId)
-        expect(retirement.retirementPresentation.terminalBase.target).toEqual(RUNTIME_TARGET)
+        expect(retirement.tabsBeforeRetirement).toEqual(tabsBeforeRetirement(terminalSessionId))
         observedCounts.push(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count)
       })
 
@@ -470,7 +464,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: retirementPresentation(terminalSessionId),
+        tabsBeforeRetirement: tabsBeforeRetirement(terminalSessionId),
       })
 
       expect(observedCounts).toEqual([1])
@@ -519,7 +513,7 @@ describe('TerminalSessionProjection', () => {
         ...contradictoryIdentity,
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
       projection.handleIdentity({
         ...contradictoryIdentity,
@@ -738,7 +732,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-unroutedunroutedroute',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
 
@@ -749,7 +743,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-unroutedunroutedroute',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
@@ -804,7 +798,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
@@ -1001,7 +995,7 @@ describe('TerminalSessionProjection', () => {
           'pty_session_1_aaaaaaaaa',
           1,
           'term-111111111111111111111',
-          retirementPresentation('term-111111111111111111111'),
+          tabsBeforeRetirement('term-111111111111111111111'),
         ),
       )
 
@@ -1526,7 +1520,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      retirementPresentation: null,
+      tabsBeforeRetirement: null,
     })
 
     expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
@@ -1619,7 +1613,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      retirementPresentation: null,
+      tabsBeforeRetirement: null,
     })
 
     localProjection.reconcileServerSessions(
@@ -1653,7 +1647,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      retirementPresentation: null,
+      tabsBeforeRetirement: null,
     })
     localProjection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -1686,7 +1680,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       terminalSessionId,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      retirementPresentation: null,
+      tabsBeforeRetirement: null,
     })
     localProjection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -1753,7 +1747,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     terminalSessionId,
     workspaceId: REPO_ROOT,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    retirementPresentation: null,
+    tabsBeforeRetirement: null,
   })
 
   function transitioningProjection(): { projection: TerminalSessionProjection; session: any } {

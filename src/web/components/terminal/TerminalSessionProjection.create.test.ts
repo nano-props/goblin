@@ -3,9 +3,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type {
   TerminalCreateResult,
-  TerminalRetirementPresentationContext,
   TerminalSessionClosedEvent,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
@@ -180,7 +180,7 @@ function sessionClosedEvent(
   terminalRuntimeSessionId: string,
   terminalRuntimeGeneration: number,
   terminalSessionId: string,
-  retirementPresentation: TerminalRetirementPresentationContext | null = null,
+  tabsBeforeRetirement: WorkspacePaneTabEntry[] | null = null,
 ): TerminalSessionClosedEvent {
   return {
     terminalRuntimeSessionId,
@@ -188,7 +188,7 @@ function sessionClosedEvent(
     terminalSessionId,
     workspaceId: REPO_ROOT,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    retirementPresentation,
+    tabsBeforeRetirement,
   }
 }
 

@@ -7,7 +7,6 @@ import type {
   TerminalSocketServerMessage,
 } from '#/shared/terminal-socket.ts'
 import {
-  terminalSessionBase,
   type TerminalControllerStatus,
   type TerminalCreateResult,
   type TerminalNotifyBellInput,
@@ -22,12 +21,10 @@ import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
-  RuntimeWorkspacePaneTargetSchema,
   WorkspacePaneFilesystemExecutionTargetSchema,
   WorkspacePaneTabEntrySchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
-import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -153,7 +150,6 @@ const TerminalSessionBaseSchema = v.pipe(
     presentation: TerminalPresentationSchema,
   }),
   v.check((base) => base.target.kind === base.presentation.kind, 'Terminal target and presentation disagree'),
-  v.transform((base) => terminalSessionBase(base.target, base.presentation)),
 )
 const TerminalNotifyBellInputSchema = v.strictObject({
   title: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
@@ -340,54 +336,23 @@ const TerminalTitleEventSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,
   canonicalTitle: v.nullable(v.string()),
 })
-const TerminalRetirementPresentationContextSchema = v.pipe(
-  v.strictObject({
-    target: RuntimeWorkspacePaneTargetSchema,
-    terminalBase: TerminalSessionBaseSchema,
-    tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
-  }),
-  v.check(
-    (context) =>
-      runtimeWorkspacePaneTargetKey(context.target) === runtimeWorkspacePaneTargetKey(context.terminalBase.target),
-    'Terminal retirement presentation target disagrees with terminal base',
-  ),
-)
-
-const TerminalExitEventSchema = v.pipe(
-  v.strictObject({
-    terminalRuntimeSessionId: v.string(),
-    terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
-    terminalSessionId: v.string(),
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    retirementPresentation: v.nullable(TerminalRetirementPresentationContextSchema),
-  }),
-  v.check(
-    (event) =>
-      !event.retirementPresentation ||
-      (event.workspaceId === event.retirementPresentation.terminalBase.target.workspaceId &&
-        event.workspaceRuntimeId === event.retirementPresentation.terminalBase.target.workspaceRuntimeId),
-    'Terminal retirement presentation scope disagrees with event',
-  ),
-)
-const TerminalSessionClosedEventSchema = v.pipe(
-  v.strictObject({
-    type: v.literal('session-closed'),
-    terminalRuntimeSessionId: v.string(),
-    terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
-    terminalSessionId: v.string(),
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    retirementPresentation: v.nullable(TerminalRetirementPresentationContextSchema),
-  }),
-  v.check(
-    (event) =>
-      !event.retirementPresentation ||
-      (event.workspaceId === event.retirementPresentation.terminalBase.target.workspaceId &&
-        event.workspaceRuntimeId === event.retirementPresentation.terminalBase.target.workspaceRuntimeId),
-    'Terminal retirement presentation scope disagrees with event',
-  ),
-)
+const TerminalExitEventSchema = v.strictObject({
+  terminalRuntimeSessionId: v.string(),
+  terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
+  terminalSessionId: v.string(),
+  workspaceId: WorkspaceIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  tabsBeforeRetirement: v.nullable(v.array(WorkspacePaneTabEntrySchema)),
+})
+const TerminalSessionClosedEventSchema = v.strictObject({
+  type: v.literal('session-closed'),
+  terminalRuntimeSessionId: v.string(),
+  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
+  terminalSessionId: v.string(),
+  workspaceId: WorkspaceIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  tabsBeforeRetirement: v.nullable(v.array(WorkspacePaneTabEntrySchema)),
+})
 
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_RUNTIME_SESSION_ID_RE.test(value)

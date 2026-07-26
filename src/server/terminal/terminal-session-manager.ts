@@ -13,7 +13,6 @@ import {
   type TerminalOutputEvent,
   type TerminalPresentation,
   type TerminalRestartResult,
-  type TerminalRetirementPresentationContext,
   type TerminalResizeResult,
   type TerminalRuntimeMetadata,
   type TerminalSessionSummary,
@@ -65,10 +64,11 @@ import type { TerminalSessionAdmission } from '#/server/terminal/terminal-sessio
 import { serverLogger } from '#/server/logger.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 interface TerminalSessionRetirementResult {
   outcome: 'detached' | 'already-detached' | 'failed'
-  retirementPresentation: TerminalRetirementPresentationContext | null
+  tabsBeforeRetirement: WorkspacePaneTabEntry[] | null
 }
 const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
@@ -114,10 +114,10 @@ export interface TerminalEventSink<TUser extends string | number> {
   onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
   onTitle?(userId: TUser, event: TerminalTitleEvent): void
   onExit(userId: TUser, event: TerminalExitEvent): void | Promise<void>
-  withRetirementPresentation(
+  withRetirementTabsSnapshot(
     userId: TUser,
     session: TerminalSessionSummary,
-    commit: (presentation: TerminalRetirementPresentationContext | null) => void,
+    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
   ): Promise<void>
   onSessionClosed?(
     userId: TUser,
@@ -675,7 +675,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       return {
         kind: 'closed',
         session: summary,
-        retirementPresentation: retirement.result.retirementPresentation,
+        tabsBeforeRetirement: retirement.result.tabsBeforeRetirement,
       }
     }
     if (retirement.result.outcome !== 'failed' || this.directory.get(terminalRuntimeSessionId) !== session) {
@@ -703,7 +703,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (existing) return { admission: 'joined', result: await existing }
     const session = this.directory.get(terminalRuntimeSessionId)
     if (!session) {
-      return { admission: 'absent', result: { outcome: 'already-detached', retirementPresentation: null } }
+      return { admission: 'absent', result: { outcome: 'already-detached', tabsBeforeRetirement: null } }
     }
     // Publish the single-flight operation before disposal can synchronously
     // deliver PTY exit and re-enter closeSession through the lifecycle sink.
@@ -727,12 +727,12 @@ export class TerminalSessionManager<TUser extends string | number> {
       await session.ptyBinding.disposeAndWait(session)
     } catch (error) {
       if (this.directory.get(session.id) !== session) {
-        return { outcome: 'already-detached', retirementPresentation: null }
+        return { outcome: 'already-detached', tabsBeforeRetirement: null }
       }
       if (markTerminalSessionError(session, error instanceof Error ? error.message : String(error))) {
         this.emitLifecycle(session)
       }
-      return { outcome: 'failed', retirementPresentation: null }
+      return { outcome: 'failed', tabsBeforeRetirement: null }
     }
     return await this.commitSessionRetirement(session, reason)
   }
@@ -742,21 +742,21 @@ export class TerminalSessionManager<TUser extends string | number> {
     reason: TerminalSessionCloseReason,
     terminalRuntimeGeneration?: number,
   ): Promise<TerminalSessionRetirementResult> {
-    const commit = (retirementPresentation: TerminalRetirementPresentationContext | null) => {
+    const commit = (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => {
       if (
         this.directory.get(session.id) !== session ||
         (terminalRuntimeGeneration !== undefined && terminalPtyGeneration(session) !== terminalRuntimeGeneration)
       ) {
-        return { outcome: 'already-detached' as const, retirementPresentation }
+        return { outcome: 'already-detached' as const, tabsBeforeRetirement }
       }
       this.detachSessionWithEffects(session, reason)
-      return { outcome: 'detached' as const, retirementPresentation }
+      return { outcome: 'detached' as const, tabsBeforeRetirement }
     }
     if (reason !== 'session' && reason !== 'workspace-pane') return commit(null)
-    const state: { result: TerminalSessionRetirementResult | null } = { result: null }
+    let result: TerminalSessionRetirementResult | null = null
     try {
-      await this.sink.withRetirementPresentation(session.userId, this.sessionSummary(session), (presentation) => {
-        state.result = commit(presentation)
+      await this.sink.withRetirementTabsSnapshot(session.userId, this.sessionSummary(session), (tabs) => {
+        result = commit(tabs)
       })
     } catch (error) {
       terminalSessionManagerLogger.warn(
@@ -765,7 +765,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       )
       return commit(null)
     }
-    return state.result ?? { outcome: 'already-detached', retirementPresentation: null }
+    return result ?? { outcome: 'already-detached', tabsBeforeRetirement: null }
   }
 
   private detachSessionWithEffects(session: TerminalSessionView<TUser>, reason: TerminalSessionCloseReason): void {
@@ -1398,7 +1398,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           ...this.terminalSessionIdentity(session),
           workspaceId: coordinates.workspaceId,
           workspaceRuntimeId: coordinates.workspaceRuntimeId,
-          retirementPresentation: retirement.retirementPresentation,
+          tabsBeforeRetirement: retirement.tabsBeforeRetirement,
         })
       })
       .finally(() => {

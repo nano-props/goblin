@@ -619,7 +619,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-exit-1111111111111111',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
-          retirementPresentation: null,
+          tabsBeforeRetirement: null,
         },
       },
     ]
@@ -651,7 +651,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-closed-11111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       },
     ]
     for (const message of topLevelEvents) {
@@ -1380,7 +1380,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       }),
     ).toEqual({
       type: 'session-closed',
@@ -1389,7 +1389,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      retirementPresentation: null,
+      tabsBeforeRetirement: null,
     })
     expect(
       normalizeTerminalSocketServerMessage({
@@ -1403,23 +1403,8 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('rejects retirement presentation target mismatches', () => {
-    const retirementPresentation = {
-      target: {
-        kind: 'workspace-root',
-        workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: 'repo-runtime-test',
-      },
-      terminalBase: {
-        target: {
-          kind: 'workspace-root',
-          workspaceId: 'goblin+file:///other',
-          workspaceRuntimeId: 'other-runtime-test',
-        },
-        presentation: { kind: 'workspace-root' },
-      },
-      tabsBeforeRetirement: [],
-    }
+  test('rejects malformed terminal retirement tab snapshots', () => {
+    const tabsBeforeRetirement = [{ type: 'terminal' }]
     expect(
       normalizeTerminalRealtimeMessage({
         type: 'exit',
@@ -1429,7 +1414,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-retirement-mismatch',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
-          retirementPresentation,
+          tabsBeforeRetirement,
         },
       }),
     ).toBeNull()
@@ -1441,7 +1426,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-retirement-mismatch',
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        retirementPresentation,
+        tabsBeforeRetirement,
       }),
     ).toBeNull()
   })
@@ -1610,7 +1595,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       },
     }
     expect(normalizeTerminalRealtimeMessage(message)).toEqual({
@@ -1621,7 +1606,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
-        retirementPresentation: null,
+        tabsBeforeRetirement: null,
       },
     })
     expect(

@@ -2,9 +2,7 @@ import { isValidCwd, isValidWorkspaceLocatorInput } from '#/shared/input-validat
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
-  terminalSessionBase,
   terminalSessionCoordinates,
-  type TerminalRetirementPresentationContext,
   type TerminalSessionSummary,
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
@@ -262,10 +260,10 @@ class TerminalSessionService {
     })
   }
 
-  async withTerminalRetirementPresentation(
+  async withTerminalRetirementTabsSnapshot(
     userId: string,
     session: TerminalSessionSummary,
-    commit: (presentation: TerminalRetirementPresentationContext | null) => void,
+    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
   ): Promise<void> {
     const coordinates = terminalSessionCoordinates(session)
     await this.workspaceTabsCoordinator.withExclusiveSnapshot(
@@ -279,15 +277,7 @@ class TerminalSessionService {
         const entry = snapshot.entries.find(
           (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === targetKey,
         )
-        commit(
-          entry
-            ? {
-                target: entry.target,
-                terminalBase: terminalSessionBase(session.target, session.presentation),
-                tabsBeforeRetirement: entry.tabs,
-              }
-            : null,
-        )
+        commit(entry ? entry.tabs : null)
       },
     )
   }

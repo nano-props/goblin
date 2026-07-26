@@ -421,7 +421,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
 
   async withExclusiveSnapshot(
     input: { userId: string; workspaceId: WorkspaceId; scope: string },
-    commit: (snapshot: WorkspacePaneTabsSnapshot) => void,
+    commit: (snapshot: WorkspacePaneTabsSnapshot) => undefined,
   ): Promise<void> {
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)

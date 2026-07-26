@@ -13,7 +13,6 @@ import type {
   TerminalExitEvent,
   TerminalOutputEvent,
   TerminalProjectionEffect,
-  TerminalRetirementPresentationContext,
   TerminalSessionClosedEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalSessionsSnapshot,
@@ -59,6 +58,7 @@ import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.t
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -82,7 +82,7 @@ interface ResolvedTerminalCreateOptions {
 
 export interface AcceptedTerminalRetirement {
   terminalSessionId: string
-  retirementPresentation: TerminalRetirementPresentationContext
+  tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
 type AcceptedTerminalRetirementListener = (retirement: AcceptedTerminalRetirement) => void
@@ -356,7 +356,6 @@ export class TerminalSessionProjection {
   handleExit(event: TerminalExitEvent): void {
     const classified = this.classifyRealtimeEvent(event)
     if (!classified) {
-      this.notifyRetirementPresentation(event)
       this.futureExitOrphans.record(event)
       this.pendingServerBellByRuntimeBindingKey.delete(terminalRealtimeEventBindingKey(event))
       return
@@ -388,7 +387,7 @@ export class TerminalSessionProjection {
       // where the session has moved to a new terminalRuntimeSessionId (e.g. after
       // a server-side restart) but a stale runtime event arrives for the
       // old binding of the same durable session.
-      this.notifyRetirementPresentation(event)
+      this.notifyAcceptedRetirementFromEvent(event)
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor, binding, true)
       return
     }
@@ -414,7 +413,6 @@ export class TerminalSessionProjection {
     const classified = this.classifyRealtimeEvent(event)
     if (!classified) {
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
-      this.notifyRetirementPresentation(event)
       return
     }
     if (classified.classification !== 'active') {
@@ -427,7 +425,7 @@ export class TerminalSessionProjection {
     // Only sibling windows, which have no pending close for this session,
     // need the passive retirement presentation.
     if (this.hasPendingCloseForSession(session)) return
-    this.notifyRetirementPresentation(event)
+    this.notifyAcceptedRetirementFromEvent(event)
     this.discardLocalSessionAndDismissDetailIfLast(
       session.descriptor.terminalSessionId,
       session.descriptor,
@@ -1069,11 +1067,11 @@ export class TerminalSessionProjection {
     }
   }
 
-  private notifyRetirementPresentation(event: TerminalExitEvent): void {
-    if (!event.retirementPresentation) return
+  private notifyAcceptedRetirementFromEvent(event: TerminalExitEvent): void {
+    if (!event.tabsBeforeRetirement) return
     this.notifyAcceptedRetirement({
       terminalSessionId: event.terminalSessionId,
-      retirementPresentation: event.retirementPresentation,
+      tabsBeforeRetirement: event.tabsBeforeRetirement,
     })
   }
 
