@@ -14,7 +14,6 @@ describe('AppTerminalProjectionRecovery', () => {
     const markReady = vi.fn()
     const recovery = new AppTerminalProjectionRecovery({
       projection: {
-        terminalSessionsCatalogCoverageRevision: () => null,
         reconcileServerSessionsSnapshot: reconcile,
         resynchronizeConnectedViews: vi.fn(),
       },
@@ -40,7 +39,6 @@ describe('AppTerminalProjectionRecovery', () => {
     const failure = new Error('catalog unavailable')
     const recovery = new AppTerminalProjectionRecovery({
       projection: {
-        terminalSessionsCatalogCoverageRevision: () => null,
         reconcileServerSessionsSnapshot: vi.fn(() => true),
         resynchronizeConnectedViews: vi.fn(),
       },
@@ -61,11 +59,34 @@ describe('AppTerminalProjectionRecovery', () => {
     )
   })
 
+  test('fails fast when the server snapshot does not reach the requested revision', async () => {
+    const markFailed = vi.fn()
+    const recoverSessions = vi.fn(async () => ({ revision: 2, sessions: [] }))
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions,
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'pending' }),
+      beginHydration: vi.fn(),
+      markReady: vi.fn(),
+      markFailed,
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 3 })
+
+    await vi.waitFor(() => expect(markFailed).toHaveBeenCalledOnce())
+    expect(recoverSessions).toHaveBeenCalledOnce()
+  })
+
   test('resynchronizes connected views only after a fresh reconnect catalog is accepted', async () => {
     const resynchronizeConnectedViews = vi.fn()
     const recovery = new AppTerminalProjectionRecovery({
       projection: {
-        terminalSessionsCatalogCoverageRevision: () => 3,
         reconcileServerSessionsSnapshot: vi.fn(() => true),
         resynchronizeConnectedViews,
       },
