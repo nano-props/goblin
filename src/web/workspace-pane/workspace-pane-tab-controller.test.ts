@@ -292,7 +292,7 @@ describe('workspace pane tab controller transactions', () => {
     ).toBe('terminal')
   })
 
-  test('rejects exact target completion after its runtime is replaced', async () => {
+  test('keeps a completed history navigation committed after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
       commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
@@ -315,7 +315,7 @@ describe('workspace pane tab controller transactions', () => {
       },
     }))
     commit.resolve(true)
-    await expect(completion).resolves.toBe(false)
+    await expect(completion).resolves.toBe(true)
   })
 
   test('propagates an unexpected navigation failure', async () => {
@@ -383,7 +383,7 @@ describe('workspace pane tab controller transactions', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('rejects completion when the target worktree changes while navigation settles', async () => {
+  test('keeps a completed history navigation committed when the target worktree changes in flight', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneRouteCommitNavigation = {
       commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
@@ -407,7 +407,7 @@ describe('workspace pane tab controller transactions', () => {
     })
     commit.resolve(true)
 
-    await expect(completion).resolves.toBe(false)
+    await expect(completion).resolves.toBe(true)
   })
 
   test('commits pane presentation inside navigation-intent settlement', async () => {
@@ -476,7 +476,7 @@ describe('workspace pane tab controller transactions', () => {
     )
   })
 
-  test('preserves pending authority when it changes during close-back commit', async () => {
+  test('does not navigate when authority becomes pending before close-back admission', async () => {
     const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
       target: workspacePaneTarget(),
       closingEntry: workspacePaneStaticTabEntry('files'),
@@ -496,13 +496,14 @@ describe('workspace pane tab controller transactions', () => {
     const outcome = commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)
     primaryWindowQueryClient.setQueryData(queryKey, projection)
 
-    await expect(outcome).resolves.toEqual({ kind: 'retry' })
+    await expect(outcome).resolves.toEqual({ kind: 'pending' })
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     lease.navigationIntent.release()
   })
 
-  test('rechecks retained presentation authority inside the navigation commit effect', async () => {
+  test('does not reinterpret committed history when presentation authority changes in flight', async () => {
     let presentationCurrentness: 'current' | 'pending' = 'current'
+    let currentHref = '/workspace/example/branch/feature-a/terminal/term-1'
     const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
       target: workspacePaneTarget(),
       closingEntry: workspacePaneStaticTabEntry('files'),
@@ -513,6 +514,7 @@ describe('workspace pane tab controller transactions', () => {
     if (!lease) throw new Error('missing presentation lease')
     const navigation = controllerNavigation({
       commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
+        currentHref = '/workspace/example/branch/feature-a/tab/status'
         presentationCurrentness = 'pending'
         options?.onCommit?.()
         return true
@@ -520,8 +522,9 @@ describe('workspace pane tab controller transactions', () => {
     })
 
     await expect(commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)).resolves.toEqual({
-      kind: 'pending',
+      kind: 'committed',
     })
+    expect(currentHref).toBe('/workspace/example/branch/feature-a/tab/status')
     lease.navigationIntent.release()
   })
 })

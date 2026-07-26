@@ -63,10 +63,10 @@ describe('resolveWorkspacePaneCommandTarget', () => {
     expect(target).toEqual({ routeAuthority: 'pending', target: null })
   })
 
-  test('keeps an unavailable workspace route pending because the same runtime can recover', () => {
+  test('fails closed when workspace capability resolution is unavailable', () => {
     const target = resolveTarget({ workspace: unavailableWorkspace() })
 
-    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+    expect(target).toEqual({ routeAuthority: 'stale', target: null })
   })
 
   test('treats a workspace missing from the ready shell projection as stale', () => {
@@ -157,24 +157,24 @@ describe('resolveWorkspacePaneCommandTarget', () => {
     expect(target).toEqual({ routeAuthority: 'pending', target: null })
   })
 
-  test('keeps a branch route pending while its failed read model has no authoritative answer', () => {
+  test('fails closed when the branch read model fails', () => {
     const target = resolveTarget({
       routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature' },
       workspace: gitWorkspace(),
       branchReadModel: { status: 'error', snapshot: null },
     })
 
-    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+    expect(target).toEqual({ routeAuthority: 'stale', target: null })
   })
 
-  test('keeps a worktree route pending while its failed read model can still recover', () => {
+  test('fails closed when the worktree read model fails', () => {
     const target = resolveTarget({
       routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/project-worktree' },
       workspace: gitWorkspace(),
       worktreeReadModel: { status: 'error', worktrees: null },
     })
 
-    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+    expect(target).toEqual({ routeAuthority: 'stale', target: null })
   })
 
   test('marks a branch missing from a complete read model as stale', () => {

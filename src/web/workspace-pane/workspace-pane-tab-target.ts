@@ -112,12 +112,12 @@ export function filesystemWorkspacePaneTargetLeaseCurrentness(
   if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
   if (lease.routeTarget.kind === 'workspace-root') return 'current'
   if (workspace.capability.kind === 'probing') return 'pending'
-  if (workspace.capability.kind === 'unavailable') return 'pending'
+  if (workspace.capability.kind === 'unavailable') return 'stale'
   if (workspace.capability.kind !== 'git') return 'stale'
   const worktreePath = lease.routeTarget.worktreePath
   const worktreeStatusQuery = getRepoWorktreeStatusQueryStatus(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)
   if (worktreeStatusQuery === 'pending') return 'pending'
-  if (worktreeStatusQuery === 'error') return 'pending'
+  if (worktreeStatusQuery === 'error') return 'stale'
   const worktreeStatus = getSuccessfulRepoWorktreeStatusQueryData(
     lease.routeTarget.workspaceId,
     lease.workspaceRuntimeId,
@@ -211,11 +211,11 @@ export function workspacePaneTargetLeaseCurrentness(lease: WorkspacePaneTargetLe
   if (!workspace) return 'stale'
   if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
   if (workspace.capability.kind === 'probing') return 'pending'
-  if (workspace.capability.kind === 'unavailable') return 'pending'
+  if (workspace.capability.kind === 'unavailable') return 'stale'
   if (workspace.capability.kind !== 'git') return 'stale'
   const projectionStatus = getRepoProjectionQueryStatus(lease.workspaceId, lease.workspaceRuntimeId, null, 'full')
   if (projectionStatus === 'pending') return 'pending'
-  if (projectionStatus === 'error') return 'pending'
+  if (projectionStatus === 'error') return 'stale'
   const current = resolveWorkspacePaneDestinationTargetLease(lease.workspaceId, lease.branchName)
   return current !== null &&
     current.workspaceRuntimeId === lease.workspaceRuntimeId &&
@@ -343,9 +343,8 @@ export type WorkspacePaneTabTargetForPaneTargetResolution =
   { kind: 'ready'; target: WorkspacePaneTabModel } | { kind: 'pending' } | { kind: 'stale' }
 
 /**
- * Resolves a pane target against one captured workspace runtime epoch. Pending
- * and failed queries are both inconclusive; neither proves that a retained
- * presentation target is stale.
+ * Resolves a pane target against one captured workspace runtime epoch. Only an
+ * actively loading projection is pending; terminal read failures fail closed.
  */
 export function resolveWorkspacePaneTabTargetForPaneTarget(input: {
   paneTarget: WorkspacePaneTabsTarget
@@ -358,7 +357,7 @@ export function resolveWorkspacePaneTabTargetForPaneTarget(input: {
   const workspace = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
   if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId) return { kind: 'stale' }
   if (workspace.capability.kind === 'probing') return { kind: 'pending' }
-  if (workspace.capability.kind === 'unavailable') return { kind: 'pending' }
+  if (workspace.capability.kind === 'unavailable') return { kind: 'stale' }
   if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return { kind: 'stale' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
@@ -374,7 +373,8 @@ export function resolveWorkspacePaneTabTargetForPaneTarget(input: {
     ...paneTarget,
     workspaceRuntimeId,
   })
-  if (tabsProjection.phase !== 'ready') return { kind: 'pending' }
+  if (tabsProjection.phase === 'pending') return { kind: 'pending' }
+  if (tabsProjection.phase === 'failed') return { kind: 'stale' }
   return {
     kind: 'ready',
     target: createWorkspacePaneTabModel({

@@ -250,13 +250,14 @@ Accepted presentation is globally single-flight. Its consumer either settles
 the current fact or releases it during lifecycle teardown before the ledger
 delivers another. The passive transition uses a passive navigation intent and
 an exact-route precondition; it neither displaces an owned user commit nor
-overrides a route that has changed. Commit-time target validation preserves
-`ready`, `pending`, and `stale` as distinct authority states. A temporarily
-unavailable workspace or a pending or failed repo, worktree, or workspace-pane
-tabs projection is inconclusive and retains the immutable plan; only a complete
-projection, runtime replacement, or route change may prove it stale. Canonical
-tabs publication wakes the retained plan without polling or reconstructing its
-destination.
+overrides a route that has changed. Pre-navigation target validation preserves
+`ready`, `pending`, and `stale` as distinct authority states. Only actively
+loading workspace capability, repo, worktree, or workspace-pane tabs authority
+retains the immutable plan. Failed or unavailable authority, a complete
+projection without the target, runtime replacement, or route change settles it.
+Once history commits, later currentness changes cannot redefine that navigation
+as pending. Canonical tabs publication wakes a plan retained during loading
+without polling or reconstructing its destination.
 
 Addressable close sources use one idempotent session-close promise. Presentation
 capture is the last reversible boundary: if it fails while the PTY is still

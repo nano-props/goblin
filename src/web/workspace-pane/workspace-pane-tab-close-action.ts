@@ -103,7 +103,7 @@ export interface RetiredTerminalWorkspacePaneTabPresentationPlan {
 }
 
 export type RetiredTerminalWorkspacePaneTabPresentationCommitOutcome =
-  { kind: 'committed' } | { kind: 'retry' } | { kind: 'pending' } | { kind: 'abandoned' }
+  { kind: 'committed' } | { kind: 'pending' } | { kind: 'abandoned' }
 
 type CloseWorkspacePaneTabActionStart =
   | { kind: 'done'; result: boolean }

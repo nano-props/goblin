@@ -253,22 +253,6 @@ test('retains a plan when tabs authority becomes pending and retries when its pr
   expect(retirement.settle).toHaveBeenCalledOnce()
 })
 
-test('immediately retries when commit-time authority recovered before the outcome returned', async () => {
-  mocks.commitPresentation.mockImplementationOnce(async () => ({ kind: 'retry' }))
-  const { rerender } = renderAuthorityPresentationHook()
-  rerender({ authority: 'ready' })
-  const listener = mocks.listener
-  if (!listener) throw new Error('missing accepted-retirement listener')
-  const retirement = retirementForTest()
-
-  act(() => listener(retirement))
-  await flushPresentation()
-
-  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
-  expect(mocks.commitPresentation).toHaveBeenCalledTimes(2)
-  expect(retirement.settle).toHaveBeenCalledOnce()
-})
-
 test('settles an awaiting-target retirement when the route definitively leaves its terminal', () => {
   const { rerender } = renderHydratingPresentationHook()
   const listener = mocks.listener

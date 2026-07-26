@@ -160,15 +160,6 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
           pending.phase = { kind: 'awaiting-authority', plan }
           return
         }
-        if (commitOutcome.kind === 'retry') {
-          if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
-            finishPending(pending, 'settle')
-            return
-          }
-          pending.phase = { kind: 'ready', plan }
-          attemptPending()
-          return
-        }
         if (outcome.status === 'superseded') {
           pending.phase = { kind: 'ready', plan }
           attemptPending()

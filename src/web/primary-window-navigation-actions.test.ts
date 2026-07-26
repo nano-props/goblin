@@ -118,7 +118,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     },
   )
 
-  test('commits a filesystem route only while its workspace runtime remains current', async () => {
+  test('does not reinterpret committed history when its workspace runtime changes in flight', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
@@ -158,8 +158,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     }))
     routeCommit.resolve(true)
 
-    await expect(commit).resolves.toBe(false)
-    expect(onAbandon).toHaveBeenCalledOnce()
+    await expect(commit).resolves.toBe(true)
+    expect(onAbandon).not.toHaveBeenCalled()
     expect(
       preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
@@ -200,7 +200,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(sequence).toEqual(['presentation', 'new navigation'])
   })
 
-  test('rechecks retained filesystem presentation authority inside navigation settlement', async () => {
+  test('does not reinterpret committed history when retained presentation authority changes in flight', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     let presentationCurrentness: 'current' | 'pending' = 'current'
     const navigation = routeNavigation()
@@ -227,11 +227,11 @@ describe('createPrimaryWindowNavigationActions', () => {
         { kind: 'static', tab: 'files' },
         { presentationCurrentness: () => presentationCurrentness, onTargetPending },
       ),
-    ).resolves.toBe(false)
-    expect(onTargetPending).toHaveBeenCalledOnce()
+    ).resolves.toBe(true)
+    expect(onTargetPending).not.toHaveBeenCalled()
   })
 
-  test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
+  test('does not reinterpret committed history when its authoritative worktree disappears in flight', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -269,8 +269,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     routeCommit.resolve(true)
 
-    await expect(commit).resolves.toBe(false)
-    expect(onAbandon).toHaveBeenCalledOnce()
+    await expect(commit).resolves.toBe(true)
+    expect(onAbandon).not.toHaveBeenCalled()
   })
 
   test('abandons exactly once when filesystem presentation projection commit throws', async () => {

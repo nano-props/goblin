@@ -45,7 +45,7 @@ export function resolveWorkspacePaneCommandTarget(
   if (!workspace) return { routeAuthority: 'stale', target: null }
   if (workspace.id !== routeTarget.workspaceId) return { routeAuthority: 'stale', target: null }
   if (workspace.capability.kind === 'probing') return { routeAuthority: 'pending', target: null }
-  if (workspace.capability.kind === 'unavailable') return { routeAuthority: 'pending', target: null }
+  if (workspace.capability.kind === 'unavailable') return { routeAuthority: 'stale', target: null }
 
   if (routeTarget.kind === 'workspace-root') {
     const capability = workspace.capability
@@ -68,8 +68,11 @@ export function resolveWorkspacePaneCommandTarget(
 
   if (routeTarget.kind === 'git-branch') {
     if (workspace.capability.kind !== 'git') return { routeAuthority: 'stale', target: null }
-    if (input.branchReadModel.status !== 'success' || !input.branchReadModel.snapshot) {
+    if (input.branchReadModel.status === 'pending') {
       return { routeAuthority: 'pending', target: null }
+    }
+    if (input.branchReadModel.status === 'error' || !input.branchReadModel.snapshot) {
+      return { routeAuthority: 'stale', target: null }
     }
     const branchExists = repoBranchSnapshotDataFromSnapshot(input.branchReadModel.snapshot).branches.some(
       (entry) => entry.name === routeTarget.branchName,
@@ -95,14 +98,17 @@ export function resolveWorkspacePaneCommandTarget(
   }
   if (workspace.capability.kind !== 'git') return { routeAuthority: 'stale', target: null }
   if (input.worktreeReadModel.status === 'error' || !input.worktreeReadModel.worktrees) {
-    return { routeAuthority: 'pending', target: null }
+    return { routeAuthority: 'stale', target: null }
   }
   const worktree = input.worktreeReadModel.worktrees?.find((entry) => entry.path === routeTarget.worktreePath)
   if (!worktree) return { routeAuthority: 'stale', target: null }
   if (worktree.branch) {
     const branchSnapshot = input.branchReadModel.snapshot
-    if (input.branchReadModel.status !== 'success' || !branchSnapshot) {
+    if (input.branchReadModel.status === 'pending') {
       return { routeAuthority: 'pending', target: null }
+    }
+    if (input.branchReadModel.status === 'error' || !branchSnapshot) {
+      return { routeAuthority: 'stale', target: null }
     }
     if (
       !repoBranchSnapshotDataFromSnapshot(branchSnapshot).branches.some(

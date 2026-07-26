@@ -74,7 +74,7 @@ admitted (user | passive)
 - There are no timers, delays, watches, or post-retirement reconstruction caches in this protocol.
 - Terminal retirement presentation is admitted only from the manager's canonical, target-scoped before-state record. Natural exit and explicit close share that record; catalog after-state convergence never synthesizes presentation intent.
 - During workspace-membership hydration, validated retirement facts may wait in the ledger, but presentation remains blocked until complete exact membership and a causally covering terminal catalog establish authority.
-- Retirement close-back currentness is tri-state. Temporarily unavailable workspace capability and pending or failed repo, worktree, and pane-tabs reads remain unverified and retain the captured plan; only complete authoritative absence is stale. Pane-tabs publication explicitly wakes the retained plan.
+- Retirement close-back currentness is tri-state. Only actively loading workspace capability, repo, worktree, and pane-tabs reads retain the captured plan. Failed or unavailable authority fails closed and settles the retirement. Pane-tabs publication explicitly wakes a plan retained during loading.
 
 ## Invariants
 

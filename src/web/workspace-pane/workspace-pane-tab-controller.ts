@@ -75,8 +75,7 @@ export interface WorkspacePaneControllerPresentationLease {
   presentationCurrentness: (() => WorkspacePaneTargetCurrentness) | null
 }
 
-export type WorkspacePaneControllerCommitOutcome =
-  { kind: 'committed' } | { kind: 'retry' } | { kind: 'pending' } | { kind: 'abandoned' }
+export type WorkspacePaneControllerCommitOutcome = { kind: 'committed' } | { kind: 'pending' } | { kind: 'abandoned' }
 
 export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   target: WorkspacePaneTabModel
@@ -203,8 +202,6 @@ export async function commitWorkspacePaneControllerCloseBackTargetOutcome(
   lease: WorkspacePaneControllerPresentationLease,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): Promise<WorkspacePaneControllerCommitOutcome> {
-  const initialCurrentness = workspacePaneControllerPresentationLeaseCurrentness(lease)
-  if (initialCurrentness !== 'current') return { kind: initialCurrentness === 'pending' ? 'pending' : 'abandoned' }
   let targetBecamePending = false
   const committed = await commitWorkspacePaneControllerTargetRoute(
     lease.target,
@@ -223,10 +220,7 @@ export async function commitWorkspacePaneControllerCloseBackTargetOutcome(
     lease.fromRoute,
   )
   if (committed) return { kind: 'committed' }
-  if (!targetBecamePending) return { kind: 'abandoned' }
-  const finalCurrentness = workspacePaneControllerPresentationLeaseCurrentness(lease)
-  if (finalCurrentness === 'current') return { kind: 'retry' }
-  return finalCurrentness === 'pending' ? { kind: 'pending' } : { kind: 'abandoned' }
+  return { kind: targetBecamePending ? 'pending' : 'abandoned' }
 }
 
 async function commitWorkspacePaneControllerTargetRoute(
@@ -379,15 +373,13 @@ async function commitWorkspacePaneValidatedTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  let presentationCommitted = false
   const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
     replace: options?.replace,
     navigationIntent,
     ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
     onCommit: () => {
-      presentationCommitted = commitPrimaryWindowNavigationEffect(
-        () =>
-          targetIsCurrent(target) &&
+      commitPrimaryWindowNavigationEffect(() => {
+        if (targetIsCurrent(target)) {
           commitSupplement(
             {
               workspaceId: target.workspaceId,
@@ -396,13 +388,14 @@ async function commitWorkspacePaneValidatedTargetRoute(
               worktreePath: target.worktreePath,
             },
             route,
-          ),
-        options,
-      )
+          )
+        }
+        return true
+      }, options)
     },
     onAbandon: options?.onAbandon,
   })
-  return committed && presentationCommitted
+  return committed
 }
 
 export async function commitWorkspacePaneExactTargetRoute(
@@ -434,15 +427,15 @@ export async function commitWorkspacePaneExactTargetRoute(
       options?.onAbandon?.()
       return false
     }
-    let presentationCommitted = false
     const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
       replace: options?.replace,
       navigationIntent,
       routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
       onCommit: () => {
-        presentationCommitted = commitPrimaryWindowNavigationEffect(
-          () =>
-            workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending, options?.presentationCurrentness) &&
+        commitPrimaryWindowNavigationEffect(() => {
+          // History is already committed. Currentness now scopes only the
+          // local supplement; it must not redefine the navigation outcome.
+          if (workspacePaneTargetIsCurrentForCommit(target, undefined, options?.presentationCurrentness)) {
             commitWorkspacePaneRouteSupplement(
               {
                 workspaceId: target.workspaceId,
@@ -451,13 +444,14 @@ export async function commitWorkspacePaneExactTargetRoute(
                 worktreePath: target.worktreePath,
               },
               route,
-            ),
-          options,
-        )
+            )
+          }
+          return true
+        }, options)
       },
       onAbandon: options?.onAbandon,
     })
-    return committed && presentationCommitted
+    return committed
   } finally {
     if (ownsNavigationIntent) navigationIntent.release()
   }
@@ -474,15 +468,6 @@ function workspacePaneTargetIsCurrentForCommit(
   )
   if (currentness === 'pending') onTargetPending?.()
   return currentness === 'current'
-}
-
-function workspacePaneControllerPresentationLeaseCurrentness(
-  lease: WorkspacePaneControllerPresentationLease,
-): WorkspacePaneTargetCurrentness {
-  return combinedWorkspacePaneTargetCurrentness(
-    workspacePaneTabControllerTargetCurrentness(lease.target),
-    lease.presentationCurrentness?.() ?? 'current',
-  )
 }
 
 function combinedWorkspacePaneTargetCurrentness(

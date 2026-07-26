@@ -759,7 +759,7 @@ test('presents a naturally exited active terminal through the captured exact clo
       navigationWith({ commitFilesystemWorkspacePaneRoute }),
       failedIntent,
     ),
-  ).resolves.toEqual({ kind: 'pending' })
+  ).resolves.toEqual({ kind: 'abandoned' })
   failedIntent.release()
   expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
 

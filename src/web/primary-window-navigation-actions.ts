@@ -38,7 +38,7 @@ export interface PrimaryWindowNavigationOptions {
   onAbandon?: () => void
   /** Reports a transient authority loss to the transaction that owns this commit. */
   onTargetPending?: () => void
-  /** Additional presentation authority checked before navigation and again at commit. */
+  /** Additional authority admitted before navigation and used to scope its local commit supplement. */
   presentationCurrentness?: () => WorkspacePaneTargetCurrentness
   routePrecondition?:
     { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
@@ -286,28 +286,24 @@ async function commitFilesystemWorkspacePaneRoute(
       options?.onAbandon?.()
       return false
     }
-    let presentationCommitted = false
     const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
       replace: options?.replace,
       navigationIntent: intent,
       routePrecondition: options?.routePrecondition,
       onCommit: () => {
-        presentationCommitted = commitPrimaryWindowNavigationEffect(
-          () =>
-            filesystemWorkspacePaneCommitTargetIsCurrent(
-              target,
-              options?.onTargetPending,
-              options?.presentationCurrentness,
-            ) &&
-            (route === null
-              ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
-              : commitFilesystemWorkspacePanePresentation(target.routeTarget, route)),
-          options,
-        )
+        commitPrimaryWindowNavigationEffect(() => {
+          // History is already committed. Currentness now scopes only the
+          // local supplement; it must not redefine the navigation outcome.
+          if (filesystemWorkspacePaneCommitTargetIsCurrent(target, undefined, options?.presentationCurrentness)) {
+            if (route === null) commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
+            else commitFilesystemWorkspacePanePresentation(target.routeTarget, route)
+          }
+          return true
+        }, options)
       },
       onAbandon: options?.onAbandon,
     })
-    return committed && presentationCommitted
+    return committed
   } finally {
     if (ownsIntent) intent.release()
   }
