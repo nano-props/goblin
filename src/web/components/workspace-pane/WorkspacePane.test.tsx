@@ -790,7 +790,7 @@ describe('WorkspacePane', () => {
     resetTerminalCommandBridge()
   })
 
-  test('keeps a naturally exited workspace-root terminal URL as an empty presentation', async () => {
+  test('keeps an unexplained missing workspace-root terminal URL as an empty presentation', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-terminal-exit-workspace')
     const retainedSessionId = 'term-111111111111111111111'
     const exitedSessionId = 'term-222222222222222222222'

@@ -1,5 +1,4 @@
 import {
-  type TerminalExitEvent,
   type TerminalBellRealtimeEvent,
   type TerminalOutputEvent,
   type TerminalSessionPhase,
@@ -170,9 +169,8 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'workspaceId'>): void
   emitExit(
     session: TSession,
-    event: Omit<TerminalExitEvent, 'terminalSessionId' | 'workspaceId' | 'workspaceRuntimeId'>,
-  ): void
-  confirmedExit(session: TSession, terminalRuntimeGeneration: number): void
+    event: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number },
+  ): void | Promise<void>
 }
 
 export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
@@ -710,15 +708,14 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         this.handle = null
         state.activity = 'retained'
         try {
-          this.events.emitExit(session, { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation })
-        } catch (error) {
-          ptyLifecycleLogger.warn(
-            { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation, err: error },
-            'failed to publish PTY exit',
-          )
-        }
-        try {
-          this.events.confirmedExit(session, generation)
+          void Promise.resolve(
+            this.events.emitExit(session, {
+              terminalRuntimeSessionId: session.id,
+              terminalRuntimeGeneration: generation,
+            }),
+          ).catch((error: unknown) => {
+            this.failBindingObserver(session, state, error, 'exit-confirmation')
+          })
         } catch (error) {
           this.failBindingObserver(session, state, error, 'exit-confirmation')
         }

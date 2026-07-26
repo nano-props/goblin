@@ -1,9 +1,10 @@
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
+  dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
   type ConfirmedTerminalWorkspacePaneTabClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
@@ -81,6 +82,13 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
+}
+
+interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
+  target: WorkspacePaneCommandTarget
+  navigation: PrimaryWindowNavigationActions
+  terminalSessionId: string
+  tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
 
 type CloseCurrentWorkspacePaneTabCommandOptions = Omit<CloseWorkspacePaneTabCommandOptions, 'targetIdentity'>
@@ -220,6 +228,19 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
       options.confirmedTerminal.base.presentation.kind === 'git-worktree'
         ? options.confirmedTerminal.base.presentation.head
         : undefined,
+  })
+}
+
+export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
+  options: RetiredTerminalWorkspacePaneTabPresentationCommandOptions,
+): Promise<boolean> {
+  return dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
+    ...options,
+    workspaceId: options.target.routeTarget.workspaceId,
+    ...workspacePaneCommandCoordinates(options.target),
+    routeTarget: workspacePaneCommandRouteTarget(options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.target.routeTarget.workspaceId, options.target),
+    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
   })
 }
 

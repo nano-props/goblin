@@ -186,6 +186,20 @@ export function commitWorkspacePaneControllerCloseBackTarget(
   )
 }
 
+export function commitWorkspacePaneControllerRetirementCloseBackTarget(
+  lease: WorkspacePaneControllerPresentationLease,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): Promise<boolean> {
+  return commitWorkspacePaneControllerTargetRoute(
+    lease.target,
+    lease.toRoute,
+    navigation,
+    { replace: true, ...(lease.focusEffects ?? {}) },
+    lease.navigationGeneration,
+    lease.fromRoute,
+  )
+}
+
 async function commitWorkspacePaneControllerTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,

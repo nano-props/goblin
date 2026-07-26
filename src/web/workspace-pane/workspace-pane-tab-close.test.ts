@@ -11,6 +11,7 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import {
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
+  dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -44,6 +45,8 @@ import {
 } from '#/web/terminal-focus.ts'
 import {
   beginPrimaryWindowNavigation,
+  primaryWindowNavigationIsCurrent,
+  registerPrimaryWindowNavigation,
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 
@@ -649,6 +652,148 @@ test('does not let a late close from an old runtime navigate or clear the replac
   expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, replacementRuntimeId, 'workspace-pane:files')).toBe(
     'workspace-pane:status',
   )
+})
+
+test('presents a naturally exited terminal from the server-captured before-state', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+  const runtimeTarget = runtimeWorkspacePaneTargetForTest({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  })
+  setWorkspacePaneTabsForTargetQueryData({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    // The local query may already contain the reconciled after-state. The
+    // close-back decision comes from tabsBeforeRetirement below.
+    tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+  })
+  const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID)
+  setTerminalSessionCommandBridgeForTest({
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey,
+      selectedDescriptor: {
+        terminalSessionId,
+        index: 1,
+        target: runtimeTarget,
+        presentation: { kind: 'workspace-root' },
+      },
+      sessions: [
+        {
+          type: 'terminal',
+          terminalFilesystemTargetKey,
+          terminalSessionId,
+          index: 1,
+          title: 'terminal 1',
+          phase: 'closed',
+          selected: true,
+          hasBell: false,
+          hasRecentOutput: false,
+        },
+      ],
+      count: 1,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }),
+    createTerminal: vi.fn(async () => terminalSessionId),
+    selectTerminal: vi.fn(),
+  })
+  const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
+  const commitFilesystemWorkspacePaneRoute = vi.fn<
+    PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
+  >(async (_target, _route, options) => {
+    options?.onCommit?.()
+    return true
+  })
+
+  await expect(
+    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
+      workspaceId: REPO_ID,
+      workspacePaneRoute: sourceRoute,
+      routeTarget: paneTarget,
+      paneTarget,
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      terminalSessionId,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('files'),
+      ],
+    }),
+  ).resolves.toBe(true)
+
+  expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect.objectContaining({ routeTarget: paneTarget, workspaceRuntimeId: repo.workspaceRuntimeId }),
+    { kind: 'static', tab: 'files' },
+    expect.objectContaining({
+      replace: true,
+      routePrecondition: { kind: 'exact-route', route: sourceRoute },
+    }),
+  )
+
+  resetPrimaryWindowNavigationForTest()
+  const explicitGeneration = beginPrimaryWindowNavigation()
+  const explicitNavigation = registerPrimaryWindowNavigation(explicitGeneration, '/pending-explicit-navigation')
+  if (!explicitNavigation) throw new Error('missing explicit navigation registration')
+  const passiveCommit = vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
+
+  await expect(
+    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
+      workspaceId: REPO_ID,
+      workspacePaneRoute: sourceRoute,
+      routeTarget: paneTarget,
+      paneTarget,
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute: passiveCommit }),
+      terminalSessionId,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('files'),
+      ],
+    }),
+  ).resolves.toBe(false)
+
+  expect(passiveCommit).not.toHaveBeenCalled()
+  expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
+  explicitNavigation.release()
+})
+
+test('does not navigate when a background terminal exits naturally', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+  const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+  const runtimeTarget = runtimeWorkspacePaneTargetForTest({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+  })
+  setWorkspacePaneTabsForTargetQueryData({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+  })
+  const commitFilesystemWorkspacePaneRoute =
+    vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
+
+  await expect(
+    dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
+      workspaceId: REPO_ID,
+      workspacePaneRoute: { kind: 'static', tab: 'status' },
+      routeTarget: paneTarget,
+      paneTarget,
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      terminalSessionId,
+      tabsBeforeRetirement: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+      ],
+    }),
+  ).resolves.toBe(false)
+
+  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
 })
 
 function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {

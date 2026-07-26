@@ -20,7 +20,10 @@ import {
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  restorableWorkspacePaneTargetFromRuntime,
+  runtimeWorkspacePaneTargetKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { bindWorkspacePaneTarget, type RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import {
   canonicalWorkspaceLocator,
@@ -255,6 +258,28 @@ class TerminalSessionService {
       scope,
       worktreePath: terminalExecutionPath(session.target),
     })
+  }
+
+  async withTerminalRetirementTabsSnapshot(
+    userId: string,
+    session: TerminalSessionSummary,
+    commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
+  ): Promise<void> {
+    const coordinates = terminalSessionCoordinates(session)
+    await this.workspaceTabsCoordinator.withExclusiveSnapshot(
+      {
+        userId,
+        workspaceId: coordinates.workspaceId,
+        scope: terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId),
+      },
+      (snapshot) => {
+        const targetKey = runtimeWorkspacePaneTargetKey(session.target)
+        const entry = snapshot.entries.find(
+          (candidate) => runtimeWorkspacePaneTargetKey(candidate.target) === targetKey,
+        )
+        commit(entry ? entry.tabs : null)
+      },
+    )
   }
 
   async listWorkspaceTabs(

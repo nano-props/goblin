@@ -189,6 +189,17 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
+Natural PTY exit and a sibling window's successful terminal close are already
+committed resource retirements, so they must not issue a second close command.
+The server captures the canonical pane tabs before removing terminal membership
+and includes that before-state in either retirement event. When the client
+accepts the event for the current runtime binding, it makes one close-back
+attempt. The passive transition reuses the current navigation generation only
+when it has no registered history-commit owner, uses `REPLACE`, and commits with
+an exact-route precondition. Missing target authority, an owned navigation, a
+changed route, or a failed navigation ends the presentation attempt without
+replay or compensation.
+
 Addressable close sources use one idempotent session-close promise. The session
 remains in the authoritative Directory until pending spawns settle and PTY
 termination is acknowledged. Direct close, prune, detached-user cleanup, and

@@ -2,7 +2,9 @@ import type { TerminalSessionsSnapshot } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionProjection } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import type { RuntimeProjectionScope, RuntimeProjectionTarget } from '#/web/runtime/runtime-projection-scope.ts'
-import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
+
+const TERMINAL_PROJECTION_REFRESH_LANE = 'terminal-projection-refresh'
+const TERMINAL_PROJECTION_RECONNECT_LANE = 'terminal-projection-reconnect'
 
 interface TerminalProjectionHydrationEntry {
   workspaceRuntimeId: string
@@ -12,7 +14,7 @@ interface TerminalProjectionHydrationEntry {
 export interface AppTerminalProjectionRecoveryDependencies {
   projection: Pick<
     TerminalSessionProjection,
-    'terminalSessionsCatalogCoverageRevision' | 'reconcileServerSessionsSnapshot' | 'resynchronizeConnectedViews'
+    'reconcileServerSessionsSnapshot' | 'resynchronizeConnectedViews' | 'terminalSessionsCatalogCoverageRevision'
   >
   readClientId: () => string
   recoverSessions: (target: RuntimeProjectionTarget) => Promise<TerminalSessionsSnapshot>
@@ -29,7 +31,8 @@ export type TerminalProjectionRecoveryRequirement =
 
 export class AppTerminalProjectionRecovery {
   private readonly dependencies: AppTerminalProjectionRecoveryDependencies
-  private readonly coordinator = new TerminalProjectionRecoveryCoordinator()
+  private readonly reconnectResynchronizationByScope = new WeakMap<RuntimeProjectionScope, number>()
+  private nextReconnectResynchronization = 1
 
   constructor(dependencies: AppTerminalProjectionRecoveryDependencies) {
     this.dependencies = dependencies
@@ -48,37 +51,30 @@ export class AppTerminalProjectionRecovery {
   request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void {
     const clientId = this.dependencies.readClientId()
     const reconnect = requirement.kind === 'reconnect'
-    this.coordinator.request({
-      scope,
-      minimumRevision: reconnect ? 0 : requirement.revision,
-      freshness: reconnect ? 'after-current' : 'join-current',
-      recover: async () => await this.dependencies.recoverSessions(scope.target),
-      accept: (catalog) => {
-        if (!scope.isActive()) return { kind: 'inactive' }
-        const localRevision = this.dependencies.projection.terminalSessionsCatalogCoverageRevision(scope.target)
-        if (localRevision !== null && localRevision > catalog.revision) {
-          return { kind: 'superseded', localRevision }
+    const minimumRevision = reconnect ? 0 : requirement.revision
+    const reconnectResynchronization = reconnect
+      ? this.requireReconnectResynchronization(scope)
+      : (this.reconnectResynchronizationByScope.get(scope) ?? null)
+    scope.runLatest(
+      reconnect ? TERMINAL_PROJECTION_RECONNECT_LANE : TERMINAL_PROJECTION_REFRESH_LANE,
+      async () => await this.dependencies.recoverSessions(scope.target),
+      (catalog) => {
+        if (catalog.revision < minimumRevision) {
+          throw new Error(
+            `Terminal sessions recovery did not reach required revision ${minimumRevision}; received ${catalog.revision}`,
+          )
         }
         const reconciled = this.dependencies.projection.reconcileServerSessionsSnapshot(scope.target, catalog, clientId)
-        if (reconciled) return { kind: 'accepted' }
-        if (!scope.isActive()) return { kind: 'inactive' }
-        const currentRevision = this.dependencies.projection.terminalSessionsCatalogCoverageRevision(scope.target)
-        if (currentRevision !== null && currentRevision > catalog.revision) {
-          return { kind: 'superseded', localRevision: currentRevision }
+        if (!reconciled) {
+          const currentRevision = this.dependencies.projection.terminalSessionsCatalogCoverageRevision(scope.target)
+          if (reconnectResynchronization === null || currentRevision === null || currentRevision <= catalog.revision) {
+            throw new Error('Terminal sessions snapshot rejected by the active runtime membership')
+          }
         }
-        return { kind: 'membership-rejected' }
-      },
-      complete: () => {
+        this.consumeReconnectResynchronization(scope, reconnectResynchronization)
         this.dependencies.markReady(scope.target.workspaceId, scope.target.workspaceRuntimeId)
       },
-      afterAccept: reconnect
-        ? () =>
-            this.dependencies.projection.resynchronizeConnectedViews(
-              scope.target.workspaceId,
-              scope.target.workspaceRuntimeId,
-            )
-        : undefined,
-      reject: (error) => {
+      (error) => {
         this.dependencies.logFailure(error)
         const hydration = this.dependencies.hydrationEntry(scope.target.workspaceId)
         if (hydration?.workspaceRuntimeId !== scope.target.workspaceRuntimeId || hydration.phase !== 'pending') return
@@ -88,7 +84,19 @@ export class AppTerminalProjectionRecovery {
           projectionHydrationFailureMessage(error),
         )
       },
-    })
+    )
+  }
+
+  private requireReconnectResynchronization(scope: RuntimeProjectionScope): number {
+    const generation = this.nextReconnectResynchronization++
+    this.reconnectResynchronizationByScope.set(scope, generation)
+    return generation
+  }
+
+  private consumeReconnectResynchronization(scope: RuntimeProjectionScope, generation: number | null): void {
+    if (generation === null || this.reconnectResynchronizationByScope.get(scope) !== generation) return
+    this.dependencies.projection.resynchronizeConnectedViews(scope.target.workspaceId, scope.target.workspaceRuntimeId)
+    this.reconnectResynchronizationByScope.delete(scope)
   }
 }
 

@@ -619,6 +619,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'term-exit-1111111111111111',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
+          tabsBeforeRetirement: null,
         },
       },
     ]
@@ -649,6 +650,8 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-closed-11111111111111',
         workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        tabsBeforeRetirement: null,
       },
     ]
     for (const message of topLevelEvents) {
@@ -1376,6 +1379,8 @@ describe('shared terminal validators', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        tabsBeforeRetirement: null,
       }),
     ).toEqual({
       type: 'session-closed',
@@ -1383,6 +1388,8 @@ describe('shared terminal validators', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      tabsBeforeRetirement: null,
     })
     expect(
       normalizeTerminalSocketServerMessage({
@@ -1392,6 +1399,34 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'term-111111111111111111111',
         workspaceId: 'goblin+file:///repo',
         worktreePath: '/repo/worktree',
+      }),
+    ).toBeNull()
+  })
+
+  test('rejects malformed terminal retirement tab snapshots', () => {
+    const tabsBeforeRetirement = [{ type: 'terminal' }]
+    expect(
+      normalizeTerminalRealtimeMessage({
+        type: 'exit',
+        event: {
+          terminalRuntimeSessionId: 'pty_retirement_mismatch',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-retirement-mismatch',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          tabsBeforeRetirement,
+        },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeTerminalRealtimeMessage({
+        type: 'session-closed',
+        terminalRuntimeSessionId: 'pty_retirement_mismatch',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-retirement-mismatch',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        tabsBeforeRetirement,
       }),
     ).toBeNull()
   })
@@ -1560,6 +1595,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        tabsBeforeRetirement: null,
       },
     }
     expect(normalizeTerminalRealtimeMessage(message)).toEqual({
@@ -1570,6 +1606,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeGeneration: 1,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
+        tabsBeforeRetirement: null,
       },
     })
     expect(

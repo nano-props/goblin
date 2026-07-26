@@ -1,4 +1,4 @@
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneFilesystemExecutionPath,
   type WorkspacePaneFilesystemExecutionTarget,
@@ -401,7 +401,11 @@ export interface TerminalExitEvent {
   terminalSessionId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  /** Canonical pane membership captured before terminal retirement. */
+  tabsBeforeRetirement: WorkspacePaneTabEntry[] | null
 }
+
+export type TerminalSessionClosedEvent = TerminalExitEvent
 
 /**
  * Realtime identity-change event (controller crash, controller

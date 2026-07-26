@@ -426,6 +426,7 @@ describe('terminal web host client', () => {
     const onIdentity = vi.fn()
     const onLifecycle = vi.fn()
     const onSessionsChanged = vi.fn()
+    const onSessionClosed = vi.fn()
     const onWorkspaceTabsChanged = vi.fn()
 
     const disposeOutput = terminalClient.onOutput(onOutput)
@@ -435,6 +436,7 @@ describe('terminal web host client', () => {
     const disposeIdentity = terminalClient.onIdentity(onIdentity)
     const disposeLifecycle = terminalClient.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalClient.onSessionsChanged(onSessionsChanged)
+    const disposeSessionClosed = terminalClient.onSessionClosed(onSessionClosed)
     const disposeWorkspaceTabsChanged = workspacePaneTabsClient.onChanged(onWorkspaceTabsChanged)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -486,6 +488,7 @@ describe('terminal web host client', () => {
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
+          tabsBeforeRetirement: null,
         },
       }),
     )
@@ -526,6 +529,20 @@ describe('terminal web host client', () => {
     )
     socket.emitMessage(
       JSON.stringify({
+        type: 'session-closed',
+        terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        workspaceId: 'goblin+file:///tmp/repo',
+        workspaceRuntimeId: 'repo-runtime-1',
+        tabsBeforeRetirement: [
+          { type: 'status', tabId: 'workspace-pane:status' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
+        ],
+      }),
+    )
+    socket.emitMessage(
+      JSON.stringify({
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
         change: 'invalidation',
         workspaceId: 'goblin+file:///tmp/repo',
@@ -561,6 +578,7 @@ describe('terminal web host client', () => {
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: 'goblin+file:///tmp/repo',
       workspaceRuntimeId: 'repo-runtime-1',
+      tabsBeforeRetirement: null,
     })
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
@@ -584,6 +602,17 @@ describe('terminal web host client', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 1,
     })
+    expect(onSessionClosed).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_1',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      workspaceId: 'goblin+file:///tmp/repo',
+      workspaceRuntimeId: 'repo-runtime-1',
+      tabsBeforeRetirement: [
+        { type: 'status', tabId: 'workspace-pane:status' },
+        { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
+      ],
+    })
     expect(onWorkspaceTabsChanged).toHaveBeenCalledWith({
       type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
       change: 'invalidation',
@@ -597,6 +626,7 @@ describe('terminal web host client', () => {
     disposeIdentity()
     disposeLifecycle()
     disposeSessionsChanged()
+    disposeSessionClosed()
     disposeWorkspaceTabsChanged()
   })
 

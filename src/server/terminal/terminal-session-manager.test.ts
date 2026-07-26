@@ -3,8 +3,10 @@ import { SerializeAddon } from '@xterm/addon-serialize'
 import {
   terminalExecutionPath,
   type TerminalAttachResult,
+  type TerminalSessionSummary,
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   createPtyHandle,
   type PtyHandle,
@@ -52,6 +54,14 @@ function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)
   if (!locator) throw new Error('invalid workspace locator fixture')
   return locator
+}
+
+async function noRetirementTabsSnapshot(
+  _userId: string,
+  _session: TerminalSessionSummary,
+  commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
+): Promise<void> {
+  commit(null)
 }
 
 interface DeferredPtySupervisor extends PtySupervisor {
@@ -125,6 +135,7 @@ function createManagerWithPresence(
     {
       onOutput: vi.fn(),
       onExit: vi.fn(),
+      withRetirementTabsSnapshot: noRetirementTabsSnapshot,
       ...sink,
     },
     (_userId, clientId) => isClientOnline(clientId),
@@ -134,6 +145,13 @@ function createManagerWithPresence(
 
 function createAlwaysOnlineManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSink<string>> = {}) {
   return createManagerWithPresence(supervisor, sink, () => true)
+}
+
+function tabsBeforeRetirement(): WorkspacePaneTabEntry[] {
+  return [
+    { type: 'files', tabId: 'workspace-pane:files' },
+    { type: 'terminal', runtimeSessionId: TERMINAL_SESSION_ID },
+  ]
 }
 
 function ptySpawnSuccess(id: string): Extract<PtySpawnResult, { ok: true }> {
@@ -224,7 +242,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     let presenceFails = true
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
-      { onOutput: vi.fn(), onExit: vi.fn() },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn() },
       () => {
         if (presenceFails) throw new Error('presence unavailable')
         return true
@@ -254,7 +272,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     let presenceFails = false
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
-      { onOutput: vi.fn(), onExit: vi.fn() },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn() },
       () => {
         if (presenceFails) throw new Error('presence unavailable')
         return true
@@ -418,7 +436,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const onlineClients = new Set([CLIENT_ID])
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
       (_userId, clientId) => onlineClients.has(clientId),
       createWorkspaceRuntimeRetentionHost(),
     )
@@ -454,7 +472,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const onlineClients = new Set([CLIENT_ID, 'client-b', 'client-c'])
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity: vi.fn() },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onIdentity: vi.fn() },
       (_userId, clientId) => onlineClients.has(clientId),
       createWorkspaceRuntimeRetentionHost(),
     )
@@ -699,7 +717,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const onIdentity = vi.fn()
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
       (_userId, clientId) => onlineClients.has(clientId),
       createWorkspaceRuntimeRetentionHost(),
     )
@@ -853,7 +871,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const onlineClients = new Set([CLIENT_ID, viewerClientId])
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn() },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn() },
       (_userId, clientId) => onlineClients.has(clientId),
       createWorkspaceRuntimeRetentionHost(),
     )
@@ -905,7 +923,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const onIdentity = vi.fn()
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
       (_userId, clientId) => onlineClients.has(clientId),
       createWorkspaceRuntimeRetentionHost(),
     )
@@ -1001,6 +1019,53 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     expect(onOutput).not.toHaveBeenCalled()
   })
 
+  test('publishes natural exit with the canonical tabs before-state', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onExit = vi.fn()
+    const tabs = tabsBeforeRetirement()
+    const withRetirementTabsSnapshot = vi.fn(
+      async (
+        _userId: string,
+        _session: TerminalSessionSummary,
+        commit: (tabsBeforeRetirement: WorkspacePaneTabEntry[] | null) => undefined,
+      ) => {
+        commit(tabs)
+      },
+    )
+    const manager = createAlwaysOnlineManager(supervisor, { onExit, withRetirementTabsSnapshot })
+    const created = await createSession(manager, supervisor)
+
+    supervisor.emitExit('pty_initial_123456')
+
+    await vi.waitFor(() =>
+      expect(onExit).toHaveBeenCalledWith(
+        USER_ID,
+        expect.objectContaining({
+          terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+          tabsBeforeRetirement: tabs,
+        }),
+      ),
+    )
+    expect(withRetirementTabsSnapshot).toHaveBeenCalledOnce()
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+  })
+
+  test('returns the canonical tabs before-state from an explicit close', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const tabs = tabsBeforeRetirement()
+    const manager = createAlwaysOnlineManager(supervisor, {
+      withRetirementTabsSnapshot: async (_userId, _session, commit) => {
+        commit(tabs)
+      },
+    })
+    const created = await createSession(manager, supervisor)
+
+    await expect(manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)).resolves.toMatchObject({
+      kind: 'closed',
+      tabsBeforeRetirement: tabs,
+    })
+  })
+
   test('rejects an existing admission while retirement is in progress', async () => {
     let finishRetirement: (() => void) | undefined
     const supervisor = createDeferredPtySupervisor()
@@ -1046,7 +1111,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     }
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn() },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn() },
       () => true,
       retentions,
     )
@@ -1076,7 +1141,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
     const retain = vi.fn(() => ({ release }))
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
       () => true,
       { retain },
     )
@@ -1100,6 +1165,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
       {
         onOutput: vi.fn(),
         onExit: vi.fn(),
+        withRetirementTabsSnapshot: noRetirementTabsSnapshot,
         onSessionClosed: vi.fn(() => {
           throw new Error('close effect failed')
         }),
@@ -1124,6 +1190,7 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
       {
         onOutput: vi.fn(),
         onExit: vi.fn(),
+        withRetirementTabsSnapshot: noRetirementTabsSnapshot,
         onSessionClosed: vi.fn(() => closeEffect.promise),
       },
       () => true,
@@ -1141,11 +1208,16 @@ describe('TerminalSessionManager admission and frame lifecycle', () => {
 
   test('releases the admission reservation when runtime retention rejects a stale generation', () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = new TerminalSessionManager<string>(supervisor, { onOutput: vi.fn(), onExit: vi.fn() }, () => true, {
-      retain: vi.fn(() => {
-        throw new Error('error.workspace-runtime-stale')
-      }),
-    })
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn() },
+      () => true,
+      {
+        retain: vi.fn(() => {
+          throw new Error('error.workspace-runtime-stale')
+        }),
+      },
+    )
     const input = {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1502,7 +1574,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const release = vi.fn()
     const manager = new TerminalSessionManager<string>(
       supervisor,
-      { onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
+      { withRetirementTabsSnapshot: noRetirementTabsSnapshot, onOutput: vi.fn(), onExit: vi.fn(), onSessionClosed },
       () => true,
       { retain: vi.fn(() => ({ release })) },
     )

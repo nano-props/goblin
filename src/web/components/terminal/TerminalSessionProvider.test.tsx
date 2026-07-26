@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
-import type { TerminalExecutionTarget } from '#/shared/terminal-types.ts'
+import type { TerminalExecutionTarget, TerminalSessionClosedEvent } from '#/shared/terminal-types.ts'
 import {
   canonicalWorkspaceLocator,
   parseCanonicalWorkspaceLocator,
@@ -334,6 +334,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalSessionId,
     workspaceId: REPO_ID,
     workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
+    tabsBeforeRetirement: null,
   }
 }
 
@@ -346,14 +347,7 @@ let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null =
 let sessionsChangedHandler: ((event: TerminalSessionsChangedEvent) => void) | null = null
 let sessionsChangedRevision = 0
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
-let sessionClosedHandler:
-  | ((event: {
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: typeof REPO_ID
-    }) => void)
-  | null = null
+let sessionClosedHandler: ((event: TerminalSessionClosedEvent) => void) | null = null
 type OptionalIdentityRevision<T> = T extends unknown
   ? Omit<T, 'identityRevision'> & { identityRevision?: number }
   : never
@@ -772,21 +766,12 @@ beforeEach(() => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
         }
       }),
-      onSessionClosed: vi.fn(
-        (
-          cb: (event: {
-            terminalRuntimeSessionId: string
-            terminalRuntimeGeneration: number
-            terminalSessionId: string
-            workspaceId: typeof REPO_ID
-          }) => void,
-        ) => {
-          sessionClosedHandler = cb
-          return () => {
-            if (sessionClosedHandler === cb) sessionClosedHandler = null
-          }
-        },
-      ),
+      onSessionClosed: vi.fn((cb: (event: TerminalSessionClosedEvent) => void) => {
+        sessionClosedHandler = cb
+        return () => {
+          if (sessionClosedHandler === cb) sessionClosedHandler = null
+        }
+      }),
     }),
     workspacePaneTabs: () => ({
       replace: vi.fn(async () => ({ revision: 1, entries: [] })),
@@ -1005,7 +990,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('applies a server bell that arrives before the session projection materializes', async () => {
+  test('drops a server bell that arrives before the session projection materializes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1036,14 +1021,9 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.hasBell])).toEqual([
-        ['term-111111111111111111111', true],
+        ['term-111111111111111111111', false],
       ])
-      expect(notifyBell).toHaveBeenCalledWith({
-        title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\nbuild running',
-        terminalSessionId: 'term-111111111111111111111',
-        session: repoTerminalBase(),
-      })
+      expect(notifyBell).not.toHaveBeenCalled()
     } finally {
       hasFocus.mockRestore()
       await unmount()
@@ -1288,6 +1268,8 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: REPO_ID,
+          workspaceRuntimeId: 'repo-runtime-test',
+          tabsBeforeRetirement: null,
         })
       })
 

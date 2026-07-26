@@ -885,9 +885,13 @@ describe('server terminal runtime', () => {
     })
 
     mockPtys[0]?.emitExit()
-    const exitMessage = socket.send.mock.calls
-      .map(([payload]) => JSON.parse(String(payload)))
-      .find((message) => message.type === 'exit')
+    let exitMessage: unknown
+    await vi.waitFor(() => {
+      exitMessage = socket.send.mock.calls
+        .map(([payload]) => JSON.parse(String(payload)))
+        .find((message) => message.type === 'exit')
+      expect(exitMessage).toBeDefined()
+    })
     expect(exitMessage).toMatchObject({
       type: 'exit',
       event: {

@@ -52,7 +52,6 @@ describe('TerminalPtyBinding aborted spawn retirement', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      confirmedExit: vi.fn(),
     } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
     const binding = new TerminalPtyBinding(supervisor, events)
     const session: TerminalPtySessionState<string> = {
@@ -414,7 +413,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      confirmedExit: vi.fn(),
     })
     const session: TerminalPtySessionState<string> = {
       id: 'pty_runtime_render_capacity_123456',
@@ -456,7 +454,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      confirmedExit: vi.fn(),
     })
     const session: TerminalPtySessionState<string> = {
       id: 'pty_runtime_observer_failure_123456',
@@ -498,7 +495,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      confirmedExit: vi.fn(),
     })
     const session: TerminalPtySessionState<string> = {
       id: 'pty_runtime_buffered_observer_failure_123456',
@@ -523,11 +519,10 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
   })
 
-  test('confirms native exit even when exit publication throws', async () => {
+  test('contains a synchronous exit handler failure', async () => {
     const channel = createPtyEventChannel()
     const handle = createPtyHandle('pty_exit_publication_failure_123456')
     const supervisor = createChannelSupervisor(channel.lease, handle)
-    const confirmedExit = vi.fn()
     const binding = new TerminalPtyBinding(supervisor, {
       isSessionLive: () => true,
       emitLifecycle: vi.fn(),
@@ -537,7 +532,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       emitExit: () => {
         throw new Error('exit sink failed')
       },
-      confirmedExit,
     })
     const session: TerminalPtySessionState<string> = {
       id: 'pty_runtime_exit_publication_failure_123456',
@@ -552,7 +546,7 @@ describe('TerminalPtyBinding adoption boundary', () => {
       result: { ok: true },
     })
     expect(() => channel.sink.exit(0, null)).not.toThrow()
-    expect(confirmedExit).toHaveBeenCalledWith(session, 1)
+    expect(session).toMatchObject({ phase: 'error', message: 'error.unavailable' })
   })
 
   test('does not roll a replacement back after its buffered exit is published', async () => {
@@ -578,7 +572,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       getDiagnostics: vi.fn(),
       shutdown: vi.fn(),
     } satisfies PtySupervisor
-    const confirmedExit = vi.fn()
     const events = {
       isSessionLive: vi.fn(() => true),
       emitLifecycle: vi.fn(),
@@ -586,7 +579,6 @@ describe('TerminalPtyBinding adoption boundary', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      confirmedExit,
     } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
     const binding = new TerminalPtyBinding(supervisor, events)
     const session: TerminalPtySessionState<string> = {
@@ -608,7 +600,10 @@ describe('TerminalPtyBinding adoption boundary', () => {
 
     expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 2, activity: 'retained' })
     expect(previousRender.screen.disposed).toBe(true)
-    expect(confirmedExit).toHaveBeenCalledWith(session, 2)
+    expect(events.emitExit).toHaveBeenCalledWith(session, {
+      terminalRuntimeSessionId: session.id,
+      terminalRuntimeGeneration: 2,
+    })
   })
 })
 
@@ -640,7 +635,6 @@ async function createBoundBinding(
     emitBell: vi.fn(),
     emitTitle: vi.fn(),
     emitExit: vi.fn(),
-    confirmedExit: vi.fn(),
   } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
   const binding = new TerminalPtyBinding(supervisor, events)
   const session: TerminalPtySessionState<string> = {
@@ -705,7 +699,6 @@ function createPreparedBinding(supervisor: PtySupervisor) {
     emitBell: vi.fn(),
     emitTitle: vi.fn(),
     emitExit: vi.fn(),
-    confirmedExit: vi.fn(),
   })
   return { binding, session }
 }

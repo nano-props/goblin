@@ -64,6 +64,7 @@ import {
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
+import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -543,6 +544,10 @@ function AuthenticatedWorkspaceSideEffects({
   navigateToIndex: () => void
 }): null {
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
+  useTerminalRetirementWorkspacePanePresentation({
+    currentTarget: currentWorkspacePaneCommandTarget,
+    navigation,
+  })
   useClientEffectIntentRouter({
     navigation,
     currentWorkspaceId: hydratedRouteWorkspaceId,

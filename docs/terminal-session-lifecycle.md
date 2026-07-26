@@ -347,6 +347,13 @@ The projection drops the matching local session without issuing a
 second server close (the originating window already disposed the
 local entry, and the server has already killed the PTY).
 
+Before terminal membership is retired, the server captures the canonical pane
+tabs and includes that before-state in the natural-exit or sibling-window close
+event. The client makes one close-back attempt only when the retired terminal is
+still the exact current route and no navigation commit is already owned. If the
+target projection is unavailable or the route has moved, presentation fails
+fast; the committed terminal retirement is not retried.
+
 This handles the case where window A's close drops the socket
 mid-flight and window B's server-side close still emits the broadcast
 — both windows end up consistent.

@@ -419,6 +419,22 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     })
   }
 
+  async withExclusiveSnapshot(
+    input: { userId: string; workspaceId: WorkspaceId; scope: string },
+    commit: (snapshot: WorkspacePaneTabsSnapshot) => undefined,
+  ): Promise<void> {
+    return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
+      const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
+      const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
+      const snapshot = await layout.snapshot({
+        scope: aggregateScope(input.userId, input.workspaceId, input.scope),
+        validTargets,
+        providerSnapshots: providers,
+      })
+      commit(snapshot)
+    })
+  }
+
   async closeScope(input: { userId: string; scope: string }): Promise<void> {
     const workspaceId = workspaceIdFromScope(input.scope)
     await this.runWorkspaceTabsOperation(workspaceId, (layout) => {

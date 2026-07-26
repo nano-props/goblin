@@ -47,6 +47,23 @@ export function currentPrimaryWindowNavigationGeneration(): PrimaryWindowNavigat
   return latestPrimaryWindowNavigationGeneration
 }
 
+/**
+ * Captures the current generation only when no history commit is registered
+ * against it. The caller may use that generation for a passive transition
+ * without displacing the registered commit owner. A later navigation still
+ * invalidates the captured generation through the normal currentness check.
+ *
+ * This deliberately does not coordinate the brief interval between a user
+ * action choosing a generation and registering its history commit. Terminal
+ * close-back is best-effort presentation: a rare overlap may produce a
+ * retryable navigation race, while runtime and tab authority remain intact.
+ * Modeling admission across every async action would add lifecycle state and
+ * release paths disproportionate to that recoverable UI-only risk.
+ */
+export function captureUnownedPrimaryWindowNavigationGeneration(): PrimaryWindowNavigationGeneration | null {
+  return ownedPrimaryWindowNavigation ? null : latestPrimaryWindowNavigationGeneration
+}
+
 export async function executePrimaryWindowNavigation(
   generation: PrimaryWindowNavigationGeneration,
   navigate: () => Promise<unknown>,

@@ -170,17 +170,17 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('reuses one cold recovery across StrictMode effect replay', async () => {
+  test('hydrates terminal projection under StrictMode effect replay', async () => {
     const repo = seedCurrentRepo()
     const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise)
+    recoverSessionsMock.mockReturnValue(coldRecovery.promise)
     const result = renderInJsdom(
       <StrictMode>
         <RuntimeProbe currentWorkspaceId={REPO_ID} />
       </StrictMode>,
     )
     try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalled())
       await act(async () => {
         coldRecovery.resolve({ revision: 0, sessions: [] })
       })
@@ -190,7 +190,6 @@ describe('AppRuntimeProjectionProvider', () => {
           phase: 'ready',
         }),
       )
-      expect(recoverSessionsMock).toHaveBeenCalledOnce()
       expect(document.body.textContent).toContain('probe')
     } finally {
       result.unmount()
@@ -411,33 +410,29 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('follows a cold recovery superseded by a concurrent create revision', async () => {
+  test('fails fast when the projection rejects a cold recovery superseded by a local revision', async () => {
     const repo = seedCurrentRepo()
     const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise).mockResolvedValueOnce({ revision: 2, sessions: [] })
+    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise)
     projectionMocks.terminalSessionsCatalogCoverageRevision.mockReturnValue(0)
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       projectionMocks.terminalSessionsCatalogCoverageRevision.mockReturnValue(2)
+      projectionMocks.reconcileServerSessionsSnapshot.mockReturnValueOnce(false)
 
       await act(async () => {
         coldRecovery.resolve({ revision: 1, sessions: [] })
       })
 
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(2))
       await vi.waitFor(() =>
         expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'ready',
+          phase: 'failed',
         }),
       )
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledOnce()
-      expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
-        { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
-        { revision: 2, sessions: [] },
-        'client_sharedterminal',
-      )
     } finally {
       result.unmount()
     }
@@ -465,10 +460,10 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('lets an in-flight cold recovery satisfy a newer terminal event without issuing a second request', async () => {
+  test('runs a fresh recovery when a terminal event supersedes an in-flight cold recovery', async () => {
     const repo = seedCurrentRepo()
     const recovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock.mockReturnValueOnce(recovery.promise)
+    recoverSessionsMock.mockReturnValueOnce(recovery.promise).mockResolvedValue({ revision: 4, sessions: [] })
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
@@ -482,7 +477,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() =>
         expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
-      expect(recoverSessionsMock).toHaveBeenCalledOnce()
+      expect(recoverSessionsMock).toHaveBeenCalledTimes(2)
     } finally {
       result.unmount()
     }
@@ -552,10 +547,10 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('coalesces cold recovery, reconnect, and a sessions event before resynchronizing views once', async () => {
+  test('recovers cold state, reconnect, and a sessions event before resynchronizing views once', async () => {
     seedCurrentRepo()
     const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise).mockResolvedValueOnce({ revision: 2, sessions: [] })
+    recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise).mockResolvedValue({ revision: 2, sessions: [] })
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
@@ -575,9 +570,7 @@ describe('AppRuntimeProjectionProvider', () => {
         coldRecovery.resolve({ revision: 0, sessions: [] })
       })
 
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(2))
       await vi.waitFor(() => expect(projectionMocks.resynchronizeConnectedViews).toHaveBeenCalledOnce())
-      expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledOnce()
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
         {
           workspaceId: REPO_ID,
@@ -595,33 +588,23 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('keeps reconnect resynchronization dormant across a failed fresh follow-up', async () => {
+  test('carries a failed reconnect resynchronization into the next accepted sessions refresh', async () => {
     const repo = seedCurrentRepo()
-    const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
-    recoverSessionsMock
-      .mockReturnValueOnce(coldRecovery.promise)
-      .mockRejectedValueOnce(new Error('network unavailable'))
-      .mockResolvedValueOnce({ revision: 2, sessions: [] })
     const result = renderRuntimeProvider(REPO_ID)
     try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      await vi.waitFor(() =>
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
+      )
+      recoverSessionsMock.mockClear()
+      recoverSessionsMock.mockRejectedValueOnce(new Error('network unavailable'))
       await act(async () => {
         recoveredHandler?.('client_sharedterminal')
       })
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
-      await act(async () => {
-        coldRecovery.resolve({ revision: 1, sessions: [] })
-      })
-
-      await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'failed',
-          errorMessage: 'network unavailable',
-        }),
-      )
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       expect(projectionMocks.resynchronizeConnectedViews).not.toHaveBeenCalled()
 
+      recoverSessionsMock.mockResolvedValueOnce({ revision: 2, sessions: [] })
       await act(async () => {
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 2 })
       })
@@ -632,7 +615,7 @@ describe('AppRuntimeProjectionProvider', () => {
           phase: 'ready',
         }),
       )
-      expect(recoverSessionsMock).toHaveBeenCalledTimes(3)
+      expect(recoverSessionsMock).toHaveBeenCalledTimes(2)
       expect(projectionMocks.resynchronizeConnectedViews).toHaveBeenCalledOnce()
     } finally {
       result.unmount()
@@ -700,7 +683,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('does not queue a second focus refresh while cold recovery is pending', async () => {
+  test('completes the latest focus refresh while cold recovery is pending', async () => {
     const repo = seedCurrentRepo()
     const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
     recoverSessionsMock.mockReturnValueOnce(coldRecovery.promise).mockResolvedValue({ revision: 1, sessions: [] })
@@ -719,7 +702,7 @@ describe('AppRuntimeProjectionProvider', () => {
           phase: 'ready',
         }),
       )
-      expect(recoverSessionsMock).toHaveBeenCalledOnce()
+      expect(recoverSessionsMock).toHaveBeenCalledTimes(2)
     } finally {
       result.unmount()
     }

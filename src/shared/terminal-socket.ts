@@ -13,6 +13,7 @@ import type {
   TerminalRestartResult,
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
+  TerminalSessionClosedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -20,7 +21,6 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RealtimeRpcRequestMessage, RealtimeRpcResponseMessage } from '#/shared/realtime-rpc.ts'
 
 export type TerminalRealtimeMessage =
@@ -42,13 +42,7 @@ export type TerminalRealtimeMessage =
   // this to drop the local session immediately, without waiting for
   // a full list-rescan. The workspace identity lets the client route
   // the event without a manager lookup.
-  | {
-      type: 'session-closed'
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
-      terminalSessionId: string
-      workspaceId: WorkspaceId
-    }
+  | ({ type: 'session-closed' } & TerminalSessionClosedEvent)
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput

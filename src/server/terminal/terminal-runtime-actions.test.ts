@@ -59,6 +59,7 @@ function terminalCloseOutcome(): TerminalSessionCloseOutcome {
       message: null,
       canonicalSize: { cols: 80, rows: 24 },
     },
+    tabsBeforeRetirement: null,
   }
 }
 
@@ -283,6 +284,8 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabsBeforeRetirement: null,
     })
   })
 
