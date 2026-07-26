@@ -21,6 +21,13 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 - Use the project's `ScrollArea` (`src/web/components/ui/scroll-area.tsx`) for any scrollable region by default. Only fall back to native `overflow` when there's a concrete reason (e.g. terminal scrollbars need native browser behavior).
 - Hover-revealed action triggers (row action menus) must also stay visible in compact UI and while their popover is open. Collapse the show-conditions into one boolean and use `cn(base, visible && '…', !visible && '…')` — see `docs/ui-conventions.md`.
 
+## UI correctness and proportionality
+
+- Treat UI behavior as interactive presentation, not as a database transaction. Define and verify the happy path, then keep failure behavior simple and recoverable. This does not make every navigation, lifecycle, or ownership defect cosmetic; trace which user action and authority boundary are affected before classifying the risk.
+- Keep corrective complexity proportional to concrete, reproducible, or evidence-backed product risk. Before adding coordination, retries, recovery state, or a broader lifecycle protocol, evaluate likelihood, severity, data integrity, and whether the user can immediately retry. Missing production-frequency data is not evidence that a reproducible defect is harmless.
+- Purely passive UI ordering, focus, selection, animation, or navigation effects may remain best-effort when failure is locally contained, preserves authoritative state, and is easy for the user to correct. Interference with an explicit user action must be evaluated explicitly; accept it only as a documented product tradeoff when its probability and impact do not justify a broader mechanism.
+- Proportionality does not waive established admission, lifecycle, ownership, authorization, or data-boundary invariants. It determines the shape of a fix and whether a newly proposed UI invariant justifies its maintenance cost. Reserve stronger coordination for data integrity, security, resource ownership, irreversible writes, or concrete frequent user harm.
+
 ## Root-cause and data-boundary fixes
 
 - Trace defects to the authoritative data source, violated invariant, and atomic read/write boundary before changing application behavior.
