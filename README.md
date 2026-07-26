@@ -27,7 +27,10 @@ Installs a host-architecture `.app` to `~/Applications` (mac) or
 
 ## Run server mode
 
+Install dependencies first, then start server mode:
+
 ```sh
+bun install # first run only
 ./serve.sh
 ```
 
