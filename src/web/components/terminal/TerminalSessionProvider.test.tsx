@@ -990,7 +990,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('applies a server bell that arrives before the session projection materializes', async () => {
+  test('drops a server bell that arrives before the session projection materializes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1021,14 +1021,9 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.hasBell])).toEqual([
-        ['term-111111111111111111111', true],
+        ['term-111111111111111111111', false],
       ])
-      expect(notifyBell).toHaveBeenCalledWith({
-        title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\nbuild running',
-        terminalSessionId: 'term-111111111111111111111',
-        session: repoTerminalBase(),
-      })
+      expect(notifyBell).not.toHaveBeenCalled()
     } finally {
       hasFocus.mockRestore()
       await unmount()
