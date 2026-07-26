@@ -64,7 +64,6 @@ vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
 function gitProbe() {
   return {
     status: 'ready' as const,
-    name: 'repo',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true },
@@ -143,7 +142,6 @@ describe('restoreWorkspaceTabs', () => {
       entry: { id: 'goblin+file:///repo' },
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      name: 'repo',
     })
     expect(result.workspace.gitProjection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
@@ -291,7 +289,6 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready', target: remoteTarget },
-      name: 'repo',
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -494,7 +491,6 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready', attemptId: 3, target: remoteTarget },
-      name: 'repo',
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
@@ -534,7 +530,6 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
-      name: 'repo',
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue({
       status: 'unavailable',

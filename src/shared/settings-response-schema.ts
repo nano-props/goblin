@@ -114,7 +114,6 @@ export const ServerWorkspaceStateSchema = v.strictObject({
 const RestoredWorkspaceRuntimeBaseEntries = {
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-  name: v.string(),
   entry: WorkspaceSessionEntrySchema,
 } as const
 

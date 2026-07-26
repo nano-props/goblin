@@ -60,12 +60,10 @@ describe('restorable-workspace-state', () => {
   test('persists a plain Workspace root without synthetic Git targets', () => {
     const workspace = emptyWorkspace(
       'goblin+file:///tmp/repo-without-query-model',
-      'repo-without-query-model',
       'repo-runtime-without-query',
     )
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'repo-without-query-model',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -119,7 +117,7 @@ describe('restorable-workspace-state', () => {
         'feature/active': [workspacePaneStaticTabEntry('status')],
       },
     })
-    const stubRepo = emptyWorkspace('goblin+file:///tmp/repo-b', 'repo-b', 'repo-runtime-b')
+    const stubRepo = emptyWorkspace('goblin+file:///tmp/repo-b', 'repo-runtime-b')
     stubRepo.session = {
       entry: localWorkspaceSessionEntry(stubRepo.id),
       projectionState: 'stub',

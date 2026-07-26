@@ -13,11 +13,10 @@ import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type RemoteWorkspaceConnectionOutcome =
-  | { kind: 'ready'; workspaceId: WorkspaceId; name: string; target: RemoteWorkspaceTarget }
+  | { kind: 'ready'; workspaceId: WorkspaceId; target: RemoteWorkspaceTarget }
   | {
       kind: 'failed'
       workspaceId: WorkspaceId
-      name: string
       reason: RemoteWorkspaceFailureReason
       target?: RemoteWorkspaceTarget
     }
@@ -34,13 +33,12 @@ function commandOutcome(
   if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
   const lifecycle = result.lifecycle
   if (lifecycle.kind === 'ready') {
-    return { kind: 'ready', workspaceId, name: result.name, target: lifecycle.target }
+    return { kind: 'ready', workspaceId, target: lifecycle.target }
   }
   if (lifecycle.kind === 'failed') {
     return {
       kind: 'failed',
       workspaceId,
-      name: result.name,
       reason: lifecycle.reason,
       target: lifecycle.target,
     }

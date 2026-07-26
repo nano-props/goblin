@@ -123,7 +123,6 @@ export interface WorkspaceSessionState {
 
 export interface RepoSnapshotCacheEntry {
   savedAt: number
-  name: string
   data: {
     branches: RepoBranchState[]
     currentBranch: string
@@ -134,7 +133,6 @@ export interface RepoSnapshotCacheEntry {
 export interface WorkspaceState {
   /** Canonical workspace id. Local workspace ids encode their absolute filesystem root. */
   id: WorkspaceId
-  name: string
   /** Current runtime authority for this workspace; mirrors the runtime endpoint `workspaceRuntimeId`. */
   workspaceRuntimeId: string
   ui: WorkspaceUiState

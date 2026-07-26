@@ -27,7 +27,6 @@ const failRemoteWorkspaceRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
   vi.fn<() => WorkspaceProbeState>(() => ({
     status: 'ready' as const,
-    name: 'Mock workspace',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true },
@@ -113,7 +112,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('rejects terminal creation from an unavailable authoritative capability', async () => {
     workspaceProbeStateForRuntimeMock.mockReturnValueOnce({
       status: 'ready',
-      name: 'Mock workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: false },
@@ -168,7 +166,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
     workspaceProbeStateForRuntimeMock
       .mockReturnValueOnce({
         status: 'ready',
-        name: 'Mock workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -178,7 +175,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
       })
       .mockReturnValueOnce({
         status: 'ready',
-        name: 'Mock workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: false },

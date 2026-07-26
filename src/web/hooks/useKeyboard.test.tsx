@@ -490,7 +490,6 @@ describe('useKeyboard', () => {
       currentBranchName: null,
       workspaceProbe: {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },

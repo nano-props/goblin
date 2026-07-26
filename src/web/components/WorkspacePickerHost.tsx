@@ -16,6 +16,7 @@ import { useMemo } from 'react'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { toast } from 'sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 
 interface WorkspacePickerHostProps {
   currentWorkspaceId: WorkspaceId | null
@@ -51,7 +52,7 @@ export function WorkspacePickerHost({
           const git = workspace.capability.kind === 'git' ? workspace.capability.git : null
           return {
             id: workspace.id,
-            name: workspace.name,
+            name: workspaceNameFromLocator(workspace.id),
             gitCapability:
               workspace.capability.kind === 'git'
                 ? 'available'

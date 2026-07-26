@@ -13,7 +13,7 @@ function repoRefreshStoreAccess(
   workspaceRuntimeId = 'workspace-runtime-test-9',
   capability: 'git' | 'filesystem' | 'unavailable' = 'git',
 ) {
-  const workspace = emptyWorkspace(WORKSPACE_ID, 'workspace', workspaceRuntimeId)
+  const workspace = emptyWorkspace(WORKSPACE_ID, workspaceRuntimeId)
   if (capability === 'unavailable') {
     acceptWorkspaceProbeState(workspace, {
       status: 'unavailable',
@@ -22,7 +22,6 @@ function repoRefreshStoreAccess(
   } else {
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

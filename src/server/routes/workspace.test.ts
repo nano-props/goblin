@@ -66,7 +66,6 @@ vi.mock('#/server/common/identity.ts', () => ({
 
 const readyPlainWorkspace = {
   status: 'ready' as const,
-  name: 'workspace-route',
   capabilities: {
     files: { read: true as const, write: true },
     terminal: { available: true },
@@ -128,7 +127,7 @@ describe('workspace routes', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       ok: true,
-      workspace: { id: WORKSPACE_ID, name: 'workspace-route' },
+      workspace: { id: WORKSPACE_ID },
       workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/),
       capabilities: { git: { status: 'unavailable' } },
     })

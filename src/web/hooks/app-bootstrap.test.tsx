@@ -648,10 +648,8 @@ function restoredRuntimeForWorkspace(
           : { transport: { kind: 'file' as const } }),
         workspaceId: workspaceIdForTest(entry.id),
         workspaceRuntimeId: `repo-runtime-${entry.id}`,
-        name: entry.id.split('/').pop() || entry.id,
         workspaceProbe: {
           status: 'ready',
-          name: entry.id.split('/').pop() || entry.id,
           capabilities: {
             files: { read: true, write: true },
             terminal: { available: true },

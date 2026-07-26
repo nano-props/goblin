@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
+import type { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const REMOTE_ID = workspaceIdForTest('goblin+ssh://example/repo')
 
 const mocks = vi.hoisted(() => ({
-  runLifecycleWrite: vi.fn(),
+  runLifecycleWrite: vi.fn<typeof runRemoteWorkspaceLifecycleWrite>(),
   getServerRemotePathSuggestions: vi.fn(),
 }))
 
@@ -22,8 +26,7 @@ describe('remote lifecycle route', () => {
   test('passes authenticated and validated input to the write path', async () => {
     mocks.runLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      workspaceId: 'goblin+ssh://example/repo',
-      name: 'repo',
+      workspaceId: REMOTE_ID,
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
     })
 
@@ -52,7 +55,7 @@ describe('remote lifecycle route', () => {
       },
       { beforeCapabilityCommit: expect.any(Function) },
     )
-    expect(await response.json()).toMatchObject({ kind: 'settled', name: 'repo' })
+    expect(await response.json()).toMatchObject({ kind: 'settled', workspaceId: 'goblin+ssh://example/repo' })
   })
 
   test('uses only alias and prefix for remote directory suggestions', async () => {
@@ -78,10 +81,10 @@ describe('remote lifecycle route', () => {
   test('injects Git downgrade cleanup into the serialized capability transition', async () => {
     const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
     mocks.runLifecycleWrite.mockImplementation(async (_input, options) => {
+      if (!options?.beforeCapabilityCommit) throw new Error('expected capability transition hook')
       await options.beforeCapabilityCommit({
         before: {
           status: 'ready',
-          name: 'repo',
           diagnostics: [],
           capabilities: {
             files: { read: true, write: true },
@@ -91,7 +94,6 @@ describe('remote lifecycle route', () => {
         },
         after: {
           status: 'ready',
-          name: 'repo',
           diagnostics: [],
           capabilities: {
             files: { read: true, write: true },
@@ -100,7 +102,23 @@ describe('remote lifecycle route', () => {
           },
         },
       })
-      return { kind: 'settled', workspaceId: 'goblin+ssh://example/repo', name: 'repo', lifecycle: { kind: 'ready' } }
+      return {
+        kind: 'settled',
+        workspaceId: REMOTE_ID,
+        lifecycle: {
+          kind: 'ready',
+          attemptId: 1,
+          target: {
+            id: REMOTE_ID,
+            alias: 'example',
+            remotePath: '/repo',
+            displayName: 'example:repo',
+            host: 'example.test',
+            user: 'developer',
+            port: 22,
+          },
+        },
+      }
     })
 
     const response = await createRemoteRoutes({

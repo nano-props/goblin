@@ -13,10 +13,9 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const listeners = new Set<(event: any) => void>()
 function workspace() {
-  const value = emptyWorkspace(WORKSPACE_ID, 'workspace', 'repo-runtime-test-7')
+  const value = emptyWorkspace(WORKSPACE_ID, 'repo-runtime-test-7')
   acceptWorkspaceProbeState(value, {
     status: 'ready',
-    name: 'workspace',
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },

@@ -49,7 +49,6 @@ const WorkspaceUnavailableResponseSchema = v.strictObject({
 
 export const WorkspaceGitReadyProbeResponseSchema = v.strictObject({
   status: v.literal('ready'),
-  name: v.string(),
   capabilities: v.strictObject({
     files: v.strictObject({ read: v.literal(true), write: v.boolean() }),
     terminal: v.strictObject({ available: v.boolean() }),
@@ -67,7 +66,6 @@ export const WorkspaceGitReadyProbeResponseSchema = v.strictObject({
 
 const WorkspaceReadyResponseSchema = v.strictObject({
   status: v.literal('ready'),
-  name: v.string(),
   capabilities: WorkspaceCapabilitiesResponseSchema,
   diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
 })
@@ -81,7 +79,6 @@ export const WorkspaceProbeStateResponseSchema = v.variant('status', [
 const WorkspaceSettledProbeStateResponseSchema = v.variant('status', [
   v.strictObject({
     status: v.literal('ready'),
-    name: v.string(),
     capabilities: WorkspaceCapabilitiesResponseSchema,
     diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
   }),
@@ -138,7 +135,7 @@ export const WorkspaceRuntimeOpenIdResponseSchema = v.strictObject({
 export const WorkspaceRuntimeOpenResponseSchema = v.variant('ok', [
   v.strictObject({
     ok: v.literal(true),
-    workspace: v.strictObject({ id: WorkspaceIdSchema, name: v.string() }),
+    workspace: v.strictObject({ id: WorkspaceIdSchema }),
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     capabilities: WorkspaceCapabilitiesResponseSchema,
     diagnostics: v.array(WorkspaceDiagnosticResponseSchema),
@@ -200,7 +197,6 @@ export const RemoteLifecycleResponseSchema = v.variant('kind', [
   v.strictObject({
     kind: v.literal('settled'),
     workspaceId: WorkspaceIdSchema,
-    name: v.string(),
     lifecycle: v.variant('kind', [
       v.strictObject({ kind: v.literal('ready'), attemptId: NonNegativeIntegerSchema, target: RemoteWorkspaceTargetResponseSchema }),
       v.strictObject({

@@ -37,7 +37,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
 import { compareAndReplaceServerWorkspaceEntries, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { abortableWorkspaceRestore, workspaceDisplayName } from '#/server/modules/workspace-restore-utils.ts'
+import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
@@ -239,14 +239,12 @@ async function openWorkspaceRuntime(
     if (!authoritativeProbe) {
       throw new Error('workspace runtime was superseded during restore')
     }
-    const name = authoritativeProbe.status === 'ready' ? authoritativeProbe.name : workspaceDisplayName(entry.id)
     if (!workspaceGitAvailable(authoritativeProbe) || !options.active) {
       return {
         kind: 'opened',
         opened: stubWorkspace({
           entry,
           workspaceId: lease.workspaceId,
-          name,
           workspaceProbe: authoritativeProbe,
           transport: { kind: 'file' },
           lease,
@@ -264,7 +262,6 @@ async function openWorkspaceRuntime(
         opened: stubWorkspace({
           entry,
           workspaceId: lease.workspaceId,
-          name,
           workspaceProbe: authoritativeProbe,
           transport: { kind: 'file' },
           lease,
@@ -276,7 +273,6 @@ async function openWorkspaceRuntime(
       opened: gitProjectedWorkspace({
         entry,
         workspaceId: lease.workspaceId,
-        name,
         workspaceProbe: authoritativeProbe,
         transport: { kind: 'file' },
         gitProjection: projection,
@@ -311,7 +307,6 @@ async function openRemoteWorkspace(
           opened: stubWorkspace({
             entry,
             workspaceId: lease.workspaceId,
-            name: lifecycle.name,
             workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
             transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
             lease,
@@ -327,7 +322,6 @@ async function openRemoteWorkspace(
         opened: stubWorkspace({
           entry,
           workspaceId: lease.workspaceId,
-          name: lifecycle.name,
           workspaceProbe,
           transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
           lease,
@@ -345,7 +339,6 @@ async function openRemoteWorkspace(
         opened: stubWorkspace({
           entry,
           workspaceId: lease.workspaceId,
-          name: lifecycle.name,
           workspaceProbe,
           transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
           lease,
@@ -357,7 +350,6 @@ async function openRemoteWorkspace(
       opened: gitProjectedWorkspace({
         entry,
         workspaceId: lease.workspaceId,
-        name: lifecycle.name,
         workspaceProbe,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         gitProjection: projection,
@@ -419,7 +411,6 @@ async function withAcquiredWorkspaceRuntimeLease<T>(
 
 interface OpenedWorkspaceRuntimeInputBase {
   workspaceId: WorkspaceId
-  name: string
   workspaceProbe: WorkspaceProbeState
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }

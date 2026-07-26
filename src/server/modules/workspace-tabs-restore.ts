@@ -13,7 +13,7 @@ import {
   projectWorkspacePaneTabsWithMembershipGuard,
   workspaceEntry,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
-import { abortableWorkspaceRestore, workspaceDisplayName } from '#/server/modules/workspace-restore-utils.ts'
+import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import {
@@ -99,7 +99,6 @@ async function projectWorkspace(
         entry,
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
-        name: lifecycle.name,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
@@ -110,7 +109,6 @@ async function projectWorkspace(
         entry,
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
-        name: lifecycle.name,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
@@ -127,7 +125,6 @@ async function projectWorkspace(
         entry,
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
-        name: lifecycle.name,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
         gitProjection: null,
@@ -137,7 +134,6 @@ async function projectWorkspace(
       entry,
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
-      name: lifecycle.name,
       transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
       workspaceProbe,
       gitProjection: projection,
@@ -173,7 +169,6 @@ async function projectWorkspace(
       entry,
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
-      name: probe.name ?? workspaceDisplayName(entry.id),
       transport: { kind: 'file' },
       workspaceProbe: probe,
       gitProjection: null,
@@ -190,7 +185,6 @@ async function projectWorkspace(
       entry,
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
-      name: probe.name ?? workspaceDisplayName(entry.id),
       transport: { kind: 'file' },
       workspaceProbe: probe,
       gitProjection: null,
@@ -200,7 +194,6 @@ async function projectWorkspace(
     entry,
     workspaceId: entry.id,
     workspaceRuntimeId: input.workspaceRuntimeId,
-    name: probe.name ?? workspaceDisplayName(entry.id),
     transport: { kind: 'file' },
     workspaceProbe: probe,
     gitProjection: projection,

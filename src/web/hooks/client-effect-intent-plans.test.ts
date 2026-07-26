@@ -16,7 +16,6 @@ const CURRENT_GIT_REPO = {
   workspaceRuntimeId: 'repo-runtime-test-7',
   workspaceProbe: {
     status: 'ready' as const,
-    name: 'repo',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true },

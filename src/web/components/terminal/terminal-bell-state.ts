@@ -1,4 +1,4 @@
-import { lastPathSegment } from '#/web/lib/paths.ts'
+import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
@@ -63,7 +63,7 @@ export function createTerminalBellState(
       // The in-app unread state above is published immediately.
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
       lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
-      const repoName = lastPathSegment(terminalSessionCoordinates(descriptor).workspaceId)
+      const workspaceName = workspaceNameFromLocator(terminalSessionCoordinates(descriptor).workspaceId)
       const bodyParts = terminalPresentationBranch(descriptor.presentation)
         ? [terminalPresentationBranch(descriptor.presentation)]
         : []
@@ -72,7 +72,7 @@ export function createTerminalBellState(
       else if (event.processName) bodyParts.push(event.processName)
       void terminalClient
         .notifyBell({
-          title: repoName,
+          title: workspaceName,
           body: bodyParts.join('\n'),
           terminalSessionId: descriptor.terminalSessionId,
           session: terminalSessionBase(descriptor.target, descriptor.presentation),

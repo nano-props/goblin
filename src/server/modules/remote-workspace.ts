@@ -141,20 +141,12 @@ export async function resolveServerRemoteWorkspaceConnection(
   // Step 1: parse the id into a ref.
   const parsed = parseRemoteWorkspaceId(workspaceId)
   const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
-  if (!ref) {
-    return {
-      kind: 'failed',
-      name: parsed?.alias ?? workspaceId,
-      lifecycle: { kind: 'failed', reason: 'config-changed' },
-    }
-  }
-
+  if (!ref) throw new TypeError('canonical SSH workspace ID did not produce a remote workspace reference')
   // Step 2: resolve the SSH target.
   const targetResult = await deps.resolveTarget({ alias: ref.alias, remotePath: ref.remotePath }, signal)
   if ('error' in targetResult) {
     return {
       kind: 'failed',
-      name: ref.displayName,
       lifecycle: {
         kind: 'failed',
         reason: toRemoteWorkspaceFailureReason(targetResult.error),
@@ -173,7 +165,6 @@ export async function resolveServerRemoteWorkspaceConnection(
     if (pathStage?.status === 'failed') {
       return {
         kind: 'failed',
-        name: ref.displayName,
         lifecycle: {
           kind: 'failed',
           reason: toRemoteWorkspaceFailureReason(pathStage.category ?? 'path-missing'),
@@ -189,7 +180,6 @@ export async function resolveServerRemoteWorkspaceConnection(
     if (gitUnavailable || directoryReadable) {
       return {
         kind: 'ready',
-        name: ref.displayName,
         gitAvailable: false,
         ...(probeReason === 'git-missing'
           ? { gitDiagnostic: probe.message ?? 'git-missing' }
@@ -201,7 +191,6 @@ export async function resolveServerRemoteWorkspaceConnection(
     }
     return {
       kind: 'failed',
-      name: ref.displayName,
       lifecycle: { kind: 'failed', reason, target },
     }
   }
@@ -209,7 +198,6 @@ export async function resolveServerRemoteWorkspaceConnection(
   if (probe.gitAtWorkspaceRoot === false) {
     return {
       kind: 'ready',
-      name: ref.displayName,
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
     }
@@ -218,7 +206,6 @@ export async function resolveServerRemoteWorkspaceConnection(
   // Step 4: success.
   return {
     kind: 'ready',
-    name: ref.displayName,
     gitAvailable: true,
     lifecycle: { kind: 'ready', target },
   }

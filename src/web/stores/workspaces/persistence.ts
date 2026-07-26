@@ -37,9 +37,8 @@ const BranchSchema = v.object({
   mergedToDefault: v.optional(v.boolean()),
 })
 
-const RepoSnapshotCacheEntrySchema = v.object({
+const RepoSnapshotCacheEntrySchema = v.strictObject({
   savedAt: FiniteNumber,
-  name: v.string(),
   data: v.object({
     branches: v.array(BranchSchema),
     currentBranch: v.string(),
@@ -83,7 +82,6 @@ function repoSnapshotCacheEntryFromRepo(
   if (branchModel.branches.length === 0) return null
   return {
     savedAt: Date.now(),
-    name: repo.name,
     data: {
       branches: cachedBranches(branchModel.branches),
       currentBranch: branchModel.currentBranch,
@@ -112,7 +110,6 @@ function normalizeRepoSnapshotCacheEntry(value: unknown): RepoSnapshotCacheEntry
   const snapshot = parsed.output
   return {
     savedAt: snapshot.savedAt,
-    name: snapshot.name,
     data: {
       ...snapshot.data,
       branches: cachedBranches(snapshot.data.branches),

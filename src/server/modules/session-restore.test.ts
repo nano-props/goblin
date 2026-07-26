@@ -104,7 +104,6 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
-      name: 'repo',
       repoId: 'goblin+ssh://prod/srv/repo',
     })
   })
@@ -156,7 +155,6 @@ describe('restoreServerWorkspace', () => {
           entry: { id: 'goblin+file:///repo' },
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
-          name: 'repo',
         },
       ],
       workspacePaneTabs: [
@@ -349,7 +347,6 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
-      name: 'repo',
     })
     mocks.workspaceProbes.set(remoteEntry.id, {
       status: 'unavailable',
@@ -618,7 +615,6 @@ describe('restoreServerWorkspace', () => {
 function gitProbe() {
   return {
     status: 'ready' as const,
-    name: 'repo',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true },

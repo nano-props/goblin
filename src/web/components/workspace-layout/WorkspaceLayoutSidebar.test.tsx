@@ -9,6 +9,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
@@ -162,6 +163,22 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'files' }),
     )
+  })
+
+  test('keeps the remote directory name visible while its capability probe is pending', () => {
+    const remoteWorkspaceId = workspaceIdForTest('goblin+ssh://example/home/developer/Documents')
+    const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-remote')
+    useWorkspacesStore.setState({
+      workspaces: { [remoteWorkspaceId]: workspace },
+      workspaceOrder: [remoteWorkspaceId],
+    })
+
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar workspaceId={remoteWorkspaceId} compact={false} git={null} />,
+    )
+
+    expect(container.querySelector('[data-testid="workspace-root-row"]')?.textContent).toContain('Documents')
+    expect(container.querySelector('[data-testid="workspace-root-row"]')?.textContent).not.toContain('example:')
   })
 
   test('keeps the workspace row action menu visible in compact UI', () => {

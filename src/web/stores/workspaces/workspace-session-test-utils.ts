@@ -32,7 +32,6 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       if (workspaceInput === '/missing') return { status: 'unavailable', reason: 'error.workspace-path-not-found' }
       return {
         status: 'ready',
-        name: workspaceInput.split('/').at(-1) ?? workspaceInput,
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -123,13 +122,11 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
         ? {
             kind: 'settled',
             workspaceId: canonicalWorkspaceId,
-            name: result.name,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
           }
         : {
             kind: 'settled',
             workspaceId: canonicalWorkspaceId,
-            name: result.name,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
           }
     }

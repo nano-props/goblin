@@ -87,7 +87,6 @@ function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceId, work
     workspaceRuntimeId,
     probe: {
       status: 'ready',
-      name: 'Mock workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

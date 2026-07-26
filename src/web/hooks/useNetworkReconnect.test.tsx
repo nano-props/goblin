@@ -70,7 +70,7 @@ function remoteTargetFixture() {
 }
 
 function seedRepo(id: ReturnType<typeof workspaceIdForTest>, lifecycle: RemoteWorkspaceConnectionLifecycle | null) {
-  const repo = emptyWorkspace(id, id, 'repo-runtime-test')
+  const repo = emptyWorkspace(id, 'repo-runtime-test')
   repo.admission = isRemoteWorkspaceId(id) ? { kind: 'remote', lifecycle, lifecycleAttemptId: null } : { kind: 'local' }
   useWorkspacesStore.setState((s) => ({
     ...s,

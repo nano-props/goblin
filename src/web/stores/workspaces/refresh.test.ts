@@ -88,10 +88,9 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 describe('remote fetch timestamps', () => {
   test('refreshes a plain Workspace and projects Git only after capability promotion', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-refresh'
-    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -105,7 +104,6 @@ describe('remote fetch timestamps', () => {
       kind: 'committed',
       probe: {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -124,10 +122,9 @@ describe('remote fetch timestamps', () => {
 
   test('coalesces concurrent explicit refreshes for the same Workspace runtime', async () => {
     const workspaceRuntimeId = 'workspace-runtime-coalesced-refresh'
-    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -149,7 +146,6 @@ describe('remote fetch timestamps', () => {
       kind: 'committed',
       probe: {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -174,7 +170,6 @@ describe('remote fetch timestamps', () => {
       kind: 'committed',
       probe: {
         status: 'ready',
-        name: 'workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -201,7 +196,6 @@ describe('remote fetch timestamps', () => {
     updateRepoForTest((repo) => {
       acceptWorkspaceProbeState(repo, {
         status: 'ready',
-        name: 'workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -219,7 +213,6 @@ describe('remote fetch timestamps', () => {
       kind: 'failed',
       probe: {
         status: 'ready',
-        name: 'workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -241,10 +234,9 @@ describe('remote fetch timestamps', () => {
 
   test('returns transport failures for a plain Workspace without creating Git state', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-failed-refresh'
-    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -266,10 +258,9 @@ describe('remote fetch timestamps', () => {
 
   test('closing a plain Workspace cancels its in-flight capability refresh', async () => {
     const workspaceRuntimeId = 'workspace-runtime-plain-closing'
-    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -292,10 +283,9 @@ describe('remote fetch timestamps', () => {
 
   test('closing a plain Workspace cancels Git work created by a concurrent capability promotion', async () => {
     const workspaceRuntimeId = 'workspace-runtime-promoted-while-closing'
-    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    const workspace = emptyWorkspace(REPO_ID, workspaceRuntimeId)
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -314,7 +304,6 @@ describe('remote fetch timestamps', () => {
       kind: 'committed',
       probe: {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -1292,7 +1281,6 @@ describe('projection refresh request ordering', () => {
     updateRepoForTest((repo) => {
       acceptWorkspaceProbeState(repo, {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },

@@ -126,7 +126,7 @@ describe('BranchList', () => {
 
 function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
   return createGitRepoPresentationForTest(
-    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo', 'repo-runtime-test'),
+    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo-runtime-test'),
     {
       branches,
       currentBranch,

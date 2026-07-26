@@ -43,7 +43,6 @@ describe('remote lifecycle write path', () => {
     })!
     mocks.resolveConnection.mockResolvedValue({
       kind: 'ready',
-      name: 'repo',
       lifecycle: { kind: 'ready', target },
       gitAvailable: true,
     })
@@ -53,7 +52,6 @@ describe('remote lifecycle write path', () => {
     ).resolves.toMatchObject({
       kind: 'settled',
       workspaceId,
-      name: 'repo',
       lifecycle: { kind: 'ready', attemptId: 1 },
     })
     expect(mocks.resolveConnection).toHaveBeenCalledTimes(1)
@@ -94,13 +92,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
       })
@@ -133,13 +129,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
       })
@@ -186,13 +180,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValue({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
       })
@@ -241,7 +233,6 @@ describe('remote lifecycle write path', () => {
     })!
     mocks.resolveConnection.mockResolvedValue({
       kind: 'ready',
-      name: 'repo',
       lifecycle: { kind: 'ready', target },
       gitAvailable: true,
     })
@@ -283,7 +274,6 @@ describe('remote lifecycle write path', () => {
     })!
     mocks.resolveConnection.mockResolvedValue({
       kind: 'ready',
-      name: 'repo',
       lifecycle: { kind: 'ready', target },
       gitAvailable: false,
     })
@@ -312,13 +302,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
       })
@@ -344,7 +332,6 @@ describe('remote lifecycle write path', () => {
     })!
     mocks.resolveConnection.mockResolvedValue({
       kind: 'ready',
-      name: 'repo',
       lifecycle: { kind: 'ready', target },
       gitAvailable: false,
       gitDiagnostic: 'Git probe timed out',
@@ -371,13 +358,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
         gitDiagnostic: 'Git probe timed out',
@@ -406,7 +391,6 @@ describe('remote lifecycle write path', () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
     mocks.resolveConnection.mockResolvedValue({
       kind: 'failed',
-      name: 'repo',
       lifecycle: { kind: 'failed', reason },
     })
 
@@ -427,13 +411,11 @@ describe('remote lifecycle write path', () => {
     mocks.resolveConnection
       .mockResolvedValueOnce({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: true,
       })
       .mockResolvedValue({
         kind: 'ready',
-        name: 'repo',
         lifecycle: { kind: 'ready', target },
         gitAvailable: false,
       })
@@ -469,7 +451,6 @@ describe('remote lifecycle write path', () => {
       .mockImplementationOnce(() => firstResult.promise)
       .mockResolvedValueOnce({
         kind: 'failed',
-        name: 'repo',
         lifecycle: { kind: 'failed', reason: 'unreachable' },
       })
     const first = runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
@@ -482,7 +463,6 @@ describe('remote lifecycle write path', () => {
     })
     firstResult.resolve({
       kind: 'failed',
-      name: 'repo',
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
 
@@ -513,7 +493,6 @@ describe('remote lifecycle write path', () => {
     })!
     mocks.resolveConnection.mockResolvedValue({
       kind: 'ready',
-      name: 'repo',
       lifecycle: { kind: 'ready', target },
       gitAvailable: true,
     })

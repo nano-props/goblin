@@ -23,7 +23,6 @@ const target: RemoteWorkspaceTarget = {
 }
 const ready: RemoteWorkspaceConnectionResult = {
   kind: 'ready',
-  name: 'repo',
   gitAvailable: true,
   lifecycle: { kind: 'ready', target },
 }
@@ -72,7 +71,7 @@ describe('workspace runtime remote lifecycle', () => {
     expect(firstSignal.aborted).toBe(false)
     releaseFirst(ready)
     await expect(first).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
-    await expect(ensured).resolves.toMatchObject({ kind: 'settled', name: 'repo', lifecycle: { attemptId: 1 } })
+    await expect(ensured).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
   })
 
   test('ensure reuses the complete settled projection without resolving again', async () => {
@@ -82,7 +81,7 @@ describe('workspace runtime remote lifecycle', () => {
 
     await expect(
       runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, resolver, () => {}, 'ensure'),
-    ).resolves.toMatchObject({ kind: 'settled', name: target.displayName, lifecycle: { kind: 'ready', attemptId: 1 } })
+    ).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 1 } })
     expect(resolver).not.toHaveBeenCalled()
   })
 
@@ -227,7 +226,6 @@ describe('workspace runtime remote lifecycle', () => {
       }),
     ).resolves.toEqual({
       kind: 'settled',
-      name: workspaceId,
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' },
     })
     expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
@@ -284,7 +282,6 @@ describe('workspace runtime remote lifecycle', () => {
       }),
     ).resolves.toEqual({
       kind: 'settled',
-      name: target.displayName,
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable', target },
     })
     expect(listWorkspaceRuntimes(userId)).toEqual([
@@ -340,7 +337,6 @@ describe('workspace runtime remote lifecycle', () => {
       failRemoteWorkspaceLifecycle({ userId, workspaceId, workspaceRuntimeId: runtimeId, reason: 'timeout' }),
     ).resolves.toEqual({
       kind: 'settled',
-      name: workspaceId,
       lifecycle: { kind: 'failed', attemptId: 2, reason: 'timeout' },
     })
     expect(signal.aborted).toBe(true)
@@ -362,7 +358,6 @@ describe('workspace runtime remote lifecycle', () => {
       failRemoteWorkspaceLifecycle({ userId, workspaceId, workspaceRuntimeId: runtimeId, reason: 'handshake-failed' }),
     ).resolves.toEqual({
       kind: 'settled',
-      name: target.displayName,
       lifecycle: { kind: 'failed', attemptId: 2, reason: 'handshake-failed', target },
     })
   })

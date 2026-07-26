@@ -55,10 +55,9 @@ describe('backgroundSyncTargetsFromStore', () => {
   })
 
   test('does not register a plain Workspace', () => {
-    const workspace = emptyWorkspace(LOCAL_WORKSPACE_ID, 'workspace', 'workspace-runtime-test')
+    const workspace = emptyWorkspace(LOCAL_WORKSPACE_ID, 'workspace-runtime-test')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -78,14 +77,13 @@ function createRepo(input: {
   remote: { hasRemotes: boolean; hasGitHubRemote: boolean }
   unavailableReason?: 'error.workspace-path-not-found'
 }): WorkspaceState {
-  const readyRepo = emptyWorkspace(input.id, 'repo', 'workspace-runtime-test')
+  const readyRepo = emptyWorkspace(input.id, 'workspace-runtime-test')
   if (input.unavailableReason) {
     acceptWorkspaceProbeState(readyRepo, { status: 'unavailable', reason: input.unavailableReason })
     return readyRepo
   }
   acceptWorkspaceProbeState(readyRepo, {
     status: 'ready',
-    name: 'repo',
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },

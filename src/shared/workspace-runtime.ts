@@ -27,7 +27,7 @@ export type WorkspaceCapabilities = {
 
 export type WorkspaceProbeState =
   | { status: 'probing' }
-  | { status: 'ready'; name: string; capabilities: WorkspaceCapabilities; diagnostics: WorkspaceDiagnostic[] }
+  | { status: 'ready'; capabilities: WorkspaceCapabilities; diagnostics: WorkspaceDiagnostic[] }
   | { status: 'unavailable'; reason: WorkspaceUnavailableReason }
 
 export type WorkspaceSettledProbeState = Exclude<WorkspaceProbeState, { status: 'probing' }>
@@ -158,7 +158,6 @@ export function sameWorkspaceProbeState(a: WorkspaceProbeState, b: WorkspaceProb
     return a.status === 'unavailable' && b.status === 'unavailable' && a.reason === b.reason
   }
   return (
-    a.name === b.name &&
     a.capabilities.files.write === b.capabilities.files.write &&
     a.capabilities.terminal.available === b.capabilities.terminal.available &&
     sameGitCapability(a.capabilities.git, b.capabilities.git) &&

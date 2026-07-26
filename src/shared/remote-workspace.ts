@@ -204,7 +204,6 @@ export type RemoteWorkspaceLifecycleCommandResult =
   | {
       kind: 'settled'
       workspaceId: WorkspaceId
-      name: string
       lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
     }
   | { kind: 'superseded'; workspaceId: WorkspaceId }
@@ -250,14 +249,12 @@ export function isRemoteWorkspaceConnectionTerminal(
 export type RemoteWorkspaceConnectionResult =
   | {
       kind: 'ready'
-      name: string
       gitAvailable: boolean
       gitDiagnostic?: string
       lifecycle: { kind: 'ready'; target: RemoteWorkspaceTarget }
     }
   | {
       kind: 'failed'
-      name: string
       lifecycle: { kind: 'failed'; reason: RemoteWorkspaceFailureReason; target?: RemoteWorkspaceTarget }
     }
 

@@ -11,7 +11,10 @@ import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import {
+  addResolvedWorkspace,
+  insertPlaceholderWorkspace,
+} from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import {
@@ -26,6 +29,25 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
+  test('creates a remote placeholder before its lifecycle resolves', () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'developer',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    if (!target) throw new Error('expected normalized remote target')
+
+    const result = insertPlaceholderWorkspace(
+      { workspaces: {}, repoSnapshotCache: {}, workspaceOrder: [] },
+      remoteWorkspaceSessionEntry(target),
+      'workspace-runtime-test',
+    )
+
+    expect(result.workspaces[target.id]).toMatchObject({ id: target.id, admission: { kind: 'remote' } })
+  })
+
   test('accepts a capability change for an unchanged ready remote target', () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -36,11 +58,10 @@ describe('repo lifecycle', () => {
     })
     if (!target) throw new Error('expected normalized remote target')
     const workspaceRuntimeId = 'workspace-runtime-test'
-    const workspace = emptyWorkspace(target.id, target.displayName, workspaceRuntimeId)
+    const workspace = emptyWorkspace(target.id, workspaceRuntimeId)
     workspace.session = { entry: remoteWorkspaceSessionEntry(target), projectionState: 'projected' }
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: target.displayName,
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -56,11 +77,9 @@ describe('repo lifecycle', () => {
       { workspaces: { [workspaceId]: workspace }, repoSnapshotCache: {}, workspaceOrder: [workspaceId] },
       {
         id: workspaceId,
-        name: target.displayName,
         target,
         workspaceProbe: {
           status: 'ready',
-          name: target.displayName,
           capabilities: {
             files: { read: true, write: true },
             terminal: { available: true },
@@ -145,10 +164,9 @@ describe('repo lifecycle', () => {
 
   test('closing a filesystem workspace does not enter the Git operation lifecycle', async () => {
     installGoblin()
-    const workspace = emptyWorkspace(REPO_A, 'Example workspace', 'workspace-runtime-filesystem')
+    const workspace = emptyWorkspace(REPO_A, 'workspace-runtime-filesystem')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'Example workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -444,7 +462,6 @@ describe('repo lifecycle', () => {
     const lifecycle = Promise.withResolvers<{
       kind: 'settled'
       workspaceId: string
-      name: string
       lifecycle: { kind: 'ready'; attemptId: number; target: NonNullable<typeof target> }
     }>()
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
@@ -455,7 +472,6 @@ describe('repo lifecycle', () => {
     lifecycle.resolve({
       kind: 'settled',
       workspaceId: target!.id,
-      name: target!.displayName,
       lifecycle: { kind: 'ready', attemptId: 1, target: target! },
     })
 
@@ -486,7 +502,7 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('ensureWorkspaceOpen uses the canonical remote name instead of a stale cached name', async () => {
+  test('ensureWorkspaceOpen does not reuse a stale cached remote projection', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -500,7 +516,6 @@ describe('repo lifecycle', () => {
       repoSnapshotCache: {
         [target!.id]: {
           savedAt: Date.now(),
-          name: 'example:/',
           data: {
             branches: [branchSnapshot('cached')],
             currentBranch: 'cached',
@@ -516,7 +531,7 @@ describe('repo lifecycle', () => {
     const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
 
     expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
-    expect(useWorkspacesStore.getState().workspaces[target!.id]?.name).toBe('example:repo')
+    expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeDefined()
     await vi.waitFor(() => {
       const repo = useWorkspacesStore.getState().workspaces[target!.id]
       expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) : null).toEqual([])

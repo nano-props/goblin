@@ -67,7 +67,7 @@ function seedRepo(options: {
 }
 
 function seedRepoShellWithoutBranchReadModel(): void {
-  const repo = emptyWorkspace(REPO_ID, 'selection-test-repo', 'repo-runtime-selection-no-query')
+  const repo = emptyWorkspace(REPO_ID, 'repo-runtime-selection-no-query')
   useWorkspacesStore.setState((s) => ({
     workspaces: { ...s.workspaces, [REPO_ID]: repo },
     workspaceOrder: [...s.workspaceOrder, REPO_ID],

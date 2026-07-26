@@ -60,7 +60,6 @@ describe('session restore runtime ownership', () => {
       workspaceRuntimeId: lease.workspaceRuntimeId,
       probe: {
         status: 'ready',
-        name: 'workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },

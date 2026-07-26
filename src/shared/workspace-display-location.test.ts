@@ -6,9 +6,20 @@ import {
   formatRemoteWorktreeLocator,
   formatWorkspaceDisplayLocation,
   formatWorkspaceSessionEntryLocator,
+  workspaceNameFromLocator,
 } from '#/shared/workspace-display-location.ts'
 
 describe('workspace display locations', () => {
+  test('derives the same workspace directory name for local and remote locators', () => {
+    expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///home/example/Documents'))).toBe('Documents')
+    expect(workspaceNameFromLocator(workspaceIdForTest('goblin+ssh://prod/home/example/Documents'))).toBe('Documents')
+    expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///C:/Users/example/My%20Workspace'))).toBe(
+      'My Workspace',
+    )
+    expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///'))).toBe('/')
+    expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///C:/'))).toBe('C:\\')
+  })
+
   test('formats local workspace locations as tildified paths', () => {
     expect(formatLocalWorkspaceLocation('/Users/example/Developer/workspace', '/Users/example')).toBe(
       '~/Developer/workspace',
@@ -23,35 +34,46 @@ describe('workspace display locations', () => {
 
   test('formats workspace locations from the best available remote metadata', () => {
     expect(
-      formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/workspace', '/Users/example', {
-        user: 'git',
-        host: 'example.test',
-        remotePath: '/srv/workspace',
-      }),
+      formatWorkspaceDisplayLocation(
+        workspaceIdForTest('goblin+file:///Users/example/Developer/workspace'),
+        '/Users/example',
+        {
+          user: 'git',
+          host: 'example.test',
+          remotePath: '/srv/workspace',
+        },
+      ),
     ).toBe('~/Developer/workspace')
     expect(
-      formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/workspace', '/Users/example', null),
+      formatWorkspaceDisplayLocation(
+        workspaceIdForTest('goblin+file:///Users/example/Developer/workspace'),
+        '/Users/example',
+        null,
+      ),
     ).toBe('~/Developer/workspace')
-    expect(formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/workspace', '/Users/example')).toBe(
-      'prod:/srv/workspace',
-    )
     expect(
-      formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/workspace', '/Users/example', {
+      formatWorkspaceDisplayLocation(workspaceIdForTest('goblin+ssh://prod/srv/workspace'), '/Users/example'),
+    ).toBe('prod:/srv/workspace')
+    expect(
+      formatWorkspaceDisplayLocation(workspaceIdForTest('goblin+ssh://prod/srv/workspace'), '/Users/example', {
         user: 'git',
         host: 'example.test',
         remotePath: '/srv/workspace',
       }),
     ).toBe('git@example.test:/srv/workspace')
     expect(
-      formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/workspace', '/Users/example', {
+      formatWorkspaceDisplayLocation(workspaceIdForTest('goblin+ssh://prod/srv/workspace'), '/Users/example', {
         user: 'git',
         host: 'stale.example.test',
         remotePath: '/srv/other',
       }),
     ).toBe('prod:/srv/workspace')
-    expect(formatWorkspaceDisplayLocation('goblin+file:///C:/Users/example/My%20Workspace', 'C:\\Users\\example')).toBe(
-      '~\\My Workspace',
-    )
+    expect(
+      formatWorkspaceDisplayLocation(
+        workspaceIdForTest('goblin+file:///C:/Users/example/My%20Workspace'),
+        'C:\\Users\\example',
+      ),
+    ).toBe('~\\My Workspace')
   })
 
   test('formats recent workspace session entry locators', () => {

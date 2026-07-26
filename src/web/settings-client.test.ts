@@ -154,7 +154,6 @@ describe('settings-client', () => {
         workspaceId: 'goblin+file:///tmp/routed-repo',
         entry: { id: 'goblin+file:///tmp/routed-repo' },
         workspaceRuntimeId: 'repo_runtime_test',
-        name: 'routed-repo',
         workspaceProbe: { status: 'unavailable', reason: 'error.workspace-path-not-found' },
         transport: { kind: 'file' },
         gitProjection: null,

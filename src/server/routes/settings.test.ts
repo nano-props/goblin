@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import type { restoreWorkspaceTabs as restoreWorkspaceTabsWrite } from '#/server/modules/workspace-tabs-restore.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
@@ -16,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   handleSetWorkspaceExternalAppRecent: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
-  restoreWorkspaceTabs: vi.fn(),
+  restoreWorkspaceTabs: vi.fn<typeof restoreWorkspaceTabsWrite>(),
   addServerWorkspaceEntry: vi.fn(),
   removeServerWorkspaceEntry: vi.fn(),
 }))
@@ -208,12 +210,22 @@ describe('settings routes', () => {
   })
 
   test('delegates lazy repo tab restore to the server restore coordinator', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///repo-active')
     const restored = {
-      repo: {
-        entry: { id: 'goblin+file:///repo-active' },
-        repoRoot: 'goblin+file:///repo-active',
+      workspace: {
+        entry: { id: workspaceId },
+        workspaceId,
         workspaceRuntimeId: 'repo_runtime_test',
-        name: 'repo-active',
+        transport: { kind: 'file' as const },
+        workspaceProbe: {
+          status: 'ready' as const,
+          capabilities: {
+            files: { read: true as const, write: true },
+            terminal: { available: true },
+            git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+          },
+          diagnostics: [],
+        },
         gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,

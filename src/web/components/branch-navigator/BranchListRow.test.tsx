@@ -91,7 +91,7 @@ function baseProps(
 
 function branchListRowRepo(): BranchActionRepo {
   const repo = createGitRepoPresentationForTest(
-    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo', 'repo-runtime-test'),
+    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo-runtime-test'),
     {
       branches: [],
       currentBranch: '',

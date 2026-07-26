@@ -15,7 +15,6 @@ beforeEach(() => {
     workspaceRuntimeId: 'repo-runtime-test',
     workspaceProbe: {
       status: 'ready',
-      name: 'workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

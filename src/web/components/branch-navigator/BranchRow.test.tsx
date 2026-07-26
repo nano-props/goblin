@@ -565,7 +565,7 @@ function branchActionMenuShell(container: HTMLElement): HTMLDivElement | undefin
 
 function branchRowRepo() {
   return createGitRepoPresentationForTest(
-    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo', 'repo-runtime-test'),
+    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo-runtime-test'),
     {
       branches: [],
       currentBranch: '',
