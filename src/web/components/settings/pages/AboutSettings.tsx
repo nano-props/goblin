@@ -27,7 +27,7 @@ export function AboutSettings() {
         <div className="min-w-0 flex-1">
           <span className="truncate text-sm font-medium text-foreground">{t('about.version')}</span>
         </div>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground">v{__APP_VERSION__}</span>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">{__APP_VERSION__}</span>
       </SettingsListItem>
       <SettingsListItem as="li" size="xl">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">

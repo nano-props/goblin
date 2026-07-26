@@ -54,7 +54,7 @@ if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
   console.error(`Error: package.json version must be semver-like, got ${JSON.stringify(version)}.`)
   process.exit(1)
 }
-const tag = `v${version}`
+const tag = version
 
 if (process.platform !== 'darwin' && process.platform !== 'win32') {
   console.error(
