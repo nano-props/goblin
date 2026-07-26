@@ -221,15 +221,20 @@ test('abandons a waiting retirement when catalog reconciliation invalidates its 
 })
 
 test('abandons a waiting plan immediately when its exact source route changes', async () => {
-  using userIntent = beginPrimaryWindowNavigationIntent('user')
+  const userIntent = beginPrimaryWindowNavigationIntent('user')
   const { rerender } = renderPresentationHook()
   const listener = mocks.listener
   if (!listener) throw new Error('missing accepted-retirement listener')
+  const retirement = retirementForTest()
 
-  act(() => listener(retirementForTest()))
+  act(() => listener(retirement))
   await flushPresentation()
   rerender({ route: { kind: 'static', tab: 'files' } })
 
+  expect(retirement.settle).toHaveBeenCalledOnce()
+  expect(mocks.commitPresentation).not.toHaveBeenCalled()
+  act(() => userIntent.release())
+  await flushPresentation()
   expect(mocks.commitPresentation).not.toHaveBeenCalled()
 })
 

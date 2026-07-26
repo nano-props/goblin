@@ -26,6 +26,7 @@ import {
   WorkspacePaneTabEntrySchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
+import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -338,6 +339,19 @@ const TerminalTitleEventSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,
   canonicalTitle: v.nullable(v.string()),
 })
+const TerminalRetirementPresentationContextSchema = v.pipe(
+  v.strictObject({
+    target: RuntimeWorkspacePaneTargetSchema,
+    terminalBase: TerminalSessionBaseSchema,
+    tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
+  }),
+  v.check(
+    (context) =>
+      runtimeWorkspacePaneTargetKey(context.target) === runtimeWorkspacePaneTargetKey(context.terminalBase.target),
+    'Terminal retirement presentation target disagrees with terminal base',
+  ),
+)
+
 const TerminalExitEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
@@ -345,13 +359,7 @@ const TerminalExitEventSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   catalogRevision: TerminalCatalogRevisionSchema,
-  retirementPresentation: v.nullable(
-    v.strictObject({
-      target: RuntimeWorkspacePaneTargetSchema,
-      terminalBase: TerminalSessionBaseSchema,
-      tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
-    }),
-  ),
+  retirementPresentation: v.nullable(TerminalRetirementPresentationContextSchema),
 })
 const TerminalSessionClosedEventSchema = v.strictObject({
   type: v.literal('session-closed'),
@@ -361,13 +369,7 @@ const TerminalSessionClosedEventSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   catalogRevision: TerminalCatalogRevisionSchema,
-  retirementPresentation: v.nullable(
-    v.strictObject({
-      target: RuntimeWorkspacePaneTargetSchema,
-      terminalBase: TerminalSessionBaseSchema,
-      tabsBeforeRetirement: v.array(WorkspacePaneTabEntrySchema),
-    }),
-  ),
+  retirementPresentation: v.nullable(TerminalRetirementPresentationContextSchema),
 })
 
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
@@ -408,7 +410,15 @@ const TerminalRealtimeMessageVariants = [
   }),
   TerminalSessionClosedEventSchema,
 ] as const
-const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
+const TerminalRealtimeMessageSchema = v.pipe(
+  v.variant('type', TerminalRealtimeMessageVariants),
+  v.check((message) => {
+    const event = message.type === 'exit' ? message.event : message.type === 'session-closed' ? message : null
+    if (!event?.retirementPresentation) return true
+    const target = event.retirementPresentation.terminalBase.target
+    return event.workspaceId === target.workspaceId && event.workspaceRuntimeId === target.workspaceRuntimeId
+  }, 'Terminal retirement event scope disagrees with target'),
+)
 const TerminalSocketServerMessageSchema = v.variant('type', [
   ...TerminalRealtimeMessageVariants,
   v.object({

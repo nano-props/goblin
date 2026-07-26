@@ -64,6 +64,14 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
   const attemptPending = useEffectEvent(() => {
     const pending = pendingRef.current
     if (!pending) return
+    if (pending.phase.kind === 'waiting-for-intent') {
+      if (
+        !retiredTerminalPlanStillOwnsCurrentRoute(pending.phase.plan, currentRouteTarget, currentWorkspacePaneRoute)
+      ) {
+        finishPending(pending, 'settle')
+      }
+      return
+    }
     let plan: RetiredTerminalWorkspacePaneTabPresentationPlan
     if (pending.phase.kind === 'awaiting-target') {
       if (
