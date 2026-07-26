@@ -104,7 +104,7 @@ export function WorkspacePaneSkeleton({ toolbarTrafficLightOffset = false }: { t
                 <Skeleton data-testid="workspace-pane-skeleton-switcher" className="h-7 w-7 shrink-0" />
               </>
             ) : (
-              Array.from({ length: 3 }, (_, index) => (
+              Array.from({ length: 2 }, (_, index) => (
                 <Skeleton
                   key={index}
                   data-testid="workspace-pane-skeleton-tab"

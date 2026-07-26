@@ -93,7 +93,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(actionSlot?.className).toContain('pr-3')
   })
 
-  test('uses three real-width workspace tab placeholders in default mode', () => {
+  test('uses two real-width workspace tab placeholders in default mode', () => {
     const { container } = renderInJsdom(
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )
@@ -101,7 +101,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     const skeleton = container.querySelector('[data-testid="workspace-pane-skeleton"]')
     const tabs = container.querySelectorAll('[data-testid="workspace-pane-skeleton-tab"]')
     expect(skeleton?.getAttribute('aria-busy')).toBe('true')
-    expect(tabs).toHaveLength(3)
+    expect(tabs).toHaveLength(2)
     for (const tab of tabs) {
       expect(tab.className).toContain('h-7')
       expect(tab.className).toContain('w-36')
