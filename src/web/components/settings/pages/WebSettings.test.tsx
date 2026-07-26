@@ -5,7 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { LanInfo } from '#/shared/api-types.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -29,8 +32,10 @@ afterEach(() => {
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
 
-async function renderPage() {
+async function renderPage(options: { lanInfo?: LanInfo; lanEnabled?: boolean } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lanEnabled: options.lanEnabled }))
+  if (options.lanInfo) queryClient.setQueryData(lanInfoQueryKey(), options.lanInfo)
   return renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <WebSettings />
@@ -53,7 +58,9 @@ function seedElectronBootstrap() {
         'terminal-badge',
       ],
     },
-    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+    // Normal Electron sessions are same-origin and do not use the one-time
+    // QR/login handoff snapshot.
+    initialServer: null,
   }
   setClientBridgeForTests({
     kind: () => 'electron',
@@ -172,11 +179,15 @@ function seedWebBootstrap() {
 describe('WebSettings runtime parity', () => {
   test('exposes the Rotate token button and LAN section in the Electron runtime', async () => {
     seedElectronBootstrap()
-    const { container } = await renderPage()
+    const { container } = await renderPage({
+      lanInfo: { host: '127.0.0.1', port: 32100, lanUrls: [] },
+      lanEnabled: false,
+    })
 
     const html = container.innerHTML
     expect(html).toContain('settings.web.token-rotate')
     expect(html).toContain('settings.lan.enabled')
+    expect(html).toContain('settings.lan.local-only')
   })
 
   test('hides the Rotate token button and LAN section in the web runtime', async () => {
@@ -195,17 +206,16 @@ describe('WebSettings runtime parity', () => {
     expect(html).not.toContain('settings.lan.enabled')
   })
 
-  test('still shows the server URL and token copy button in both repoOperationSchedulers', async () => {
-    // The shared surface (URL display, token copy, QR codes when
-    // LAN URLs are present) must render in both repoOperationSchedulers so the
-    // web operator can still paste the access token into the
-    // auth gate. Regression guard for the cross-runtime split
-    // accidentally dropping the shared chrome.
+  test('shows the current browser origin and token copy button in both runtimes', async () => {
+    // The current address is a property of the loaded page, not the optional
+    // QR/login bootstrap handoff. Normal sessions must never regress to an
+    // empty dash when `initialServer` is null.
     seedElectronBootstrap()
     const { container: electronContainer, unmount: unmountElectron } = await renderPage()
     const electronHtml = electronContainer.innerHTML
     expect(electronHtml).toContain('settings.web.url')
     expect(electronHtml).toContain('settings.web.token-copy')
+    expect(electronContainer.querySelector('#settings-web-url')?.textContent).toBe(window.location.origin)
 
     act(() => {
       unmountElectron()
@@ -216,10 +226,38 @@ describe('WebSettings runtime parity', () => {
     const webHtml = webContainer.innerHTML
     expect(webHtml).toContain('settings.web.url')
     expect(webHtml).toContain('settings.web.token-copy')
+    expect(webContainer.querySelector('#settings-web-url')?.textContent).toBe(window.location.origin)
     // No toasts fired — both clients stay quiet when the page
     // mounts. (The toast mock would catch any accidental error
     // reporting from a missing bridge call.)
     expect(toastMocks.error).not.toHaveBeenCalled()
+  })
+
+  test('shows server-reported LAN addresses in the web runtime without a native LAN toggle', async () => {
+    seedWebBootstrap()
+    const lanUrl = 'http://192.168.1.20:32100'
+    const { container } = await renderPage({
+      lanInfo: { host: '0.0.0.0', port: 32100, lanUrls: [lanUrl] },
+    })
+
+    const html = container.innerHTML
+    expect(html).toContain('settings.web.lan-urls')
+    expect(html).toContain(lanUrl)
+    expect(html).not.toContain('settings.lan.enabled')
+    expect(html).not.toContain('0.0.0.0')
+  })
+
+  test('describes a pending restart instead of claiming LAN access stopped immediately', async () => {
+    seedElectronBootstrap()
+    const lanUrl = 'http://192.168.1.20:32100'
+    const { container } = await renderPage({
+      lanInfo: { host: '0.0.0.0', port: 32100, lanUrls: [lanUrl] },
+      lanEnabled: false,
+    })
+
+    const html = container.innerHTML
+    expect(html).toContain('settings.lan.restart-hint')
+    expect(html).not.toContain('settings.lan.local-only')
   })
 })
 

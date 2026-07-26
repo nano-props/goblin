@@ -638,8 +638,12 @@ export const ko: Record<DictKey, string> = {
   'settings.web.title': '원격 액세스',
   'settings.nav.web': '원격 액세스',
   'settings.web.server': '서버',
-  'settings.web.url': '서버 URL',
-  'settings.web.url-hint': '브라우저가 내장 서버에 접근하는 데 사용하는 주소입니다.',
+  'settings.web.url': '현재 접근 주소',
+  'settings.web.url-hint':
+    '이 기기에서 Goblin에 접근할 때 사용하는 주소입니다. 다른 기기에서는 접근할 수 없을 수 있습니다.',
+  'settings.web.url-copy': '주소 복사',
+  'settings.web.url-copied': '주소를 클립보드에 복사했습니다.',
+  'settings.web.url-copy-failed': '주소를 복사하지 못했습니다.',
   'settings.web.token': '접근 토큰',
   'settings.web.token-hint':
     '25자 base36 문자열. 새 브라우저에서 한 번 로그인할 때 필요하며, 이후에는 http-only 쿠키로 저장됩니다.',
@@ -652,6 +656,9 @@ export const ko: Record<DictKey, string> = {
   'settings.web.token-rotation-hint':
     '아래 QR 코드에는 이 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
   'settings.web.lan': '네트워크',
+  'settings.web.lan-urls': 'LAN 주소',
+  'settings.web.lan-urls-hint': '같은 로컬 네트워크의 다른 기기에서 이 주소로 Goblin에 접근할 수 있습니다.',
+  'settings.lan.local-only': '현재 이 기기에서만 접근할 수 있습니다.',
   'settings.web.qr': 'QR 코드',
   'settings.web.qr-scan': 'QR 코드',
   'settings.about': '정보',

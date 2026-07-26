@@ -17,7 +17,7 @@ import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schem
  * Settings page for everything related to the embedded / standalone
  * server that the client talks to. Visible in both repoOperationSchedulers:
  *
- * - Both: the server URL, the access token (with copy + auto-rotate
+ * - Both: the current address, the access token (with copy + auto-rotate
  *   QR), and any LAN URLs the server is currently bound to.
  * - Electron only: the `lanEnabled` toggle (the bind address is
  *   owned by the host process) and the `Rotate token` action
@@ -26,10 +26,8 @@ import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schem
  *
  * In web / `bun run serve.sh` mode the operator owns the process
  * and the bind address; rotation is a manual delete + restart, so
- * we don't surface the button. The `lanEnabled` field is still
- * echoed as a read-only value because the embedded Electron server
- * writes it before serving the bootstrap, and a curious operator
- * may want to confirm.
+ * we don't surface those native-host controls. Server-reported LAN
+ * addresses remain visible because they are useful in either runtime.
  */
 export function WebSettings() {
   const t = useT()
@@ -39,17 +37,18 @@ export function WebSettings() {
   const { data: lanInfo } = useLanInfoQuery()
   const { setLanEnabled } = useLanSettingsController()
 
-  const baseUrl = useMemo(() => {
-    const server = getInitialBootstrap().initialServer
-    if (server?.url) return server.url
-    return ''
-  }, [])
+  // This is the browser-facing authority the client actually uses for
+  // same-origin HTTP and WebSocket traffic. `initialServer` is not the
+  // steady-state server configuration: it is populated only for the
+  // one-time QR/login handoff, so reading the address from it leaves normal
+  // Electron and standalone-web sessions with no value.
+  const currentUrl = window.location.origin
 
-  // Token display: in embedded mode the value is inlined in the
-  // bootstrap; in web mode we round-trip to the auth-gated
-  // `/api/access-token` endpoint. Either way the displayed value
-  // matches what the server actually authenticates against, so a
-  // copy/paste into the gate (or QR scan) works.
+  // A QR/login handoff may carry the token in the bootstrap. Normal
+  // same-origin sessions round-trip to the auth-gated `/api/access-token`
+  // endpoint. Either way the displayed value matches what the server
+  // actually authenticates against, so a copy/paste into the gate (or QR
+  // scan) works.
   const bootstrapToken = getInitialBootstrap().initialServer?.accessToken
   const [fetchedToken, setFetchedToken] = useState<string | null>(null)
   useEffect(() => {
@@ -72,13 +71,22 @@ export function WebSettings() {
   }, [bootstrapToken])
   const accessToken = fetchedToken
 
-  const handleCopy = async () => {
+  const handleCopyToken = async () => {
     if (!accessToken) return
     try {
       await navigator.clipboard.writeText(accessToken)
       toast.success(t('settings.web.token-copied'))
     } catch {
       toast.error(t('settings.web.token-copy-failed'))
+    }
+  }
+
+  const handleCopyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success(t('settings.web.url-copied'))
+    } catch {
+      toast.error(t('settings.web.url-copy-failed'))
     }
   }
 
@@ -115,6 +123,13 @@ export function WebSettings() {
     if (!accessToken) return []
     return lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken)}`)
   }, [lanUrls, accessToken])
+  const showNetworkGroup = isElectron || lanUrls.length > 0
+  let lanStatusKey: 'settings.lan.restart-hint' | 'settings.lan.local-only' | null = null
+  if (isElectron && lanInfo) {
+    const lanAccessActive = !isLoopbackHost(lanInfo.host)
+    if (lanEnabled !== lanAccessActive) lanStatusKey = 'settings.lan.restart-hint'
+    else if (!lanAccessActive) lanStatusKey = 'settings.lan.local-only'
+  }
 
   return (
     <>
@@ -125,9 +140,12 @@ export function WebSettings() {
             label={t('settings.web.url')}
             hint={t('settings.web.url-hint')}
             control={
-              <code id="settings-web-url" className="rounded border bg-muted px-2 py-1 font-mono text-xs">
-                {baseUrl || '—'}
-              </code>
+              <AddressControl
+                id="settings-web-url"
+                url={currentUrl}
+                copyLabel={t('settings.web.url-copy')}
+                onCopy={handleCopyUrl}
+              />
             }
           />
           <SettingsRow
@@ -143,7 +161,7 @@ export function WebSettings() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  onClick={handleCopy}
+                  onClick={handleCopyToken}
                   disabled={!accessToken}
                   aria-label={t('settings.web.token-copy')}
                 >
@@ -167,24 +185,45 @@ export function WebSettings() {
         <div className="px-4 py-2 text-sm text-muted-foreground">{t('settings.web.token-rotation-hint')}</div>
       </SettingsGroup>
 
-      {isElectron ? (
+      {showNetworkGroup ? (
         <SettingsGroup label={t('settings.web.lan')}>
           <SettingsList>
-            <SettingsRow
-              controlId="settings-web-lan-enabled"
-              label={t('settings.lan.enabled')}
-              hint={t('settings.lan.enabled-hint')}
-              control={
-                <Switch
-                  id="settings-web-lan-enabled"
-                  checked={lanEnabled}
-                  onCheckedChange={(enabled) => void setLanEnabled(enabled)}
-                  aria-label={t('settings.lan.enabled')}
-                />
-              }
-            />
+            {isElectron ? (
+              <SettingsRow
+                controlId="settings-web-lan-enabled"
+                label={t('settings.lan.enabled')}
+                hint={t('settings.lan.enabled-hint')}
+                control={
+                  <Switch
+                    id="settings-web-lan-enabled"
+                    checked={lanEnabled}
+                    onCheckedChange={(enabled) => void setLanEnabled(enabled)}
+                    aria-label={t('settings.lan.enabled')}
+                  />
+                }
+              />
+            ) : null}
+            {lanUrls.length > 0 ? (
+              <SettingsRow
+                controlId="settings-web-lan-urls"
+                label={t('settings.web.lan-urls')}
+                hint={t('settings.web.lan-urls-hint')}
+                control={
+                  <div id="settings-web-lan-urls" className="flex min-w-0 flex-col items-stretch gap-1.5">
+                    {lanUrls.map((url) => (
+                      <AddressControl
+                        key={url}
+                        url={url}
+                        copyLabel={t('settings.web.url-copy')}
+                        onCopy={handleCopyUrl}
+                      />
+                    ))}
+                  </div>
+                }
+              />
+            ) : null}
           </SettingsList>
-          <div className="px-4 py-2 text-sm text-muted-foreground">{t('settings.lan.restart-hint')}</div>
+          {lanStatusKey ? <div className="px-4 py-2 text-sm text-muted-foreground">{t(lanStatusKey)}</div> : null}
         </SettingsGroup>
       ) : null}
 
@@ -198,6 +237,39 @@ export function WebSettings() {
         </SettingsGroup>
       ) : null}
     </>
+  )
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
+}
+
+function AddressControl({
+  id,
+  url,
+  copyLabel,
+  onCopy,
+}: {
+  id?: string
+  url: string
+  copyLabel: string
+  onCopy: (url: string) => Promise<void>
+}) {
+  return (
+    <div className="flex w-full max-w-96 min-w-0 items-center justify-end gap-1">
+      <code id={id} className="min-w-0 flex-1 break-all rounded border bg-muted px-2 py-1 font-mono text-xs">
+        {url}
+      </code>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        onClick={() => void onCopy(url)}
+        aria-label={`${copyLabel}: ${url}`}
+      >
+        <Copy className="h-4 w-4" />
+      </Button>
+    </div>
   )
 }
 

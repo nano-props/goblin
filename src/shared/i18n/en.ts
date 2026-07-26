@@ -650,8 +650,11 @@ export const en = {
   'settings.web.title': 'Remote access',
   'settings.nav.web': 'Remote access',
   'settings.web.server': 'Server',
-  'settings.web.url': 'Server URL',
-  'settings.web.url-hint': 'The address your browser uses to reach the embedded server.',
+  'settings.web.url': 'Current address',
+  'settings.web.url-hint': 'The address this device uses to access Goblin. It may not be reachable from other devices.',
+  'settings.web.url-copy': 'Copy address',
+  'settings.web.url-copied': 'Address copied to clipboard.',
+  'settings.web.url-copy-failed': 'Could not copy address.',
   'settings.web.token': 'Access token',
   'settings.web.token-hint':
     'A 25-character base36 string. Required once to log in from a new browser; saved as an http-only cookie after that.',
@@ -664,6 +667,9 @@ export const en = {
   'settings.web.token-rotation-hint':
     'The QR codes below include this token. Scanning them auto-fills the gate on the target device.',
   'settings.web.lan': 'Network',
+  'settings.web.lan-urls': 'LAN addresses',
+  'settings.web.lan-urls-hint': 'Other devices on the same local network can use these addresses to access Goblin.',
+  'settings.lan.local-only': 'Access is currently limited to this device.',
   'settings.web.qr': 'QR codes',
   'settings.web.qr-scan': 'QR code',
   'settings.about': 'About',

@@ -646,8 +646,12 @@ export const ja: Record<DictKey, string> = {
   'settings.web.title': 'リモートアクセス',
   'settings.nav.web': 'リモートアクセス',
   'settings.web.server': 'サーバー',
-  'settings.web.url': 'サーバーURL',
-  'settings.web.url-hint': 'ブラウザが組み込みサーバーにアクセスするためのアドレス。',
+  'settings.web.url': '現在のアクセスアドレス',
+  'settings.web.url-hint':
+    'このデバイスがGoblinへのアクセスに使用しているアドレスです。他のデバイスからアクセスできるとは限りません。',
+  'settings.web.url-copy': 'アドレスをコピー',
+  'settings.web.url-copied': 'アドレスをクリップボードにコピーしました。',
+  'settings.web.url-copy-failed': 'アドレスをコピーできませんでした。',
   'settings.web.token': 'アクセストークン',
   'settings.web.token-hint':
     '25文字のbase36文字列。新しいブラウザからログインする際に一度だけ必要で、その後はhttp-only Cookieとして保存されます。',
@@ -660,6 +664,10 @@ export const ja: Record<DictKey, string> = {
   'settings.web.token-rotation-hint':
     '下のQRコードにはこのトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
   'settings.web.lan': 'ネットワーク',
+  'settings.web.lan-urls': 'LANアドレス',
+  'settings.web.lan-urls-hint':
+    '同じローカルネットワーク上の他のデバイスは、これらのアドレスでGoblinにアクセスできます。',
+  'settings.lan.local-only': '現在、このデバイスからのみアクセスできます。',
   'settings.web.qr': 'QRコード',
   'settings.web.qr-scan': 'QRコード',
   'settings.about': '情報',
