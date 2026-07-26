@@ -29,8 +29,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
   resolveRetiredTerminalWorkspacePaneTabTarget,
+  resolveWorkspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
+  type WorkspacePaneTargetCurrentness,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   clearWorkspacePaneTabOpener,
@@ -238,16 +240,15 @@ export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
   })
   return runWorkspacePaneAction(queueTarget, async () => {
     if (!navigationIntent.isCurrent()) return { kind: 'abandoned' }
-    const currentTarget = currentRetiredTerminalWorkspacePaneTabTarget(plan)
-    if (!currentTarget || !retiredTerminalCloseBackDestinationIsCurrent(plan, currentTarget)) {
-      return { kind: 'abandoned' }
-    }
+    const currentness = retiredTerminalWorkspacePaneTabPresentationCurrentness(plan)
+    if (currentness !== 'current') return { kind: currentness === 'pending' ? 'pending' : 'abandoned' }
     const presentationLease = beginWorkspacePaneCloseActiveTabPresentationLease({
       target,
       closingEntry: plan.closingEntry,
       nextEntry: plan.nextEntry,
       workspacePaneRoute: plan.sourceRoute,
       navigationIntent,
+      presentationCurrentness: () => retiredTerminalWorkspacePaneTabPresentationCurrentness(plan),
     })
     if (!presentationLease) return { kind: 'abandoned' }
     return await runWorkspacePaneCloseTransition(presentationLease, async () => {
@@ -256,16 +257,19 @@ export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
   })
 }
 
-function currentRetiredTerminalWorkspacePaneTabTarget(
+function retiredTerminalWorkspacePaneTabPresentationCurrentness(
   plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
-): WorkspacePaneTabModel | null {
+): WorkspacePaneTargetCurrentness {
   const target = plan.target
-  return workspacePaneTabTargetForPaneTarget({
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
     routeTarget: workspacePaneRouteTargetForModel(target),
     paneTarget: workspacePaneTabsTargetForModel(target),
+    workspaceRuntimeId: target.workspaceRuntimeId,
     workspacePaneRoute: plan.sourceRoute,
     worktreeHead: target.branchName ? { kind: 'branch', branchName: target.branchName } : undefined,
   })
+  if (resolution.kind !== 'ready') return resolution.kind
+  return retiredTerminalCloseBackDestinationIsCurrent(plan, resolution.target) ? 'current' : 'stale'
 }
 
 function retiredTerminalCloseBackDestinationIsCurrent(

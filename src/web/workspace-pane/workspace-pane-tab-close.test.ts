@@ -37,6 +37,7 @@ import {
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -729,6 +730,44 @@ test('presents a naturally exited active terminal through the captured exact clo
     },
   })
   if (!plan) throw new Error('missing retired terminal presentation plan')
+
+  const tabsQueryKey = workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId)
+  primaryWindowQueryClient.removeQueries({ queryKey: tabsQueryKey, exact: true })
+  const pendingIntent = beginPrimaryWindowNavigationIntent('passive')
+  await expect(
+    commitRetiredTerminalWorkspacePaneTabPresentationPlan(
+      plan,
+      navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      pendingIntent,
+    ),
+  ).resolves.toEqual({ kind: 'pending' })
+  pendingIntent.release()
+  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+
+  primaryWindowQueryClient.setQueryData(tabsQueryKey, { revision: 1, entries: [] })
+  const failedTabsQuery = primaryWindowQueryClient.getQueryCache().find({ queryKey: tabsQueryKey, exact: true })
+  if (!failedTabsQuery) throw new Error('missing workspace pane tabs query')
+  failedTabsQuery.setState({
+    ...failedTabsQuery.state,
+    status: 'error',
+    error: new Error('tabs projection unavailable'),
+  })
+  const failedIntent = beginPrimaryWindowNavigationIntent('passive')
+  await expect(
+    commitRetiredTerminalWorkspacePaneTabPresentationPlan(
+      plan,
+      navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      failedIntent,
+    ),
+  ).resolves.toEqual({ kind: 'pending' })
+  failedIntent.release()
+  expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+
+  setWorkspacePaneTabsForTargetQueryData({
+    ...paneTarget,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    tabs: [workspacePaneStaticTabEntry('files')],
+  })
   using passiveIntent = beginPrimaryWindowNavigationIntent('passive')
   await expect(
     commitRetiredTerminalWorkspacePaneTabPresentationPlan(

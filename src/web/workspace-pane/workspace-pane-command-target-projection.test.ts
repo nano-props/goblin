@@ -36,6 +36,15 @@ function gitWorkspace(workspaceRuntimeId = 'runtime-1') {
   return workspace
 }
 
+function unavailableWorkspace(workspaceRuntimeId = 'runtime-1') {
+  const workspace = probingWorkspace(workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'unavailable',
+    reason: 'error.workspace-transport-unavailable',
+  })
+  return workspace
+}
+
 function resolveTarget(overrides: Partial<Parameters<typeof resolveWorkspacePaneCommandTarget>[0]> = {}) {
   return resolveWorkspacePaneCommandTarget({
     routeTarget: ROOT_ROUTE_TARGET,
@@ -54,8 +63,14 @@ describe('resolveWorkspacePaneCommandTarget', () => {
     expect(target).toEqual({ routeAuthority: 'pending', target: null })
   })
 
-  test('treats a workspace missing from the ready shell projection as resolved missing', () => {
-    expect(resolveTarget({ workspace: null })).toEqual({ routeAuthority: 'resolved', target: null })
+  test('keeps an unavailable workspace route pending because the same runtime can recover', () => {
+    const target = resolveTarget({ workspace: unavailableWorkspace() })
+
+    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+  })
+
+  test('treats a workspace missing from the ready shell projection as stale', () => {
+    expect(resolveTarget({ workspace: null })).toEqual({ routeAuthority: 'stale', target: null })
   })
 
   test('resolves a workspace-root target without waiting for disabled repo queries', () => {
@@ -69,12 +84,15 @@ describe('resolveWorkspacePaneCommandTarget', () => {
     const target = resolveTarget({
       routeTarget,
       workspace: gitWorkspace(),
-      branchReadModel: { status: 'success', snapshot: { branches: [], current: 'main' } },
+      branchReadModel: {
+        status: 'success',
+        snapshot: { branches: [createBranchSnapshot('feature')], current: 'main' },
+      },
       worktreeReadModel: { status: 'pending', worktrees: null },
     })
 
     expect(target).toEqual({
-      routeAuthority: 'resolved',
+      routeAuthority: 'ready',
       target: { routeTarget, workspacePaneRoute: null, filesystemTarget: null },
     })
   })
@@ -139,7 +157,27 @@ describe('resolveWorkspacePaneCommandTarget', () => {
     expect(target).toEqual({ routeAuthority: 'pending', target: null })
   })
 
-  test('leaves an unresolved branch without a filesystem target after its read models settle', () => {
+  test('keeps a branch route pending while its failed read model has no authoritative answer', () => {
+    const target = resolveTarget({
+      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature' },
+      workspace: gitWorkspace(),
+      branchReadModel: { status: 'error', snapshot: null },
+    })
+
+    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+  })
+
+  test('keeps a worktree route pending while its failed read model can still recover', () => {
+    const target = resolveTarget({
+      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/project-worktree' },
+      workspace: gitWorkspace(),
+      worktreeReadModel: { status: 'error', worktrees: null },
+    })
+
+    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+  })
+
+  test('marks a branch missing from a complete read model as stale', () => {
     const routeTarget = { kind: 'git-branch' as const, workspaceId: WORKSPACE_ID, branchName: 'feature' }
     const target = resolveTarget({
       routeTarget,
@@ -148,16 +186,13 @@ describe('resolveWorkspacePaneCommandTarget', () => {
       worktreeReadModel: { status: 'success', worktrees: [] },
     })
 
-    expect(target).toEqual({
-      routeAuthority: 'resolved',
-      target: { routeTarget, workspacePaneRoute: null, filesystemTarget: null },
-    })
+    expect(target).toEqual({ routeAuthority: 'stale', target: null })
   })
 
   test('rejects a route target owned by a different workspace projection', () => {
     const differentWorkspaceId = workspaceIdForTest('goblin+file:///workspace/different')
     const target = resolveTarget({ workspace: emptyWorkspace(differentWorkspaceId, 'different', 'runtime-1') })
 
-    expect(target).toEqual({ routeAuthority: 'resolved', target: null })
+    expect(target).toEqual({ routeAuthority: 'stale', target: null })
   })
 })

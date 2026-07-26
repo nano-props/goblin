@@ -200,6 +200,37 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(sequence).toEqual(['presentation', 'new navigation'])
   })
 
+  test('rechecks retained filesystem presentation authority inside navigation settlement', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    let presentationCurrentness: 'current' | 'pending' = 'current'
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
+      presentationCurrentness = 'pending'
+      options?.onCommit?.()
+      return true
+    })
+    const actions = createPrimaryWindowNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onTargetPending = vi.fn()
+
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          authority: { kind: 'workspace-runtime' },
+        },
+        { kind: 'static', tab: 'files' },
+        { presentationCurrentness: () => presentationCurrentness, onTargetPending },
+      ),
+    ).resolves.toBe(false)
+    expect(onTargetPending).toHaveBeenCalledOnce()
+  })
+
   test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

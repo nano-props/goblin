@@ -33,7 +33,7 @@ interface WorkspacePaneCommandTargetProjectionInput {
 }
 
 export interface WorkspacePaneCommandTargetProjection {
-  routeAuthority: 'pending' | 'resolved'
+  routeAuthority: 'ready' | 'pending' | 'stale'
   target: WorkspacePaneCommandTarget | null
 }
 
@@ -41,18 +41,19 @@ export function resolveWorkspacePaneCommandTarget(
   input: WorkspacePaneCommandTargetProjectionInput,
 ): WorkspacePaneCommandTargetProjection {
   const { routeTarget, workspacePaneRoute, workspace } = input
-  if (!routeTarget) return { routeAuthority: 'resolved', target: null }
-  if (!workspace) return { routeAuthority: 'resolved', target: null }
-  if (workspace.id !== routeTarget.workspaceId) return { routeAuthority: 'resolved', target: null }
+  if (!routeTarget) return { routeAuthority: 'stale', target: null }
+  if (!workspace) return { routeAuthority: 'stale', target: null }
+  if (workspace.id !== routeTarget.workspaceId) return { routeAuthority: 'stale', target: null }
   if (workspace.capability.kind === 'probing') return { routeAuthority: 'pending', target: null }
+  if (workspace.capability.kind === 'unavailable') return { routeAuthority: 'pending', target: null }
 
   if (routeTarget.kind === 'workspace-root') {
     const capability = workspace.capability
     if (capability.kind !== 'git' && capability.kind !== 'filesystem') {
-      return { routeAuthority: 'resolved', target: null }
+      return { routeAuthority: 'stale', target: null }
     }
     return {
-      routeAuthority: 'resolved',
+      routeAuthority: 'ready',
       target: {
         routeTarget,
         workspacePaneRoute,
@@ -66,18 +67,16 @@ export function resolveWorkspacePaneCommandTarget(
   }
 
   if (routeTarget.kind === 'git-branch') {
-    if (workspace.capability.kind === 'git' && input.branchReadModel.status === 'pending') {
-      return {
-        routeAuthority: 'pending',
-        target: {
-          routeTarget,
-          workspacePaneRoute,
-          filesystemTarget: null,
-        },
-      }
+    if (workspace.capability.kind !== 'git') return { routeAuthority: 'stale', target: null }
+    if (input.branchReadModel.status !== 'success' || !input.branchReadModel.snapshot) {
+      return { routeAuthority: 'pending', target: null }
     }
+    const branchExists = repoBranchSnapshotDataFromSnapshot(input.branchReadModel.snapshot).branches.some(
+      (entry) => entry.name === routeTarget.branchName,
+    )
+    if (!branchExists) return { routeAuthority: 'stale', target: null }
     return {
-      routeAuthority: 'resolved',
+      routeAuthority: 'ready',
       target: {
         routeTarget,
         workspacePaneRoute,
@@ -94,15 +93,27 @@ export function resolveWorkspacePaneCommandTarget(
   if (workspace.capability.kind === 'git' && input.worktreeReadModel.status === 'pending') {
     return { routeAuthority: 'pending', target: null }
   }
-  if (workspace.capability.kind !== 'git') return { routeAuthority: 'resolved', target: null }
-  if (input.worktreeReadModel.status === 'error') return { routeAuthority: 'resolved', target: null }
-  const worktree = input.worktreeReadModel.worktrees?.find((entry) => entry.path === routeTarget.worktreePath)
-  if (!worktree) return { routeAuthority: 'resolved', target: null }
-  if (worktree.branch && input.branchReadModel.status === 'pending') {
+  if (workspace.capability.kind !== 'git') return { routeAuthority: 'stale', target: null }
+  if (input.worktreeReadModel.status === 'error' || !input.worktreeReadModel.worktrees) {
     return { routeAuthority: 'pending', target: null }
   }
+  const worktree = input.worktreeReadModel.worktrees?.find((entry) => entry.path === routeTarget.worktreePath)
+  if (!worktree) return { routeAuthority: 'stale', target: null }
+  if (worktree.branch) {
+    const branchSnapshot = input.branchReadModel.snapshot
+    if (input.branchReadModel.status !== 'success' || !branchSnapshot) {
+      return { routeAuthority: 'pending', target: null }
+    }
+    if (
+      !repoBranchSnapshotDataFromSnapshot(branchSnapshot).branches.some(
+        (entry) => entry.name === worktree.branch && entry.worktree?.path === worktree.path,
+      )
+    ) {
+      return { routeAuthority: 'stale', target: null }
+    }
+  }
   return {
-    routeAuthority: 'resolved',
+    routeAuthority: 'ready',
     target: {
       routeTarget,
       workspacePaneRoute,

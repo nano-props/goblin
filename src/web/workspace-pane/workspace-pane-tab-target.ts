@@ -112,11 +112,12 @@ export function filesystemWorkspacePaneTargetLeaseCurrentness(
   if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
   if (lease.routeTarget.kind === 'workspace-root') return 'current'
   if (workspace.capability.kind === 'probing') return 'pending'
+  if (workspace.capability.kind === 'unavailable') return 'pending'
   if (workspace.capability.kind !== 'git') return 'stale'
   const worktreePath = lease.routeTarget.worktreePath
   const worktreeStatusQuery = getRepoWorktreeStatusQueryStatus(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)
   if (worktreeStatusQuery === 'pending') return 'pending'
-  if (worktreeStatusQuery === 'error') return 'stale'
+  if (worktreeStatusQuery === 'error') return 'pending'
   const worktreeStatus = getSuccessfulRepoWorktreeStatusQueryData(
     lease.routeTarget.workspaceId,
     lease.workspaceRuntimeId,
@@ -210,10 +211,11 @@ export function workspacePaneTargetLeaseCurrentness(lease: WorkspacePaneTargetLe
   if (!workspace) return 'stale'
   if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
   if (workspace.capability.kind === 'probing') return 'pending'
+  if (workspace.capability.kind === 'unavailable') return 'pending'
   if (workspace.capability.kind !== 'git') return 'stale'
   const projectionStatus = getRepoProjectionQueryStatus(lease.workspaceId, lease.workspaceRuntimeId, null, 'full')
   if (projectionStatus === 'pending') return 'pending'
-  if (projectionStatus === 'error') return 'stale'
+  if (projectionStatus === 'error') return 'pending'
   const current = resolveWorkspacePaneDestinationTargetLease(lease.workspaceId, lease.branchName)
   return current !== null &&
     current.workspaceRuntimeId === lease.workspaceRuntimeId &&
@@ -331,41 +333,66 @@ export function workspacePaneTabTargetForPaneTarget(input: {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   worktreeHead?: GitHead
 }): WorkspacePaneTabModel | null {
-  const { paneTarget, routeTarget, workspacePaneRoute, worktreeHead } = input
+  const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[input.paneTarget.workspaceId]?.workspaceRuntimeId
+  if (!workspaceRuntimeId) return null
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({ ...input, workspaceRuntimeId })
+  return resolution.kind === 'ready' ? resolution.target : null
+}
+
+export type WorkspacePaneTabTargetForPaneTargetResolution =
+  { kind: 'ready'; target: WorkspacePaneTabModel } | { kind: 'pending' } | { kind: 'stale' }
+
+/**
+ * Resolves a pane target against one captured workspace runtime epoch. Pending
+ * and failed queries are both inconclusive; neither proves that a retained
+ * presentation target is stale.
+ */
+export function resolveWorkspacePaneTabTargetForPaneTarget(input: {
+  paneTarget: WorkspacePaneTabsTarget
+  routeTarget: WorkspacePaneTabsTarget
+  workspaceRuntimeId: string
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  worktreeHead?: GitHead
+}): WorkspacePaneTabTargetForPaneTargetResolution {
+  const { paneTarget, routeTarget, workspaceRuntimeId, workspacePaneRoute, worktreeHead } = input
   const workspace = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
-  if (!workspace) return null
-  if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return null
-  const worktreePath = workspacePaneTabsTargetWorktreePath(paneTarget)
+  if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId) return { kind: 'stale' }
+  if (workspace.capability.kind === 'probing') return { kind: 'pending' }
+  if (workspace.capability.kind === 'unavailable') return { kind: 'pending' }
+  if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return { kind: 'stale' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
+    workspaceRuntimeId,
     filesystemTarget:
       paneTarget.kind === 'workspace-root'
-        ? workspaceRootFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId)
+        ? workspaceRootFilesystemExecutionTarget(workspace.id, workspaceRuntimeId)
         : paneTarget.kind === 'git-worktree'
-          ? gitWorktreeFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId, paneTarget.worktreePath)
+          ? gitWorktreeFilesystemExecutionTarget(workspace.id, workspaceRuntimeId, paneTarget.worktreePath)
           : null,
   })
   const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
     ...paneTarget,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
+    workspaceRuntimeId,
   })
-  if (tabsProjection.phase !== 'ready') return null
-  return createWorkspacePaneTabModel({
-    workspaceId: workspace.id,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-    routeTarget,
-    paneTarget,
-    worktreeHead,
-    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
-    allowPreferredTabFallback: workspacePaneRoute === undefined,
-    tabEntries: tabsProjection.tabs,
-    tabEntriesProjectionPhase: tabsProjection.phase,
-    runtimeTabViews: runtimeProjection.runtimeTabViews,
-    runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-    requestedSessionIdByRuntimeType:
-      workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
-  })
+  if (tabsProjection.phase !== 'ready') return { kind: 'pending' }
+  return {
+    kind: 'ready',
+    target: createWorkspacePaneTabModel({
+      workspaceId: workspace.id,
+      workspaceRuntimeId,
+      routeTarget,
+      paneTarget,
+      worktreeHead,
+      preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
+      allowPreferredTabFallback: workspacePaneRoute === undefined,
+      tabEntries: tabsProjection.tabs,
+      tabEntriesProjectionPhase: tabsProjection.phase,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType:
+        workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
+    }),
+  }
 }
 
 /**

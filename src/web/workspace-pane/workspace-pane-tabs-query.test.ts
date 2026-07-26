@@ -5,14 +5,18 @@ import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
+  clearWorkspacePaneTabsProjectionState,
   readWorkspacePaneTabsForTarget,
   refreshWorkspacePaneTabsQueryData,
+  subscribeWorkspacePaneTabsProjectionChanges,
   workspacePaneTabsByTargetFromQueryData,
+  workspacePaneTabsProjectionSnapshot,
   workspacePaneTabsQueryKey,
   workspacePaneTabsQueryOptions,
   writeWorkspacePaneTabsSnapshotQueryData,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
@@ -42,6 +46,21 @@ test('test workspace identity construction rejects legacy raw workspace ids', ()
 })
 
 describe('workspace pane tabs revisioned query cache', () => {
+  test('publishes accepted snapshots and projection clears to authority subscribers', () => {
+    primaryWindowQueryClient.clear()
+    const versions: number[] = []
+    const unsubscribe = subscribeWorkspacePaneTabsProjectionChanges(() => {
+      versions.push(workspacePaneTabsProjectionSnapshot())
+    })
+
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(1, []))
+    clearWorkspacePaneTabsProjectionState(REPO_ROOT, WORKSPACE_RUNTIME_ID)
+    unsubscribe()
+
+    expect(versions).toHaveLength(2)
+    expect(versions[1]).toBe((versions[0] ?? 0) + 1)
+  })
+
   test('reads workspace-root runtime tabs by their explicit target identity', () => {
     const queryClient = new QueryClient()
     const tabs = [

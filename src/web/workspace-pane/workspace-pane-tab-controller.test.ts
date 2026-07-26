@@ -500,6 +500,30 @@ describe('workspace pane tab controller transactions', () => {
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     lease.navigationIntent.release()
   })
+
+  test('rechecks retained presentation authority inside the navigation commit effect', async () => {
+    let presentationCurrentness: 'current' | 'pending' = 'current'
+    const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
+      target: workspacePaneTarget(),
+      closingEntry: workspacePaneStaticTabEntry('files'),
+      nextEntry: workspacePaneStaticTabEntry('status'),
+      workspacePaneRoute: SOURCE_ROUTE,
+      presentationCurrentness: () => presentationCurrentness,
+    })
+    if (!lease) throw new Error('missing presentation lease')
+    const navigation = controllerNavigation({
+      commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
+        presentationCurrentness = 'pending'
+        options?.onCommit?.()
+        return true
+      }),
+    })
+
+    await expect(commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)).resolves.toEqual({
+      kind: 'pending',
+    })
+    lease.navigationIntent.release()
+  })
 })
 
 function workspacePaneTarget(): WorkspacePaneTabModel {

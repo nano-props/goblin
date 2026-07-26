@@ -15,6 +15,7 @@ import {
   filesystemWorkspacePaneTargetLeaseCurrentness,
   workspaceRootPaneTargetLease,
   type FilesystemWorkspacePaneTargetLease,
+  type WorkspacePaneTargetCurrentness,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -37,6 +38,8 @@ export interface PrimaryWindowNavigationOptions {
   onAbandon?: () => void
   /** Reports a transient authority loss to the transaction that owns this commit. */
   onTargetPending?: () => void
+  /** Additional presentation authority checked before navigation and again at commit. */
+  presentationCurrentness?: () => WorkspacePaneTargetCurrentness
   routePrecondition?:
     { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
@@ -276,7 +279,10 @@ async function commitFilesystemWorkspacePaneRoute(
   const ownsIntent = options?.navigationIntent === undefined
   const intent = resolvePrimaryWindowNavigationIntent(options)
   try {
-    if (!intent.isCurrent() || !filesystemWorkspacePaneCommitTargetIsCurrent(target, options?.onTargetPending)) {
+    if (
+      !intent.isCurrent() ||
+      !filesystemWorkspacePaneCommitTargetIsCurrent(target, options?.onTargetPending, options?.presentationCurrentness)
+    ) {
       options?.onAbandon?.()
       return false
     }
@@ -288,7 +294,11 @@ async function commitFilesystemWorkspacePaneRoute(
       onCommit: () => {
         presentationCommitted = commitPrimaryWindowNavigationEffect(
           () =>
-            filesystemWorkspacePaneCommitTargetIsCurrent(target, options?.onTargetPending) &&
+            filesystemWorkspacePaneCommitTargetIsCurrent(
+              target,
+              options?.onTargetPending,
+              options?.presentationCurrentness,
+            ) &&
             (route === null
               ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
               : commitFilesystemWorkspacePanePresentation(target.routeTarget, route)),
@@ -306,8 +316,16 @@ async function commitFilesystemWorkspacePaneRoute(
 function filesystemWorkspacePaneCommitTargetIsCurrent(
   target: FilesystemWorkspacePaneCommitTarget,
   onTargetPending?: () => void,
+  presentationCurrentness?: () => WorkspacePaneTargetCurrentness,
 ): boolean {
-  const currentness = filesystemWorkspacePaneTargetLeaseCurrentness(target)
+  const targetCurrentness = filesystemWorkspacePaneTargetLeaseCurrentness(target)
+  const presentation = presentationCurrentness?.() ?? 'current'
+  const currentness =
+    targetCurrentness === 'stale' || presentation === 'stale'
+      ? 'stale'
+      : targetCurrentness === 'pending' || presentation === 'pending'
+        ? 'pending'
+        : 'current'
   if (currentness === 'pending') onTargetPending?.()
   return currentness === 'current'
 }

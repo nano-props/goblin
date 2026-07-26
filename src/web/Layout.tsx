@@ -480,7 +480,7 @@ function AuthenticatedWorkspaceSideEffects({
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   currentWorkspacePaneRouteTarget: WorkspacePaneTabsTarget | null
-  currentWorkspacePaneRouteAuthority: 'pending' | 'resolved'
+  currentWorkspacePaneRouteAuthority: 'ready' | 'pending' | 'stale'
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void

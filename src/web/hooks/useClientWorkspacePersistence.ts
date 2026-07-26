@@ -11,8 +11,8 @@ import {
 } from '#/web/stores/workspaces/selector-state.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
-  subscribeWorkspacePaneTabsPersistenceChanges,
-  workspacePaneTabsPersistenceSnapshot,
+  subscribeWorkspacePaneTabsProjectionChanges,
+  workspacePaneTabsProjectionSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -171,5 +171,5 @@ function clientWorkspaceFromPersistenceInput(
 }
 
 function useWorkspacePaneTabsCacheVersion(): number {
-  return useSyncExternalStore(subscribeWorkspacePaneTabsPersistenceChanges, workspacePaneTabsPersistenceSnapshot)
+  return useSyncExternalStore(subscribeWorkspacePaneTabsProjectionChanges, workspacePaneTabsProjectionSnapshot)
 }

@@ -19,6 +19,7 @@ import {
   type PrimaryWindowNavigationIntent,
   type PrimaryWindowNavigationOutcome,
 } from '#/web/primary-window-navigation-lifecycle.ts'
+import { useWorkspacePaneTabsProjectionVersion } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 interface PendingRetiredTerminalPresentation {
   retirement: AcceptedTerminalRetirement
@@ -46,12 +47,13 @@ interface PendingRetiredTerminalPresentation {
 
 export function useTerminalRetirementWorkspacePanePresentation(input: {
   currentRouteTarget: WorkspacePaneTabsTarget | null
-  currentRouteAuthority: 'pending' | 'resolved'
+  currentRouteAuthority: 'ready' | 'pending' | 'stale'
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }): void {
   const { currentRouteTarget, currentRouteAuthority, currentWorkspacePaneRoute, navigation } = input
   const projection = useTerminalSessionProjection()
+  const workspacePaneTabsProjectionVersion = useWorkspacePaneTabsProjectionVersion()
   const pendingRef = useRef<PendingRetiredTerminalPresentation | null>(null)
 
   const finishPending = useEffectEvent(
@@ -76,6 +78,8 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
         !retiredTerminalPlanStillOwnsCurrentRoute(pending.phase.plan, currentRouteTarget, currentWorkspacePaneRoute)
       ) {
         finishPending(pending, 'settle')
+      } else if (currentRouteAuthority === 'stale') {
+        finishPending(pending, 'settle')
       }
       return
     }
@@ -85,6 +89,10 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
         currentWorkspacePaneRoute?.kind !== 'terminal' ||
         currentWorkspacePaneRoute.terminalSessionId !== pending.retirement.terminalSessionId
       ) {
+        finishPending(pending, 'settle')
+        return
+      }
+      if (currentRouteAuthority === 'stale') {
         finishPending(pending, 'settle')
         return
       }
@@ -108,6 +116,10 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
       return
     }
     if (!retiredTerminalPlanStillOwnsCurrentRoute(plan, currentRouteTarget, currentWorkspacePaneRoute)) {
+      finishPending(pending, 'settle')
+      return
+    }
+    if (currentRouteAuthority === 'stale') {
       finishPending(pending, 'settle')
       return
     }
@@ -196,7 +208,16 @@ export function useTerminalRetirementWorkspacePanePresentation(input: {
     }
   }, [projection])
 
-  useEffect(() => attemptPending(), [currentRouteTarget, currentRouteAuthority, currentWorkspacePaneRoute, navigation])
+  useEffect(
+    () => attemptPending(),
+    [
+      currentRouteTarget,
+      currentRouteAuthority,
+      currentWorkspacePaneRoute,
+      navigation,
+      workspacePaneTabsProjectionVersion,
+    ],
+  )
 }
 
 function pendingPresentationPlan(

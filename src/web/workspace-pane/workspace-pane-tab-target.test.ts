@@ -14,6 +14,7 @@ import {
   filesystemWorkspacePaneTargetLeaseCurrentness,
   gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForBranch,
+  resolveWorkspacePaneTabTargetForPaneTarget,
   workspacePanePreferenceTargetOptions,
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
@@ -25,6 +26,7 @@ import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/work
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
@@ -68,6 +70,66 @@ describe('workspace pane tab target read model', () => {
         selectedIdentity: `terminal:${terminalSessionId}`,
       },
     })
+  })
+
+  test('preserves pending and failed tabs authority when resolving a retained runtime target', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+    const input = {
+      paneTarget,
+      routeTarget: paneTarget,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      workspacePaneRoute: { kind: 'static' as const, tab: 'files' as const },
+    }
+
+    expect(resolveWorkspacePaneTabTargetForPaneTarget(input)).toEqual({ kind: 'pending' })
+
+    const queryKey = workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    primaryWindowQueryClient.setQueryData(queryKey, { revision: 1, entries: [] })
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('missing workspace pane tabs query')
+    query.setState({ ...query.state, status: 'error', error: new Error('tabs unavailable') })
+
+    expect(resolveWorkspacePaneTabTargetForPaneTarget(input)).toEqual({ kind: 'pending' })
+  })
+
+  test('marks a retained pane target stale when its workspace runtime epoch is replaced', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+
+    expect(
+      resolveWorkspacePaneTabTargetForPaneTarget({
+        paneTarget,
+        routeTarget: paneTarget,
+        workspaceRuntimeId: `${repo.workspaceRuntimeId}-retired`,
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+      }),
+    ).toEqual({ kind: 'stale' })
+  })
+
+  test('keeps a retained target pending while the same workspace runtime is temporarily unavailable', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+    setWorkspacePaneTabsForTargetQueryData({
+      ...paneTarget,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+    const input = {
+      paneTarget,
+      routeTarget: paneTarget,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      workspacePaneRoute: { kind: 'static' as const, tab: 'files' as const },
+    }
+    acceptWorkspaceProbeState(repo, {
+      status: 'unavailable',
+      reason: 'error.workspace-transport-unavailable',
+    })
+
+    expect(resolveWorkspacePaneTabTargetForPaneTarget(input)).toEqual({ kind: 'pending' })
+
+    markGitAvailable(repo)
+    expect(resolveWorkspacePaneTabTargetForPaneTarget(input).kind).toBe('ready')
   })
 
   test('models the workspace root as a workspace target rather than an empty branch', () => {
@@ -182,7 +244,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.renderedTab).toBe('status')
   })
 
-  test('invalidates a worktree command lease when the status refresh fails with cached data', async () => {
+  test('keeps a worktree command lease unverified when the status refresh fails with cached data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
@@ -210,10 +272,10 @@ describe('workspace pane tab target read model', () => {
       primaryWindowQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)),
     ).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
-    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('stale')
+    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('pending')
   })
 
-  test('invalidates a branch command lease when the projection refresh fails with cached data', async () => {
+  test('keeps a branch command lease unverified when the projection refresh fails with cached data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
@@ -240,7 +302,7 @@ describe('workspace pane tab target read model', () => {
 
     expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
-    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('stale')
+    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('pending')
   })
 
   test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {

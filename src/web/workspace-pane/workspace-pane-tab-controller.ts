@@ -72,6 +72,7 @@ export interface WorkspacePaneControllerPresentationLease {
   fromRoute: WorkspacePaneTabControllerRoute
   toRoute: WorkspacePaneTabControllerRoute
   focusEffects: TerminalPresentationFocusEffects | null
+  presentationCurrentness: (() => WorkspacePaneTargetCurrentness) | null
 }
 
 export type WorkspacePaneControllerCommitOutcome =
@@ -83,6 +84,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   nextEntry: WorkspacePaneTabEntry | null
   workspacePaneRoute: ParsedWorkspacePaneRouteTarget | undefined
   navigationIntent?: PrimaryWindowNavigationIntent
+  presentationCurrentness?: () => WorkspacePaneTargetCurrentness
 }): WorkspacePaneControllerPresentationLease | null {
   const fromRoute =
     workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
@@ -109,6 +111,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
       toRoute?.kind === 'terminal'
         ? claimTerminalPresentationFocus(navigationIntent.generation, toRoute.terminalSessionId)
         : null,
+    presentationCurrentness: input.presentationCurrentness ?? null,
   }
 }
 
@@ -200,7 +203,7 @@ export async function commitWorkspacePaneControllerCloseBackTargetOutcome(
   lease: WorkspacePaneControllerPresentationLease,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): Promise<WorkspacePaneControllerCommitOutcome> {
-  const initialCurrentness = workspacePaneTabControllerTargetCurrentness(lease.target)
+  const initialCurrentness = workspacePaneControllerPresentationLeaseCurrentness(lease)
   if (initialCurrentness !== 'current') return { kind: initialCurrentness === 'pending' ? 'pending' : 'abandoned' }
   let targetBecamePending = false
   const committed = await commitWorkspacePaneControllerTargetRoute(
@@ -214,13 +217,14 @@ export async function commitWorkspacePaneControllerCloseBackTargetOutcome(
       onTargetPending: () => {
         targetBecamePending = true
       },
+      presentationCurrentness: lease.presentationCurrentness ?? undefined,
     },
     lease.navigationIntent,
     lease.fromRoute,
   )
   if (committed) return { kind: 'committed' }
   if (!targetBecamePending) return { kind: 'abandoned' }
-  const finalCurrentness = workspacePaneTabControllerTargetCurrentness(lease.target)
+  const finalCurrentness = workspacePaneControllerPresentationLeaseCurrentness(lease)
   if (finalCurrentness === 'current') return { kind: 'retry' }
   return finalCurrentness === 'pending' ? { kind: 'pending' } : { kind: 'abandoned' }
 }
@@ -230,7 +234,14 @@ async function commitWorkspacePaneControllerTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options:
-    { replace?: boolean; onCommit?: () => void; onAbandon?: () => void; onTargetPending?: () => void } | undefined,
+    | {
+        replace?: boolean
+        onCommit?: () => void
+        onAbandon?: () => void
+        onTargetPending?: () => void
+        presentationCurrentness?: () => WorkspacePaneTargetCurrentness
+      }
+    | undefined,
   navigationIntent: PrimaryWindowNavigationIntent,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
 ): Promise<boolean> {
@@ -264,6 +275,7 @@ async function commitWorkspacePaneControllerTargetRoute(
     onCommit: options?.onCommit,
     onAbandon: options?.onAbandon,
     onTargetPending: options?.onTargetPending,
+    presentationCurrentness: options?.presentationCurrentness,
     routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
   })
 }
@@ -398,7 +410,13 @@ export async function commitWorkspacePaneExactTargetRoute(
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
-  options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void; onTargetPending?: () => void },
+  options?: {
+    replace?: boolean
+    onCommit?: () => void
+    onAbandon?: () => void
+    onTargetPending?: () => void
+    presentationCurrentness?: () => WorkspacePaneTargetCurrentness
+  },
   providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
   const ownsNavigationIntent = providedNavigationIntent === undefined
@@ -409,7 +427,10 @@ export async function commitWorkspacePaneExactTargetRoute(
       return false
     }
     const branchName = target.branchName
-    if (!branchName || !workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending)) {
+    if (
+      !branchName ||
+      !workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending, options?.presentationCurrentness)
+    ) {
       options?.onAbandon?.()
       return false
     }
@@ -421,7 +442,7 @@ export async function commitWorkspacePaneExactTargetRoute(
       onCommit: () => {
         presentationCommitted = commitPrimaryWindowNavigationEffect(
           () =>
-            workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending) &&
+            workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending, options?.presentationCurrentness) &&
             commitWorkspacePaneRouteSupplement(
               {
                 workspaceId: target.workspaceId,
@@ -445,10 +466,32 @@ export async function commitWorkspacePaneExactTargetRoute(
 function workspacePaneTargetIsCurrentForCommit(
   target: WorkspacePaneControllerTarget,
   onTargetPending: (() => void) | undefined,
+  presentationCurrentness?: () => WorkspacePaneTargetCurrentness,
 ): boolean {
-  const currentness = workspacePaneTabControllerTargetCurrentness(target)
+  const currentness = combinedWorkspacePaneTargetCurrentness(
+    workspacePaneTabControllerTargetCurrentness(target),
+    presentationCurrentness?.() ?? 'current',
+  )
   if (currentness === 'pending') onTargetPending?.()
   return currentness === 'current'
+}
+
+function workspacePaneControllerPresentationLeaseCurrentness(
+  lease: WorkspacePaneControllerPresentationLease,
+): WorkspacePaneTargetCurrentness {
+  return combinedWorkspacePaneTargetCurrentness(
+    workspacePaneTabControllerTargetCurrentness(lease.target),
+    lease.presentationCurrentness?.() ?? 'current',
+  )
+}
+
+function combinedWorkspacePaneTargetCurrentness(
+  target: WorkspacePaneTargetCurrentness,
+  presentation: WorkspacePaneTargetCurrentness,
+): WorkspacePaneTargetCurrentness {
+  if (target === 'stale' || presentation === 'stale') return 'stale'
+  if (target === 'pending' || presentation === 'pending') return 'pending'
+  return 'current'
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {

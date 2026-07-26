@@ -12,6 +12,8 @@ import {
   tryBeginPassivePrimaryWindowNavigationIntent,
   type PrimaryWindowNavigationIntent,
 } from '#/web/primary-window-navigation-lifecycle.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -83,6 +85,7 @@ async function flushPresentation(): Promise<void> {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetPrimaryWindowNavigationForTest()
   mocks.listener = null
   mocks.unsubscribe.mockReset()
@@ -114,7 +117,7 @@ function renderPresentationHook() {
     ({ route }: { route: typeof TERMINAL_ROUTE | { kind: 'static'; tab: 'files' } }) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: ROUTE_TARGET,
-        currentRouteAuthority: 'resolved',
+        currentRouteAuthority: 'ready',
         currentWorkspacePaneRoute: route,
         navigation: primaryWindowNavigationActionsForTest(),
       }),
@@ -131,7 +134,7 @@ function renderHydratingPresentationHook() {
     ({ target, route }: Props) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: target,
-        currentRouteAuthority: 'resolved',
+        currentRouteAuthority: 'ready',
         currentWorkspacePaneRoute: route,
         navigation: primaryWindowNavigationActionsForTest(),
       }),
@@ -141,14 +144,14 @@ function renderHydratingPresentationHook() {
 
 function renderAuthorityPresentationHook() {
   return renderHook(
-    ({ authority }: { authority: 'pending' | 'resolved' }) =>
+    ({ authority }: { authority: 'pending' | 'ready' | 'stale' }) =>
       useTerminalRetirementWorkspacePanePresentation({
         currentRouteTarget: ROUTE_TARGET,
         currentRouteAuthority: authority,
         currentWorkspacePaneRoute: TERMINAL_ROUTE,
         navigation: primaryWindowNavigationActionsForTest(),
       }),
-    { initialProps: { authority: 'pending' as 'pending' | 'resolved' } },
+    { initialProps: { authority: 'pending' as 'pending' | 'ready' | 'stale' } },
   )
 }
 
@@ -203,7 +206,7 @@ test('retains one captured plan until target authority hydrates', async () => {
   expect(mocks.commitPresentation).not.toHaveBeenCalled()
   expect(retirement.settle).not.toHaveBeenCalled()
 
-  rerender({ authority: 'resolved' })
+  rerender({ authority: 'ready' })
   await flushPresentation()
 
   expect(mocks.capturePresentation).toHaveBeenCalledOnce()
@@ -212,10 +215,25 @@ test('retains one captured plan until target authority hydrates', async () => {
   expect(mocks.settlePresentation).toHaveBeenCalledOnce()
 })
 
-test('retains a plan when commit-time authority becomes pending and retries after hydration', async () => {
-  mocks.commitPresentation.mockImplementationOnce(async () => ({ kind: 'pending' }))
+test('settles a retained plan only after route authority becomes definitively stale', () => {
   const { rerender } = renderAuthorityPresentationHook()
-  rerender({ authority: 'resolved' })
+  const listener = mocks.listener
+  if (!listener) throw new Error('missing accepted-retirement listener')
+  const retirement = retirementForTest()
+
+  act(() => listener(retirement))
+  expect(mocks.capturePresentation).toHaveBeenCalledOnce()
+  expect(mocks.commitPresentation).not.toHaveBeenCalled()
+
+  rerender({ authority: 'stale' })
+
+  expect(retirement.settle).toHaveBeenCalledOnce()
+  expect(mocks.settlePresentation).toHaveBeenCalledOnce()
+})
+
+test('retains a plan when tabs authority becomes pending and retries when its projection publishes', async () => {
+  mocks.commitPresentation.mockImplementationOnce(async () => ({ kind: 'pending' }))
+  renderPresentationHook()
   const listener = mocks.listener
   if (!listener) throw new Error('missing accepted-retirement listener')
   const retirement = retirementForTest()
@@ -225,8 +243,9 @@ test('retains a plan when commit-time authority becomes pending and retries afte
   expect(mocks.commitPresentation).toHaveBeenCalledOnce()
   expect(retirement.settle).not.toHaveBeenCalled()
 
-  rerender({ authority: 'pending' })
-  rerender({ authority: 'resolved' })
+  act(() => {
+    writeWorkspacePaneTabsSnapshotQueryData(WORKSPACE_ID, 'runtime-1', { revision: 1, entries: [] })
+  })
   await flushPresentation()
 
   expect(mocks.capturePresentation).toHaveBeenCalledOnce()
@@ -237,7 +256,7 @@ test('retains a plan when commit-time authority becomes pending and retries afte
 test('immediately retries when commit-time authority recovered before the outcome returned', async () => {
   mocks.commitPresentation.mockImplementationOnce(async () => ({ kind: 'retry' }))
   const { rerender } = renderAuthorityPresentationHook()
-  rerender({ authority: 'resolved' })
+  rerender({ authority: 'ready' })
   const listener = mocks.listener
   if (!listener) throw new Error('missing accepted-retirement listener')
   const retirement = retirementForTest()
