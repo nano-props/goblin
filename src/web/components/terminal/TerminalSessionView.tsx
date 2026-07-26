@@ -139,10 +139,6 @@ export function TerminalSessionView({
   }, [clearBell, terminalSessionId])
 
   useEffect(() => {
-    setManualPasteDraft((current) => (current?.terminalSessionId === terminalSessionId ? current : null))
-  }, [terminalSessionId])
-
-  useEffect(() => {
     if (!terminalSessionId) return
     const handleFocus = () => clearBell(terminalSessionId)
     window.addEventListener('focus', handleFocus)
@@ -263,6 +259,13 @@ export function TerminalSessionView({
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
+
+  useEffect(() => {
+    setManualPasteDraft((current) =>
+      current && (!isController || current.terminalSessionId !== terminalSessionId) ? null : current,
+    )
+  }, [isController, terminalSessionId])
+
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const showViewerOverlay = sessionPhase === 'open-viewer'
   const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
@@ -502,7 +505,7 @@ export function TerminalSessionView({
           </Button>
         </div>
       )}
-      {isMobileDevice() && isController && terminalSessionId && (
+      {isMobileDevice() && isController && terminalSessionId && !searchOpen && (
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
           labels={mobileToolbarLabels}
@@ -526,8 +529,11 @@ export function TerminalSessionView({
             event.preventDefault()
             const draft = manualPasteDraft
             if (!draft || !draft.text) return
+            if (!draft.pasteWriter(draft.text)) {
+              toast.error(t('terminal.paste-text-failed'))
+              return
+            }
             setManualPasteDraft(null)
-            if (!draft.pasteWriter(draft.text)) toast.error(t('terminal.paste-text-failed'))
           }}
         >
           <textarea

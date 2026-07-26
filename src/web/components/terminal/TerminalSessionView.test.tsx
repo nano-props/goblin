@@ -338,14 +338,16 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('offers manual text entry on an insecure LAN origin even if a clipboard object is exposed', async () => {
+  test('offers manual text entry on an insecure LAN origin without losing text for an expired target', async () => {
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     const secureContextDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'isSecureContext')
     const readText = vi.fn(async () => 'must not be read')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } })
     Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value: false })
-    const pasteWriter = vi.fn(() => true)
-    const rendered = await renderTerminalSession({ capturePasteWriter: vi.fn(() => pasteWriter) })
+    const expiredPasteWriter = vi.fn(() => false)
+    const currentPasteWriter = vi.fn(() => true)
+    const capturePasteWriter = vi.fn().mockReturnValueOnce(expiredPasteWriter).mockReturnValueOnce(currentPasteWriter)
+    const rendered = await renderTerminalSession({ capturePasteWriter })
 
     try {
       const pasteButton = Array.from(rendered.container.querySelectorAll('button')).find(
@@ -364,13 +366,52 @@ describe('TerminalSessionView', () => {
       act(() => submit.click())
 
       expect(readText).not.toHaveBeenCalled()
-      expect(pasteWriter).toHaveBeenCalledWith('manual paste text')
+      expect(expiredPasteWriter).toHaveBeenCalledWith('manual paste text')
+      expect(textarea.value).toBe('manual paste text')
+      expect(document.body.contains(textarea)).toBe(true)
+
+      const cancel = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-content"] button'),
+      ).find((button) => button.textContent === 'dialog.cancel')
+      if (!cancel) throw new Error('expected manual paste cancel button')
+      act(() => cancel.click())
+      act(() => pasteButton.click())
+
+      const currentTextarea = document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="terminal.mobile-paste-placeholder"]',
+      )
+      if (!currentTextarea) throw new Error('expected current manual paste textarea')
+      fireEvent.change(currentTextarea, { target: { value: 'current paste text' } })
+      const currentSubmit = document.querySelector<HTMLButtonElement>(
+        '[data-slot="dialog-content"] button[type="submit"]',
+      )
+      if (!currentSubmit) throw new Error('expected current manual paste submit button')
+      act(() => currentSubmit.click())
+
+      expect(currentPasteWriter).toHaveBeenCalledWith('current paste text')
+      expect(document.querySelector('textarea[aria-label="terminal.mobile-paste-placeholder"]')).toBeNull()
     } finally {
       await rendered.cleanup()
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
       if (secureContextDescriptor) Object.defineProperty(globalThis, 'isSecureContext', secureContextDescriptor)
       else Reflect.deleteProperty(globalThis, 'isSecureContext')
+    }
+  })
+
+  test('hides the mobile toolbar while terminal search is open', async () => {
+    const rendered = await renderTerminalSession()
+
+    try {
+      expect(rendered.container.querySelector('.goblin-terminal-mobile-toolbar')).not.toBeNull()
+      await act(async () => {
+        rendered.sessionRoot.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true, bubbles: true }))
+      })
+
+      expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
+      expect(rendered.container.querySelector('.goblin-terminal-mobile-toolbar')).toBeNull()
+    } finally {
+      await rendered.cleanup()
     }
   })
 

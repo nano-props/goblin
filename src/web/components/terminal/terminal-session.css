@@ -363,10 +363,9 @@
   background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
 }
 
-/* Prefer one complete column when the terminal surface has room. The 536px
-   cutoff also keeps the centered 436px column clear of the 48px search overlay.
+/* Prefer one complete column when the terminal surface has room.
    Landscape and shorter terminal surfaces use the two key groups as columns. */
-@container goblin-terminal-session (orientation: landscape) or (max-height: 536px) {
+@container goblin-terminal-session (orientation: landscape) or (max-height: 480px) {
   .goblin-terminal-mobile-toolbar__row {
     flex-direction: row;
   }
