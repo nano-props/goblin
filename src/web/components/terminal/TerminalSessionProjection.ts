@@ -284,6 +284,11 @@ export class TerminalSessionProjection {
 
   handleServerBell(event: TerminalBellRealtimeEvent): void {
     const classified = this.classifyRealtimeEvent(event)
+    // Intentional best-effort presentation boundary: a bell is transient UI
+    // state, so it is accepted only for an exact locally active binding. Do
+    // not retain bells that race catalog hydration or a future generation;
+    // preserving that rare badge would require a second bounded binding
+    // lifecycle beside the authoritative session projection.
     if (!classified || classified.classification === 'future') return
     if (classified.classification === 'foreign' || classified.classification === 'retiring') return
     this.applyServerBell(classified.session, event)
@@ -304,6 +309,12 @@ export class TerminalSessionProjection {
 
   handleExit(event: TerminalExitEvent): void {
     const classified = this.classifyRealtimeEvent(event)
+    // Passive close-back is deliberately emitted only when the local
+    // projection can accept this exact active binding. Unknown or future
+    // retirements still converge through the authoritative sessions catalog,
+    // but their transient before-state is not buffered for later navigation.
+    // The accepted failure mode is a locally correctable stale terminal route,
+    // not retained cross-generation coordination state.
     if (!classified) return
     if (
       terminalSessionCoordinates(classified.session.descriptor).workspaceId !== event.workspaceId ||
