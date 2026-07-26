@@ -22,7 +22,11 @@ import {
   gitWorktreeFilesystemExecutionTarget,
   workspaceRootFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
-import { getSuccessfulRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import {
+  getRepoProjectionQueryStatus,
+  getRepoWorktreeStatusQueryStatus,
+  getSuccessfulRepoWorktreeStatusQueryData,
+} from '#/web/repo-query-cache.ts'
 import {
   terminalExecutionPath,
   terminalSessionCoordinates,
@@ -97,28 +101,43 @@ export function gitWorktreePaneTargetLease(
 }
 
 export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWorkspacePaneTargetLease): boolean {
+  return filesystemWorkspacePaneTargetLeaseCurrentness(lease) === 'current'
+}
+
+export function filesystemWorkspacePaneTargetLeaseCurrentness(
+  lease: FilesystemWorkspacePaneTargetLease,
+): WorkspacePaneTargetCurrentness {
   const workspace = useWorkspacesStore.getState().workspaces[lease.routeTarget.workspaceId]
-  if (workspace?.workspaceRuntimeId !== lease.workspaceRuntimeId) return false
-  if (lease.routeTarget.kind === 'workspace-root') return true
+  if (!workspace) return 'stale'
+  if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
+  if (lease.routeTarget.kind === 'workspace-root') return 'current'
+  if (workspace.capability.kind === 'probing') return 'pending'
+  if (workspace.capability.kind !== 'git') return 'stale'
   const worktreePath = lease.routeTarget.worktreePath
+  const worktreeStatusQuery = getRepoWorktreeStatusQueryStatus(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)
+  if (worktreeStatusQuery === 'pending') return 'pending'
+  if (worktreeStatusQuery === 'error') return 'stale'
   const worktreeStatus = getSuccessfulRepoWorktreeStatusQueryData(
     lease.routeTarget.workspaceId,
     lease.workspaceRuntimeId,
   )
-  if (!worktreeStatus) return false
+  if (!worktreeStatus) return 'stale'
   if (lease.authority.kind === 'branch') {
     const branchName = lease.authority.branchName
-    return (
-      workspacePaneTargetLeaseIsCurrent({
-        workspaceId: lease.routeTarget.workspaceId,
-        workspaceRuntimeId: lease.workspaceRuntimeId,
-        branchName,
-        worktreePath,
-      }) && worktreeStatus.status.some((worktree) => worktree.path === worktreePath && worktree.branch === branchName)
-    )
+    const branchCurrentness = workspacePaneTargetLeaseCurrentness({
+      workspaceId: lease.routeTarget.workspaceId,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      branchName,
+      worktreePath,
+    })
+    if (branchCurrentness !== 'current') return branchCurrentness
+    return worktreeStatus.status.some((worktree) => worktree.path === worktreePath && worktree.branch === branchName)
+      ? 'current'
+      : 'stale'
   }
-  if (workspace.capability.kind !== 'git') return false
   return worktreeStatus.status.some((worktree) => worktree.path === worktreePath && worktree.branch === undefined)
+    ? 'current'
+    : 'stale'
 }
 
 export type WorkspacePaneTabTargetResolution =
@@ -148,6 +167,7 @@ export interface WorkspacePaneDestinationTargetLease {
 }
 
 export type WorkspacePaneTargetLease = WorkspacePaneDestinationTargetLease
+export type WorkspacePaneTargetCurrentness = 'current' | 'pending' | 'stale'
 
 export type WorkspacePaneDestinationTargetResolution =
   { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }
@@ -182,12 +202,24 @@ export function resolveWorkspacePaneDestinationTargetLease(
 }
 
 export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
+  return workspacePaneTargetLeaseCurrentness(lease) === 'current'
+}
+
+export function workspacePaneTargetLeaseCurrentness(lease: WorkspacePaneTargetLease): WorkspacePaneTargetCurrentness {
+  const workspace = useWorkspacesStore.getState().workspaces[lease.workspaceId]
+  if (!workspace) return 'stale'
+  if (workspace.workspaceRuntimeId !== lease.workspaceRuntimeId) return 'stale'
+  if (workspace.capability.kind === 'probing') return 'pending'
+  if (workspace.capability.kind !== 'git') return 'stale'
+  const projectionStatus = getRepoProjectionQueryStatus(lease.workspaceId, lease.workspaceRuntimeId, null, 'full')
+  if (projectionStatus === 'pending') return 'pending'
+  if (projectionStatus === 'error') return 'stale'
   const current = resolveWorkspacePaneDestinationTargetLease(lease.workspaceId, lease.branchName)
-  return (
-    current !== null &&
+  return current !== null &&
     current.workspaceRuntimeId === lease.workspaceRuntimeId &&
     current.worktreePath === lease.worktreePath
-  )
+    ? 'current'
+    : 'stale'
 }
 
 export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneTargetLease): boolean {

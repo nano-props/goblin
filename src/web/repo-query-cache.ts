@@ -61,6 +61,20 @@ export function getSuccessfulRepoProjectionQueryData(
   return projection && projection.loadedAt > 0 ? projection : undefined
 }
 
+export function getRepoProjectionQueryStatus(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  branch: string | null | undefined,
+  mode: PullRequestFetchMode | undefined,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): 'pending' | 'error' | 'success' {
+  const query = queryClient.getQueryState<GitWorkspaceRuntimeProjection>(
+    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
+  )
+  if (!query || query.status === 'pending') return 'pending'
+  return query.status === 'success' && query.data && query.data.loadedAt > 0 ? 'success' : 'error'
+}
+
 export function getRepoWorktreeStatusQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
@@ -78,6 +92,18 @@ export function getSuccessfulRepoWorktreeStatusQueryData(
     repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
   )
   return query?.status === 'success' ? query.data : undefined
+}
+
+export function getRepoWorktreeStatusQueryStatus(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): 'pending' | 'error' | 'success' {
+  const query = queryClient.getQueryState<RepoWorktreeStatusSnapshot>(
+    repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
+  )
+  if (!query || query.status === 'pending') return 'pending'
+  return query.status === 'success' && query.data ? 'success' : 'error'
 }
 
 export function setRepoWorktreeStatusQueryData(

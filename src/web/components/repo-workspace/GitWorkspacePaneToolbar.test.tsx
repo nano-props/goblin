@@ -793,6 +793,7 @@ describe('GitWorkspacePaneToolbar', () => {
       REPO_ID,
       'feature/worktree',
       'term-111111111111111111111',
+      { replace: true },
     )
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
@@ -1321,7 +1322,9 @@ describe('GitWorkspacePaneToolbar', () => {
         worktreePath: WORKTREE_PATH,
       }),
     )
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes', {
+      replace: true,
+    })
   })
 
   test('opens a terminal while the initial session projection is still in flight', async () => {

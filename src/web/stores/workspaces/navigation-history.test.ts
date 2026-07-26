@@ -90,6 +90,21 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
+  test('does not retain a retired terminal after close-back replacement', () => {
+    const store = useWorkspacesStore.getState()
+    const dashboard = entry('dashboard')
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
+    const files = branchEntry({ tab: 'status', terminalSessionId: null })
+
+    store.recordWorkspaceNavigation(dashboard)
+    store.recordWorkspaceNavigation(terminal)
+    store.recordWorkspaceNavigation(files, { replace: true })
+
+    expect(history().current).toEqual(files)
+    expect(history().backStack).toEqual([dashboard])
+    expect(traverse('back')).toEqual(dashboard)
+  })
+
   test('updates branch metadata without adding a back entry', () => {
     const store = useWorkspacesStore.getState()
     store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: null }))

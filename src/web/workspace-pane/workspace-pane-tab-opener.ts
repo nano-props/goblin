@@ -75,6 +75,17 @@ export function clearWorkspacePaneTabOpener(
   useWorkspacesStore.getState().clearTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity)
 }
 
+export function consumeWorkspacePaneTabOpener(
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+  childIdentity: string,
+  openerIdentity: string,
+): void {
+  useWorkspacesStore
+    .getState()
+    .consumeTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity, openerIdentity)
+}
+
 function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, workspaceRuntimeId: string): string {
   return `${tabOpenerScopeKey(target)}\0${workspaceRuntimeId}`
 }

@@ -51,16 +51,20 @@ describe('resolveWorkspacePaneCommandTarget', () => {
   test('does not project a target while the workspace capability is unresolved', () => {
     const target = resolveTarget({ workspace: probingWorkspace() })
 
-    expect(target).toBeNull()
+    expect(target).toEqual({ routeAuthority: 'pending', target: null })
+  })
+
+  test('treats a workspace missing from the ready shell projection as resolved missing', () => {
+    expect(resolveTarget({ workspace: null })).toEqual({ routeAuthority: 'resolved', target: null })
   })
 
   test('resolves a workspace-root target without waiting for disabled repo queries', () => {
     const target = resolveTarget()
 
-    expect(target?.routeTarget).toEqual(ROOT_ROUTE_TARGET)
+    expect(target.target?.routeTarget).toEqual(ROOT_ROUTE_TARGET)
   })
 
-  test('keeps a branch target pending until both authoritative repo read models resolve', () => {
+  test('resolves branch route authority independently from worktree command readiness', () => {
     const routeTarget = { kind: 'git-branch' as const, workspaceId: WORKSPACE_ID, branchName: 'feature' }
     const target = resolveTarget({
       routeTarget,
@@ -69,7 +73,10 @@ describe('resolveWorkspacePaneCommandTarget', () => {
       worktreeReadModel: { status: 'pending', worktrees: null },
     })
 
-    expect(target).toEqual({ routeTarget, workspacePaneRoute: null, filesystemTarget: null })
+    expect(target).toEqual({
+      routeAuthority: 'resolved',
+      target: { routeTarget, workspacePaneRoute: null, filesystemTarget: null },
+    })
   })
 
   test('atomically resolves a branch command target from matching branch and worktree read models', () => {
@@ -89,12 +96,35 @@ describe('resolveWorkspacePaneCommandTarget', () => {
       },
     })
 
-    const filesystemTarget = target?.filesystemTarget
+    const filesystemTarget = target.target?.filesystemTarget
     if (!filesystemTarget) throw new Error('missing projected branch filesystem target')
     expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
   })
 
   test('resolves a direct worktree target from the worktree read model alone', () => {
+    const worktreePath = '/workspace/project-worktree'
+    const target = resolveTarget({
+      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath },
+      workspace: gitWorkspace(),
+      branchReadModel: {
+        status: 'success',
+        snapshot: {
+          branches: [createBranchSnapshot('feature', { worktree: { path: worktreePath } })],
+          current: 'main',
+        },
+      },
+      worktreeReadModel: {
+        status: 'success',
+        worktrees: [{ path: worktreePath, branch: 'feature', isMain: false, entries: [] }],
+      },
+    })
+
+    const filesystemTarget = target.target?.filesystemTarget
+    if (!filesystemTarget) throw new Error('missing projected worktree filesystem target')
+    expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
+  })
+
+  test('waits for branch authority before resolving a branch-headed worktree route', () => {
     const worktreePath = '/workspace/project-worktree'
     const target = resolveTarget({
       routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath },
@@ -106,26 +136,28 @@ describe('resolveWorkspacePaneCommandTarget', () => {
       },
     })
 
-    const filesystemTarget = target?.filesystemTarget
-    if (!filesystemTarget) throw new Error('missing projected worktree filesystem target')
-    expect(workspacePaneFilesystemRootPath(filesystemTarget)).toBe(worktreePath)
+    expect(target).toEqual({ routeAuthority: 'pending', target: null })
   })
 
   test('leaves an unresolved branch without a filesystem target after its read models settle', () => {
+    const routeTarget = { kind: 'git-branch' as const, workspaceId: WORKSPACE_ID, branchName: 'feature' }
     const target = resolveTarget({
-      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature' },
+      routeTarget,
       workspace: gitWorkspace(),
       branchReadModel: { status: 'success', snapshot: { branches: [], current: 'main' } },
       worktreeReadModel: { status: 'success', worktrees: [] },
     })
 
-    expect(target?.filesystemTarget).toBeNull()
+    expect(target).toEqual({
+      routeAuthority: 'resolved',
+      target: { routeTarget, workspacePaneRoute: null, filesystemTarget: null },
+    })
   })
 
   test('rejects a route target owned by a different workspace projection', () => {
     const differentWorkspaceId = workspaceIdForTest('goblin+file:///workspace/different')
     const target = resolveTarget({ workspace: emptyWorkspace(differentWorkspaceId, 'different', 'runtime-1') })
 
-    expect(target).toBeNull()
+    expect(target).toEqual({ routeAuthority: 'resolved', target: null })
   })
 })

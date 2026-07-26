@@ -3,6 +3,7 @@ import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneControllerCloseBackTarget,
+  commitWorkspacePaneControllerCloseBackTargetOutcome,
   commitWorkspacePaneControllerRoute,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
@@ -33,6 +34,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { beginPrimaryWindowNavigationIntent } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
@@ -464,7 +466,39 @@ describe('workspace pane tab controller transactions', () => {
       workspacePaneRoute: SOURCE_ROUTE,
     })
     if (!lease) throw new Error('missing presentation lease')
-    await expect(commitWorkspacePaneControllerCloseBackTarget(lease, committingNavigation())).resolves.toBe(true)
+    const navigation = committingNavigation()
+    await expect(commitWorkspacePaneControllerCloseBackTarget(lease, navigation)).resolves.toBe(true)
+    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      'feature/a',
+      { kind: 'static', tab: 'status' },
+      expect.objectContaining({ replace: true, routePrecondition: { kind: 'exact-route', route: SOURCE_ROUTE } }),
+    )
+  })
+
+  test('preserves pending authority when it changes during close-back commit', async () => {
+    const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
+      target: workspacePaneTarget(),
+      closingEntry: workspacePaneStaticTabEntry('files'),
+      nextEntry: workspacePaneStaticTabEntry('status'),
+      workspacePaneRoute: SOURCE_ROUTE,
+    })
+    if (!lease) throw new Error('missing presentation lease')
+    const queryKey = repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', null, 'full')
+    const projection = primaryWindowQueryClient.getQueryData(queryKey)
+    if (!projection) throw new Error('missing repo projection fixture')
+    const originalIsCurrent = lease.navigationIntent.isCurrent.bind(lease.navigationIntent)
+    lease.navigationIntent.isCurrent = () => {
+      primaryWindowQueryClient.removeQueries({ queryKey })
+      return originalIsCurrent()
+    }
+    const navigation = committingNavigation()
+    const outcome = commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)
+    primaryWindowQueryClient.setQueryData(queryKey, projection)
+
+    await expect(outcome).resolves.toEqual({ kind: 'retry' })
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    lease.navigationIntent.release()
   })
 })
 

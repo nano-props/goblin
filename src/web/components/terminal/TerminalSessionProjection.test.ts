@@ -853,6 +853,67 @@ describe('TerminalSessionProjection', () => {
       expect(replacement).toHaveBeenCalledOnce()
     })
 
+    test('detaches a throwing retirement consumer and preserves its claim for a replacement', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      projection.subscribeAcceptedRetirement(() => {
+        throw new Error('consumer failed')
+      })
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_throw_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-throwing-consumer-111',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        catalogRevision: 1,
+        retirementPresentation: {
+          target: RUNTIME_TARGET,
+          terminalBase: RETIREMENT_TERMINAL_BASE,
+          tabsBeforeRetirement: [],
+        },
+      })
+
+      const replacement = vi.fn((retirement: AcceptedTerminalRetirement) => retirement.settle())
+      expect(() => projection.subscribeAcceptedRetirement(replacement)).not.toThrow()
+      expect(replacement).toHaveBeenCalledOnce()
+    })
+
+    test('iteratively drains a large synchronous retirement backlog', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { revision: 1, sessions: [] },
+        'client_local',
+      )
+      const count = 2_000
+      for (let index = 0; index < count; index += 1) {
+        projection.handleSessionClosed({
+          terminalRuntimeSessionId: `pty_backlog_${index}`,
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: `term-backlog-${index}`,
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          catalogRevision: 1,
+          retirementPresentation: {
+            target: RUNTIME_TARGET,
+            terminalBase: RETIREMENT_TERMINAL_BASE,
+            tabsBeforeRetirement: [],
+          },
+        })
+      }
+      let delivered = 0
+      projection.subscribeAcceptedRetirement((retirement) => {
+        delivered += 1
+        retirement.settle()
+      })
+
+      expect(delivered).toBe(count)
+    })
+
     test('delivers accepted retirement presentations one at a time', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessionsSnapshot(

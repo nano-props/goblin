@@ -168,9 +168,9 @@ export class TerminalSessionProjection {
   // Before that boundary, user-wide realtime retirement facts wait in the
   // ledger and cannot be accepted or discarded from an empty local store.
   private runtimeMembership:
-    | { kind: 'pending' }
-    | { kind: 'complete'; index: TerminalRuntimeMembershipIndex }
-    | { kind: 'failed' } = { kind: 'pending' }
+    { kind: 'pending' } | { kind: 'complete'; index: TerminalRuntimeMembershipIndex } | { kind: 'failed' } = {
+    kind: 'pending',
+  }
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
     WorkspaceId,
@@ -207,6 +207,8 @@ export class TerminalSessionProjection {
   private readonly lastPublishedWorkspaceBellCount = new Map<WorkspaceId, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private acceptedRetirementListener: AcceptedTerminalRetirementListener | null = null
+  private dispatchingAcceptedRetirements = false
+  private acceptedRetirementDispatchRequested = false
   private readonly terminalSessionIdsByTerminalFilesystemTarget = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
   private readonly terminalRetirements = new TerminalRetirementLedger()
@@ -1152,44 +1154,56 @@ export class TerminalSessionProjection {
   }
 
   private dispatchAcceptedRetirements(): void {
-    const listener = this.acceptedRetirementListener
-    if (!listener) return
-    const claim = this.terminalRetirements.claimPendingPresentation()
-    if (!claim) return
-    const retirementPresentation = claim.fact.retirementPresentation
-    if (!retirementPresentation) {
-      this.terminalRetirements.settlePresentationClaim(claim)
-      this.dispatchAcceptedRetirements()
-      return
-    }
-    const invalidationSignal = this.terminalRetirements.presentationClaimInvalidationSignal(claim)
-    const settle = () => {
-      const didSettle = this.terminalRetirements.settlePresentationClaim(claim)
-      if (didSettle && !invalidationSignal.aborted) this.dispatchAcceptedRetirements()
-    }
-    const release = () => {
-      this.terminalRetirements.releasePresentationClaim(claim)
-    }
-    const retirement: AcceptedTerminalRetirement = {
-      terminalSessionId: claim.fact.terminalSessionId,
-      base: terminalSessionBase(
-        retirementPresentation.terminalBase.target,
-        retirementPresentation.terminalBase.presentation,
-      ),
-      retirementPresentation,
-      invalidationSignal,
-      settle,
-      release,
-      [Symbol.dispose]: release,
-    }
+    this.acceptedRetirementDispatchRequested = true
+    if (this.dispatchingAcceptedRetirements) return
+    this.dispatchingAcceptedRetirements = true
     try {
-      listener(retirement)
-    } catch (err) {
-      retirement.release()
-      terminalSessionProviderLog.warn('accepted terminal retirement listener threw', {
-        terminalSessionId: retirement.terminalSessionId,
-        err,
-      })
+      while (this.acceptedRetirementDispatchRequested) {
+        this.acceptedRetirementDispatchRequested = false
+        const listener = this.acceptedRetirementListener
+        if (!listener) continue
+        const claim = this.terminalRetirements.claimPendingPresentation()
+        if (!claim) continue
+        const retirementPresentation = claim.fact.retirementPresentation
+        if (!retirementPresentation) {
+          if (this.terminalRetirements.settlePresentationClaim(claim)) {
+            this.acceptedRetirementDispatchRequested = true
+          }
+          continue
+        }
+        const invalidationSignal = this.terminalRetirements.presentationClaimInvalidationSignal(claim)
+        const settle = () => {
+          const didSettle = this.terminalRetirements.settlePresentationClaim(claim)
+          if (didSettle && !invalidationSignal.aborted) this.dispatchAcceptedRetirements()
+        }
+        const release = () => {
+          this.terminalRetirements.releasePresentationClaim(claim)
+        }
+        const retirement: AcceptedTerminalRetirement = {
+          terminalSessionId: claim.fact.terminalSessionId,
+          base: terminalSessionBase(
+            retirementPresentation.terminalBase.target,
+            retirementPresentation.terminalBase.presentation,
+          ),
+          retirementPresentation,
+          invalidationSignal,
+          settle,
+          release,
+          [Symbol.dispose]: release,
+        }
+        try {
+          listener(retirement)
+        } catch (err) {
+          retirement.release()
+          if (this.acceptedRetirementListener === listener) this.acceptedRetirementListener = null
+          terminalSessionProviderLog.warn('accepted terminal retirement listener threw', {
+            terminalSessionId: retirement.terminalSessionId,
+            err,
+          })
+        }
+      }
+    } finally {
+      this.dispatchingAcceptedRetirements = false
     }
   }
 

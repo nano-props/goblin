@@ -161,9 +161,10 @@ function AuthenticatedWorkspaceShell() {
   const commandBranchProjection = useRepoProjectionReadModel(
     commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
     commandWorkspace?.workspaceRuntimeId ?? '',
-    routeContext?.kind === 'branch' ? routeContext.branchName : null,
+    null,
     'full',
-    routeContext?.kind === 'branch' && commandWorkspace?.capability.kind === 'git',
+    (routeContext?.kind === 'branch' || routeContext?.kind === 'worktree') &&
+      commandWorkspace?.capability.kind === 'git',
   )
   const commandWorktreeStatus = useRepoWorktreeStatusReadModel(
     commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
@@ -171,7 +172,7 @@ function AuthenticatedWorkspaceShell() {
     (routeContext?.kind === 'branch' || routeContext?.kind === 'worktree') &&
       commandWorkspace?.capability.kind === 'git',
   )
-  const currentWorkspacePaneCommandTarget = resolveWorkspacePaneCommandTarget({
+  const currentWorkspacePaneCommandTargetProjection = resolveWorkspacePaneCommandTarget({
     routeTarget: currentWorkspacePaneRouteTarget,
     workspacePaneRoute: currentWorkspacePaneRoute,
     workspace: commandWorkspace ?? null,
@@ -184,6 +185,7 @@ function AuthenticatedWorkspaceShell() {
       worktrees: commandWorktreeStatus.data?.status ?? null,
     },
   })
+  const currentWorkspacePaneCommandTarget = currentWorkspacePaneCommandTargetProjection.target
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
@@ -221,6 +223,7 @@ function AuthenticatedWorkspaceShell() {
         currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         currentWorkspacePaneRouteTarget={currentWorkspacePaneRouteTarget}
+        currentWorkspacePaneRouteAuthority={currentWorkspacePaneCommandTargetProjection.routeAuthority}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
@@ -459,6 +462,7 @@ function AuthenticatedWorkspaceSideEffects({
   currentWorkspacePaneCommandTarget,
   currentWorkspacePaneRoute,
   currentWorkspacePaneRouteTarget,
+  currentWorkspacePaneRouteAuthority,
   routeContext,
   navigation,
   closeAllOverlays,
@@ -476,6 +480,7 @@ function AuthenticatedWorkspaceSideEffects({
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   currentWorkspacePaneRouteTarget: WorkspacePaneTabsTarget | null
+  currentWorkspacePaneRouteAuthority: 'pending' | 'resolved'
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
@@ -490,6 +495,7 @@ function AuthenticatedWorkspaceSideEffects({
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useTerminalRetirementWorkspacePanePresentation({
     currentRouteTarget: currentWorkspacePaneRouteTarget,
+    currentRouteAuthority: currentWorkspacePaneRouteAuthority,
     currentWorkspacePaneRoute,
     navigation,
   })

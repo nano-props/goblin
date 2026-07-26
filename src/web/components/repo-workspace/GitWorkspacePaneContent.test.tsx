@@ -554,7 +554,9 @@ describe('GitWorkspacePaneContent', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'status', {
+      replace: true,
+    })
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 

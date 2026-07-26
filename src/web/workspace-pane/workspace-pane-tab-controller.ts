@@ -18,9 +18,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
   filesystemWorkspacePaneTargetLeaseForModel,
+  filesystemWorkspacePaneTargetLeaseCurrentness,
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   workspacePaneCommittedRuntimeTargetIsCurrent,
+  workspacePaneTargetLeaseCurrentness,
   workspacePaneTargetLeaseIsCurrent,
+  type WorkspacePaneTargetCurrentness,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   beginPrimaryWindowNavigationIntent,
@@ -70,6 +73,9 @@ export interface WorkspacePaneControllerPresentationLease {
   toRoute: WorkspacePaneTabControllerRoute
   focusEffects: TerminalPresentationFocusEffects | null
 }
+
+export type WorkspacePaneControllerCommitOutcome =
+  { kind: 'committed' } | { kind: 'retry' } | { kind: 'pending' } | { kind: 'abandoned' }
 
 export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   target: WorkspacePaneTabModel
@@ -183,25 +189,48 @@ export async function selectWorkspacePaneControllerTabEntry(
   }
 }
 
-export function commitWorkspacePaneControllerCloseBackTarget(
+export async function commitWorkspacePaneControllerCloseBackTarget(
   lease: WorkspacePaneControllerPresentationLease,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): Promise<boolean> {
-  return commitWorkspacePaneControllerTargetRoute(
+  return (await commitWorkspacePaneControllerCloseBackTargetOutcome(lease, navigation)).kind === 'committed'
+}
+
+export async function commitWorkspacePaneControllerCloseBackTargetOutcome(
+  lease: WorkspacePaneControllerPresentationLease,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): Promise<WorkspacePaneControllerCommitOutcome> {
+  const initialCurrentness = workspacePaneTabControllerTargetCurrentness(lease.target)
+  if (initialCurrentness !== 'current') return { kind: initialCurrentness === 'pending' ? 'pending' : 'abandoned' }
+  let targetBecamePending = false
+  const committed = await commitWorkspacePaneControllerTargetRoute(
     lease.target,
     lease.toRoute,
     navigation,
-    lease.focusEffects ?? undefined,
+    {
+      replace: true,
+      onCommit: lease.focusEffects?.onCommit,
+      onAbandon: lease.focusEffects?.onAbandon,
+      onTargetPending: () => {
+        targetBecamePending = true
+      },
+    },
     lease.navigationIntent,
     lease.fromRoute,
   )
+  if (committed) return { kind: 'committed' }
+  if (!targetBecamePending) return { kind: 'abandoned' }
+  const finalCurrentness = workspacePaneTabControllerTargetCurrentness(lease.target)
+  if (finalCurrentness === 'current') return { kind: 'retry' }
+  return finalCurrentness === 'pending' ? { kind: 'pending' } : { kind: 'abandoned' }
 }
 
 async function commitWorkspacePaneControllerTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
+  options:
+    { replace?: boolean; onCommit?: () => void; onAbandon?: () => void; onTargetPending?: () => void } | undefined,
   navigationIntent: PrimaryWindowNavigationIntent,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
 ): Promise<boolean> {
@@ -219,7 +248,13 @@ async function commitWorkspacePaneControllerTargetRoute(
     return false
   }
   const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
-  if (!lease || !filesystemWorkspacePaneTargetLeaseIsCurrent(lease)) {
+  if (!lease) {
+    options?.onAbandon?.()
+    return false
+  }
+  const currentness = filesystemWorkspacePaneTargetLeaseCurrentness(lease)
+  if (currentness !== 'current') {
+    if (currentness === 'pending') options?.onTargetPending?.()
     options?.onAbandon?.()
     return false
   }
@@ -228,6 +263,7 @@ async function commitWorkspacePaneControllerTargetRoute(
     navigationIntent,
     onCommit: options?.onCommit,
     onAbandon: options?.onAbandon,
+    onTargetPending: options?.onTargetPending,
     routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
   })
 }
@@ -362,7 +398,7 @@ export async function commitWorkspacePaneExactTargetRoute(
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
-  options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
+  options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void; onTargetPending?: () => void },
   providedNavigationIntent?: PrimaryWindowNavigationIntent,
 ): Promise<boolean> {
   const ownsNavigationIntent = providedNavigationIntent === undefined
@@ -373,7 +409,7 @@ export async function commitWorkspacePaneExactTargetRoute(
       return false
     }
     const branchName = target.branchName
-    if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+    if (!branchName || !workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending)) {
       options?.onAbandon?.()
       return false
     }
@@ -385,7 +421,7 @@ export async function commitWorkspacePaneExactTargetRoute(
       onCommit: () => {
         presentationCommitted = commitPrimaryWindowNavigationEffect(
           () =>
-            workspacePaneTabControllerTargetIsCurrent(target) &&
+            workspacePaneTargetIsCurrentForCommit(target, options?.onTargetPending) &&
             commitWorkspacePaneRouteSupplement(
               {
                 workspaceId: target.workspaceId,
@@ -406,45 +442,54 @@ export async function commitWorkspacePaneExactTargetRoute(
   }
 }
 
+function workspacePaneTargetIsCurrentForCommit(
+  target: WorkspacePaneControllerTarget,
+  onTargetPending: (() => void) | undefined,
+): boolean {
+  const currentness = workspacePaneTabControllerTargetCurrentness(target)
+  if (currentness === 'pending') onTargetPending?.()
+  return currentness === 'current'
+}
+
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
+  return workspacePaneTabControllerTargetCurrentness(target) === 'current'
+}
+
+export function workspacePaneTabControllerTargetCurrentness(
+  target: WorkspacePaneControllerTarget,
+): WorkspacePaneTargetCurrentness {
   if (
     target.routeTarget.kind === 'inactive' ||
     target.paneTarget.kind === 'inactive' ||
     target.routeTarget.workspaceId !== target.workspaceId ||
     target.paneTarget.workspaceId !== target.workspaceId
   ) {
-    return false
+    return 'stale'
   }
   if (target.routeTarget.kind !== 'git-branch') {
     const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
-    return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
+    return lease === null ? 'stale' : filesystemWorkspacePaneTargetLeaseCurrentness(lease)
   }
-  if (target.branchName !== target.routeTarget.branchName) return false
+  if (target.branchName !== target.routeTarget.branchName) return 'stale'
   if (target.paneTarget.kind === 'git-branch') {
-    return (
-      target.branchName === target.paneTarget.branchName &&
-      target.worktreePath === null &&
-      workspacePaneTargetLeaseIsCurrent({
-        workspaceId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName: target.paneTarget.branchName,
-        worktreePath: target.worktreePath,
-      })
-    )
+    if (target.branchName !== target.paneTarget.branchName || target.worktreePath !== null) return 'stale'
+    return workspacePaneTargetLeaseCurrentness({
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      branchName: target.paneTarget.branchName,
+      worktreePath: target.worktreePath,
+    })
   }
   if (target.paneTarget.kind === 'git-worktree') {
-    if (target.worktreePath !== target.paneTarget.worktreePath) return false
-    return (
-      target.branchName !== null &&
-      workspacePaneTargetLeaseIsCurrent({
-        workspaceId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName: target.branchName,
-        worktreePath: target.paneTarget.worktreePath,
-      })
-    )
+    if (target.worktreePath !== target.paneTarget.worktreePath || target.branchName === null) return 'stale'
+    return workspacePaneTargetLeaseCurrentness({
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      branchName: target.branchName,
+      worktreePath: target.paneTarget.worktreePath,
+    })
   }
-  return false
+  return 'stale'
 }
 
 function workspacePaneTabControllerRouteFromParsed(

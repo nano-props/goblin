@@ -32,52 +32,88 @@ interface WorkspacePaneCommandTargetProjectionInput {
   worktreeReadModel: WorktreeReadModelInput
 }
 
+export interface WorkspacePaneCommandTargetProjection {
+  routeAuthority: 'pending' | 'resolved'
+  target: WorkspacePaneCommandTarget | null
+}
+
 export function resolveWorkspacePaneCommandTarget(
   input: WorkspacePaneCommandTargetProjectionInput,
-): WorkspacePaneCommandTarget | null {
+): WorkspacePaneCommandTargetProjection {
   const { routeTarget, workspacePaneRoute, workspace } = input
-  if (!routeTarget || !workspace || workspace.id !== routeTarget.workspaceId) return null
+  if (!routeTarget) return { routeAuthority: 'resolved', target: null }
+  if (!workspace) return { routeAuthority: 'resolved', target: null }
+  if (workspace.id !== routeTarget.workspaceId) return { routeAuthority: 'resolved', target: null }
+  if (workspace.capability.kind === 'probing') return { routeAuthority: 'pending', target: null }
 
   if (routeTarget.kind === 'workspace-root') {
     const capability = workspace.capability
-    if (capability.kind !== 'git' && capability.kind !== 'filesystem') return null
+    if (capability.kind !== 'git' && capability.kind !== 'filesystem') {
+      return { routeAuthority: 'resolved', target: null }
+    }
     return {
-      routeTarget,
-      workspacePaneRoute,
-      filesystemTarget: workspaceRootPaneFilesystemTarget({
-        workspaceId: workspace.id,
-        workspaceRuntimeId: workspace.workspaceRuntimeId,
-        capabilities: capability.probe.capabilities,
-      }),
+      routeAuthority: 'resolved',
+      target: {
+        routeTarget,
+        workspacePaneRoute,
+        filesystemTarget: workspaceRootPaneFilesystemTarget({
+          workspaceId: workspace.id,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
+          capabilities: capability.probe.capabilities,
+        }),
+      },
     }
   }
 
   if (routeTarget.kind === 'git-branch') {
+    if (workspace.capability.kind === 'git' && input.branchReadModel.status === 'pending') {
+      return {
+        routeAuthority: 'pending',
+        target: {
+          routeTarget,
+          workspacePaneRoute,
+          filesystemTarget: null,
+        },
+      }
+    }
     return {
-      routeTarget,
-      workspacePaneRoute,
-      filesystemTarget: resolveBranchFilesystemTarget({
+      routeAuthority: 'resolved',
+      target: {
         routeTarget,
-        workspace,
-        branchReadModel: input.branchReadModel,
-        worktreeReadModel: input.worktreeReadModel,
-      }),
+        workspacePaneRoute,
+        filesystemTarget: resolveBranchFilesystemTarget({
+          routeTarget,
+          workspace,
+          branchReadModel: input.branchReadModel,
+          worktreeReadModel: input.worktreeReadModel,
+        }),
+      },
     }
   }
 
-  if (workspace.capability.kind !== 'git' || input.worktreeReadModel.status !== 'success') return null
+  if (workspace.capability.kind === 'git' && input.worktreeReadModel.status === 'pending') {
+    return { routeAuthority: 'pending', target: null }
+  }
+  if (workspace.capability.kind !== 'git') return { routeAuthority: 'resolved', target: null }
+  if (input.worktreeReadModel.status === 'error') return { routeAuthority: 'resolved', target: null }
   const worktree = input.worktreeReadModel.worktrees?.find((entry) => entry.path === routeTarget.worktreePath)
-  if (!worktree) return null
+  if (!worktree) return { routeAuthority: 'resolved', target: null }
+  if (worktree.branch && input.branchReadModel.status === 'pending') {
+    return { routeAuthority: 'pending', target: null }
+  }
   return {
-    routeTarget,
-    workspacePaneRoute,
-    filesystemTarget: gitWorktreePaneFilesystemTarget({
-      workspaceId: workspace.id,
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
-      worktreePath: routeTarget.worktreePath,
-      head: gitHead(worktree.branch ?? null),
-      capabilities: workspace.capability.probe.capabilities,
-    }),
+    routeAuthority: 'resolved',
+    target: {
+      routeTarget,
+      workspacePaneRoute,
+      filesystemTarget: gitWorktreePaneFilesystemTarget({
+        workspaceId: workspace.id,
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        worktreePath: routeTarget.worktreePath,
+        head: gitHead(worktree.branch ?? null),
+        capabilities: workspace.capability.probe.capabilities,
+      }),
+    },
   }
 }
 

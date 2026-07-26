@@ -11,6 +11,7 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneTargetLeaseCurrentness,
   gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForBranch,
   workspacePanePreferenceTargetOptions,
@@ -209,6 +210,7 @@ describe('workspace pane tab target read model', () => {
       primaryWindowQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)),
     ).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
+    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('stale')
   })
 
   test('invalidates a branch command lease when the projection refresh fails with cached data', async () => {
@@ -238,6 +240,7 @@ describe('workspace pane tab target read model', () => {
 
     expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
+    expect(filesystemWorkspacePaneTargetLeaseCurrentness(lease)).toBe('stale')
   })
 
   test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {

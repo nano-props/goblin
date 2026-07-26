@@ -12,6 +12,7 @@ import {
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
+  commitWorkspacePaneControllerCloseBackTargetOutcome,
   selectWorkspacePaneControllerTabEntry,
   workspacePaneControllerRouteForEntry,
   workspacePaneTabControllerTargetIsCurrent,
@@ -31,7 +32,11 @@ import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import {
+  clearWorkspacePaneTabOpener,
+  consumeWorkspacePaneTabOpener,
+  workspacePaneTabOpener,
+} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
@@ -92,7 +97,11 @@ export interface RetiredTerminalWorkspacePaneTabPresentationPlan {
   readonly closingEntry: WorkspacePaneTabEntry
   readonly nextEntry: WorkspacePaneTabEntry | null
   readonly sourceRoute: Extract<ParsedWorkspacePaneRoute, { kind: 'terminal' }>
+  readonly openerIdentity: string | null
 }
+
+export type RetiredTerminalWorkspacePaneTabPresentationCommitOutcome =
+  { kind: 'committed' } | { kind: 'retry' } | { kind: 'pending' } | { kind: 'abandoned' }
 
 type CloseWorkspacePaneTabActionStart =
   | { kind: 'done'; result: boolean }
@@ -188,12 +197,10 @@ export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
     sourceRoute.terminalSessionId !== options.terminalSessionId ||
     resolution.target.selectedIdentity !== closingIdentity
   ) {
-    clearWorkspacePaneTabOpener(resolution.paneTarget, coordinates.workspaceRuntimeId, closingIdentity)
     return null
   }
   const target = resolution.target
   const transition = captureWorkspacePaneCloseTransition(target, closingIdentity, target.selectedIdentity)
-  clearWorkspacePaneTabOpener(resolution.paneTarget, coordinates.workspaceRuntimeId, closingIdentity)
   if (!transition.wasActive || !transition.closingEntry) return null
   return {
     terminalSessionId: options.terminalSessionId,
@@ -201,14 +208,27 @@ export function captureRetiredTerminalWorkspacePaneTabPresentationPlan(
     closingEntry: transition.closingEntry,
     nextEntry: transition.nextEntry,
     sourceRoute,
+    openerIdentity: transition.openerIdentity,
   }
+}
+
+export function settleRetiredTerminalWorkspacePaneTabPresentationPlan(
+  plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
+): void {
+  if (plan.openerIdentity === null) return
+  consumeWorkspacePaneTabOpener(
+    workspacePaneTabsTargetForModel(plan.target),
+    plan.target.workspaceRuntimeId,
+    workspacePaneTabEntryIdentity(plan.closingEntry),
+    plan.openerIdentity,
+  )
 }
 
 export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
   plan: RetiredTerminalWorkspacePaneTabPresentationPlan,
   navigation: PrimaryWindowNavigationActions,
   navigationIntent: PrimaryWindowNavigationIntent,
-): Promise<boolean> {
+): Promise<RetiredTerminalWorkspacePaneTabPresentationCommitOutcome> {
   const { target } = plan
   const queueTarget = workspacePaneActionTargetFromCoordinates({
     workspaceId: target.workspaceId,
@@ -217,9 +237,11 @@ export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
     worktreePath: target.worktreePath,
   })
   return runWorkspacePaneAction(queueTarget, async () => {
-    if (!navigationIntent.isCurrent() || !workspacePaneTabControllerTargetIsCurrent(target)) return false
+    if (!navigationIntent.isCurrent()) return { kind: 'abandoned' }
     const currentTarget = currentRetiredTerminalWorkspacePaneTabTarget(plan)
-    if (!currentTarget || !retiredTerminalCloseBackDestinationIsCurrent(plan, currentTarget)) return false
+    if (!currentTarget || !retiredTerminalCloseBackDestinationIsCurrent(plan, currentTarget)) {
+      return { kind: 'abandoned' }
+    }
     const presentationLease = beginWorkspacePaneCloseActiveTabPresentationLease({
       target,
       closingEntry: plan.closingEntry,
@@ -227,9 +249,9 @@ export function commitRetiredTerminalWorkspacePaneTabPresentationPlan(
       workspacePaneRoute: plan.sourceRoute,
       navigationIntent,
     })
-    if (!presentationLease) return false
+    if (!presentationLease) return { kind: 'abandoned' }
     return await runWorkspacePaneCloseTransition(presentationLease, async () => {
-      return await commitWorkspacePaneControllerCloseBackTarget(presentationLease, navigation)
+      return await commitWorkspacePaneControllerCloseBackTargetOutcome(presentationLease, navigation)
     })
   })
 }
@@ -377,6 +399,7 @@ interface WorkspacePaneCloseTransition {
   wasActive: boolean
   closingEntry: WorkspacePaneTabEntry | null
   nextEntry: WorkspacePaneTabEntry | null
+  openerIdentity: string | null
   presentationLease: WorkspacePaneControllerPresentationLease | null
 }
 
@@ -404,9 +427,9 @@ function captureWorkspacePaneCloseTransition(
   target: WorkspacePaneTabModel,
   closingIdentity: string,
   selectedIdentity: string | null | undefined,
-): Pick<WorkspacePaneCloseTransition, 'wasActive' | 'closingEntry' | 'nextEntry'> {
+): Pick<WorkspacePaneCloseTransition, 'wasActive' | 'closingEntry' | 'nextEntry' | 'openerIdentity'> {
   const wasActive = selectedIdentity === closingIdentity
-  if (!wasActive) return { wasActive: false, closingEntry: null, nextEntry: null }
+  if (!wasActive) return { wasActive: false, closingEntry: null, nextEntry: null, openerIdentity: null }
   const openerIdentity = workspacePaneTabOpener(
     workspacePaneTabsTargetForModel(target),
     target.workspaceRuntimeId,
@@ -415,7 +438,7 @@ function captureWorkspacePaneCloseTransition(
   const nextEntry = nextWorkspacePaneTabEntryAfterClose(target.tabEntries, closingIdentity, openerIdentity)
   const closingEntry =
     target.tabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === closingIdentity) ?? null
-  return { wasActive, closingEntry, nextEntry }
+  return { wasActive, closingEntry, nextEntry, openerIdentity }
 }
 
 function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {
@@ -477,10 +500,10 @@ function resolveCloseWorkspacePaneTarget(
   })
 }
 
-async function runWorkspacePaneCloseTransition(
+async function runWorkspacePaneCloseTransition<T>(
   presentationLease: WorkspacePaneControllerPresentationLease | null,
-  operation: () => Promise<boolean>,
-): Promise<boolean> {
+  operation: () => Promise<T>,
+): Promise<T> {
   try {
     return await operation()
   } finally {
