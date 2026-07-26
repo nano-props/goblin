@@ -84,10 +84,15 @@ describe('deriveWorkspaceConnectivity', () => {
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     const acceptedProjection = workspace.capability.git
     acceptedProjection.remote.fetchFailed = true
+    const refreshedProbe = {
+      ...gitProbe,
+      diagnostics: [{ scope: 'transport' as const, message: 'Connection recovered' }],
+    }
 
-    acceptWorkspaceProbeState(workspace, gitProbe)
+    acceptWorkspaceProbeState(workspace, refreshedProbe)
 
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
+    expect(workspace.capability.probe).toEqual(refreshedProbe)
     expect(workspace.capability.git).toBe(acceptedProjection)
     expect(workspace.capability.git.remote.fetchFailed).toBe(true)
   })

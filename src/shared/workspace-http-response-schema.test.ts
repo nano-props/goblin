@@ -59,23 +59,33 @@ test('rejects legacy workspace names in runtime response contracts', () => {
     user: 'developer',
     port: 22,
   }
+  const runtimeOpenResponse = {
+    ok: true as const,
+    workspace: { id: workspaceId },
+    workspaceRuntimeId: 'runtime_test000000000000',
+    capabilities: readyProbe.capabilities,
+    diagnostics: [],
+  }
+  const lifecycleResponse = {
+    kind: 'settled' as const,
+    workspaceId,
+    lifecycle: { kind: 'ready' as const, attemptId: 1, target },
+  }
 
+  expect(v.parse(WorkspaceProbeStateResponseSchema, readyProbe)).toEqual(readyProbe)
+  expect(v.parse(WorkspaceRuntimeOpenResponseSchema, runtimeOpenResponse)).toEqual(runtimeOpenResponse)
+  expect(v.parse(RemoteLifecycleResponseSchema, lifecycleResponse)).toEqual(lifecycleResponse)
   expect(v.safeParse(WorkspaceProbeStateResponseSchema, { ...readyProbe, name: 'Documents' }).success).toBe(false)
   expect(
     v.safeParse(WorkspaceRuntimeOpenResponseSchema, {
-      ok: true,
-      workspace: { id: workspaceId, name: 'Documents' },
-      workspaceRuntimeId: 'runtime_test000000000000',
-      capabilities: readyProbe.capabilities,
-      diagnostics: [],
+      ...runtimeOpenResponse,
+      workspace: { ...runtimeOpenResponse.workspace, name: 'Documents' },
     }).success,
   ).toBe(false)
   expect(
     v.safeParse(RemoteLifecycleResponseSchema, {
-      kind: 'settled',
-      workspaceId,
+      ...lifecycleResponse,
       name: 'Documents',
-      lifecycle: { kind: 'ready', attemptId: 1, target },
     }).success,
   ).toBe(false)
 })
