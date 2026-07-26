@@ -1,7 +1,7 @@
 {
   "name": "goblin",
   "productName": "Goblin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Goblin — Workspace Manager",
   "private": true,
   "type": "module",
