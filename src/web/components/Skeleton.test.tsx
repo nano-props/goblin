@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
+import { STATUS_ROW_LAYOUT_CLASS } from '#/web/components/workspace-pane/status-ui.tsx'
+
+const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
 
 vi.mock('#/web/components/SplitPane.tsx', () => ({
   SplitPane: ({ before, after }: { before: React.ReactNode; after: React.ReactNode }) => (
@@ -14,6 +21,10 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
 }))
 
 describe('WorkspaceLayoutSkeleton', () => {
+  beforeEach(() => {
+    responsiveMocks.compact = false
+  })
+
   test('shows branch rows and an empty workspace placeholder by default in split mode', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton />)
 
@@ -33,8 +44,9 @@ describe('WorkspaceLayoutSkeleton', () => {
   test('renders split workspace content when a repo workspace is selected', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton workspacePaneState="content" />)
 
-    expect(container.querySelectorAll('li')).toHaveLength(14)
+    expect(container.querySelectorAll('li')).toHaveLength(6)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container.querySelectorAll('[data-testid="workspace-status-skeleton-row"]')).toHaveLength(8)
     expect(container.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
@@ -53,7 +65,8 @@ describe('WorkspaceLayoutSkeleton', () => {
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )
 
-    expect(container.querySelectorAll('li')).toHaveLength(8)
+    expect(container.querySelectorAll('li')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-testid="workspace-status-skeleton-row"]')).toHaveLength(8)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
@@ -78,5 +91,50 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(content?.className).toContain('px-3')
     expect(content?.className).toContain('py-1')
     expect(actionSlot?.className).toContain('pr-3')
+  })
+
+  test('uses three real-width workspace tab placeholders in default mode', () => {
+    const { container } = renderInJsdom(
+      <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
+    )
+
+    const skeleton = container.querySelector('[data-testid="workspace-pane-skeleton"]')
+    const tabs = container.querySelectorAll('[data-testid="workspace-pane-skeleton-tab"]')
+    expect(skeleton?.getAttribute('aria-busy')).toBe('true')
+    expect(tabs).toHaveLength(3)
+    for (const tab of tabs) {
+      expect(tab.className).toContain('h-7')
+      expect(tab.className).toContain('w-36')
+      expect(tab.className).toContain('shrink-0')
+    }
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton-back"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton-switcher"]')).toBeNull()
+  })
+
+  test('matches compact workspace toolbar geometry', () => {
+    responsiveMocks.compact = true
+    const { container } = renderInJsdom(
+      <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
+    )
+
+    const toolbar = container.querySelector('.goblin-workspace-toolbar')
+    const tabs = container.querySelectorAll('[data-testid="workspace-pane-skeleton-tab"]')
+    expect(toolbar?.className).toContain('goblin-workspace-toolbar--non-draggable')
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0]?.className).toContain('min-w-0')
+    expect(tabs[0]?.className).toContain('flex-1')
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton-back"]')?.className).toContain('w-7')
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton-switcher"]')?.className).toContain('w-7')
+  })
+
+  test('uses the real Status row geometry for workspace content placeholders', () => {
+    const { container } = renderInJsdom(
+      <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
+    )
+
+    const rows = container.querySelectorAll('[data-testid="workspace-status-skeleton-row"]')
+    expect(rows).toHaveLength(8)
+    for (const row of rows) expect(row.className).toBe(STATUS_ROW_LAYOUT_CLASS)
+    expect(rows[0]?.parentElement?.getAttribute('aria-hidden')).toBe('true')
   })
 })

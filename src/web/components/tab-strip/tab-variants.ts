@@ -3,6 +3,9 @@ import { compositeFocusRing } from '#/web/components/ui/focus.ts'
 
 type ToolbarTabVariant = 'workspace-picker' | 'workspace-pane'
 
+export const WORKSPACE_PANE_TAB_EXPANDED_GEOMETRY_CLASS = 'h-7 w-36 shrink-0 rounded-md'
+export const WORKSPACE_PANE_TAB_COMPACT_GEOMETRY_CLASS = 'h-7 min-w-0 flex-1 rounded-md'
+
 export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
@@ -23,8 +26,8 @@ export function toolbarTabChromeClassName(options: {
     variant === 'workspace-picker'
       ? 'flex h-8 max-w-64 shrink-0 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
-        ? 'flex h-7 min-w-0 flex-1 gap-1 rounded-md border px-2.5 text-sm'
-        : 'flex h-7 w-36 shrink-0 gap-1 rounded-md border px-2.5 text-sm',
+        ? cn('flex gap-1 border px-2.5 text-sm', WORKSPACE_PANE_TAB_COMPACT_GEOMETRY_CLASS)
+        : cn('flex gap-1 border px-2.5 text-sm', WORKSPACE_PANE_TAB_EXPANDED_GEOMETRY_CLASS),
     variant === 'workspace-picker'
       ? active && !muteActiveChrome
         ? 'border-input bg-card text-foreground'

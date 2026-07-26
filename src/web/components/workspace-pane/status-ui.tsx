@@ -5,7 +5,8 @@ import { STATUS_TONE_CHIP_CLASS, STATUS_TONE_TEXT_CLASS, type StatusTone } from 
 export type Tone = StatusTone
 export type StatusRowValueLayout = 'inline' | 'fill' | 'chips'
 
-const ROW_CLASS = 'grid h-9 grid-cols-[1.25rem_5.75rem_minmax(0,1fr)] items-center gap-3 px-4'
+export const STATUS_ROWS_CLASS = 'divide-y divide-separator/60 border-b border-separator/70'
+export const STATUS_ROW_LAYOUT_CLASS = 'grid h-9 grid-cols-[1.25rem_5.75rem_minmax(0,1fr)] items-center gap-3 px-4'
 const ROW_ICON_CLASS = 'flex size-5 items-center justify-center text-muted-foreground/75'
 const ROW_LABEL_CLASS = 'truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75'
 const MONO_VALUE_CLASS = 'font-mono'
@@ -80,7 +81,7 @@ export function ClickableStatusChip(props: ClickableStatusChipProps) {
 
 export function StatusRows({ children }: { children: ReactNode }) {
   return (
-    <div role="list" className="divide-y divide-separator/60 border-b border-separator/70">
+    <div role="list" className={STATUS_ROWS_CLASS}>
       {children}
     </div>
   )
@@ -107,7 +108,7 @@ export function StatusRow({
   ...props
 }: StatusRowProps) {
   return (
-    <div ref={ref} role="listitem" className={cn(ROW_CLASS, className)} {...props}>
+    <div ref={ref} role="listitem" className={cn(STATUS_ROW_LAYOUT_CLASS, className)} {...props}>
       <span className={cn(ROW_ICON_CLASS, STATUS_TONE_TEXT_CLASS[tone])}>{icon}</span>
       <span className={ROW_LABEL_CLASS}>{label}</span>
       <div className="flex min-w-0 items-center gap-2">

@@ -269,10 +269,7 @@ function WorkspaceViewContent({
           workspacePane={
             <WorkspaceLayoutPane>
               {currentBranchName ? (
-                <WorkspacePaneSkeleton
-                  toolbarDraggable={!compact}
-                  toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                />
+                <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
               ) : (
                 <>
                   <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
