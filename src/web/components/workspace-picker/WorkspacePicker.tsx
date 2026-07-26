@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, Folder, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { ChevronDown, Download, Folder, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -139,13 +139,8 @@ function WorkspaceMenuContent({
                       leading={<WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />}
                       contentClassName="whitespace-normal"
                       trailing={
-                        selected || (workspace.terminalBellCount ?? 0) > 0 ? (
-                          <div className="flex items-center gap-1.5">
-                            {(workspace.terminalBellCount ?? 0) > 0 ? (
-                              <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
-                            ) : null}
-                            {selected ? <Check size={13} aria-hidden /> : null}
-                          </div>
+                        (workspace.terminalBellCount ?? 0) > 0 ? (
+                          <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
                         ) : null
                       }
                     >

@@ -226,7 +226,7 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         workspaces={[
-          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a', { terminalBellCount: 4 }),
           workspace('workspace-b', 'goblin+file:///tmp/workspace-b', { terminalBellCount: 2 }),
           workspace('workspace-c', 'goblin+file:///tmp/workspace-c', { terminalBellCount: 1 }),
         ]}
@@ -243,7 +243,7 @@ describe('WorkspacePicker', () => {
     const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
     const triggerBadge = trigger.querySelector('.bg-notification')
-    expect(triggerBadge?.textContent).toBe('3')
+    expect(triggerBadge?.textContent).toBe('7')
 
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
@@ -251,12 +251,14 @@ describe('WorkspacePicker', () => {
       await Promise.resolve()
     })
 
+    const workspaceARow = document.body.querySelector('button[aria-current="true"]')
     const workspaceBRow = [...document.body.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('workspace-b'),
     )
     const workspaceCRow = [...document.body.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('workspace-c'),
     )
+    expect(workspaceARow?.querySelector('.bg-notification')?.textContent).toBe('4')
     expect(workspaceBRow?.querySelector('.bg-notification')?.textContent).toBe('2')
     expect(workspaceCRow?.querySelector('.bg-notification')?.textContent).toBe('1')
   })
