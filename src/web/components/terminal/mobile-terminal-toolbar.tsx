@@ -145,10 +145,10 @@ export function MobileTerminalToolbar({
                   key.compactPriority === 'horizontal-arrow' && 'goblin-terminal-mobile-toolbar__btn--horizontal-arrow',
                 )}
                 onPointerDown={(event) => event.preventDefault()}
-                onClick={() => {
+                onClick={(event) => {
                   if (key.type === 'paste') {
                     onPaste()
-                    onRequestFocus()
+                    if (event.detail > 0) onRequestFocus()
                     return
                   }
                   if (key.type === 'scroll') {
@@ -157,7 +157,7 @@ export function MobileTerminalToolbar({
                   }
                   if (key.type === 'virtual-key') {
                     onVirtualKey(key.key)
-                    onRequestFocus()
+                    if (event.detail > 0) onRequestFocus()
                     return
                   }
                 }}

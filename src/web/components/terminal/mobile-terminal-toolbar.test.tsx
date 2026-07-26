@@ -173,12 +173,21 @@ describe('MobileTerminalToolbar', () => {
     }
   })
 
-  test('requests terminal focus after input actions but not scroll actions', () => {
+  test('requests terminal focus only for pointer-sourced input actions', () => {
     const onRequestFocus = vi.fn()
     const { container } = render({ onRequestFocus })
     clickButtonByAccessibleName(container, 'Arrow Up')
     clickButtonByAccessibleName(container, 'Paste')
-    clickButtonByAccessibleName(container, 'Page Up')
+    expect(onRequestFocus).not.toHaveBeenCalled()
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const arrowUp = buttons.find((button) => button.querySelector('.sr-only')?.textContent === 'Arrow Up')
+    const paste = buttons.find((button) => button.querySelector('.sr-only')?.textContent === 'Paste')
+    const pageUp = buttons.find((button) => button.querySelector('.sr-only')?.textContent?.startsWith('Page Up'))
+    if (!arrowUp || !paste || !pageUp) throw new Error('expected pointer focus test buttons')
+    fireEvent.click(arrowUp, { detail: 1 })
+    fireEvent.click(paste, { detail: 1 })
+    fireEvent.click(pageUp, { detail: 1 })
     expect(onRequestFocus).toHaveBeenCalledTimes(2)
   })
 

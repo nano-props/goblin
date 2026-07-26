@@ -228,9 +228,9 @@ export class TerminalSessionView {
     term.input(data, true)
   }
 
-  pasteText(data: string): boolean {
-    if (!data || !this.term) return false
-    this.term.paste(data)
+  pasteText(term: XTermTerminal, data: string): boolean {
+    if (!data || this.term !== term) return false
+    term.paste(data)
     return true
   }
 

@@ -400,6 +400,8 @@ export const ko: Record<DictKey, string> = {
   'terminal.mobile-key-ctrl-c': 'Ctrl+C',
   'terminal.mobile-key-page-up': '위로 페이지 이동(터미널 스크롤)',
   'terminal.mobile-key-page-down': '아래로 페이지 이동(터미널 스크롤)',
+  'terminal.mobile-paste-description': '아래 입력란에 텍스트를 붙여넣은 다음 터미널로 전송하세요.',
+  'terminal.mobile-paste-placeholder': '여기에 터미널 텍스트 붙여넣기',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',

@@ -994,12 +994,12 @@ export class TerminalSessionProjection {
     return this.sessions.get(terminalSessionId)?.captureInputWriter() ?? null
   }
 
-  sendVirtualKey = (terminalSessionId: string, key: TerminalVirtualKey): void => {
-    this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
+  capturePasteWriter = (terminalSessionId: string) => {
+    return this.sessions.get(terminalSessionId)?.capturePasteWriter() ?? null
   }
 
-  pasteText = (terminalSessionId: string, data: string): boolean => {
-    return this.sessions.get(terminalSessionId)?.pasteText(data) ?? false
+  sendVirtualKey = (terminalSessionId: string, key: TerminalVirtualKey): void => {
+    this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }
 
   takeover = (terminalSessionId: string): Promise<boolean> => {

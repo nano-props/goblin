@@ -408,6 +408,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.mobile-key-ctrl-c': 'Ctrl+C',
   'terminal.mobile-key-page-up': '上へページ移動（ターミナルをスクロール）',
   'terminal.mobile-key-page-down': '下へページ移動（ターミナルをスクロール）',
+  'terminal.mobile-paste-description': '下の入力欄にテキストを貼り付けて、ターミナルへ送信します。',
+  'terminal.mobile-paste-placeholder': 'ここにターミナル用のテキストを貼り付け',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',

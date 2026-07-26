@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, fireEvent } from '@testing-library/react'
 import { StrictMode, type ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -313,9 +313,9 @@ describe('TerminalSessionView', () => {
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     const readText = vi.fn(async () => 'first line\nsecond line')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } })
-    const pasteText = vi.fn(() => true)
-    const focusTerminal = vi.fn(() => true)
-    const rendered = await renderTerminalSession({ pasteText, focusTerminal })
+    const pasteWriter = vi.fn(() => true)
+    const capturePasteWriter = vi.fn(() => pasteWriter)
+    const rendered = await renderTerminalSession({ capturePasteWriter })
 
     try {
       const pasteButton = Array.from(rendered.container.querySelectorAll('button')).find(
@@ -329,12 +329,48 @@ describe('TerminalSessionView', () => {
       })
 
       expect(readText).toHaveBeenCalledOnce()
-      expect(pasteText).toHaveBeenCalledWith('term-111111111111111111111', 'first line\nsecond line')
-      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(capturePasteWriter).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(pasteWriter).toHaveBeenCalledWith('first line\nsecond line')
     } finally {
       await rendered.cleanup()
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  test('offers manual text entry on an insecure LAN origin even if a clipboard object is exposed', async () => {
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    const secureContextDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'isSecureContext')
+    const readText = vi.fn(async () => 'must not be read')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } })
+    Object.defineProperty(globalThis, 'isSecureContext', { configurable: true, value: false })
+    const pasteWriter = vi.fn(() => true)
+    const rendered = await renderTerminalSession({ capturePasteWriter: vi.fn(() => pasteWriter) })
+
+    try {
+      const pasteButton = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'menu.edit.paste',
+      )
+      if (!pasteButton) throw new Error('expected mobile terminal Paste button')
+      act(() => pasteButton.click())
+
+      const textarea = document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="terminal.mobile-paste-placeholder"]',
+      )
+      if (!textarea) throw new Error('expected manual paste textarea')
+      fireEvent.change(textarea, { target: { value: 'manual paste text' } })
+      const submit = document.querySelector<HTMLButtonElement>('[data-slot="dialog-content"] button[type="submit"]')
+      if (!submit) throw new Error('expected manual paste submit button')
+      act(() => submit.click())
+
+      expect(readText).not.toHaveBeenCalled()
+      expect(pasteWriter).toHaveBeenCalledWith('manual paste text')
+    } finally {
+      await rendered.cleanup()
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+      if (secureContextDescriptor) Object.defineProperty(globalThis, 'isSecureContext', secureContextDescriptor)
+      else Reflect.deleteProperty(globalThis, 'isSecureContext')
     }
   })
 

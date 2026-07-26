@@ -3,12 +3,12 @@ import type { TerminalSessionContextValue } from '#/web/components/terminal/type
 
 type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,
-  'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'pasteText'
+  'createTerminalWithAdmission' | 'captureInputWriter' | 'capturePasteWriter' | 'sendVirtualKey'
 > &
   Partial<
     Pick<
       TerminalSessionContextValue,
-      'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'pasteText'
+      'createTerminalWithAdmission' | 'captureInputWriter' | 'capturePasteWriter' | 'sendVirtualKey'
     >
   >
 type CreatedAdmissionTestTerminalSessionContextValue = Omit<
@@ -35,9 +35,9 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const createTerminalWithAdmission =
     context.createTerminalWithAdmission ?? unexpectedContextCapability('createTerminalWithAdmission')
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
+  const capturePasteWriter = context.capturePasteWriter ?? unexpectedContextCapability('capturePasteWriter')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
-  const pasteText = context.pasteText ?? unexpectedContextCapability('pasteText')
-  return { ...context, createTerminalWithAdmission, captureInputWriter, sendVirtualKey, pasteText }
+  return { ...context, createTerminalWithAdmission, captureInputWriter, capturePasteWriter, sendVirtualKey }
 }
 
 /** Explicit adapter for tests whose create callback represents one successful new-session admission. */

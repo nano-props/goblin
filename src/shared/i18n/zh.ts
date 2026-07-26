@@ -392,6 +392,8 @@ export const zh: Record<DictKey, string> = {
   'terminal.mobile-key-ctrl-c': 'Ctrl+C',
   'terminal.mobile-key-page-up': '向上翻页（滚动终端）',
   'terminal.mobile-key-page-down': '向下翻页（滚动终端）',
+  'terminal.mobile-paste-description': '将文本粘贴到下方输入框，然后发送到终端。',
+  'terminal.mobile-paste-placeholder': '在此粘贴终端文本',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '访达',

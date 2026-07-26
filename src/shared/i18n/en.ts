@@ -409,6 +409,8 @@ export const en = {
   'terminal.mobile-key-ctrl-c': 'Ctrl+C',
   'terminal.mobile-key-page-up': 'Page up (scroll terminal)',
   'terminal.mobile-key-page-down': 'Page down (scroll terminal)',
+  'terminal.mobile-paste-description': 'Paste text into the field below, then send it to the terminal.',
+  'terminal.mobile-paste-placeholder': 'Paste terminal text here',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Finder',

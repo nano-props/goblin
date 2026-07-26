@@ -2740,7 +2740,7 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('delegates paste text to xterm for the active presented controller', async () => {
+  test('captures xterm paste for the active presented controller and rejects it after restart', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -2755,8 +2755,19 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
     await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
 
-    expect(session.pasteText('first line\nsecond line')).toBe(true)
+    const pasteWriter = session.capturePasteWriter()
+    if (!pasteWriter) throw new Error('expected presented paste writer')
+    expect(pasteWriter('first line\nsecond line')).toBe(true)
     expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledWith('first line\nsecond line')
+
+    session.restart()
+    await flushUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 2)
+    emitSessionOutput(session, 2)
+    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+
+    expect(pasteWriter('from old generation')).toBe(false)
+    expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals.at(-1)!.paste).not.toHaveBeenCalled()
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {
