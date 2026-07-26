@@ -588,7 +588,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('does not carry a failed reconnect resynchronization into a later sessions refresh', async () => {
+  test('carries a failed reconnect resynchronization into the next accepted sessions refresh', async () => {
     const repo = seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -616,7 +616,7 @@ describe('AppRuntimeProjectionProvider', () => {
         }),
       )
       expect(recoverSessionsMock).toHaveBeenCalledTimes(2)
-      expect(projectionMocks.resynchronizeConnectedViews).not.toHaveBeenCalled()
+      expect(projectionMocks.resynchronizeConnectedViews).toHaveBeenCalledOnce()
     } finally {
       result.unmount()
     }
