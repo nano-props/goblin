@@ -82,7 +82,15 @@ const xtermMocks = vi.hoisted(() => {
       }
       queueMicrotask(callback)
     })
+    input = vi.fn((data: string, wasUserInput = true) => {
+      if (wasUserInput) {
+        if (this.options.scrollOnUserInput) this.scrollToBottom()
+        for (const handler of this.coreUserInputHandlers) handler()
+      }
+      this.emitData(data)
+    })
     reset = vi.fn()
+    paste = vi.fn()
     scrollToBottom = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
@@ -2679,6 +2687,87 @@ describe('TerminalSession', () => {
       terminalRuntimeGeneration: 1,
       data: "bat '/worktree/file.ts'\r",
     })
+  })
+
+  test('encodes virtual keys at the current xterm input boundary', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+
+    xtermMocks.terminals[0]!.scrollToBottom.mockClear()
+    session.sendVirtualKey('arrow-up')
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+    expect(xtermMocks.terminals[0]!.input).toHaveBeenLastCalledWith('\x1b[A', true)
+    expect(xtermMocks.terminals[0]!.scrollToBottom).toHaveBeenCalledOnce()
+    expect(terminalCalls.write).toHaveBeenLastCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1b[A',
+    })
+
+    terminalCalls.write.mockClear()
+    xtermMocks.terminals[0]!.modes.applicationCursorKeysMode = true
+    xtermMocks.terminals[0]!.options.scrollOnUserInput = false
+    xtermMocks.terminals[0]!.scrollToBottom.mockClear()
+    session.sendVirtualKey('arrow-right')
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+    expect(xtermMocks.terminals[0]!.input).toHaveBeenLastCalledWith('\x1bOC', true)
+    expect(xtermMocks.terminals[0]!.scrollToBottom).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenLastCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1bOC',
+    })
+
+    terminalCalls.write.mockClear()
+    xtermMocks.terminals[0]!.options.scrollOnUserInput = true
+    session.sendVirtualKey('interrupt')
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+    expect(terminalCalls.write).toHaveBeenLastCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x03',
+    })
+  })
+
+  test('captures xterm paste for the active presented controller and rejects it after restart', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+
+    const pasteWriter = session.capturePasteWriter()
+    if (!pasteWriter) throw new Error('expected presented paste writer')
+    expect(pasteWriter('first line\nsecond line')).toBe(true)
+    expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledWith('first line\nsecond line')
+
+    session.restart()
+    await flushUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 2)
+    emitSessionOutput(session, 2)
+    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+
+    expect(pasteWriter('from old generation')).toBe(false)
+    expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals.at(-1)!.paste).not.toHaveBeenCalled()
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {

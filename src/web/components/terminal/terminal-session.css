@@ -5,6 +5,8 @@
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+  container-name: goblin-terminal-session;
+  container-type: size;
   background: var(--color-background);
   --goblin-terminal-surface-inset: 4px;
   --goblin-terminal-float-offset: 10px;
@@ -12,6 +14,8 @@
   --goblin-terminal-float-padding: 6px 8px;
   --goblin-terminal-float-radius: 8px;
   --goblin-terminal-control-radius: 6px;
+  --goblin-terminal-mobile-key-size: 40px;
+  --goblin-terminal-mobile-key-gap: 4px;
 }
 
 .goblin-terminal-session__host {
@@ -329,14 +333,20 @@
 .goblin-terminal-mobile-toolbar__row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--goblin-terminal-mobile-key-gap);
+}
+
+.goblin-terminal-mobile-toolbar__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--goblin-terminal-mobile-key-gap);
 }
 
 .goblin-terminal-mobile-toolbar__btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  width: var(--goblin-terminal-mobile-key-size);
+  height: var(--goblin-terminal-mobile-key-size);
+  min-width: var(--goblin-terminal-mobile-key-size);
+  min-height: var(--goblin-terminal-mobile-key-size);
   padding: 0;
   font-size: 14px;
   font-weight: 500;
@@ -351,4 +361,34 @@
 
 .goblin-terminal-mobile-toolbar__btn:hover {
   background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
+}
+
+/* Prefer one complete column when the terminal surface has room.
+   Landscape and shorter terminal surfaces use the two key groups as columns. */
+@container goblin-terminal-session (orientation: landscape) or (max-height: 480px) {
+  .goblin-terminal-mobile-toolbar__row {
+    flex-direction: row;
+  }
+}
+
+/* When the complete two-column toolbar no longer fits, keep command navigation
+   and cancellation controls. Terminal scrolling and system paste remain
+   available without dedicated buttons. */
+@container goblin-terminal-session (max-height: 220px) {
+  .goblin-terminal-mobile-toolbar__btn--low-priority {
+    display: none;
+  }
+}
+
+/* The final compact form is two rows: history navigation plus Esc/Ctrl+C. */
+@container goblin-terminal-session (max-height: 175px) {
+  .goblin-terminal-mobile-toolbar__btn--horizontal-arrow {
+    display: none;
+  }
+}
+
+@container goblin-terminal-session (max-height: 83px) {
+  .goblin-terminal-mobile-toolbar {
+    display: none;
+  }
 }

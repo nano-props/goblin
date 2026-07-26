@@ -40,8 +40,10 @@ import type {
   TerminalInputWriter,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
+  TerminalPasteWriter,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
+  TerminalVirtualKey,
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
@@ -216,6 +218,21 @@ export class TerminalSession {
     const binding = this.currentWritableInputBinding()
     if (!binding) return null
     return (data) => this.enqueueInput(binding, data)
+  }
+
+  capturePasteWriter(): TerminalPasteWriter | null {
+    const binding = this.currentWritableInputBinding()
+    const term = this.view.currentTerminal()
+    if (!binding || !term) return null
+    return (data) => {
+      if (!data || !this.view.isPresented() || !this.isCurrentInputBinding(binding)) return false
+      return this.view.pasteText(term, data)
+    }
+  }
+
+  sendVirtualKey(key: TerminalVirtualKey): void {
+    if (!this.currentWritableInputBinding()) return
+    this.view.sendVirtualKey(key)
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
@@ -691,7 +708,7 @@ export class TerminalSession {
     if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal()) throw new StartCancelledError()
     await preloadTerminalFont()
     if (this.disposed || this.startEpoch !== epoch || !this.view.canOpenTerminal()) throw new StartCancelledError()
-    const term = this.view.openTerminal((data) => this.writeInput(data))
+    const term = this.view.openTerminal()
     this.renderQueue = new TerminalRenderQueue(term, {
       isCurrent: () => !this.disposed && this.view.currentTerminal() === term,
       isCheckpointRendered: (checkpoint) => this.isCheckpointRendered(checkpoint),

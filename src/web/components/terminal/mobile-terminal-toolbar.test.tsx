@@ -1,21 +1,42 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, fireEvent } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
+import type { MobileTerminalToolbarLabels } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
+import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+
+const LABELS: MobileTerminalToolbarLabels = {
+  toolbar: 'Terminal input helpers',
+  tab: 'Tab',
+  arrowUp: 'Arrow Up',
+  arrowDown: 'Arrow Down',
+  arrowLeft: 'Arrow Left',
+  arrowRight: 'Arrow Right',
+  escape: 'Escape',
+  ctrlC: 'Ctrl+C',
+  paste: 'Paste',
+  pageUp: 'Page Up (scroll up)',
+  pageDown: 'Page Down (scroll down)',
+}
 
 function render(
   props: {
-    onInput?: (data: string) => void
+    onVirtualKey?: (key: TerminalVirtualKey) => void
+    onPaste?: () => void
+    onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
     disabled?: boolean
   } = {},
 ) {
   return renderInJsdom(
     <MobileTerminalToolbar
-      onInput={props.onInput ?? vi.fn()}
-      onScrollLines={props.onScrollLines}
+      labels={LABELS}
+      onVirtualKey={props.onVirtualKey ?? vi.fn()}
+      onPaste={props.onPaste ?? vi.fn()}
+      onRequestFocus={props.onRequestFocus ?? vi.fn()}
+      onScrollLines={props.onScrollLines ?? vi.fn()}
       disabled={props.disabled}
     />,
   )
@@ -48,31 +69,126 @@ function clickButtonByAccessibleName(container: HTMLElement, labelPrefix: string
 }
 
 describe('MobileTerminalToolbar', () => {
-  test('Escape and Tab send their bytes verbatim', () => {
-    const onInput = vi.fn()
-    const { container } = render({ onInput })
+  test('Escape and Tab send key intents without owning terminal encoding', () => {
+    const onVirtualKey = vi.fn()
+    const { container } = render({ onVirtualKey })
     clickButton(container, '⎋')
     clickButton(container, '⇥')
-    expect(onInput).toHaveBeenNthCalledWith(1, '\x1b')
-    expect(onInput).toHaveBeenNthCalledWith(2, '\t')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(1, 'escape')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(2, 'tab')
   })
 
-  test('Ctrl+C shortcut button sends the interrupt byte directly', () => {
-    const onInput = vi.fn()
-    const { container } = render({ onInput })
+  test('arrow buttons send terminal-mode-aware key intents', () => {
+    const onVirtualKey = vi.fn()
+    const { container } = render({ onVirtualKey })
+    clickButtonByAccessibleName(container, 'Arrow Up')
+    clickButtonByAccessibleName(container, 'Arrow Down')
+    clickButtonByAccessibleName(container, 'Arrow Left')
+    clickButtonByAccessibleName(container, 'Arrow Right')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(1, 'arrow-up')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(2, 'arrow-down')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(3, 'arrow-left')
+    expect(onVirtualKey).toHaveBeenNthCalledWith(4, 'arrow-right')
+  })
+
+  test('orders the compact two-column groups by navigation then terminal actions', () => {
+    const { container } = render()
+    const toolbarGroup = container.querySelector('[role="group"]')
+    expect(toolbarGroup?.getAttribute('aria-label')).toBe(LABELS.toolbar)
+    const accessibleNames = Array.from(container.querySelectorAll('button')).map(
+      (button) => button.querySelector('.sr-only')?.textContent,
+    )
+    expect(accessibleNames).toEqual([
+      'Tab',
+      'Arrow Up',
+      'Arrow Down',
+      'Arrow Left',
+      'Arrow Right',
+      'Escape',
+      'Ctrl+C',
+      'Paste',
+      'Page Up (scroll up)',
+      'Page Down (scroll down)',
+    ])
+  })
+
+  test('marks only the controls removed by the compact CSS breakpoints', () => {
+    const { container } = render()
+    const accessibleNames = (selector: string) =>
+      Array.from(container.querySelectorAll(selector)).map((button) => button.querySelector('.sr-only')?.textContent)
+    expect(accessibleNames('.goblin-terminal-mobile-toolbar__btn--low-priority')).toEqual([
+      'Tab',
+      'Paste',
+      'Page Up (scroll up)',
+      'Page Down (scroll down)',
+    ])
+    expect(accessibleNames('.goblin-terminal-mobile-toolbar__btn--horizontal-arrow')).toEqual([
+      'Arrow Left',
+      'Arrow Right',
+    ])
+  })
+
+  test('Ctrl+C shortcut button sends an interrupt intent', () => {
+    const onVirtualKey = vi.fn()
+    const { container } = render({ onVirtualKey })
     clickButtonByAccessibleName(container, 'Ctrl+C')
-    expect(onInput).toHaveBeenCalledWith('\x03')
+    expect(onVirtualKey).toHaveBeenCalledWith('interrupt')
   })
 
-  test('Page Up/Page Down scroll without sending input', () => {
-    const onInput = vi.fn()
+  test('Paste button invokes the clipboard paste action without sending a key intent', () => {
+    const onVirtualKey = vi.fn()
+    const onPaste = vi.fn()
+    const { container } = render({ onVirtualKey, onPaste })
+    clickButtonByAccessibleName(container, 'Paste')
+    expect(onPaste).toHaveBeenCalledOnce()
+    expect(onVirtualKey).not.toHaveBeenCalled()
+  })
+
+  test('Page Up/Page Down scroll without sending a key intent', () => {
+    const onVirtualKey = vi.fn()
     const onScrollLines = vi.fn()
-    const { container } = render({ onInput, onScrollLines })
+    const { container } = render({ onVirtualKey, onScrollLines })
     clickButtonByAccessibleName(container, 'Page Up')
     clickButtonByAccessibleName(container, 'Page Down')
     expect(onScrollLines).toHaveBeenNthCalledWith(1, -12)
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
-    expect(onInput).not.toHaveBeenCalled()
+    expect(onVirtualKey).not.toHaveBeenCalled()
+  })
+
+  test('prevents pointer activation from taking the current focus', () => {
+    const input = document.createElement('textarea')
+    document.body.appendChild(input)
+    try {
+      input.focus()
+      const { container } = render()
+      const tabButton = Array.from(container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'Tab',
+      )
+      if (!tabButton) throw new Error('expected Tab button')
+
+      expect(fireEvent.pointerDown(tabButton)).toBe(false)
+      expect(document.activeElement).toBe(input)
+    } finally {
+      input.remove()
+    }
+  })
+
+  test('requests terminal focus only for pointer-sourced input actions', () => {
+    const onRequestFocus = vi.fn()
+    const { container } = render({ onRequestFocus })
+    clickButtonByAccessibleName(container, 'Arrow Up')
+    clickButtonByAccessibleName(container, 'Paste')
+    expect(onRequestFocus).not.toHaveBeenCalled()
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const arrowUp = buttons.find((button) => button.querySelector('.sr-only')?.textContent === 'Arrow Up')
+    const paste = buttons.find((button) => button.querySelector('.sr-only')?.textContent === 'Paste')
+    const pageUp = buttons.find((button) => button.querySelector('.sr-only')?.textContent?.startsWith('Page Up'))
+    if (!arrowUp || !paste || !pageUp) throw new Error('expected pointer focus test buttons')
+    fireEvent.click(arrowUp, { detail: 1 })
+    fireEvent.click(paste, { detail: 1 })
+    fireEvent.click(pageUp, { detail: 1 })
+    expect(onRequestFocus).toHaveBeenCalledTimes(2)
   })
 
   test('Buttons honour the disabled prop', () => {

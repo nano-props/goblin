@@ -10,6 +10,8 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
+import { DialogFooter } from '#/web/components/ui/dialog.tsx'
+import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
 import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
@@ -32,9 +34,15 @@ import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
-import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
+import type { TerminalInputWriter, TerminalPasteWriter } from '#/web/components/terminal/types.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
+
+interface ManualPasteDraft {
+  terminalSessionId: string
+  pasteWriter: TerminalPasteWriter
+  text: string
+}
 
 interface TerminalSessionViewProps {
   base: TerminalSessionBase
@@ -56,6 +64,7 @@ export function TerminalSessionView({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [manualPasteDraft, setManualPasteDraft] = useState<ManualPasteDraft | null>(null)
   const context = useTerminalSessionContext()
   const {
     clearBell,
@@ -66,6 +75,8 @@ export function TerminalSessionView({
     findPrevious,
     clearSearch,
     captureInputWriter,
+    capturePasteWriter,
+    sendVirtualKey,
     takeover,
     restart,
     focusTerminal,
@@ -93,6 +104,19 @@ export function TerminalSessionView({
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey) > 0
   const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
+  const mobileToolbarLabels = {
+    toolbar: t('terminal.mobile-toolbar'),
+    tab: t('terminal.mobile-key-tab'),
+    arrowUp: t('terminal.mobile-key-arrow-up'),
+    arrowDown: t('terminal.mobile-key-arrow-down'),
+    arrowLeft: t('terminal.mobile-key-arrow-left'),
+    arrowRight: t('terminal.mobile-key-arrow-right'),
+    escape: t('terminal.mobile-key-escape'),
+    ctrlC: t('terminal.mobile-key-ctrl-c'),
+    paste: t('menu.edit.paste'),
+    pageUp: t('terminal.mobile-key-page-up'),
+    pageDown: t('terminal.mobile-key-page-down'),
+  }
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -235,6 +259,13 @@ export function TerminalSessionView({
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
+
+  useEffect(() => {
+    setManualPasteDraft((current) =>
+      current && (!isController || current.terminalSessionId !== terminalSessionId) ? null : current,
+    )
+  }, [isController, terminalSessionId])
+
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const showViewerOverlay = sessionPhase === 'open-viewer'
   const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
@@ -400,6 +431,23 @@ export function TerminalSessionView({
     },
     [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
+  const handleToolbarPaste = useCallback(() => {
+    if (!terminalSessionId || !isController) return
+    const pasteWriter = capturePasteWriter(terminalSessionId)
+    if (!pasteWriter) return
+    const clipboard = navigator.clipboard
+    const openManualPaste = () => setManualPasteDraft({ terminalSessionId, pasteWriter, text: '' })
+    if (globalThis.isSecureContext === false || !clipboard?.readText) {
+      openManualPaste()
+      return
+    }
+    void clipboard.readText().then(
+      (text) => {
+        if (text && !pasteWriter(text)) toast.error(t('terminal.paste-text-failed'))
+      },
+      () => toast.error(t('terminal.paste-text-failed')),
+    )
+  }, [capturePasteWriter, isController, t, terminalSessionId])
 
   return (
     <div
@@ -457,13 +505,59 @@ export function TerminalSessionView({
           </Button>
         </div>
       )}
-      {isMobileDevice() && isController && terminalSessionId && (
+      {isMobileDevice() && isController && terminalSessionId && !searchOpen && (
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
-          onInput={(data) => captureInputWriter(terminalSessionId)?.(data)}
+          labels={mobileToolbarLabels}
+          onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
+          onPaste={handleToolbarPaste}
+          onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />
       )}
+      <FormDialog
+        open={manualPasteDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) setManualPasteDraft(null)
+        }}
+        title={t('menu.edit.paste')}
+        description={t('terminal.mobile-paste-description')}
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const draft = manualPasteDraft
+            if (!draft || !draft.text) return
+            if (!draft.pasteWriter(draft.text)) {
+              toast.error(t('terminal.paste-text-failed'))
+              return
+            }
+            setManualPasteDraft(null)
+          }}
+        >
+          <textarea
+            autoFocus
+            rows={5}
+            value={manualPasteDraft?.text ?? ''}
+            aria-label={t('terminal.mobile-paste-placeholder')}
+            placeholder={t('terminal.mobile-paste-placeholder')}
+            className="min-h-24 w-full resize-y rounded-md border border-input bg-control px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onChange={(event) => {
+              const text = event.target.value
+              setManualPasteDraft((current) => (current ? { ...current, text } : null))
+            }}
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setManualPasteDraft(null)}>
+              {t('dialog.cancel')}
+            </Button>
+            <Button type="submit" disabled={!manualPasteDraft?.text}>
+              {t('menu.edit.paste')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </FormDialog>
       {showViewerOverlay && (
         <ViewerOverlay
           badge={readonlyBadge}

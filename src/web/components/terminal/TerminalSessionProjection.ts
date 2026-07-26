@@ -38,6 +38,7 @@ import type {
   TerminalRuntimeMembershipIndex,
   TerminalFilesystemTargetSnapshot,
   TerminalSnapshot,
+  TerminalVirtualKey,
 } from '#/web/components/terminal/types.ts'
 import {
   terminalPresentationBranch,
@@ -991,6 +992,14 @@ export class TerminalSessionProjection {
 
   captureInputWriter = (terminalSessionId: string) => {
     return this.sessions.get(terminalSessionId)?.captureInputWriter() ?? null
+  }
+
+  capturePasteWriter = (terminalSessionId: string) => {
+    return this.sessions.get(terminalSessionId)?.capturePasteWriter() ?? null
+  }
+
+  sendVirtualKey = (terminalSessionId: string, key: TerminalVirtualKey): void => {
+    this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }
 
   takeover = (terminalSessionId: string): Promise<boolean> => {

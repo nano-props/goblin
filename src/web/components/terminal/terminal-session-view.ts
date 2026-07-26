@@ -23,7 +23,14 @@ import {
 import { terminalLog } from '#/web/logger.ts'
 import { constrainTerminalSize } from '#/shared/terminal-validators.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
-import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+
+const CURSOR_KEY_SUFFIX = {
+  'arrow-up': 'A',
+  'arrow-down': 'B',
+  'arrow-left': 'D',
+  'arrow-right': 'C',
+} satisfies Record<Extract<TerminalVirtualKey, `arrow-${string}`>, string>
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -151,7 +158,7 @@ export class TerminalSessionView {
     blurElementIfFocused(this.frame)
   }
 
-  openTerminal(onMacOptionInput: (data: string) => void): XTermTerminal {
+  openTerminal(): XTermTerminal {
     this.markPresentationPending()
     const theme = terminalThemeForCurrentDocument()
     const term = new Terminal({
@@ -169,7 +176,7 @@ export class TerminalSessionView {
     this.fitAddon = fitAddon
     term.loadAddon(fitAddon)
     this.installOptionalAddons(term)
-    this.installKeyboardHandlers(term, onMacOptionInput)
+    this.installKeyboardHandlers(term)
     this.applyTerminalTheme(term, theme)
     this.disposeThemeObserver = observeTerminalTheme((nextTheme) => {
       this.applyTerminalTheme(term, nextTheme)
@@ -214,6 +221,19 @@ export class TerminalSessionView {
     this.term?.scrollLines(amount)
   }
 
+  sendVirtualKey(key: TerminalVirtualKey): void {
+    const term = this.term
+    if (!term) return
+    const data = inputForVirtualKey(key, term.modes.applicationCursorKeysMode)
+    term.input(data, true)
+  }
+
+  pasteText(term: XTermTerminal, data: string): boolean {
+    if (!data || this.term !== term) return false
+    term.paste(data)
+    return true
+  }
+
   find(term: string, direction: 'next' | 'previous', incremental: boolean): boolean {
     if (!term || !this.searchAddon) {
       this.clearSearch()
@@ -256,7 +276,7 @@ export class TerminalSessionView {
     if (!this.frame.contains(this.xtermHost)) this.frame.appendChild(this.xtermHost)
   }
 
-  private installKeyboardHandlers(term: XTermTerminal, onInput: (data: string) => void): void {
+  private installKeyboardHandlers(term: XTermTerminal): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
     const safariShiftKeyResolver = this.safariShiftKeyResolver
     term.attachCustomKeyEventHandler((event) => {
@@ -267,23 +287,18 @@ export class TerminalSessionView {
       if (optionInput) {
         event.preventDefault()
         event.stopPropagation()
-        this.sendInterceptedKeyboardInput(term, optionInput, onInput)
+        term.input(optionInput, true)
         return false
       }
       const safariShiftInput = safariShiftKeyResolver.inputForEvent(event)
       if (safariShiftInput) {
         event.preventDefault()
         event.stopPropagation()
-        this.sendInterceptedKeyboardInput(term, safariShiftInput, onInput)
+        term.input(safariShiftInput, true)
         return false
       }
       return true
     })
-  }
-
-  private sendInterceptedKeyboardInput(term: XTermTerminal, data: string, onInput: (data: string) => void): void {
-    if (term.options.scrollOnUserInput) term.scrollToBottom()
-    onInput(data)
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
@@ -399,6 +414,22 @@ export class TerminalSessionView {
     } finally {
       pending.onSettled?.()
     }
+  }
+}
+
+function inputForVirtualKey(key: TerminalVirtualKey, applicationCursorKeysMode: boolean): string {
+  switch (key) {
+    case 'tab':
+      return '\t'
+    case 'escape':
+      return '\x1b'
+    case 'interrupt':
+      return '\x03'
+    case 'arrow-up':
+    case 'arrow-down':
+    case 'arrow-left':
+    case 'arrow-right':
+      return `${applicationCursorKeysMode ? '\x1bO' : '\x1b['}${CURSOR_KEY_SUFFIX[key]}`
   }
 }
 
