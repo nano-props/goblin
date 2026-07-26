@@ -178,9 +178,18 @@ export function createServerTerminalClient(options: {
       case 'sessions-changed':
         for (const subscriber of sessionsChangedSubscribers) subscriber(message)
         return
-      case 'session-closed':
-        for (const subscriber of sessionClosedSubscribers) subscriber(message)
+      case 'session-closed': {
+        const event: TerminalSessionClosedEvent = {
+          terminalRuntimeSessionId: message.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: message.terminalRuntimeGeneration,
+          terminalSessionId: message.terminalSessionId,
+          workspaceId: message.workspaceId,
+          workspaceRuntimeId: message.workspaceRuntimeId,
+          tabsBeforeRetirement: message.tabsBeforeRetirement,
+        }
+        for (const subscriber of sessionClosedSubscribers) subscriber(event)
         return
+      }
       case 'identity': {
         const identityEvent = {
           terminalRuntimeSessionId: message.event.terminalRuntimeSessionId,
