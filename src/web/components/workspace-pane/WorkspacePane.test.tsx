@@ -156,10 +156,9 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function directoryWorkspaceProbe(name: string, options: { filesWritable?: boolean; terminalAvailable?: boolean } = {}) {
+function directoryWorkspaceProbe(options: { filesWritable?: boolean; terminalAvailable?: boolean } = {}) {
   return {
     status: 'ready' as const,
-    name,
     capabilities: {
       files: { read: true as const, write: options.filesWritable ?? true },
       terminal: { available: options.terminalAvailable ?? true },
@@ -187,7 +186,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
@@ -247,7 +246,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('filesystem-toolbar-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), {
       terminal: {
@@ -288,7 +287,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('remote-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
 
     render(
@@ -319,7 +318,6 @@ describe('WorkspacePane', () => {
               ...repo,
               workspaceProbe: {
                 status: 'ready',
-                name: 'remote-workspace',
                 capabilities: {
                   files: { read: true, write: true },
                   terminal: { available: true },
@@ -438,7 +436,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-compact-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     const onBackToNavigator = vi.fn()
 
@@ -468,7 +466,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-status-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     const repo = useWorkspacesStore.getState().workspaces[workspaceId]!
     useWorkspacesStore
@@ -513,7 +511,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-status-unavailable-size'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
@@ -547,7 +545,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-status-files-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
@@ -593,7 +591,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-routed-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
@@ -632,7 +630,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-bare-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
@@ -665,7 +663,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('terminal-unavailable-workspace', {
+      workspaceProbe: directoryWorkspaceProbe({
         filesWritable: false,
         terminalAvailable: false,
       }),
@@ -694,7 +692,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-terminal-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
@@ -798,7 +796,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('plain-terminal-exit-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
@@ -875,7 +873,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('rejected-terminal-route-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     setWorkspacePaneTabsForTargetQueryData({
@@ -935,7 +933,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('deferred-terminal-route-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     setWorkspacePaneTabsForTargetQueryData({
@@ -979,7 +977,7 @@ describe('WorkspacePane', () => {
       id: workspaceId,
       branches: [],
       currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe('empty-plain-workspace'),
+      workspaceProbe: directoryWorkspaceProbe(),
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',

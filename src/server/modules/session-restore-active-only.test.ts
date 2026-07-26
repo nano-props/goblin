@@ -93,7 +93,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       repoId: 'goblin+ssh://prod/srv/repo',
-      name: 'prod:repo',
       lifecycle: { kind: 'ready', target: { id: 'goblin+ssh://prod/srv/repo' } },
     })
     mocks.readRepoProjection.mockImplementation(async (workspaceId: string) => ({
@@ -154,7 +153,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(active.gitProjection).not.toBeNull()
     expect(stub.gitProjection).toBeNull()
     expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')
-    expect(stub.name).toBe('repo')
     // Git targets remain deferred until lazy projection, but workspace-root
     // layout is capability-invariant and can bind immediately.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
@@ -373,7 +371,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
   })
 
-  test('non-active remote Workspaces are probed and retain their display name', async () => {
+  test('non-active remote Workspaces are probed without loading their Git projection', async () => {
     const remoteEntry = { id: REMOTE_WORKSPACE_ID }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -403,7 +401,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(remoteStub).toMatchObject({
       entry: remoteEntry,
       workspaceId: remoteEntry.id,
-      name: 'prod:repo',
       gitProjection: null,
     })
     expect(mocks.runRemoteWorkspaceLifecycleWrite).toHaveBeenCalledOnce()
@@ -456,7 +453,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.workspaceProbes.set(workspaceId, {
       status: 'ready',
-      name: 'repo',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -496,7 +492,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
 function gitProbe() {
   return {
     status: 'ready' as const,
-    name: 'repo',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true },

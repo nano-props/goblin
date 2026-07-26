@@ -1260,7 +1260,7 @@ type PrimaryWindowNavigationActionTestOptions = Omit<
 
 function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationActionTestOptions) {
   if (options.currentWorkspaceId && !useWorkspacesStore.getState().workspaces[options.currentWorkspaceId]) {
-    const workspace = emptyWorkspace(options.currentWorkspaceId, 'workspace', 'navigation-actions-runtime')
+    const workspace = emptyWorkspace(options.currentWorkspaceId, 'navigation-actions-runtime')
     useWorkspacesStore.setState((state) => ({
       workspaces: { ...state.workspaces, [workspace.id]: workspace },
     }))
@@ -1283,7 +1283,6 @@ function markRepoGitUnavailable(workspaceId: string): void {
         [workspaceId]: replaceWorkspace(repo, (draft) => {
           acceptWorkspaceProbeState(draft, {
             status: 'ready',
-            name: 'workspace',
             capabilities: {
               files: { read: true, write: true },
               terminal: { available: true },

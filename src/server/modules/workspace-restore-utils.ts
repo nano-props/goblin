@@ -12,8 +12,3 @@ export async function abortableWorkspaceRestore<T>(promise: Promise<T>, signal?:
     if (onAbort) signal.removeEventListener('abort', onAbort)
   }
 }
-
-export function workspaceDisplayName(value: string): string {
-  const trimmed = value.replace(/[\\/]+$/, '')
-  return trimmed.split(/[\\/]/).pop() || value
-}

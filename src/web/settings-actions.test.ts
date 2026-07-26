@@ -5,7 +5,13 @@ import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/s
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { GitHubCliState, WorkspaceSettingsState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
+import type {
+  GitHubCliState,
+  WorkspaceSettingsState,
+  WorkspaceRestoreResult,
+  WorkspaceTabsRestoreResult,
+} from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_A = workspaceIdForTest('goblin+file:///tmp/repo-a')
@@ -19,6 +25,13 @@ type RestoreServerWorkspaceMock = (
   clientId: string,
   options?: { activeWorkspaceId?: string | null; signal?: AbortSignal },
 ) => Promise<WorkspaceRestoreResult>
+
+type RestoreWorkspaceTabsMock = (
+  clientId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  options?: { signal?: AbortSignal },
+) => Promise<WorkspaceTabsRestoreResult>
 
 const appDataClientMocks = vi.hoisted(() => ({
   addRecentWorkspace: vi.fn<() => Promise<AddRecentWorkspaceResult>>(async () => ({
@@ -50,12 +63,21 @@ const appDataClientMocks = vi.hoisted(() => ({
     openWorkspaceEntries: [],
     runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
   })),
-  restoreWorkspaceTabs: vi.fn(async () => ({
+  restoreWorkspaceTabs: vi.fn<RestoreWorkspaceTabsMock>(async () => ({
     workspace: {
-      entry: { id: 'goblin+file:///tmp/repo-a' },
-      workspaceId: 'goblin+file:///tmp/repo-a',
+      entry: { id: WORKSPACE_A },
+      workspaceId: WORKSPACE_A,
       workspaceRuntimeId: 'repo_runtime_test',
-      name: 'repo-a',
+      transport: { kind: 'file' },
+      workspaceProbe: {
+        status: 'ready',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
       gitProjection: {
         snapshot: { current: 'main', branches: [] },
         pullRequests: null,
@@ -129,10 +151,19 @@ describe('settings actions', () => {
     appDataClientMocks.restoreWorkspaceTabs.mockReset()
     appDataClientMocks.restoreWorkspaceTabs.mockResolvedValue({
       workspace: {
-        entry: { id: 'goblin+file:///tmp/repo-a' },
-        workspaceId: 'goblin+file:///tmp/repo-a',
+        entry: { id: WORKSPACE_A },
+        workspaceId: WORKSPACE_A,
         workspaceRuntimeId: 'repo_runtime_test',
-        name: 'repo-a',
+        transport: { kind: 'file' },
+        workspaceProbe: {
+          status: 'ready',
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+          },
+          diagnostics: [],
+        },
         gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,

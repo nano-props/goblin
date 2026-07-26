@@ -121,7 +121,6 @@ describe('workspace runtimes', () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const probe = {
       status: 'ready' as const,
-      name: 'repo',
       capabilities: {
         files: { read: true as const, write: true },
         terminal: { available: true },
@@ -154,7 +153,6 @@ describe('workspace runtimes', () => {
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
     const first = {
       status: 'ready' as const,
-      name: 'first',
       capabilities: {
         files: { read: true as const, write: true },
         terminal: { available: true },
@@ -162,7 +160,10 @@ describe('workspace runtimes', () => {
       },
       diagnostics: [],
     }
-    const later = { ...first, name: 'later' }
+    const later = {
+      ...first,
+      capabilities: { ...first.capabilities, terminal: { available: false } },
+    }
 
     expect(
       commitOrReadInitialWorkspaceProbeState({
@@ -186,7 +187,6 @@ describe('workspace runtimes', () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const initial = {
       status: 'ready' as const,
-      name: 'repo',
       capabilities: {
         files: { read: true as const, write: true },
         terminal: { available: true },
@@ -244,7 +244,6 @@ describe('workspace runtimes', () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const available = {
       status: 'ready' as const,
-      name: 'repo',
       capabilities: {
         files: { read: true as const, write: true },
         terminal: { available: true },
@@ -281,7 +280,6 @@ describe('workspace runtimes', () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const available = {
       status: 'ready' as const,
-      name: 'repo',
       capabilities: {
         files: { read: true as const, write: true },
         terminal: { available: true },
@@ -359,7 +357,6 @@ describe('workspace runtimes', () => {
       workspaceRuntimeId: runtimeId,
       probe: async () => ({
         status: 'ready',
-        name: 'repo',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -473,14 +470,10 @@ describe('workspace runtimes', () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, workspaceId, 'client-a')
     const failed = vi.fn(async () => ({
       kind: 'failed' as const,
-      repoId: workspaceId,
-      name: 'repo',
       lifecycle: { kind: 'failed' as const, reason: 'unreachable' as const },
     }))
     const ready = vi.fn(async () => ({
       kind: 'ready' as const,
-      repoId: workspaceId,
-      name: 'repo',
       gitAvailable: true,
       lifecycle: {
         kind: 'ready' as const,
@@ -568,9 +561,7 @@ describe('workspace runtimes', () => {
           'client-a',
           Array.from({ length: 101 }, () => newRoot),
         ),
-      ).toThrow(
-        'workspace runtime reconcile accepts at most 100 workspace ids',
-      )
+      ).toThrow('workspace runtime reconcile accepts at most 100 workspace ids')
       expect(listWorkspaceRuntimes(USER_ID)).toEqual([
         expect.objectContaining({ workspaceId: oldRoot, workspaceRuntimeId: oldRuntimeId }),
       ])

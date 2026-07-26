@@ -268,7 +268,6 @@ function createRepo(): RepoPresentationForTest {
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
   const repo = seedRepoWithReadModelForTest({
     id: WORKSPACE_ID,
-    name: 'goblin-repo',
     workspaceRuntimeId: 'repo-runtime-test',
     branches,
     currentBranch: 'main',
@@ -284,7 +283,6 @@ function createRepoWithCreatedWorktree(): RepoPresentationForTest {
   ]
   const repo = seedRepoWithReadModelForTest({
     id: WORKSPACE_ID,
-    name: 'goblin-repo',
     workspaceRuntimeId: 'repo-runtime-test',
     branches,
     currentBranch: 'main',
@@ -304,7 +302,6 @@ function createRemoteRepo(): RepoPresentationForTest {
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
   const repo = seedRepoWithReadModelForTest({
     id: target.id,
-    name: 'remote-workspace',
     workspaceRuntimeId: 'repo-runtime-test',
     branches,
     currentBranch: 'main',

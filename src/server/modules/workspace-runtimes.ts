@@ -70,12 +70,12 @@ export interface WorkspaceRuntimeMembershipLease {
 type TerminalRemoteLifecycle = Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
 
 export type RemoteWorkspaceLifecycleRunResult =
-  | { kind: 'settled'; name: string; lifecycle: TerminalRemoteLifecycle }
+  | { kind: 'settled'; lifecycle: TerminalRemoteLifecycle }
   | { kind: 'superseded' }
   | { kind: 'stale-runtime' }
 
 export type RemoteWorkspaceLifecycleFailResult =
-  | { kind: 'settled'; name: string; lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'failed' }> }
+  | { kind: 'settled'; lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'failed' }> }
   | { kind: 'not-remote' }
   | { kind: 'stale-runtime' }
 
@@ -665,7 +665,6 @@ export async function failRemoteWorkspaceLifecycle(input: {
     notifyRemoteLifecycleTransition(input.onTransition ?? (() => {}), state.remoteLifecycle, input.workspaceId)
     return {
       kind: 'settled',
-      name: workspaceRuntimeDisplayName(state, input.workspaceId),
       lifecycle: state.remoteLifecycle,
     } satisfies RemoteWorkspaceLifecycleFailResult
   })
@@ -693,11 +692,7 @@ export async function runRemoteWorkspaceLifecycle(
         if (current.remoteLifecycle.kind === 'ready') {
           return {
             kind: 'result',
-            result: settledRemoteWorkspaceLifecycleResult(
-              current,
-              workspaceId,
-              workspaceRuntimeDisplayName(current, workspaceId),
-            ),
+            result: settledRemoteWorkspaceLifecycleResult(current),
           } as const
         }
       }
@@ -766,7 +761,6 @@ async function settleRemoteWorkspaceLifecycleAttempt(
     }
     result = {
       kind: 'failed',
-      name: workspaceId,
       lifecycle: { kind: 'failed', reason: 'unknown' },
     }
   }
@@ -839,7 +833,7 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
     state.remoteAttemptController = null
     state.remoteAttemptPromise = null
     state.pendingWorkspaceProbeTransition = null
-    const settled = settledRemoteWorkspaceLifecycleResult(state, input.workspaceId, input.result.name)
+    const settled = settledRemoteWorkspaceLifecycleResult(state)
     notifyRemoteLifecycleTransition(input.onTransition, settled.lifecycle, input.workspaceId)
     return settled
   })
@@ -882,18 +876,11 @@ function terminalRemoteLifecycle(result: RemoteWorkspaceConnectionResult, attemp
 
 function settledRemoteWorkspaceLifecycleResult(
   state: WorkspaceRuntimeState,
-  workspaceId: WorkspaceId,
-  name: string,
 ): Extract<RemoteWorkspaceLifecycleRunResult, { kind: 'settled' }> {
   if (state.remoteLifecycle.kind !== 'ready' && state.remoteLifecycle.kind !== 'failed') {
     throw new Error('remote workspace lifecycle must be terminal before it settles')
   }
-  return { kind: 'settled', name, lifecycle: state.remoteLifecycle }
-}
-
-function workspaceRuntimeDisplayName(state: WorkspaceRuntimeState, workspaceId: WorkspaceId): string {
-  if (state.workspaceProbe.status === 'ready') return state.workspaceProbe.name
-  return remoteLifecycleTarget(state.remoteLifecycle)?.displayName ?? workspaceId
+  return { kind: 'settled', lifecycle: state.remoteLifecycle }
 }
 
 function remoteLifecycleTarget(lifecycle: RemoteWorkspaceRuntimeLifecycle): RemoteWorkspaceTarget | null {

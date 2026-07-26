@@ -60,10 +60,9 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
     empty.unmount()
 
-    const workspace = emptyWorkspace(WORKSPACE_ID, 'plain-workspace', 'workspace-runtime-plain')
+    const workspace = emptyWorkspace(WORKSPACE_ID, 'workspace-runtime-plain')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
-      name: 'plain-workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

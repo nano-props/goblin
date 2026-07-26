@@ -316,11 +316,10 @@ function resolvedWorkspaceFromRestoredRuntime(restored: RestoredWorkspaceRuntime
         : ('stub' as const),
   }
   if (restored.transport.kind === 'ssh') {
-    return { id: restored.workspaceId, name: restored.name, session }
+    return { id: restored.workspaceId, session }
   }
   return {
     id: restored.workspaceId,
-    name: restored.name,
     workspaceProbe: restored.workspaceProbe,
     session,
   }

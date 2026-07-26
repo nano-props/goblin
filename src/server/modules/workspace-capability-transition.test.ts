@@ -7,7 +7,6 @@ import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 const PLAIN_PROBE: WorkspaceProbeState = {
   status: 'ready',
-  name: 'workspace',
   capabilities: {
     files: { read: true, write: true },
     terminal: { available: true },

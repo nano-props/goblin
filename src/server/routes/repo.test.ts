@@ -96,7 +96,6 @@ beforeEach(() => {
   clearWorkspaceRuntimesForUser('user-test')
   mocks.probeLocalWorkspace.mockResolvedValue({
     status: 'ready',
-    name: 'workspace',
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },
@@ -150,7 +149,6 @@ async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise<string
     workspaceRuntimeId,
     probe: {
       status: 'ready',
-      name: 'repo',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
@@ -204,7 +202,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       workspaceRuntimeId: workspaceRuntimeId,
       probe: async () => ({
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -761,7 +758,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       workspaceRuntimeId,
       probe: {
         status: 'ready',
-        name: 'plain-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },

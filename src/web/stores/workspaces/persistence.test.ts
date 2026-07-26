@@ -19,7 +19,6 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
-    name: 'repo',
     data: {
       branches: [],
       currentBranch: '',
@@ -60,6 +59,13 @@ describe('normalizeRepoSnapshotCache', () => {
     })
 
     expect(Object.keys(normalized)).toEqual(['fresh'])
+  })
+
+  test('rejects cache entries that carry a stored workspace name', () => {
+    const cached = cachedRepo(Date.now())
+    const normalized = normalizeRepoSnapshotCache({ repo: { ...cached, name: 'stale-name' } })
+
+    expect(normalized.repo).toBeUndefined()
   })
 
   test('normalizes cached branch worktree references while dropping dynamic metadata', () => {

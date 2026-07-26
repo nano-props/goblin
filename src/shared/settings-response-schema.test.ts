@@ -73,12 +73,10 @@ describe('settings response schemas', () => {
           {
             workspaceId,
             workspaceRuntimeId: 'runtime_test000000000000',
-            name: 'deferred-repo',
             entry: { id: workspaceId },
             transport: { kind: 'file' },
             workspaceProbe: {
               status: 'ready',
-              name: 'deferred-repo',
               capabilities: {
                 files: { read: true, write: true },
                 terminal: { available: true },
@@ -95,5 +93,29 @@ describe('settings response schemas', () => {
     }
 
     expect(v.parse(WorkspaceRestoreResponseSchema, response)).toEqual(response)
+    const restoredWorkspace = response.runtime.workspaces[0]!
+    expect(
+      v.safeParse(WorkspaceRestoreResponseSchema, {
+        ...response,
+        runtime: {
+          ...response.runtime,
+          workspaces: [{ ...restoredWorkspace, name: 'deferred-repo' }],
+        },
+      }).success,
+    ).toBe(false)
+    expect(
+      v.safeParse(WorkspaceRestoreResponseSchema, {
+        ...response,
+        runtime: {
+          ...response.runtime,
+          workspaces: [
+            {
+              ...restoredWorkspace,
+              workspaceProbe: { ...restoredWorkspace.workspaceProbe, name: 'deferred-repo' },
+            },
+          ],
+        },
+      }).success,
+    ).toBe(false)
   })
 })

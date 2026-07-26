@@ -14,7 +14,6 @@ export function acceptRemoteWorkspaceLifecycleProjection(
   set: WorkspacesSet,
   get: WorkspacesGet,
   entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle'>,
-  options: { name?: string } = {},
 ): boolean {
   const lifecycle = entry.remoteLifecycle
   if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
@@ -42,7 +41,7 @@ export function acceptRemoteWorkspaceLifecycleProjection(
       )
     )
       return
-    applyRemoteWorkspaceLifecycle(repo, lifecycle, options.name)
+    applyRemoteWorkspaceLifecycle(repo, lifecycle)
     accepted = true
   })
   return accepted
@@ -52,11 +51,7 @@ export function acceptRemoteWorkspaceLifecycleProjection(
 export function acceptRemoteWorkspaceRuntimeProjection(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  entry: Pick<
-    WorkspaceRuntimeEntry,
-    'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle' | 'workspaceProbe'
-  >,
-  options: { name?: string } = {},
+  entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle' | 'workspaceProbe'>,
 ): boolean {
   const lifecycle = entry.remoteLifecycle
   if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
@@ -67,7 +62,7 @@ export function acceptRemoteWorkspaceRuntimeProjection(
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (workspace) => {
     if (!remoteWorkspaceRuntimeProjectionIsFresh(workspace, lifecycle)) return
-    applyRemoteWorkspaceLifecycle(workspace, lifecycle, options.name)
+    applyRemoteWorkspaceLifecycle(workspace, lifecycle)
     acceptWorkspaceProbeState(workspace, entry.workspaceProbe)
     accepted = true
   })
@@ -107,16 +102,11 @@ function remoteWorkspaceRuntimeProjectionIsFresh(
   )
 }
 
-function applyRemoteWorkspaceLifecycle(
-  workspace: WorkspaceState,
-  lifecycle: RemoteWorkspaceRuntimeLifecycle,
-  name?: string,
-): void {
+function applyRemoteWorkspaceLifecycle(workspace: WorkspaceState, lifecycle: RemoteWorkspaceRuntimeLifecycle): void {
   if (workspace.admission.kind !== 'remote') return
   workspace.admission.lifecycleAttemptId = lifecycle.attemptId
   if (lifecycle.kind === 'idle') workspace.admission.lifecycle = null
   else if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(workspace)
   else if (lifecycle.kind === 'ready') markRemoteLifecycleReady(workspace, lifecycle.target)
   else markRemoteLifecycleFailed(workspace, lifecycle.reason, lifecycle.target)
-  if (lifecycle.kind === 'ready' && name) workspace.name = name
 }

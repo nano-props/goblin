@@ -21,10 +21,9 @@ interface RepoOverrides {
 }
 
 function repo(overrides: RepoOverrides = {}): WorkspaceState {
-  const base = emptyWorkspace(WORKSPACE_ID, 'repo', 'repo-runtime-test')
+  const base = emptyWorkspace(WORKSPACE_ID, 'repo-runtime-test')
   acceptWorkspaceProbeState(base, {
     status: 'ready',
-    name: 'repo',
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },

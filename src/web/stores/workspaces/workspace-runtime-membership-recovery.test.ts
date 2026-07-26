@@ -181,7 +181,7 @@ describe('workspace runtime membership recovery', () => {
     installGoblinTestBridge({
       'workspace.runtimeOpen': async () => ({
         ok: true,
-        workspace: { id: REPO_ROOT, name: 'runtime-membership-recovery' },
+        workspace: { id: REPO_ROOT },
         workspaceRuntimeId: 'repo-runtime-123456789012345678901',
         capabilities: {
           files: { read: true, write: true },

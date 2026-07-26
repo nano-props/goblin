@@ -49,7 +49,7 @@ afterEach(() => {
 
 describe('WorkspaceDashboardPane', () => {
   test('does not admit Git or directory reads before workspace capability settles', () => {
-    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID, name: 'probing' })
+    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, { status: 'probing' })
     primaryWindowQueryClient.removeQueries({
       queryKey: repoProjectionQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary'),
@@ -80,10 +80,9 @@ describe('WorkspaceDashboardPane', () => {
   })
 
   test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
-    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID, name: 'notes' })
+    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, {
       status: 'ready',
-      name: 'notes',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

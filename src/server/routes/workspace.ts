@@ -109,7 +109,7 @@ export function createWorkspaceRoutes(options: {
           }
           return {
             ok: true as const,
-            workspace: { id: workspaceId, name: authoritativeProbe.name },
+            workspace: { id: workspaceId },
             workspaceRuntimeId,
             capabilities: authoritativeProbe.capabilities,
             diagnostics: authoritativeProbe.diagnostics,

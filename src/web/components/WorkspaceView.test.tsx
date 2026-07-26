@@ -280,7 +280,6 @@ const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-view-test')
 function filesystemWorkspaceProbe() {
   return {
     status: 'ready' as const,
-    name: 'workspace',
     capabilities: {
       files: { read: true as const, write: true },
       terminal: { available: true as const },
@@ -513,7 +512,6 @@ describe('WorkspaceView workspace navigation', () => {
       currentBranchName: null,
       workspaceProbe: {
         status: 'ready',
-        name: 'remote-workspace',
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },

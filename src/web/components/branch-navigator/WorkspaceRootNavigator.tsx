@@ -12,7 +12,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
-import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
+import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
@@ -37,7 +37,7 @@ export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: Work
       const workspace = state.workspaces[workspaceId]
       const probe = workspace?.capability.probe
       return {
-        name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(workspaceId),
+        name: workspaceNameFromLocator(workspaceId),
         terminalAvailable: workspaceTerminalAvailable(probe),
         workspaceRuntimeId: workspace?.workspaceRuntimeId ?? null,
         capabilities: probe?.status === 'ready' ? probe.capabilities : null,

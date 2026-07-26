@@ -252,7 +252,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('terminal bell clicks restore a plain Workspace root terminal', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
-    const workspace = emptyWorkspace(workspaceId, 'workspace', 'workspace-runtime-test')
+    const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-test')
     useWorkspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     const terminalSessionId = 'term-111111111111111111111'
 

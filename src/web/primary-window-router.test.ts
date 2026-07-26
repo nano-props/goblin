@@ -90,8 +90,8 @@ afterEach(() => {
 
 describe('primary window initial route', () => {
   test('prefers the restored workspace over the first workspace in order', () => {
-    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
-    const workspaceB = emptyWorkspace(WORKSPACE_B_ID, 'workspace-b', 'workspace-runtime-b')
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-runtime-a')
+    const workspaceB = emptyWorkspace(WORKSPACE_B_ID, 'workspace-runtime-b')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
@@ -104,7 +104,7 @@ describe('primary window initial route', () => {
   })
 
   test('waits for workspace membership restore instead of routing to the first partial workspace', () => {
-    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-runtime-a')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
@@ -117,7 +117,7 @@ describe('primary window initial route', () => {
   })
 
   test('falls back to the first ordered workspace when restore has settled without a restored workspace', () => {
-    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-runtime-a')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
@@ -356,10 +356,9 @@ describe('workspace route capability admission', () => {
 
 function seedWorkspaceCapability(workspaceId: WorkspaceId, gitStatus: 'available' | 'unavailable') {
   resetWorkspacesStore()
-  const workspace = emptyWorkspace(workspaceId, 'workspace', 'runtime-router-test')
+  const workspace = emptyWorkspace(workspaceId, 'runtime-router-test')
   acceptWorkspaceProbeState(workspace, {
     status: 'ready',
-    name: 'workspace',
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },

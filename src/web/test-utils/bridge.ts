@@ -118,7 +118,7 @@ export function createGitRepoPresentationForTest(
   repo: WorkspaceState,
   branchReadModel: RepoBranchReadModelData,
 ): RepoPresentationForTest {
-  acceptWorkspaceProbeState(repo, createGitWorkspaceProbeForTest(repo.name))
+  acceptWorkspaceProbeState(repo, createGitWorkspaceProbeForTest())
   return repoPresentationForTest(repo, branchReadModel)
 }
 
@@ -140,7 +140,6 @@ export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPres
 
 export function seedRepoShellForTest(options: {
   id: string
-  name?: string
   currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
@@ -149,11 +148,7 @@ export function seedRepoShellForTest(options: {
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
   const workspaceId = workspaceIdForTest(options.id)
-  const base = emptyWorkspace(
-    workspaceId,
-    options.name ?? 'repo',
-    options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'),
-  )
+  const base = emptyWorkspace(workspaceId, options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'))
   const repo: WorkspaceState = {
     ...base,
     ui: {
@@ -263,10 +258,9 @@ export function createRepoBranch(name: string, options: Partial<RepoBranchState>
   return stripBranchWorktreeMetadata([createBranchSnapshot(name, options)])[0]!
 }
 
-export function createGitWorkspaceProbeForTest(name = 'workspace'): WorkspaceProbeState {
+export function createGitWorkspaceProbeForTest(): WorkspaceProbeState {
   return {
     status: 'ready',
-    name,
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },
@@ -1075,14 +1069,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           state.members.add(clientId)
           state.workspaceProbe = {
             status: 'ready',
-            name: probe.name,
             capabilities: probe.capabilities,
             diagnostics: probe.diagnostics,
           }
           workspaceRuntimeState.set(workspaceInput, state)
           return {
             ok: true as const,
-            workspace: { id: workspaceInput, name: probe.name },
+            workspace: { id: workspaceInput },
             workspaceRuntimeId: state.currentWorkspaceRuntimeId,
             capabilities: probe.capabilities,
             diagnostics: probe.diagnostics,
@@ -1188,7 +1181,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             const value = result as {
               kind?: string
               workspaceId?: string
-              name?: string
               lifecycle?: RemoteWorkspaceRuntimeLifecycle
             }
             if (value.kind === 'settled' && value.workspaceId && value.lifecycle) {
@@ -1204,7 +1196,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
                 if (value.lifecycle.kind === 'ready') {
                   state.workspaceProbe = {
                     status: 'ready',
-                    name: value.name ?? value.workspaceId,
                     capabilities: {
                       files: { read: true, write: true },
                       terminal: { available: true },
@@ -1269,7 +1260,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
                 kind: 'committed',
                 probe: {
                   status: 'ready',
-                  name: 'workspace',
                   capabilities: {
                     files: { read: true, write: true },
                     terminal: { available: true },
@@ -1320,7 +1310,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
 
 export function seedRepoWithReadModelForTest(options: {
   id: string
-  name?: string
   branches?: RepoBranchState[]
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
@@ -1355,7 +1344,6 @@ export function seedRepoWithReadModelForTest(options: {
       : undefined)
   const repo = seedRepoShellForTest({
     id: options.id,
-    name: options.name,
     workspaceRuntimeId: options.workspaceRuntimeId,
     currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
@@ -1363,7 +1351,6 @@ export function seedRepoWithReadModelForTest(options: {
     remoteLifecycle: options.remoteLifecycle,
     workspaceProbe: options.workspaceProbe ?? {
       status: 'ready',
-      name: options.name ?? 'repo',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

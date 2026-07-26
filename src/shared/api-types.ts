@@ -147,7 +147,6 @@ export interface WorkspaceRuntimeMembershipReconcileResult {
 interface RestoredWorkspaceRuntimeBase {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  name: string
   workspaceProbe: WorkspaceProbeState
 }
 
@@ -306,7 +305,7 @@ export interface WorkspaceFileViewerResult {
 export type WorkspaceRuntimeOpenResult =
   | {
       ok: true
-      workspace: { id: WorkspaceId; name: string }
+      workspace: { id: WorkspaceId }
       workspaceRuntimeId: string
       capabilities: WorkspaceCapabilities
       diagnostics: Array<{ scope: 'git' | 'transport'; message: string }>

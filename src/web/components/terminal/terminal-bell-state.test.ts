@@ -107,6 +107,32 @@ describe('terminal bell state', () => {
     hasFocus.mockRestore()
   })
 
+  test.each([
+    ['/tmp/My Workspace', 'My Workspace'],
+    ['goblin+file:///C:/', 'C:\\'],
+  ])('derives the system notification title from canonical workspace identity', async (repoRoot, title) => {
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
+    const controller = createTerminalBellState(vi.fn(), vi.fn())
+    const workspaceDescriptor = terminalDescriptorForTest({
+      terminalSessionId: 'term-222222222222222222222',
+      index: 1,
+      repoRoot,
+      workspaceRuntimeId: 'repo-runtime-test',
+      branch: null,
+      worktreePath: repoRoot,
+    })
+
+    controller.handleBell(workspaceDescriptor, { processName: 'zsh', visible: false })
+    await Promise.resolve()
+
+    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith(expect.objectContaining({ title }))
+    hasFocus.mockRestore()
+  })
+
   test('marks bells unread without requesting a system notification when disabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)

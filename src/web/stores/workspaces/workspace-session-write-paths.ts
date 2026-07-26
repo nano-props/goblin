@@ -1,4 +1,3 @@
-import { lastPathSegment } from '#/web/lib/paths.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import PQueue from 'p-queue'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -53,7 +52,6 @@ import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/work
 
 interface ResolvedWorkspace {
   id: WorkspaceId
-  name: string
   target?: RemoteWorkspaceTarget
   workspaceProbe?: WorkspaceProbeState
   session?: {
@@ -117,7 +115,6 @@ async function openLocalWorkspaceRuntimeForCommandInput(workspaceInput: string):
   }
   const workspaceProbe: WorkspaceProbeState = {
     status: 'ready',
-    name: opened.workspace.name,
     capabilities: opened.capabilities,
     diagnostics: opened.diagnostics,
   }
@@ -129,7 +126,7 @@ async function openLocalWorkspaceRuntimeForCommandInput(workspaceInput: string):
   return {
     input: workspaceInput,
     reason: null,
-    workspace: { ...opened.workspace, workspaceProbe },
+    workspace: { id: opened.workspace.id, workspaceProbe },
     workspaceRuntimeId: opened.workspaceRuntimeId,
     workspaceProbe,
   }
@@ -527,21 +524,9 @@ async function recordRecentWorkspacePostOpen(workspace: WorkspaceSessionEntry): 
   }
 }
 
-/** Build a fresh workspace by layering the restorable Git cache on top of an
- *  empty shell. `nameHints` is consulted in workspaceOrder; the first non-empty
- *  hint wins, then the cached name, then the last path segment of the
- *  id. The caller may settle admission before returning it from
- *  `upsertWorkspace.create`. */
-function buildNewWorkspace(
-  s: Pick<WorkspacesStore, 'repoSnapshotCache'>,
-  id: WorkspaceId,
-  nameHints: ReadonlyArray<string | undefined | null>,
-  workspaceRuntimeId: string,
-): WorkspaceState {
-  const cached = s.repoSnapshotCache[id]
-  const hint = nameHints.find((value): value is string => !!value)
-  const name = hint ?? cached?.name ?? lastPathSegment(id)
-  return emptyWorkspace(id, name, workspaceRuntimeId)
+/** Build a fresh workspace from its canonical identity. */
+function buildNewWorkspace(id: WorkspaceId, workspaceRuntimeId: string): WorkspaceState {
+  return emptyWorkspace(id, workspaceRuntimeId)
 }
 
 function remoteTargetsEqual(
@@ -631,7 +616,7 @@ export function addResolvedWorkspace(
   return upsertWorkspace(s, resolvedWorkspace.id, {
     rankById,
     create: () => {
-      const workspace = buildNewWorkspace(s, resolvedWorkspace.id, [resolvedWorkspace.name], workspaceRuntimeId)
+      const workspace = buildNewWorkspace(resolvedWorkspace.id, workspaceRuntimeId)
       workspace.session = {
         entry: sessionEntryForResolvedWorkspace(resolvedWorkspace),
         projectionState: sessionProjectionStateForResolvedWorkspace(resolvedWorkspace),
@@ -649,7 +634,6 @@ export function addResolvedWorkspace(
     },
     update: (existing) => {
       const runtimeChanged = existing.workspaceRuntimeId !== workspaceRuntimeId
-      const nameChanged = resolvedWorkspace.name.length > 0 && existing.name !== resolvedWorkspace.name
       const sessionEntry = sessionEntryForResolvedWorkspace(resolvedWorkspace)
       const sessionProjectionState = sessionProjectionStateForResolvedWorkspace(resolvedWorkspace)
       const sessionChanged =
@@ -659,11 +643,10 @@ export function addResolvedWorkspace(
         !!resolvedWorkspace.workspaceProbe &&
         !sameWorkspaceProbeState(existing.capability.probe, resolvedWorkspace.workspaceProbe)
       if (!resolvedWorkspace.target) {
-        if (!runtimeChanged && !nameChanged && !sessionChanged && !workspaceProbeChanged) return null
+        if (!runtimeChanged && !sessionChanged && !workspaceProbeChanged) return null
         const next: WorkspaceState = {
           ...existing,
           workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
-          name: nameChanged ? resolvedWorkspace.name : existing.name,
           session: {
             entry: sessionEntry,
             projectionState: sessionProjectionState,
@@ -680,7 +663,6 @@ export function addResolvedWorkspace(
       )
       if (
         !runtimeChanged &&
-        !nameChanged &&
         !sessionChanged &&
         !workspaceProbeChanged &&
         lifecycleReady &&
@@ -695,7 +677,6 @@ export function addResolvedWorkspace(
       const next: WorkspaceState = {
         ...existing,
         workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
-        name: nameChanged ? resolvedWorkspace.name : existing.name,
         session: {
           entry: sessionEntry,
           projectionState: sessionProjectionState,
@@ -742,11 +723,7 @@ export function insertPlaceholderWorkspace(
   return upsertWorkspace(s, entry.id, {
     rankById,
     create: () => {
-      const remoteRef = isRemoteWorkspaceId(entry.id)
-        ? normalizeRemoteWorkspaceRef(parseRemoteWorkspaceId(entry.id))
-        : null
-      const fallbackName = remoteRef?.displayName ?? null
-      const workspace = buildNewWorkspace(s, entry.id, [fallbackName], workspaceRuntimeId)
+      const workspace = buildNewWorkspace(entry.id, workspaceRuntimeId)
       workspace.session = {
         entry,
         projectionState: 'projected',

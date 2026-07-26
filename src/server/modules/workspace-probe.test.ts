@@ -29,7 +29,6 @@ describe('workspace probe', () => {
     })
     expect(result).toEqual({
       status: 'ready',
-      name: 'workspace',
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },

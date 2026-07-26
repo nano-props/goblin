@@ -20,12 +20,11 @@ const MAX_REPO_EVENTS = 50
 type WorkspaceMutator = (workspace: Draft<WorkspaceState>) => void
 type WorkspacesPatch = Pick<WorkspacesStore, 'workspaces'>
 
-export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: string): WorkspaceState {
+export function emptyWorkspace(id: string, workspaceRuntimeId: string): WorkspaceState {
   const workspaceId: WorkspaceId | null = canonicalWorkspaceLocator(id)
   if (!workspaceId) throw new Error('Workspace state requires a canonical workspace ID')
   return {
     id: workspaceId,
-    name,
     workspaceRuntimeId,
     ui: { preferredWorkspacePaneTabByTarget: {} },
     session: {

@@ -18,11 +18,9 @@ describe('workspace pane layout restore admission', () => {
       entry: { id: WORKSPACE_ID },
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'workspace-runtime-test',
-      name: 'workspace',
       transport: { kind: 'file' as const },
       workspaceProbe: {
         status: 'ready' as const,
-        name: 'workspace',
         capabilities: {
           files: { read: true as const, write: true },
           terminal: { available: true },

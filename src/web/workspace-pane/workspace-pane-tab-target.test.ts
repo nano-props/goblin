@@ -58,7 +58,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
-    const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
+    const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
     markGitAvailable(repo)
     useWorkspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
@@ -96,7 +96,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
-    const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-tabs')
+    const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-tabs')
     markGitAvailable(repo)
     useWorkspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
@@ -317,7 +317,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('keeps detached worktree openers isolated from workspace-root and branch targets', () => {
-    const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-detached-opener')
+    const repo = emptyWorkspace(REPO_ID, 'repo-runtime-detached-opener')
     useWorkspacesStore.setState((state) => ({
       workspaces: { ...state.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...state.workspaceOrder, REPO_ID],
@@ -351,7 +351,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('records against a canonical branch target without requiring a branch read model', () => {
-    const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
+    const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
     useWorkspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
@@ -372,7 +372,6 @@ describe('workspace pane tab target read model', () => {
 function markGitAvailable(repo: ReturnType<typeof emptyWorkspace>): void {
   acceptWorkspaceProbeState(repo, {
     status: 'ready',
-    name: repo.name,
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },

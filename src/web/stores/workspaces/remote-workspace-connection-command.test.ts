@@ -26,7 +26,7 @@ const target = normalizeRemoteTarget({
 describe('remote lifecycle command client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    const repo = emptyWorkspace(workspaceId, 'repo', runtimeId)
+    const repo = emptyWorkspace(workspaceId, runtimeId)
     if (repo.admission.kind !== 'remote') throw new Error('expected remote workspace admission')
     repo.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
     useWorkspacesStore.setState({ workspaces: { [workspaceId]: repo }, workspaceOrder: [workspaceId] })
@@ -38,7 +38,6 @@ describe('remote lifecycle command client', () => {
           remoteLifecycle: { kind: 'ready', attemptId: 3, target },
           workspaceProbe: {
             status: 'ready',
-            name: 'repo',
             capabilities: {
               files: { read: true, write: true },
               terminal: { available: true },
@@ -67,7 +66,7 @@ describe('remote lifecycle command client', () => {
     expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
-    release({ kind: 'settled', workspaceId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 3, target } })
+    release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 3, target } })
     await expect(pending).resolves.toMatchObject({ kind: 'ready', workspaceId: workspaceId })
   })
 
@@ -75,7 +74,6 @@ describe('remote lifecycle command client', () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
       kind: 'settled',
       workspaceId,
-      name: 'repo',
       lifecycle: { kind: 'ready', attemptId: 3, target },
     })
     await expect(
@@ -119,7 +117,7 @@ describe('remote lifecycle command client', () => {
         [workspaceId]: { ...state.workspaces[workspaceId]!, workspaceRuntimeId: 'repo-runtime-test-2' },
       },
     }))
-    release({ kind: 'settled', workspaceId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
+    release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 1, target } })
     await expect(pending).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
     expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
@@ -169,7 +167,6 @@ describe('remote lifecycle command client', () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
       kind: 'settled',
       workspaceId,
-      name: 'repo',
       lifecycle: { kind: 'ready', attemptId: 3, target },
     })
     vi.mocked(invalidateWorkspaceRuntimes).mockRejectedValue(new Error('offline'))
@@ -183,7 +180,6 @@ describe('remote lifecycle command client', () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
       kind: 'settled',
       workspaceId,
-      name: 'repo',
       lifecycle: { kind: 'ready', attemptId: 3, target },
     })
     vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue({

@@ -23,6 +23,7 @@ import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/we
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
@@ -73,7 +74,6 @@ export function WorkspaceDashboardPane({
       return state
         ? {
             id: state.id,
-            name: state.name,
             workspaceRuntimeId: state.workspaceRuntimeId,
             admission: state.admission,
             capability: state.capability,
@@ -191,7 +191,7 @@ function DirectoryDashboard({
   overview,
   compact,
 }: {
-  workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
+  workspace: Pick<WorkspaceState, 'id' | 'admission'>
   overview: WorkspaceDirectoryOverview
   compact: boolean
 }) {
@@ -203,7 +203,9 @@ function DirectoryDashboard({
   return (
     <>
       <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4')}>
-        <h1 className="truncate text-base font-semibold text-foreground">{workspace.name}</h1>
+        <h1 className="truncate text-base font-semibold text-foreground">
+          {workspaceNameFromLocator(workspace.id)}
+        </h1>
         <div className="mt-1 truncate text-xs text-muted-foreground" title={displayLocation}>
           {displayLocation}
         </div>
@@ -291,7 +293,7 @@ function DashboardHeader({
   git,
   currentBranch,
 }: {
-  workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
+  workspace: Pick<WorkspaceState, 'id' | 'admission'>
   git: GitWorkspaceProjection
   currentBranch: string
 }) {
@@ -311,7 +313,9 @@ function DashboardHeader({
     >
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="min-w-0 truncate text-base font-semibold text-foreground">{workspace.name}</h1>
+          <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
+            {workspaceNameFromLocator(workspace.id)}
+          </h1>
           <Badge variant="outline" className="text-muted-foreground">
             {currentBranch || t('dashboard.no-current-branch')}
           </Badge>

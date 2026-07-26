@@ -29,7 +29,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const GIT_WORKSPACE_PROBE = {
   status: 'ready' as const,
-  name: 'workspace',
   capabilities: {
     files: { read: true as const, write: true },
     terminal: { available: true },
@@ -54,7 +53,6 @@ describe('repo session hydration', () => {
             entry: localWorkspaceSessionEntry(REPO_A),
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
-            name: 'directory-a',
             transport: { kind: 'file' as const },
             workspaceProbe: DIRECTORY_WORKSPACE_PROBE,
             gitProjection: null,
@@ -112,7 +110,6 @@ describe('repo session hydration', () => {
             entry: localWorkspaceSessionEntry(REPO_A),
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
-            name: 'server-a',
             transport: { kind: 'file' as const },
             workspaceProbe: GIT_WORKSPACE_PROBE,
             gitProjection: {
@@ -180,7 +177,6 @@ describe('repo session hydration', () => {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
-          name: 'server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: {
@@ -242,7 +238,6 @@ describe('repo session hydration', () => {
       repoSnapshotCache: {
         [REPO_A]: {
           savedAt,
-          name: 'cached-a',
           data: {
             branches: [branchSnapshot('cached-main')],
             currentBranch: 'cached-main',
@@ -258,7 +253,6 @@ describe('repo session hydration', () => {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
-          name: 'server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: null,
@@ -283,7 +277,6 @@ describe('repo session hydration', () => {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
-          name: 'server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: null,
@@ -305,7 +298,6 @@ describe('repo session hydration', () => {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
-          name: 'server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: projection,
@@ -338,7 +330,6 @@ describe('repo session hydration', () => {
             entry: localWorkspaceSessionEntry(REPO_A),
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
-            name: 'server-a',
             transport: { kind: 'file' as const },
             workspaceProbe: GIT_WORKSPACE_PROBE,
             gitProjection: null,
@@ -360,7 +351,6 @@ describe('repo session hydration', () => {
         entry: localWorkspaceSessionEntry(REPO_A),
         workspaceId: REPO_A,
         workspaceRuntimeId: 'repo-runtime-server-a',
-        name: 'server-a',
         transport: { kind: 'file' as const },
         workspaceProbe: GIT_WORKSPACE_PROBE,
         gitProjection: {
@@ -403,7 +393,6 @@ describe('repo session hydration', () => {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-old',
-          name: 'server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: null,
@@ -417,7 +406,6 @@ describe('repo session hydration', () => {
         entry: localWorkspaceSessionEntry(REPO_A),
         workspaceId: REPO_A,
         workspaceRuntimeId: 'repo-runtime-old',
-        name: 'server-a',
         transport: { kind: 'file' as const },
         workspaceProbe: GIT_WORKSPACE_PROBE,
         gitProjection: {
@@ -462,7 +450,6 @@ describe('repo session hydration', () => {
           entry,
           workspaceId,
           workspaceRuntimeId: 'workspace-runtime-remote',
-          name: 'workspace',
           transport: { kind: 'ssh', lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable', target } },
           workspaceProbe: {
             status: 'unavailable',
@@ -505,7 +492,6 @@ describe('repo session hydration', () => {
           entry,
           workspaceId,
           workspaceRuntimeId,
-          name: 'repo',
           transport: { kind: 'ssh', lifecycle: { kind: 'ready', attemptId: 1, target } },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           gitProjection: null,
@@ -528,7 +514,6 @@ describe('repo session hydration', () => {
           entry,
           workspaceId,
           workspaceRuntimeId,
-          name: 'repo',
           transport: { kind: 'ssh', lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable', target } },
           workspaceProbe: {
             status: 'unavailable',

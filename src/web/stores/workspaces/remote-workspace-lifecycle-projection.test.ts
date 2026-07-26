@@ -21,7 +21,7 @@ const target = normalizeRemoteTarget({
 
 describe('remote lifecycle projection acceptance', () => {
   beforeEach(() => {
-    const repo = emptyWorkspace(repoRoot, 'repo', workspaceRuntimeId)
+    const repo = emptyWorkspace(repoRoot, workspaceRuntimeId)
     useWorkspacesStore.setState({ workspaces: { [repoRoot]: repo }, workspaceOrder: [repoRoot] })
   })
 

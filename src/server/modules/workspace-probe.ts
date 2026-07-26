@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { constants as fsConstants } from 'node:fs'
 import { access, realpath, stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
@@ -48,7 +47,6 @@ export async function probeLocalWorkspace(
   if (locator.transport !== 'file') {
     return { status: 'unavailable', reason: 'error.workspace-transport-unsupported' }
   }
-
   const dependencies = options.dependencies ?? defaultDependencies
   options.signal?.throwIfAborted()
   const directoryFailure = await probeDirectory(locator.path, dependencies)
@@ -60,7 +58,6 @@ export async function probeLocalWorkspace(
     gitProbe.status === 'inconclusive' ? [{ scope: 'git' as const, message: gitProbe.diagnostic }] : []
   return {
     status: 'ready',
-    name: workspaceName(locator.path, platform),
     capabilities: capabilitiesFromGitProbe(gitProbe, { write, terminal: true }),
     diagnostics,
   }
@@ -90,7 +87,6 @@ export async function probeWorkspace(
   }
   return {
     status: 'ready',
-    name: resolved.name,
     capabilities: {
       files: { read: true, write: true },
       terminal: { available: true },
@@ -194,9 +190,4 @@ function errorCode(error: unknown): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message : 'Git probe failed'
-}
-
-function workspaceName(workspacePath: string, platform: WorkspaceLocatorPlatform): string {
-  const implementation = platform === 'win32' ? path.win32 : path.posix
-  return implementation.basename(workspacePath) || implementation.parse(workspacePath).root
 }

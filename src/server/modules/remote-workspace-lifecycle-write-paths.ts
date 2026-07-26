@@ -49,7 +49,6 @@ export async function runRemoteWorkspaceLifecycleWrite(
       }
       const probe: WorkspaceSettledProbeState = {
         status: 'ready',
-        name: resolved.name,
         capabilities: {
           files: { read: true, write: true },
           terminal: { available: true },
@@ -76,5 +75,5 @@ export async function runRemoteWorkspaceLifecycleWrite(
   if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
   if (!workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId))
     return { kind: 'stale-runtime', workspaceId }
-  return { kind: 'settled', workspaceId, name: result.name, lifecycle: result.lifecycle }
+  return { kind: 'settled', workspaceId, lifecycle: result.lifecycle }
 }

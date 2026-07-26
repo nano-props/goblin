@@ -84,7 +84,6 @@ describe('server remote target resolution', () => {
       }),
     ).resolves.toEqual({
       kind: 'ready',
-      name: 'prod:workspace',
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
     })
