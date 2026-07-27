@@ -1625,20 +1625,27 @@ describe('getRemoteStatus', () => {
       ).join(NUL + NUL) +
       NUL +
       NUL
+    const followupWorktree =
+      ['worktree /srv/followup', 'HEAD f00ba40', 'branch refs/heads/main'].join(NUL) + NUL + NUL
     const running = Promise.withResolvers<RemoteCommandResult>()
     const runningWorkersSettled = Promise.withResolvers<void>()
     let started = 0
     let unsettledRunningWorkers = 3
+    let useFollowupMembership = false
     const run = vi.fn<RemoteGitRunner>(async (command) => {
-      if (command.type === 'gitWorktreeList') return okRemoteResult(worktrees)
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(useFollowupMembership ? followupWorktree : worktrees)
+      }
       if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
       started += 1
       if (started === 1) return failRemoteResult('status failed')
       try {
         return await running.promise
       } finally {
-        unsettledRunningWorkers -= 1
-        if (unsettledRunningWorkers === 0) runningWorkersSettled.resolve()
+        if (unsettledRunningWorkers > 0) {
+          unsettledRunningWorkers -= 1
+          if (unsettledRunningWorkers === 0) runningWorkersSettled.resolve()
+        }
       }
     })
 
@@ -1649,6 +1656,10 @@ describe('getRemoteStatus', () => {
     running.resolve(okRemoteResult(''))
     await runningWorkersSettled.promise
     expect(started).toBe(4)
+
+    useFollowupMembership = true
+    await expect(getRemoteStatus(TARGET, { run })).resolves.toHaveLength(1)
+    expect(started).toBe(5)
   })
 
   test('cancels a queued status probe without starting it', async () => {

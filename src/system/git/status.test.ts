@@ -3,14 +3,12 @@ import { getWorktreePatch } from '#/system/git/patch.ts'
 import { sampleWorktreeStatus, sampleWorktreeStatusForTarget } from '#/system/git/status.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 
-const mocks = vi.hoisted(() => ({ git: vi.fn(), stat: vi.fn() }))
+const mocks = vi.hoisted(() => ({ git: vi.fn() }))
 
 vi.mock('#/system/git/git-exec.ts', () => ({ git: mocks.git }))
-vi.mock('node:fs/promises', () => ({ stat: mocks.stat }))
 
 beforeEach(() => {
   mocks.git.mockReset()
-  mocks.stat.mockReset()
 })
 
 describe('getWorkingStatus', () => {
@@ -36,7 +34,6 @@ describe('getWorkingStatus', () => {
       )
       .mockResolvedValueOnce('')
       .mockRejectedValueOnce(new Error('status failed'))
-    mocks.stat.mockResolvedValueOnce({})
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 
     await expect(getWorkingStatus('/tmp/repo')).rejects.toThrow('status failed')
@@ -204,8 +201,10 @@ describe('getWorkingStatus', () => {
       try {
         return await running.promise
       } finally {
-        unsettledRunningWorkers -= 1
-        if (unsettledRunningWorkers === 0) runningWorkersSettled.resolve()
+        if (unsettledRunningWorkers > 0) {
+          unsettledRunningWorkers -= 1
+          if (unsettledRunningWorkers === 0) runningWorkersSettled.resolve()
+        }
       }
     })
 
@@ -216,6 +215,9 @@ describe('getWorkingStatus', () => {
     running.resolve('')
     await runningWorkersSettled.promise
     expect(started).toBe(4)
+
+    await expect(sampleWorktreeStatusForTarget(worktree('after-failure'))).resolves.toMatchObject({ kind: 'status' })
+    expect(started).toBe(5)
   })
 
   test('does not start a queued status probe after caller cancellation', async () => {
