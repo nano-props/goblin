@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
 import { act, waitFor } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import type { ComponentProps, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-client.ts'
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
@@ -327,7 +330,7 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:changes"]')).toBeNull()
   })
 
-  test('renders the external app launcher at the workspace toolbar right edge', async () => {
+  test('renders the external app launcher at the workspace toolbar right edge', () => {
     runtimeExternalAppSettings.value = {
       ...defaultRuntimeExternalAppSettings(),
       editorAppAvailability: { vscode: true },
@@ -338,16 +341,12 @@ describe('GitWorkspacePaneToolbar', () => {
     })
 
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
+    if (!trigger) throw new Error('missing external app menu trigger')
     const trailingActions = c.querySelector('[data-workspace-toolbar-trailing-actions]')
     expect(trailingActions).not.toBeNull()
     expect(trailingActions?.contains(trigger)).toBe(true)
 
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openPopover(trigger)
 
     const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
       (button) => button.textContent,
@@ -378,10 +377,9 @@ describe('GitWorkspacePaneToolbar', () => {
     )
 
     const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
-    expect(primary).not.toBeNull()
-    await act(async () => {
-      primary?.click()
-      await Promise.resolve()
+    if (!primary) throw new Error('missing external app primary action')
+    act(() => {
+      primary.click()
     })
 
     await waitFor(() =>
@@ -416,9 +414,10 @@ describe('GitWorkspacePaneToolbar', () => {
       </QueryClientProvider>,
     )
 
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')?.click()
-      await Promise.resolve()
+    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
+    if (!primary) throw new Error('missing external app primary action')
+    act(() => {
+      primary.click()
     })
 
     await waitFor(() =>
@@ -446,7 +445,7 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(container.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
-  test('keeps remote-capable apps and hides Finder for a remote workspace root', async () => {
+  test('keeps remote-capable apps and hides Finder for a remote workspace root', () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
     const target = workspaceRootPaneFilesystemTarget({
       workspaceId,
@@ -464,11 +463,8 @@ describe('GitWorkspacePaneToolbar', () => {
     )
 
     const trigger = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.click()
-      await Promise.resolve()
-    })
+    if (!trigger) throw new Error('missing external app menu trigger')
+    openPopover(trigger)
 
     const labels = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
       (button) => button.textContent,
@@ -514,20 +510,16 @@ describe('GitWorkspacePaneToolbar', () => {
 
   test('uses the scoped recent external app as the split-button primary action', async () => {
     const initialSnapshot = defaultSettingsSnapshot({ workspaceSettings: [] })
-    const fetchSpy = mockRecentAppPostFetch(initialSnapshot)
+    const fetchSpy = installRecentAppFetch(initialSnapshot)
     const { container: c, queryClient } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
     })
 
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
+    if (!trigger) throw new Error('missing external app menu trigger')
 
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openPopover(trigger)
 
     const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'worktrees.reveal-title',
@@ -588,20 +580,16 @@ describe('GitWorkspacePaneToolbar', () => {
 
   test('shows an error toast when storing the recent external app fails', async () => {
     const initialSnapshot = defaultSettingsSnapshot({ workspaceSettings: [] })
-    mockRecentAppPostFetch(initialSnapshot, { failPost: true })
+    installRecentAppFetch(initialSnapshot, { failPost: true })
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
     })
 
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    expect(trigger).not.toBeNull()
+    if (!trigger) throw new Error('missing external app menu trigger')
 
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openPopover(trigger)
 
     const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'worktrees.reveal-title',
@@ -842,7 +830,7 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
-  test('compact workspace tab popover merges status and terminal tabs', async () => {
+  test('compact workspace tab popover merges status and terminal tabs', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -856,11 +844,7 @@ describe('GitWorkspacePaneToolbar', () => {
     const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing workspace tab popover trigger')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openPopover(trigger)
 
     const list = document.body.querySelector('[role="list"]')
     expect(list?.textContent).toContain('tab.status')
@@ -1184,6 +1168,7 @@ describe('GitWorkspacePaneToolbar', () => {
   })
 
   test('keeps terminal focus when pressing End on the compact terminal tab', async () => {
+    const user = userEvent.setup()
     compactUi = true
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const { container: c } = renderToolbar({
@@ -1193,11 +1178,10 @@ describe('GitWorkspacePaneToolbar', () => {
     })
 
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
-    expect(terminalTab).not.toBeNull()
+    if (!terminalTab) throw new Error('missing compact terminal tab')
 
-    act(() => {
-      terminalTab?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
-    })
+    terminalTab.focus()
+    await user.keyboard('{End}')
     await flush()
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
@@ -1205,6 +1189,7 @@ describe('GitWorkspacePaneToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
+    const user = userEvent.setup()
     const showRepoBranchWorkspacePaneTab = vi.fn<
       ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab']
     >(() => true)
@@ -1242,18 +1227,14 @@ describe('GitWorkspacePaneToolbar', () => {
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
     if (!statusTab || !changesTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
-    act(() => {
-      statusTab.focus()
-      statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
+    statusTab.focus()
+    await user.keyboard('{ArrowRight}')
     await flush()
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(document.activeElement).toBe(changesTab)
     showRepoBranchWorkspacePaneTab.mockClear()
 
-    act(() => {
-      changesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
+    await user.keyboard('{ArrowRight}')
     await flush()
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
@@ -1264,15 +1245,14 @@ describe('GitWorkspacePaneToolbar', () => {
     showRepoBranchWorkspacePaneTab.mockClear()
     showRepoBranchTerminalSession.mockClear()
 
-    act(() => {
-      terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-    })
+    await user.keyboard('{ArrowLeft}')
     await flush()
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(document.activeElement).toBe(changesTab)
   })
 
   test('skips the changes tab in keyboard navigation when it is not open', async () => {
+    const user = userEvent.setup()
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
@@ -1286,10 +1266,8 @@ describe('GitWorkspacePaneToolbar', () => {
     const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab')
     if (!statusTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
-    act(() => {
-      terminalTab.focus()
-      terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-    })
+    terminalTab.focus()
+    await user.keyboard('{ArrowLeft}')
     await flush()
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(document.activeElement).toBe(statusTab)
@@ -1724,7 +1702,14 @@ function navigationWith(
 }
 
 async function flush() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await waitForNextMacrotask()
+}
+
+function openPopover(trigger: HTMLButtonElement) {
+  act(() => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+  })
 }
 
 function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonElement | null {
@@ -1766,18 +1751,12 @@ function terminalEntry(id: string): WorkspacePaneTabEntry {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-/**
- * Stub `globalThis.fetch` so the menu's `setRecentWorkspaceExternalApp`
- * call resolves cleanly. Also serves the snapshot GET — `useSettingsSnapshotQuery`
- * has `staleTime: 0`, so background refetches would otherwise throw.
- * Other URLs throw to surface unexpected traffic.
- */
-function mockRecentAppPostFetch(
+function installRecentAppFetch(
   initialSnapshot: object,
   options: { failPost?: boolean } = {},
 ): ReturnType<typeof vi.fn> {
   let currentSnapshot = initialSnapshot
-  const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  return mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     if (url.endsWith('/api/settings/workspace-external-app-recent')) {
       if (options.failPost) {
@@ -1813,8 +1792,6 @@ function mockRecentAppPostFetch(
     }
     throw new Error(`unexpected fetch in test: ${url}`)
   })
-  vi.stubGlobal('fetch', fetchSpy)
-  return fetchSpy
 }
 
 function externalAppTargetKey(worktreePath: string): string {

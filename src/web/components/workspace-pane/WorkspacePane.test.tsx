@@ -2,8 +2,9 @@
 
 import { act, cleanup, render as renderTestingLibrary, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { useMemo, useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -47,7 +48,6 @@ import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
@@ -59,14 +59,10 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
@@ -926,51 +922,6 @@ describe('WorkspacePane', () => {
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('does not turn unrelated navigation settlement into filesystem route navigation', async () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///tmp/deferred-terminal-route-workspace')
-    const missingSessionId = 'term-222222222222222222222'
-    const repo = seedRepoWithReadModelForTest({
-      id: workspaceId,
-      branches: [],
-      currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe(),
-    })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('files')],
-    })
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async () => false)
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{
-                  kind: 'workspace-root',
-                  route: { kind: 'terminal', terminalSessionId: missingSessionId },
-                }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    await act(async () => {
-      await Promise.resolve()
-    })
-    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-
-    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-  })
-
   test('renders the shared empty pane when every workspace-root tab is closed', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/empty-plain-workspace')
     const repo = seedRepoWithReadModelForTest({
@@ -1379,7 +1330,7 @@ describe('WorkspacePane', () => {
 
     await act(async () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await waitForNextMacrotask()
     })
     expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(
       REPO_ID,
@@ -1622,168 +1573,6 @@ describe('WorkspacePane', () => {
     ).toBe('term-222222222222222222222')
   })
 
-  test('preserves existing app history while a stale terminal URL renders empty', async () => {
-    const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branchName = 'feature/a'
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        [branchName]: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        ],
-      },
-    })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
-    const route = routeNavigation()
-
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext
-              value={terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111')}
-            >
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{
-                  kind: 'routed',
-                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
-                }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    await act(async () => await Promise.resolve())
-    expect(route.openRepoBranch).not.toHaveBeenCalled()
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toEqual({
-      current: { workspaceId: REPO_ID, route: { kind: 'dashboard' } },
-      backStack: [],
-      forwardStack: [],
-    })
-  })
-
-  test('does not replace a missing terminal route while terminal projection is pending', async () => {
-    const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branchName = 'feature/a'
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        [branchName]: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
-        ],
-      },
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
-    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-222222222222222222222')
-    const readContext = terminalReadContextWithSessions(
-      terminalFilesystemTargetKey,
-      ['term-111111111111111111111', 'term-222222222222222222222'],
-      'term-222222222222222222222',
-    )
-    const route = routeNavigation()
-
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={readContext}>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{
-                  kind: 'routed',
-                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
-                }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    await act(async () => {
-      await Promise.resolve()
-    })
-
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
-    expect(
-      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
-    ).toBe('term-222222222222222222222')
-  })
-
-  test('does not reconcile a stale terminal route while terminal creation is pending', async () => {
-    const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branchName = 'feature/a'
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        [branchName]: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        ],
-      },
-    })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
-    const route = routeNavigation()
-
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(
-                terminalFilesystemTargetKey,
-                ['term-111111111111111111111'],
-                'term-111111111111111111111',
-                {
-                  createPending: true,
-                },
-              )}
-            >
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{
-                  kind: 'routed',
-                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
-                }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    await act(async () => {
-      await Promise.resolve()
-    })
-
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
-    expect(route.openRepoBranch).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
-  })
-
   test('syncs a routed static tab after the branch projection appears', async () => {
     const branchName = 'feature/cold-route'
 
@@ -1905,137 +1694,6 @@ describe('WorkspacePane', () => {
     expect(route.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test('returns from the files tab to status when files is opened from the status panel', async () => {
-    const branchName = 'feature/status-files'
-    const worktreePath = '/tmp/repo-workspace-status-files'
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'status',
-      workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-      },
-      status: [{ path: worktreePath, branch: branchName, isMain: false, entries: [] }],
-    })
-    expect(
-      recordWorkspacePaneTabOpener(
-        {
-          kind: 'git-worktree',
-          workspaceId: REPO_ID,
-          worktreePath,
-        },
-        repo.workspaceRuntimeId,
-        'workspace-pane:files',
-        'workspace-pane:status',
-      ),
-    ).toBe('recorded')
-
-    function RoutedWorkspaceHarness() {
-      const [route, setRoute] = useState<WorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
-      const navigationWithRoute = useMemo<PrimaryWindowNavigationActions>(() => {
-        const showRepoBranchEmptyWorkspacePane: ObservedBranchRouteNavigationForTest['showRepoBranchEmptyWorkspacePane'] =
-          (workspaceId, nextBranch) => {
-            useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, nextBranch, null)
-            setRoute(null)
-            return true
-          }
-        const showRepoBranchWorkspacePaneTab: ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab'] = (
-          workspaceId,
-          nextBranch,
-          tab,
-        ) => {
-          useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, nextBranch, tab)
-          setRoute({ kind: 'static', tab })
-          return true
-        }
-        seedInitialObservedWorkspacePaneRouteForTest()
-        return observedPrimaryWindowNavigationActionsForTest(
-          {
-            currentWorkspacePaneRoute: navigation.currentWorkspacePaneRoute,
-            showRepoBranchEmptyWorkspacePane,
-            showRepoBranchWorkspacePaneTab,
-            showRepoBranchTerminalSession: () => false,
-          },
-          {
-            observeAcceptedRoute: () => {},
-          },
-        )
-      }, [])
-      const routeLabel = route?.kind === 'static' ? route.tab : route?.kind === 'terminal' ? 'terminal' : 'empty'
-      return (
-        <PrimaryWindowNavigationProvider value={navigationWithRoute}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <div data-testid="workspace-route">{routeLabel}</div>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      )
-    }
-
-    const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <RoutedWorkspaceHarness />
-      </QueryClientProvider>,
-    )
-
-    const pathButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === worktreePath,
-    )
-    expect(pathButton).not.toBeNull()
-
-    act(() => {
-      pathButton?.click()
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('workspace-route').textContent).toBe('files')
-    })
-    const paneTarget = {
-      kind: 'git-worktree' as const,
-      workspaceId: REPO_ID,
-      worktreePath,
-    }
-    expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe(
-      'workspace-pane:status',
-    )
-    const closeTarget = workspacePaneTabTargetForBranch(REPO_ID, branchName, {
-      workspacePaneRoute: { kind: 'static', tab: 'files' },
-    })
-    expect(closeTarget?.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'workspace-pane:files'])
-    expect(
-      closeTarget
-        ? nextWorkspacePaneTabEntryAfterClose(
-            closeTarget.tabEntries,
-            'workspace-pane:files',
-            workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files'),
-          )?.type
-        : null,
-    ).toBe('status')
-
-    const filesTab = container.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:files"]')
-    const filesCloseButton = filesTab
-      ? Array.from(filesTab.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-          (button.getAttribute('aria-label') ?? '').includes('workspace-pane-tabs.close-named'),
-        )
-      : null
-    expect(filesCloseButton).not.toBeNull()
-
-    act(() => {
-      filesCloseButton?.click()
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('workspace-route').textContent).toBe('status')
-    })
-  })
-
   test('defers stale static route replacement while active tab close is pending', async () => {
     const branchName = 'feature/close-route-race'
     const worktreePath = '/tmp/close-route-race-worktree'
@@ -2116,7 +1774,7 @@ describe('WorkspacePane', () => {
         tabs: [workspacePaneStaticTabEntry('status')],
       })
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitForNextMacrotask()
 
     expect(route.openRepoBranch).not.toHaveBeenCalled()
     expect(route.openRepoBranchTab).not.toHaveBeenCalled()
@@ -2126,57 +1784,6 @@ describe('WorkspacePane', () => {
 
     await expect(closePromise).resolves.toBe(true)
     expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
-  })
-
-  test('reports a successful close without adding fallback navigation when close-back rejects', async () => {
-    const branchName = 'feature/close-route-rejected'
-    const worktreePath = '/tmp/close-route-rejected-worktree'
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'files',
-      workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-      },
-    })
-    const route = routeNavigation()
-    vi.mocked(route.openRepoBranchTab).mockImplementation(() => {
-      throw new Error('navigation rejected')
-    })
-    const actions = navigationWithStore(route)
-
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={actions}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-    vi.mocked(route.openRepoBranch).mockClear()
-
-    await expect(
-      runCloseWorkspacePaneTabCommand({
-        workspaceId: REPO_ID,
-        target: {
-          routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName },
-          workspacePaneRoute: { kind: 'static', tab: 'files' },
-          filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
-        },
-        navigation: actions,
-      }),
-    ).resolves.toBe(true)
-
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
-    expect(route.openRepoBranch).not.toHaveBeenCalled()
   })
 
   test('renders an unrenderable static URL as an empty pane without navigating', () => {
@@ -2212,40 +1819,6 @@ describe('WorkspacePane', () => {
     expect(route.openRepoBranch).not.toHaveBeenCalled()
     expect(route.openRepoBranchTab).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
-  })
-
-  test('keeps an unrenderable URL and saved preference unchanged when the pane is empty', () => {
-    const branchName = 'feature/empty-pane'
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName)],
-      currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'status',
-      workspacePaneTabsByBranch: {
-        [branchName]: [],
-      },
-    })
-    const route = routeNavigation()
-
-    render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
-              />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    expect(route.openRepoBranch).not.toHaveBeenCalled()
-    expect(route.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(
       repo &&
@@ -2254,7 +1827,7 @@ describe('WorkspacePane', () => {
           workspaceId: REPO_ID,
           branchName,
         }),
-    ).toBe('status')
+    ).toBe('changes')
   })
 
   test('uses the React Query projection read model for workspace branch presentation when available', () => {

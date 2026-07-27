@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
@@ -347,7 +348,7 @@ describe('GitWorkspacePaneContent', () => {
   })
 
   test('flashes the check affordance when copy patch onSelect resolves to true, then reverts', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const worktreePath = '/tmp/copy-success-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -411,7 +412,6 @@ describe('GitWorkspacePaneContent', () => {
     })
 
     expect(document.body.textContent).not.toContain('status.copy-patch-success')
-    vi.useRealTimers()
   })
 
   test('does not render the changes row in the status tab when the worktree is clean', () => {

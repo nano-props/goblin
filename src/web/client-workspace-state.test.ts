@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  readClientWorkspaceState,
-  writeClientWorkspaceState,
-} from '#/web/client-workspace-state.ts'
+import { readClientWorkspaceState, writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { withBrowserStorageUnavailable } from '#/test-utils/storage.ts'
 import * as nativeBridge from '#/web/native-bridge.ts'
 import * as nativeHostClient from '#/web/native-host-client.ts'
 
@@ -92,16 +90,10 @@ describe('client workspace persistence', () => {
   })
 
   test('fails closed when browser storage is unavailable for reads and writes', async () => {
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
-    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined })
-    try {
+    await withBrowserStorageUnavailable('localStorage', async () => {
       await expect(readClientWorkspaceState()).rejects.toThrow('Browser storage unavailable')
-      await expect(writeClientWorkspaceState(currentState())).rejects.toThrow(
-        'Browser storage unavailable',
-      )
-    } finally {
-      if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor)
-    }
+      await expect(writeClientWorkspaceState(currentState())).rejects.toThrow('Browser storage unavailable')
+    })
   })
 
   test('uses the atomic single-key storage boundary without Web Locks', async () => {

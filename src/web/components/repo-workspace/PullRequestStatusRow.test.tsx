@@ -2,6 +2,7 @@
 
 import { fireEvent } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
@@ -94,35 +95,31 @@ describe('PullRequestStatusRow', () => {
   })
 
   test('absorbs accidental double-clicks within the latch window', () => {
-    vi.useFakeTimers()
-    try {
-      const pullRequest = createPullRequest(178, {
-        state: 'open',
-        url: 'https://github.com/acme/repo/pull/178',
-      })
-      renderInJsdom(
-        <PullRequestStatusRow
-          repoId={REPO_ID}
-          workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
-          branchName={BRANCH_NAME}
-          pullRequest={pullRequest}
-        />,
-      )
+    useFakeTimers()
+    const pullRequest = createPullRequest(178, {
+      state: 'open',
+      url: 'https://github.com/acme/repo/pull/178',
+    })
+    renderInJsdom(
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={pullRequest}
+      />,
+    )
 
-      const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
-      fireEvent.click(chip)
-      fireEvent.click(chip)
-      fireEvent.click(chip)
+    const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
+    fireEvent.click(chip)
+    fireEvent.click(chip)
+    fireEvent.click(chip)
 
-      expect(openExternalMock).toHaveBeenCalledTimes(1)
+    expect(openExternalMock).toHaveBeenCalledTimes(1)
 
-      // Once the latch expires (500ms) a fresh click should fire again.
-      vi.advanceTimersByTime(500)
-      fireEvent.click(chip)
+    // Once the latch expires (500ms) a fresh click should fire again.
+    vi.advanceTimersByTime(500)
+    fireEvent.click(chip)
 
-      expect(openExternalMock).toHaveBeenCalledTimes(2)
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(openExternalMock).toHaveBeenCalledTimes(2)
   })
 })

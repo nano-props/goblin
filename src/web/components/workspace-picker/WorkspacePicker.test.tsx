@@ -128,7 +128,7 @@ describe('WorkspacePicker', () => {
     expect(currentWorkspaceButton.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
   })
 
-  test('opens the workspace menu popover from the sidebar surface', async () => {
+  test('opens the workspace menu popover from the sidebar surface', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -149,11 +149,7 @@ describe('WorkspacePicker', () => {
     const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar workspace trigger')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(trigger)
 
     const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('workspace-a'),
@@ -162,7 +158,7 @@ describe('WorkspacePicker', () => {
     expect(document.body.textContent).toContain('/tmp/workspace-b')
   })
 
-  test('renders canonical workspace ids as user-facing locations in the workspace menu', async () => {
+  test('renders canonical workspace ids as user-facing locations in the workspace menu', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/sample-project')
     render(
       <WorkspacePicker
@@ -179,17 +175,14 @@ describe('WorkspacePicker', () => {
     )
 
     const trigger = document.body.querySelector(`[data-current-workspace-id="${workspaceId}"]`)
-    await act(async () => {
-      trigger!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar workspace trigger')
+    clickPopoverTrigger(trigger)
 
     expect(document.body.textContent).toContain('/workspace/sample-project')
     expect(document.body.textContent).not.toContain('goblin+file://')
   })
 
-  test('opens the workspace menu popover when the current workspace tab is clicked', async () => {
+  test('opens the workspace menu popover when the current workspace tab is clicked', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -209,11 +202,7 @@ describe('WorkspacePicker', () => {
     const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
 
-    await act(async () => {
-      tab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(tab)
 
     const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('workspace-a'),
@@ -222,7 +211,7 @@ describe('WorkspacePicker', () => {
     expect(selectedItem?.className).toContain('bg-selected')
   })
 
-  test('shows unread terminal bell badges on the trigger and matching workspace rows', async () => {
+  test('shows unread terminal bell badges on the trigger and matching workspace rows', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -245,11 +234,7 @@ describe('WorkspacePicker', () => {
     const triggerBadge = trigger.querySelector('.bg-notification')
     expect(triggerBadge?.textContent).toBe('7')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(trigger)
 
     const workspaceARow = document.body.querySelector('button[aria-current="true"]')
     const workspaceBRow = [...document.body.querySelectorAll('button')].find((button) =>
@@ -290,7 +275,7 @@ describe('WorkspacePicker', () => {
     expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
   })
 
-  test('keeps current workspace chrome borderless with hover and shows two-line rows with path in the popover', async () => {
+  test('keeps current workspace chrome borderless with hover and shows two-line rows with path in the popover', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -334,11 +319,7 @@ describe('WorkspacePicker', () => {
     const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
 
-    await act(async () => {
-      tab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(tab)
 
     const closeButton = document.body.querySelector('button[aria-label="Close workspace-a"]')
     expect(closeButton).not.toBeNull()
@@ -362,7 +343,7 @@ describe('WorkspacePicker', () => {
     expect(locator?.textContent?.trim()).toBe('/tmp/workspace-a')
   })
 
-  test('renders a placeholder button on the sidebar surface when no workspace is open', async () => {
+  test('renders a placeholder button on the sidebar surface when no workspace is open', () => {
     const onOpenLocal = vi.fn()
 
     render(
@@ -380,20 +361,16 @@ describe('WorkspacePicker', () => {
     )
 
     const placeholder = document.body.querySelector('[data-testid="workspace-picker-placeholder"]')
-    expect(placeholder).not.toBeNull()
-    expect(placeholder?.textContent).toContain('Select workspace')
-    expect(placeholder?.className).toContain('w-full')
+    if (!(placeholder instanceof HTMLButtonElement)) throw new Error('missing workspace picker placeholder')
+    expect(placeholder.textContent).toContain('Select workspace')
+    expect(placeholder.className).toContain('w-full')
 
-    await act(async () => {
-      placeholder!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      placeholder!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(placeholder)
 
     expect(document.body.textContent).toContain('Open local repository…')
   })
 
-  test('shows a + button that opens the action popover when no workspace is open', async () => {
+  test('shows a + button that opens the action popover when no workspace is open', () => {
     const onOpenLocal = vi.fn()
     const onOpenRemote = vi.fn()
     const onClone = vi.fn()
@@ -412,14 +389,10 @@ describe('WorkspacePicker', () => {
     )
 
     const plus = document.body.querySelector('button[aria-label="Open"]')
-    expect(plus).not.toBeNull()
-    expect(plus?.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
+    if (!(plus instanceof HTMLButtonElement)) throw new Error('missing open workspace button')
+    expect(plus.closest('nav')?.hasAttribute('data-interactive')).toBe(false)
 
-    await act(async () => {
-      plus!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      plus!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    clickPopoverTrigger(plus)
 
     // Popover shows the three actions and no workspace rows.
     expect(document.body.textContent).toContain('Open local repository…')
@@ -432,16 +405,24 @@ describe('WorkspacePicker', () => {
     const cloneButton = [...document.body.querySelectorAll('button')].find((b) =>
       b.textContent?.includes('Clone repository…'),
     )
-    expect(cloneButton).not.toBeNull()
-    await act(async () => {
-      cloneButton!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+    if (!(cloneButton instanceof HTMLButtonElement)) throw new Error('missing clone repository action')
+    act(() => {
+      cloneButton.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
     })
     expect(onClone).toHaveBeenCalled()
+    expect(document.body.contains(cloneButton)).toBe(false)
   })
 })
 
 function render(element: React.ReactNode) {
   return renderInJsdom(element)
+}
+
+function clickPopoverTrigger(trigger: HTMLButtonElement) {
+  act(() => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+  })
 }
 
 function workspace(name: string, id: string, overrides: Partial<WorkspacePickerItem> = {}): WorkspacePickerItem {

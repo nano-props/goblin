@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   markRepoOperationTargets,
@@ -46,7 +47,7 @@ function branchBrowserRemoteProvider(
 }
 
 async function flushAsyncWork() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await waitForNextMacrotask()
 }
 
 beforeEach(() => {

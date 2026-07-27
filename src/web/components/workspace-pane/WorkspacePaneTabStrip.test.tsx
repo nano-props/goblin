@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act } from '@testing-library/react'
+import { useFakeTimers } from '#/test-utils/timers.ts'
+import { act, waitFor } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import {
@@ -28,7 +30,7 @@ const tabStripTabRects = new Map<string, DOMRect>()
 let tabStripNewButtonRect: DOMRect | null = null
 
 beforeEach(() => {
-  vi.useFakeTimers()
+  useFakeTimers()
   Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
     configurable: true,
     writable: true,
@@ -72,7 +74,6 @@ afterEach(() => {
   tabStripViewportRect = null
   tabStripTabRects.clear()
   tabStripNewButtonRect = null
-  vi.useRealTimers()
   // Reset our module-level render handle so the next test that only
   // calls `rerender(...)` (e.g. "restores the full tab strip after
   // leaving compact mode") falls through to `render(...)` instead of
@@ -130,7 +131,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tooltip?.textContent).not.toContain('~/Developer/goblin')
   })
 
-  test('keeps the selected terminal in the collapsed popover list and still offers new terminal', async () => {
+  test('keeps the selected terminal in the collapsed popover list and still offers new terminal', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -151,11 +152,7 @@ describe('WorkspacePaneTabStrip', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openCompactSwitcher(trigger)
 
     const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('term-2'),
@@ -170,7 +167,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
-  test('disables the collapsed new-terminal action while terminal creation is busy', async () => {
+  test('disables the collapsed new-terminal action while terminal creation is busy', () => {
     const onNew = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -190,11 +187,7 @@ describe('WorkspacePaneTabStrip', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openCompactSwitcher(trigger)
 
     const newTerminalAction = [...document.body.querySelectorAll('button')].find(
       (button) => button.textContent === 'terminal.new',
@@ -226,7 +219,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    await openCompactSwitcher(trigger)
+    openCompactSwitcher(trigger)
     const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'terminal.new',
     )
@@ -257,7 +250,7 @@ describe('WorkspacePaneTabStrip', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    await openCompactSwitcher(trigger)
+    openCompactSwitcher(trigger)
     const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'terminal.new',
     )
@@ -286,14 +279,16 @@ describe('WorkspacePaneTabStrip', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    await openCompactSwitcher(trigger)
+    openCompactSwitcher(trigger)
     const content = document.body.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!content) throw new Error('missing terminal popover content')
 
-    act(() => content.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    await flushTimers()
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    content.focus()
+    await user.keyboard('{Escape}')
 
-    expect(document.activeElement).toBe(trigger)
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 
   test('blocks tab switching and closing while terminal creation is pending', () => {
@@ -363,7 +358,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(pendingTab?.querySelector('button[aria-label^="close "]')).toBeNull()
   })
 
-  test('blocks compact popover tab switching while terminal creation is pending', async () => {
+  test('blocks compact popover tab switching while terminal creation is pending', () => {
     const onSelect = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -387,11 +382,7 @@ describe('WorkspacePaneTabStrip', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-      await Promise.resolve()
-    })
+    openCompactSwitcher(trigger)
 
     const inactiveItem = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'term-2',
@@ -406,7 +397,9 @@ describe('WorkspacePaneTabStrip', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  test('collapsed terminal tab only navigates out on arrow keys', () => {
+  test('collapsed terminal tab only navigates out on arrow keys', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
     const onNavigateOut = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -429,13 +422,8 @@ describe('WorkspacePaneTabStrip', () => {
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal tab')
 
-    act(() => {
-      tab.focus()
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
-    })
+    tab.focus()
+    await user.keyboard('{ArrowLeft}{ArrowRight}{Home}{End}')
 
     expect(onNavigateOut.mock.calls).toEqual([['prev'], ['next']])
     expect(document.activeElement).toBe(tab)
@@ -549,7 +537,9 @@ describe('WorkspacePaneTabStrip', () => {
     expect(tab?.querySelector('.bg-attention')).toBeNull()
   })
 
-  test('moves focus across the full terminal tab strip and only navigates out at arrow-key edges', () => {
+  test('moves focus across the full terminal tab strip and only navigates out at arrow-key edges', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
       cb(0)
       return 0
@@ -585,29 +575,21 @@ describe('WorkspacePaneTabStrip', () => {
       throw new Error('missing terminal tabs')
     }
 
-    act(() => {
-      tab1.focus()
-      tab1.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
+    tab1.focus()
+    await user.keyboard('{ArrowRight}')
     expect(document.activeElement).toBe(tab2)
     expect(onNavigateOut).not.toHaveBeenCalled()
 
-    act(() => {
-      tab3.focus()
-      tab3.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
+    tab3.focus()
+    await user.keyboard('{ArrowRight}')
     expect(onNavigateOut).toHaveBeenNthCalledWith(1, 'next')
 
-    act(() => {
-      tab2.focus()
-      tab2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-    })
+    tab2.focus()
+    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(tab1)
 
-    act(() => {
-      tab2.focus()
-      tab2.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
-    })
+    tab2.focus()
+    await user.keyboard('{End}')
     expect(document.activeElement).toBe(tab3)
   })
 
@@ -1656,16 +1638,14 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
 
 async function flushTimers() {
   await act(async () => {
-    vi.runAllTimers()
-    await Promise.resolve()
+    await vi.runAllTimersAsync()
   })
 }
 
-async function openCompactSwitcher(trigger: HTMLButtonElement) {
-  await act(async () => {
+function openCompactSwitcher(trigger: HTMLButtonElement) {
+  act(() => {
     trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-    await Promise.resolve()
   })
 }
 

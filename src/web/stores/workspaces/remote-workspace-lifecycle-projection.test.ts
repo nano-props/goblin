@@ -6,7 +6,6 @@ import {
   acceptRemoteWorkspaceLifecycleSnapshot,
 } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspaceRemoteAdmission } from '#/web/workspace-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const repoRoot = workspaceIdForTest('goblin+ssh://example/repo')
@@ -28,7 +27,7 @@ describe('remote lifecycle projection acceptance', () => {
   test('accepts connecting then terminal within one server attempt', () => {
     expect(accept({ kind: 'connecting', attemptId: 2 })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(true)
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toEqual({
+    expect(remoteAdmission()).toEqual({
       kind: 'remote',
       lifecycleAttemptId: 2,
       lifecycle: { kind: 'ready', target },
@@ -40,7 +39,7 @@ describe('remote lifecycle projection acceptance', () => {
     expect(accept({ kind: 'failed', attemptId: 3, reason: 'timeout' })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(false)
     expect(accept({ kind: 'connecting', attemptId: 3 })).toBe(false)
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'timeout' },
     })
   })
@@ -72,7 +71,7 @@ describe('remote lifecycle projection acceptance', () => {
         },
       ],
     })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'ready', target },
     })
     expect(useWorkspacesStore.getState().workspaces['goblin+ssh://other/repo']).toBeUndefined()
@@ -87,4 +86,10 @@ function accept(
     workspaceRuntimeId,
     remoteLifecycle,
   })
+}
+
+function remoteAdmission() {
+  const admission = useWorkspacesStore.getState().workspaces[repoRoot]?.admission
+  if (admission?.kind !== 'remote') throw new Error('expected remote workspace admission')
+  return admission
 }

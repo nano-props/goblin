@@ -1,5 +1,6 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -497,7 +498,7 @@ describe('remote fetch timestamps', () => {
     }
 
     await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitForNextMacrotask()
 
     expect(fetchCount).toBe(1)
     expect(snapshotCount).toBe(1)
@@ -1631,7 +1632,7 @@ describe('projection refresh request ordering', () => {
       })
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitForNextMacrotask()
 
     expect(warnSpy).toHaveBeenCalledWith('failed to prune repo sessions', { err })
   })
