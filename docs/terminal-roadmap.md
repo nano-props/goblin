@@ -118,7 +118,7 @@ responsibilities are split into focused server modules:
 - `terminal-session-create-coordinator.ts` owns per-filesystem-target create queueing and terminal session id allocation
 - `terminal-session-ensurer.ts` owns local/remote session ensure input construction
 - workspace-pane runtime tab modules own workspace tab operation queueing,
-  read-side canonicalization, and pure prune/materialize/dedupe rules
+  read-side canonicalization, and pure filter/materialize/dedupe rules
 
 Out-of-band Git changes do not trigger terminal recovery or session pruning.
 A terminal remains owned by its normal lifecycle until the user closes it, the

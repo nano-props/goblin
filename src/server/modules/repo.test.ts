@@ -522,7 +522,7 @@ describe('fetchRepo invalidation publishing', () => {
   test.each([
     ['user', 'user'],
     ['background', 'background'],
-  ])('%s sync fetches prune stale remote-tracking refs', async (_name, kind) => {
+  ])('%s sync publishes snapshot invalidation after fetching with prune', async (_name, kind) => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')

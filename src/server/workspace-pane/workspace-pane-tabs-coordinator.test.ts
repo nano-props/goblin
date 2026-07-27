@@ -1320,6 +1320,9 @@ describe('workspace pane tabs coordinator queues', () => {
       entries: [{ target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree-alias' } }],
     })
     expect(coordinator.physicalWorktreeTargets(identity)).toHaveLength(1)
+
+    await coordinator.clearPhysicalWorktreeIndex(oldCapability)
+    expect(coordinator.physicalWorktreeTargets(identity)).toHaveLength(1)
   })
 })
 
