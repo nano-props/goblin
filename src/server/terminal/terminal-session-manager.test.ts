@@ -22,6 +22,7 @@ import {
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -1662,8 +1663,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
     invalidation.publishEffects()
     await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
     manager.forceShutdown()
 
     expect(killAndWait).toHaveBeenCalledWith(createPtyHandle('pty_initial_123456'))
@@ -1997,8 +1997,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     if (!created.ok) throw new Error(created.message)
 
     const close = manager.closeSessionForUserOutcome(USER_ID, created.terminalRuntimeSessionId)
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
     expect(onSessionClosed).not.toHaveBeenCalled()
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toHaveLength(1)
 
@@ -2289,8 +2288,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       24,
       CLIENT_ID,
     )
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
     expect(supervisor.spawns).toEqual([])
 
     termination.resolve()

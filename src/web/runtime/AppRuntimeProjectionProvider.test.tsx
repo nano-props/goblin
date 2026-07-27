@@ -3,7 +3,7 @@
 import { act } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import type * as WorkspaceSessionWritePaths from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -578,8 +578,7 @@ describe('AppRuntimeProjectionProvider', () => {
       revision: 1,
       sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
     })
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
 
     expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
     expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
@@ -612,8 +611,7 @@ describe('AppRuntimeProjectionProvider', () => {
       targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
       changedTargets: [],
     })
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
 
     expect(recoverSessionsMock).not.toHaveBeenCalled()
     expect(listWorkspaceTabsMock).not.toHaveBeenCalled()

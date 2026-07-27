@@ -96,7 +96,7 @@ describe('test harness policy', () => {
     ['hand-rolled React root', "import { createRoot as mount } from 'react-dom/client'; mount(node)"],
     ['act imported directly from React', "import { act as reactAct } from 'react'"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
-    ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve(); await Promise.resolve()'],
+    ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve()'],
     ['repeated manual microtask drain', 'for (let i = 0; i < 3; i += 1) await Promise.resolve()'],
     ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
@@ -308,7 +308,7 @@ function detectRepeatedMicrotaskDrain(statements: NodePath[], violations: Set<Po
   let consecutive = 0
   for (const statement of statements) {
     consecutive = isAwaitPromiseResolve(statement) ? consecutive + 1 : 0
-    if (consecutive === 3) violations.add('repeated manual microtask drain')
+    if (consecutive === 2) violations.add('repeated manual microtask drain')
   }
 }
 

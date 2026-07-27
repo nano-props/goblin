@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import type { TerminalCreateResult, TerminalSessionClosedEvent } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -601,8 +601,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expectation
 
     resolve(makeCreateResult())
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 

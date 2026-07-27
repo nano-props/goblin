@@ -5,6 +5,7 @@ import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
@@ -1630,8 +1631,7 @@ describe('repo mutation invalidation publishing', () => {
 
     firstCreate.resolve({ ok: true, message: 'first created' })
     await expect(first).resolves.toEqual({ ok: true, message: 'first created' })
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
     expect(mocks.createWorktree).toHaveBeenCalledTimes(2)
 
     secondCreate.resolve({ ok: true, message: 'second created' })
@@ -1809,8 +1809,7 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     const second = pullRepoBranch(LINKED_REPO_ID, 'feature/b')
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushMicrotasks(2)
 
     expect(mocks.pullBranch).not.toHaveBeenCalled()
 

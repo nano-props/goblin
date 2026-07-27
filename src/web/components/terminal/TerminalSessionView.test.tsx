@@ -4,7 +4,7 @@ import { act, fireEvent } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { StrictMode, type ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
-import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
@@ -326,8 +326,7 @@ describe('TerminalSessionView', () => {
       if (!pasteButton) throw new Error('expected mobile terminal Paste button')
       await act(async () => {
         pasteButton.click()
-        await Promise.resolve()
-        await Promise.resolve()
+        await flushMicrotasks(2)
       })
 
       expect(readText).toHaveBeenCalledOnce()
