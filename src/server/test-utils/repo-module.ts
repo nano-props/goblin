@@ -401,8 +401,12 @@ export function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-type TestRepoQueryInvalidation = { repoId: string; query: 'repo-snapshot' | 'repo-runtime' }
+type TestRepoQueryInvalidation = {
+  repoId: string
+  query: 'repo-snapshot' | 'repo-worktree-snapshot' | 'repo-runtime'
+}
 type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
+type TestRepoWorktreeSnapshotInvalidation = { repoId: string; query: 'repo-worktree-snapshot' }
 
 export function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
   return hoistedMocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
@@ -411,6 +415,12 @@ export function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
 export function repoSnapshotInvalidations(): TestRepoSnapshotInvalidation[] {
   return repoQueryInvalidationEvents().filter(
     (event): event is TestRepoSnapshotInvalidation => event.query === 'repo-snapshot',
+  )
+}
+
+export function repoWorktreeSnapshotInvalidations(): TestRepoWorktreeSnapshotInvalidation[] {
+  return repoQueryInvalidationEvents().filter(
+    (event): event is TestRepoWorktreeSnapshotInvalidation => event.query === 'repo-worktree-snapshot',
   )
 }
 

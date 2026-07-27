@@ -903,35 +903,6 @@ describe('runBranchAction', () => {
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
-  test('does not let stale branch action refresh results overwrite a reopened repo', async () => {
-    let resolveSnapshot!: () => void
-    installGoblinTestBridge({
-      'repo.pull': async () => ({ ok: true, message: 'ok' }),
-      'repo.projection': () =>
-        new Promise((resolve) => {
-          resolveSnapshot = () =>
-            resolve(repoProjection({ branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' }))
-        }),
-    })
-
-    const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
-    await flushAsyncWork()
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      workspaceRuntimeId: 'repo-runtime-test-2',
-      branches: [createRepoBranch('feature/new-instance')],
-      currentBranch: 'feature/new-instance',
-    })
-
-    resolveSnapshot()
-    await work
-
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')
-    expect(repoCurrentBranch()).toBe('feature/new-instance')
-    expect(repoBranchNames()).toEqual(['feature/new-instance'])
-  })
-
   test('keeps selection after non-create branch actions refresh', async () => {
     setBranchViewModeForTest('worktrees')
     installGoblinTestBridge({

@@ -61,20 +61,22 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 
   test('accepts a same-path worktree recreated during one runtime', async () => {
-    let canonicalPath = '/volumes/repo/worktrees/feature'
+    let present = true
     const resolver = new PhysicalWorktreeIdentityResolver({
       async getLocalWorktrees() {
-        return [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo]
+        return present ? [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo] : []
       },
       async nativeRealpath() {
-        return canonicalPath
+        return '/volumes/repo/worktrees/feature'
       },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
 
     await resolver.capture(LOCAL_INPUT)
-    canonicalPath = '/volumes/repo/worktrees/feature'
+    present = false
+    await expect(resolver.capture(LOCAL_INPUT)).rejects.toThrow('error.invalid-worktree-path')
+    present = true
     await expect(resolver.capture(LOCAL_INPUT)).resolves.toMatchObject({
       identity: { endpoint: '/volumes/repo/worktrees/feature' },
     })

@@ -193,6 +193,7 @@ describe('workspace refresh operations', () => {
     expect(fetchCount).toBe(1)
     expect(snapshotCount).toBe(1)
     expect(statusCount).toBe(1)
+    expect(repoBranchNames()).toEqual(['feature/a', 'feature/b'])
   })
 
   test('manual sync records thrown fetch failures instead of rejecting', async () => {

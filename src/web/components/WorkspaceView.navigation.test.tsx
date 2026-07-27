@@ -43,8 +43,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
     )
   })
 
-  test('invalidates the Git snapshot once when leaving a terminal for a static pane', () => {
-    const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+  test('invalidates the Git projection and worktree status once when leaving a terminal for a static pane', () => {
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
       kind: 'branch' as const,
       workspaceId: REPO_ID,
@@ -67,12 +68,15 @@ describe('WorkspaceView workspace navigation and restore', () => {
       )
     })
 
-    expect(invalidate).toHaveBeenCalledTimes(1)
-    expect(invalidate).toHaveBeenCalledWith(REPO_ID, expect.any(String))
+    expect(invalidateSnapshot).toHaveBeenCalledTimes(1)
+    expect(invalidateSnapshot).toHaveBeenCalledWith(REPO_ID, expect.any(String))
+    expect(invalidateStatus).toHaveBeenCalledTimes(1)
+    expect(invalidateStatus).toHaveBeenCalledWith(REPO_ID, expect.any(String))
   })
 
-  test('does not invalidate the Git snapshot for terminal-to-terminal or static-to-static navigation', () => {
-    const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+  test('does not invalidate Git reads for terminal-to-terminal or static-to-static navigation', () => {
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
       kind: 'branch' as const,
       workspaceId: REPO_ID,
@@ -95,29 +99,33 @@ describe('WorkspaceView workspace navigation and restore', () => {
       )
     })
 
-    expect(invalidate).not.toHaveBeenCalled()
+    expect(invalidateSnapshot).not.toHaveBeenCalled()
+    expect(invalidateStatus).not.toHaveBeenCalled()
 
     act(() => {
       result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
     })
 
-    expect(invalidate).toHaveBeenCalledTimes(1)
+    expect(invalidateSnapshot).toHaveBeenCalledTimes(1)
+    expect(invalidateStatus).toHaveBeenCalledTimes(1)
 
     act(() => {
       result.rerender(branchWorkspaceView())
     })
 
-    expect(invalidate).toHaveBeenCalledTimes(1)
+    expect(invalidateSnapshot).toHaveBeenCalledTimes(1)
+    expect(invalidateStatus).toHaveBeenCalledTimes(1)
   })
 
-  test('does not transfer a terminal-exit snapshot invalidation across workspaces', () => {
+  test('does not transfer terminal-exit invalidations across workspaces', () => {
     const otherWorkspaceId = workspaceIdForTest('goblin+file:///tmp/other-workspace')
     seedRepoWithReadModelForTest({
       id: otherWorkspaceId,
       branches: [createRepoBranch('main')],
       currentBranchName: null,
     })
-    const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const result = render(
       <WorkspaceView
         workspaceId={REPO_ID}
@@ -139,12 +147,14 @@ describe('WorkspaceView workspace navigation and restore', () => {
       )
     })
 
-    expect(invalidate).not.toHaveBeenCalled()
+    expect(invalidateSnapshot).not.toHaveBeenCalled()
+    expect(invalidateStatus).not.toHaveBeenCalled()
   })
 
-  test('does not invalidate a Git snapshot when leaving a filesystem terminal', () => {
+  test('does not invalidate Git reads when leaving a filesystem terminal', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
-    const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const result = render(
       <WorkspaceView
         workspaceId={REPO_ID}
@@ -160,7 +170,8 @@ describe('WorkspaceView workspace navigation and restore', () => {
       result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
     })
 
-    expect(invalidate).not.toHaveBeenCalled()
+    expect(invalidateSnapshot).not.toHaveBeenCalled()
+    expect(invalidateStatus).not.toHaveBeenCalled()
   })
 
   test('does not mount an existing repo before its runtime membership is restored', () => {

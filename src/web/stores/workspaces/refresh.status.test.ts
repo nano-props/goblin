@@ -296,7 +296,7 @@ describe('workspace refresh status', () => {
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 
-  test('workspace visible status cache refresh drops stale errors after projection invalidation', async () => {
+  test('workspace visible status cache refresh drops stale errors after worktree invalidation', async () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     let statusCalls = 0
     let rejectStatus!: (err: Error) => void
@@ -312,13 +312,14 @@ describe('workspace refresh status', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    invalidateRepoSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
 
     rejectStatus(new Error('error.path-not-found'))
     await refresh
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(repo.capability.kind).toBe('git')
+    expect(statusCalls).toBe(1)
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 

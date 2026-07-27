@@ -9,6 +9,7 @@ import {
   createLocalRepoWorktreeWithBootstrap,
   expectNoRepoSnapshotInvalidations,
   expectRepoSnapshotInvalidations,
+  repoWorktreeSnapshotInvalidations,
   mocks,
 } from '#/server/test-utils/repo-module.ts'
 
@@ -52,6 +53,21 @@ describe('repo branch mutations', () => {
       message: 'ok',
       affectedWorktreePaths: ['/tmp/repo-worktree'],
     })
+  })
+
+  test('pullRepoBranch publishes invalidation when failure may follow partial ref updates', async () => {
+    mocks.pullBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'fatal: pull failed',
+      repositoryStateChanged: true,
+      affectedWorktreePaths: ['/tmp/repo'],
+    })
+    const repo = await import('#/server/modules/repo-write-paths.ts')
+
+    await repo.pullRepoBranch(REPO_ID, 'feature/a')
+
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expect(repoWorktreeSnapshotInvalidations()).toEqual([{ repoId: REPO_ID, query: 'repo-worktree-snapshot' }])
   })
 
   test.each([
