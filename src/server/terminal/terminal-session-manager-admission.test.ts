@@ -235,6 +235,4 @@ describe('TerminalSessionManager admission', () => {
       message: 'error.invalid-arguments',
     })
   })
-
-
 })

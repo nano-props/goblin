@@ -1,8 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import {
-  acquireWorkspaceRuntime,
-  releaseWorkspaceRuntime,
-} from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
 import { REALTIME_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS } from '#/server/realtime/realtime-broker.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {

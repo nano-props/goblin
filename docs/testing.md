@@ -66,9 +66,10 @@ import a helper from inside another test file.
 - Importing `act` from `react` in tests. Use `act` from
   `@testing-library/react` so the act environment flag is scoped to the
   callback.
-- Inline `class MockWebSocket` outside `src/web/test-utils/`. An inline
-  xterm mock is allowed only for the `vi.hoisted` boundary documented in §5;
-  do not duplicate that exception in component or provider tests.
+- Defining or installing a WebSocket mock outside
+  `src/web/test-utils/websocket-mock.ts`. An inline xterm mock is allowed only
+  for the `vi.hoisted` boundary documented in §5; do not duplicate that
+  exception in component or provider tests.
 - Redefining `window.localStorage` or `window.sessionStorage` in any test
   file.
 - `vi.stubGlobal('fetch', …)` for routes already covered by
@@ -213,6 +214,9 @@ boundary to satisfy the usual file-size split guideline.
   and reviewable.
 - Use `await vi.waitFor(() => …)` (Vitest) or `await waitFor(() => …)`
   (RTL) for retries. Hard-coding `setTimeout(…, 50)` is forbidden.
+- Use `await waitForNextMacrotask()` when ordering depends on crossing one
+  real event-loop turn. Do not spell this as a local zero-delay `setTimeout`
+  promise; the shared helper makes the boundary explicit and reviewable.
 - `expect(...).resolves` / `expect(...).rejects` are the standard way to
   await a single promise. Don't write `let err; try { ... } catch (e) { err = e }`.
 

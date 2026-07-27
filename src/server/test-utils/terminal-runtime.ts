@@ -393,7 +393,11 @@ export async function requestWorkspacePaneRuntime(
   )) as WorkspacePaneRuntimeOpenResult
 }
 
-export async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
+export async function createTerminalSession(
+  host: ServerTerminalHost,
+  clientId: string,
+  userId = USER_1,
+): Promise<string> {
   const result = await createLocalWorktreeTerminal(host, clientId, userId, 'additional')
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)

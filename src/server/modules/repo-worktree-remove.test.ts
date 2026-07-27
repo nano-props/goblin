@@ -132,10 +132,7 @@ describe('repo worktree removal', () => {
       },
     ])
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: true },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expectRepoSnapshotInvalidations(
@@ -184,7 +181,9 @@ describe('repo worktree removal', () => {
     expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
     expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
-    expect(mocks.getUpstream.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
+    expect(mocks.getUpstream.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.removeWorktree.mock.invocationCallOrder[0]!,
+    )
   })
 
   test('removeRepoWorktree does not use a missing tracking ref for branch deletion admission', async () => {
@@ -236,10 +235,7 @@ describe('repo worktree removal', () => {
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
     mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: true },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
@@ -319,10 +315,7 @@ describe('repo worktree removal', () => {
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
     mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValueOnce(true)
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: false },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
@@ -346,10 +339,7 @@ describe('repo worktree removal', () => {
     ])
     mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: false },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
@@ -369,12 +359,21 @@ describe('repo worktree removal', () => {
       },
     ])
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: false },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-locked-worktree' })
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
+  })
+
+  test('removeRepoWorktree refuses when worktree status could not be read', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
   })
 })

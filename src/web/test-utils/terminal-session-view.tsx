@@ -123,7 +123,9 @@ export type TestFilesystemTargetSnapshot = Omit<
   outputActiveCount?: number
 }
 
-export function completeFilesystemTargetSnapshot(snapshot: TestFilesystemTargetSnapshot): TerminalFilesystemTargetSnapshot {
+export function completeFilesystemTargetSnapshot(
+  snapshot: TestFilesystemTargetSnapshot,
+): TerminalFilesystemTargetSnapshot {
   const sessions = snapshot.sessions.map((session) => ({
     ...session,
     type: 'terminal' as const,
@@ -283,7 +285,11 @@ export async function dispatchPaste(sessionRoot: HTMLElement, files: File[]): Pr
  * Variant of `dispatchPaste` that also fakes `clipboardData.getData('text/plain')`
  * and returns the event so tests can assert on `defaultPrevented`.
  */
-export async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, files: File[] = []): Promise<Event> {
+export async function dispatchPasteWithText(
+  sessionRoot: HTMLElement,
+  text: string,
+  files: File[] = [],
+): Promise<Event> {
   const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
   Object.defineProperty(pasteEvent, 'clipboardData', {
     value: clipboardDataWithTextAndFiles(text, files),

@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest'
 import { glob } from 'tinyglobby'
 
 const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
+const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 
 const repositoryPolicyLabels = [
   'hand-rolled React root',
@@ -34,6 +35,23 @@ describe('test harness policy', () => {
       for (const label of repositoryPolicyLabels) {
         if (labels.has(label)) violations.push(`${file}: ${label}`)
       }
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  test('keeps test helpers on the canonical WebSocket mock', async () => {
+    const files = await glob([
+      'src/test-utils/**/*.ts',
+      'src/test-utils/**/*.tsx',
+      'src/web/test-utils/**/*.ts',
+      'src/web/test-utils/**/*.tsx',
+    ])
+    const violations: string[] = []
+
+    for (const file of files) {
+      if (file === POLICY_FILE || file === CANONICAL_WEBSOCKET_MOCK_FILE) continue
+      if ((await analyzeFile(file)).has('inline WebSocket mock')) violations.push(file)
     }
 
     expect(violations).toEqual([])
@@ -75,13 +93,14 @@ describe('test harness policy', () => {
       const documentation = "new KeyboardEvent('keydown'); IS_REACT_ACT_ENVIRONMENT"
       import { vi } from 'vitest'
       import { createRoot } from 'react-dom/client'
-      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window) {
+      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window, global) {
         vi.stubGlobal('fetch')
         vi.useFakeTimers()
         createRoot()
         new KeyboardEvent('keydown')
         new Promise((resolve) => window.setTimeout(resolve, 0))
         Object.defineProperty(window, 'localStorage', {})
+        global.WebSocket = class TestSocket {}
       }
       const config = { IS_REACT_ACT_ENVIRONMENT: false }
       config.IS_REACT_ACT_ENVIRONMENT = true
@@ -99,8 +118,24 @@ describe('test harness policy', () => {
     ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve()'],
     ['repeated manual microtask drain', 'for (let i = 0; i < 3; i += 1) await Promise.resolve()'],
     ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0))'],
+    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve))'],
+    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, undefined))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
     ['test-local Storage replacement', "Object.defineProperty(window, 'localStorage', { value: storage })"],
+    [
+      'inline WebSocket mock',
+      "import { vi } from 'vitest'; class TestWebSocket {}; vi.stubGlobal('WebSocket', TestWebSocket)",
+    ],
+    ['inline WebSocket mock', 'globalThis.WebSocket = class TestSocket {}'],
+    ['inline WebSocket mock', 'global.WebSocket = class TestSocket {}'],
+    ['inline WebSocket mock', "Object.defineProperty(window, 'WebSocket', { value: class TestSocket {} })"],
+    ['inline WebSocket mock', "Object.defineProperty(global, 'WebSocket', { value: class TestSocket {} })"],
+    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 as number))'],
+    [
+      'test-local zero-delay macrotask wait',
+      'await new Promise((resolve) => setTimeout(resolve, undefined as undefined))',
+    ],
+    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 satisfies number))'],
     ['direct KeyboardEvent construction', "new KeyboardEvent('keydown')"],
     ['direct fake-timer configuration', "import { vi as testVi } from 'vitest'; testVi.useFakeTimers()"],
   ] satisfies Array<[PolicyLabel, string]>)('detects %s from syntax bindings', (label, source) => {
@@ -171,6 +206,7 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     },
     AssignmentExpression(path) {
       if (isActEnvironmentTarget(path.get('left'))) violations.add('manual React act-environment mutation')
+      if (isGlobalWebSocketTarget(path.get('left'))) violations.add('inline WebSocket mock')
     },
     UnaryExpression(path) {
       if (path.node.operator === 'delete' && isActEnvironmentTarget(path.get('argument'))) {
@@ -194,6 +230,7 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
         const globalName = stringArgument(path, 0)
         if (globalName === 'fetch') violations.add('test-local fetch replacement')
         if (isStorageName(globalName)) violations.add('test-local Storage replacement')
+        if (globalName === 'WebSocket') violations.add('inline WebSocket mock')
       }
       if (isDefinePropertyOnGlobal(path, 'IS_REACT_ACT_ENVIRONMENT')) {
         violations.add('manual React act-environment mutation')
@@ -201,6 +238,7 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
       if (isDefinePropertyOnGlobal(path, 'localStorage') || isDefinePropertyOnGlobal(path, 'sessionStorage')) {
         violations.add('test-local Storage replacement')
       }
+      if (isDefinePropertyOnGlobal(path, 'WebSocket')) violations.add('inline WebSocket mock')
     },
   })
 
@@ -251,6 +289,7 @@ function unwrapExpression(path: NodePath): NodePath {
   let current = path
   while (
     current.isTSAsExpression() ||
+    current.isTSSatisfiesExpression() ||
     current.isTSTypeAssertion() ||
     current.isTSNonNullExpression() ||
     current.isParenthesizedExpression()
@@ -264,12 +303,16 @@ function isGlobalObject(path: NodePath, seen = new Set<Binding>()): boolean {
   const expression = unwrapExpression(path)
   if (!expression.isIdentifier()) return false
   const binding = expression.scope.getBinding(expression.node.name)
-  if ((expression.node.name === 'globalThis' || expression.node.name === 'window') && !binding) return true
+  if (isGlobalObjectName(expression.node.name) && !binding) return true
   if (!binding || seen.has(binding) || !binding.path.isVariableDeclarator()) return false
   const initializer = binding.path.get('init')
   if (!initializer.node) return false
   seen.add(binding)
   return isGlobalObject(initializer, seen)
+}
+
+function isGlobalObjectName(name: string): boolean {
+  return name === 'globalThis' || name === 'global' || name === 'window'
 }
 
 function isActEnvironmentTarget(path: NodePath): boolean {
@@ -291,6 +334,11 @@ function isGlobalFunction(path: NodePath, name: string): boolean {
   return isUnboundIdentifier(path, name) || isGlobalMember(path, name)
 }
 
+function isGlobalWebSocketTarget(path: NodePath): boolean {
+  const target = unwrapExpression(path)
+  return isUnboundIdentifier(target, 'WebSocket') || isGlobalMember(target, 'WebSocket')
+}
+
 function containsZeroDelayTimeout(promisePath: NodePath): boolean {
   const executor = argumentPaths(promisePath)[0]
   if (!executor?.isFunction()) return false
@@ -298,7 +346,15 @@ function containsZeroDelayTimeout(promisePath: NodePath): boolean {
   executor.traverse({
     CallExpression(path: NodePath<CallExpression>) {
       if (!isGlobalFunction(path.get('callee'), 'setTimeout')) return
-      if (argumentPaths(path)[1]?.isNumericLiteral({ value: 0 })) found = true
+      const delay = argumentPaths(path)[1]
+      const delayExpression = delay && unwrapExpression(delay)
+      if (
+        delayExpression === undefined ||
+        delayExpression.isNumericLiteral({ value: 0 }) ||
+        isUnboundIdentifier(delayExpression, 'undefined')
+      ) {
+        found = true
+      }
     },
   })
   return found

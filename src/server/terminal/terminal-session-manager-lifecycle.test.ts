@@ -536,5 +536,4 @@ describe('TerminalSessionManager session lifecycle', () => {
     expect(supervisor.killed).toEqual([])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
   })
-
 })

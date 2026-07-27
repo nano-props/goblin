@@ -5,11 +5,7 @@ import {
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  createPtyHandle,
-  type PtySpawnResult,
-  type PtySupervisor,
-} from '#/server/terminal/pty-supervisor.ts'
+import { createPtyHandle, type PtySpawnResult, type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { createPtyEventChannel, type PtyEventSink } from '#/server/terminal/pty-event-lease.ts'
 import {
   TerminalSessionManager,
@@ -141,10 +137,7 @@ export function createManagerWithPresence(
   )
 }
 
-export function createAlwaysOnlineManager(
-  supervisor: PtySupervisor,
-  sink: Partial<TerminalEventSink<string>> = {},
-) {
+export function createAlwaysOnlineManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSink<string>> = {}) {
   return createManagerWithPresence(supervisor, sink, () => true)
 }
 

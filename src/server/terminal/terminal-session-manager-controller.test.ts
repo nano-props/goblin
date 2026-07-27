@@ -550,6 +550,4 @@ describe('TerminalSessionManager controller and frame lifecycle', () => {
       }),
     )
   })
-
-
 })

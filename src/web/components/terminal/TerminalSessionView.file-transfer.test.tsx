@@ -9,10 +9,7 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import {
   TerminalSessionView,

@@ -19,10 +19,7 @@ import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-na
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import {
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-} from '#/web/test-utils/bridge.ts'
+import { installWorkspacePaneTabsTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'

@@ -1,11 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import {
-  REPO_ID,
-  deferred,
-  expectNoRepoSnapshotInvalidations,
-  mocks,
-} from '#/server/test-utils/repo-module.ts'
+import { REPO_ID, deferred, expectNoRepoSnapshotInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo coordination', () => {
   test('serializes different SSH aliases for the same resolved repository', async () => {
