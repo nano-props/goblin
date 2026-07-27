@@ -71,6 +71,7 @@ export type RemoteGitRunner = (
 ) => Promise<RemoteCommandResult>
 
 const REMOTE_WORKTREE_STATUS_CONCURRENCY = 4
+// Both aggregate status and patch enumeration use this admission boundary.
 const remoteWorktreeStatusQueue = new PQueue({ concurrency: REMOTE_WORKTREE_STATUS_CONCURRENCY })
 const REMOTE_FETCH_SPEC_CONCURRENCY = 8
 const REMOTE_PATCH_UNTRACKED_DIFF_CONCURRENCY = 8
@@ -205,11 +206,31 @@ async function runRemoteWorktreeStatusProbe(
   worktreePath: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<RemoteCommandResult> {
+  return await runAdmittedRemoteStatusCommand(target, { type: 'gitStatus', path: worktreePath }, options)
+}
+
+async function runRemoteWorktreeStatusAllProbe(
+  target: RemoteWorkspaceTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; timeoutMs: number; run: RemoteGitRunner },
+): Promise<RemoteCommandResult> {
+  return await runAdmittedRemoteStatusCommand(target, { type: 'gitStatusAll', path: worktreePath }, options)
+}
+
+async function runAdmittedRemoteStatusCommand(
+  target: RemoteWorkspaceTarget,
+  command: Extract<RemoteCommandKind, { type: 'gitStatus' | 'gitStatusAll' }>,
+  options: { signal?: AbortSignal; timeoutMs?: number; run: RemoteGitRunner },
+): Promise<RemoteCommandResult> {
   options.signal?.throwIfAborted()
   return await runWithQueuedAdmission(
     remoteWorktreeStatusQueue,
     options.signal,
-    async () => await options.run({ type: 'gitStatus', path: worktreePath }, target, { signal: options.signal }),
+    async () =>
+      await options.run(command, target, {
+        signal: options.signal,
+        ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      }),
   )
 }
 
@@ -367,7 +388,8 @@ export async function getRemotePatch(
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!tracked.ok) return remoteExecResult(tracked)
 
-  const status = await run({ type: 'gitStatusAll', path: known.path }, target, {
+  const status = await runRemoteWorktreeStatusAllProbe(target, known.path, {
+    run,
     signal: options.signal,
     timeoutMs: REMOTE_PATCH_TIMEOUT_MS,
   })
@@ -1274,8 +1296,12 @@ async function mapWithConcurrency<T, R>(
   if (items.length === 0) return []
   const results = new Array<R | undefined>(items.length)
   let cursor = 0
+  // Running commands settle normally, but no worker claims more input after
+  // the aggregate operation has already failed.
+  let stopped = false
   const worker = async () => {
     while (true) {
+      if (stopped) return
       if (signal?.aborted) return
       const index = cursor++
       if (index >= items.length) return
@@ -1283,6 +1309,7 @@ async function mapWithConcurrency<T, R>(
         results[index] = await fn(items[index]!)
       } catch (err) {
         if (signal?.aborted) return
+        stopped = true
         throw err
       }
     }

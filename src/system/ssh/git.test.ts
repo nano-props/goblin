@@ -5,6 +5,7 @@ import {
   deleteRemoteBranch,
   getRemoteBrowserUrl,
   getRemoteLog,
+  getRemotePatch,
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
@@ -1581,6 +1582,73 @@ describe('getRemoteStatus', () => {
     statusBarrier.resolve()
     await Promise.all(reads)
     expect(peakStatusReads).toBe(4)
+  })
+
+  test('shares status admission with remote patch untracked-file enumeration', async () => {
+    const oneWorktreeOutput = ['worktree /srv/repo', 'HEAD f00ba40', 'branch refs/heads/main'].join(NUL) + NUL + NUL
+    const statusCompletions: Array<PromiseWithResolvers<RemoteCommandResult>> = []
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(oneWorktreeOutput)
+      if (command.type === 'gitPatch') return okRemoteResult('')
+      if (command.type === 'gitStatus' || command.type === 'gitStatusAll') {
+        const completion = Promise.withResolvers<RemoteCommandResult>()
+        statusCompletions.push(completion)
+        return await completion.promise
+      }
+      return failRemoteResult('unexpected command')
+    })
+    const blockers = Array.from({ length: 4 }, () => getRemoteStatus(TARGET, { run }))
+    await vi.waitFor(() => expect(statusCompletions).toHaveLength(4))
+
+    const patch = getRemotePatch(TARGET, '/srv/repo', {
+      run,
+      knownWorktrees: [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }],
+    })
+    await vi.waitFor(() => expect(run.mock.calls.some(([command]) => command.type === 'gitPatch')).toBe(true))
+    expect(run.mock.calls.some(([command]) => command.type === 'gitStatusAll')).toBe(false)
+
+    statusCompletions[0]!.resolve(okRemoteResult(''))
+    await vi.waitFor(() => expect(statusCompletions).toHaveLength(5))
+    expect(run.mock.calls.some(([command]) => command.type === 'gitStatusAll')).toBe(true)
+    for (const completion of statusCompletions.slice(1)) completion.resolve(okRemoteResult(''))
+    await Promise.all([...blockers, patch])
+  })
+
+  test('stops submitting remote aggregate probes after the first failure', async () => {
+    const worktrees =
+      Array.from({ length: 20 }, (_, index) =>
+        [
+          `worktree /srv/repo-${index}`,
+          `HEAD ${String(index).padStart(7, '0')}`,
+          `branch refs/heads/feature/${index}`,
+        ].join(NUL),
+      ).join(NUL + NUL) +
+      NUL +
+      NUL
+    const running = Promise.withResolvers<RemoteCommandResult>()
+    const runningWorkersSettled = Promise.withResolvers<void>()
+    let started = 0
+    let unsettledRunningWorkers = 3
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(worktrees)
+      if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
+      started += 1
+      if (started === 1) return failRemoteResult('status failed')
+      try {
+        return await running.promise
+      } finally {
+        unsettledRunningWorkers -= 1
+        if (unsettledRunningWorkers === 0) runningWorkersSettled.resolve()
+      }
+    })
+
+    const read = getRemoteStatus(TARGET, { run })
+    await expect(read).rejects.toThrow('status failed')
+    expect(started).toBe(4)
+
+    running.resolve(okRemoteResult(''))
+    await runningWorkersSettled.promise
+    expect(started).toBe(4)
   })
 
   test('cancels a queued status probe without starting it', async () => {

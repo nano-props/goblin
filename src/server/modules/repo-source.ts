@@ -27,13 +27,8 @@ import {
   pushBranch,
 } from '#/system/git/remote.ts'
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
-import { getWorkingStatus } from '#/system/git/status.ts'
-import {
-  createWorktree,
-  readWorktreeMembership,
-  removeWorktree,
-  sampleWorktreeStatusForTarget,
-} from '#/system/git/worktrees.ts'
+import { getWorkingStatus, sampleWorktreeStatusForTarget } from '#/system/git/status.ts'
+import { createWorktree, readWorktreeMembership, removeWorktree } from '#/system/git/worktrees.ts'
 import { haveSameWorktrees } from '#/system/git/parsers.ts'
 import {
   bootstrapWorktreeAfterCreate,

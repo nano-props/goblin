@@ -73,7 +73,6 @@ export interface WorktreeInfo {
   isBare: boolean
   isPrimary: boolean
   isDirty?: boolean
-  changeCount?: number
   isLocked?: boolean
   /** Git still has administrative metadata for this worktree, but its
    * physical worktree is no longer usable and may be pruned. */

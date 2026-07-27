@@ -1,48 +1,13 @@
-import PQueue from 'p-queue'
 import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
-import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
-import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
+import { parseWorktrees } from '#/system/git/parsers.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
-
-const WORKTREE_STATUS_CONCURRENCY = 4
-const worktreeStatusQueue = new PQueue({ concurrency: WORKTREE_STATUS_CONCURRENCY })
-
-export type WorktreeStatusRead =
-  | { kind: 'bare'; worktree: WorktreeInfo }
-  | { kind: 'status'; worktree: WorktreeInfo; entries: ReturnType<typeof parseStatus> }
 
 export async function readWorktreeMembership(cwd: string, signal?: AbortSignal): Promise<WorktreeInfo[]> {
   signal?.throwIfAborted()
   const output = await git(cwd, ['worktree', 'list', '--porcelain', '-z'], { signal })
   signal?.throwIfAborted()
   return parseWorktrees(output)
-}
-
-export async function sampleWorktreeStatus(
-  worktrees: readonly WorktreeInfo[],
-  signal?: AbortSignal,
-): Promise<WorktreeStatusRead[]> {
-  return await mapWithConcurrency(
-    [...worktrees],
-    WORKTREE_STATUS_CONCURRENCY,
-    async (worktree) => await sampleWorktreeStatusForTarget(worktree, signal),
-    { signal, abort: 'throw' },
-  )
-}
-
-export async function sampleWorktreeStatusForTarget(
-  worktree: WorktreeInfo,
-  signal?: AbortSignal,
-): Promise<WorktreeStatusRead> {
-  signal?.throwIfAborted()
-  if (worktree.isBare) return { kind: 'bare', worktree }
-  const result = await runWithQueuedAdmission(worktreeStatusQueue, signal, async (): Promise<WorktreeStatusRead> => {
-    const out = await git(worktree.path, ['status', '--porcelain', '-z'], { signal })
-    return { kind: 'status', worktree, entries: parseStatus(out) }
-  })
-  signal?.throwIfAborted()
-  return result
 }
 
 /** Worktree create/remove can both touch tens of thousands of files

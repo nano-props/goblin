@@ -36,6 +36,9 @@ export async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results = new Array<R>(items.length)
   let nextIndex = 0
+  // Match Promise.all's fail-fast result without letting surviving workers
+  // claim the rest of the input after one worker has already failed.
+  let stopped = false
   const takeNextIndex = () => {
     if (nextIndex >= items.length) return undefined
     const index = nextIndex
@@ -44,13 +47,19 @@ export async function mapWithConcurrency<T, R>(
   }
   const worker = async () => {
     while (true) {
+      if (stopped) return
       if (options?.signal?.aborted) {
         if (options.abort === 'throw') throw new Error('cancelled')
         return
       }
       const i = takeNextIndex()
       if (i === undefined) return
-      results[i] = await fn(items[i]!)
+      try {
+        results[i] = await fn(items[i]!)
+      } catch (err) {
+        stopped = true
+        throw err
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))

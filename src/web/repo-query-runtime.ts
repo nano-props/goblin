@@ -233,17 +233,14 @@ function invalidateActiveRepoSnapshotQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient,
-  options: { excludeProjectionQueryKey?: readonly unknown[] } = {},
 ): void {
-  const excludedProjectionHash = options.excludeProjectionQueryKey ? hashKey(options.excludeProjectionQueryKey) : null
   void queryClient.invalidateQueries(
     {
       queryKey: repoDataQueryKey(repoRoot, workspaceRuntimeId),
       refetchType: 'active',
       predicate: (query) => {
         const kind = query.queryKey[3]
-        if (kind === 'projection') return !excludedProjectionHash || query.queryHash !== excludedProjectionHash
-        return kind === 'worktree-status' || kind === 'log' || kind === 'remote-branches'
+        return kind === 'projection' || kind === 'worktree-status' || kind === 'log' || kind === 'remote-branches'
       },
     },
     { cancelRefetch: false },
