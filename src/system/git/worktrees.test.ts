@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
+import { createWorktree, readWorktreeMembership, removeWorktree } from '#/system/git/worktrees.ts'
 
 const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
 const gitMock = vi.hoisted(() => vi.fn())
@@ -53,7 +53,16 @@ describe('worktree git operations', () => {
           localBranch: 'feature/branch',
         },
       },
-      ['worktree', 'add', '-b', 'feature/branch', '--track', '--', '/tmp/repo-feature', 'refs/remotes/origin/feature/branch'],
+      [
+        'worktree',
+        'add',
+        '-b',
+        'feature/branch',
+        '--track',
+        '--',
+        '/tmp/repo-feature',
+        'refs/remotes/origin/feature/branch',
+      ],
     ],
   ])(
     'delegates %s createWorktree to git worktree add with the shared timeout and signal',
@@ -90,6 +99,6 @@ describe('worktree git operations', () => {
   test('does not turn a failed authoritative worktree-list read into an empty repository', async () => {
     gitMock.mockRejectedValue(new Error('git unavailable'))
 
-    await expect(getWorktrees('/tmp/repo', { includeStatus: false })).rejects.toThrow('git unavailable')
+    await expect(readWorktreeMembership('/tmp/repo')).rejects.toThrow('git unavailable')
   })
 })

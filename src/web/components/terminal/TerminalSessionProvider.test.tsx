@@ -572,7 +572,6 @@ beforeEach(() => {
         close: closeMock,
         notifyBell: vi.fn(async () => true),
         setBadge: vi.fn(async () => {}),
-        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         recoverSessions: async (input: { workspaceId: typeof REPO_ID }) => ({
           revision: Math.max(1, sessionsChangedRevision),
           sessions: completeServerSessions(await listSessionsMock(input)),
@@ -682,7 +681,6 @@ beforeEach(() => {
         phase: 'open' as const,
       })),
       close: closeMock,
-      pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: async (input) => ({
         revision: Math.max(1, sessionsChangedRevision),
         sessions: completeServerSessions(await listSessionsMock(input)),

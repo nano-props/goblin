@@ -17,7 +17,6 @@ export const WORKTREE_BOOTSTRAP_CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaa
 export const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
   afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
-  afterRemoveFailed: async () => {},
 }
 
 async function physicalWorktreeCapabilityForTest(workspaceId: WorkspaceId, worktreePath: string) {
@@ -34,10 +33,8 @@ async function physicalWorktreeCapabilityForTest(workspaceId: WorkspaceId, workt
       execution: {
         kind: 'local',
         canonicalWorktreePath,
-        endpointMarker: { deviceId: '1', inode: '1' },
       },
       runtimeSignal: new AbortController().signal,
-      validateExecution: async () => undefined,
     },
   )
 }
@@ -122,9 +119,8 @@ const hoistedMocks = vi.hoisted(() => ({
   getRemoteInfo: vi.fn(),
   getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
-  getWorktrees: vi.fn(),
   readWorktreeMembership: vi.fn(),
-  sampleWorktreeStatus: vi.fn(),
+  sampleWorktreeStatusForTarget: vi.fn(),
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
   cloneGitRepo: vi.fn(),
@@ -142,10 +138,12 @@ const hoistedMocks = vi.hoisted(() => ({
   getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteSnapshot: vi.fn(),
   getRemoteWorkspacePaneTargetIdentities: vi.fn(),
-  resolveRemoteRepoExecutionIdentity: vi.fn(),
+  resolveRemoteRepoCommonDir: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
   getServerWorkspaceSettings: vi.fn(),
+  getServerFetchIntervalSec: vi.fn(),
+  subscribeServerFetchInterval: vi.fn(),
   pruneServerWorkspaceSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
   trustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
@@ -206,13 +204,12 @@ vi.mock('#/system/git/remote-refs.ts', () => ({
 
 vi.mock('#/system/git/status.ts', () => ({
   getWorkingStatus: hoistedMocks.getWorkingStatus,
+  sampleWorktreeStatusForTarget: hoistedMocks.sampleWorktreeStatusForTarget,
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   createWorktree: hoistedMocks.createWorktree,
-  getWorktrees: hoistedMocks.getWorktrees,
   readWorktreeMembership: hoistedMocks.readWorktreeMembership,
-  sampleWorktreeStatus: hoistedMocks.sampleWorktreeStatus,
   removeWorktree: hoistedMocks.removeWorktree,
 }))
 
@@ -229,6 +226,8 @@ vi.mock('#/shared/input-validation.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceSettings: hoistedMocks.getServerWorkspaceSettings,
+  getServerFetchIntervalSec: hoistedMocks.getServerFetchIntervalSec,
+  subscribeServerFetchInterval: hoistedMocks.subscribeServerFetchInterval,
   pruneServerWorkspaceSettingsForRemovedWorktree: hoistedMocks.pruneServerWorkspaceSettingsForRemovedWorktree,
   trustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.trustServerWorkspaceWorktreeBootstrapConfig,
   untrustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.untrustServerWorkspaceWorktreeBootstrapConfig,
@@ -252,7 +251,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: hoistedMocks.getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
-  resolveRemoteRepoExecutionIdentity: hoistedMocks.resolveRemoteRepoExecutionIdentity,
+  resolveRemoteRepoCommonDir: hoistedMocks.resolveRemoteRepoCommonDir,
   getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
@@ -318,6 +317,8 @@ beforeEach(async () => {
     },
   })
   hoistedMocks.getServerWorkspaceSettings.mockResolvedValue([])
+  hoistedMocks.getServerFetchIntervalSec.mockResolvedValue(5)
+  hoistedMocks.subscribeServerFetchInterval.mockImplementation(() => () => {})
   hoistedMocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValue(false)
   hoistedMocks.resolveRemoteTarget.mockResolvedValue({
     target: {
@@ -339,10 +340,9 @@ beforeEach(async () => {
   hoistedMocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   hoistedMocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched' })
   hoistedMocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
-  hoistedMocks.resolveRemoteRepoExecutionIdentity.mockImplementation(async (target: { remotePath: string }) => ({
-    commonDir: target.remotePath,
-    generationKey: 'remote-generation-1',
-  }))
+  hoistedMocks.resolveRemoteRepoCommonDir.mockImplementation(
+    async (target: { remotePath: string }) => target.remotePath,
+  )
   hoistedMocks.getCurrentBranch.mockResolvedValue('main')
   hoistedMocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
@@ -352,9 +352,12 @@ beforeEach(async () => {
   )
   hoistedMocks.getRepoName.mockResolvedValue('repo')
   hoistedMocks.getRepoRoot.mockResolvedValue('/tmp/repo')
-  hoistedMocks.getWorktrees.mockResolvedValue([])
   hoistedMocks.readWorktreeMembership.mockResolvedValue([])
-  hoistedMocks.sampleWorktreeStatus.mockResolvedValue([])
+  hoistedMocks.sampleWorktreeStatusForTarget.mockImplementation(async (worktree) => ({
+    kind: worktree.isBare ? 'bare' : 'status',
+    worktree,
+    ...(worktree.isBare ? {} : { entries: [] }),
+  }))
   hoistedMocks.getDefaultBranch.mockResolvedValue('main')
   hoistedMocks.getUpstream.mockResolvedValue(null)
   hoistedMocks.isAncestor.mockResolvedValue(true)
@@ -406,8 +409,12 @@ export function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-type TestRepoQueryInvalidation = { repoId: string; query: 'repo-snapshot' | 'repo-runtime' }
+type TestRepoQueryInvalidation = {
+  repoId: string
+  query: 'repo-snapshot' | 'repo-worktree-snapshot' | 'repo-runtime'
+}
 type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
+type TestRepoWorktreeSnapshotInvalidation = { repoId: string; query: 'repo-worktree-snapshot' }
 
 export function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
   return hoistedMocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
@@ -416,6 +423,12 @@ export function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
 export function repoSnapshotInvalidations(): TestRepoSnapshotInvalidation[] {
   return repoQueryInvalidationEvents().filter(
     (event): event is TestRepoSnapshotInvalidation => event.query === 'repo-snapshot',
+  )
+}
+
+export function repoWorktreeSnapshotInvalidations(): TestRepoWorktreeSnapshotInvalidation[] {
+  return repoQueryInvalidationEvents().filter(
+    (event): event is TestRepoWorktreeSnapshotInvalidation => event.query === 'repo-worktree-snapshot',
   )
 }
 

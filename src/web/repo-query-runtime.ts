@@ -33,6 +33,7 @@ class MismatchedRepoRuntimeReadError extends Error {
 }
 
 const repoSnapshotInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
+const repoProjectionInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const worktreeStatusInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const operationsInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const repoProjectionFetchInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
@@ -46,6 +47,15 @@ function repoSnapshotInvalidationVersionMap(queryClient: QueryClient): Map<strin
   if (!map) {
     map = new Map()
     repoSnapshotInvalidationVersionsByClient.set(queryClient, map)
+  }
+  return map
+}
+
+function repoProjectionInvalidationVersionMap(queryClient: QueryClient): Map<string, number> {
+  let map = repoProjectionInvalidationVersionsByClient.get(queryClient)
+  if (!map) {
+    map = new Map()
+    repoProjectionInvalidationVersionsByClient.set(queryClient, map)
   }
   return map
 }
@@ -104,6 +114,24 @@ function bumpRepoSnapshotInvalidationVersion(
   map.set(key, (map.get(key) ?? 0) + 1)
 }
 
+function getRepoProjectionInvalidationVersion(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+): number {
+  return repoProjectionInvalidationVersionMap(queryClient).get(repoRuntimeScopeKey(repoRoot, workspaceRuntimeId)) ?? 0
+}
+
+function bumpRepoProjectionInvalidationVersion(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+): void {
+  const map = repoProjectionInvalidationVersionMap(queryClient)
+  const key = repoRuntimeScopeKey(repoRoot, workspaceRuntimeId)
+  map.set(key, (map.get(key) ?? 0) + 1)
+}
+
 function getRepoOperationsInvalidationVersion(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
@@ -147,7 +175,7 @@ function markRepoProjectionFetchStarted(
   mode: PullRequestFetchMode,
   queryClient: QueryClient,
 ): number {
-  const version = getRepoSnapshotInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)
+  const version = getRepoProjectionInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)
   repoProjectionFetchInvalidationVersionMap(queryClient).set(
     repoProjectionFetchVersionKey(repoRoot, workspaceRuntimeId, branch, mode),
     version,
@@ -193,22 +221,44 @@ function markRepoSnapshotInvalidated(
   bumpRepoSnapshotInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)
 }
 
+function markRepoProjectionInvalidated(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  bumpRepoProjectionInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)
+}
+
 function invalidateActiveRepoSnapshotQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient,
-  options: { excludeProjectionQueryKey?: readonly unknown[] } = {},
 ): void {
-  const excludedProjectionHash = options.excludeProjectionQueryKey ? hashKey(options.excludeProjectionQueryKey) : null
   void queryClient.invalidateQueries(
     {
       queryKey: repoDataQueryKey(repoRoot, workspaceRuntimeId),
       refetchType: 'active',
       predicate: (query) => {
         const kind = query.queryKey[3]
-        if (kind === 'projection') return !excludedProjectionHash || query.queryHash !== excludedProjectionHash
-        return kind === 'worktree-status' || kind === 'log' || kind === 'remote-branches'
+        return kind === 'projection' || kind === 'log' || kind === 'remote-branches'
       },
+    },
+    { cancelRefetch: false },
+  )
+}
+
+function invalidateActiveRepoProjectionQueries(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+  excludedQueryKey: readonly unknown[],
+): void {
+  const excludedProjectionHash = hashKey(excludedQueryKey)
+  void queryClient.invalidateQueries(
+    {
+      queryKey: repoDataQueryKey(repoRoot, workspaceRuntimeId),
+      refetchType: 'active',
+      predicate: (query) => query.queryKey[3] === 'projection' && query.queryHash !== excludedProjectionHash,
     },
     { cancelRefetch: false },
   )
@@ -252,7 +302,7 @@ export async function fetchRepoProjectionReadModel(
   const startedVersion = markRepoProjectionFetchStarted(repoRoot, workspaceRuntimeId, branch, mode, queryClient)
   const projection = await getRepoProjection(repoRoot, workspaceRuntimeId, branch, { mode }, signal)
   signal.throwIfAborted()
-  if (startedVersion < getRepoSnapshotInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)) {
+  if (startedVersion < getRepoProjectionInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)) {
     throw new StaleRepoRuntimeReadError()
   }
   return projection
@@ -333,11 +383,8 @@ interface RepoProjectionRefreshReadInput {
 }
 
 async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshReadInput): Promise<void> {
-  markRepoSnapshotInvalidated(input.repoRoot, input.workspaceRuntimeId, input.queryClient)
-  bumpRepoWorktreeStatusInvalidationVersion(input.repoRoot, input.workspaceRuntimeId, input.queryClient)
-  invalidateActiveRepoSnapshotQueries(input.repoRoot, input.workspaceRuntimeId, input.queryClient, {
-    excludeProjectionQueryKey: input.queryKey,
-  })
+  markRepoProjectionInvalidated(input.repoRoot, input.workspaceRuntimeId, input.queryClient)
+  invalidateActiveRepoProjectionQueries(input.repoRoot, input.workspaceRuntimeId, input.queryClient, input.queryKey)
   await invalidateExactRepoProjectionQuery(input.queryClient, input.queryKey)
 }
 
@@ -373,7 +420,7 @@ function repoProjectionReadCurrent(input: RepoProjectionRefreshReadInput): boole
   )
   return (
     fetchInvalidationVersion ===
-      getRepoSnapshotInvalidationVersion(input.repoRoot, input.workspaceRuntimeId, input.queryClient) &&
+      getRepoProjectionInvalidationVersion(input.repoRoot, input.workspaceRuntimeId, input.queryClient) &&
     input.queryClient.getQueryState(input.queryKey)?.isInvalidated !== true
   )
 }
@@ -434,26 +481,17 @@ export async function refreshRepoWorktreeStatusReadModel(
   const queryClient = options.queryClient ?? primaryWindowQueryClient
   const queryKey = repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId)
   await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
-  for (;;) {
-    try {
-      const snapshot = await abortablePromise(
-        queryClient.fetchQuery({
-          queryKey,
-          retry: (_failureCount, error) => isStaleRepoRuntimeReadError(error),
-          retryDelay: 0,
-          staleTime: 0,
-          queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, queryClient),
-        }),
-        options.signal,
-      )
-      options.signal?.throwIfAborted()
-      if (queryClient.getQueryState(queryKey)?.isInvalidated !== true) return snapshot
-    } catch (err) {
-      if (!isStaleRepoRuntimeReadError(err)) throw err
-    }
-    await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
-    options.signal?.throwIfAborted()
-  }
+  const snapshot = await abortablePromise(
+    queryClient.fetchQuery({
+      queryKey,
+      retry: false,
+      staleTime: 0,
+      queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, queryClient),
+    }),
+    options.signal,
+  )
+  options.signal?.throwIfAborted()
+  return snapshot
 }
 
 export function invalidateRepoSnapshotQueries(
@@ -462,11 +500,11 @@ export function invalidateRepoSnapshotQueries(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   markRepoSnapshotInvalidated(repoRoot, workspaceRuntimeId, queryClient)
-  bumpRepoWorktreeStatusInvalidationVersion(repoRoot, workspaceRuntimeId, queryClient)
+  markRepoProjectionInvalidated(repoRoot, workspaceRuntimeId, queryClient)
   invalidateActiveRepoSnapshotQueries(repoRoot, workspaceRuntimeId, queryClient)
 }
 
-export function invalidateRepoWorktreeSnapshotQueries(
+export function invalidateRepoWorktreeStatusQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,

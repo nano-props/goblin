@@ -93,20 +93,23 @@ Runtime creation follows three responsibility layers:
    runtime/tab writes, while explicit server operation permits let mutations
    admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then
-   clears the removed physical identity from every affected epoch index. It
-   does not use an old physical generation to authorize durable retirement;
+   clears the removed physical identity from every affected epoch index. An
+   exact admission lease prevents old cleanup from clearing a newer same-path
+   binding, but it does not model filesystem generation or revalidate external
+   state at execution time. Cleanup cannot authorize durable retirement;
    invalid rows stay suppressed by the repo projection and are removed by the
    next membership-aware atomic repair. Branch retirement remains a direct
-   aggregate command. A Git failure reconciles runtime tabs while preserving
-   the worktree's static projection. Git success followed by finalize failure
-   is reported as a committed repository change and remains idempotently retryable.
+   aggregate command. A Git failure returns directly; resources already
+   quiesced remain closed and the user repairs or retries. Git success followed
+   by finalize failure is reported as a committed repository change, and a
+   later authoritative read converges the projection.
    Provider commands return the exact target lifecycle effect plus the
    canonical tabs snapshot produced by that command. Full terminal collections
    are query snapshots with their own terminal projection revision; clients
    apply terminal and tabs snapshots independently, so neither model borrows
    the other's revision as a freshness proxy.
    Terminal close itself is a manager-owned, idempotent promise: concurrent
-   tab close, prune, runtime cleanup, and worktree quiescence join the same PTY
+   tab close, runtime cleanup, and worktree quiescence join the same PTY
    termination acknowledgement before the session leaves authoritative state.
 3. The client command/projection owns only admission/dedupe, revision-gated
    cache projection, opener facts, cancellation, and exact route completion.

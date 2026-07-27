@@ -7,23 +7,13 @@ import {
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 describe('physical worktree operation coordinator', () => {
-  test('admits one queue for multiple generations of the same identity', async () => {
+  test('admits one queue for multiple captures of the same stable identity', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const oldCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
-      execution: {
-        kind: 'local',
-        canonicalWorktreePath: identity.endpoint,
-        endpointMarker: { deviceId: '1', inode: '1' },
-      },
     })
     const currentCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
-      execution: {
-        kind: 'local',
-        canonicalWorktreePath: identity.endpoint,
-        endpointMarker: { deviceId: '1', inode: '2' },
-      },
     })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     let executions = 0
@@ -101,7 +91,7 @@ describe('physical worktree operation coordinator', () => {
     await expect(coordinator.runRemoval(capability, async () => 'removed')).resolves.toMatchObject({ admitted: true })
   })
 
-  test('uses a live indexed lease when another indexed generation is already aborted', async () => {
+  test('uses a live indexed lease when another capture is already aborted', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const aborted = new AbortController()
     aborted.abort()
@@ -156,6 +146,51 @@ describe('physical worktree operation coordinator', () => {
     await held
     const replacement = issueTestPhysicalWorktreeExecutionCapability({ identity: a.identity })
     await expect(coordinator.runRemoval(replacement, async () => 'removed')).resolves.toMatchObject({ admitted: true })
+  })
+
+  test('runtime close cancels a queued operation without running it', async () => {
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const held = issueTestPhysicalWorktreeExecutionCapability({ identity })
+    const runtime = new AbortController()
+    const queued = issueTestPhysicalWorktreeExecutionCapability({ identity, runtimeSignal: runtime.signal })
+    const coordinator = createPhysicalWorktreeOperationCoordinator()
+    const gate = deferred<void>()
+    const active = coordinator.runOperation(held, async () => await gate.promise)
+    await Promise.resolve()
+    let ran = false
+    const operation = coordinator.runOperation(queued, async () => {
+      ran = true
+    })
+
+    runtime.abort(new Error('error.workspace-runtime-stale'))
+    await expect(operation).rejects.toThrow('error.workspace-runtime-stale')
+    expect(ran).toBe(false)
+    gate.resolve()
+    await active
+  })
+
+  test('runtime close cancels a queued removal without running it', async () => {
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const held = issueTestPhysicalWorktreeExecutionCapability({ identity })
+    const runtime = new AbortController()
+    const removalCapability = issueTestPhysicalWorktreeExecutionCapability({
+      identity,
+      runtimeSignal: runtime.signal,
+    })
+    const coordinator = createPhysicalWorktreeOperationCoordinator()
+    const gate = deferred<void>()
+    const active = coordinator.runOperation(held, async () => await gate.promise)
+    await Promise.resolve()
+    let ran = false
+    const removal = coordinator.runRemoval(removalCapability, async () => {
+      ran = true
+    })
+
+    runtime.abort(new Error('error.workspace-runtime-stale'))
+    await expect(removal).rejects.toThrow('error.workspace-runtime-stale')
+    expect(ran).toBe(false)
+    gate.resolve()
+    await active
   })
 })
 

@@ -8,7 +8,6 @@ import {
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
   getRemoteWorktreeBootstrapPreview,
@@ -17,7 +16,6 @@ import {
   remoteCommandExists,
   remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
-  parseRemoteRepoExecutionIdentity,
   remoteExecResult,
   removeRemoteWorktree,
   type RemoteGitRunner,
@@ -82,7 +80,6 @@ export const MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT = [
 export const SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
   afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
-  afterRemoveFailed: async () => {},
 }
 
 export function okRemoteResult(stdout: string): RemoteCommandResult {

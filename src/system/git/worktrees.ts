@@ -1,55 +1,13 @@
 import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
-import { haveSameWorktrees, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
-import { mapWithConcurrency } from '#/system/git/concurrency.ts'
+import { parseWorktrees } from '#/system/git/parsers.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
-
-const WORKTREE_STATUS_CONCURRENCY = 16
-
-export type WorktreeStatusRead =
-  | { kind: 'bare'; worktree: WorktreeInfo }
-  | { kind: 'status'; worktree: WorktreeInfo; entries: ReturnType<typeof parseStatus> }
-
-interface GetWorktreesOptions {
-  includeStatus?: boolean
-  signal?: AbortSignal
-}
-
-export async function getWorktrees(cwd: string, options?: GetWorktreesOptions): Promise<WorktreeInfo[]> {
-  const worktrees = await readWorktreeMembership(cwd, options?.signal)
-  if (options?.includeStatus === false) return worktrees
-  const samples = await sampleWorktreeStatus(worktrees, options?.signal)
-  const finalWorktrees = await readWorktreeMembership(cwd, options?.signal)
-  if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('Worktree membership changed during status read')
-  return samples.map((sample) =>
-    sample.kind === 'status'
-      ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
-      : sample.worktree,
-  )
-}
 
 export async function readWorktreeMembership(cwd: string, signal?: AbortSignal): Promise<WorktreeInfo[]> {
   signal?.throwIfAborted()
   const output = await git(cwd, ['worktree', 'list', '--porcelain', '-z'], { signal })
   signal?.throwIfAborted()
   return parseWorktrees(output)
-}
-
-export async function sampleWorktreeStatus(
-  worktrees: readonly WorktreeInfo[],
-  signal?: AbortSignal,
-): Promise<WorktreeStatusRead[]> {
-  return await mapWithConcurrency(
-    [...worktrees],
-    WORKTREE_STATUS_CONCURRENCY,
-    async (wt): Promise<WorktreeStatusRead> => {
-      if (wt.isBare) return { kind: 'bare', worktree: wt }
-      const out = await git(wt.path, ['status', '--porcelain', '-z'], { signal })
-      const entries = parseStatus(out)
-      return { kind: 'status', worktree: wt, entries }
-    },
-    { signal, abort: 'throw' },
-  )
 }
 
 /** Worktree create/remove can both touch tens of thousands of files

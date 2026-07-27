@@ -427,42 +427,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })
 
-  test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
-    const failure = new RemoteWorkspaceRuntimeFailureError({
-      workspaceId: request.workspaceId,
-      workspaceRuntimeId: request.workspaceRuntimeId,
-      reason: 'unreachable',
-      message: 'connection refused',
-    })
-    const capability = issueTestPhysicalWorktreeExecutionCapability({
-      identity: testPhysicalWorktreeIdentity(request.worktreePath),
-      validateExecution: async () => {
-        throw failure
-      },
-    })
-    const create = vi.fn()
-    const ensureRuntimeTabForSession = vi.fn()
-    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
-    const application = createWorkspacePaneRuntimeApplication({
-      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      physicalWorktrees: { capture: async () => capability },
-      terminalSessions: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
-      workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
-      broadcastWorkspaceTabsChanged: vi.fn(),
-    })
-
-    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
-      ok: false,
-      runtimeType: 'terminal',
-      message: 'connection refused',
-    })
-    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
-    expect(create).not.toHaveBeenCalled()
-    expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
-  })
-
   test.each(['created', 'reused', 'restored'] as const)(
     'rechecks workspace runtime authority at the tab commit boundary for a %s terminal',
     async (action) => {

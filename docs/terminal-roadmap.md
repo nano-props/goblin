@@ -117,9 +117,14 @@ responsibilities are split into focused server modules:
 - `terminal-session-creator.ts` owns create orchestration
 - `terminal-session-create-coordinator.ts` owns per-filesystem-target create queueing and terminal session id allocation
 - `terminal-session-ensurer.ts` owns local/remote session ensure input construction
-- `terminal-session-pruner.ts` owns removed-worktree session pruning
 - workspace-pane runtime tab modules own workspace tab operation queueing,
-  read-side canonicalization, and pure prune/materialize/dedupe rules
+  read-side canonicalization, and pure filter/materialize/dedupe rules
+
+Out-of-band Git changes do not trigger terminal recovery or session pruning.
+A terminal remains owned by its normal lifecycle until the user closes it, the
+process exits, or its workspace runtime closes. If its execution path is no
+longer usable, the next operation fails directly and the user repairs, closes,
+or reopens it; projection refreshes must not compensate by retiring the PTY.
 
 The public behavior remains server-first: clients use server-returned canonical
 tabs/sessions and do not infer terminal runtime-tab projection state locally.

@@ -3,7 +3,6 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
 import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { validatePhysicalWorktreeExecution } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_INPUT = {
@@ -12,8 +11,6 @@ const LOCAL_INPUT = {
   workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktrees/alias',
 }
-const LOCAL_MARKER = { deviceId: '10', inode: '20' }
-
 describe('PhysicalWorktreeIdentityResolver', () => {
   test('captures the local workspace root without requiring Git worktree membership', async () => {
     const getLocalWorktrees = vi.fn()
@@ -21,9 +18,6 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       getLocalWorktrees,
       async nativeRealpath(input) {
         return input
-      },
-      async nativeStat() {
-        return LOCAL_MARKER
       },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
@@ -36,7 +30,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     resolver.dispose()
   })
 
-  test('freshly validates and canonicalizes every local operation while binding one runtime identity', async () => {
+  test('freshly resolves and canonicalizes every local operation', async () => {
     let worktreeReads = 0
     const getLocalWorktrees = vi.fn(async () => {
       worktreeReads += 1
@@ -46,9 +40,6 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       getLocalWorktrees,
       async nativeRealpath() {
         return '/volumes/repo/worktrees/feature'
-      },
-      async nativeStat() {
-        return LOCAL_MARKER
       },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
@@ -65,61 +56,34 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       identity: { endpoint: '/volumes/repo/worktrees/feature' },
     })
     expect(worktreeReads).toBe(2)
-    expect(getLocalWorktrees).toHaveBeenCalledWith('/repos/main', {
-      includeStatus: false,
-      signal: expect.any(AbortSignal),
-    })
+    expect(getLocalWorktrees).toHaveBeenCalledWith('/repos/main', expect.any(AbortSignal))
     resolver.dispose()
   })
 
-  test('marks a runtime stale when a fresh local canonical endpoint changes', async () => {
-    let canonicalPath = '/volumes/repo/worktrees/feature'
+  test('accepts a same-path worktree recreated during one runtime', async () => {
+    let present = true
     const resolver = new PhysicalWorktreeIdentityResolver({
       async getLocalWorktrees() {
-        return [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo]
+        return present ? [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo] : []
       },
       async nativeRealpath() {
-        return canonicalPath
-      },
-      async nativeStat() {
-        return LOCAL_MARKER
+        return '/volumes/repo/worktrees/feature'
       },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
 
     await resolver.capture(LOCAL_INPUT)
-    canonicalPath = '/volumes/repo/worktrees/replaced-feature'
-    await expect(resolver.capture(LOCAL_INPUT)).rejects.toThrow('error.workspace-runtime-stale')
-    resolver.dispose()
-  })
-
-  test('rejects a captured local capability when the canonical path is recreated with a new inode', async () => {
-    let marker = LOCAL_MARKER
-    const resolver = new PhysicalWorktreeIdentityResolver({
-      async getLocalWorktrees() {
-        return [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo]
-      },
-      async nativeRealpath() {
-        return '/volumes/repo/worktrees/feature'
-      },
-      async nativeStat() {
-        return marker
-      },
-      isCurrentWorkspaceRuntime: () => true,
-      onWorkspaceRuntimeClosed: () => () => undefined,
+    present = false
+    await expect(resolver.capture(LOCAL_INPUT)).rejects.toThrow('error.invalid-worktree-path')
+    present = true
+    await expect(resolver.capture(LOCAL_INPUT)).resolves.toMatchObject({
+      identity: { endpoint: '/volumes/repo/worktrees/feature' },
     })
-    const capability = await resolver.capture(LOCAL_INPUT)
-
-    marker = { deviceId: LOCAL_MARKER.deviceId, inode: '21' }
-
-    await expect(validatePhysicalWorktreeExecution(capability, undefined)).rejects.toThrow(
-      'error.workspace-runtime-stale',
-    )
     resolver.dispose()
   })
 
-  test('marks a remote runtime stale when the execution endpoint changes under one SSH config', async () => {
+  test('recaptures remote identity under one stable SSH configuration', async () => {
     const workspaceId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     let remoteOutput = remoteIdentityOutput('0123456789abcdef0123456789abcdef', 'machine-a', 'mnt-a')
     const runRemoteCommand = vi.fn(async () => ({ ok: true, stdout: remoteOutput, stderr: '' }))
@@ -149,8 +113,56 @@ describe('PhysicalWorktreeIdentityResolver', () => {
 
     await resolver.capture(input)
     remoteOutput = remoteIdentityOutput('fedcba9876543210fedcba9876543210', 'machine-b', 'mnt-b')
-    await expect(resolver.capture(input)).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(resolver.capture(input)).resolves.toMatchObject({
+      identity: { kind: 'remote', endpoint: '/srv/worktrees/feature' },
+    })
     expect(runRemoteCommand).toHaveBeenCalledTimes(2)
+    resolver.dispose()
+  })
+
+  test.each([
+    ['/srv/repo', '/srv/repo'],
+    ['/srv/repo', '/srv/worktrees/feature'],
+    ['/srv/worktrees/feature', '/srv/repo'],
+  ])('fails fast when SSH configuration changes between %s and %s', async (firstPath, secondPath) => {
+    const workspaceId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    let configFingerprint = 'config-a'
+    const runRemoteCommand = vi.fn(async (command) => {
+      if (command.type !== 'resolvePhysicalWorktreeIdentity') throw new Error('unexpected command')
+      return {
+        ok: true,
+        stdout: remoteIdentityOutput('0123456789abcdef0123456789abcdef', 'machine-a', 'mnt-a', command.path),
+        stderr: '',
+      }
+    })
+    const resolver = new PhysicalWorktreeIdentityResolver({
+      async resolveRemoteTarget() {
+        return {
+          target: {
+            id: workspaceId,
+            alias: 'prod',
+            host: 'example.invalid',
+            user: 'developer',
+            port: 22,
+            remotePath: '/srv/repo',
+            displayName: 'prod',
+          },
+          configFingerprint,
+        }
+      },
+      async resolveRemoteWorktree(_target, worktreePath) {
+        return { path: worktreePath } as WorktreeInfo
+      },
+      runRemoteCommand,
+      isCurrentWorkspaceRuntime: () => true,
+      onWorkspaceRuntimeClosed: () => () => undefined,
+    })
+    await resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: firstPath })
+    configFingerprint = 'config-b'
+    await expect(resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: secondPath })).rejects.toThrow(
+      'error.workspace-runtime-stale',
+    )
+    expect(runRemoteCommand).toHaveBeenCalledOnce()
     resolver.dispose()
   })
 
@@ -209,9 +221,6 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() {
-        return LOCAL_MARKER
-      },
       isCurrentWorkspaceRuntime: () => current,
       onWorkspaceRuntimeClosed(listener) {
         closedListener = listener
@@ -241,9 +250,6 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() {
-        return LOCAL_MARKER
-      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
@@ -262,9 +268,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   test('workspace runtime close aborts every waiter for the shared resolve', async () => {
     let closedListener: (event: WorkspaceRuntimeClosedEvent) => void = () => undefined
     const resolver = new PhysicalWorktreeIdentityResolver({
-      async getLocalWorktrees(_workspacePath, options) {
+      async getLocalWorktrees(_workspacePath, signal) {
         return await new Promise<WorktreeInfo[]>((_resolve, reject) => {
-          options?.signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
+          signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
         })
       },
       isCurrentWorkspaceRuntime: () => true,
@@ -294,9 +300,6 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() {
-        return LOCAL_MARKER
-      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
@@ -308,6 +311,11 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 })
 
-function remoteIdentityOutput(runtimeToken: string, machineFact: string, rootFact: string): string {
-  return `${runtimeToken}\0${machineFact}\0${rootFact}\0/srv/worktrees/feature\0${LOCAL_MARKER.deviceId}\0${LOCAL_MARKER.inode}\0`
+function remoteIdentityOutput(
+  runtimeToken: string,
+  machineFact: string,
+  rootFact: string,
+  endpoint = '/srv/worktrees/feature',
+): string {
+  return `${runtimeToken}\0${machineFact}\0${rootFact}\0${endpoint}\0`
 }

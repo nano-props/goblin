@@ -93,7 +93,6 @@ function makeActions(
   }
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
-    prune: vi.fn(),
     listSessions: vi.fn(),
   }
   return {
@@ -128,10 +127,8 @@ describe('terminal-runtime-actions membership', () => {
     const { actions, manager, sessionService } = makeActions()
     const input = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
 
-    await expect(actions.prune(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
     await expect(actions.recoverSessions(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
     await expect(actions.listSessions(CLIENT_ID, USER_ID, input)).rejects.toThrow('error.workspace-runtime-stale')
-    expect(sessionService.prune).not.toHaveBeenCalled()
     expect(sessionService.listSessions).not.toHaveBeenCalled()
     expect(manager.terminalSessionsSnapshotForUser).not.toHaveBeenCalled()
   })
@@ -215,24 +212,6 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
-    expect(broadcasts).not.toHaveBeenCalled()
-  })
-})
-
-describe('terminal-runtime-actions prune', () => {
-  test('rejects stale repo-runtime prune requests before touching session state', async () => {
-    clearWorkspaceRuntimesForUser(USER_ID)
-    syncCurrentWorkspaceRuntime()
-    const { actions, broadcasts, sessionService } = makeActions()
-
-    await expect(
-      actions.prune(CLIENT_ID, USER_ID, {
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-stale',
-      }),
-    ).rejects.toThrow('error.workspace-runtime-stale')
-
-    expect(sessionService.prune).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
   })
 })

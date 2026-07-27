@@ -181,7 +181,7 @@ export function CreateWorktreePagePane({
     const result = await runBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
-      { workspaceRuntimeId: liveRepo.workspaceRuntimeId, refreshOnError: false },
+      { workspaceRuntimeId: liveRepo.workspaceRuntimeId },
     )
     if (result?.ok) onCreated(createWorktreeTargetBranch(request.input))
     return false

@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { RemoteWorkspaceTarget } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   LINKED_REPO_ID,
@@ -13,7 +12,7 @@ import {
 
 describe('fetchRepo canonical boundaries', () => {
   test('does not execute fetch when affected-worktree discovery fails', async () => {
-    mocks.getWorktrees.mockRejectedValueOnce(new Error('worktree discovery failed'))
+    mocks.readWorktreeMembership.mockRejectedValueOnce(new Error('worktree discovery failed'))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -36,7 +35,7 @@ describe('fetchRepo canonical boundaries', () => {
   test.each([
     ['user', 'user'],
     ['background', 'background'],
-  ])('%s sync fetches prune stale remote-tracking refs', async (_name, kind) => {
+  ])('%s sync publishes snapshot invalidation after fetching with prune', async (_name, kind) => {
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
@@ -44,6 +43,7 @@ describe('fetchRepo canonical boundaries', () => {
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
   })
 
   test('merges caller abort signal into fetch operations', async () => {
@@ -52,14 +52,14 @@ describe('fetchRepo canonical boundaries', () => {
       expect(signal?.aborted).toBe(false)
       caller.abort('stopped')
       expect(signal?.aborted).toBe(true)
-      return { ok: false, message: 'cancelled' }
+      return { ok: false, message: 'cancelled', repositoryStateChanged: true }
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
-    expect(result).toEqual({ ok: false, message: 'cancelled' })
-    expectNoRepoSnapshotInvalidations()
+    expect(result).toEqual({ ok: false, message: 'cancelled', repositoryStateChanged: true })
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
@@ -90,9 +90,9 @@ describe('fetchRepo canonical boundaries', () => {
   })
 
   test('publishes sibling worktree snapshot invalidations after a successful sync', async () => {
-    mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
-      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
@@ -116,9 +116,9 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
-    mocks.getWorktrees.mockResolvedValue([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
-      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValue([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
@@ -198,45 +198,9 @@ describe('fetchRepo canonical boundaries', () => {
     )
   })
 
-  test('fast-fails a queued remote write when its captured target changes', async () => {
-    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    let host = 'host-a.example'
-    mocks.resolveRemoteTarget.mockImplementation(async () => ({
-      target: {
-        id: repoId,
-        alias: 'prod',
-        host,
-        user: 'deploy',
-        port: 22,
-        remotePath: '/srv/repo',
-        displayName: 'prod:repo',
-      },
-    }))
-    const activeFetch = deferred<{ ok: true; message: string }>()
-    mocks.fetchRemoteRepo.mockImplementationOnce(async () => await activeFetch.promise)
-    mocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched current target' })
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const active = fetchRepo(repoId, 'background')
-    await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1))
-    const stale = fetchRepo(repoId, 'user')
-    await vi.waitFor(() => expect(mocks.resolveRemoteTarget).toHaveBeenCalledTimes(3))
-
-    host = 'host-b.example'
-    const current = fetchRepo(repoId, 'user')
-    activeFetch.resolve({ ok: true, message: 'fetched original target' })
-
-    await expect(active).resolves.toEqual({ ok: true, message: 'fetched original target' })
-    await expect(stale).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
-    await expect(current).resolves.toEqual({ ok: true, message: 'fetched current target' })
-    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
-    expect(mocks.fetchRemoteRepo.mock.calls[0]?.[0]).toMatchObject({ host: 'host-a.example' })
-    expect(mocks.fetchRemoteRepo.mock.calls[1]?.[0]).toMatchObject({ host: 'host-b.example' })
-  })
-
   test('does not admit a remote write without a confirmed canonical boundary', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    mocks.resolveRemoteRepoExecutionIdentity.mockResolvedValue(null)
+    mocks.resolveRemoteRepoCommonDir.mockResolvedValue(null)
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     await expect(fetchRepo(repoId, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
@@ -249,66 +213,6 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
     expect(mocks.fetchAll).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails when a local locator changes its canonical execution root', async () => {
-    mocks.fsRealpath.mockResolvedValueOnce('/physical/repo-a').mockResolvedValueOnce('/physical/repo-b')
-    mocks.resolveRepoCommonDir.mockResolvedValue('/physical/shared/.git')
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
-      ok: false,
-      message: 'error.repository-target-changed',
-    })
-    expect(mocks.fetchAll).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails when a local common directory is replaced at the same canonical path', async () => {
-    mocks.fsStat
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 11n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
-      ok: false,
-      message: 'error.repository-target-changed',
-    })
-    expect(mocks.fetchAll).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails when a local object store is recreated inside the retained common directory', async () => {
-    mocks.fsStat
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(REPO_ID, 'user')).resolves.toEqual({
-      ok: false,
-      message: 'error.repository-target-changed',
-    })
-    expect(mocks.fsStat).toHaveBeenNthCalledWith(1, '/tmp/repo/.git', { bigint: true })
-    expect(mocks.fsStat).toHaveBeenNthCalledWith(2, '/tmp/repo/.git/objects', { bigint: true })
-    expect(mocks.fsStat).toHaveBeenNthCalledWith(3, '/tmp/repo/.git', { bigint: true })
-    expect(mocks.fsStat).toHaveBeenNthCalledWith(4, '/tmp/repo/.git/objects', { bigint: true })
-    expect(mocks.fetchAll).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails when a remote repository is replaced at the same canonical path', async () => {
-    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    mocks.resolveRemoteRepoExecutionIdentity
-      .mockResolvedValueOnce({ commonDir: '/srv/repo/.git', generationKey: 'remote-generation-1' })
-      .mockResolvedValueOnce({ commonDir: '/srv/repo/.git', generationKey: 'remote-generation-2' })
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(repoId, 'user')).resolves.toEqual({
-      ok: false,
-      message: 'error.repository-target-changed',
-    })
-    expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
   })
 
   test('does not bind a local read to a locator when canonical resolution fails', async () => {
@@ -330,7 +234,6 @@ describe('fetchRepo canonical boundaries', () => {
     const lifecycle = {
       beforeRemove,
       afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-      afterRemoveFailed: vi.fn(async () => {}),
     }
     const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
       import('#/server/modules/repo-write-paths.ts'),
@@ -346,10 +249,8 @@ describe('fetchRepo canonical boundaries', () => {
         execution: {
           kind: 'local',
           canonicalWorktreePath: '/tmp/repo-worktree',
-          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
         },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       },
     )
 
@@ -379,10 +280,9 @@ describe('fetchRepo canonical boundaries', () => {
         {
           beforeRemove,
           afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
         },
       ),
-    ).rejects.toThrow('error.repository-target-changed')
+    ).rejects.toThrow('error.repository-boundary-unavailable')
     expect(beforeRemove).not.toHaveBeenCalled()
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(repoWriteOperationCoordinatorStatsForTests()).toEqual({
@@ -427,10 +327,8 @@ describe('fetchRepo canonical boundaries', () => {
         execution: {
           kind: 'local',
           canonicalWorktreePath: '/tmp/repo-worktree',
-          endpointMarker: { deviceId: '1', inode: '1' },
         },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       },
     )
 
@@ -440,7 +338,6 @@ describe('fetchRepo canonical boundaries', () => {
       {
         beforeRemove,
         afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-        afterRemoveFailed: vi.fn(async () => {}),
       },
       physicalWorktreeCapability,
       undefined,
@@ -456,7 +353,7 @@ describe('fetchRepo canonical boundaries', () => {
       releaseCapture.resolve()
 
       await expect(removal).rejects.toThrow('error.workspace-runtime-stale')
-      expect(mocks.getWorktrees).not.toHaveBeenCalled()
+      expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
       expect(beforeRemove).not.toHaveBeenCalled()
       expect(mocks.removeWorktree).not.toHaveBeenCalled()
       expect(coordinator.repoWriteOperationCoordinatorStatsForTests()).toEqual({
@@ -470,145 +367,6 @@ describe('fetchRepo canonical boundaries', () => {
       releaseCapture.resolve()
       workspaceRuntimes.clearWorkspaceRuntimesForUser(userId)
     }
-  })
-
-  test('fast-fails captured worktree removal when its repository generation changes', async () => {
-    mocks.fsStat
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 20n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 10n })
-      .mockResolvedValueOnce({ isDirectory: () => true, dev: 1n, ino: 21n })
-    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const lifecycle = {
-      beforeRemove,
-      afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-      afterRemoveFailed: vi.fn(async () => {}),
-    }
-    const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
-      import('#/server/modules/repo-write-paths.ts'),
-      import('#/server/worktree-removal/physical-worktree-capability.ts'),
-    ])
-    const physicalWorktreeCapability = issuePhysicalWorktreeExecutionCapability(
-      { kind: 'local', executionNamespaceId: 'local', endpoint: '/tmp/repo-worktree' },
-      {
-        userId: 'test-user',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: 'test-runtime',
-        worktreePath: '/tmp/repo-worktree',
-        execution: {
-          kind: 'local',
-          canonicalWorktreePath: '/tmp/repo-worktree',
-          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
-        },
-        runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
-      },
-    )
-
-    await expect(
-      removeCapturedRepoWorktree(
-        REPO_ID,
-        { branch: 'feature/a', worktreePath: '/tmp/repo-worktree', deleteBranch: true },
-        lifecycle,
-        physicalWorktreeCapability,
-      ),
-    ).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
-    expect(beforeRemove).not.toHaveBeenCalled()
-    expect(mocks.removeWorktree).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails captured worktree removal when its workspace locator moves to another repository', async () => {
-    let repoLocatorReads = 0
-    mocks.fsRealpath.mockImplementation(async (cwd: string) => {
-      if (cwd !== '/tmp/repo') return cwd
-      repoLocatorReads += 1
-      return repoLocatorReads === 1 ? '/tmp/repo' : '/tmp/replacement-repo'
-    })
-    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-
-    await expect(
-      removeLocalRepoWorktreeForTest(
-        { deleteBranch: true },
-        {
-          beforeRemove,
-          afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
-        },
-      ),
-    ).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
-    expect(beforeRemove).not.toHaveBeenCalled()
-    expect(mocks.removeWorktree).not.toHaveBeenCalled()
-  })
-
-  test('fast-fails captured worktree removal when its SSH locator moves to another repository', async () => {
-    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    const targetA: RemoteWorkspaceTarget = {
-      id: repoId,
-      alias: 'prod',
-      host: 'repo-a.example.test',
-      user: 'deploy',
-      port: 22,
-      remotePath: '/srv/repo',
-      displayName: 'prod:repo',
-      sshConnection: {
-        destination: 'prod',
-        options: ['hostname=repo-a.example.test', 'user=deploy', 'port=22'],
-      },
-    }
-    const targetB: RemoteWorkspaceTarget = {
-      ...targetA,
-      host: 'repo-b.example.test',
-      remotePath: '/srv/replacement-repo',
-      sshConnection: {
-        destination: 'prod',
-        options: ['hostname=repo-b.example.test', 'user=deploy', 'port=22'],
-      },
-    }
-    mocks.resolveRemoteTarget
-      .mockResolvedValueOnce({ target: targetA, configFingerprint: 'config-a' })
-      .mockResolvedValueOnce({ target: targetB, configFingerprint: 'config-b' })
-    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
-      import('#/server/modules/repo-write-paths.ts'),
-      import('#/server/worktree-removal/physical-worktree-capability.ts'),
-    ])
-    const physicalWorktreeCapability = issuePhysicalWorktreeExecutionCapability(
-      { kind: 'remote', executionNamespaceId: 'prod', endpoint: '/srv/repo-worktree' },
-      {
-        userId: 'test-user',
-        workspaceId: repoId,
-        workspaceRuntimeId: 'test-runtime',
-        worktreePath: '/srv/repo-worktree',
-        execution: {
-          kind: 'remote',
-          canonicalWorktreePath: '/srv/repo-worktree',
-          target: targetA,
-          configFingerprint: 'config-a',
-          endpointMarker: { deviceId: '1', inode: '1' },
-        },
-        runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
-      },
-    )
-
-    await expect(
-      removeCapturedRepoWorktree(
-        repoId,
-        { branch: 'feature/a', worktreePath: '/srv/repo-worktree', deleteBranch: true },
-        {
-          beforeRemove,
-          afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
-        },
-        physicalWorktreeCapability,
-      ),
-    ).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
-    expect(beforeRemove).not.toHaveBeenCalled()
-    expect(mocks.removeRemoteWorktree).not.toHaveBeenCalled()
   })
 
   test('preserves cancellation while resolving a local canonical boundary', async () => {

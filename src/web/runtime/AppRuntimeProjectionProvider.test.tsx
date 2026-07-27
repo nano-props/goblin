@@ -19,7 +19,6 @@ import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import * as repoDataQuery from '#/web/repo-query-runtime.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
@@ -145,28 +144,6 @@ describe('AppRuntimeProjectionProvider', () => {
       })
       expect(kickReconnectMock).not.toHaveBeenCalled()
     } finally {
-      result.unmount()
-    }
-  })
-
-  test('invalidates Git status when the application becomes visible again', async () => {
-    const repo = seedCurrentRepo()
-    const invalidate = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeSnapshotQueries')
-    const result = renderRuntimeProvider(repo.id)
-    try {
-      await act(async () => {
-        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
-        document.dispatchEvent(new Event('visibilitychange'))
-      })
-      expect(invalidate).toHaveBeenCalledWith(repo.id, repo.workspaceRuntimeId)
-
-      invalidate.mockClear()
-      await act(async () => {
-        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
-      })
-      expect(invalidate).toHaveBeenCalledWith(repo.id, repo.workspaceRuntimeId)
-    } finally {
-      invalidate.mockRestore()
       result.unmount()
     }
   })
@@ -698,7 +675,6 @@ function testBridge(): ClientBridge {
         phase: 'open' as const,
       })),
       close: vi.fn(async () => true),
-      pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: recoverSessionsMock,
       notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),

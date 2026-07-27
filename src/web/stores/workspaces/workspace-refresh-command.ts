@@ -2,6 +2,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import { requestWorkspaceCapabilityRefresh } from '#/web/workspace-capability-refresh.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -62,7 +63,10 @@ async function runManualWorkspaceRefreshOnce(
   if (!resolved || !isGitWorkspace(resolved.repo)) return { ok: true }
   const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
     refreshProjectionReadModel: async (repoId, nextWorkspaceRuntimeId) => {
-      await requestRepoProjectionReadModelRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId })
+      await Promise.all([
+        requestRepoProjectionReadModelRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId }),
+        refreshRepoWorktreeStatus(store, repoId, nextWorkspaceRuntimeId),
+      ])
     },
   })
   await runExclusiveOperation({

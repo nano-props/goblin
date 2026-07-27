@@ -99,7 +99,7 @@ describe('WorktreeRemovalApplication', () => {
     await expect(removal).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
-  test('reconciles every affected user scope after Git removal fails', async () => {
+  test('returns a Git removal failure without compensating closed resources', async () => {
     const affectedScopes = [
       {
         userId: 'user-a',
@@ -116,12 +116,10 @@ describe('WorktreeRemovalApplication', () => {
         worktreePath: '/repo/worktree',
       },
     ]
-    const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => {})
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createApplication({
       terminalScopes: affectedScopes,
-      reconcilePhysicalWorktreeAfterRemovalFailure,
       retireTarget,
       broadcastWorkspaceTabsChanged,
     })
@@ -132,29 +130,13 @@ describe('WorktreeRemovalApplication', () => {
         async remove(_capability, lifecycle) {
           const prepared = await lifecycle.beforeRemove()
           if (!prepared.ok) return prepared
-          await lifecycle.afterRemoveFailed()
           return { ok: false, message: 'git remove failed' }
         },
       }),
     ).resolves.toEqual({ ok: false, message: 'git remove failed' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledWith({
-      workspaceId: target.repoRoot,
-      worktreePath: target.worktreePath,
-      physicalWorktreeCapability: expect.objectContaining({
-        identity: testPhysicalWorktreeIdentity(target.worktreePath),
-      }),
-      permit: expect.objectContaining({ operationId: expect.any(Number) }),
-      scopes: affectedScopes.map(({ userId, scope, worktreePath }) => ({
-        userId,
-        scope,
-        workspaceId: target.repoRoot,
-        worktreePath,
-      })),
-    })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', target.repoRoot)
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-b', target.repoRoot)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('leaves runtime resources untouched when repository validation rejects removal', async () => {
@@ -174,10 +156,8 @@ describe('WorktreeRemovalApplication', () => {
 
   test('aborts before Git remove when terminal quiescence cannot be confirmed', async () => {
     const removeCommit = vi.fn()
-    const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const application = createApplication({
       terminalQuiescence: { ok: false, scopes: [], message: 'PTY close timed out' },
-      reconcilePhysicalWorktreeAfterRemovalFailure,
     })
 
     await expect(
@@ -192,7 +172,6 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
     expect(removeCommit).not.toHaveBeenCalled()
-    expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledOnce()
   })
 
   test('runtime close cancels an admitted removal before the destructive mutation settles', async () => {
@@ -259,30 +238,6 @@ describe('WorktreeRemovalApplication', () => {
     expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
-  test('fails remote lifecycle when queued validation hits a remote runtime failure', async () => {
-    const failure = new RemoteWorkspaceRuntimeFailureError({
-      workspaceId: target.repoRoot,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      reason: 'unreachable',
-      message: 'connection refused',
-    })
-    const capability = issueTestPhysicalWorktreeExecutionCapability({
-      identity: testPhysicalWorktreeIdentity(target.worktreePath),
-      validateExecution: async () => {
-        throw failure
-      },
-    })
-    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
-    const application = createApplication({
-      physicalWorktrees: { capture: async () => capability },
-    })
-
-    await expect(
-      application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
-    ).resolves.toEqual({ ok: false, message: 'connection refused' })
-    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
-  })
-
   test('does not retire pane layout after worktree and branch removal', async () => {
     const retireTarget = vi.fn(async () => {})
     const application = createApplication({ retireTarget })
@@ -325,7 +280,7 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
-  test('does not retire durable layout from a removed physical generation', async () => {
+  test('does not retire durable layout from a removed physical binding', async () => {
     const retireTarget = vi.fn(async () => {})
     const physicalWorktreeTargets = [
       {
@@ -394,7 +349,6 @@ function createApplication(
           message: string
         }
     closeSessionsForPhysicalWorktree?: (identity: PhysicalWorktreeIdentity) => Promise<TestTerminalScope[]>
-    reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
@@ -418,8 +372,6 @@ function createApplication(
     workspaceTabs: {
       physicalWorktreeTargets: () => options.physicalWorktreeTargets ?? [],
       clearPhysicalWorktreeIndex: options.clearPhysicalWorktreeIndex ?? (async () => {}),
-      reconcilePhysicalWorktreeAfterRemovalFailure:
-        options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
     isCurrentWorkspaceRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

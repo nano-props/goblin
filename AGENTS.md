@@ -42,6 +42,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 
 - Read-only git commands may run concurrently.
 - Keep network git commands (`fetch`, `pull`, `push`) cancellable and coalesced per repo.
+- Correctness guarantees cover Git operations initiated through the app, not concurrent mutations from terminals or other external Git processes. Treat external Git activity as out-of-band. If it invalidates a current operation, fail directly and require the user to repair, retry, or reopen; later app/background authoritative reads only need to converge the projection to the resulting Git state. Do not add locks, repeated admission checks, compensation, rollback/replay, compatibility fallbacks, hidden retries, polling/watchers, recovery jobs, or a second authority to coordinate with external Git tools.
 - Avoid destructive git features in the app. If one is introduced, design safety, cancellation, and recovery explicitly first.
 
 ## App-level design docs

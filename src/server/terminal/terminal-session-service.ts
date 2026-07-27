@@ -40,7 +40,6 @@ import {
   type TerminalSessionEnsureResult,
   type TerminalSessionEnsurerOptions,
 } from '#/server/terminal/terminal-session-ensurer.ts'
-import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import {
   createTerminalSessionCreator,
   type ServerTerminalCreateInput,
@@ -51,7 +50,6 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   terminalSessionsSnapshotForUser(userId: string, scope: string): TerminalSessionsSnapshot
-  requestSessionRetirement(terminalRuntimeSessionId: string): Promise<boolean>
   primaryTerminalSessionIdForFilesystemTarget(
     userId: string,
     scope: string,
@@ -72,13 +70,11 @@ interface TerminalSessionServiceOptions {
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalSessionCreator = ReturnType<typeof createTerminalSessionCreator>
 type TerminalSessionEnsurer = ReturnType<typeof createTerminalSessionEnsurer>
-type TerminalSessionPruner = ReturnType<typeof createTerminalSessionPruner>
 class TerminalSessionService {
   private readonly options: TerminalSessionServiceOptions
   private readonly createCoordinator: TerminalSessionCreateCoordinator
   private readonly creator: TerminalSessionCreator
   private readonly ensurer: TerminalSessionEnsurer
-  private readonly pruner: TerminalSessionPruner
   private readonly workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
 
   constructor(options: TerminalSessionServiceOptions) {
@@ -88,7 +84,6 @@ class TerminalSessionService {
       manager: options.manager,
       gCommand: options.gCommand,
     })
-    this.pruner = createTerminalSessionPruner({ manager: options.manager })
     this.workspaceTabsCoordinator = options.workspaceTabsCoordinator
     this.creator = createTerminalSessionCreator({
       createCoordinator: this.createCoordinator,
@@ -314,28 +309,6 @@ class TerminalSessionService {
     )
     assertCurrentMembership?.()
     return sessions
-  }
-
-  async prune(
-    clientId: string,
-    userId: string,
-    workspaceId: WorkspaceId,
-    workspaceRuntimeId: string,
-    assertCurrentMembership?: () => void,
-  ): Promise<{ pruned: number; remaining: number }> {
-    if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
-    if (!isValidWorkspaceLocatorInput(workspaceId)) return { pruned: 0, remaining: 0 }
-
-    const sessionScope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-    return await this.pruner.prune({
-      userId,
-      workspaceId,
-      scope: sessionScope,
-      assertCurrent: () => {
-        assertCurrentMembership?.()
-        this.assertCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)
-      },
-    })
   }
 
   private isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean {

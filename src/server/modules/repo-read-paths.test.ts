@@ -201,7 +201,7 @@ describe('readRepoProjection', () => {
 
     expect(result).toMatchObject({ workspaceRuntimeId: 'repo-runtime-test', status })
     expect(result.loadedAt).toEqual(expect.any(Number))
-    expect(getStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getStatus).toHaveBeenCalledWith(undefined)
   })
 
   test('does not turn an aborted status read into an empty clean snapshot', async () => {
@@ -250,56 +250,6 @@ describe('readRepoProjection', () => {
 })
 
 describe('repo projection section deadlines', () => {
-  test('rejects a worktree status snapshot when its status read times out', async () => {
-    useFakeTimers()
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(
-        asRepoSource(
-          makeSource({
-            getStatus: (signal?: AbortSignal) =>
-              new Promise<WorktreeStatus[]>((_resolve, reject) => {
-                signal?.addEventListener('abort', () => reject(signal.reason))
-              }),
-          }),
-        ),
-      ),
-    )
-    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus(WORKSPACE_ID, {
-      workspaceRuntimeId: 'repo-runtime-test',
-      timeoutMs: 50,
-    })
-
-    const rejected = expect(promise).rejects.toThrow('repository read timeout')
-    await vi.advanceTimersByTimeAsync(75)
-    await rejected
-  })
-
-  test('does not accept an empty status result resolved after its deadline', async () => {
-    useFakeTimers()
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(
-        asRepoSource(
-          makeSource({
-            getStatus: (signal?: AbortSignal) =>
-              new Promise<WorktreeStatus[]>((resolve) => {
-                signal?.addEventListener('abort', () => resolve([]))
-              }),
-          }),
-        ),
-      ),
-    )
-    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus(WORKSPACE_ID, {
-      workspaceRuntimeId: 'repo-runtime-test',
-      timeoutMs: 50,
-    })
-
-    const rejected = expect(promise).rejects.toThrow('repository read timeout')
-    await vi.advanceTimersByTimeAsync(75)
-    await rejected
-  })
-
   test('returns successful results when sections finish before the deadline', async () => {
     const snapshot: RepoSnapshot = {
       branches: [],

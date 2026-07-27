@@ -2,7 +2,6 @@ import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
-import { RepositoryTargetChangedError } from '#/server/modules/repository-target-changed-error.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
@@ -11,7 +10,6 @@ import {
   getBranches,
   getCurrentBranch,
   resolveRepoCommonDir,
-  resolveRepoObjectsDir,
   getHeadHash,
   getLog as getBranchLog,
   getUpstream,
@@ -27,15 +25,8 @@ import {
   pushBranch,
 } from '#/system/git/remote.ts'
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
-import { getWorkingStatus } from '#/system/git/status.ts'
-import {
-  createWorktree,
-  getWorktrees,
-  readWorktreeMembership,
-  removeWorktree,
-  sampleWorktreeStatus,
-} from '#/system/git/worktrees.ts'
-import { haveSameWorktrees } from '#/system/git/parsers.ts'
+import { getWorkingStatus, sampleWorktreeStatusForTarget } from '#/system/git/status.ts'
+import { createWorktree, readWorktreeMembership, removeWorktree } from '#/system/git/worktrees.ts'
 import {
   bootstrapWorktreeAfterCreate,
   getWorktreeBootstrapPreview as getLocalWorktreeBootstrapPreview,
@@ -65,7 +56,7 @@ import {
   getRemotePatch,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  resolveRemoteRepoExecutionIdentity,
+  resolveRemoteRepoCommonDir,
   getRemoteSnapshot,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
@@ -102,21 +93,12 @@ import {
 } from '#/shared/workspace-locator.ts'
 import {
   physicalWorktreeExecutionBinding,
-  validatePhysicalWorktreeExecution,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
-/**
- * generationKey identifies the physical common-dir/object-store incarnation.
- * A logical reset that preserves both directories (but rewrites HEAD, refs, or
- * config) intentionally remains the same boundary; detecting that would
- * require an application-owned persistent token.
- */
-type RepoWriteBoundary =
-  | { kind: 'local-git'; commonDir: string; generationKey: string }
-  | { kind: 'remote-git'; executionIdentity: string; generationKey: string }
+type RepoWriteBoundary = { kind: 'local-git'; commonDir: string } | { kind: 'remote-git'; executionIdentity: string }
 
 export interface RepoMutationResult extends ExecResult {
   /**
@@ -187,16 +169,12 @@ export interface RepoWriteExecutionCapability {
 }
 
 interface RepoWriteExecutionState {
-  coordinationKey: string
-  repositoryKey: string
+  boundaryKey: string
   source: RepoSource
-  validate(signal?: AbortSignal): Promise<boolean>
 }
 
 interface RepoWriteExecutionSnapshot {
-  coordinationKey: string
-  repositoryKey: string
-  executionIdentity: string
+  boundaryKey: string
   source: RepoSource
 }
 
@@ -251,15 +229,8 @@ async function resolveRepoWriteExecutionState(
   if (!locator) throw new Error('error.workspace-locator-malformed')
   if (locator.transport === 'file') {
     const execution = await resolveLocalRepoExecution(locator.path, signal)
-    const coordinationKey = repoWriteBoundaryCoordinationKey(execution.boundary)
     return {
-      coordinationKey,
-      repositoryKey: repoWriteBoundaryRepositoryKey(execution.boundary),
-      executionIdentity: JSON.stringify({
-        coordinationKey,
-        canonicalRepoPath: execution.canonicalRepoPath,
-        generationKey: execution.boundary.generationKey,
-      }),
+      boundaryKey: repoWriteBoundaryKey(execution.boundary),
       source: createLocalRepoSource(execution.canonicalRepoPath),
     }
   }
@@ -267,20 +238,8 @@ async function resolveRepoWriteExecutionState(
   const target = await resolveRemoteWorkspaceTarget(repoId, runtime, signal)
   const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
   const boundary = await resolveRemoteRepoWriteBoundaryForTarget(target, signal, run)
-  const coordinationKey = repoWriteBoundaryCoordinationKey(boundary)
   return {
-    coordinationKey,
-    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
-    executionIdentity: JSON.stringify({
-      coordinationKey,
-      generationKey: boundary.generationKey,
-      alias: target.alias,
-      destination: target.sshConnection?.destination,
-      host: target.host,
-      user: target.user,
-      port: target.port,
-      options: target.sshConnection?.options ?? [],
-    }),
+    boundaryKey: repoWriteBoundaryKey(boundary),
     source: await createRemoteRepoSource(repoId, target, null, runtime),
   }
 }
@@ -290,18 +249,9 @@ export async function captureRepoWriteExecution(
   runtime?: RepoSourceRuntimeContext,
   signal?: AbortSignal,
 ): Promise<RepoWriteExecutionCapability> {
-  // Queue identity and execution source come from one strict capture. Validation
-  // may reject a changed target, but execution never re-resolves or falls back.
   const captured = await resolveRepoWriteExecutionState(repoId, runtime, signal)
-  const state: RepoWriteExecutionState = {
-    ...captured,
-    async validate(validationSignal) {
-      const current = await resolveRepoWriteExecutionState(repoId, runtime, validationSignal)
-      return current.executionIdentity === captured.executionIdentity
-    },
-  }
   const capability = Object.freeze({}) as RepoWriteExecutionCapability
-  repoWriteExecutions.set(capability, state)
+  repoWriteExecutions.set(capability, captured)
   return capability
 }
 
@@ -321,33 +271,16 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
           runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
         )
       : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, signal)
-  const capturedLocatorRepositoryKey = repoWriteBoundaryRepositoryKey(capturedLocatorBoundary)
-  const capturedPhysicalRepositoryKey = repoWriteBoundaryRepositoryKey(boundary)
-  if (capturedLocatorRepositoryKey !== capturedPhysicalRepositoryKey) throw new RepositoryTargetChangedError()
+  const capturedLocatorBoundaryKey = repoWriteBoundaryKey(capturedLocatorBoundary)
+  const capturedPhysicalBoundaryKey = repoWriteBoundaryKey(boundary)
+  if (capturedLocatorBoundaryKey !== capturedPhysicalBoundaryKey) throw new RepositoryBoundaryUnavailableError()
   const source =
     execution.kind === 'remote'
       ? await createRemoteRepoSource(repoId, execution.target, physicalWorktreeCapability, runtime)
       : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability)
   const state: RepoWriteExecutionState = {
-    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
-    repositoryKey: capturedPhysicalRepositoryKey,
+    boundaryKey: capturedPhysicalBoundaryKey,
     source,
-    async validate(validationSignal) {
-      await validatePhysicalWorktreeExecution(physicalWorktreeCapability, validationSignal)
-      const currentLocatorBoundary = await resolveRepoWriteBoundaryForLocator(repoId, runtime, validationSignal)
-      const currentBoundary =
-        execution.kind === 'remote'
-          ? await resolveRemoteRepoWriteBoundaryForTarget(
-              execution.target,
-              validationSignal,
-              runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, execution.target) : undefined,
-            )
-          : await resolveLocalRepoWriteBoundaryForPath(execution.canonicalWorktreePath, validationSignal)
-      return (
-        repoWriteBoundaryRepositoryKey(currentLocatorBoundary) === capturedLocatorRepositoryKey &&
-        repoWriteBoundaryRepositoryKey(currentBoundary) === capturedPhysicalRepositoryKey
-      )
-    },
   }
   const capability = Object.freeze({}) as RepoWriteExecutionCapability
   repoWriteExecutions.set(capability, state)
@@ -355,11 +288,7 @@ export async function captureRepoWriteExecutionFromPhysicalWorktree(
 }
 
 export function repoWriteExecutionBoundaryKey(capability: RepoWriteExecutionCapability): string {
-  return repoWriteExecutionState(capability).repositoryKey
-}
-
-export function repoWriteExecutionCoordinationKey(capability: RepoWriteExecutionCapability): string {
-  return repoWriteExecutionState(capability).coordinationKey
+  return repoWriteExecutionState(capability).boundaryKey
 }
 
 export async function runWithCapturedRepoWriteExecution<T>(
@@ -367,13 +296,6 @@ export async function runWithCapturedRepoWriteExecution<T>(
   task: (source: RepoSource) => Promise<T>,
 ): Promise<T> {
   return await task(repoWriteExecutionState(capability).source)
-}
-
-export async function validateRepoWriteExecution(
-  capability: RepoWriteExecutionCapability,
-  signal?: AbortSignal,
-): Promise<boolean> {
-  return await repoWriteExecutionState(capability).validate(signal)
 }
 
 function repoWriteExecutionState(capability: RepoWriteExecutionCapability): RepoWriteExecutionState {
@@ -386,7 +308,7 @@ function serverWorkspaceLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
-function repoWriteBoundaryCoordinationKey(boundary: RepoWriteBoundary): string {
+function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
   switch (boundary.kind) {
     case 'local-git':
       return `local-git:${boundary.commonDir}`
@@ -395,13 +317,6 @@ function repoWriteBoundaryCoordinationKey(boundary: RepoWriteBoundary): string {
   }
   const exhaustive: never = boundary
   return exhaustive
-}
-
-function repoWriteBoundaryRepositoryKey(boundary: RepoWriteBoundary): string {
-  return JSON.stringify({
-    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
-    generationKey: boundary.generationKey,
-  })
 }
 
 /**
@@ -429,22 +344,12 @@ async function resolveLocalRepoExecution(repoPath: string, signal?: AbortSignal)
     const canonicalRepoPath = await fs.realpath(repoPath)
     signal?.throwIfAborted()
     const commonDir = await resolveRepoCommonDir(canonicalRepoPath, { signal })
-    const objectsDir = await resolveRepoObjectsDir(canonicalRepoPath, { signal })
-    const commonDirStat = await fs.stat(commonDir, { bigint: true })
-    const objectsDirStat = await fs.stat(objectsDir, { bigint: true })
     signal?.throwIfAborted()
     return {
       canonicalRepoPath,
       boundary: {
         kind: 'local-git',
         commonDir,
-        generationKey: JSON.stringify({
-          commonDirDeviceId: commonDirStat.dev.toString(10),
-          commonDirInode: commonDirStat.ino.toString(10),
-          objectsDir,
-          objectsDirDeviceId: objectsDirStat.dev.toString(10),
-          objectsDirInode: objectsDirStat.ino.toString(10),
-        }),
       },
     }
   } catch {
@@ -478,9 +383,9 @@ async function resolveRemoteRepoWriteBoundaryForTarget(
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<RepoWriteBoundary> {
-  const identity = await resolveRemoteRepoExecutionIdentity(target, { signal, run })
+  const commonDir = await resolveRemoteRepoCommonDir(target, { signal, run })
   signal?.throwIfAborted()
-  if (!identity) throw new RepositoryBoundaryUnavailableError()
+  if (!commonDir) throw new RepositoryBoundaryUnavailableError()
   const sshOptions = target.sshConnection?.options ?? []
   return {
     kind: 'remote-git',
@@ -492,9 +397,8 @@ async function resolveRemoteRepoWriteBoundaryForTarget(
       ...(sshOptions.some(sshOptionUsesOriginalDestination)
         ? { destination: target.sshConnection?.destination ?? target.alias }
         : {}),
-      writeGroupPath: identity.commonDir,
+      writeGroupPath: commonDir,
     }),
-    generationKey: identity.generationKey,
   }
 }
 
@@ -511,17 +415,11 @@ function sshOptionUsesOriginalDestination(option: string): boolean {
   return false
 }
 
-export async function resolveRepoWriteBoundaryIdentity(
-  repoId: WorkspaceId,
-  signal?: AbortSignal,
-): Promise<{ coordinationKey: string; repositoryKey: string }> {
+export async function resolveRepoWriteBoundaryKey(repoId: WorkspaceId, signal?: AbortSignal): Promise<string> {
   const boundary = isRemoteWorkspaceId(repoId)
     ? await resolveRemoteRepoWriteBoundary(repoId, signal)
     : await resolveLocalRepoWriteBoundary(repoId, signal)
-  return {
-    coordinationKey: repoWriteBoundaryCoordinationKey(boundary),
-    repositoryKey: repoWriteBoundaryRepositoryKey(boundary),
-  }
+  return repoWriteBoundaryKey(boundary)
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
@@ -554,7 +452,7 @@ function remoteWorktreeRepoIds(
 }
 
 async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
-  const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+  const worktrees = await readWorktreeMembership(repoId, signal)
   signal?.throwIfAborted()
   return localWorktreeRepoIds(worktrees)
 }
@@ -615,7 +513,7 @@ function createLocalRepoSource(
     knownWorktrees?: WorktreeInfo[],
   ): Promise<ExecResult | null> {
     const current = await getCurrentBranch(gitCwd, { signal })
-    const worktrees = knownWorktrees ?? (await getWorktrees(gitCwd, { includeStatus: false, signal }))
+    const worktrees = knownWorktrees ?? (await readWorktreeMembership(gitCwd, signal))
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
     const isCheckedOutElsewhere = worktrees.some((wt) => {
       if (wt.branch !== branch) return false
@@ -662,27 +560,16 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       signal?.throwIfAborted()
       const membership = await readWorktreeMembership(repoId, signal)
-      const statusSamples = await sampleWorktreeStatus(membership, signal)
-      const worktrees = statusSamples.map((sample) =>
-        sample.kind === 'status'
-          ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
-          : sample.worktree,
-      )
-      signal?.throwIfAborted()
       const currentBranch = await getCurrentBranch(repoId, { signal })
-      const branches = await getBranches(repoId, worktrees, currentBranch, { signal })
+      const branches = await getBranches(repoId, membership, currentBranch, { signal })
       const current = currentBranch ?? ''
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
       const remote = await getRemoteInfo(repoId, signal)
       signal?.throwIfAborted()
-      const finalMembership = await readWorktreeMembership(repoId, signal)
-      if (!haveSameWorktrees(membership, finalMembership)) {
-        throw new Error('Worktree membership changed during repository snapshot read')
-      }
       return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       signal?.throwIfAborted()
       return await getBranchWorktreeIdentities(repoId, worktrees, { signal })
     },
@@ -716,13 +603,13 @@ function createLocalRepoSource(
       if (!available.ok) return available
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const fetched = await fetchAll(repoId, signal)
-      return fetched.ok ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const pulled = await pullBranch(repoId, branch, worktreePath, signal)
-      return pulled.ok ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -765,7 +652,7 @@ function createLocalRepoSource(
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const upstream = !options?.force || options?.deleteUpstream ? await getUpstream(repoId, branch, signal) : null
       const validation = await validateBranchDeletion(
         branch,
@@ -783,7 +670,7 @@ function createLocalRepoSource(
     },
     async removeWorktree(input, signal, lifecycle) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
       const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
       const exactExecution = physicalWorktreeCapability
@@ -792,9 +679,17 @@ function createLocalRepoSource(
       const requestedPath = exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : input.worktreePath
       const removable = resolveRemovableWorktree(worktrees, input.branch, requestedPath, mainWorktreePath)
       if (!removable.ok) return { ok: false, message: removable.message }
+      const targetStatus = await sampleWorktreeStatusForTarget(removable.target, signal)
+      const statusAwareTarget =
+        targetStatus.kind === 'status'
+          ? {
+              ...targetStatus.worktree,
+              isDirty: targetStatus.entries.length > 0,
+            }
+          : targetStatus.worktree
       const mutationCwd =
         path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
-      const invalid = validateRemovableWorktreeState(removable.target)
+      const invalid = validateRemovableWorktreeState(statusAwareTarget)
       if (invalid) return invalid
       const upstream =
         input.deleteBranch && (!input.forceDeleteBranch || input.deleteUpstream)
@@ -814,23 +709,6 @@ function createLocalRepoSource(
       }
       const prepared = await lifecycle.beforeRemove()
       if (!prepared.ok) return prepared
-      if (physicalWorktreeCapability) {
-        try {
-          await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
-          const currentPath = await fs.realpath(removable.target.path)
-          const currentStat = await fs.stat(currentPath, { bigint: true })
-          if (
-            exactExecution?.kind !== 'local' ||
-            currentPath !== exactExecution.canonicalWorktreePath ||
-            currentStat.dev.toString(10) !== exactExecution.endpointMarker.deviceId ||
-            currentStat.ino.toString(10) !== exactExecution.endpointMarker.inode
-          )
-            throw new Error('error.workspace-runtime-stale')
-        } catch (error) {
-          await lifecycle.afterRemoveFailed()
-          return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
-        }
-      }
       let removed: Awaited<ReturnType<typeof removeWorktree>>
       try {
         removed = await removeWorktree(
@@ -839,13 +717,9 @@ function createLocalRepoSource(
           signal,
         )
       } catch (error) {
-        await lifecycle.afterRemoveFailed()
         throw error
       }
-      if (!removed.ok) {
-        await lifecycle.afterRemoveFailed()
-        return removed
-      }
+      if (!removed.ok) return removed
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repositoryStateChanged: true }, affectedRepoIds)
       if (!input.deleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
@@ -860,7 +734,7 @@ function createLocalRepoSource(
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const known = resolveKnownWorktree(worktrees, worktreePath)
       if (!known.ok) return { ok: false, message: known.message }
       try {
@@ -919,12 +793,12 @@ async function createRemoteRepoSource(
     async fetch(signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const fetched = await fetchRemoteRepo(target, { signal, run })
-      return fetched.ok ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
     },
     async pull(branch, worktreePath, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
-      return pulled.ok ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
     },
     async push(branch, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
@@ -984,18 +858,6 @@ async function createRemoteRepoSource(
         run,
         beforeRemove: lifecycle.beforeRemove,
         afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
-        afterRemoveFailed: lifecycle.afterRemoveFailed,
-        validateBeforeRemove: physicalWorktreeCapability
-          ? async () => {
-              try {
-                await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
-                return { ok: true, message: '' }
-              } catch (error) {
-                if (isRemoteWorkspaceRuntimeFailure(error)) throw error
-                return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
-              }
-            }
-          : undefined,
       })
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },

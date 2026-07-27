@@ -8,7 +8,7 @@ import {
   type TerminalSessionEnsureContext,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { issueTestPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
 import type { TerminalSessionPrepareManagerResult } from '#/server/terminal/terminal-session-ensurer.ts'
@@ -16,7 +16,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: vi.fn(async () => [
+  readWorktreeMembership: vi.fn(async () => [
     { path: '/repo/worktree', branch: 'feature/worktree', isBare: false, isPrimary: false },
   ]),
 }))
@@ -75,7 +75,6 @@ function remotePhysicalWorktreeExecutionCapability() {
       kind: 'remote',
       canonicalWorktreePath: REMOTE_WORKTREE_PATH,
       configFingerprint: 'ensurer-test-config',
-      endpointMarker: { deviceId: '10', inode: '20' },
       target: {
         id: REMOTE_REPO_ROOT,
         alias: 'prod',
@@ -91,7 +90,7 @@ function remotePhysicalWorktreeExecutionCapability() {
 
 describe('terminal session ensurer', () => {
   beforeEach(() => {
-    vi.mocked(getWorktrees).mockResolvedValue([
+    vi.mocked(readWorktreeMembership).mockResolvedValue([
       { path: WORKTREE_PATH, branch: BRANCH_NAME, isBare: false, isPrimary: false },
     ])
     vi.mocked(resolveKnownWorktree).mockReturnValue({ ok: true, path: WORKTREE_PATH })
@@ -132,7 +131,7 @@ describe('terminal session ensurer', () => {
       admission: { kind: 'existing' },
       terminalSessionId: 'term-locallocallocallocal1',
     })
-    expect(getWorktrees).not.toHaveBeenCalled()
+    expect(readWorktreeMembership).not.toHaveBeenCalled()
     expect(resolveKnownWorktree).not.toHaveBeenCalled()
     expect(prepareSession).toHaveBeenCalledWith({
       userId: USER_ID,

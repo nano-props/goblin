@@ -24,7 +24,7 @@ describe('resolveRemoteWorkspaceTarget', () => {
 
 describe('getRepoSnapshot', () => {
   test('reads git state directly without publishing invalidation', async () => {
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     const snapshot = repoSnapshot('fresh')
     mocks.getBranches.mockResolvedValueOnce(snapshot.branches)
     mocks.getCurrentBranch.mockResolvedValueOnce(snapshot.current)
@@ -38,7 +38,7 @@ describe('getRepoSnapshot', () => {
   })
 
   test('rejects an authoritative snapshot when branch membership cannot be read', async () => {
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.getBranches.mockRejectedValueOnce(new Error('git unavailable'))
 
     const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
@@ -51,7 +51,7 @@ describe('getRepoSnapshot', () => {
 describe('getWorkspacePaneTargetIdentities', () => {
   test('reads only worktree and branch identity without status or remote display data', async () => {
     const worktrees = [{ path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true }]
-    mocks.getWorktrees.mockResolvedValueOnce(worktrees)
+    mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees)
     mocks.getBranchWorktreeIdentities.mockResolvedValueOnce([
       { branch: 'main', worktreePath: '/tmp/repo' },
       { branch: 'feature/no-worktree', worktreePath: null },
@@ -63,7 +63,7 @@ describe('getWorkspacePaneTargetIdentities', () => {
       { branch: 'feature/no-worktree', worktreePath: null },
     ])
 
-    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+    expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktrees, { signal: undefined })
     expect(mocks.getBranches).not.toHaveBeenCalled()
     expect(mocks.getWorkingStatus).not.toHaveBeenCalled()

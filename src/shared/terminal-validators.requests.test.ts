@@ -437,43 +437,6 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('rejects prune requests without a workspace runtime id', () => {
-    expect(
-      normalizeTerminalClientMessage({
-        type: 'request',
-        requestId: 'request_125',
-        action: 'prune',
-        input: {
-          workspaceId: 'goblin+file:///repo',
-        },
-      }),
-    ).toBeNull()
-
-    expect(
-      normalizeTerminalClientMessage({
-        type: 'request',
-        requestId: 'request_126',
-        action: 'prune',
-        input: {
-          workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
-        },
-      }),
-    ).toMatchObject({ type: 'request', action: 'prune' })
-
-    expect(
-      normalizeTerminalClientMessage({
-        type: 'request',
-        requestId: 'request_legacy',
-        action: 'prune',
-        input: {
-          repoRoot: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
-        },
-      }),
-    ).toBeNull()
-  })
-
   test('rejects client identity supplied inside terminal action payloads', () => {
     const terminalRuntimeSessionId = 'pty_request_123456789'
     const requests = [
@@ -564,28 +527,24 @@ describe('shared terminal validators requests', () => {
   })
 
   test('rejects legacy and dual workspace identity on scoped terminal requests', () => {
-    for (const action of ['recover-sessions', 'prune'] as const) {
-      const message = {
-        type: 'request',
-        requestId: `request_${action}`,
-        action,
-        input: {
-          workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
-        },
-      }
-      expect(normalizeTerminalClientMessage(message)).toEqual(message)
-      expect(
-        normalizeTerminalClientMessage({
-          ...message,
-          input: { ...message.input, repoRoot: message.input.workspaceId },
-        }),
-      ).toBeNull()
-      const { workspaceId, ...legacyInput } = message.input
-      expect(
-        normalizeTerminalClientMessage({ ...message, input: { ...legacyInput, repoRoot: workspaceId } }),
-      ).toBeNull()
+    const message = {
+      type: 'request',
+      requestId: 'request_recover_sessions',
+      action: 'recover-sessions',
+      input: {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+      },
     }
+    expect(normalizeTerminalClientMessage(message)).toEqual(message)
+    expect(
+      normalizeTerminalClientMessage({
+        ...message,
+        input: { ...message.input, repoRoot: message.input.workspaceId },
+      }),
+    ).toBeNull()
+    const { workspaceId, ...legacyInput } = message.input
+    expect(normalizeTerminalClientMessage({ ...message, input: { ...legacyInput, repoRoot: workspaceId } })).toBeNull()
   })
 
   test('rejects legacy and dual workspace identity on terminal realtime events', () => {

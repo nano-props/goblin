@@ -20,7 +20,6 @@ export type RepoBranchActionKind = RepoBranchAction['kind']
 export interface RunBranchActionOptions {
   workspaceRuntimeId?: string
   deferResultMessages?: string[]
-  refreshOnError?: boolean
   /** Internal override for tests that exercise queued refresh wait timeouts. */
   waitTimeoutMs?: number
 }

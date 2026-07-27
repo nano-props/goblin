@@ -4,10 +4,7 @@ import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import {
-  parseRemotePhysicalWorktreeEndpointMarker,
-  parseRemotePhysicalWorktreeIdentity,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { parseRemotePhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 describe('physical worktree identity', () => {
   test('resolved local entries reached through different repo roots share a canonical path key', () => {
@@ -41,7 +38,6 @@ describe('physical worktree identity', () => {
       executionNamespaceId: expect.stringMatching(/^[a-f0-9]{32}$/u),
       endpoint: '/srv/worktrees/feature',
     })
-    expect(parseRemotePhysicalWorktreeEndpointMarker(output)).toEqual({ deviceId: '10', inode: '20' })
   })
 
   test('different machine facts cannot collide even if a runtime token is repeated', () => {
@@ -64,7 +60,5 @@ describe('physical worktree identity', () => {
 })
 
 function remoteOutput(machineFact: string): string {
-  const deviceId = '10'
-  const inode = '20'
-  return `0123456789abcdef0123456789abcdef\0${machineFact}\0mnt-a\0/srv/worktrees/feature\0${deviceId}\0${inode}\0`
+  return `0123456789abcdef0123456789abcdef\0${machineFact}\0mnt-a\0/srv/worktrees/feature\0`
 }

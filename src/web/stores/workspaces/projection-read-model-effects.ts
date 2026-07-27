@@ -1,5 +1,3 @@
-import { terminalLog } from '#/web/logger.ts'
-import { terminalClient } from '#/web/terminal.ts'
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/workspaces/persistence.ts'
@@ -117,7 +115,4 @@ export function acceptRepoProjectionReadModel(
   })
 
   persistRepoSnapshotCacheEntry(set, get().workspaces[repoRoot], workspaceRuntimeId)
-  void terminalClient.pruneTerminals(repoRoot, workspaceRuntimeId).catch((err) => {
-    terminalLog.warn('failed to prune repo sessions', { err })
-  })
 }

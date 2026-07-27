@@ -11,7 +11,6 @@ import {
   appRealtimeSocket,
   buildRuntime,
   createLocalWorktreeTerminal,
-  getWorktreesMock,
   mockPtys,
   requestWorkspacePaneRuntime,
   requestWorkspacePaneTabs,
@@ -491,47 +490,4 @@ describe('server terminal runtime sessions', () => {
     shutdown()
   })
 
-  test('reconciles workspace tabs when prune closes removed-worktree sessions', async () => {
-    const { host, shutdown } = buildRuntime()
-    const socket = appRealtimeSocket()
-    host.registerSocket('client_a', USER_1, socket)
-    const opened = await requestWorkspacePaneRuntime(
-      host,
-      socket,
-      {
-        runtimeType: 'terminal',
-        request: {
-          target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID),
-          kind: 'additional',
-        },
-      },
-      'req_open_terminal_before_prune',
-    )
-    expect(opened.ok).toBe(true)
-    socket.send.mockClear()
-    getWorktreesMock.mockResolvedValueOnce([])
-
-    await expect(
-      host.prune('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
-    ).resolves.toEqual({ pruned: 1, remaining: 0 })
-
-    await vi.waitFor(() => {
-      expect(
-        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
-      ).toBe(true)
-    })
-    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
-    await expect(
-      requestWorkspacePaneTabs(
-        host,
-        socket,
-        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
-        'req_list_after_prune',
-      ),
-    ).resolves.toMatchObject({ entries: [] })
-
-    host.unregisterSocket('client_a', USER_1, socket)
-    shutdown()
-  })
 })

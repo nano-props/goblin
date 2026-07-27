@@ -148,7 +148,7 @@ describe('BranchView', () => {
       branches: [
         createBranchSnapshot('feature/query-dirty', {
           isCurrent: true,
-          worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
+          worktree: { path: WORKTREE_PATH },
         }),
       ],
       currentBranch: 'feature/query-dirty',
@@ -211,12 +211,6 @@ describe('BranchView', () => {
       .mockResolvedValueOnce({ workspaceRuntimeId: repo.workspaceRuntimeId, status: [], loadedAt: 2 })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderBranchView()
-
-    await primaryWindowQueryClient.invalidateQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
-      exact: true,
-      refetchType: 'active',
-    })
 
     expect(await screen.findByText('status.stale-title')).toBeTruthy()
     expect(screen.getByText('main')).toBeTruthy()

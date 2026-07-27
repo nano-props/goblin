@@ -68,15 +68,81 @@ describe('normalizeRepoSnapshotCache', () => {
     expect(normalized.repo).toBeUndefined()
   })
 
-  test('normalizes cached branch worktree references while dropping dynamic metadata', () => {
+  test('rejects cached branches that carry dynamic metadata', () => {
     const now = Date.now()
     const raw = cachedRepo(now)
-    raw.data.branches = [createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })]
+    raw.data.branches = [
+      createBranchSnapshot('feature/a', {
+        worktree: {
+          path: '/tmp/worktree-a',
+          isPrimary: true,
+          isLocked: true,
+        },
+        pullRequest: {
+          number: 1,
+          title: 'PR 1',
+          url: 'https://example.com/repository/pull/1',
+          state: 'open',
+        },
+      }),
+    ]
 
     const normalized = normalizeRepoSnapshotCache({ repo: raw })
 
-    expect(normalized.repo?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(normalized.repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(normalized.repo).toBeUndefined()
+  })
+
+  test('rejects the legacy worktree summary shape', () => {
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const raw = {
+      ...cachedRepo(Date.now()),
+      data: {
+        branches: [
+          {
+            ...branch,
+            worktree: {
+              ...branch.worktree,
+              summary: { dirty: true, changeCount: 2 },
+            },
+          },
+        ],
+        currentBranch: 'feature/a',
+      },
+    }
+
+    const normalized = normalizeRepoSnapshotCache({ repo: raw })
+
+    expect(normalized.repo).toBeUndefined()
+  })
+
+  test('rejects unknown nested cache fields', () => {
+    const cached = cachedRepo(Date.now())
+    const withUnknownData = {
+      ...cached,
+      data: { ...cached.data, legacyProjection: true },
+    }
+    const withUnknownUi = {
+      ...cached,
+      ui: { ...cached.ui, legacyViewMode: 'worktrees' },
+    }
+
+    expect(normalizeRepoSnapshotCache({ repo: withUnknownData }).repo).toBeUndefined()
+    expect(normalizeRepoSnapshotCache({ repo: withUnknownUi }).repo).toBeUndefined()
+  })
+
+  test('rejects cached branches without a last commit short hash', () => {
+    const { lastCommitShortHash: _lastCommitShortHash, ...branchWithoutShortHash } = createRepoBranch('feature/a')
+    const raw = {
+      ...cachedRepo(Date.now()),
+      data: {
+        branches: [branchWithoutShortHash],
+        currentBranch: 'feature/a',
+      },
+    }
+
+    const normalized = normalizeRepoSnapshotCache({ repo: raw })
+
+    expect(normalized.repo).toBeUndefined()
   })
 })
 
@@ -106,10 +172,6 @@ describe('persistRepoSnapshotCacheEntry', () => {
             path: '/tmp/worktree-a',
             isPrimary: true,
             isLocked: true,
-            summary: {
-              dirty: true,
-              changeCount: 2,
-            },
           },
           pullRequest: {
             number: 1,

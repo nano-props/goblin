@@ -32,9 +32,9 @@ describe('repo worktree creation', () => {
   })
 
   test('createRepoWorktree publishes snapshot invalidations for existing siblings and the new worktree', async () => {
-    mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
-      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false },
     ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -289,15 +289,13 @@ describe('repo worktree creation', () => {
     const firstDelete = deferred<{ ok: true; message: string }>()
     const secondRemove = deferred<{ ok: true; message: string }>()
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
-    mocks.getWorktrees.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       {
         path: '/tmp/repo-worktree',
         branch: 'feature/b',
         isBare: false,
         isPrimary: false,
-        isDirty: false,
-        changeCount: 0,
       },
     ])
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
@@ -356,15 +354,13 @@ describe('repo worktree creation', () => {
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
-    mocks.getWorktrees.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       {
         path: '/tmp/repo-linked',
         branch: 'feature/b',
         isBare: false,
         isPrimary: false,
-        isDirty: false,
-        changeCount: 0,
       },
     ])
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)

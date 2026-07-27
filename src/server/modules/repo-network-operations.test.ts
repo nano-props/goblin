@@ -87,10 +87,7 @@ describe('fetchRepo coordination', () => {
         displayName: `${ref.alias}:${ref.remotePath}`,
       },
     }))
-    mocks.resolveRemoteRepoExecutionIdentity.mockImplementation(async (target: { remotePath: string }) => ({
-      commonDir: target.remotePath,
-      generationKey: 'remote-generation-1',
-    }))
+    mocks.resolveRemoteRepoCommonDir.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
     const first = deferred<{ ok: true; message: string }>()
     const second = deferred<{ ok: true; message: string }>()
     const fetchPaths: string[] = []

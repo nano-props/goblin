@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
+import { QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -9,6 +10,15 @@ import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { repoProjectionQueryOptions } from '#/web/repo-query-options.ts'
+
+const repoClientMocks = vi.hoisted(() => ({
+  getRepoProjection: vi.fn(),
+  getRepoOperations: vi.fn(),
+  getRepoWorktreeStatus: vi.fn(),
+}))
+
+vi.mock('#/web/repo-client.ts', () => repoClientMocks)
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
@@ -51,6 +61,15 @@ function Harness() {
   return null
 }
 
+function ProjectionObserverHarness() {
+  useRepoStoreInvalidationRefresh()
+  const projection = useQuery(
+    repoProjectionQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7', null, 'full'),
+    primaryWindowQueryClient,
+  )
+  return <output>{projection.data?.snapshot?.current ?? 'loading'}</output>
+}
+
 describe('useRepoStoreInvalidationRefresh', () => {
   beforeEach(() => {
     useFakeTimers()
@@ -82,15 +101,41 @@ describe('useRepoStoreInvalidationRefresh', () => {
       },
       { cancelRefetch: false },
     )
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      {
-        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
-        refetchType: 'active',
-      },
-      { cancelRefetch: false },
-    )
-    expect(invalidateSpy).toHaveBeenCalledTimes(2)
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
     invalidateSpy.mockRestore()
+  })
+
+  test('repo-snapshot invalidation makes an active observer accept the final projection', async () => {
+    let projectionReads = 0
+    repoClientMocks.getRepoProjection.mockImplementation(async () => {
+      projectionReads += 1
+      return {
+        snapshot: { branches: [], current: projectionReads === 1 ? 'before-fetch' : 'after-fetch' },
+        pullRequests: null,
+        requested: { branch: null, pullRequestMode: 'full' },
+        loadedAt: projectionReads,
+      }
+    })
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <ProjectionObserverHarness />
+      </QueryClientProvider>,
+    )
+    await vi.waitFor(() => {
+      expect(projectionReads).toBe(1)
+      expect(document.body.textContent).toContain('before-fetch')
+    })
+
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-snapshot' })
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(projectionReads).toBe(2)
+      expect(document.body.textContent).toContain('after-fetch')
+    })
   })
 
   test('limits repo-runtime invalidations to operation queries', async () => {
@@ -135,14 +180,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       },
       { cancelRefetch: false },
     )
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      {
-        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
-        refetchType: 'active',
-      },
-      { cancelRefetch: false },
-    )
-    expect(invalidateSpy).toHaveBeenCalledTimes(2)
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
     invalidateSpy.mockRestore()
   })
 })

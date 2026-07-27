@@ -240,88 +240,51 @@ describe('terminal web host client', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  test('does not fall back to http when prune websocket cannot open', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
-
-    socket?.close()
-
-    await expect(prunePromise).rejects.toThrow('App realtime socket closed before open')
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
-  test('does not fall back to http when prune uses websocket request-response', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
-    socket?.emitOpen()
-    await Promise.resolve()
-    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
-    expect(request).toMatchObject({
-      type: 'request',
-      action: 'prune',
-      input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-    })
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'prune',
-        payload: { pruned: 1, remaining: 2 },
-      }),
-    )
-
-    await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 2 })
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
     socket.emitMessage(
       JSON.stringify({
         type: 'response',
         requestId: request?.requestId,
         ok: true,
-        action: 'prune',
-        payload: { pruned: 1, remaining: 0 },
+        action: 'recover-sessions',
+        payload: { revision: 0, sessions: [] },
       }),
     )
 
-    await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 0 })
+    await expect(recoverPromise).resolves.toEqual({ revision: 0, sessions: [] })
     expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
   test('closes an idle terminal socket after a one-shot websocket request times out without subscribers', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal.ts')
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'prune',
+      action: 'recover-sessions',
       input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     })
-    const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
 
     await vi.advanceTimersByTimeAsync(30_000)
 
@@ -351,18 +314,21 @@ describe('terminal web host client', () => {
     if (!socket) throw new Error('missing web terminal socket')
     socket.emitOpen()
     await vi.advanceTimersByTimeAsync(1_000)
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'prune',
+      action: 'recover-sessions',
       input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     })
     socket.send = vi.fn(() => {
       throw new Error('send failed')
     })
-    const expectation = expect(prunePromise).rejects.toThrow('App realtime heartbeat send failed')
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime heartbeat send failed')
 
     await vi.advanceTimersByTimeAsync(29_000)
 
@@ -382,15 +348,18 @@ describe('terminal web host client', () => {
     socket.emitOpen()
     await Promise.resolve()
 
-    const prunePromise = terminalClient.pruneTerminals(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
-      action: 'prune',
+      action: 'recover-sessions',
       input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     })
-    const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
 
     await vi.advanceTimersByTimeAsync(30_000)
     await expectation

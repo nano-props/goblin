@@ -29,7 +29,10 @@ import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
-import { invalidateRepoSnapshotQueries } from '#/web/repo-query-runtime.ts'
+import {
+  invalidateRepoSnapshotQueries,
+  invalidateRepoWorktreeStatusQueries,
+} from '#/web/repo-query-runtime.ts'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
 interface WorkspaceProjectionRestoreController {
@@ -104,6 +107,7 @@ function WorkspaceViewContent({
     if (previous.workspaceId !== workspaceId || !previous.terminal || terminal) return
     if (!workspace || !gitWorkspaceCanExecute(workspace)) return
     invalidateRepoSnapshotQueries(workspace.id, workspace.workspaceRuntimeId)
+    invalidateRepoWorktreeStatusQueries(workspace.id, workspace.workspaceRuntimeId)
   }, [routeView, workspace, workspaceId])
   const git = workspace?.capability.kind === 'git' ? workspace.capability.git : null
   const gitAvailable = git !== null

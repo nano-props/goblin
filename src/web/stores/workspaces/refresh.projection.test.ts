@@ -2,7 +2,7 @@ import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
+import { refreshStatusLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
@@ -68,9 +68,6 @@ describe('workspace refresh projection', () => {
 
   test('projection read-model refresh writes the server projection result into repo data query cache', async () => {
     const workspaceRuntimeId = seedRepo([branch('old')])
-    const status: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'main', isMain: true, entries: [{ x: 'M', y: ' ', path: 'src/main.ts' }] },
-    ]
     const snapshot = { branches: [branch('main')], current: 'main' }
     const projection = {
       snapshot,
@@ -79,14 +76,15 @@ describe('workspace refresh projection', () => {
       loadedAt: 123,
     }
     ipcHandlers['repo.projection'] = async () => projection
-    ipcHandlers['repo.worktreeStatus'] = () => ({ workspaceRuntimeId, status, loadedAt: 456 })
+    const statusRead = vi.fn()
+    ipcHandlers['repo.worktreeStatus'] = statusRead
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(
       primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, workspaceRuntimeId, null, 'full')),
     ).toEqual(projection)
-    expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(456)
+    expect(statusRead).not.toHaveBeenCalled()
   })
 
   test('projection read-model refresh drops stale results when the repo is reopened during a projection read', async () => {
@@ -130,12 +128,13 @@ describe('workspace refresh projection', () => {
     )
   })
 
-  test('projection and status refreshes settle independently when projection fails', async () => {
+  test('projection failure does not start a compensating status refresh', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     ipcHandlers['repo.projection'] = async () => {
       throw new Error('projection failed')
     }
-    ipcHandlers['repo.worktreeStatus'] = () => ({ workspaceRuntimeId, status: [], loadedAt: 456 })
+    const statusRead = vi.fn()
+    ipcHandlers['repo.worktreeStatus'] = statusRead
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
@@ -144,34 +143,26 @@ describe('workspace refresh projection', () => {
       phase: 'idle',
       error: 'projection failed',
     })
-    expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(456)
+    expect(statusRead).not.toHaveBeenCalled()
   })
 
-  test('projection and status refreshes settle independently when status fails', async () => {
-    const workspaceRuntimeId = seedRepo([branch('old')])
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({ branches: [branch('main')], current: 'main' }, { loadedAt: 123 })
+  test('standalone status errors remain query-local', async () => {
+    const workspaceRuntimeId = seedRepo([branch('main')])
     ipcHandlers['repo.worktreeStatus'] = async () => {
-      throw new Error('status failed')
+      throw new Error('error.workspace-git-unavailable')
     }
 
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel).toMatchObject({
-      phase: 'idle',
-      error: null,
-      loadedAt: 123,
-    })
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
     expect(
       primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
     ).toEqual(
       expect.objectContaining({
         message: 'error.failed-read-repo',
-        cause: expect.objectContaining({ message: 'status failed' }),
+        cause: expect.objectContaining({ message: 'error.workspace-git-unavailable' }),
       }),
     )
-    expect(cachedRepoProjection(workspaceRuntimeId)?.snapshot?.current).toBe('main')
   })
 
   test('repo read-model projection refresh writes the server snapshot result into repo data query cache', async () => {
@@ -206,10 +197,6 @@ describe('workspace refresh projection', () => {
         branch('feature/a', undefined, {
           worktree: {
             path: '/tmp/worktree-a',
-            summary: {
-              dirty: false,
-              changeCount: 0,
-            },
           },
         }),
       ],
@@ -222,10 +209,6 @@ describe('workspace refresh projection', () => {
           branch('feature/a', undefined, {
             worktree: {
               path: '/tmp/worktree-a',
-              summary: {
-                dirty: false,
-                changeCount: 0,
-              },
             },
           }),
         ],
@@ -239,10 +222,6 @@ describe('workspace refresh projection', () => {
           branch('feature/a', undefined, {
             worktree: {
               path: '/tmp/worktree-a',
-              summary: {
-                dirty: true,
-                changeCount: 4,
-              },
             },
           }),
         ],
@@ -253,35 +232,6 @@ describe('workspace refresh projection', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
-      isDirty: false,
-      changeCount: 0,
-    })
-  })
-
-  test('repo read-model projection refresh does not use snapshot dirty summary without status', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [
-          branch('feature/a', undefined, {
-            worktree: {
-              path: '/tmp/worktree-a',
-              summary: {
-                dirty: true,
-                changeCount: 3,
-              },
-            },
-          }),
-        ],
-        current: 'feature/a',
-      })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    const projection = repo ? readRepoBranchQueryProjection(repo) : null
-    expect(projection?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(projection?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
       isDirty: false,
       changeCount: 0,
     })
@@ -395,111 +345,4 @@ describe('workspace refresh projection', () => {
     ).toBe('terminal')
   })
 
-  test('repo read-model projection refresh prunes terminal sessions to current worktree paths', async () => {
-    const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const calls: Array<{ workspaceId: string; workspaceRuntimeId: string }> = []
-    ipcHandlers['terminal.prune'] = async (input: { workspaceId: string; workspaceRuntimeId: string }) => {
-      calls.push(input)
-      return { pruned: 1, remaining: 1 }
-    }
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [
-          branch('main', undefined, { worktree: { path: '/repo' } }),
-          branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } }),
-          branch('feature/plain'),
-        ],
-        current: 'main',
-      })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-
-    expect(calls).toEqual([
-      expect.objectContaining({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId,
-      }),
-    ])
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
-    expect(worktreesByPath?.['/tmp/stale-worktree']).toBeUndefined()
-    expect(Object.keys(worktreesByPath ?? {}).sort()).toEqual(['/repo', '/tmp/worktree-a'])
-  })
-
-  test('repo read-model projection refresh warns when pruning terminal sessions fails', async () => {
-    const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const err = new Error('prune failed')
-    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    ipcHandlers['terminal.prune'] = async () => {
-      throw err
-    }
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [branch('main', undefined, { worktree: { path: '/repo' } })],
-        current: 'main',
-      })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await waitForNextMacrotask()
-
-    expect(warnSpy).toHaveBeenCalledWith('failed to prune repo sessions', { err })
-  })
-
-  test.each(['status-first', 'projection-first'] as const)(
-    'status errors stay query-local when %s completes',
-    async (completionOrder) => {
-      const workspaceRuntimeId = seedRepo([branch('old')])
-      let resolveProjection!: (projection: GitWorkspaceRuntimeProjection) => void
-      let rejectStatus!: (error: Error) => void
-      ipcHandlers['repo.projection'] = () =>
-        new Promise((resolve) => {
-          resolveProjection = resolve
-        })
-      ipcHandlers['repo.worktreeStatus'] = () =>
-        new Promise((_resolve, reject) => {
-          rejectStatus = reject
-        })
-
-      const refresh = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-      await vi.waitFor(() => {
-        expect(resolveProjection).toEqual(expect.any(Function))
-        expect(rejectStatus).toEqual(expect.any(Function))
-      })
-
-      if (completionOrder === 'status-first') {
-        rejectStatus(new Error('error.path-not-found'))
-        await vi.waitFor(() => {
-          expect(
-            primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
-          ).toEqual(
-            expect.objectContaining({
-              message: 'error.failed-read-repo',
-              cause: expect.objectContaining({ message: 'error.path-not-found' }),
-            }),
-          )
-        })
-        resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
-      } else {
-        resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
-        await vi.waitFor(() => {
-          expect(
-            requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads
-              .repoReadModel.phase,
-          ).toBe('idle')
-        })
-        rejectStatus(new Error('error.path-not-found'))
-      }
-      await refresh
-
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
-      expect(
-        primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
-      ).toEqual(
-        expect.objectContaining({
-          message: 'error.failed-read-repo',
-          cause: expect.objectContaining({ message: 'error.path-not-found' }),
-        }),
-      )
-    },
-  )
 })

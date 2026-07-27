@@ -24,8 +24,8 @@
 
 import { execa } from 'execa'
 import { git } from '#/system/git/git-exec.ts'
-import { parseStatus } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
+import { readWorktreeStatusEntriesIncludingAllUntracked } from '#/system/git/status.ts'
 
 // Cap concurrent `git diff --no-index` invocations. Without a cap a
 // worktree with thousands of untracked files would fork that many git
@@ -47,8 +47,7 @@ export async function getWorktreePatch(worktreePath: string, options?: { signal?
   // entry, but `git diff --no-index /dev/null subdir/` doesn't work
   // (no-index expects two file paths). With -uall we get one entry per
   // file and each diff invocation succeeds.
-  const statusOut = await git(worktreePath, ['status', '--porcelain', '-z', '-uall'], { signal })
-  const entries = parseStatus(statusOut)
+  const entries = await readWorktreeStatusEntriesIncludingAllUntracked(worktreePath, signal)
   const untrackedPaths = entries.filter((e) => e.x === '?' && e.y === '?').map((e) => e.path)
 
   // `git diff --no-index` exits with code 1 when the files differ — that's

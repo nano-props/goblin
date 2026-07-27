@@ -304,8 +304,6 @@ export interface TerminalTestNotificationInput {
 
 export type TerminalListSessionsInput = WorkspaceRuntimeScope
 
-export type TerminalPruneInput = WorkspaceRuntimeScope
-
 interface TerminalSessionSummaryFields {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration

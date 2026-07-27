@@ -20,7 +20,6 @@ declare const physicalWorktreeAdmissionLeaseBrand: unique symbol
 
 export interface PhysicalWorktreeAdmissionLease {
   readonly identity: PhysicalWorktreeIdentity
-  readonly generationKey: string
   readonly [physicalWorktreeAdmissionLeaseBrand]: true
 }
 
@@ -36,25 +35,17 @@ export type PhysicalWorktreeExecutionBinding =
   | {
       readonly kind: 'local'
       readonly canonicalWorktreePath: string
-      readonly endpointMarker: PhysicalWorktreeEndpointMarker
     }
   | {
       readonly kind: 'remote'
       readonly canonicalWorktreePath: string
       readonly target: Readonly<ResolvedRemoteWorkspaceTarget>
       readonly configFingerprint: string
-      readonly endpointMarker: PhysicalWorktreeEndpointMarker
     }
-
-export interface PhysicalWorktreeEndpointMarker {
-  readonly deviceId: string
-  readonly inode: string
-}
 
 interface PhysicalWorktreeExecutionCapabilityState extends PhysicalWorktreeExecutionInput {
   execution: PhysicalWorktreeExecutionBinding
   admissionLease: PhysicalWorktreeAdmissionLease
-  validateExecution(signal: AbortSignal): Promise<void>
 }
 
 const capabilities = new WeakMap<PhysicalWorktreeExecutionCapability, PhysicalWorktreeExecutionCapabilityState>()
@@ -67,7 +58,6 @@ export function issuePhysicalWorktreeExecutionCapability(
   const frozenIdentity = Object.freeze({ ...identity }) as PhysicalWorktreeIdentity
   const admissionLease = Object.freeze({
     identity: frozenIdentity,
-    generationKey: executionGenerationKey(state.execution),
   }) as PhysicalWorktreeAdmissionLease
   const capability = Object.freeze({ identity: frozenIdentity }) as PhysicalWorktreeExecutionCapability
   const execution = freezeExecutionBinding(state.execution)
@@ -95,18 +85,6 @@ export function physicalWorktreeExecutionScope(
   }
 }
 
-export async function validatePhysicalWorktreeExecution(
-  capability: PhysicalWorktreeExecutionCapability,
-  signal: AbortSignal | undefined,
-): Promise<void> {
-  const state = capabilityState(capability)
-  const runtimeSignal = physicalWorktreeAdmissionLeaseSignal(state.admissionLease)
-  const operationSignal = signal ? AbortSignal.any([runtimeSignal, signal]) : runtimeSignal
-  operationSignal.throwIfAborted()
-  await state.validateExecution(operationSignal)
-  operationSignal.throwIfAborted()
-}
-
 export function physicalWorktreeAdmissionLease(
   capability: PhysicalWorktreeExecutionCapability,
 ): PhysicalWorktreeAdmissionLease {
@@ -120,7 +98,7 @@ export function physicalWorktreeAdmissionLeaseSignal(lease: PhysicalWorktreeAdmi
 }
 
 export function physicalWorktreeAdmissionLeaseKey(lease: PhysicalWorktreeAdmissionLease): string {
-  return `${physicalWorktreeIdentityKey(lease.identity)}\0${lease.generationKey}`
+  return physicalWorktreeIdentityKey(lease.identity)
 }
 
 export function assertPhysicalWorktreeExecutionCapability(
@@ -148,7 +126,7 @@ function capabilityState(capability: PhysicalWorktreeExecutionCapability): Physi
 
 function freezeExecutionBinding(execution: PhysicalWorktreeExecutionBinding): PhysicalWorktreeExecutionBinding {
   if (execution.kind === 'local') {
-    return Object.freeze({ ...execution, endpointMarker: Object.freeze({ ...execution.endpointMarker }) })
+    return Object.freeze({ ...execution })
   }
   const sshConnection = execution.target.sshConnection ?? buildCanonicalSshConnectionSnapshot(execution.target, '')
   return Object.freeze({
@@ -157,11 +135,5 @@ function freezeExecutionBinding(execution: PhysicalWorktreeExecutionBinding): Ph
       ...execution.target,
       sshConnection: Object.freeze({ ...sshConnection, options: Object.freeze([...sshConnection.options]) }),
     }),
-    endpointMarker: Object.freeze({ ...execution.endpointMarker }),
   })
-}
-
-function executionGenerationKey(execution: PhysicalWorktreeExecutionBinding): string {
-  const endpoint = `${execution.endpointMarker.deviceId}\0${execution.endpointMarker.inode}`
-  return execution.kind === 'local' ? endpoint : `${execution.configFingerprint}\0${endpoint}`
 }

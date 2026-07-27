@@ -2,12 +2,10 @@ import PQueue from 'p-queue'
 import {
   captureRepoWriteExecution,
   repoWriteExecutionBoundaryKey,
-  repoWriteExecutionCoordinationKey,
-  resolveRepoWriteBoundaryIdentity,
+  resolveRepoWriteBoundaryKey,
   runWithCapturedRepoWriteExecution,
   type RepoSource,
   type RepoWriteExecutionCapability,
-  validateRepoWriteExecution,
 } from '#/server/modules/repo-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
@@ -54,7 +52,6 @@ export interface RepoWriteBoundaryHandle {
 
 interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
   readonly descriptor: string
-  readonly coordinationDescriptor: string
   repoIds: Set<WorkspaceId>
   readonly queue: PQueue
   operations: Map<string, RepoServerOperationState>
@@ -74,7 +71,6 @@ let nextBoundaryGroupId = 1
 const boundaryGroups = new Set<RepoWriteBoundaryGroup>()
 const boundaryGroupByRepoId = new Map<WorkspaceId, RepoWriteBoundaryGroup>()
 const boundaryGroupByDescriptor = new Map<string, RepoWriteBoundaryGroup>()
-const queueByCoordinationDescriptor = new Map<string, PQueue>()
 const workspaceRuntimeRegistrationsByRepoId = new Map<WorkspaceId, Map<string, WorkspaceRuntimeBoundaryRegistration>>()
 let boundaryGroupByHandle = new WeakMap<RepoWriteBoundaryHandle, RepoWriteBoundaryGroup>()
 let workspaceRuntimeCloseSubscription: (() => void) | null = null
@@ -83,18 +79,12 @@ function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
 }
 
-function createBoundaryGroup(descriptor: string, coordinationDescriptor: string): RepoWriteBoundaryGroup {
-  let queue = queueByCoordinationDescriptor.get(coordinationDescriptor)
-  if (!queue) {
-    queue = new PQueue({ concurrency: 1 })
-    queueByCoordinationDescriptor.set(coordinationDescriptor, queue)
-  }
+function createBoundaryGroup(descriptor: string): RepoWriteBoundaryGroup {
   const group: RepoWriteBoundaryGroup = {
     id: `repo-write-boundary-${nextBoundaryGroupId++}`,
     descriptor,
-    coordinationDescriptor,
     repoIds: new Set(),
-    queue,
+    queue: new PQueue({ concurrency: 1 }),
     operations: new Map(),
     lastSuccessfulFetchAt: null,
   }
@@ -109,19 +99,15 @@ async function resolveRepoWriteBoundaryGroup(
   signal?: AbortSignal,
   runtimeRegistration?: WorkspaceRuntimeBoundaryRegistration | null,
 ): Promise<RepoWriteBoundaryGroup> {
-  const identity = await resolveRepoWriteBoundaryIdentity(repoId, signal)
+  const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
   assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
-  return bindRepoWriteBoundaryGroup(repoId, identity.repositoryKey, identity.coordinationKey)
+  return bindRepoWriteBoundaryGroup(repoId, boundaryKey)
 }
 
-function bindRepoWriteBoundaryGroup(
-  repoId: WorkspaceId,
-  descriptor: string,
-  coordinationDescriptor: string,
-): RepoWriteBoundaryGroup {
+function bindRepoWriteBoundaryGroup(repoId: WorkspaceId, descriptor: string): RepoWriteBoundaryGroup {
   ensureRepoRuntimeCloseSubscription()
   const previousGroup = boundaryGroupByRepoId.get(repoId)
-  const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor, coordinationDescriptor)
+  const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor)
   if (previousGroup !== group && previousGroup) {
     previousGroup.repoIds.delete(repoId)
     deleteBoundaryGroupIfIdle(previousGroup)
@@ -322,18 +308,6 @@ function deleteBoundaryGroupIfIdle(group: RepoWriteBoundaryGroup): void {
   boundaryGroups.delete(group)
   if (boundaryGroupByDescriptor.get(group.descriptor) === group) boundaryGroupByDescriptor.delete(group.descriptor)
   boundaryGroupByHandle.delete(group)
-  deleteCoordinationQueueIfUnreferenced(group.coordinationDescriptor, group.queue)
-}
-
-function deleteCoordinationQueueIfUnreferenced(coordinationDescriptor: string, queue: PQueue): void {
-  if ([...boundaryGroups].some((candidate) => candidate.coordinationDescriptor === coordinationDescriptor)) return
-  if (queue.size > 0 || queue.pending > 0) {
-    void queue.onIdle().then(() => deleteCoordinationQueueIfUnreferenced(coordinationDescriptor, queue))
-    return
-  }
-  if (queueByCoordinationDescriptor.get(coordinationDescriptor) === queue) {
-    queueByCoordinationDescriptor.delete(coordinationDescriptor)
-  }
 }
 
 function ensureRepoRuntimeCloseSubscription(): void {
@@ -441,7 +415,6 @@ function createRepoWriteOperationContext(
       return await runRepoWriteNetworkOperation(operation, task, callerSignal)
     },
     async runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>) {
-      const validation = await observePromise(async () => await validateRepoWriteExecution(execution, callerSignal))
       const admissionError = workspaceRuntimeRegistrationClosedError(runtimeRegistration)
       if (admissionError) {
         operation.settle({ ok: false, message: admissionError.message })
@@ -450,12 +423,6 @@ function createRepoWriteOperationContext(
       if (callerSignal?.aborted) {
         operation.requestCancel('caller-abort')
         const result = cancelledRepoWriteResult<T>()
-        operation.settle(result)
-        return result
-      }
-      if (!validation.ok) throw validation.error
-      if (!validation.value) {
-        const result = { ok: false, message: 'error.repository-target-changed' } as T
         operation.settle(result)
         return result
       }
@@ -485,11 +452,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   if (signal?.aborted) return cancelledRepoWriteResult()
   if (!capture.ok) throw capture.error
   const execution = capture.value
-  const group = bindRepoWriteBoundaryGroup(
-    repoId,
-    repoWriteExecutionBoundaryKey(execution),
-    repoWriteExecutionCoordinationKey(execution),
-  )
+  const group = bindRepoWriteBoundaryGroup(repoId, repoWriteExecutionBoundaryKey(execution))
   const operation = beginRepoWriteOperation(group, operationInput)
   const context = createRepoWriteOperationContext(operation, execution, runtimeRegistration, signal)
   let task: () => Promise<T>
@@ -595,7 +558,6 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   boundaryGroups.clear()
   boundaryGroupByRepoId.clear()
   boundaryGroupByDescriptor.clear()
-  queueByCoordinationDescriptor.clear()
   workspaceRuntimeRegistrationsByRepoId.clear()
   boundaryGroupByHandle = new WeakMap()
   workspaceRuntimeCloseSubscription?.()

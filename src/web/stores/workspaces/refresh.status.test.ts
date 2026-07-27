@@ -36,7 +36,7 @@ import {
   setRepoWorktreeStatusQueryData,
 } from '#/web/repo-query-cache.ts'
 import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
-import { invalidateRepoSnapshotQueries } from '#/web/repo-query-runtime.ts'
+import { invalidateRepoSnapshotQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
@@ -102,28 +102,16 @@ describe('workspace refresh status', () => {
       branch('feature/cleaned', undefined, {
         worktree: {
           path: '/tmp/worktree-cleaned',
-          summary: {
-            dirty: true,
-            changeCount: 2,
-          },
         },
       }),
       branch('feature/dirty', undefined, {
         worktree: {
           path: '/tmp/worktree-dirty',
-          summary: {
-            dirty: false,
-            changeCount: 0,
-          },
         },
       }),
       branch('feature/missing', undefined, {
         worktree: {
           path: '/tmp/worktree-missing',
-          summary: {
-            dirty: true,
-            changeCount: 3,
-          },
         },
       }),
     ])
@@ -133,28 +121,16 @@ describe('workspace refresh status', () => {
           branch('feature/cleaned', undefined, {
             worktree: {
               path: '/tmp/worktree-cleaned',
-              summary: {
-                dirty: true,
-                changeCount: 2,
-              },
             },
           }),
           branch('feature/dirty', undefined, {
             worktree: {
               path: '/tmp/worktree-dirty',
-              summary: {
-                dirty: false,
-                changeCount: 0,
-              },
             },
           }),
           branch('feature/missing', undefined, {
             worktree: {
               path: '/tmp/worktree-missing',
-              summary: {
-                dirty: true,
-                changeCount: 3,
-              },
             },
           }),
         ],
@@ -294,19 +270,15 @@ describe('workspace refresh status', () => {
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(freshStatus)
   })
 
-  test('workspace visible status cache refresh drops stale results after projection invalidation', async () => {
+  test('workspace visible status cache refresh rejects stale results without retrying', async () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     let statusCalls = 0
     let resolveStatus!: (snapshot: { workspaceRuntimeId: string; status: WorktreeStatus[]; loadedAt: number }) => void
     const staleStatus: WorktreeStatus[] = [
       { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
     ]
-    const newerStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'newer.ts' }] },
-    ]
     ipcHandlers['repo.worktreeStatus'] = async () => {
       statusCalls += 1
-      if (statusCalls > 1) return { workspaceRuntimeId, status: newerStatus, loadedAt: Date.now() }
       return await new Promise((resolve) => {
         resolveStatus = resolve
       })
@@ -316,14 +288,15 @@ describe('workspace refresh status', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    invalidateRepoSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
     resolveStatus({ workspaceRuntimeId, status: staleStatus, loadedAt: Date.now() })
     await refresh
 
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(newerStatus)
+    expect(statusCalls).toBe(1)
+    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 
-  test('workspace visible status cache refresh drops stale errors after projection invalidation', async () => {
+  test('workspace visible status cache refresh drops stale errors after worktree invalidation', async () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     let statusCalls = 0
     let rejectStatus!: (err: Error) => void
@@ -339,13 +312,14 @@ describe('workspace refresh status', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    invalidateRepoSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
 
     rejectStatus(new Error('error.path-not-found'))
     await refresh
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(repo.capability.kind).toBe('git')
+    expect(statusCalls).toBe(1)
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 

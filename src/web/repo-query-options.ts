@@ -1,4 +1,4 @@
-import { queryOptions, skipToken } from '@tanstack/react-query'
+import { queryOptions, skipToken, type Query } from '@tanstack/react-query'
 import type { PullRequestFetchMode } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -22,6 +22,17 @@ import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
 
 const retryStaleRepoRuntimeRead = (_failureCount: number, error: unknown): boolean => isStaleRepoRuntimeReadError(error)
 
+function refetchStatusWhenFirstObserverMounts<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends readonly unknown[],
+>(query: Query<TQueryFnData, TError, TData, TQueryKey>): boolean | 'always' {
+  // Revalidate a cached workspace when it becomes visible again, but do not
+  // multiply reads as the sidebar, dashboard, and workspace panes subscribe.
+  return query.getObserversCount() === 1 ? 'always' : false
+}
+
 export function repoProjectionQueryOptions(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
@@ -44,8 +55,9 @@ export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceR
   return queryOptions({
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
+    retry: false,
+    refetchOnMount: refetchStatusWhenFirstObserverMounts,
+    refetchOnWindowFocus: 'always',
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
@@ -110,8 +122,9 @@ export function repoWorktreeStatusReadModelQueryOptions(
       repoRoot === null
         ? skipToken
         : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
+    retry: false,
+    refetchOnMount: refetchStatusWhenFirstObserverMounts,
+    refetchOnWindowFocus: 'always',
     staleTime: Number.POSITIVE_INFINITY,
     enabled: active,
     subscribed: active,

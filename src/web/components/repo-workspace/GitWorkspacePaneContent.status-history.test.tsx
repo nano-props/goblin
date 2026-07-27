@@ -54,7 +54,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 4 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/changes',
@@ -126,7 +126,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/copy-success', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/copy-success',
@@ -192,7 +192,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/clean', {
-          worktree: { path: worktreePath, summary: { dirty: false, changeCount: 0 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/clean',
@@ -241,7 +241,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 18 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/status-links',
@@ -337,7 +337,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 18 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/status-links',
@@ -466,7 +466,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/hidden', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/hidden',
@@ -515,7 +515,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes-panel', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 2 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/changes-panel',
@@ -568,7 +568,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/stale-changes', {
-          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+          worktree: { path: worktreePath },
         }),
       ],
       currentBranchName: 'feature/stale-changes',

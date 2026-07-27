@@ -575,7 +575,6 @@ beforeEach(() => {
       })),
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
       close: terminalCalls.close.mockResolvedValue(true),
-      pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: vi.fn(async () => ({ revision: 0, sessions: [] })),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),

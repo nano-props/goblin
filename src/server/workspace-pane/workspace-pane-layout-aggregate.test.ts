@@ -86,11 +86,6 @@ function replacementCapability() {
   return issueTestPhysicalWorktreeExecutionCapability({
     identity,
     worktreePath: target.worktreePath,
-    execution: {
-      kind: 'local',
-      canonicalWorktreePath: identity.endpoint,
-      endpointMarker: { deviceId: 'replacement-device', inode: 'replacement-inode' },
-    },
   })
 }
 

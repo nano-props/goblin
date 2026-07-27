@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   readWorkspaceFilesystemSourceLocal: vi.fn(),
   readGitWorktreeFilesystemSourceRemote: vi.fn(),
   readWorkspaceFilesystemSourceRemote: vi.fn(),
-  getWorktrees: vi.fn(),
+  readWorktreeMembership: vi.fn(),
   resolveRemoteWorktree: vi.fn(),
 }))
 
@@ -24,7 +24,7 @@ vi.mock('#/server/modules/workspace-filesystem-source.ts', () => ({
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: mocks.getWorktrees,
+  readWorktreeMembership: mocks.readWorktreeMembership,
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
@@ -94,7 +94,7 @@ function remoteWorktreeTarget() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
-  mocks.getWorktrees.mockResolvedValue([
+  mocks.readWorktreeMembership.mockResolvedValue([
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
@@ -112,7 +112,7 @@ describe('workspace filesystem tree read layer', () => {
 
     await expect(readWorkspaceFilesystemTree(workspaceRootTarget(LOCAL_REPO_ID))).resolves.toEqual(emptyTree)
 
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     expect(mocks.readWorkspaceFilesystemSourceLocal).toHaveBeenCalledWith('/tmp/repo', expect.any(Object), undefined)
   })
 
@@ -121,9 +121,7 @@ describe('workspace filesystem tree read layer', () => {
 
     const result = await readWorkspaceFilesystemTree(localWorktreeTarget(), { prefix: 'src' })
 
-    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', {
-      includeStatus: false,
-    })
+    expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.readGitWorktreeFilesystemSourceLocal).toHaveBeenCalledWith(
       '/tmp/repo/.worktrees/feature',
       expect.objectContaining({ prefix: 'src' }),
@@ -138,7 +136,7 @@ describe('workspace filesystem tree read layer', () => {
 
     await readWorkspaceFilesystemTree(localWorktreeTarget(), { signal })
 
-    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal })
+    expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', signal)
     expect(mocks.readGitWorktreeFilesystemSourceLocal).toHaveBeenCalledWith(
       '/tmp/repo/.worktrees/feature',
       expect.any(Object),
@@ -159,7 +157,7 @@ describe('workspace filesystem tree read layer', () => {
       'error.workspace-target-transport-mismatch',
     )
 
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     expect(mocks.readGitWorktreeFilesystemSourceLocal).not.toHaveBeenCalled()
   })
 
@@ -175,7 +173,7 @@ describe('workspace filesystem tree read layer', () => {
 
     const result = await readWorkspaceFilesystemTree(remoteWorktreeTarget(), { prefix: 'src' })
 
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(
       remoteRepoId,
       { workspaceRuntimeId: RUNTIME_ID },

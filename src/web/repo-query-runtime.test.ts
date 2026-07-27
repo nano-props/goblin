@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -24,7 +24,7 @@ import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/we
 import {
   invalidateRepoOperationsQueries,
   invalidateRepoSnapshotQueries,
-  invalidateRepoWorktreeSnapshotQueries,
+  invalidateRepoWorktreeStatusQueries,
   refreshRepoProjectionReadModel,
   refreshRepoWorktreeStatusReadModel,
 } from '#/web/repo-query-runtime.ts'
@@ -159,7 +159,7 @@ describe('repo projection query data', () => {
 
     expect(invalidateQueries).toHaveBeenCalledOnce()
     expect(queryClient.getQueryState(projectionKey)?.isInvalidated).toBe(true)
-    expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(operationsKey)?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(settledOperationsKey)?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(true)
@@ -192,7 +192,7 @@ describe('repo projection query data', () => {
       queryClient.setQueryData(queryKey, {})
     }
 
-    invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+    invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
 
     expect(queryClient.getQueryState(projectionKey)?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(true)
@@ -396,7 +396,7 @@ describe('repo projection query data', () => {
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(1))
       invalidateRepoOperationsQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       releases[0]!(repoProjectionForTest(1))
       await vi.waitFor(() => expect(observer.getCurrentResult().data?.loadedAt).toBe(1))
       expect(releases).toHaveLength(1)
@@ -549,9 +549,9 @@ describe('repo projection query data', () => {
       })
 
       expect(queryClient.getQueryState(operationsKey)?.isInvalidated).toBe(false)
-      expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(true)
-      expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(true)
-      expect(queryClient.getQueryState(remoteBranchesKey)?.isInvalidated).toBe(true)
+      expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(false)
+      expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(false)
+      expect(queryClient.getQueryState(remoteBranchesKey)?.isInvalidated).toBe(false)
       expect(signals[0]?.aborted).toBe(false)
       releases[0]?.(repoProjectionForTest(2))
       await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
@@ -559,6 +559,28 @@ describe('repo projection query data', () => {
       expect(signals[0]?.aborted).toBe(false)
     } finally {
       unsubscribe()
+      queryClient.clear()
+    }
+  })
+
+  test('imperative projection refresh does not stale or retry an in-flight log read', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const logRead = Promise.withResolvers<Awaited<ReturnType<typeof repoClientMocks.getRepoLog>>>()
+    repoClientMocks.getRepoLog.mockReturnValue(logRead.promise)
+    repoClientMocks.getRepoProjection.mockResolvedValue(repoProjectionForTest(1))
+    function LogHarness() {
+      useRepoLogQuery(WORKSPACE_ID, 'repo-runtime-1', 'main')
+      return null
+    }
+    const result = renderInJsdom(createElement(QueryClientProvider, { client: queryClient }, createElement(LogHarness)))
+    try {
+      await vi.waitFor(() => expect(repoClientMocks.getRepoLog).toHaveBeenCalledOnce())
+
+      await refreshRepoProjectionReadModel(WORKSPACE_ID, 'repo-runtime-1', null, 'full', { queryClient })
+      logRead.resolve([])
+      await vi.waitFor(() => expect(repoClientMocks.getRepoLog).toHaveBeenCalledOnce())
+    } finally {
+      result.unmount()
       queryClient.clear()
     }
   })
@@ -793,7 +815,7 @@ describe('repo projection query data', () => {
 })
 
 describe('repo worktree status query data', () => {
-  test('shares cached status across observers and only refetches after invalidation', async () => {
+  test('shares status across observers and revalidates a cached workspace once when it becomes active', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(
@@ -822,27 +844,83 @@ describe('repo worktree status query data', () => {
       createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
     )
     try {
-      expect(queryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, 'repo-runtime-1'))?.fetchStatus).toBe(
-        'idle',
-      )
-      expect(releases).toHaveLength(1)
-      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
-
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       await vi.waitFor(() => expect(releases).toHaveLength(2))
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
       releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
       await vi.waitFor(() =>
         expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2),
       )
+
+      invalidateRepoSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      await Promise.resolve()
+      expect(releases).toHaveLength(2)
       expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      await vi.waitFor(() => expect(releases).toHaveLength(3))
+      releases[2]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 3 })
+      await vi.waitFor(() =>
+        expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(3),
+      )
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(3)
     } finally {
       second.unmount()
       queryClient.clear()
     }
   })
 
-  test('reruns an in-flight status read after a worktree snapshot invalidation', async () => {
+  test('shares one status refetch across repeated focus activation without cancelling it', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
+    setRepoWorktreeStatusQueryData(
+      WORKSPACE_ID,
+      'repo-runtime-1',
+      { workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 },
+      queryClient,
+    )
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation((_repoRoot, _workspaceRuntimeId, signal) => {
+      signals.push(signal)
+      return new Promise<RepoWorktreeStatusSnapshot>((resolve) => releases.push(resolve))
+    })
+    function StatusObservers() {
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
+      return null
+    }
+
+    focusManager.setFocused(false)
+    const result = renderInJsdom(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+    )
+    try {
+      await vi.waitFor(() => expect(releases).toHaveLength(1))
+      releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+      await vi.waitFor(() =>
+        expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2),
+      )
+
+      focusManager.setFocused(true)
+      await vi.waitFor(() => expect(releases).toHaveLength(2))
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+
+      expect(releases).toHaveLength(2)
+      expect(signals[1]?.aborted).toBe(false)
+      releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 3 })
+      await vi.waitFor(() =>
+        expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(3),
+      )
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+    } finally {
+      result.unmount()
+      queryClient.clear()
+      focusManager.setFocused(undefined)
+    }
+  })
+
+  test('rejects an invalidated in-flight status read without retrying it', async () => {
+    const queryClient = new QueryClient()
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(
       () =>
@@ -854,14 +932,13 @@ describe('repo worktree status query data', () => {
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(1))
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
 
-      await vi.waitFor(() => expect(releases).toHaveLength(2))
+      await vi.waitFor(() => expect(observer.getCurrentResult().isError).toBe(true))
       expect(observer.getCurrentResult().data).toBeUndefined()
-
-      releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
-      await vi.waitFor(() => expect(observer.getCurrentResult().data?.loadedAt).toBe(2))
+      expect(releases).toHaveLength(1)
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
     } finally {
       unsubscribe()
       queryClient.clear()

@@ -3,10 +3,7 @@ import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktre
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type {
-  PhysicalWorktreeOperationCoordinator,
-  PhysicalWorktreeOperationPermit,
-} from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
@@ -19,10 +16,7 @@ interface WorktreeRemovalApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminalSessions: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
-  workspaceTabs: Pick<
-    WorkspacePaneTabsCoordinator,
-    'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
-  >
+  workspaceTabs: Pick<WorkspacePaneTabsCoordinator, 'physicalWorktreeTargets' | 'clearPhysicalWorktreeIndex'>
   isCurrentWorkspaceRuntime(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: WorkspaceId): void
@@ -88,16 +82,7 @@ export class WorktreeRemovalApplication {
                 const quiescence = await this.quiesce(input.repoRoot, worktreePath, physicalCapability)
                 signal.throwIfAborted()
                 affectedScopes = quiescence.scopes
-                if (!quiescence.ok) {
-                  await this.reconcileAfterFailure(
-                    input.repoRoot,
-                    worktreePath,
-                    physicalCapability,
-                    permit,
-                    affectedScopes,
-                  )
-                  return { ok: false, message: quiescence.message }
-                }
+                if (!quiescence.ok) return { ok: false, message: quiescence.message }
                 return { ok: true, message: '' }
               },
               afterWorktreeRemoved: async () => {
@@ -105,7 +90,7 @@ export class WorktreeRemovalApplication {
                   this.deps.worktreeOperations.assertPermit(physicalCapability, permit)
                   // Reverse-index refs only identify stale runtime scopes. They
                   // cannot authorize durable retirement: a stable target may
-                  // already be rebound to a new physical generation.
+                  // already be rebound under a newer admission lease.
                   await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability)
                   this.broadcast(affectedScopes)
                   return { ok: true, message: '' }
@@ -119,14 +104,6 @@ export class WorktreeRemovalApplication {
                   }
                 }
               },
-              afterRemoveFailed: async () =>
-                await this.reconcileAfterFailure(
-                  input.repoRoot,
-                  worktreePath,
-                  physicalCapability,
-                  permit,
-                  affectedScopes,
-                ),
             },
             signal,
           )
@@ -200,38 +177,6 @@ export class WorktreeRemovalApplication {
       this.deps.broadcastSessionsChanged(userId, repoRoot, workspaceRuntimeId)
       this.deps.broadcastWorkspaceTabsChanged(userId, repoRoot)
     }
-  }
-
-  private async reconcileAfterFailure(
-    repoRoot: WorkspaceId,
-    worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
-    scopes: readonly {
-      userId: string
-      repoRoot: WorkspaceId
-      workspaceRuntimeId: string
-      scope: string
-      worktreePath: string
-    }[],
-  ): Promise<void> {
-    try {
-      await this.deps.workspaceTabs.reconcilePhysicalWorktreeAfterRemovalFailure({
-        workspaceId: repoRoot,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-        scopes: scopes.map(({ userId, repoRoot, scope, worktreePath }) => ({
-          userId,
-          workspaceId: repoRoot,
-          scope,
-          worktreePath,
-        })),
-      })
-    } catch (error) {
-      worktreeRemovalLogger.error({ error, repoRoot, worktreePath }, 'tabs reconcile failed')
-    }
-    this.broadcast(scopes)
   }
 }
 

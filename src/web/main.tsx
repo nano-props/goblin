@@ -37,7 +37,11 @@ async function boot(): Promise<void> {
   } finally {
     timeout.dispose()
   }
-  root.render(<AppRoot />)
+  root.render(
+    <StrictMode>
+      <AppRoot />
+    </StrictMode>,
+  )
 }
 
 function createTimeoutController(ms: number): { signal: AbortSignal; abort: (reason: unknown) => void; dispose: () => void } {
@@ -54,16 +58,14 @@ function createTimeoutController(ms: number): { signal: AbortSignal; abort: (rea
 
 function AppRoot() {
   return (
-    <StrictMode>
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <ResponsiveUiProvider>
-          <AuthProvider>
-            <PrimaryWindowRouterProvider />
-          </AuthProvider>
-        </ResponsiveUiProvider>
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
-      </QueryClientProvider>
-    </StrictMode>
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <ResponsiveUiProvider>
+        <AuthProvider>
+          <PrimaryWindowRouterProvider />
+        </AuthProvider>
+      </ResponsiveUiProvider>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
+    </QueryClientProvider>
   )
 }
 

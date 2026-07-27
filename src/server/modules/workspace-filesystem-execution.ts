@@ -5,7 +5,7 @@ import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
 import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteWorktree, type RemoteGitRunner } from '#/system/ssh/git.ts'
 
 interface ResolvedWorkspaceFilesystemExecutionBase {
@@ -61,7 +61,7 @@ export async function resolveWorkspaceFilesystemExecution(
   }
   const worktree =
     target.kind === 'git-worktree'
-      ? requiredLocalWorktree(await getWorktrees(workspace.path, { includeStatus: false, signal }), root.path)
+      ? requiredLocalWorktree(await readWorktreeMembership(workspace.path, signal), root.path)
       : null
   return { transport: 'local', target, executionPath: root.path, worktree }
 }

@@ -9,6 +9,7 @@ import {
   createLocalRepoWorktreeWithBootstrap,
   expectNoRepoSnapshotInvalidations,
   expectRepoSnapshotInvalidations,
+  repoWorktreeSnapshotInvalidations,
   mocks,
 } from '#/server/test-utils/repo-module.ts'
 
@@ -52,6 +53,21 @@ describe('repo branch mutations', () => {
       message: 'ok',
       affectedWorktreePaths: ['/tmp/repo-worktree'],
     })
+  })
+
+  test('pullRepoBranch publishes invalidation when failure may follow partial ref updates', async () => {
+    mocks.pullBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'fatal: pull failed',
+      repositoryStateChanged: true,
+      affectedWorktreePaths: ['/tmp/repo'],
+    })
+    const repo = await import('#/server/modules/repo-write-paths.ts')
+
+    await repo.pullRepoBranch(REPO_ID, 'feature/a')
+
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expect(repoWorktreeSnapshotInvalidations()).toEqual([{ repoId: REPO_ID, query: 'repo-worktree-snapshot' }])
   })
 
   test.each([
@@ -254,9 +270,9 @@ describe('repo branch mutations', () => {
     ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
     ['deleteRepoBranch', async (repo: typeof RepoWritePaths) => repo.deleteRepoBranch(REPO_ID, 'feature/a')],
   ])('%s publishes sibling worktree snapshot invalidations after success', async (_name, run) => {
-    mocks.getWorktrees.mockResolvedValue([
-      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
-      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false, isDirty: false },
+    mocks.readWorktreeMembership.mockResolvedValue([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false },
     ])
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
@@ -288,7 +304,7 @@ describe('repo branch mutations', () => {
 
   test('deleteRepoBranch uses current HEAD semantics for safe deletes', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.isAncestor.mockImplementationOnce(async (_cwd, _branch, descendant) => descendant === 'release/1.0')
     mocks.getUpstream.mockResolvedValueOnce(null)
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
@@ -302,7 +318,7 @@ describe('repo branch mutations', () => {
 
   test('deleteRepoBranch treats a configured but missing tracking ref as unavailable for merge safety', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.isAncestor.mockResolvedValueOnce(false)
     mocks.getUpstream.mockResolvedValueOnce({
       ancestryRef: null,
@@ -321,7 +337,7 @@ describe('repo branch mutations', () => {
 
   test('deleteRepoBranch freezes one upstream read across validation and deletion', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.isAncestor.mockResolvedValue(true)
     mocks.getUpstream
       .mockResolvedValueOnce({
@@ -346,7 +362,7 @@ describe('repo branch mutations', () => {
 
   test('uses a local upstream for merge safety without attempting remote deletion', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
-    mocks.getWorktrees.mockResolvedValueOnce([])
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.isAncestor.mockResolvedValue(true)
     mocks.getUpstream.mockResolvedValueOnce({
       ancestryRef: 'refs/heads/main',

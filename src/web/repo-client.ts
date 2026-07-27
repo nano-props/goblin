@@ -152,7 +152,7 @@ export async function fetchRepo(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/fetch',
     { cwd, workspaceRuntimeId },

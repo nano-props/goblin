@@ -193,6 +193,7 @@ describe('workspace refresh operations', () => {
     expect(fetchCount).toBe(1)
     expect(snapshotCount).toBe(1)
     expect(statusCount).toBe(1)
+    expect(repoBranchNames()).toEqual(['feature/a', 'feature/b'])
   })
 
   test('manual sync records thrown fetch failures instead of rejecting', async () => {
@@ -238,7 +239,7 @@ describe('workspace refresh operations', () => {
     expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.fetch.phase).toBe('idle')
   })
 
-  test('branch write actions run through branch operation state and refresh after completion', async () => {
+  test('branch write actions rely on server invalidation after completion', async () => {
     const workspaceRuntimeId = seedRepo([branch('main'), branch('feature/a')])
     let resolveDelete!: (value: { ok: true; message: string }) => void
     let snapshotCount = 0
@@ -246,8 +247,6 @@ describe('workspace refresh operations', () => {
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveDelete = resolve
       })
-    // Post-write branch action refresh goes through the query-backed
-    // projection refresh path now.
     ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
       return repoProjection({ branches: [branch('main')], current: 'main' })
@@ -266,8 +265,8 @@ describe('workspace refresh operations', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.operations.branchAction.phase).toBe('idle')
-    expect(repoBranchNames()).toEqual(['main'])
-    expect(snapshotCount).toBe(1)
+    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
+    expect(snapshotCount).toBe(0)
   })
 
   test('create worktree runs through branch operation state and refreshes only after success', async () => {
@@ -281,7 +280,7 @@ describe('workspace refresh operations', () => {
 
     const result = await useWorkspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId, refreshOnError: false })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
@@ -301,13 +300,13 @@ describe('workspace refresh operations', () => {
 
     const result = await useWorkspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId, refreshOnError: false })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(snapshotCount).toBe(0)
   })
 
-  test('create worktree partial failure refreshes when the repository already changed', async () => {
+  test('create worktree partial failure relies on server invalidation', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     let snapshotCount = 0
     ipcHandlers['repo.createWorktree'] = async () => ({
@@ -322,15 +321,15 @@ describe('workspace refresh operations', () => {
 
     const result = await useWorkspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId, refreshOnError: false })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId })
 
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: setup failed',
       repositoryStateChanged: true,
     })
-    expect(snapshotCount).toBe(1)
-    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
+    expect(snapshotCount).toBe(0)
+    expect(repoBranchNames()).toEqual(['main'])
   })
 
   test('deferred branch action results skip toast and refresh until caller confirms follow-up', async () => {
@@ -357,7 +356,7 @@ describe('workspace refresh operations', () => {
     expect(requireGitWorkspaceForTest(repo).capability.git.operations.branchAction.phase).toBe('idle')
   })
 
-  test('branch action failures refresh by default', async () => {
+  test('branch action failures do not issue a client completion refresh', async () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     let snapshotCount = 0
     ipcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.delete-branch-failed' })
@@ -376,7 +375,7 @@ describe('workspace refresh operations', () => {
       kind: 'result',
       result: { ok: false, message: 'error.delete-branch-failed' },
     })
-    expect(snapshotCount).toBe(1)
+    expect(snapshotCount).toBe(0)
   })
 
   test('failed network branch actions do not clear the sticky fetch failure badge', async () => {

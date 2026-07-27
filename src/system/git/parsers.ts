@@ -49,17 +49,12 @@ export function parseBranches(
     }
   }
 
-  const worktreeMap = new Map<
-    string,
-    { path: string; isDirty?: boolean; isPrimary: boolean; changeCount?: number; isLocked?: boolean }
-  >()
+  const worktreeMap = new Map<string, { path: string; isPrimary: boolean; isLocked?: boolean }>()
   for (const wt of worktrees) {
     if (wt.branch) {
       worktreeMap.set(wt.branch, {
         path: wt.path,
-        isDirty: wt.isDirty,
         isPrimary: wt.isPrimary,
-        changeCount: wt.changeCount,
         isLocked: wt.isLocked,
       })
     }
@@ -104,19 +99,10 @@ export function parseBranches(
 
     const wtInfo = worktreeMap.get(name)
     if (wtInfo) {
-      const hasSummary = wtInfo.isDirty !== undefined || wtInfo.changeCount !== undefined
       branchInfo.worktree = {
         path: wtInfo.path,
         isPrimary: wtInfo.isPrimary,
         ...(wtInfo.isLocked !== undefined ? { isLocked: wtInfo.isLocked } : {}),
-        ...(hasSummary
-          ? {
-              summary: {
-                ...(wtInfo.isDirty !== undefined ? { dirty: wtInfo.isDirty } : {}),
-                ...(wtInfo.changeCount !== undefined ? { changeCount: wtInfo.changeCount } : {}),
-              },
-            }
-          : {}),
       }
     }
 
@@ -248,21 +234,4 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
     })
   }
   return worktrees
-}
-
-export function haveSameWorktrees(left: readonly WorktreeInfo[], right: readonly WorktreeInfo[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((worktree, index) => {
-      const other = right[index]
-      return (
-        other !== undefined &&
-        worktree.path === other.path &&
-        worktree.branch === other.branch &&
-        worktree.isBare === other.isBare &&
-        worktree.isPrimary === other.isPrimary &&
-        worktree.isLocked === other.isLocked
-      )
-    })
-  )
 }

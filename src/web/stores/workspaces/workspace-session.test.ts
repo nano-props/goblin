@@ -5,7 +5,7 @@ import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
@@ -354,7 +354,7 @@ describe('repo lifecycle', () => {
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
       const repo = useWorkspacesStore.getState().workspaces[REPO_A]
-      expect(repo ? readRepoBranchQueryProjection(repo)?.currentBranch : null).toBe('fresh')
+      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.currentBranch : null).toBe('fresh')
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
@@ -362,7 +362,7 @@ describe('repo lifecycle', () => {
 
     {
       const repo = useWorkspacesStore.getState().workspaces[REPO_A]
-      expect(repo ? readRepoBranchQueryProjection(repo)?.currentBranch : null).toBe('fresh')
+      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.currentBranch : null).toBe('fresh')
     }
   })
 
@@ -534,7 +534,9 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeDefined()
     await vi.waitFor(() => {
       const repo = useWorkspacesStore.getState().workspaces[target!.id]
-      expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) : null).toEqual([])
+      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.branches.map((branch) => branch.name) : null).toEqual(
+        [],
+      )
     })
   })
 

@@ -321,9 +321,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async recoverSessions(clientId, userId, input) {
       return await actions.recoverSessions(clientId, userId, input)
     },
-    async prune(clientId, userId, input) {
-      return await actions.prune(clientId, userId, input)
-    },
   }
 
   const realtimeHandlers = createTerminalRealtimeHandlers(terminalActionHost)

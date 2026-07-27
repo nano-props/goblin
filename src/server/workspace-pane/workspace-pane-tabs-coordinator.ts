@@ -465,27 +465,6 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     )
   }
 
-  async reconcilePhysicalWorktreeAfterRemovalFailure(input: {
-    workspaceId: WorkspaceId
-    worktreePath: string
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-    permit: PhysicalWorktreeOperationPermit
-    scopes: readonly { userId: string; workspaceId: WorkspaceId; scope: string; worktreePath: string }[]
-  }): Promise<void> {
-    await Promise.all(
-      input.scopes.map(async ({ userId, workspaceId, scope, worktreePath }) => {
-        await this.reconcileWorktreeAdmitted({
-          userId,
-          workspaceId,
-          scope,
-          worktreePath,
-          physicalWorktreeCapability: input.physicalWorktreeCapability,
-          permit: input.permit,
-        })
-      }),
-    )
-  }
-
   async closeUser(input: { userId: string }): Promise<void> {
     await Promise.all(
       this.layoutAggregate.epochsForUser(input.userId).map(async (scope) => {

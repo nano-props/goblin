@@ -8,7 +8,7 @@ import {
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import { REALTIME_HEARTBEAT_DEADLINE_MS as HEARTBEAT_DEADLINE_MS } from '#/server/realtime/realtime-broker.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
@@ -77,7 +77,9 @@ export function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceI
 }
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
+  readWorktreeMembership: vi.fn(async () => [
+    { path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false },
+  ]),
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -106,7 +108,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
   })),
 }))
 
-export const getWorktreesMock = vi.mocked(getWorktrees)
+export const readWorktreeMembershipMock = vi.mocked(readWorktreeMembership)
 export const resolveRemoteTargetMock = vi.mocked(resolveRemoteTarget)
 
 vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', async (importOriginal) => {
@@ -129,7 +131,6 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
               kind: 'remote',
               canonicalWorktreePath: input.worktreePath,
               configFingerprint: 'terminal-runtime-test-config-fingerprint',
-              endpointMarker: { deviceId: '10', inode: '20' },
               target: {
                 id: input.workspaceId,
                 alias: 'prod',
@@ -143,10 +144,8 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
           : {
               kind: 'local',
               canonicalWorktreePath: input.worktreePath,
-              endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
             },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       })
     }
   }

@@ -8,7 +8,6 @@ import {
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
   getRemoteWorktreeBootstrapPreview,
@@ -17,7 +16,6 @@ import {
   remoteCommandExists,
   remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
-  parseRemoteRepoExecutionIdentity,
   remoteExecResult,
   removeRemoteWorktree,
   type RemoteGitRunner,
@@ -286,7 +284,6 @@ describe('remote git mutations', () => {
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove,
       afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       deleteBranch: true,
@@ -466,7 +463,6 @@ describe('remote git mutations', () => {
       removeRemoteWorktree(TARGET, {
         beforeRemove,
         afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-        afterRemoveFailed: async () => {},
         branch: 'feature/test',
         worktreePath: '/srv/repo-feature',
         deleteBranch: true,

@@ -196,7 +196,6 @@ interface TerminalClientTestOutputs {
   'terminal.resize': TerminalResizeResult
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
-  'terminal.prune': { pruned: number; remaining: number }
   'terminal.recoverSessions': TerminalSessionsSnapshot
   'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
@@ -230,8 +229,6 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'workspacePaneRuntime.open'
     case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
       return 'workspacePaneRuntime.close'
-    case 'prune':
-      return 'terminal.prune'
     case 'recover-sessions':
       return 'terminal.recoverSessions'
     default:
@@ -424,7 +421,6 @@ export function installWorkspacePaneTabsTestBridge(
         phase: 'open' as const,
       }),
       close: async () => true,
-      pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
@@ -735,7 +731,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               phase: 'open' as const,
             }),
           close: () => Promise.resolve(true),
-          pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
           recoverSessions: () => Promise.resolve({ revision: 0, sessions: [] }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
@@ -796,7 +791,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'workspacePaneRuntime.close',
     payload: unknown,
   ): TerminalClientTestOutputs['workspacePaneRuntime.close']
-  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
     name: 'terminal.recoverSessions',
     payload: unknown,
@@ -838,8 +832,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             canonicalSize: { cols: 80, rows: 24 },
             phase: 'open' as const,
           }
-        case 'terminal.prune':
-          return { pruned: 0, remaining: 0 }
         case 'workspacePaneTabs.replace':
           return {
             revision: 1,
@@ -979,8 +971,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       write: async (input) => callTerminalHandler('terminal.write', input),
       resize: async (input) => callTerminalHandler('terminal.resize', input),
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      pruneTerminals: async (workspaceId, workspaceRuntimeId) =>
-        callTerminalHandler('terminal.prune', { workspaceId, workspaceRuntimeId }),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,

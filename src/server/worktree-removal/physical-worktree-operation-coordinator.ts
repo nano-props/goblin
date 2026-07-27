@@ -6,7 +6,6 @@ import {
 import {
   physicalWorktreeAdmissionLease,
   physicalWorktreeAdmissionLeaseSignal,
-  validatePhysicalWorktreeExecution,
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
@@ -73,7 +72,6 @@ export class PhysicalWorktreeOperationCoordinator {
         value: await this.runByKey(
           key,
           async () => {
-            await validatePhysicalWorktreeExecution(capability, signal)
             signal.throwIfAborted()
             return await task(permit, context)
           },
@@ -85,7 +83,7 @@ export class PhysicalWorktreeOperationCoordinator {
     }
   }
 
-  /** Acquire each stable physical identity once, while validating the newest capability available for it. */
+  /** Acquire each stable physical identity once. */
   async runAdmissionBatch<T>(
     records: readonly PhysicalWorktreeAdmissionRecord[],
     task: () => Promise<T>,
@@ -111,12 +109,11 @@ export class PhysicalWorktreeOperationCoordinator {
       const acquire = async (index: number): Promise<T> => {
         const record = normalized[index]
         if (!record) return await task()
-        const { key, currentCapability: capability } = record
+        const { key } = record
         return await this.runByKey(
           key,
           async () => {
             batchSignal.throwIfAborted()
-            if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
             return await acquire(index + 1)
           },
           batchSignal,
@@ -148,7 +145,6 @@ export class PhysicalWorktreeOperationCoordinator {
         value: await this.runByKey(
           key,
           async () => {
-            await validatePhysicalWorktreeExecution(capability, signal)
             signal.throwIfAborted()
             return await task(context, permit)
           },

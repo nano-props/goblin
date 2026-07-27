@@ -8,7 +8,6 @@ import {
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
   getRemoteWorktreeBootstrapPreview,
@@ -17,7 +16,7 @@ import {
   remoteCommandExists,
   remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
-  parseRemoteRepoExecutionIdentity,
+  parseRemoteRepoCommonDir,
   remoteExecResult,
   removeRemoteWorktree,
   type RemoteGitRunner,
@@ -42,39 +41,12 @@ import {
 } from '#/system/ssh/git-test-utils.ts'
 
 describe('remote git snapshot', () => {
-  test('parses a canonical repository execution identity with its object generation', () => {
-    expect(
-      parseRemoteRepoExecutionIdentity(
-        [
-          '0123456789abcdef0123456789abcdef',
-          'machine-a',
-          'mnt-a',
-          '/srv/repo/.git',
-          '10',
-          '20',
-          '/srv/repo/.git/objects',
-          '30',
-          '40',
-          '',
-        ].join('\0'),
-      ),
-    ).toEqual({
-      commonDir: '/srv/repo/.git',
-      generationKey: JSON.stringify({
-        runtimeToken: '0123456789abcdef0123456789abcdef',
-        machineFact: 'machine-a',
-        rootNamespaceFact: 'mnt-a',
-        commonDirDeviceId: '10',
-        commonDirInode: '20',
-        objectsDir: '/srv/repo/.git/objects',
-        objectsDirDeviceId: '30',
-        objectsDirInode: '40',
-      }),
-    })
+  test('parses a canonical repository common directory', () => {
+    expect(parseRemoteRepoCommonDir('/srv/repo/.git\0')).toBe('/srv/repo/.git')
   })
 
-  test('rejects malformed repository execution identity output', () => {
-    expect(parseRemoteRepoExecutionIdentity('invalid')).toBeNull()
+  test('rejects malformed repository common directory output', () => {
+    expect(parseRemoteRepoCommonDir('')).toBeNull()
   })
 
   test('builds browser URLs from remote verbose output', async () => {
@@ -114,7 +86,7 @@ describe('remote git snapshot', () => {
   })
 
   test('includes remote metadata in remote snapshots', async () => {
-    const run: RemoteGitRunner = async (command) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -130,7 +102,7 @@ describe('remote git snapshot', () => {
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
         case 'gitStatus':
-          return okRemoteResult('')
+          throw new Error('snapshot must not read status')
         case 'gitRemoteVerbose':
           return okRemoteResult(
             'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)',
@@ -138,7 +110,7 @@ describe('remote git snapshot', () => {
         default:
           return okRemoteResult('')
       }
-    }
+    })
 
     const snapshot = await getRemoteSnapshot(TARGET, { run: run })
 
@@ -148,6 +120,11 @@ describe('remote git snapshot', () => {
       browserRemoteProvider: 'gitlab',
       hasGitHubRemote: false,
     })
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitStatus' }),
+      expect.anything(),
+      expect.anything(),
+    )
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
@@ -161,7 +138,7 @@ describe('remote git snapshot', () => {
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
       { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
-    expect(run).toHaveBeenCalledTimes(3)
+    expect(run).toHaveBeenCalledTimes(2)
     expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
     })
@@ -269,7 +246,7 @@ describe('remote git snapshot', () => {
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
     ])
-    expect(run).toHaveBeenCalledTimes(3)
+    expect(run).toHaveBeenCalledTimes(2)
   })
 
   test('prefers stderr when converting remote exec failures', () => {

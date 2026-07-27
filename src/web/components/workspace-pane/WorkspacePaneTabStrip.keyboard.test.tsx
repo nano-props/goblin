@@ -11,45 +11,51 @@ import {
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
-let keyboardSensorToken: object
-let pointerSensorToken: object
-let sortableOnKeyDown: ReturnType<typeof vi.fn>
-let sortableOnPointerDown: ReturnType<typeof vi.fn>
-let useSensorMock: ReturnType<typeof vi.fn>
-let sortableDragging = false
+const dndMocks = vi.hoisted(() => ({
+  keyboardSensorToken: {},
+  pointerSensorToken: {},
+  sortableOnKeyDown: vi.fn(),
+  sortableOnPointerDown: vi.fn(),
+  useSensor: vi.fn((sensor, options) => ({ sensor, options })),
+  sortableDragging: false,
+}))
+
+vi.mock('@dnd-kit/core', () => ({
+  DndContext: ({ children }: { children: unknown }) => children,
+  KeyboardSensor: dndMocks.keyboardSensorToken,
+  PointerSensor: dndMocks.pointerSensorToken,
+  closestCenter: vi.fn(),
+  useSensor: (sensor: unknown, options: unknown) => dndMocks.useSensor(sensor, options),
+  useSensors: (...sensors: unknown[]) => sensors,
+}))
+
+vi.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: unknown }) => children,
+  horizontalListSortingStrategy: {},
+  sortableKeyboardCoordinates: vi.fn(),
+  useSortable: () => ({
+    attributes: {},
+    listeners: {
+      onKeyDown: dndMocks.sortableOnKeyDown,
+      onPointerDown: dndMocks.sortableOnPointerDown,
+    },
+    setNodeRef: vi.fn(),
+    setActivatorNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: dndMocks.sortableDragging,
+  }),
+}))
 
 beforeEach(() => {
-  vi.resetModules()
-  keyboardSensorToken = {}
-  pointerSensorToken = {}
-  sortableOnKeyDown = vi.fn()
-  sortableOnPointerDown = vi.fn()
-  sortableDragging = false
-  useSensorMock = vi.fn((sensor, options) => ({ sensor, options }))
-
-  vi.doMock('@dnd-kit/core', () => ({
-    DndContext: ({ children }: { children: unknown }) => children,
-    KeyboardSensor: keyboardSensorToken,
-    PointerSensor: pointerSensorToken,
-    closestCenter: vi.fn(),
-    useSensor: useSensorMock,
-    useSensors: (...sensors: unknown[]) => sensors,
-  }))
-  vi.doMock('@dnd-kit/sortable', () => ({
-    SortableContext: ({ children }: { children: unknown }) => children,
-    horizontalListSortingStrategy: {},
-    sortableKeyboardCoordinates: vi.fn(),
-    useSortable: () => ({
-      attributes: {},
-      listeners: { onKeyDown: sortableOnKeyDown, onPointerDown: sortableOnPointerDown },
-      setNodeRef: vi.fn(),
-      setActivatorNodeRef: vi.fn(),
-      transform: null,
-      transition: undefined,
-      isDragging: sortableDragging,
-    }),
-  }))
+  dndMocks.sortableOnKeyDown.mockReset()
+  dndMocks.sortableOnPointerDown.mockReset()
+  dndMocks.useSensor.mockReset()
+  dndMocks.useSensor.mockImplementation((sensor, options) => ({ sensor, options }))
+  dndMocks.sortableDragging = false
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
     value: vi.fn(),
@@ -58,16 +64,12 @@ beforeEach(() => {
 
 afterEach(() => {
   delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView
-  vi.doUnmock('@dnd-kit/core')
-  vi.doUnmock('@dnd-kit/sortable')
 })
 
 describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
   test('keeps selected styling while the active tab is dragging', async () => {
-    sortableDragging = true
-    const { workspacePaneTabStripModule, WorkspacePaneTabStripScrollMemoryProvider } =
-      await loadWorkspacePaneTabStripTestModules()
-    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
+    dndMocks.sortableDragging = true
+    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip()
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
@@ -95,9 +97,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
   test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
     const user = userEvent.setup()
-    const { workspacePaneTabStripModule, WorkspacePaneTabStripScrollMemoryProvider } =
-      await loadWorkspacePaneTabStripTestModules()
-    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
+    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip()
 
     renderInJsdom(
       <TestWorkspacePaneTabStrip
@@ -116,9 +116,11 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
     )
 
-    expect(useSensorMock).toHaveBeenCalledWith(pointerSensorToken, { activationConstraint: { distance: 6 } })
-    expect(useSensorMock).toHaveBeenCalledWith(
-      keyboardSensorToken,
+    expect(dndMocks.useSensor).toHaveBeenCalledWith(dndMocks.pointerSensorToken, {
+      activationConstraint: { distance: 6 },
+    })
+    expect(dndMocks.useSensor).toHaveBeenCalledWith(
+      dndMocks.keyboardSensorToken,
       expect.objectContaining({ coordinateGetter: expect.any(Function) }),
     )
 
@@ -134,13 +136,13 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     tab.focus()
     await user.keyboard('{ArrowRight}')
 
-    expect(sortableOnKeyDown).toHaveBeenCalledTimes(1)
+    expect(dndMocks.sortableOnKeyDown).toHaveBeenCalledTimes(1)
 
     act(() => {
       tabChrome.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
 
-    expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
+    expect(dndMocks.sortableOnPointerDown).toHaveBeenCalledTimes(1)
 
     const closeButton = tabChrome.querySelector('button[aria-label="close term-1"]')
     if (!(closeButton instanceof HTMLButtonElement)) throw new Error('missing close button')
@@ -149,27 +151,11 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       closeButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
 
-    expect(sortableOnPointerDown).toHaveBeenCalledTimes(1)
+    expect(dndMocks.sortableOnPointerDown).toHaveBeenCalledTimes(1)
   })
 })
 
-async function loadWorkspacePaneTabStripTestModules() {
-  // These tests reset the module graph before installing DnD mocks. Load the
-  // provider from that same graph so the tab strip and wrapper share one context.
-  const [workspacePaneTabStripModule, scrollMemoryModule] = await Promise.all([
-    import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'),
-    import('#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'),
-  ])
-  return {
-    workspacePaneTabStripModule,
-    WorkspacePaneTabStripScrollMemoryProvider: scrollMemoryModule.WorkspacePaneTabStripScrollMemoryProvider,
-  }
-}
-
-function makeWorkspacePaneTabStrip(
-  workspacePaneTabStripModule: typeof import('#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'),
-) {
-  const { WorkspacePaneTabStrip } = workspacePaneTabStripModule
+function makeWorkspacePaneTabStrip() {
   return function TestWorkspacePaneTabStrip(props: {
     terminalFilesystemTargetKey: string
     sessions: TerminalSessionSummary[]

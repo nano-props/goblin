@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import {
   createBranchSnapshot,
@@ -71,43 +71,8 @@ describe('repo projection read-model effects', () => {
     })
   })
 
-  test('snapshot success does not block on terminal prune completion', () => {
-    installGoblinTestBridge({
-      'terminal.prune': async () => {
-        await new Promise<void>(() => {})
-        return { pruned: 0, remaining: 0 }
-      },
-    })
-    const repo = seedRepoShellForTest({
-      id: WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
-      workspaceProbe: createGitWorkspaceProbeForTest(),
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [createBranchSnapshot('feature/a')],
-      currentBranch: 'feature/a',
-    })
-
-    expect(() => {
-      acceptRepoProjectionReadModel(
-        useWorkspacesStore.setState,
-        useWorkspacesStore.getState,
-        {
-          repoRoot: WORKSPACE_ID,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          projection: acceptedProjection(),
-        },
-        { scope: 'repo-read-model' },
-      )
-    }).not.toThrow()
-  })
-
   test('snapshot success skips side effects when the snapshot is stale', () => {
-    const pruneTerminals = vi.fn(() => Promise.resolve({ pruned: 0, remaining: 0 }))
-    installGoblinTestBridge({
-      'terminal.prune': pruneTerminals,
-    })
+    installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
@@ -130,7 +95,6 @@ describe('repo projection read-model effects', () => {
       { scope: 'repo-read-model' },
     )
 
-    expect(pruneTerminals).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toBeUndefined()
   })
 
@@ -192,10 +156,7 @@ describe('repo projection read-model effects', () => {
   })
 
   test('summary projections do not update the core read model cache', () => {
-    const pruneTerminals = vi.fn(() => Promise.resolve({ pruned: 0, remaining: 0 }))
-    installGoblinTestBridge({
-      'terminal.prune': pruneTerminals,
-    })
+    installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
@@ -244,6 +205,5 @@ describe('repo projection read-model effects', () => {
       loadedAt: null,
     })
     expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toBeUndefined()
-    expect(pruneTerminals).not.toHaveBeenCalled()
   })
 })
