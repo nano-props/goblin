@@ -65,10 +65,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       identity: { endpoint: '/volumes/repo/worktrees/feature' },
     })
     expect(worktreeReads).toBe(2)
-    expect(getLocalWorktrees).toHaveBeenCalledWith('/repos/main', {
-      includeStatus: false,
-      signal: expect.any(AbortSignal),
-    })
+    expect(getLocalWorktrees).toHaveBeenCalledWith('/repos/main', expect.any(AbortSignal))
     resolver.dispose()
   })
 
@@ -262,9 +259,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   test('workspace runtime close aborts every waiter for the shared resolve', async () => {
     let closedListener: (event: WorkspaceRuntimeClosedEvent) => void = () => undefined
     const resolver = new PhysicalWorktreeIdentityResolver({
-      async getLocalWorktrees(_workspacePath, options) {
+      async getLocalWorktrees(_workspacePath, signal) {
         return await new Promise<WorktreeInfo[]>((_resolve, reject) => {
-          options?.signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
+          signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
         })
       },
       isCurrentWorkspaceRuntime: () => true,

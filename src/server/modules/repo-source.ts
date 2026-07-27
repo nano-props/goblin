@@ -30,10 +30,9 @@ import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/s
 import { getWorkingStatus } from '#/system/git/status.ts'
 import {
   createWorktree,
-  getWorktrees,
   readWorktreeMembership,
   removeWorktree,
-  sampleWorktreeStatus,
+  sampleWorktreeStatusForTarget,
 } from '#/system/git/worktrees.ts'
 import { haveSameWorktrees } from '#/system/git/parsers.ts'
 import {
@@ -554,7 +553,7 @@ function remoteWorktreeRepoIds(
 }
 
 async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
-  const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+  const worktrees = await readWorktreeMembership(repoId, signal)
   signal?.throwIfAborted()
   return localWorktreeRepoIds(worktrees)
 }
@@ -615,7 +614,7 @@ function createLocalRepoSource(
     knownWorktrees?: WorktreeInfo[],
   ): Promise<ExecResult | null> {
     const current = await getCurrentBranch(gitCwd, { signal })
-    const worktrees = knownWorktrees ?? (await getWorktrees(gitCwd, { includeStatus: false, signal }))
+    const worktrees = knownWorktrees ?? (await readWorktreeMembership(gitCwd, signal))
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
     const isCheckedOutElsewhere = worktrees.some((wt) => {
       if (wt.branch !== branch) return false
@@ -662,15 +661,8 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       signal?.throwIfAborted()
       const membership = await readWorktreeMembership(repoId, signal)
-      const statusSamples = await sampleWorktreeStatus(membership, signal)
-      const worktrees = statusSamples.map((sample) =>
-        sample.kind === 'status'
-          ? { ...sample.worktree, isDirty: sample.entries.length > 0, changeCount: sample.entries.length }
-          : sample.worktree,
-      )
-      signal?.throwIfAborted()
       const currentBranch = await getCurrentBranch(repoId, { signal })
-      const branches = await getBranches(repoId, worktrees, currentBranch, { signal })
+      const branches = await getBranches(repoId, membership, currentBranch, { signal })
       const current = currentBranch ?? ''
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
       const remote = await getRemoteInfo(repoId, signal)
@@ -682,7 +674,7 @@ function createLocalRepoSource(
       return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       signal?.throwIfAborted()
       return await getBranchWorktreeIdentities(repoId, worktrees, { signal })
     },
@@ -765,7 +757,7 @@ function createLocalRepoSource(
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const upstream = !options?.force || options?.deleteUpstream ? await getUpstream(repoId, branch, signal) : null
       const validation = await validateBranchDeletion(
         branch,
@@ -783,7 +775,7 @@ function createLocalRepoSource(
     },
     async removeWorktree(input, signal, lifecycle) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
       const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
       const exactExecution = physicalWorktreeCapability
@@ -792,9 +784,17 @@ function createLocalRepoSource(
       const requestedPath = exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : input.worktreePath
       const removable = resolveRemovableWorktree(worktrees, input.branch, requestedPath, mainWorktreePath)
       if (!removable.ok) return { ok: false, message: removable.message }
+      const targetStatus = await sampleWorktreeStatusForTarget(removable.target, signal)
+      const statusAwareTarget =
+        targetStatus.kind === 'status'
+          ? {
+              ...targetStatus.worktree,
+              isDirty: targetStatus.entries.length > 0,
+            }
+          : targetStatus.worktree
       const mutationCwd =
         path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
-      const invalid = validateRemovableWorktreeState(removable.target)
+      const invalid = validateRemovableWorktreeState(statusAwareTarget)
       if (invalid) return invalid
       const upstream =
         input.deleteBranch && (!input.forceDeleteBranch || input.deleteUpstream)
@@ -860,7 +860,7 @@ function createLocalRepoSource(
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      const worktrees = await readWorktreeMembership(repoId, signal)
       const known = resolveKnownWorktree(worktrees, worktreePath)
       if (!known.ok) return { ok: false, message: known.message }
       try {

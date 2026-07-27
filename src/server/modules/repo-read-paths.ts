@@ -287,17 +287,12 @@ export async function readRepoProjection(
 
 export async function readRepoWorktreeStatus(
   cwd: WorkspaceId,
-  options: { signal?: AbortSignal; workspaceRuntimeId: string; timeoutMs?: number },
+  options: { signal?: AbortSignal; workspaceRuntimeId: string },
 ): Promise<RepoWorktreeStatusSnapshot> {
-  const statusCtl = composeSectionSignal(options.signal, options.timeoutMs ?? DEFAULT_REPO_READ_TIMEOUT_MS)
-  try {
-    return {
-      workspaceRuntimeId: options.workspaceRuntimeId,
-      status: await getRepoStatus(cwd, { signal: statusCtl.signal, workspaceRuntimeId: options.workspaceRuntimeId }),
-      loadedAt: Date.now(),
-    }
-  } finally {
-    statusCtl.cancel()
+  return {
+    workspaceRuntimeId: options.workspaceRuntimeId,
+    status: await getRepoStatus(cwd, { signal: options.signal, workspaceRuntimeId: options.workspaceRuntimeId }),
+    loadedAt: Date.now(),
   }
 }
 

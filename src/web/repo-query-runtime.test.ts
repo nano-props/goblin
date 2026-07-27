@@ -549,9 +549,9 @@ describe('repo projection query data', () => {
       })
 
       expect(queryClient.getQueryState(operationsKey)?.isInvalidated).toBe(false)
-      expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(true)
-      expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(true)
-      expect(queryClient.getQueryState(remoteBranchesKey)?.isInvalidated).toBe(true)
+      expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(false)
+      expect(queryClient.getQueryState(logKey)?.isInvalidated).toBe(false)
+      expect(queryClient.getQueryState(remoteBranchesKey)?.isInvalidated).toBe(false)
       expect(signals[0]?.aborted).toBe(false)
       releases[0]?.(repoProjectionForTest(2))
       await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
@@ -559,6 +559,28 @@ describe('repo projection query data', () => {
       expect(signals[0]?.aborted).toBe(false)
     } finally {
       unsubscribe()
+      queryClient.clear()
+    }
+  })
+
+  test('imperative projection refresh does not stale or retry an in-flight log read', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const logRead = Promise.withResolvers<Awaited<ReturnType<typeof repoClientMocks.getRepoLog>>>()
+    repoClientMocks.getRepoLog.mockReturnValue(logRead.promise)
+    repoClientMocks.getRepoProjection.mockResolvedValue(repoProjectionForTest(1))
+    function LogHarness() {
+      useRepoLogQuery(WORKSPACE_ID, 'repo-runtime-1', 'main')
+      return null
+    }
+    const result = renderInJsdom(createElement(QueryClientProvider, { client: queryClient }, createElement(LogHarness)))
+    try {
+      await vi.waitFor(() => expect(repoClientMocks.getRepoLog).toHaveBeenCalledOnce())
+
+      await refreshRepoProjectionReadModel(WORKSPACE_ID, 'repo-runtime-1', null, 'full', { queryClient })
+      logRead.resolve([])
+      await vi.waitFor(() => expect(repoClientMocks.getRepoLog).toHaveBeenCalledOnce())
+    } finally {
+      result.unmount()
       queryClient.clear()
     }
   })
@@ -841,8 +863,8 @@ describe('repo worktree status query data', () => {
     }
   })
 
-  test('reruns an in-flight status read after a worktree snapshot invalidation', async () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  test('rejects an invalidated in-flight status read without retrying it', async () => {
+    const queryClient = new QueryClient()
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(
       () =>
@@ -857,11 +879,10 @@ describe('repo worktree status query data', () => {
       invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
 
-      await vi.waitFor(() => expect(releases).toHaveLength(2))
+      await vi.waitFor(() => expect(observer.getCurrentResult().isError).toBe(true))
       expect(observer.getCurrentResult().data).toBeUndefined()
-
-      releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
-      await vi.waitFor(() => expect(observer.getCurrentResult().data?.loadedAt).toBe(2))
+      expect(releases).toHaveLength(1)
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
     } finally {
       unsubscribe()
       queryClient.clear()

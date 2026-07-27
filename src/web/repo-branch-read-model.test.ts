@@ -22,10 +22,6 @@ describe('repo branch read model helpers', () => {
             path: '/tmp/query-worktree',
             isPrimary: false,
             isLocked: true,
-            summary: {
-              dirty: false,
-              changeCount: 0,
-            },
           },
           pullRequest: {
             number: 123,

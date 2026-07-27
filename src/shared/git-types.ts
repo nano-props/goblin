@@ -27,12 +27,6 @@ export interface BranchWorktreeSnapshot {
   path: string
   isPrimary?: boolean
   isLocked?: boolean
-  summary?: BranchWorktreeSnapshotSummary
-}
-
-export interface BranchWorktreeSnapshotSummary {
-  dirty?: boolean
-  changeCount?: number
 }
 
 export interface PullRequestInfo {

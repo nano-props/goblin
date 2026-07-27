@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  getWorktrees: vi.fn(),
+  readWorktreeMembership: vi.fn(),
   userShellCommandExists: vi.fn(),
   resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: mocks.getWorktrees,
+  readWorktreeMembership: mocks.readWorktreeMembership,
 }))
 
 vi.mock('#/system/user-shell.ts', () => ({
@@ -40,7 +40,7 @@ const WORKSPACE_RUNTIME_ID = 'workspace-runtime-file-viewer-test'
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
-  mocks.getWorktrees.mockResolvedValue([
+  mocks.readWorktreeMembership.mockResolvedValue([
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
@@ -60,7 +60,7 @@ describe('workspace file viewer read layer', () => {
       await expect(
         readWorkspaceFileViewer(rootTarget(workspaceIdForTest('goblin+file:///tmp/plain-workspace'))),
       ).resolves.toEqual({ viewer: 'cat', shell: 'posix', executionRoot: '/tmp/plain-workspace' })
-      expect(mocks.getWorktrees).not.toHaveBeenCalled()
+      expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
       expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/plain-workspace', undefined)
     } finally {
       platformSpy.mockRestore()
@@ -77,7 +77,7 @@ describe('workspace file viewer read layer', () => {
       )
 
       expect(result).toEqual({ viewer: 'bat', shell: 'posix', executionRoot: '/tmp/repo-feature' })
-      expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+      expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
       expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/repo-feature', undefined)
     } finally {
       platformSpy.mockRestore()
@@ -159,7 +159,7 @@ describe('workspace file viewer read layer', () => {
       run: expect.any(Function),
       signal: undefined,
     })
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
   })
 
   test('resolves an SSH workspace locator without a Git worktree lookup', async () => {

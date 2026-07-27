@@ -1,3 +1,33 @@
+import type PQueue from 'p-queue'
+
+/** Cancel queued work promptly without letting p-queue release a running slot
+ * before the underlying operation has actually settled. The task keeps the
+ * caller signal so process cancellation still reaches Git or SSH. */
+export async function runWithQueuedAdmission<T>(
+  queue: PQueue,
+  signal: AbortSignal | undefined,
+  task: () => Promise<T>,
+): Promise<T> {
+  signal?.throwIfAborted()
+  if (!signal) return await queue.add(task)
+
+  const admission = new AbortController()
+  const abortWhileQueued = () => admission.abort(signal.reason)
+  signal.addEventListener('abort', abortWhileQueued, { once: true })
+  try {
+    return await queue.add(
+      async () => {
+        signal.removeEventListener('abort', abortWhileQueued)
+        signal.throwIfAborted()
+        return await task()
+      },
+      { signal: admission.signal },
+    )
+  } finally {
+    signal.removeEventListener('abort', abortWhileQueued)
+  }
+}
+
 export async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,

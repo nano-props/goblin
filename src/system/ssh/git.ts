@@ -1,4 +1,6 @@
 import path from 'node:path'
+import PQueue from 'p-queue'
+import { runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import {
   parseBootstrapConfig,
   validateBootstrapConfigPaths,
@@ -68,7 +70,9 @@ export type RemoteGitRunner = (
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
-const REMOTE_WORKTREE_STATUS_CONCURRENCY = 8
+const REMOTE_WORKTREE_STATUS_CONCURRENCY = 4
+const remoteWorktreeStatusQueue = new PQueue({ concurrency: REMOTE_WORKTREE_STATUS_CONCURRENCY })
+const REMOTE_FETCH_SPEC_CONCURRENCY = 8
 const REMOTE_PATCH_UNTRACKED_DIFF_CONCURRENCY = 8
 const REMOTE_BRANCH_OP_TIMEOUT_MS = 180_000
 const REMOTE_PATCH_TIMEOUT_MS = 90_000
@@ -105,14 +109,13 @@ export async function getRemoteSnapshot(
 ): Promise<RemoteRepoSnapshot> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  const [result, statusSnapshot, remote] = await Promise.all([
+  const [result, remote] = await Promise.all([
     run({ type: 'gitSnapshot', path: target.remotePath }, target, { signal: options.signal }),
-    sampleRemoteWorktreeStatus(target, membership, { signal: options.signal, run }),
     getRemoteRepoInfo(target, { signal: options.signal, run }),
   ])
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  const snapshot = parseRemoteSnapshot(result.stdout, statusSnapshot.worktrees)
+  const snapshot = parseRemoteSnapshot(result.stdout, membership)
   if (!snapshot) throw new Error('error.failed-read-repo')
   const finalMembership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   if (!haveSameWorktrees(membership, finalMembership)) throw new Error('error.failed-read-repo')
@@ -157,54 +160,57 @@ export async function getRemoteStatus(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<WorktreeStatus[]> {
-  const { statuses } = await getRemoteStatusAndWorktrees(target, options)
-  return statuses
-}
-
-/** Read status against an immutable before/after worktree membership snapshot. */
-export async function getRemoteStatusAndWorktrees(
-  target: RemoteWorkspaceTarget,
-  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<{ statuses: WorktreeStatus[]; worktrees: WorktreeInfo[] }> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  const sampled = await sampleRemoteWorktreeStatus(target, worktrees, { signal: options.signal, run })
+  const statuses = await sampleRemoteWorktreeStatus(target, worktrees, { signal: options.signal, run })
   const finalWorktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('error.failed-read-repo')
-  return sampled
+  return statuses
 }
 
 async function sampleRemoteWorktreeStatus(
   target: RemoteWorkspaceTarget,
   worktrees: readonly WorktreeInfo[],
   options: { signal?: AbortSignal; run: RemoteGitRunner },
-): Promise<{ statuses: WorktreeStatus[]; worktrees: WorktreeInfo[] }> {
+): Promise<WorktreeStatus[]> {
   const sampled = await mapWithConcurrency(
     [...worktrees],
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
-    async (worktree): Promise<WorktreeStatus | null> => {
-      if (worktree.isBare) return null
-      const result = await options.run({ type: 'gitStatus', path: worktree.path }, target, { signal: options.signal })
-      options.signal?.throwIfAborted()
-      if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-      return {
-        path: worktree.path,
-        branch: worktree.branch,
-        isMain: worktree.isPrimary,
-        entries: decodeRemoteStatus(result.stdout),
-      }
-    },
+    async (worktree) => await sampleRemoteWorktreeStatusForTarget(target, worktree, options),
     options.signal,
   )
-  const statuses = sampled.filter((status): status is WorktreeStatus => status !== null)
-  const statusByPath = new Map(statuses.map((status) => [status.path, status]))
-  const worktreesWithStatus = worktrees.map((worktree) => {
-    const status = statusByPath.get(worktree.path)
-    return status
-      ? { ...worktree, isDirty: status.entries.length > 0, changeCount: status.entries.length }
-      : worktree
-  })
-  return { statuses, worktrees: worktreesWithStatus }
+  return sampled.filter((status): status is WorktreeStatus => status !== null)
+}
+
+async function sampleRemoteWorktreeStatusForTarget(
+  target: RemoteWorkspaceTarget,
+  worktree: WorktreeInfo,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<WorktreeStatus | null> {
+  options.signal?.throwIfAborted()
+  if (worktree.isBare) return null
+  const result = await runRemoteWorktreeStatusProbe(target, worktree.path, options)
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
+  return {
+    path: worktree.path,
+    branch: worktree.branch,
+    isMain: worktree.isPrimary,
+    entries: decodeRemoteStatus(result.stdout),
+  }
+}
+
+async function runRemoteWorktreeStatusProbe(
+  target: RemoteWorkspaceTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<RemoteCommandResult> {
+  options.signal?.throwIfAborted()
+  return await runWithQueuedAdmission(
+    remoteWorktreeStatusQueue,
+    options.signal,
+    async () => await options.run({ type: 'gitStatus', path: worktreePath }, target, { signal: options.signal }),
+  )
 }
 
 export async function getRemoteLog(
@@ -675,7 +681,7 @@ async function readRemoteTrackingAuthority(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const authorities = await mapWithConcurrency(
     remotes,
-    REMOTE_WORKTREE_STATUS_CONCURRENCY,
+    REMOTE_FETCH_SPEC_CONCURRENCY,
     async (remote): Promise<RemoteFetchAuthority> => {
       const specs = await options.run(
         { type: 'gitRemoteFetchSpecs', path: target.remotePath, remote: remote.name },
@@ -799,7 +805,7 @@ export async function removeRemoteWorktree(
   if ('ok' in resolved) return resolved
   const mutationPath = resolved.path === target.remotePath && mainWorktreePath ? mainWorktreePath : target.remotePath
 
-  const status = await run({ type: 'gitStatus', path: resolved.path }, target, { signal: input.signal })
+  const status = await runRemoteWorktreeStatusProbe(target, resolved.path, { signal: input.signal, run })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!status.ok) return remoteExecResult(status)
   const statusAwareWorktree = { ...resolved, isDirty: decodeRemoteStatus(status.stdout).length > 0 }

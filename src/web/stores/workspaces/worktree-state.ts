@@ -15,34 +15,6 @@ export interface BranchWorktreeRepo {
   branchModel: Pick<RepoBranchReadModelData, 'worktreesByPath' | 'status'>
 }
 
-export function worktreeStatesFromBranches(
-  branches: BranchSnapshotInfo[],
-  previous: Record<string, RepoWorktreeState> = {},
-  status: WorktreeStatus[] = [],
-): Record<string, RepoWorktreeState> {
-  const statusByPath = new Map(status.map((wt) => [wt.path, wt]))
-  const next: Record<string, RepoWorktreeState> = {}
-  for (const branch of branches) {
-    const snapshotWorktree = branch.worktree
-    if (!snapshotWorktree) continue
-    const prev = previous[snapshotWorktree.path]
-    const statusEntry = statusByPath.get(snapshotWorktree.path)
-    const statusCount = statusEntry?.entries.length
-    const snapshotSummary = snapshotWorktree.summary
-    const changeCount = statusCount ?? snapshotSummary?.changeCount ?? prev?.changeCount
-    const isDirty = statusCount === undefined ? (snapshotSummary?.dirty ?? prev?.isDirty) : statusCount > 0
-    next[snapshotWorktree.path] = {
-      path: snapshotWorktree.path,
-      branch: statusEntry?.branch ?? branch.name,
-      isMain: snapshotWorktree.isPrimary ?? statusEntry?.isMain ?? prev?.isMain ?? false,
-      isDirty,
-      changeCount,
-      isLocked: snapshotWorktree.isLocked ?? prev?.isLocked,
-    }
-  }
-  return next
-}
-
 export function worktreeStatesFromBranchReadModel(
   branches: BranchSnapshotInfo[],
   status: WorktreeStatus[],

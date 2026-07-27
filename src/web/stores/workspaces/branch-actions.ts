@@ -185,19 +185,6 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
   return false
 }
 
-function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (!result.ok && result.repositoryStateChanged) return false
-  if (shouldSuppressBranchActionResultMessage(result, options)) return true
-  if (!result.ok && result.message === 'error.network-op-in-progress') return true
-  if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return true
-  return false
-}
-
-function shouldRefreshBranchActionProjection(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (shouldSkipBranchActionRefresh(result, options)) return false
-  return result.ok || result.repositoryStateChanged || options?.refreshOnError !== false
-}
-
 function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
   return result.ok && (action.kind === 'createWorktree' || action.kind === 'removeWorktree')
 }
@@ -303,8 +290,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       })
       const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
         network && ctx.ownsTarget('fetch')
-      const refreshAfterBranchAction = async (result: ExecResult): Promise<void> => {
-        if (!shouldRefreshBranchActionProjection(result, options)) return
+      const refreshMembershipProjection = async (): Promise<void> => {
         const repo = get().workspaces[id]
         if (repo?.workspaceRuntimeId !== workspaceRuntimeId) return
         await requestRepoProjectionReadModelRefresh({ get, set }, id, { workspaceRuntimeId })
@@ -315,7 +301,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }
-        if (!requiresProjectionRefreshBeforeCompletion(action, result)) await refreshAfterBranchAction(result)
         if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, workspaceRuntimeId)
       }
       const handleError = (message: string, ctx: RepoOperationContext) => {
@@ -350,7 +335,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       }
 
       const completionBarrier = async (result: ExecResult) => {
-        if (requiresProjectionRefreshBeforeCompletion(action, result)) await refreshAfterBranchAction(result)
+        if (requiresProjectionRefreshBeforeCompletion(action, result)) await refreshMembershipProjection()
       }
 
       if (network) {

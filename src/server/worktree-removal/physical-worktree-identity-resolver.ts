@@ -3,7 +3,7 @@ import { realpath } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
 import { resolveRemoteWorktree } from '#/system/ssh/git.ts'
 import { runRemoteCommand, type RemoteCommandRunner } from '#/system/ssh/commands.ts'
@@ -48,7 +48,7 @@ interface PhysicalWorktreeRuntimeEpoch {
 }
 
 export interface PhysicalWorktreeIdentityResolverDependencies {
-  getLocalWorktrees: typeof getWorktrees
+  getLocalWorktrees: typeof readWorktreeMembership
   nativeRealpath(path: string): Promise<string>
   nativeStat(path: string): Promise<PhysicalWorktreeEndpointMarker>
   resolveRemoteTarget: typeof resolveRemoteTargetWithConfigFingerprint
@@ -59,7 +59,7 @@ export interface PhysicalWorktreeIdentityResolverDependencies {
 }
 
 const defaultDependencies: PhysicalWorktreeIdentityResolverDependencies = {
-  getLocalWorktrees: getWorktrees,
+  getLocalWorktrees: readWorktreeMembership,
   nativeRealpath,
   nativeStat,
   resolveRemoteTarget: resolveRemoteTargetWithConfigFingerprint,
@@ -264,7 +264,7 @@ export class PhysicalWorktreeIdentityResolver {
   ): Promise<{ identity: PhysicalWorktreeIdentity; execution: PhysicalWorktreeExecutionBinding }> {
     const workspacePath = localWorkspaceNativePath(input.workspaceId)
     if (!workspacePath) throw new Error('error.workspace-locator-malformed')
-    const worktrees = await this.deps.getLocalWorktrees(workspacePath, { includeStatus: false, signal })
+    const worktrees = await this.deps.getLocalWorktrees(workspacePath, signal)
     this.assertEpochActive(epoch)
     const known = resolveKnownWorktree(worktrees, worktreePath)
     if (!known.ok) throw new Error(known.message)

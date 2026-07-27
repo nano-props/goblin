@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   lstat: vi.fn(),
-  getWorktrees: vi.fn(),
+  readWorktreeMembership: vi.fn(),
   movePathToTrash: vi.fn(),
   resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('node:fs/promises', () => ({
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: mocks.getWorktrees,
+  readWorktreeMembership: mocks.readWorktreeMembership,
 }))
 
 vi.mock('#/system/trash.ts', () => ({
@@ -42,7 +42,7 @@ const WORKSPACE_RUNTIME_ID = 'workspace-runtime-trash-test'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.getWorktrees.mockResolvedValue([
+  mocks.readWorktreeMembership.mockResolvedValue([
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
@@ -65,7 +65,7 @@ describe('workspace file trash write layer', () => {
     )
 
     expect(result.ok).toBe(true)
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/plain-workspace/notes.txt')
   })
 
@@ -76,7 +76,7 @@ describe('workspace file trash write layer', () => {
     )
 
     expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
-    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+    expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts')
     expect(mocks.movePathToTrash).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts', undefined)
   })
@@ -122,7 +122,7 @@ describe('workspace file trash write layer', () => {
       run: expect.any(Function),
       signal: undefined,
     })
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
   })
 
   test('resolves an SSH workspace locator before trashing a file', async () => {

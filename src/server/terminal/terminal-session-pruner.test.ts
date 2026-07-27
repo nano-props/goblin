@@ -2,13 +2,13 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: vi.fn(async () => [
+  readWorktreeMembership: vi.fn(async () => [
     { path: '/repo/live-worktree', branch: 'feature/live', isBare: false, isPrimary: false },
   ]),
 }))
@@ -22,7 +22,7 @@ const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 describe('terminal session pruner', () => {
   beforeEach(() => {
-    vi.mocked(getWorktrees).mockResolvedValue([
+    vi.mocked(readWorktreeMembership).mockResolvedValue([
       { path: LIVE_WORKTREE_PATH, branch: 'feature/live', isBare: false, isPrimary: false },
     ])
   })
@@ -56,7 +56,7 @@ describe('terminal session pruner', () => {
         assertCurrent: vi.fn(),
       }),
     ).resolves.toEqual({ pruned: 1, remaining: 2 })
-    expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
+    expect(readWorktreeMembership).toHaveBeenCalledWith('/repo')
     expect(closeSession).toHaveBeenCalledTimes(1)
     expect(closeSession).toHaveBeenCalledWith('pty_term-stalestalestalestale1')
   })
@@ -83,7 +83,7 @@ describe('terminal session pruner', () => {
         assertCurrent,
       }),
     ).resolves.toEqual({ pruned: 0, remaining: 2 })
-    expect(getWorktrees).not.toHaveBeenCalled()
+    expect(readWorktreeMembership).not.toHaveBeenCalled()
     expect(assertCurrent).toHaveBeenCalledOnce()
     expect(closeSession).not.toHaveBeenCalled()
   })
@@ -110,7 +110,7 @@ describe('terminal session pruner', () => {
         assertCurrent,
       }),
     ).rejects.toThrow('error.workspace-runtime-stale')
-    expect(getWorktrees).not.toHaveBeenCalled()
+    expect(readWorktreeMembership).not.toHaveBeenCalled()
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()
   })

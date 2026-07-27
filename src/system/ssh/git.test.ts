@@ -8,7 +8,7 @@ import {
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  getRemoteStatusAndWorktrees,
+  getRemoteStatus,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
   getRemoteWorktreeBootstrapPreview,
@@ -99,7 +99,7 @@ describe('remote git helpers', () => {
   })
 
   test('builds browser URLs from remote verbose output', async () => {
-    const run: RemoteGitRunner = async (command) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitRemoteVerbose':
           return okRemoteResult(
@@ -110,7 +110,7 @@ describe('remote git helpers', () => {
         default:
           return okRemoteResult('')
       }
-    }
+    })
 
     await expect(getRemoteBrowserUrl(TARGET, { type: 'root' }, { run: run })).resolves.toBe(
       'https://github.com/acme/project',
@@ -135,7 +135,7 @@ describe('remote git helpers', () => {
   })
 
   test('includes remote metadata in remote snapshots', async () => {
-    const run: RemoteGitRunner = async (command) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -159,7 +159,7 @@ describe('remote git helpers', () => {
         default:
           return okRemoteResult('')
       }
-    }
+    })
 
     const snapshot = await getRemoteSnapshot(TARGET, { run: run })
 
@@ -169,6 +169,8 @@ describe('remote git helpers', () => {
       browserRemoteProvider: 'gitlab',
       hasGitHubRemote: false,
     })
+    expect(snapshot?.branches[0]?.worktree).toMatchObject({ path: '/srv/repo', isPrimary: true })
+    expect(run.mock.calls.some(([command]) => command.type === 'gitStatus')).toBe(false)
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
@@ -540,6 +542,9 @@ describe('remote git helpers', () => {
       message: 'Deleted branch feature/test',
       affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
     })
+    expect(run.mock.calls.flatMap(([command]) => command.type === 'gitStatus' ? [command.path] : [])).toEqual([
+      '/srv/repo-feature',
+    ])
     expect(run).toHaveBeenCalledWith(
       { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
       TARGET,
@@ -1446,7 +1451,7 @@ describe('remote git helpers', () => {
   })
 })
 
-describe('getRemoteStatusAndWorktrees', () => {
+describe('getRemoteStatus', () => {
   const NUL = String.fromCharCode(0)
   const worktreeListOutput = [
     'worktree /srv/repo',
@@ -1466,26 +1471,23 @@ describe('getRemoteStatusAndWorktrees', () => {
       return failRemoteResult('unexpected command')
     })
 
-    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
+    const result = await getRemoteStatus(TARGET, { run: run })
 
     expect(run.mock.calls.filter(([command]) => command.type === 'gitWorktreeList')).toHaveLength(2)
     expect(new Set(run.mock.calls.flatMap(([command]) => command.type === 'gitStatus' ? [command.path] : []))).toEqual(
       new Set(['/srv/repo', '/srv/repo-feature']),
     )
-    expect(result.worktrees).toHaveLength(2)
-    expect(result.worktrees[0]).toMatchObject({ path: '/srv/repo', branch: 'main', isPrimary: true, isBare: false })
-    expect(result.worktrees[1]).toMatchObject({ path: '/srv/repo-feature', branch: 'feature/test', isPrimary: false })
-    expect(result.statuses).toHaveLength(2)
-    expect(result.statuses[0]).toMatchObject({
+    expect(result).toHaveLength(2)
+    expect(result[0]).toMatchObject({
       path: '/srv/repo',
       branch: 'main',
       isMain: true,
     })
-    expect(result.statuses[0]?.entries).toEqual([{ x: 'M', y: ' ', path: 'README.md' }])
-    expect(result.statuses[1]?.entries).toEqual([{ x: '?', y: '?', path: 'new.ts' }])
+    expect(result[0]?.entries).toEqual([{ x: 'M', y: ' ', path: 'README.md' }])
+    expect(result[1]?.entries).toEqual([{ x: '?', y: '?', path: 'new.ts' }])
   })
 
-  test('treats bare worktrees as absent from statuses but keeps them in the worktree list', async () => {
+  test('omits bare worktrees from status', async () => {
     const worktreeListOutput = [
       'worktree /srv/repo',
       'bare',
@@ -1498,21 +1500,49 @@ describe('getRemoteStatusAndWorktrees', () => {
       command.type === 'gitWorktreeList' ? okRemoteResult(worktreeListOutput) : okRemoteResult(''),
     )
 
-    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run })
+    const result = await getRemoteStatus(TARGET, { run: run })
 
-    // worktrees still includes the bare entry (callers may need it)
-    expect(result.worktrees).toHaveLength(2)
-    expect(result.worktrees[0]?.isBare).toBe(true)
-    // statuses excludes the bare entry
-    expect(result.statuses).toHaveLength(1)
-    expect(result.statuses[0]?.path).toBe('/srv/repo-feature')
+    expect(result).toHaveLength(1)
+    expect(result[0]?.path).toBe('/srv/repo-feature')
+  })
+
+  test('includes detached worktrees in complete remote status', async () => {
+    const detachedOutput = [
+      'worktree /srv/repo',
+      'HEAD f00ba40',
+      'branch refs/heads/main',
+      '',
+      'worktree /srv/repo-detached',
+      'HEAD ba5eba1',
+      'detached',
+    ].join(NUL) + NUL + NUL
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(detachedOutput)
+      if (command.type === 'gitStatus' && command.path === '/srv/repo-detached') {
+        return okRemoteResult(`?? detached.ts${NUL}`)
+      }
+      if (command.type === 'gitStatus') return okRemoteResult('')
+      return failRemoteResult('unexpected command')
+    })
+
+    const result = await getRemoteStatus(TARGET, { run })
+
+    expect(result).toEqual([
+      { path: '/srv/repo', branch: 'main', isMain: true, entries: [] },
+      {
+        path: '/srv/repo-detached',
+        branch: undefined,
+        isMain: false,
+        entries: [{ x: '?', y: '?', path: 'detached.ts' }],
+      },
+    ])
   })
 
   test('rejects when a status command fails', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) =>
       command.type === 'gitWorktreeList' ? okRemoteResult(worktreeListOutput) : failRemoteResult('boom'),
     )
-    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('boom')
+    await expect(getRemoteStatus(TARGET, { run: run })).rejects.toThrow('boom')
   })
 
   test('rejects when membership changes during status sampling', async () => {
@@ -1523,16 +1553,117 @@ describe('getRemoteStatusAndWorktrees', () => {
       return okRemoteResult('')
     })
 
-    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteStatus(TARGET, { run: run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('bounds status probes across concurrent aggregate callers', async () => {
+    const statusBarrier = Promise.withResolvers<void>()
+    let activeStatusReads = 0
+    let peakStatusReads = 0
+    const run = vi.fn<RemoteGitRunner>(async (command, _target, options) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(worktreeListOutput)
+      if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
+      expect(options?.signal).toBeUndefined()
+      activeStatusReads += 1
+      peakStatusReads = Math.max(peakStatusReads, activeStatusReads)
+      await statusBarrier.promise
+      activeStatusReads -= 1
+      return okRemoteResult('')
+    })
+
+    const reads = [
+      getRemoteStatus(TARGET, { run }),
+      getRemoteStatus(TARGET, { run }),
+      getRemoteStatus(TARGET, { run }),
+    ]
+    await vi.waitFor(() => expect(activeStatusReads).toBe(4))
+    expect(peakStatusReads).toBe(4)
+    statusBarrier.resolve()
+    await Promise.all(reads)
+    expect(peakStatusReads).toBe(4)
+  })
+
+  test('cancels a queued status probe without starting it', async () => {
+    const statusBarrier = Promise.withResolvers<void>()
+    let startedStatusReads = 0
+    let membershipReads = 0
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') {
+        membershipReads += 1
+        return okRemoteResult(worktreeListOutput)
+      }
+      if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
+      startedStatusReads += 1
+      await statusBarrier.promise
+      return okRemoteResult('')
+    })
+    const activeReads = Array.from({ length: 2 }, () => getRemoteStatus(TARGET, { run }))
+    await vi.waitFor(() => expect(startedStatusReads).toBe(4))
+    const controller = new AbortController()
+    const queuedRead = getRemoteStatus(TARGET, { run, signal: controller.signal })
+    await vi.waitFor(() => expect(membershipReads).toBe(3))
+    await Promise.resolve()
+    controller.abort()
+
+    await expect(queuedRead).rejects.toThrow()
+    expect(startedStatusReads).toBe(4)
+    statusBarrier.resolve()
+    await Promise.all(activeReads)
+  })
+
+  test('passes caller cancellation to a running remote status probe', async () => {
+    const controller = new AbortController()
+    let receivedSignal: AbortSignal | undefined
+    const run = vi.fn<RemoteGitRunner>(async (command, _target, options) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(worktreeListOutput)
+      if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
+      return await new Promise<RemoteCommandResult>((_resolve, reject) => {
+        receivedSignal = options?.signal
+        options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true })
+      })
+    })
+    const read = getRemoteStatus(TARGET, { run, signal: controller.signal })
+    await vi.waitFor(() => expect(receivedSignal).toBe(controller.signal))
+
+    controller.abort(new Error('remote status cancelled'))
+
+    await expect(read).rejects.toThrow('remote status cancelled')
+  })
+
+  test('keeps a cancelled running probe admitted until the SSH task settles', async () => {
+    const oneWorktreeOutput = ['worktree /srv/repo', 'HEAD f00ba40', 'branch refs/heads/main'].join(NUL) + NUL + NUL
+    const controller = new AbortController()
+    const completions: Array<PromiseWithResolvers<RemoteCommandResult>> = []
+    let startedStatusReads = 0
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(oneWorktreeOutput)
+      if (command.type !== 'gitStatus') return failRemoteResult('unexpected command')
+      startedStatusReads += 1
+      const completion = Promise.withResolvers<RemoteCommandResult>()
+      completions.push(completion)
+      return await completion.promise
+    })
+    const first = getRemoteStatus(TARGET, { run, signal: controller.signal })
+    const blockers = Array.from({ length: 3 }, () => getRemoteStatus(TARGET, { run }))
+    await vi.waitFor(() => expect(startedStatusReads).toBe(4))
+
+    controller.abort(new Error('cancelled while SSH exits'))
+    const fifth = getRemoteStatus(TARGET, { run })
+    await Promise.resolve()
+    expect(startedStatusReads).toBe(4)
+
+    completions[0]!.resolve(okRemoteResult(''))
+    await expect(first).rejects.toThrow('cancelled while SSH exits')
+    await vi.waitFor(() => expect(startedStatusReads).toBe(5))
+    for (const completion of completions.slice(1)) completion.resolve(okRemoteResult(''))
+    await Promise.all([...blockers, fifth])
   })
 })
 
 describe('getRemoteTreeWalk knownWorktrees path', () => {
   test('skips gitWorktreeList when knownWorktrees is supplied', async () => {
-    // Regression for the B4 round-trip optimisation: when the caller
-    // already has a worktree list (because `getRemoteStatusAndWorktrees`
-    // returned one in the same request), the walk path must NOT pay
-    // a second `gitWorktreeList` SSH call.
+    // When a caller already resolved the worktree, the walk path must not
+    // pay another `gitWorktreeList` SSH call.
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]

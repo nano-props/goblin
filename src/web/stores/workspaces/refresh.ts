@@ -6,7 +6,6 @@ import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores
 import { refreshRepoProjectionReadModel } from '#/web/repo-query-runtime.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
-import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
@@ -76,8 +75,5 @@ export async function requestRepoProjectionReadModelRefresh(
   const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
   if (!resolved || !isGitWorkspace(resolved.repo)) return
   const { workspaceRuntimeId } = resolved
-  await Promise.all([
-    runRepoProjectionReadModelRefresh(store, id, workspaceRuntimeId),
-    refreshRepoWorktreeStatus(store, id, workspaceRuntimeId),
-  ])
+  await runRepoProjectionReadModelRefresh(store, id, workspaceRuntimeId)
 }

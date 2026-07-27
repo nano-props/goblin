@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   terminalExecutionPath,
@@ -37,7 +37,7 @@ class TerminalSessionPruner {
 
     const workspacePath = localWorkspaceNativePath(input.workspaceId)
     if (!workspacePath) throw new Error('error.workspace-locator-malformed')
-    const worktrees = await getWorktrees(workspacePath, { includeStatus: false })
+    const worktrees = await readWorktreeMembership(workspacePath)
     input.assertCurrent()
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0

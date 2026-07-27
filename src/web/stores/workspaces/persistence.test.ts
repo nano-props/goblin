@@ -106,10 +106,6 @@ describe('persistRepoSnapshotCacheEntry', () => {
             path: '/tmp/worktree-a',
             isPrimary: true,
             isLocked: true,
-            summary: {
-              dirty: true,
-              changeCount: 2,
-            },
           },
           pullRequest: {
             number: 1,

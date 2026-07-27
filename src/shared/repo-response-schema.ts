@@ -61,9 +61,6 @@ const BranchSnapshotSchema = v.strictObject({
       path: v.string(),
       isPrimary: v.optional(v.boolean()),
       isLocked: v.optional(v.boolean()),
-      summary: v.optional(
-        v.strictObject({ dirty: v.optional(v.boolean()), changeCount: v.optional(v.number()) }),
-      ),
     }),
   ),
   mergedToDefault: v.optional(v.boolean()),

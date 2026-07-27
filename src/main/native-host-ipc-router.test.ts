@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { app } from 'electron'
 import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-channels.ts'
 import { isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { pullBranch } from '#/system/git/remote.ts'
@@ -77,7 +77,7 @@ vi.mock('#/system/git/branches.ts', () => ({
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   createWorktree: vi.fn(),
-  getWorktrees: vi.fn(),
+  readWorktreeMembership: vi.fn(),
   removeWorktree: vi.fn(),
 }))
 
@@ -279,7 +279,7 @@ describe('main repo ipc cancellation', () => {
     writeNativeClientWorkspaceStateMock.mockResolvedValue(undefined)
     vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
-    vi.mocked(getWorktrees).mockResolvedValue([
+    vi.mocked(readWorktreeMembership).mockResolvedValue([
       { path: 'goblin+file:///repo', branch: 'main', isBare: false, isPrimary: true },
     ])
     vi.mocked(getUpstream).mockResolvedValue(null)

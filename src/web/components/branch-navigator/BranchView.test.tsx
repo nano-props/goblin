@@ -148,7 +148,7 @@ describe('BranchView', () => {
       branches: [
         createBranchSnapshot('feature/query-dirty', {
           isCurrent: true,
-          worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
+          worktree: { path: WORKTREE_PATH },
         }),
       ],
       currentBranch: 'feature/query-dirty',

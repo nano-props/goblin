@@ -94,6 +94,34 @@ describe('getWorkingStatus', () => {
     expect(mocks.git).toHaveBeenCalledTimes(3)
   })
 
+  test('returns complete status for branch and detached worktrees', async () => {
+    const membership = [
+      'worktree /tmp/repo',
+      'HEAD f00ba4a',
+      'branch refs/heads/main',
+      '',
+      'worktree /tmp/detached-worktree',
+      'HEAD ba5eba1',
+      'detached',
+    ].join('\0') + '\0\0'
+    mocks.git
+      .mockResolvedValueOnce(membership)
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('?? detached.ts\0')
+      .mockResolvedValueOnce(membership)
+    const { getWorkingStatus } = await import('#/system/git/status.ts')
+
+    await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([
+      { path: '/tmp/repo', branch: 'main', isMain: true, entries: [] },
+      {
+        path: '/tmp/detached-worktree',
+        branch: undefined,
+        isMain: false,
+        entries: [{ x: '?', y: '?', path: 'detached.ts' }],
+      },
+    ])
+  })
+
   test('rejects when the signal aborts before a command result is accepted', async () => {
     const controller = new AbortController()
     mocks.git.mockImplementationOnce(async () => {

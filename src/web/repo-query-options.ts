@@ -44,8 +44,7 @@ export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceR
   return queryOptions({
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
+    retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
@@ -110,8 +109,7 @@ export function repoWorktreeStatusReadModelQueryOptions(
       repoRoot === null
         ? skipToken
         : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
+    retry: false,
     staleTime: Number.POSITIVE_INFINITY,
     enabled: active,
     subscribed: active,

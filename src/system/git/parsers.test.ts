@@ -111,12 +111,11 @@ describe('parseBranches', () => {
   test('attaches worktree info when branch matches', () => {
     const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(SEP)
     const result = parseBranches(line, 'main', [
-      { path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false, isDirty: true, changeCount: 3 },
+      { path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false },
     ])
     expect(result[0]?.worktree?.path).toBe('/wt/feat')
-    expect(result[0]?.worktree?.summary?.dirty).toBe(true)
     expect(result[0]?.worktree?.isPrimary).toBe(false)
-    expect(result[0]?.worktree?.summary?.changeCount).toBe(3)
+    expect(result[0]?.worktree).not.toHaveProperty('summary')
   })
 
   test('attaches primary worktree marker when branch matches the main worktree', () => {

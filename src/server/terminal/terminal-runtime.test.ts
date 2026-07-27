@@ -17,7 +17,7 @@ import {
   isCurrentWorkspaceRuntime,
   releaseWorkspaceRuntime,
 } from '#/server/modules/workspace-runtimes.ts'
-import { getWorktrees } from '#/system/git/worktrees.ts'
+import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
@@ -99,7 +99,9 @@ function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceId, work
 }
 
 vi.mock('#/system/git/worktrees.ts', () => ({
-  getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
+  readWorktreeMembership: vi.fn(async () => [
+    { path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false },
+  ]),
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -1013,7 +1015,7 @@ describe('server terminal runtime', () => {
     )
     expect(opened.ok).toBe(true)
     socket.send.mockClear()
-    vi.mocked(getWorktrees).mockResolvedValueOnce([])
+    vi.mocked(readWorktreeMembership).mockResolvedValueOnce([])
 
     await expect(
       host.prune('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
