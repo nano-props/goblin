@@ -41,10 +41,8 @@ import {
 
 describe('remote git filesystem', () => {
   test('skips gitWorktreeList when knownWorktrees is supplied', async () => {
-    // Regression for the B4 round-trip optimisation: when the caller
-    // already has a worktree list (because `getRemoteStatusAndWorktrees`
-    // returned one in the same request), the walk path must NOT pay
-    // a second `gitWorktreeList` SSH call.
+    // A caller that already resolved membership must not pay for another
+    // `gitWorktreeList` SSH call.
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]

@@ -86,7 +86,7 @@ describe('remote git snapshot', () => {
   })
 
   test('includes remote metadata in remote snapshots', async () => {
-    const run: RemoteGitRunner = async (command) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -102,7 +102,7 @@ describe('remote git snapshot', () => {
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
         case 'gitStatus':
-          return okRemoteResult('')
+          throw new Error('snapshot must not read status')
         case 'gitRemoteVerbose':
           return okRemoteResult(
             'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)',
@@ -110,7 +110,7 @@ describe('remote git snapshot', () => {
         default:
           return okRemoteResult('')
       }
-    }
+    })
 
     const snapshot = await getRemoteSnapshot(TARGET, { run: run })
 
@@ -120,6 +120,11 @@ describe('remote git snapshot', () => {
       browserRemoteProvider: 'gitlab',
       hasGitHubRemote: false,
     })
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitStatus' }),
+      expect.anything(),
+      expect.anything(),
+    )
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
