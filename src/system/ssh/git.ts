@@ -7,13 +7,7 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap.ts'
-import {
-  haveSameWorktrees,
-  parseBranches,
-  parseLog,
-  parseStatus,
-  parseWorktrees,
-} from '#/system/git/parsers.ts'
+import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
   getRepoUrlForRemotes,
@@ -118,8 +112,6 @@ export async function getRemoteSnapshot(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const snapshot = parseRemoteSnapshot(result.stdout, membership)
   if (!snapshot) throw new Error('error.failed-read-repo')
-  const finalMembership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  if (!haveSameWorktrees(membership, finalMembership)) throw new Error('error.failed-read-repo')
   return { ...snapshot, remote }
 }
 
@@ -141,8 +133,6 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   if (branches.some((branch) => !isSafeBranchName(branch)) || new Set(branches).size !== branches.length) {
     throw new Error('error.failed-read-repo')
   }
-  const finalWorktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('error.failed-read-repo')
   const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
   return [
     ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
@@ -163,10 +153,7 @@ export async function getRemoteStatus(
 ): Promise<WorktreeStatus[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  const statuses = await sampleRemoteWorktreeStatus(target, worktrees, { signal: options.signal, run })
-  const finalWorktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('error.failed-read-repo')
-  return statuses
+  return await sampleRemoteWorktreeStatus(target, worktrees, { signal: options.signal, run })
 }
 
 async function sampleRemoteWorktreeStatus(
@@ -685,19 +672,13 @@ export async function getRemoteTrackingBranches(
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<RemoteTrackingBranchIdentity[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const before = await readRemoteTrackingAuthority(target, { signal: options.signal, run })
+  const authority = await readRemoteTrackingAuthority(target, { signal: options.signal, run })
   options.signal?.throwIfAborted()
-  let branches: RemoteTrackingBranchIdentity[]
   try {
-    branches = parseRemoteTrackingRefs(before.refs, before.remotes)
+    return parseRemoteTrackingRefs(authority.refs, authority.remotes)
   } catch {
     throw new Error('error.failed-read-repo')
   }
-  const after = await readRemoteTrackingAuthority(target, { signal: options.signal, run })
-  if (before.refs !== after.refs || JSON.stringify(before.remotes) !== JSON.stringify(after.remotes)) {
-    throw new Error('error.failed-read-repo')
-  }
-  return branches
 }
 
 async function readRemoteTrackingAuthority(
@@ -1302,6 +1283,7 @@ async function mapWithConcurrency<T, R>(
   fn: (item: T) => Promise<R>,
   signal?: AbortSignal,
 ): Promise<R[]> {
+  signal?.throwIfAborted()
   if (items.length === 0) return []
   const results = new Array<R | undefined>(items.length)
   let cursor = 0
@@ -1311,19 +1293,19 @@ async function mapWithConcurrency<T, R>(
   const worker = async () => {
     while (true) {
       if (stopped) return
-      if (signal?.aborted) return
+      signal?.throwIfAborted()
       const index = cursor++
       if (index >= items.length) return
       try {
         results[index] = await fn(items[index]!)
       } catch (err) {
-        if (signal?.aborted) return
+        signal?.throwIfAborted()
         stopped = true
         throw err
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  if (signal?.aborted) return []
+  signal?.throwIfAborted()
   return results.filter((r): r is R => r !== undefined)
 }

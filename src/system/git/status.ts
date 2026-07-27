@@ -1,5 +1,5 @@
 import PQueue from 'p-queue'
-import { haveSameWorktrees, parseStatus } from '#/system/git/parsers.ts'
+import { parseStatus } from '#/system/git/parsers.ts'
 import type { StatusEntry, WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import { git } from '#/system/git/git-exec.ts'
@@ -66,8 +66,6 @@ async function readStatusEntries(worktreePath: string, args: string[], signal?: 
 export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSignal }): Promise<WorktreeStatus[]> {
   const worktrees = await readWorktreeMembership(cwd, options?.signal)
   const samples = await sampleWorktreeStatus(worktrees, options?.signal)
-  const finalWorktrees = await readWorktreeMembership(cwd, options?.signal)
-  if (!haveSameWorktrees(worktrees, finalWorktrees)) throw new Error('Worktree membership changed during status read')
   const filtered = samples.flatMap((sample): WorktreeStatus[] =>
     sample.kind === 'bare'
       ? []

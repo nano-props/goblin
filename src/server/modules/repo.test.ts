@@ -424,6 +424,7 @@ describe('getRepoSnapshot', () => {
     const result = await getRepoSnapshot(REPO_ID)
 
     expect(result).toEqual(snapshot)
+    expect(mocks.readWorktreeMembership).toHaveBeenCalledOnce()
     expect(mocks.sampleWorktreeStatusForTarget).not.toHaveBeenCalled()
     expectNoRepoSnapshotInvalidations()
   })

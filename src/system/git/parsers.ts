@@ -235,20 +235,3 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
   }
   return worktrees
 }
-
-export function haveSameWorktrees(left: readonly WorktreeInfo[], right: readonly WorktreeInfo[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((worktree, index) => {
-      const other = right[index]
-      return (
-        other !== undefined &&
-        worktree.path === other.path &&
-        worktree.branch === other.branch &&
-        worktree.isBare === other.isBare &&
-        worktree.isPrimary === other.isPrimary &&
-        worktree.isLocked === other.isLocked
-      )
-    })
-  )
-}

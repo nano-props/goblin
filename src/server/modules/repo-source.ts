@@ -29,7 +29,6 @@ import {
 import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 import { getWorkingStatus, sampleWorktreeStatusForTarget } from '#/system/git/status.ts'
 import { createWorktree, readWorktreeMembership, removeWorktree } from '#/system/git/worktrees.ts'
-import { haveSameWorktrees } from '#/system/git/parsers.ts'
 import {
   bootstrapWorktreeAfterCreate,
   getWorktreeBootstrapPreview as getLocalWorktreeBootstrapPreview,
@@ -662,10 +661,6 @@ function createLocalRepoSource(
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
       const remote = await getRemoteInfo(repoId, signal)
       signal?.throwIfAborted()
-      const finalMembership = await readWorktreeMembership(repoId, signal)
-      if (!haveSameWorktrees(membership, finalMembership)) {
-        throw new Error('Worktree membership changed during repository snapshot read')
-      }
       return { branches, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(signal) {

@@ -185,7 +185,7 @@ describe('remote git helpers', () => {
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
       { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
-    expect(run).toHaveBeenCalledTimes(3)
+    expect(run).toHaveBeenCalledTimes(2)
     expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
     })
@@ -296,7 +296,7 @@ describe('remote git helpers', () => {
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
       { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
     ])
-    expect(run).toHaveBeenCalledTimes(3)
+    expect(run).toHaveBeenCalledTimes(2)
   })
 
   test('prefers stderr when converting remote exec failures', () => {
@@ -1260,6 +1260,7 @@ describe('remote git helpers', () => {
       }
     })
     const refs = await getRemoteTrackingBranches(TARGET, { run })
+    expect(run).toHaveBeenCalledTimes(3)
     expect(run).toHaveBeenCalledWith({ type: 'gitRemoteBranches', path: '/srv/repo' }, TARGET, { signal: undefined })
     expect(refs).toEqual([
       { ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' },
@@ -1508,7 +1509,7 @@ describe('getRemoteStatus', () => {
     'branch refs/heads/feature/test',
   ].join(NUL) + NUL + NUL
 
-  test('publishes statuses only when before and after membership match', async () => {
+  test('samples statuses from one authoritative membership read', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'gitWorktreeList') return okRemoteResult(worktreeListOutput)
       if (command.type === 'gitStatus' && command.path === '/srv/repo') return okRemoteResult(`M  README.md${NUL}`)
@@ -1518,7 +1519,7 @@ describe('getRemoteStatus', () => {
 
     const result = await getRemoteStatus(TARGET, { run: run })
 
-    expect(run.mock.calls.filter(([command]) => command.type === 'gitWorktreeList')).toHaveLength(2)
+    expect(run.mock.calls.filter(([command]) => command.type === 'gitWorktreeList')).toHaveLength(1)
     expect(new Set(run.mock.calls.flatMap(([command]) => command.type === 'gitStatus' ? [command.path] : []))).toEqual(
       new Set(['/srv/repo', '/srv/repo-feature']),
     )
@@ -1588,17 +1589,6 @@ describe('getRemoteStatus', () => {
       command.type === 'gitWorktreeList' ? okRemoteResult(worktreeListOutput) : failRemoteResult('boom'),
     )
     await expect(getRemoteStatus(TARGET, { run: run })).rejects.toThrow('boom')
-  })
-
-  test('rejects when membership changes during status sampling', async () => {
-    let listReads = 0
-    const changed = ['worktree /srv/repo', 'HEAD f00ba40', 'detached'].join(NUL) + NUL + NUL
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
-      if (command.type === 'gitWorktreeList') return okRemoteResult(listReads++ === 0 ? worktreeListOutput : changed)
-      return okRemoteResult('')
-    })
-
-    await expect(getRemoteStatus(TARGET, { run: run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('bounds status probes across concurrent aggregate callers', async () => {

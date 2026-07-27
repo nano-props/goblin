@@ -12,13 +12,8 @@ import { getRemotes } from '#/system/git/remote.ts'
  *  the remote has; we run the list through `parseRemoteTrackingRefs` so
  *  the local and remote (`system/ssh/git.ts`) sides agree on the shape. */
 export async function getRemoteTrackingBranches(cwd: string, signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]> {
-  const before = await readRemoteTrackingAuthority(cwd, signal)
-  const branches = parseRemoteTrackingRefs(before.refs, before.remotes)
-  const after = await readRemoteTrackingAuthority(cwd, signal)
-  if (before.refs !== after.refs || JSON.stringify(before.remotes) !== JSON.stringify(after.remotes)) {
-    throw new Error('Remote tracking authority changed during read')
-  }
-  return branches
+  const authority = await readRemoteTrackingAuthority(cwd, signal)
+  return parseRemoteTrackingRefs(authority.refs, authority.remotes)
 }
 
 async function readRemoteTrackingAuthority(

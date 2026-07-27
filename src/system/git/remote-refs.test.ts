@@ -36,6 +36,8 @@ describe('getRemoteTrackingBranches', () => {
       ['config', '--get-all', '--', 'remote.origin.fetch'],
       { signal },
     )
+    expect(gitMock).toHaveBeenCalledTimes(2)
+    expect(gitLookupMock).toHaveBeenCalledOnce()
   })
 
   test('propagates failure from the authoritative git read', async () => {
