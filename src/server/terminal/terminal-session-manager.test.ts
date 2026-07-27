@@ -2363,7 +2363,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 })
 
 describe('TerminalSessionManager membership catalog', () => {
-  test('advances the projection revision when a fresh binding outcome settles', async () => {
+  test('advances the projection revision for binding and close, not incremental runtime details', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createAlwaysOnlineManager(supervisor)
     const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
@@ -2382,38 +2382,12 @@ describe('TerminalSessionManager membership catalog', () => {
       processName: 'terminal',
       canonicalSize: null,
     })
-
-    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_default_process_123'))
-    const created = await pending
-    if (!created.ok) throw new Error(created.message)
-    const afterBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-
-    expect(afterBinding.revision).toBe(beforeBinding.revision + 1)
-    expect(afterBinding.sessions[0]).toMatchObject({
-      terminalRuntimeGeneration: 1,
-      processName: 'zsh',
-      phase: 'open',
-    })
-  })
-
-  test('does not advance the projection revision for incremental runtime details', async () => {
-    const supervisor = createDeferredPtySupervisor()
-    const manager = createAlwaysOnlineManager(supervisor)
-    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
-    const pending = ensureSession(manager, {
-      userId: USER_ID,
-      target: WORKTREE_TARGET,
-      terminalSessionId: TERMINAL_SESSION_ID,
-      cwd: WORKTREE_PATH,
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
-    })
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_revision_123456'))
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
     const createdSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(createdSnapshot.revision).toBe(beforeBinding.revision + 1)
     expect(createdSnapshot.sessions).toEqual([
       expect.objectContaining({
         terminalSessionId: TERMINAL_SESSION_ID,
