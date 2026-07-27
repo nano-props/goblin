@@ -203,18 +203,6 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe('terminal.close-named:{"name":"terminal.opening"}')
   })
 
-  test('closes static tabs through the static tab lifecycle callback', async () => {
-    const closeStaticTab = vi.fn()
-
-    await expect(
-      statusWorkspacePaneTabProvider.close({
-        closeStaticTab,
-      }),
-    ).resolves.toBe(true)
-
-    expect(closeStaticTab).toHaveBeenCalledWith('status')
-  })
-
   test('closes static tabs without requiring a branch owner', async () => {
     const closeStaticTab = vi.fn()
 

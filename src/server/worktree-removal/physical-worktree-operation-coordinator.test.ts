@@ -51,8 +51,12 @@ describe('physical worktree operation coordinator', () => {
     const second = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     const gate = deferred<void>()
-    const active = coordinator.runOperation(held, async () => await gate.promise)
-    await Promise.resolve()
+    const activeStarted = deferred<void>()
+    const active = coordinator.runOperation(held, async () => {
+      activeStarted.resolve()
+      await gate.promise
+    })
+    await activeStarted.promise
     const batch = coordinator.runAdmissionBatch(
       [
         { identity: held.identity, currentCapability: held, indexedLeases: [] },
@@ -128,8 +132,12 @@ describe('physical worktree operation coordinator', () => {
     const b = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     const gate = deferred<void>()
-    const held = coordinator.runOperation(b, async () => await gate.promise)
-    await Promise.resolve()
+    const heldStarted = deferred<void>()
+    const held = coordinator.runOperation(b, async () => {
+      heldStarted.resolve()
+      await gate.promise
+    })
+    await heldStarted.promise
     let ran = false
     const batch = coordinator.runAdmissionBatch(
       [
@@ -140,7 +148,7 @@ describe('physical worktree operation coordinator', () => {
         ran = true
       },
     )
-    await Promise.resolve()
+    await expect(coordinator.runRemoval(a, async () => 'removed')).resolves.toEqual({ admitted: false })
     signalA.abort()
     gate.resolve()
     await expect(batch).rejects.toBeDefined()
@@ -151,10 +159,6 @@ describe('physical worktree operation coordinator', () => {
   })
 })
 
-function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-  return { promise, resolve }
+function deferred<T>() {
+  return Promise.withResolvers<T>()
 }

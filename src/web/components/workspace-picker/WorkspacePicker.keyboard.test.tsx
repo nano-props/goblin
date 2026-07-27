@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
@@ -16,7 +16,8 @@ beforeEach(() => {
 })
 
 describe('WorkspacePicker keyboard navigation', () => {
-  test('moves between workspaces from the current workspace button', () => {
+  test('moves between workspaces from the current workspace button', async () => {
+    const user = userEvent.setup()
     const onActivate = vi.fn()
 
     renderInJsdom(
@@ -40,16 +41,14 @@ describe('WorkspacePicker keyboard navigation', () => {
     )
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
-    act(() => {
-      currentWorkspaceButton.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
-      )
-    })
+    currentWorkspaceButton.focus()
+    await user.keyboard('{ArrowRight}')
 
     expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
 
-  test('moves between workspaces from the sidebar current workspace button', () => {
+  test('moves between workspaces from the sidebar current workspace button', async () => {
+    const user = userEvent.setup()
     const onActivate = vi.fn()
 
     renderInJsdom(
@@ -74,11 +73,8 @@ describe('WorkspacePicker keyboard navigation', () => {
     )
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
-    act(() => {
-      currentWorkspaceButton.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
-      )
-    })
+    currentWorkspaceButton.focus()
+    await user.keyboard('{ArrowRight}')
 
     expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })

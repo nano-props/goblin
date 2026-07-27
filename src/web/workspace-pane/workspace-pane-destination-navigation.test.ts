@@ -95,12 +95,12 @@ describe('workspace pane destination navigation', () => {
     const repo = seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
-    const commitWorkspacePaneRoute = deferredRouteCommit(routeCommit.promise)
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute,
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
     seedRepoReadModelQueryData(repo, {
       branches: [
         createRepoBranch('feature/current', { worktree: { path: CURRENT_WORKTREE } }),
@@ -118,11 +118,12 @@ describe('workspace pane destination navigation', () => {
     const repo = seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
     const queryKey = repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'full')
     const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('missing repo projection query')
@@ -139,9 +140,9 @@ describe('workspace pane destination navigation', () => {
     const firstCommit = Promise.withResolvers<boolean>()
     const firstNavigation = deferredRouteCommit(firstCommit.promise)
     const firstWork = commitWorkspacePaneDestinationRoute(first, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: firstNavigation,
+      commitWorkspacePaneRoute: firstNavigation.commit,
     })
-    await Promise.resolve()
+    await firstNavigation.started
 
     const second = beginPresentation('feature/destination')
     await expect(
@@ -157,10 +158,11 @@ describe('workspace pane destination navigation', () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
 
     beginPrimaryWindowNavigation()
     routeCommit.resolve(true)
@@ -172,10 +174,11 @@ describe('workspace pane destination navigation', () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
 
     primaryNavigationActions().actions.openSettings('general')
     routeCommit.resolve(true)
@@ -187,10 +190,11 @@ describe('workspace pane destination navigation', () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
 
     primaryNavigationActions().actions.activateWorkspace(workspaceIdForTest('goblin+file:///tmp/another-repo'))
     routeCommit.resolve(true)
@@ -202,10 +206,11 @@ describe('workspace pane destination navigation', () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
+    const routeNavigation = deferredRouteCommit(routeCommit.promise)
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
-      commitWorkspacePaneRoute: deferredRouteCommit(routeCommit.promise),
+      commitWorkspacePaneRoute: routeNavigation.commit,
     })
-    await Promise.resolve()
+    await routeNavigation.started
 
     observePrimaryWindowHistoryNavigation({
       href: '/workspace/current/tab/history',
@@ -286,8 +291,10 @@ function acceptedRouteCommit() {
 }
 
 function deferredRouteCommit(completion: Promise<boolean>) {
-  return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
+  const started = Promise.withResolvers<void>()
+  const commit = vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
+      started.resolve()
       const accepted = await completion
       if (
         accepted &&
@@ -298,6 +305,7 @@ function deferredRouteCommit(completion: Promise<boolean>) {
       return accepted
     },
   )
+  return { commit, started: started.promise }
 }
 
 function seedNoWorktreeRepo() {

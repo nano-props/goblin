@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { act } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -165,7 +166,7 @@ describe('SplitPane', () => {
     expect(onAfterSizeChange).not.toHaveBeenCalled()
   })
 
-  test('uses measured before panel width when available', async () => {
+  test('uses measured before panel width when available', () => {
     const { container } = render(
       <SplitPane
         before={<div />}
@@ -179,7 +180,6 @@ describe('SplitPane', () => {
 
     emitElementResize(splitPane(container), 800)
     emitElementResize(beforeClip(container), 320)
-    await flushEffects()
 
     expect(beforeContent(container)?.style.getPropertyValue('--goblin-split-pane-before-measured-size')).toBe('320px')
   })
@@ -200,51 +200,44 @@ describe('SplitPane', () => {
     expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
   })
 
-  test('keeps panel transition active when collapse is reversed before the timeout settles', async () => {
-    vi.useFakeTimers()
-    try {
-      const splitPaneElement = (collapsed: boolean) => (
-        <SplitPane
-          before={<div />}
-          after={<div />}
-          afterSize={62}
-          beforeCollapsed={collapsed}
-          animateBeforeCollapse
-          beforeMinSize={collapsed ? 0 : '14rem'}
-          beforeContentMinSize="14rem"
-        />
-      )
+  test('keeps panel transition active when collapse is reversed before the timeout settles', () => {
+    useFakeTimers()
+    const splitPaneElement = (collapsed: boolean) => (
+      <SplitPane
+        before={<div />}
+        after={<div />}
+        afterSize={62}
+        beforeCollapsed={collapsed}
+        animateBeforeCollapse
+        beforeMinSize={collapsed ? 0 : '14rem'}
+        beforeContentMinSize="14rem"
+      />
+    )
 
-      const { container } = render(splitPaneElement(false))
-      expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
+    const { container } = render(splitPaneElement(false))
+    expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
 
-      rerender(splitPaneElement(true))
-      await flushEffects()
-      expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
+    rerender(splitPaneElement(true))
+    expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
 
-      act(() => {
-        vi.advanceTimersByTime(120)
-      })
-      expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
+    act(() => {
+      vi.advanceTimersByTime(120)
+    })
+    expect(splitPane(container)?.dataset.collapseTransition).toBe('collapsing')
 
-      rerender(splitPaneElement(false))
-      await flushEffects()
-      expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
-      expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
+    rerender(splitPaneElement(false))
+    expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
+    expect(resizableMocks.setLayout).toHaveBeenLastCalledWith({ before: 38, after: 62 })
 
-      act(() => {
-        vi.advanceTimersByTime(239)
-      })
-      expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
+    act(() => {
+      vi.advanceTimersByTime(239)
+    })
+    expect(splitPane(container)?.dataset.collapseTransition).toBe('expanding')
 
-      act(() => {
-        vi.advanceTimersByTime(1)
-      })
-      await flushEffects()
-      expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
-    } finally {
-      vi.useRealTimers()
-    }
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
   })
 })
 
@@ -259,12 +252,6 @@ function rerender(element: ReactNode): RenderResult {
   if (!lastRender) return render(element)
   lastRender.rerender(element)
   return lastRender
-}
-
-async function flushEffects() {
-  await act(async () => {
-    await Promise.resolve()
-  })
 }
 
 function splitPane(container: HTMLElement): HTMLElement | null {

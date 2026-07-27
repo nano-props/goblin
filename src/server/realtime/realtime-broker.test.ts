@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   AppRealtimeSocketLimitError,
   MAX_APP_REALTIME_SOCKETS,
@@ -12,19 +12,18 @@ import {
   MAX_BUFFERED_REALTIME_ENTRIES,
   MAX_QUEUED_REALTIME_TRANSITIONS,
 } from '#/server/realtime/buffered-realtime-socket.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 
 const USER_ID = 'user_realtime'
+const OTHER_USER_ID = 'user_other'
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const HEARTBEAT_SILENCE_MS = REALTIME_HEARTBEAT_DEADLINE_MS + REALTIME_HEARTBEAT_INTERVAL_MS
 
 describe('realtime broker', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(TEST_NOW)
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   test('fans out typed feature messages without owning the feature domain', () => {
@@ -87,16 +86,13 @@ describe('realtime broker', () => {
   test('serializes response transitions and flushes each transition before starting the next', async () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedRealtimeSocket(rawSocket)
-    let finishFirst: (() => void) | undefined
-    const firstReady = new Promise<void>((resolve) => {
-      finishFirst = resolve
-    })
+    const firstReady = Promise.withResolvers<void>()
     const started: string[] = []
 
     bufferedSocket.enqueueTransition(async () => {
       started.push('first')
       bufferedSocket.send('event:first')
-      await firstReady
+      await firstReady.promise
       rawSocket.send('response:first')
       return null
     })
@@ -110,7 +106,7 @@ describe('realtime broker', () => {
     expect(started).toEqual(['first'])
     expect(rawSocket.send).not.toHaveBeenCalled()
 
-    finishFirst?.()
+    firstReady.resolve()
     await vi.waitFor(() => expect(rawSocket.send).toHaveBeenCalledTimes(4))
 
     expect(started).toEqual(['first', 'second'])
@@ -136,8 +132,7 @@ describe('realtime broker', () => {
 
     expect(rawSocket.close).toHaveBeenCalledWith(1013, 'realtime transition capacity exceeded')
     activeTransition.resolve(null)
-    await activeTransition.promise
-    await Promise.resolve()
+    await flushMicrotasks()
     expect(queuedTransition).not.toHaveBeenCalled()
   })
 
@@ -194,5 +189,121 @@ describe('realtime broker', () => {
     )
     expect(broker.socketCount()).toBe(MAX_APP_REALTIME_SOCKETS)
     broker.disconnectAll()
+  })
+
+  test('keeps client presence online until its final socket unregisters', () => {
+    const onClientPresenceChanged = vi.fn()
+    const onUserSocketsDrained = vi.fn()
+    const broker = new RealtimeBroker<{ type: 'noop' }>({ onClientPresenceChanged, onUserSocketsDrained })
+    const first = { send: vi.fn(), close: vi.fn() }
+    const second = { send: vi.fn(), close: vi.fn() }
+
+    broker.registerSocket('client_a', USER_ID, first)
+    broker.registerSocket('client_a', USER_ID, second)
+    broker.unregisterSocket(first)
+
+    expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(true)
+    expect(onClientPresenceChanged).toHaveBeenCalledTimes(1)
+    expect(onUserSocketsDrained).not.toHaveBeenCalled()
+
+    broker.unregisterSocket(second)
+
+    expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(false)
+    expect(onClientPresenceChanged).toHaveBeenLastCalledWith({
+      clientId: 'client_a',
+      userId: USER_ID,
+      previousOnline: true,
+      online: false,
+    })
+    expect(onUserSocketsDrained).toHaveBeenCalledWith(USER_ID)
+    broker.disconnectAll()
+  })
+
+  test('isolates user fanout and unregisters a socket whose send fails', () => {
+    const onUserSocketsDrained = vi.fn()
+    const broker = new RealtimeBroker<{ type: 'feature.changed'; value: string }>({
+      onClientPresenceChanged: vi.fn(),
+      onUserSocketsDrained,
+    })
+    const failedSocket = {
+      send: vi.fn(() => {
+        throw new Error('socket unavailable')
+      }),
+      close: vi.fn(),
+    }
+    const otherUserSocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_shared', USER_ID, failedSocket)
+    broker.registerSocket('client_shared', OTHER_USER_ID, otherUserSocket)
+
+    broker.broadcastToUser(USER_ID, { type: 'feature.changed', value: 'ok' })
+
+    expect(otherUserSocket.send).not.toHaveBeenCalled()
+    expect(broker.hasUserSockets(USER_ID)).toBe(false)
+    expect(broker.hasUserSockets(OTHER_USER_ID)).toBe(true)
+    expect(onUserSocketsDrained).toHaveBeenCalledWith(USER_ID)
+    broker.disconnectAll()
+  })
+
+  test('re-registering a socket replaces its previous user and client identity', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = new RealtimeBroker<{ type: 'noop' }>({
+      onClientPresenceChanged,
+      onUserSocketsDrained: vi.fn(),
+    })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a', USER_ID, socket)
+
+    broker.registerSocket('client_b', OTHER_USER_ID, socket)
+
+    expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(false)
+    expect(broker.isClientOnline(OTHER_USER_ID, 'client_b')).toBe(true)
+    expect(onClientPresenceChanged.mock.calls.map(([event]) => event)).toEqual([
+      { clientId: 'client_a', userId: USER_ID, previousOnline: false, online: true },
+      { clientId: 'client_a', userId: USER_ID, previousOnline: true, online: false },
+      { clientId: 'client_b', userId: OTHER_USER_ID, previousOnline: false, online: true },
+    ])
+    broker.disconnectAll()
+  })
+
+  test('expires a stale socket without taking a healthy socket for the same client offline', () => {
+    const onClientPresenceChanged = vi.fn()
+    const broker = new RealtimeBroker<{ type: 'noop' }>({
+      onClientPresenceChanged,
+      onUserSocketsDrained: vi.fn(),
+      heartbeatTimeoutReason: 'test heartbeat timeout',
+    })
+    const staleSocket = { send: vi.fn(), close: vi.fn() }
+    const healthySocket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_a', USER_ID, staleSocket)
+    broker.registerSocket('client_a', USER_ID, healthySocket)
+    onClientPresenceChanged.mockClear()
+
+    vi.advanceTimersByTime(REALTIME_HEARTBEAT_INTERVAL_MS * 2)
+    broker.recordHeartbeat(healthySocket)
+    vi.advanceTimersByTime(REALTIME_HEARTBEAT_INTERVAL_MS * 2)
+
+    expect(staleSocket.close).toHaveBeenCalledWith(1001, 'test heartbeat timeout')
+    expect(healthySocket.close).not.toHaveBeenCalled()
+    expect(broker.socketCount()).toBe(1)
+    expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(true)
+    expect(onClientPresenceChanged).not.toHaveBeenCalled()
+    broker.disconnectAll()
+  })
+
+  test('disconnectAll force-closes transports and clears broker state', () => {
+    const broker = new RealtimeBroker<{ type: 'noop' }>({
+      onClientPresenceChanged: vi.fn(),
+      onUserSocketsDrained: vi.fn(),
+    })
+    const socket = { send: vi.fn(), close: vi.fn(), forceClose: vi.fn() }
+    broker.registerSocket('client_a', USER_ID, socket)
+
+    broker.disconnectAll()
+
+    expect(socket.forceClose).toHaveBeenCalledWith(1001, 'server shutting down')
+    expect(socket.close).not.toHaveBeenCalled()
+    expect(broker.socketCount()).toBe(0)
+    expect(broker.hasUserSockets(USER_ID)).toBe(false)
+    expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(false)
   })
 })

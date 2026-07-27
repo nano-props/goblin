@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, Array<(...args: any[]) => any>>()
@@ -280,7 +281,6 @@ describe('native host startup lifecycle', () => {
     await import('#/main/main.ts')
 
     await emit('second-instance')
-    await Promise.resolve()
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
 
     mocks.resolveReady()
@@ -357,7 +357,7 @@ describe('native host startup lifecycle', () => {
 
     await emit('before-quit', { preventDefault: vi.fn() })
     rejectSettings(new Error('server stopped during quit'))
-    await Promise.resolve()
+    await flushMicrotasks()
 
     expect(mocks.showErrorBox).not.toHaveBeenCalled()
     expect(mocks.quit).not.toHaveBeenCalled()
@@ -399,7 +399,6 @@ describe('native host startup lifecycle', () => {
 
     const event = { preventDefault: vi.fn() }
     await emit('open-file', event, '/tmp/repo')
-    await Promise.resolve()
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
     expect(mocks.enqueueExternalOpenPath).toHaveBeenCalledWith('/tmp/repo')

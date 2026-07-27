@@ -9,6 +9,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import type { RemoteWorkspaceConnectionResult } from '#/shared/remote-workspace.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -24,7 +25,43 @@ vi.mock('#/server/modules/remote-workspace.ts', () => ({
 }))
 
 const userId = 'user-test'
+const clientId = 'client-test'
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
+const remoteTarget = requiredRemoteTarget()
+
+function requiredRemoteTarget() {
+  const target = normalizeRemoteTarget({
+    alias: 'example',
+    host: 'example.test',
+    user: 'developer',
+    port: 22,
+    remotePath: '/repo',
+  })
+  if (!target) throw new Error('invalid remote target fixture')
+  return target
+}
+
+function readyConnection(gitAvailable: boolean, gitDiagnostic?: string): RemoteWorkspaceConnectionResult {
+  return {
+    kind: 'ready',
+    lifecycle: { kind: 'ready', target: remoteTarget },
+    gitAvailable,
+    ...(gitDiagnostic ? { gitDiagnostic } : {}),
+  }
+}
+
+function createCapabilityCommitGate() {
+  const started = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  return {
+    beforeCapabilityCommit: async () => {
+      started.resolve()
+      await release.promise
+    },
+    started: started.promise,
+    release: release.resolve,
+  }
+}
 
 describe('remote lifecycle write path', () => {
   beforeEach(() => {
@@ -33,19 +70,8 @@ describe('remote lifecycle write path', () => {
   })
 
   test('orchestrates resolution, runtime transitions, and invalidation', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
-    mocks.resolveConnection.mockResolvedValue({
-      kind: 'ready',
-      lifecycle: { kind: 'ready', target },
-      gitAvailable: true,
-    })
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    mocks.resolveConnection.mockResolvedValue(readyConnection(true))
 
     await expect(
       runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' }),
@@ -63,7 +89,7 @@ describe('remote lifecycle write path', () => {
 
   test('rejects a local workspace before entering the remote lifecycle', async () => {
     const localWorkspaceId = workspaceIdForTest('goblin+file:///workspace')
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, localWorkspaceId, 'client-test')
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, localWorkspaceId, clientId)
     const before = listWorkspaceRuntimes(userId)
 
     await expect(
@@ -81,25 +107,10 @@ describe('remote lifecycle write path', () => {
   })
 
   test('serializes a conclusive Git downgrade through capability cleanup before committing it', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const cleanup = vi.fn(async ({ before, after }) => {
       expect(before).toMatchObject({ capabilities: { git: { status: 'available' } } })
@@ -118,39 +129,18 @@ describe('remote lifecycle write path', () => {
   })
 
   test('exposes no terminal lifecycle until its capability transition commits', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
-    const cleanupStarted = Promise.withResolvers<void>()
-    const cleanupGate = Promise.withResolvers<void>()
+    const capabilityCommit = createCapabilityCommitGate()
 
     const transition = runRemoteWorkspaceLifecycleWrite(
       { userId, workspaceId, workspaceRuntimeId, mode: 'restart' },
-      {
-        beforeCapabilityCommit: async () => {
-          cleanupStarted.resolve()
-          await cleanupGate.promise
-        },
-      },
+      { beforeCapabilityCommit: capabilityCommit.beforeCapabilityCommit },
     )
-    await cleanupStarted.promise
+    await capabilityCommit.started
 
     expect(listWorkspaceRuntimes(userId)[0]).toMatchObject({
       remoteLifecycle: { kind: 'connecting', attemptId: 2 },
@@ -158,7 +148,7 @@ describe('remote lifecycle write path', () => {
     })
     expect(mocks.publishInvalidation).toHaveBeenCalledTimes(3)
 
-    cleanupGate.resolve()
+    capabilityCommit.release()
     await transition
 
     expect(listWorkspaceRuntimes(userId)[0]).toMatchObject({
@@ -169,38 +159,17 @@ describe('remote lifecycle write path', () => {
   })
 
   test('queues restart and runtime failure behind an in-flight capability commit', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValue({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValue(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
-    const cleanupStarted = Promise.withResolvers<void>()
-    const cleanupGate = Promise.withResolvers<void>()
+    const capabilityCommit = createCapabilityCommitGate()
     const downgrade = runRemoteWorkspaceLifecycleWrite(
       { userId, workspaceId, workspaceRuntimeId, mode: 'restart' },
-      {
-        beforeCapabilityCommit: async () => {
-          cleanupStarted.resolve()
-          await cleanupGate.promise
-        },
-      },
+      { beforeCapabilityCommit: capabilityCommit.beforeCapabilityCommit },
     )
-    await cleanupStarted.promise
+    await capabilityCommit.started
 
     const restart = runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const failure = failRemoteWorkspaceLifecycle({
@@ -209,10 +178,10 @@ describe('remote lifecycle write path', () => {
       workspaceRuntimeId,
       reason: 'unreachable',
     })
-    await Promise.resolve()
+    await flushMicrotasks()
     expect(mocks.resolveConnection).toHaveBeenCalledTimes(2)
 
-    cleanupGate.resolve()
+    capabilityCommit.release()
     await expect(downgrade).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 2 } })
     await expect(restart).resolves.toMatchObject({ kind: 'superseded' })
     await expect(failure).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'failed', attemptId: 4 } })
@@ -223,60 +192,32 @@ describe('remote lifecycle write path', () => {
   })
 
   test('publishes terminal state before a membership-free runtime closes', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
-    mocks.resolveConnection.mockResolvedValue({
-      kind: 'ready',
-      lifecycle: { kind: 'ready', target },
-      gitAvailable: true,
-    })
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    mocks.resolveConnection.mockResolvedValue(readyConnection(true))
     const terminalSnapshots: unknown[] = []
     mocks.publishInvalidation.mockImplementation(() => {
       terminalSnapshots.push(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle ?? null)
     })
-    const commitStarted = Promise.withResolvers<void>()
-    const commitGate = Promise.withResolvers<void>()
+    const capabilityCommit = createCapabilityCommitGate()
     const lifecycle = runRemoteWorkspaceLifecycleWrite(
       { userId, workspaceId, workspaceRuntimeId, mode: 'restart' },
-      {
-        beforeCapabilityCommit: async () => {
-          commitStarted.resolve()
-          await commitGate.promise
-        },
-      },
+      { beforeCapabilityCommit: capabilityCommit.beforeCapabilityCommit },
     )
-    await commitStarted.promise
-    releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, 'client-test')
-    commitGate.resolve()
+    await capabilityCommit.started
+    releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, clientId)
+    capabilityCommit.release()
 
     await expect(lifecycle).resolves.toMatchObject({ kind: 'stale-runtime' })
     expect(terminalSnapshots).toEqual([
       { kind: 'connecting', attemptId: 1 },
-      { kind: 'ready', attemptId: 1, target },
+      { kind: 'ready', attemptId: 1, target: remoteTarget },
     ])
     expect(listWorkspaceRuntimes(userId)).toEqual([])
   })
 
   test('serializes initial conclusive non-Git cleanup exactly once', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
-    mocks.resolveConnection.mockResolvedValue({
-      kind: 'ready',
-      lifecycle: { kind: 'ready', target },
-      gitAvailable: false,
-    })
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    mocks.resolveConnection.mockResolvedValue(readyConnection(false))
     const cleanup = vi.fn(async ({ before, after }) => {
       expect(before).toEqual({ status: 'probing' })
       expect(after).toMatchObject({ capabilities: { git: { status: 'unavailable' } }, diagnostics: [] })
@@ -291,25 +232,10 @@ describe('remote lifecycle write path', () => {
   })
 
   test('rejects a later Git downgrade when no transactional cleanup dependency was injected', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
 
     await expect(
@@ -322,20 +248,8 @@ describe('remote lifecycle write path', () => {
   })
 
   test('commits an initial readable workspace when Git enrichment is operationally unavailable', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
-    mocks.resolveConnection.mockResolvedValue({
-      kind: 'ready',
-      lifecycle: { kind: 'ready', target },
-      gitAvailable: false,
-      gitDiagnostic: 'Git probe timed out',
-    })
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    mocks.resolveConnection.mockResolvedValue(readyConnection(false, 'Git probe timed out'))
 
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
 
@@ -347,26 +261,10 @@ describe('remote lifecycle write path', () => {
   })
 
   test('atomically commits a diagnosed Git downgrade for a readable remote workspace', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-        gitDiagnostic: 'Git probe timed out',
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValueOnce(readyConnection(false, 'Git probe timed out'))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const cleanup = vi.fn(async () => {})
 
@@ -388,7 +286,7 @@ describe('remote lifecycle write path', () => {
     ['path-missing', 'error.workspace-path-not-found'],
     ['unreachable', 'error.workspace-transport-unavailable'],
   ] as const)('commits initial remote failure %s as unavailable probe state', async (reason, expected) => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection.mockResolvedValue({
       kind: 'failed',
       lifecycle: { kind: 'failed', reason },
@@ -400,41 +298,20 @@ describe('remote lifecycle write path', () => {
   })
 
   test('keeps reopen in the same epoch while a remote capability transition is committing', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection
-      .mockResolvedValueOnce({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: true,
-      })
-      .mockResolvedValue({
-        kind: 'ready',
-        lifecycle: { kind: 'ready', target },
-        gitAvailable: false,
-      })
+      .mockResolvedValueOnce(readyConnection(true))
+      .mockResolvedValue(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
-    const cleanupStarted = Promise.withResolvers<void>()
-    const cleanupGate = Promise.withResolvers<void>()
+    const capabilityCommit = createCapabilityCommitGate()
     const transition = runRemoteWorkspaceLifecycleWrite(
       { userId, workspaceId, workspaceRuntimeId, mode: 'restart' },
-      {
-        beforeCapabilityCommit: async () => {
-          cleanupStarted.resolve()
-          await cleanupGate.promise
-        },
-      },
+      { beforeCapabilityCommit: capabilityCommit.beforeCapabilityCommit },
     )
-    await cleanupStarted.promise
-    releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, 'client-test')
-    const reopenedRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    cleanupGate.resolve()
+    await capabilityCommit.started
+    releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, clientId)
+    const reopenedRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    capabilityCommit.release()
 
     await expect(transition).resolves.toMatchObject({ kind: 'settled' })
     expect(reopenedRuntimeId).toBe(workspaceRuntimeId)
@@ -445,7 +322,7 @@ describe('remote lifecycle write path', () => {
   })
 
   test('maps a superseded attempt without leaking runtime internals', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     const firstResult = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     mocks.resolveConnection
       .mockImplementationOnce(() => firstResult.promise)
@@ -483,23 +360,12 @@ describe('remote lifecycle write path', () => {
   })
 
   test('does not publish a settled lifecycle after its runtime epoch closes', async () => {
-    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, 'client-test')
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'developer',
-      port: 22,
-      remotePath: '/repo',
-    })!
-    mocks.resolveConnection.mockResolvedValue({
-      kind: 'ready',
-      lifecycle: { kind: 'ready', target },
-      gitAvailable: true,
-    })
+    const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    mocks.resolveConnection.mockResolvedValue(readyConnection(true))
     mocks.publishInvalidation
       .mockImplementationOnce(() => {})
       .mockImplementationOnce(() => {
-        releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, 'client-test')
+        releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, clientId)
       })
 
     await expect(

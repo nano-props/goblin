@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import {
   beginPrimaryWindowNavigation,
   captureUnownedPrimaryWindowNavigationGeneration,
@@ -115,6 +116,7 @@ describe('primary window navigation lifecycle', () => {
 
   test('a newer presentation abandons an owned navigation exactly once', async () => {
     const navigation = Promise.withResolvers<void>()
+    const navigationStarted = Promise.withResolvers<void>()
     const commitEffect = vi.fn()
     const abandonEffect = vi.fn()
 
@@ -124,18 +126,20 @@ describe('primary window navigation lifecycle', () => {
         currentHref: '/start',
         commitEffect,
         abandonEffect,
-        navigate: async () => await navigation.promise,
+        navigate: async () => {
+          navigationStarted.resolve()
+          await navigation.promise
+        },
       }),
     ).toBe(true)
-    await Promise.resolve()
+    await navigationStarted.promise
 
     beginPrimaryWindowNavigation()
     expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
 
     navigation.resolve()
-    await navigation.promise
-    await Promise.resolve()
+    await waitForNextMacrotask()
     expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
   })
@@ -186,8 +190,7 @@ describe('primary window navigation lifecycle', () => {
     expect(committed).toEqual(['first', 'second'])
 
     releaseFirst.resolve()
-    await releaseFirst.promise
-    await Promise.resolve()
+    await waitForNextMacrotask()
 
     expect(href).toBe('/second')
     expect(committed).toEqual(['first', 'second'])

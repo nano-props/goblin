@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -134,7 +134,7 @@ describe('SettingsSurface', () => {
     expect(container.textContent).not.toContain('settings.workspace-layout-hint')
   })
 
-  test('keeps settings navigation selected state and page changes wired', async () => {
+  test('keeps settings navigation selected state and page changes wired', () => {
     const onPageChange = vi.fn()
     const { container } = render(
       <SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />,
@@ -146,9 +146,8 @@ describe('SettingsSurface', () => {
 
     const shortcuts = container.querySelector('button[aria-label="settings.nav.shortcuts"]')
     if (!(shortcuts instanceof HTMLButtonElement)) throw new Error('missing shortcuts settings nav row')
-    await act(async () => {
+    act(() => {
       shortcuts.click()
-      await Promise.resolve()
     })
     expect(onPageChange).toHaveBeenCalledWith('shortcuts')
   })
@@ -156,30 +155,32 @@ describe('SettingsSurface', () => {
   test('can trigger a test terminal notification from settings', async () => {
     const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    await act(async () => {
+    act(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
-      await Promise.resolve()
     })
 
-    expect(sendTestNotification).toHaveBeenCalledTimes(1)
-    expect(sendTestNotification).toHaveBeenCalledWith({
-      title: 'settings.terminal-notifications-test-title',
-      body: 'settings.terminal-notifications-test-body',
+    await waitFor(() => {
+      expect(sendTestNotification).toHaveBeenCalledTimes(1)
+      expect(sendTestNotification).toHaveBeenCalledWith({
+        title: 'settings.terminal-notifications-test-title',
+        body: 'settings.terminal-notifications-test-body',
+      })
+      expect(toastMocks.success).toHaveBeenCalledWith('settings.terminal-notifications-test-sent')
     })
-    expect(toastMocks.success).toHaveBeenCalledWith('settings.terminal-notifications-test-sent')
   })
 
   test('shows an error toast when the test notification is blocked', async () => {
     sendTestNotification.mockResolvedValueOnce(false)
     const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    await act(async () => {
+    act(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
-      await Promise.resolve()
     })
 
-    expect(toastMocks.error).toHaveBeenCalledWith('settings.terminal-notifications-test-failed', {
-      description: 'settings.terminal-notifications-test-failed-hint.mac',
+    await waitFor(() => {
+      expect(toastMocks.error).toHaveBeenCalledWith('settings.terminal-notifications-test-failed', {
+        description: 'settings.terminal-notifications-test-failed-hint.mac',
+      })
     })
   })
 
@@ -222,21 +223,17 @@ describe('SettingsSurface', () => {
   test('refreshes GitHub CLI detection from settings', async () => {
     const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
-    await act(async () => {
+    act(() => {
       buttonByText(container, 'settings.github.refresh').click()
-      await Promise.resolve()
     })
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         fetchMock.mock.calls.some((call) => {
           const [url, options] = call as unknown as [unknown, RequestInit | undefined]
           if (new URL(String(url)).pathname !== '/api/settings/github-cli/refresh') return false
           const headers = new Headers(options?.headers)
-          return (
-            options?.method === 'POST' &&
-            headers.get('content-type') === 'application/json'
-          )
+          return options?.method === 'POST' && headers.get('content-type') === 'application/json'
         }),
       ).toBe(true)
     })
@@ -288,14 +285,7 @@ function render(element: React.ReactNode) {
 }
 
 async function waitForText(container: HTMLElement, text: string) {
-  for (let i = 0; i < 5; i += 1) {
-    if (container.textContent?.includes(text)) return
-    await act(async () => {
-      await Promise.resolve()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-  }
-  throw new Error(`Missing text: ${text}`)
+  await waitFor(() => expect(container.textContent).toContain(text))
 }
 
 function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
@@ -312,12 +302,5 @@ function switchById(container: HTMLElement, id: string): HTMLButtonElement {
 }
 
 async function waitForSwitchState(container: HTMLElement, id: string, checked: 'true' | 'false') {
-  for (let i = 0; i < 5; i += 1) {
-    if (switchById(container, id).getAttribute('aria-checked') === checked) return
-    await act(async () => {
-      await Promise.resolve()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-  }
-  throw new Error(`Switch ${id} did not reach ${checked}`)
+  await waitFor(() => expect(switchById(container, id).getAttribute('aria-checked')).toBe(checked))
 }

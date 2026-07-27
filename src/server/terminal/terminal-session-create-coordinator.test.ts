@@ -3,6 +3,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const USER_ID = 'user_terminal_create_coordinator'
 const SCOPE = 'repo-runtime-terminal-create'
@@ -60,35 +61,29 @@ describe('terminal session create coordinator', () => {
       createSessionId: () => 'term-unusedunusedunused001',
     })
     const events: string[] = []
-    let releaseFirstTask: () => void = () => {}
-    const firstTaskCanFinish = new Promise<void>((resolve) => {
-      releaseFirstTask = resolve
-    })
-    let markFirstTaskStarted: () => void = () => {}
-    const firstTaskStarted = new Promise<void>((resolve) => {
-      markFirstTaskStarted = resolve
-    })
+    const firstTaskStarted = Promise.withResolvers<void>()
+    const firstTaskGate = Promise.withResolvers<void>()
     const firstTask = coordinator.runInFilesystemTargetQueue(
       { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
-        markFirstTaskStarted()
-        await firstTaskCanFinish
+        firstTaskStarted.resolve()
+        await firstTaskGate.promise
         events.push('first-end')
       },
     )
 
-    await firstTaskStarted
+    await firstTaskStarted.promise
     const secondTask = coordinator.runInFilesystemTargetQueue(
       { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('second-start')
       },
     )
-    await Promise.resolve()
+    await flushMicrotasks()
     expect(events).toEqual(['first-start'])
 
-    releaseFirstTask()
+    firstTaskGate.resolve()
     await firstTask
     await secondTask
     expect(events).toEqual(['first-start', 'first-end', 'second-start'])
@@ -102,25 +97,19 @@ describe('terminal session create coordinator', () => {
       createSessionId: () => 'term-unusedunusedunused001',
     })
     const events: string[] = []
-    let releaseFirstTask: () => void = () => {}
-    const firstTaskCanFinish = new Promise<void>((resolve) => {
-      releaseFirstTask = resolve
-    })
-    let markFirstTaskStarted: () => void = () => {}
-    const firstTaskStarted = new Promise<void>((resolve) => {
-      markFirstTaskStarted = resolve
-    })
+    const firstTaskStarted = Promise.withResolvers<void>()
+    const firstTaskGate = Promise.withResolvers<void>()
     const firstTask = coordinator.runInFilesystemTargetQueue(
       { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
-        markFirstTaskStarted()
-        await firstTaskCanFinish
+        firstTaskStarted.resolve()
+        await firstTaskGate.promise
         events.push('first-end')
       },
     )
 
-    await firstTaskStarted
+    await firstTaskStarted.promise
     await coordinator.runInFilesystemTargetQueue(
       {
         userId: USER_ID,
@@ -133,7 +122,7 @@ describe('terminal session create coordinator', () => {
     )
     expect(events).toEqual(['first-start', 'second-start'])
 
-    releaseFirstTask()
+    firstTaskGate.resolve()
     await firstTask
 
     expect(events).toEqual(['first-start', 'second-start', 'first-end'])

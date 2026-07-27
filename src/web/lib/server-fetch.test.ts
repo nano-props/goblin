@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const fetchMock = mockFetch()
@@ -12,12 +13,8 @@ describe('server-fetch', () => {
     fetchMock.mockReset()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   test('times out hung requests with a stable error key and clears its timer', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     fetchMock.mockImplementation((_url, init) => {
       const signal = (init as RequestInit | undefined)?.signal
       return new Promise((_resolve, reject) => {
@@ -35,7 +32,7 @@ describe('server-fetch', () => {
   })
 
   test('lets caller abort win over the watchdog timeout', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const caller = new AbortController()
     let requestSignal: AbortSignal | undefined
     fetchMock.mockImplementation((_url, init) => {
@@ -59,7 +56,7 @@ describe('server-fetch', () => {
   })
 
   test('clears the watchdog after a successful response', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ ok: true }),
@@ -95,7 +92,7 @@ describe('server-fetch', () => {
   })
 
   test('supports disabling the request watchdog', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let requestSignal: AbortSignal | undefined
     fetchMock.mockImplementation((_url, init) => {
       requestSignal = (init as RequestInit | undefined)?.signal ?? undefined

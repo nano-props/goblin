@@ -203,14 +203,20 @@ describe('updateWorkspacePaneTabs', () => {
 
   test('does not project a successful response after workspaceRuntimeId changes', async () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
-    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
+    const requestStarted = Promise.withResolvers<void>()
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        requestStarted.resolve()
+        return await serverTabs.promise
+      },
+    })
     seedTabs([workspacePaneStaticTabEntry('status')])
 
     const update = updateWorkspacePaneTabs({
       ...target(),
       operation: { type: 'open-static', tabType: 'history' },
     })
-    await Promise.resolve()
+    await requestStarted.promise
     seedWorkspacePaneTabsRepo(NEXT_WORKSPACE_RUNTIME_ID)
     serverTabs.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
@@ -93,6 +94,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
   })
 
   test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
+    const user = userEvent.setup()
     const { workspacePaneTabStripModule, WorkspacePaneTabStripScrollMemoryProvider } =
       await loadWorkspacePaneTabStripTestModules()
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip(workspacePaneTabStripModule)
@@ -129,9 +131,8 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
 
-    act(() => {
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }))
-    })
+    tab.focus()
+    await user.keyboard('{ArrowRight}')
 
     expect(sortableOnKeyDown).toHaveBeenCalledTimes(1)
 

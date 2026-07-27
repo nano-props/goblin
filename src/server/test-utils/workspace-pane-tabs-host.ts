@@ -1,12 +1,18 @@
 import { vi } from 'vitest'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+
+interface TestWorkspacePaneTabsHostOptions {
+  snapshot?: WorkspacePaneTabsSnapshot
+  repaired?: boolean
+}
 
 // The production host has four methods; most restore tests only need an inert, inspectable implementation.
-export function createTestWorkspacePaneTabsHost() {
+export function createTestWorkspacePaneTabsHost(options: TestWorkspacePaneTabsHostOptions = {}) {
   const restoreTabs = vi.fn<ServerWorkspacePaneTabsHost['restoreTabs']>(async () => ({
     kind: 'restored',
-    snapshot: { revision: 0, entries: [] },
-    repaired: false,
+    snapshot: options.snapshot ?? { revision: 0, entries: [] },
+    repaired: options.repaired ?? false,
   }))
   return {
     restoreTabs,

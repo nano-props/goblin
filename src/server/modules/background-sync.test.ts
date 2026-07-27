@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { BackgroundSyncRegistrationAdmission } from '#/server/modules/background-sync.ts'
@@ -49,7 +50,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 describe('server background sync scheduler', () => {
   beforeEach(() => {
     nextRegistrationRevision = 1
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.clearAllMocks()
     mocks.getServerFetchIntervalSec.mockResolvedValue(5)
     mocks.subscribeServerFetchInterval.mockImplementation(() => () => {})
@@ -58,7 +59,6 @@ describe('server background sync scheduler', () => {
   afterEach(async () => {
     const { resetBackgroundSyncForTests } = await import('#/server/modules/background-sync.ts')
     resetBackgroundSyncForTests()
-    vi.useRealTimers()
     vi.resetModules()
   })
 
@@ -155,7 +155,7 @@ describe('server background sync scheduler', () => {
 
     await vi.advanceTimersByTimeAsync(1000)
     await registerRepos([REPO_A])
-    await Promise.resolve()
+    await vi.waitFor(() => expect(getBackgroundSyncDiagnostics().tickRunning).toBe(false))
     expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     const now = Date.now()

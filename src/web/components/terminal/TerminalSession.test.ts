@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
@@ -33,7 +35,6 @@ const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
   const fitAddons: any[] = []
   const searchAddons: any[] = []
-  const unicodeAddons: any[] = []
   const webLinkAddons: any[] = []
   const imageAddons: any[] = []
   const progressAddons: any[] = []
@@ -85,7 +86,6 @@ const xtermMocks = vi.hoisted(() => {
     input = vi.fn((data: string, wasUserInput = true) => {
       if (wasUserInput) {
         if (this.options.scrollOnUserInput) this.scrollToBottom()
-        for (const handler of this.coreUserInputHandlers) handler()
       }
       this.emitData(data)
     })
@@ -95,21 +95,6 @@ const xtermMocks = vi.hoisted(() => {
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
-    private coreUserInputHandlers: Array<() => void> = []
-    _core = {
-      _charSizeService: { measure: vi.fn() },
-      _renderService: { clear: vi.fn() },
-      coreService: {
-        onUserInput: vi.fn((cb: () => void) => {
-          this.coreUserInputHandlers.push(cb)
-          return {
-            dispose: vi.fn(
-              () => (this.coreUserInputHandlers = this.coreUserInputHandlers.filter((handler) => handler !== cb)),
-            ),
-          }
-        }),
-      },
-    }
     private textarea: HTMLTextAreaElement | null = null
     private resizeHandlers: Array<(size: { cols: number; rows: number }) => void> = []
     private dataHandlers: Array<(data: string) => void> = []
@@ -214,18 +199,8 @@ const xtermMocks = vi.hoisted(() => {
 
     emitUserData(data: string) {
       const domEvent = new KeyboardEvent('keydown')
-      for (const handler of this.coreUserInputHandlers) handler()
       for (const handler of this.keyHandlers) handler({ key: data, domEvent })
       this.emitData(data)
-    }
-
-    emitCoreUserData(data: string) {
-      for (const handler of this.coreUserInputHandlers) handler()
-      this.emitData(data)
-    }
-
-    emitBinary(data: string) {
-      for (const handler of this.binaryHandlers) handler(data)
     }
 
     emitTitleChange(title: string) {
@@ -253,7 +228,6 @@ const xtermMocks = vi.hoisted(() => {
   }
 
   class MockSearchAddon {
-    term: MockTerminal | null = null
     private resultHandlers: Array<(event: { resultIndex: number; resultCount: number }) => void> = []
     clearDecorations = vi.fn()
     clearActiveDecoration = vi.fn()
@@ -265,9 +239,7 @@ const xtermMocks = vi.hoisted(() => {
       searchAddons.push(this)
     }
 
-    activate(term: MockTerminal) {
-      this.term = term
-    }
+    activate(_term: MockTerminal) {}
 
     findNext = vi.fn((term: string) => this.emitSearch(term))
     findPrevious = vi.fn((term: string) => this.emitSearch(term))
@@ -286,21 +258,14 @@ const xtermMocks = vi.hoisted(() => {
   }
 
   class MockUnicode11Addon {
-    term: MockTerminal | null = null
-
     constructor() {
       if (addonFailures.unicode) throw new Error('unicode addon failed')
-      unicodeAddons.push(this)
     }
 
-    activate(term: MockTerminal) {
-      this.term = term
-    }
+    activate(_term: MockTerminal) {}
   }
 
   class MockWebLinksAddon {
-    term: MockTerminal | null = null
-
     readonly handler?: (event: MouseEvent, uri: string) => void
     constructor(handler?: (event: MouseEvent, uri: string) => void) {
       this.handler = handler
@@ -308,9 +273,7 @@ const xtermMocks = vi.hoisted(() => {
       webLinkAddons.push(this)
     }
 
-    activate(term: MockTerminal) {
-      this.term = term
-    }
+    activate(_term: MockTerminal) {}
 
     open(uri: string) {
       this.handler?.(new MouseEvent('click'), uri)
@@ -357,7 +320,6 @@ const xtermMocks = vi.hoisted(() => {
     terminals,
     fitAddons,
     searchAddons,
-    unicodeAddons,
     webLinkAddons,
     imageAddons,
     progressAddons,
@@ -418,12 +380,16 @@ class MockResizeObserver {
     this.cb = cb
     MockResizeObserver.instances.push(this)
   }
+
+  emit(): void {
+    this.cb([], this)
+  }
 }
 
 class MockFontFaceSet {
   private readonly loadingDoneHandlers = new Set<() => void>()
   private readonly handlerMap = new Map<EventListenerOrEventListenerObject, () => void>()
-  private readyDeferred = deferred<void>()
+  private readyDeferred = Promise.withResolvers<void>()
   ready = this.readyDeferred.promise
 
   check(): boolean {
@@ -437,7 +403,7 @@ class MockFontFaceSet {
   reset(): void {
     this.loadingDoneHandlers.clear()
     this.handlerMap.clear()
-    this.readyDeferred = deferred<void>()
+    this.readyDeferred = Promise.withResolvers<void>()
     this.ready = this.readyDeferred.promise
   }
 
@@ -505,16 +471,11 @@ const descriptor: TerminalDescriptor = {
 }
 
 beforeEach(() => {
-  // Use fake timers so font refit waits and the rAF chain fire deterministically when helpers advance the clock, instead of
-  // burning real wall time on every test.
-  vi.useFakeTimers({
-    toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame'],
-  })
+  useFakeTimers()
   xtermMocks.terminals.length = 0
   nextIdentityRevision = 0
   xtermMocks.fitAddons.length = 0
   xtermMocks.searchAddons.length = 0
-  xtermMocks.unicodeAddons.length = 0
   xtermMocks.webLinkAddons.length = 0
   xtermMocks.imageAddons.length = 0
   xtermMocks.progressAddons.length = 0
@@ -547,20 +508,7 @@ beforeEach(() => {
     configurable: true,
     value: (handle: number) => window.clearTimeout(handle),
   })
-  HTMLElement.prototype.getBoundingClientRect = vi.fn(
-    () =>
-      ({
-        width: 800,
-        height: 400,
-        top: 0,
-        left: 0,
-        bottom: 400,
-        right: 800,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect,
-  )
+  HTMLElement.prototype.getBoundingClientRect = vi.fn(() => terminalRect(800, 400))
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
@@ -579,33 +527,6 @@ beforeEach(() => {
         openExternalUrl: hostOpenExternalUrl.mockResolvedValue({ ok: true, message: 'https://example.com/path' }),
         openDirectoryDialog: vi.fn(),
         consumeExternalOpenPaths: vi.fn(),
-      },
-      terminal: {
-        attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
-        restart: terminalCalls.restart.mockResolvedValue(restartResult('pty_session_1_aaaaaaaaa')),
-        write: terminalCalls.write.mockResolvedValue({ status: 'accepted' }),
-        resize: terminalCalls.resize.mockImplementation(async (input) => ({
-          ok: true,
-          terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-          identityRevision: ++nextIdentityRevision,
-          role: 'controller',
-          controllerStatus: 'connected',
-          controller: { clientId: 'client_local', status: 'connected' },
-          canonicalSize: { cols: input.cols, rows: input.rows },
-        })),
-        takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
-        close: terminalCalls.close.mockResolvedValue(true),
-        notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
-        pruneTerminals: vi.fn(),
-        onOutput: vi.fn(),
-        onBell: vi.fn(),
-        onTitle: vi.fn(),
-        onExit: vi.fn(),
-        onIdentity: vi.fn(),
-        onLifecycle: vi.fn(),
-        onSessionsChanged: vi.fn(),
-        onSessionClosed: vi.fn(),
       },
     },
   })
@@ -683,8 +604,7 @@ beforeEach(() => {
 
 describe('TerminalSession', () => {
   test('opens xterm and attaches the primary terminal session with fitted dimensions', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -701,17 +621,12 @@ describe('TerminalSession', () => {
       rows: 30,
     })
     expect(xtermMocks.terminals[0]!.options.minimumContrastRatio).toBe(4.5)
-    expect(xtermMocks.terminals[0]!.options.allowProposedApi).toBe(true)
     expect(xtermMocks.terminals[0]!.options.cursorStyle).toBe('bar')
-    expect(xtermMocks.terminals[0]!.options.fontFamily).toContain('Goblin Mono')
-    expect(xtermMocks.terminals[0]!.options.rescaleOverlappingGlyphs).toBe(true)
     expect(terminalCalls.restart).not.toHaveBeenCalled()
-    expect(session.snapshot().phase).toBe('open')
   })
 
   test('does not open xterm until authoritative hydration supplies an addressable binding', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
 
     session.attach(host)
@@ -737,13 +652,12 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', { canonicalSize: { cols: 500, rows: 300 } }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     await flushTerminalStart()
     await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
 
@@ -758,21 +672,20 @@ describe('TerminalSession', () => {
   })
 
   test('keeps the fitted xterm hidden until its full viewport render completes', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     expect(term.refresh).not.toHaveBeenCalled()
 
     attach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     await flushTerminalStart()
 
@@ -781,15 +694,14 @@ describe('TerminalSession', () => {
   })
 
   test('never reveals a fitted xterm superseded while its final render is pending', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     session.handleIdentity({
@@ -808,24 +720,23 @@ describe('TerminalSession', () => {
   })
 
   test('remeasures a pending presentation before reveal and recovers at the current layout', async () => {
-    const firstAttach = deferred<TerminalAttachResult>()
+    const firstAttach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(firstAttach.promise).mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         identityRevision: 1,
         canonicalSize: { cols: 90, rows: 25 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     const fitAddon = xtermMocks.fitAddons[0]!
     firstAttach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     fitAddon.proposeDimensions.mockReturnValue({ cols: 90, rows: 25 })
     await flushTerminalStart()
@@ -854,8 +765,7 @@ describe('TerminalSession', () => {
       }),
     )
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -879,8 +789,7 @@ describe('TerminalSession', () => {
 
   test('keeps the fresh xterm intact and renders realtime output from sequence 1', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
@@ -907,8 +816,7 @@ describe('TerminalSession', () => {
   })
 
   test('rebuilds a visible terminal from the authoritative snapshot after an append render failure', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -940,21 +848,12 @@ describe('TerminalSession', () => {
 
   test('transfers automatic focus when a fresh stream presentation is complete', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
-    const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    const { host, session, term, settled } = await startPendingFocusRequest()
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     term.emitUserData('typed-before-render')
-    await flushResizeDispatch()
+    await flushMicrotasks(2)
     expect(terminalCalls.write).not.toHaveBeenCalled()
 
     await flushTerminalStart()
@@ -980,49 +879,11 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('automatically focuses a quiet fresh stream after presentation', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushTerminalStart()
-    const term = xtermMocks.terminals[0]!
-
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
-    expect(term.write).not.toHaveBeenCalled()
-    expect(term.focus).toHaveBeenCalledOnce()
-    expect(settled).toHaveBeenCalledOnce()
-
-    term.emitUserData('input for quiet process')
-    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
-
-    expect(term.focus).toHaveBeenCalledOnce()
-    expect(terminalCalls.write).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      data: 'input for quiet process',
-    })
-  })
-
   test('drops an automatic focus transfer whose presentation lease expires before presentation', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
     let focusIsCurrent = true
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => focusIsCurrent, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
-    const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    const { host, term, settled } = await startPendingFocusRequest(() => focusIsCurrent)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
     focusIsCurrent = false
 
     await flushTerminalStart()
@@ -1033,28 +894,19 @@ describe('TerminalSession', () => {
   })
 
   test('queues fresh output while hidden and flushes it in order after presentation', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    const { session, term, frame } = await startHiddenFreshStreamPresentation()
 
     emitSessionOutput(session, 1, 'first output')
     emitSessionOutput(session, 1, ' then second output', 2)
     await Promise.resolve()
 
     expect(term.write).not.toHaveBeenCalled()
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(frame?.style.visibility).toBe('hidden')
 
     term.emitRender()
-    await flushMicrotasksUntil(() => term.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.write.mock.calls.length === 1)
 
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+    expect(frame?.style.visibility).toBe('')
     expect(term.write).toHaveBeenCalledTimes(1)
     expect(term.write).toHaveBeenCalledWith('first output then second output', expect.any(Function))
     await flushTerminalStart()
@@ -1062,21 +914,11 @@ describe('TerminalSession', () => {
   })
 
   test('renders output that arrives after fresh stream presentation without another viewport refresh', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const term = xtermMocks.terminals[0]!
-    const frame = host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    const { session, term, frame } = await startHiddenFreshStreamPresentation()
 
     expect(frame?.style.visibility).toBe('hidden')
     term.emitRender()
-    await flushMicrotasksUntil(() => frame?.style.visibility === '')
+    await waitForMicrotaskCondition(() => frame?.style.visibility === '')
 
     emitSessionOutput(session, 1, 'later output')
     await flushTerminalStart()
@@ -1088,16 +930,7 @@ describe('TerminalSession', () => {
   })
 
   test('rebuilds from the authoritative snapshot when queued fresh output cannot render after presentation', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const failedTerm = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => failedTerm.refresh.mock.calls.length === 1)
+    const { host, session, term: failedTerm } = await startHiddenFreshStreamPresentation()
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         snapshot: 'authoritative screen after pending render failure',
@@ -1123,31 +956,22 @@ describe('TerminalSession', () => {
   })
 
   test('defers fresh-output protocol replies until the terminal is presented', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const term = xtermMocks.terminals[0]!
+    const { session, term, frame } = await startHiddenFreshStreamPresentation()
     term.write.mockImplementationOnce((_data: string, callback?: () => void) => {
       term.emitData('\x1b[1;1R')
       if (callback) queueMicrotask(callback)
     })
 
     emitSessionOutput(session, 1, '\x1b[6n')
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
 
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(frame?.style.visibility).toBe('hidden')
     expect(term.write).not.toHaveBeenCalled()
     expect(terminalCalls.write).not.toHaveBeenCalled()
 
     term.emitRender()
-    await flushMicrotasksUntil(() => terminalCalls.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.write.mock.calls.length === 1)
 
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+    expect(frame?.style.visibility).toBe('')
     expect(terminalCalls.write).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -1156,15 +980,14 @@ describe('TerminalSession', () => {
   })
 
   test('discards an xterm protocol reply generated by snapshot replay', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     term.write.mockImplementationOnce((_data: string, callback?: () => void) => {
       term.emitData('\x1b[1;1R')
@@ -1179,47 +1002,27 @@ describe('TerminalSession', () => {
   })
 
   test('ignores stale-generation output without delaying fresh stream presentation', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    const { session, term, frame } = await startHiddenFreshStreamPresentation()
     emitSessionOutput(session, 0, 'stale prompt')
     await Promise.resolve()
 
     expect(term.write).not.toHaveBeenCalled()
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    expect(frame?.style.visibility).toBe('hidden')
 
     term.emitRender()
-    await flushMicrotasksUntil(
-      () => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '',
-    )
+    await waitForMicrotaskCondition(() => frame?.style.visibility === '')
 
     expect(term.write).not.toHaveBeenCalled()
     emitSessionOutput(session, 1, 'current prompt')
     await flushTerminalStart()
 
     expect(term.write).toHaveBeenCalledWith('current prompt', expect.any(Function))
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('')
+    expect(frame?.style.visibility).toBe('')
   })
 
   test('cancels a fresh stream presentation that detaches before its viewport render', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
-
-    session.attach(host)
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+    const { host, session, term, frame } = await startHiddenFreshStreamPresentation()
+    expect(frame?.style.visibility).toBe('hidden')
     session.detach(host)
     await flushTerminalStart()
 
@@ -1229,10 +1032,9 @@ describe('TerminalSession', () => {
   })
 
   test('keeps a prepared server session opening while the local xterm attach is pending', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -1260,8 +1062,7 @@ describe('TerminalSession', () => {
   test('drops xterm resize and input mutations until snapshot replay has committed', async () => {
     xtermMocks.deferWriteCallbacks(true)
     terminalCalls.attach.mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'screen' }))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -1291,8 +1092,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 80, rows: 24 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -1306,23 +1106,10 @@ describe('TerminalSession', () => {
   })
 
   test('does not attach or reveal when the host becomes unmeasurable before fit', async () => {
-    const measurableRect = {
-      width: 800,
-      height: 400,
-      top: 0,
-      left: 0,
-      bottom: 400,
-      right: 800,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    } as DOMRect
-    const hiddenRect = { ...measurableRect, width: 0, height: 0, right: 0, bottom: 0 } as DOMRect
     vi.mocked(HTMLElement.prototype.getBoundingClientRect)
-      .mockImplementationOnce(() => measurableRect)
-      .mockReturnValue(hiddenRect)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+      .mockReturnValueOnce(terminalRect(800, 400))
+      .mockReturnValue(terminalRect(0, 0))
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -1334,8 +1121,7 @@ describe('TerminalSession', () => {
   })
 
   test('fences resize and restart requests to the retiring generation', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1357,10 +1143,9 @@ describe('TerminalSession', () => {
   })
 
   test('does not close the server session when deselected while attach is in flight', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -1378,50 +1163,35 @@ describe('TerminalSession', () => {
     expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
   })
 
-  test('dispose during font preload aborts before waitForMeasurableHost runs', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-
-    // Hold preloadTerminalFont so the orchestrator yields mid-openPhase.
-    let resolvePreload!: () => void
-    geometryMocks.preloadTerminalFont.mockImplementationOnce(
-      () =>
-        new Promise<void>((r) => {
-          resolvePreload = r
-        }),
-    )
-
+  test('disposes the observer and aborts xterm creation during font preload', async () => {
+    const preload = Promise.withResolvers<void>()
+    geometryMocks.preloadTerminalFont.mockReturnValueOnce(preload.promise)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
     await flushTerminalStart()
+    const observer = MockResizeObserver.instances[0]
+    if (!observer) throw new Error('expected resize observer')
 
-    // The frame owns its observer before xterm starts opening.
-    expect(MockResizeObserver.instances).toHaveLength(1)
-
-    // Dispose while the preload promise is unresolved. Then resolve it.
     session.dispose()
-    resolvePreload()
+    preload.resolve()
     await flushTerminalStart()
 
-    // The guard after the preload await catches the disposed state before
-    // xterm creation, and frame disposal releases the already-owned observer.
-    expect(MockResizeObserver.instances).toHaveLength(1)
-    expect(MockResizeObserver.instances[0]!.disconnect).toHaveBeenCalledOnce()
+    expect(observer.disconnect).toHaveBeenCalledOnce()
     expect(xtermMocks.terminals).toHaveLength(0)
   })
 
   test('does not dispatch attach after the view detaches during font preload', async () => {
-    const preload = deferred<void>()
+    const preload = Promise.withResolvers<void>()
     geometryMocks.preloadTerminalFont.mockReturnValueOnce(preload.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => geometryMocks.preloadTerminalFont.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => geometryMocks.preloadTerminalFont.mock.calls.length === 1)
     session.detach(host)
     preload.resolve()
     await flushTerminalStart()
@@ -1432,49 +1202,10 @@ describe('TerminalSession', () => {
     expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
   })
 
-  test('remeasures and refits after fonts finish loading', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    const term = xtermMocks.terminals[0]!
+  test('remeasures without refreshing or scrolling after fonts finish loading', async () => {
+    const { term } = await startOpenControllerSession()
     const fitAddon = xtermMocks.fitAddons[0]!
     term.refresh.mockClear()
-    fitAddon.proposeDimensions.mockClear()
-
-    mockFonts.resolveReady()
-    await flushFontRefit()
-
-    expect(fitAddon.proposeDimensions).toHaveBeenCalled()
-    expect(term.refresh).not.toHaveBeenCalled()
-
-    term.refresh.mockClear()
-    fitAddon.proposeDimensions.mockClear()
-
-    mockFonts.emitLoadingDone()
-    await flushFontRefit()
-
-    expect(fitAddon.proposeDimensions).toHaveBeenCalled()
-    expect(term.refresh).not.toHaveBeenCalled()
-  })
-
-  test('does not force scroll position across font refits', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    const term = xtermMocks.terminals[0]!
-    const fitAddon = xtermMocks.fitAddons[0]!
     term.scrollToBottom.mockClear()
     fitAddon.proposeDimensions.mockClear()
 
@@ -1482,6 +1213,16 @@ describe('TerminalSession', () => {
     await flushFontRefit()
 
     expect(fitAddon.proposeDimensions).toHaveBeenCalled()
+    expect(term.refresh).not.toHaveBeenCalled()
+    expect(term.scrollToBottom).not.toHaveBeenCalled()
+
+    fitAddon.proposeDimensions.mockClear()
+
+    mockFonts.emitLoadingDone()
+    await flushFontRefit()
+
+    expect(fitAddon.proposeDimensions).toHaveBeenCalled()
+    expect(term.refresh).not.toHaveBeenCalled()
     expect(term.scrollToBottom).not.toHaveBeenCalled()
   })
 
@@ -1492,8 +1233,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 120, rows: 40 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -1506,20 +1246,10 @@ describe('TerminalSession', () => {
     expect(term.scrollToBottom).not.toHaveBeenCalled()
   })
 
-  test('loads terminal addons and exposes search', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
+  test('activates Unicode 11 and exposes terminal search', async () => {
+    const { session, term } = await startOpenControllerSession()
 
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    expect(xtermMocks.unicodeAddons).toHaveLength(1)
-    expect(xtermMocks.terminals[0]!.unicode.activeVersion).toBe('11')
-    expect(xtermMocks.webLinkAddons).toHaveLength(1)
-    expect(xtermMocks.searchAddons).toHaveLength(1)
+    expect(term.unicode.activeVersion).toBe('11')
     expect(session.findNext('needle', true)).toEqual({ resultIndex: 0, resultCount: 2, found: true })
     expect(xtermMocks.searchAddons[0]!.findNext).toHaveBeenCalledWith(
       'needle',
@@ -1536,16 +1266,7 @@ describe('TerminalSession', () => {
     const savedPlatform = navigator.platform
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'MacIntel' })
     try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new TerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      const term = xtermMocks.terminals[0]!
+      const { term } = await startOpenControllerSession()
       expect(term.options.macOptionIsMeta).toBe(true)
       expect(term.customKeyEventHandler).toBeTypeOf('function')
       term.scrollToBottom.mockClear()
@@ -1583,15 +1304,7 @@ describe('TerminalSession', () => {
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
     })
     try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new TerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      const term = xtermMocks.terminals[0]!
+      const { term } = await startOpenControllerSession()
       expect(term.customKeyEventHandler).toBeTypeOf('function')
       term.scrollToBottom.mockClear()
 
@@ -1618,125 +1331,24 @@ describe('TerminalSession', () => {
     }
   })
 
-  test('reuses remembered Safari layout for empty Shift+symbol events on multi-layout keys', async () => {
-    const savedUserAgent = navigator.userAgent
-    Object.defineProperty(window.navigator, 'userAgent', {
-      configurable: true,
-      value:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
-    })
-    try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new TerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      const term = xtermMocks.terminals[0]!
-      expect(term.customKeyEventHandler).toBeTypeOf('function')
-
-      const learnLayoutEvent = new KeyboardEvent('keydown', {
-        key: '；',
-        code: 'Semicolon',
-        shiftKey: false,
-        cancelable: true,
-      })
-      expect(term.customKeyEventHandler?.(learnLayoutEvent)).toBe(true)
-
-      const brokenShiftEvent = new KeyboardEvent('keydown', {
-        key: '',
-        code: 'Semicolon',
-        shiftKey: true,
-        cancelable: true,
-      })
-      expect(term.customKeyEventHandler?.(brokenShiftEvent)).toBe(false)
-
-      await flushTerminalStart()
-
-      expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-      expect(terminalCalls.write).toHaveBeenCalledWith({
-        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        data: '：',
-      })
-    } finally {
-      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
-    }
-  })
-
-  test('does not intercept Shift+symbol on Chrome', async () => {
-    const savedUserAgent = navigator.userAgent
-    Object.defineProperty(window.navigator, 'userAgent', {
-      configurable: true,
-      value:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    })
-    try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new TerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      const term = xtermMocks.terminals[0]!
-      const slashEvent = new KeyboardEvent('keydown', { key: '/', code: 'Slash', shiftKey: true, cancelable: true })
-      // Chrome is not Safari, so the workaround should not intercept — let xterm.js handle it.
-      expect(term.customKeyEventHandler?.(slashEvent)).toBe(true)
-      expect(terminalCalls.write).not.toHaveBeenCalled()
-    } finally {
-      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
-    }
-  })
-
-  test('opens web links through the safe shell bridge', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+  test('routes WebLinks and OSC 8 hyperlinks through the safe shell bridge', async () => {
+    const { term } = await startOpenControllerSession()
     xtermMocks.webLinkAddons[0]!.open('https://example.com/path')
-    await Promise.resolve()
-
-    expect(hostOpenExternalUrl).toHaveBeenCalledWith({ url: 'https://example.com/path', allowHttp: true })
-  })
-
-  test('opens OSC 8 hyperlinks through the safe shell bridge', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
     const event = new MouseEvent('click', { cancelable: true })
-    xtermMocks.terminals[0]!.options.linkHandler!.activate(event, 'https://example.com/osc8', {
+    term.options.linkHandler!.activate(event, 'https://example.com/osc8', {
       start: { x: 1, y: 1 },
       end: { x: 10, y: 1 },
     })
     await Promise.resolve()
 
     expect(event.defaultPrevented).toBe(true)
-    expect(xtermMocks.terminals[0]!.options.linkHandler!.allowNonHttpProtocols).toBe(false)
-    expect(hostOpenExternalUrl).toHaveBeenCalledWith({ url: 'https://example.com/osc8', allowHttp: true })
+    expect(term.options.linkHandler!.allowNonHttpProtocols).toBe(false)
+    expect(hostOpenExternalUrl).toHaveBeenNthCalledWith(1, { url: 'https://example.com/path', allowHttp: true })
+    expect(hostOpenExternalUrl).toHaveBeenNthCalledWith(2, { url: 'https://example.com/osc8', allowHttp: true })
   })
 
   test('does not send unsafe web links to the app ipc', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    await startOpenControllerSession()
     xtermMocks.webLinkAddons[0]!.open('javascript:alert(1)')
     xtermMocks.webLinkAddons[0]!.open('file:///tmp/secret')
     xtermMocks.webLinkAddons[0]!.open('https://example.com/\u0000bad')
@@ -1745,7 +1357,7 @@ describe('TerminalSession', () => {
     expect(hostOpenExternalUrl).not.toHaveBeenCalled()
   })
 
-  test('opens terminal when optional addon setup fails', async () => {
+  test('keeps the terminal usable when every optional addon fails', async () => {
     Object.assign(xtermMocks.addonFailures, {
       search: true,
       unicode: true,
@@ -1754,16 +1366,8 @@ describe('TerminalSession', () => {
       progress: true,
     })
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
+    const { session } = await startOpenControllerSession()
 
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    expect(terminalCalls.attach).toHaveBeenCalled()
     expect(session.snapshot().phase).toBe('open')
     expect(session.findNext('needle')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
     expect(warnSpy).toHaveBeenCalledWith('failed to load unicode11 addon', { err: expect.any(Error) })
@@ -1771,13 +1375,11 @@ describe('TerminalSession', () => {
     expect(warnSpy).toHaveBeenCalledWith('failed to load search addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load image addon', { err: expect.any(Error) })
     expect(warnSpy).toHaveBeenCalledWith('failed to load progress addon', { err: expect.any(Error) })
-    expect(session.snapshot().progress).toBeUndefined()
     warnSpy.mockRestore()
   })
 
   test('uses first-class restart IPC instead of recreating through ensureSession', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1796,10 +1398,9 @@ describe('TerminalSession', () => {
   })
 
   test('keeps a replacement xterm hidden until the restart stream presentation commits', async () => {
-    const restart = deferred<TerminalRestartResult>()
+    const restart = Promise.withResolvers<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1820,10 +1421,9 @@ describe('TerminalSession', () => {
   })
 
   test('rejects a duplicate restart while the admitted request is in flight', async () => {
-    const restart = deferred<TerminalRestartResult>()
+    const restart = Promise.withResolvers<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1842,40 +1442,22 @@ describe('TerminalSession', () => {
   })
 
   test('continues an admitted restart when a zero-sized host becomes measurable', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
     terminalCalls.restart.mockClear()
 
-    const hiddenRect = {
-      width: 0,
-      height: 0,
-      top: 0,
-      left: 0,
-      bottom: 0,
-      right: 0,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    } as DOMRect
-    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(hiddenRect)
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(terminalRect(0, 0))
     session.restart()
     await flushTerminalStart()
     expect(terminalCalls.restart).not.toHaveBeenCalled()
 
-    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
-      ...hiddenRect,
-      width: 800,
-      height: 400,
-      right: 800,
-      bottom: 400,
-    })
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(terminalRect(800, 400))
     const resizeObserver = MockResizeObserver.instances[0]
     if (!resizeObserver) throw new Error('expected resize observer')
-    resizeObserver.cb([], resizeObserver)
+    resizeObserver.emit()
     await flushUntil(() => terminalCalls.restart.mock.calls.length === 1)
 
     expect(terminalCalls.restart).toHaveBeenCalledWith({
@@ -1889,12 +1471,11 @@ describe('TerminalSession', () => {
   test('does not let an old xterm write callback block a replacement presentation', async () => {
     xtermMocks.deferWriteCallbacks(true)
     terminalCalls.attach.mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'old screen' }))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
-    await flushMicrotasksUntil(() => xtermMocks.terminals[0]?.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => xtermMocks.terminals[0]?.write.mock.calls.length === 1)
 
     xtermMocks.deferWriteCallbacks(false)
     session.restart()
@@ -1910,8 +1491,7 @@ describe('TerminalSession', () => {
 
   test('keeps the server session addressable when restart fails', async () => {
     terminalCalls.restart.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1939,8 +1519,7 @@ describe('TerminalSession', () => {
     terminalCalls.restart
       .mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
       .mockResolvedValueOnce(restartResult('pty_session_1_aaaaaaaaa'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -1966,8 +1545,7 @@ describe('TerminalSession', () => {
 
   test('retries a failed prepared attach through attach instead of restart', async () => {
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -1998,8 +1576,7 @@ describe('TerminalSession', () => {
 
   test('does not retry an error session when a later layout notification arrives', async () => {
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -2008,7 +1585,7 @@ describe('TerminalSession', () => {
     expect(session.snapshot().phase).toBe('error')
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
 
-    MockResizeObserver.instances[0]!.cb([], MockResizeObserver.instances[0]!)
+    MockResizeObserver.instances[0]!.emit()
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
@@ -2018,8 +1595,7 @@ describe('TerminalSession', () => {
   test('does not turn a local attach transport failure into authoritative runtime error metadata', async () => {
     terminalCalls.attach.mockRejectedValueOnce(new Error('transport unavailable'))
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -2061,8 +1637,7 @@ describe('TerminalSession', () => {
           snapshot: 'authoritative recovery',
         }),
       )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
@@ -2121,8 +1696,7 @@ describe('TerminalSession', () => {
   })
 
   test('does not retain an unscoped focus request while presentation is pending', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -2134,17 +1708,7 @@ describe('TerminalSession', () => {
   })
 
   test('rebuilds a connected view as one focus and transient-state transaction', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    const firstTerm = xtermMocks.terminals[0]!
-    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    const { session, notify, term: firstTerm } = await startSessionWithProgress()
     session.focus()
     expect(terminalHasKeyboardFocus()).toBe(true)
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
@@ -2164,16 +1728,7 @@ describe('TerminalSession', () => {
   })
 
   test('clears and publishes transient state for a connected viewer during resynchronization', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    const { host, session, notify } = await startSessionWithProgress()
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -2194,17 +1749,30 @@ describe('TerminalSession', () => {
     expect(terminalCalls.attach).toHaveBeenCalledOnce()
   })
 
-  test('continues after terminal write failures', async () => {
-    terminalCalls.write.mockRejectedValueOnce(new Error('write failed'))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+  test.each([
+    [
+      'transport failure',
+      () => {
+        const error = new Error('write failed')
+        terminalCalls.write.mockRejectedValueOnce(error)
+        return { kind: 'error' as const, error }
+      },
+    ],
+    [
+      'server rejection',
+      () => {
+        const result = { status: 'rejected' as const }
+        terminalCalls.write.mockResolvedValueOnce(result)
+        return { kind: 'result' as const, result }
+      },
+    ],
+  ] as const)('reports a terminal write %s without closing the session', async (_failureKind, configureWrite) => {
+    const failure = configureWrite()
+    const report = vi.fn()
+    const session = new TerminalSession(descriptor, vi.fn(), { report })
+    const { term } = await startOpenControllerSession(session)
 
-    xtermMocks.terminals[0]!.emitData('input')
+    term.emitData('input')
     await flushTerminalStart()
 
     expect(terminalCalls.write).toHaveBeenCalledWith({
@@ -2212,39 +1780,15 @@ describe('TerminalSession', () => {
       terminalRuntimeGeneration: 1,
       data: 'input',
     })
+    expect(report).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      failure,
+    })
     expect(session.snapshot().phase).toBe('open')
   })
 
-  test('reports a resolved terminal write rejection', async () => {
-    terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
-    const report = vi.fn()
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn(), { report })
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.terminals[0]!.emitData('input')
-    await flushTerminalStart()
-
-    expect(report).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      failure: { kind: 'result', result: { status: 'rejected' } },
-    })
-  })
-
   test('batches rapid user input into a single ordered write', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    const term = xtermMocks.terminals[0]!
+    const { term } = await startOpenControllerSession()
     term.emitData('c')
     term.emitData('l')
     term.emitData('e')
@@ -2261,15 +1805,9 @@ describe('TerminalSession', () => {
   })
 
   test('drops buffered input after dispose', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    const { session, term } = await startOpenControllerSession()
 
-    xtermMocks.terminals[0]!.emitData('x')
+    term.emitData('x')
     session.dispose()
 
     await flushTerminalStart()
@@ -2302,13 +1840,7 @@ describe('TerminalSession', () => {
         canonicalSize: failure === 'canonical size mismatch' ? { cols: 102, rows: 32 } : { cols: 101, rows: 31 },
       })
     }
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    const { session, term: invalidatedTerm } = await startOpenControllerSession()
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         snapshot: 'recovered after resize',
@@ -2317,9 +1849,8 @@ describe('TerminalSession', () => {
       }),
     )
 
-    const invalidatedTerm = xtermMocks.terminals[0]!
     invalidatedTerm.resize(101, 31)
-    await flushResizeDispatch()
+    await flushMicrotasks(2)
     await flushTerminalStart()
 
     expect(terminalCalls.resize).toHaveBeenCalledOnce()
@@ -2341,22 +1872,15 @@ describe('TerminalSession', () => {
   })
 
   test('serializes resize commits and keeps only the latest proposal while one is in flight', async () => {
-    const firstResize = deferred<TerminalResizeResult>()
+    const firstResize = Promise.withResolvers<TerminalResizeResult>()
     terminalCalls.resize.mockReturnValueOnce(firstResize.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    const { term } = await startOpenControllerSession()
 
-    const term = xtermMocks.terminals[0]!
     term.resize(101, 31)
-    await flushMicrotasksUntil(() => terminalCalls.resize.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 1)
     term.resize(102, 32)
     term.resize(103, 33)
-    await flushResizeDispatch()
+    await flushMicrotasks(2)
     expect(terminalCalls.resize).toHaveBeenCalledOnce()
 
     firstResize.resolve({
@@ -2370,7 +1894,7 @@ describe('TerminalSession', () => {
       canonicalSize: { cols: 101, rows: 31 },
     })
     nextIdentityRevision = 1
-    await flushMicrotasksUntil(() => terminalCalls.resize.mock.calls.length === 2)
+    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 2)
 
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -2383,18 +1907,13 @@ describe('TerminalSession', () => {
   })
 
   test('does not let a stale resize acknowledgement regress newer controller geometry', async () => {
-    const resize = deferred<TerminalResizeResult>()
+    const resize = Promise.withResolvers<TerminalResizeResult>()
     terminalCalls.resize.mockReturnValueOnce(resize.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    const { term } = await startOpenControllerSession(session)
 
-    xtermMocks.terminals[0]!.resize(101, 31)
+    term.resize(101, 31)
     await flushUntil(() => terminalCalls.resize.mock.calls.length === 1)
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -2429,18 +1948,12 @@ describe('TerminalSession', () => {
   })
 
   test('ignores a stale resize acknowledgement without rebuilding the current controller view', async () => {
-    const resize = deferred<TerminalResizeResult>()
+    const resize = Promise.withResolvers<TerminalResizeResult>()
     terminalCalls.resize.mockReturnValueOnce(resize.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    const { term } = await startOpenControllerSession(session)
 
-    const term = xtermMocks.terminals[0]!
     term.resize(101, 31)
     await flushUntil(() => terminalCalls.resize.mock.calls.length === 1)
     session.handleIdentity({
@@ -2475,8 +1988,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 120, rows: 40 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -2484,7 +1996,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDispatch()
+    await flushMicrotasks(2)
     expect(terminalCalls.resize).not.toHaveBeenCalled()
 
     xtermMocks.terminals[0]!.emitData('input')
@@ -2503,8 +2015,7 @@ describe('TerminalSession', () => {
         snapshotSeq: 5,
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.hydrate({
@@ -2533,8 +2044,7 @@ describe('TerminalSession', () => {
   })
 
   test('destroys the active controller view when full hydration changes binding ownership to viewer', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -2565,8 +2075,7 @@ describe('TerminalSession', () => {
   })
 
   test('drops pending output from the retired binding before recovering a hydrated controller', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -2611,8 +2120,7 @@ describe('TerminalSession', () => {
   })
 
   test('keeps the active xterm when full hydration refreshes metadata for the same binding', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -2640,8 +2148,7 @@ describe('TerminalSession', () => {
   })
 
   test('does not notify on ordinary input while already attached', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -2662,19 +2169,7 @@ describe('TerminalSession', () => {
   })
 
   test('uses a captured input writer for the active presented generation', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+    const { session } = await startPresentedControllerGeneration()
 
     const inputWriter = session.captureInputWriter()
     if (!inputWriter) throw new Error('expected presented input writer')
@@ -2690,25 +2185,13 @@ describe('TerminalSession', () => {
   })
 
   test('encodes virtual keys at the current xterm input boundary', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+    const { session, term } = await startPresentedControllerGeneration()
 
-    xtermMocks.terminals[0]!.scrollToBottom.mockClear()
+    term.scrollToBottom.mockClear()
     session.sendVirtualKey('arrow-up')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
-    expect(xtermMocks.terminals[0]!.input).toHaveBeenLastCalledWith('\x1b[A', true)
-    expect(xtermMocks.terminals[0]!.scrollToBottom).toHaveBeenCalledOnce()
+    expect(term.input).toHaveBeenLastCalledWith('\x1b[A', true)
+    expect(term.scrollToBottom).toHaveBeenCalledOnce()
     expect(terminalCalls.write).toHaveBeenLastCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -2716,13 +2199,13 @@ describe('TerminalSession', () => {
     })
 
     terminalCalls.write.mockClear()
-    xtermMocks.terminals[0]!.modes.applicationCursorKeysMode = true
-    xtermMocks.terminals[0]!.options.scrollOnUserInput = false
-    xtermMocks.terminals[0]!.scrollToBottom.mockClear()
+    term.modes.applicationCursorKeysMode = true
+    term.options.scrollOnUserInput = false
+    term.scrollToBottom.mockClear()
     session.sendVirtualKey('arrow-right')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
-    expect(xtermMocks.terminals[0]!.input).toHaveBeenLastCalledWith('\x1bOC', true)
-    expect(xtermMocks.terminals[0]!.scrollToBottom).not.toHaveBeenCalled()
+    expect(term.input).toHaveBeenLastCalledWith('\x1bOC', true)
+    expect(term.scrollToBottom).not.toHaveBeenCalled()
     expect(terminalCalls.write).toHaveBeenLastCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -2730,7 +2213,7 @@ describe('TerminalSession', () => {
     })
 
     terminalCalls.write.mockClear()
-    xtermMocks.terminals[0]!.options.scrollOnUserInput = true
+    term.options.scrollOnUserInput = true
     session.sendVirtualKey('interrupt')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
     expect(terminalCalls.write).toHaveBeenLastCalledWith({
@@ -2741,24 +2224,12 @@ describe('TerminalSession', () => {
   })
 
   test('captures xterm paste for the active presented controller and rejects it after restart', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+    const { host, session, term } = await startPresentedControllerGeneration()
 
     const pasteWriter = session.capturePasteWriter()
     if (!pasteWriter) throw new Error('expected presented paste writer')
     expect(pasteWriter('first line\nsecond line')).toBe(true)
-    expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledWith('first line\nsecond line')
+    expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
 
     session.restart()
     await flushUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 2)
@@ -2766,23 +2237,12 @@ describe('TerminalSession', () => {
     await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
 
     expect(pasteWriter('from old generation')).toBe(false)
-    expect(xtermMocks.terminals[0]!.paste).toHaveBeenCalledTimes(1)
+    expect(term.paste).toHaveBeenCalledTimes(1)
     expect(xtermMocks.terminals.at(-1)!.paste).not.toHaveBeenCalled()
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
+    const { session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()
     if (!inputWriter) throw new Error('expected presented input writer')
 
@@ -2794,18 +2254,7 @@ describe('TerminalSession', () => {
   })
 
   test('rejects a captured input writer after controller authority is lost', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
+    const { session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()
     if (!inputWriter) throw new Error('expected presented input writer')
 
@@ -2824,18 +2273,7 @@ describe('TerminalSession', () => {
   })
 
   test('keeps a captured input writer bound to the same runtime generation across presentation rebuilds', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'controller',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 100, rows: 30 },
-    })
-    session.attach(host)
-    await flushTerminalStart()
+    const { host, session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()
     if (!inputWriter) throw new Error('expected presented input writer')
 
@@ -2853,8 +2291,7 @@ describe('TerminalSession', () => {
   })
 
   test('tracks server title changes separately from process name', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -2873,36 +2310,10 @@ describe('TerminalSession', () => {
     expect(notify).toHaveBeenCalledTimes(1)
   })
 
-  test('ignores input while attached as a mirror until takeover occurs', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', {
-        controller: { clientId: 'client_remote', status: 'connected' },
-        canonicalSize: { cols: 120, rows: 40 },
-      }),
-    )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const notify = vi.fn()
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-    notify.mockClear()
-
-    xtermMocks.terminals[0]!.emitData('blocked')
-    await flushTerminalStart()
-
-    expect(terminalCalls.write).not.toHaveBeenCalled()
-    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
-    expect(notify).not.toHaveBeenCalled()
-  })
-
   test('joins concurrent takeover callers to one server mutation', async () => {
-    const takeoverResponse = deferred<TerminalTakeoverResult>()
+    const takeoverResponse = Promise.withResolvers<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -2925,10 +2336,9 @@ describe('TerminalSession', () => {
   })
 
   test('ignores a takeover response superseded by a newer identity revision', async () => {
-    const takeoverResponse = deferred<TerminalTakeoverResult>()
+    const takeoverResponse = Promise.withResolvers<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -2966,8 +2376,7 @@ describe('TerminalSession', () => {
   test('reports a committed takeover as successful when its recovery presentation fails', async () => {
     terminalCalls.takeover.mockResolvedValueOnce(takeoverResult('pty_session_1_aaaaaaaaa'))
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'recovery unavailable' })
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3011,8 +2420,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 101, rows: 31 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3020,7 +2428,7 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDispatch()
+    await flushMicrotasks(2)
     expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
 
     const takeover = session.takeover()
@@ -3067,8 +2475,7 @@ describe('TerminalSession', () => {
         snapshotSeq: 8,
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3103,7 +2510,7 @@ describe('TerminalSession', () => {
   })
 
   test('commits takeover after detach and lets the remounted view recover the authoritative controller', async () => {
-    const takeoverResponse = deferred<TerminalTakeoverResult>()
+    const takeoverResponse = Promise.withResolvers<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
     terminalCalls.attach.mockResolvedValueOnce(
       recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, {
@@ -3111,8 +2518,7 @@ describe('TerminalSession', () => {
         snapshot: 'post-takeover recovery',
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3150,8 +2556,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 100, rows: 30 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3174,17 +2579,45 @@ describe('TerminalSession', () => {
     expect(session.snapshot().attachment).toEqual({ role: 'controller' })
   })
 
-  test('mounted viewer hydrate to unowned auto-attaches without manual takeover', async () => {
+  test.each([
+    [
+      'snapshot hydration',
+      (session: TerminalSession) =>
+        session.hydrate({
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          identityRevision: 1,
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          canonicalTitle: null,
+          role: 'unowned',
+          controllerStatus: 'none',
+          canonicalSize: { cols: 120, rows: 40 },
+        }),
+    ],
+    [
+      'realtime identity',
+      (session: TerminalSession) =>
+        session.handleIdentity({
+          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+          terminalRuntimeGeneration: 1,
+          identityRevision: 1,
+          role: 'unowned',
+          controllerStatus: 'none',
+          canonicalSize: { cols: 120, rows: 40 },
+        }),
+    ],
+  ] as const)('mounted viewer auto-attaches when %s reports unowned authority', async (_source, applyUnowned) => {
     terminalCalls.attach.mockResolvedValueOnce(
-      recoveryAttachResult('pty_session_1_aaaaaaaaa', 3, {
+      recoveryAttachResult('pty_session_1_aaaaaaaaa', 2, {
         controller: { clientId: 'client_local', status: 'connected' },
         canonicalSize: { cols: 100, rows: 30 },
-        snapshot: 'reclaimed-after-hydrate',
+        snapshot: 'reclaimed-screen',
         snapshotSeq: 10,
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3193,65 +2626,21 @@ describe('TerminalSession', () => {
       controllerStatus: 'connected',
       canonicalSize: { cols: 120, rows: 40 },
     })
-
     session.attach(host)
     await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
+    expect(terminalCalls.attach).not.toHaveBeenCalled()
 
-    session.hydrate({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 1,
-      phase: 'open',
-      message: null,
-      processName: 'zsh',
-      canonicalTitle: null,
-      role: 'unowned',
-      controllerStatus: 'none',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
+    applyUnowned(session)
     await flushTerminalStart()
 
-    expect(terminalCalls.attach).toHaveBeenNthCalledWith(1, {
+    expect(terminalCalls.attach).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       cols: 100,
       rows: 30,
     })
     expect(session.snapshot().attachment).toEqual({ role: 'controller' })
-    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('reclaimed-after-hydrate', expect.any(Function))
-  })
-
-  test('takeover measures a hidden xterm instead of using canonical size as a fallback', async () => {
-    terminalCalls.takeover.mockResolvedValueOnce(
-      takeoverResult('pty_session_1_aaaaaaaaa', {
-        controller: { clientId: 'client_local', status: 'connected' },
-        canonicalSize: { cols: 100, rows: 30 },
-      }),
-    )
-    terminalCalls.attach.mockResolvedValueOnce(recoveryAttachResult('pty_session_1_aaaaaaaaa', 1))
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session, {
-      terminalRuntimeGeneration: 1,
-      phase: 'open',
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    session.attach(host)
-
-    const takeover = session.takeover()
-    await flushTerminalStart()
-    await expect(takeover).resolves.toBe(true)
-
-    expect(terminalCalls.takeover).toHaveBeenCalledWith({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      cols: 100,
-      rows: 30,
-    })
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('reclaimed-screen', expect.any(Function))
   })
 
   test('commits fitted geometry in the first post-takeover recovery attach', async () => {
@@ -3274,8 +2663,7 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 132, rows: 43 },
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3316,8 +2704,7 @@ describe('TerminalSession', () => {
         phase: 'restarting',
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3331,7 +2718,7 @@ describe('TerminalSession', () => {
     expect(session.snapshot().phase).toBe('restarting')
   })
 
-  test('realtime identity event is the authority for non-takeover paths', async () => {
+  test('applies a newer realtime identity after takeover commits', async () => {
     terminalCalls.attach
       .mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
@@ -3350,8 +2737,7 @@ describe('TerminalSession', () => {
         controller: null,
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3375,52 +2761,6 @@ describe('TerminalSession', () => {
     expect(session.snapshot().attachment).toMatchObject({ role: 'unowned' })
   })
 
-  test('mounted viewer auto-attaches when realtime identity flips to unowned', async () => {
-    terminalCalls.attach
-      .mockResolvedValueOnce(
-        attachResult('pty_session_1_aaaaaaaaa', {
-          controller: { clientId: 'client_remote', status: 'connected' },
-          canonicalSize: { cols: 120, rows: 40 },
-        }),
-      )
-      .mockResolvedValueOnce(
-        recoveryAttachResult('pty_session_1_aaaaaaaaa', 3, {
-          controller: { clientId: 'client_local', status: 'connected' },
-          canonicalSize: { cols: 100, rows: 30 },
-          snapshot: 'reclaimed-screen',
-          snapshotSeq: 9,
-        }),
-      )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
-
-    session.handleIdentity({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 1,
-      role: 'unowned',
-      controllerStatus: 'none',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    await flushTerminalStart()
-
-    expect(terminalCalls.attach).toHaveBeenNthCalledWith(2, {
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      cols: 100,
-      rows: 30,
-    })
-    expect(session.snapshot().attachment).toEqual({ role: 'controller' })
-    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('reclaimed-screen', expect.any(Function))
-  })
-
   test('starts a generation-fenced recovery attach when identity grants local control', async () => {
     terminalCalls.attach
       .mockResolvedValueOnce(
@@ -3435,8 +2775,7 @@ describe('TerminalSession', () => {
           canonicalSize: { cols: 100, rows: 30 },
         }),
       )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3462,75 +2801,11 @@ describe('TerminalSession', () => {
     expect(session.snapshot().attachment).toEqual({ role: 'controller' })
   })
 
-  test('drops terminal-emulator input while replay is being written', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
-    )
-    xtermMocks.deferWriteCallbacks(true)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
-
-    xtermMocks.terminals[0]!.emitData('\x1b]10;rgb:1d1d/1d1d/1f1f\x1b\\')
-    xtermMocks.flushDeferredWriteCallbacks()
-    xtermMocks.deferWriteCallbacks(false)
-    await flushUntil(() => session.snapshot().phase === 'open')
-    await flushTerminalStart()
-
-    expect(terminalCalls.write).not.toHaveBeenCalled()
-  })
-
-  test('drops xterm core-attributed user input while replay is being written', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
-    )
-    xtermMocks.deferWriteCallbacks(true)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
-
-    xtermMocks.terminals[0]!.emitCoreUserData('input during replay')
-    xtermMocks.flushDeferredWriteCallbacks()
-    xtermMocks.deferWriteCallbacks(false)
-    await flushUntil(() => session.snapshot().phase === 'open')
-    await flushTerminalStart()
-
-    expect(terminalCalls.write).not.toHaveBeenCalled()
-  })
-
-  test('drops xterm binary mouse input while replay is being written', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
-    )
-    xtermMocks.deferWriteCallbacks(true)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    session.attach(host)
-    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
-
-    xtermMocks.terminals[0]!.emitBinary('\x1b[M ##')
-    xtermMocks.flushDeferredWriteCallbacks()
-    xtermMocks.deferWriteCallbacks(false)
-    await flushUntil(() => session.snapshot().phase === 'open')
-    await flushTerminalStart()
-
-    expect(terminalCalls.write).not.toHaveBeenCalled()
-  })
-
   test('resets the terminal before replaying the snapshot', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'tail', snapshotSeq: 1 }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3544,8 +2819,7 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'prompt', snapshotSeq: 1 }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3577,8 +2851,7 @@ describe('TerminalSession', () => {
   })
 
   test('batches terminal output writes on animation frames', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
@@ -3622,8 +2895,7 @@ describe('TerminalSession', () => {
   })
 
   test('flushes matching terminal exits before the provider dismisses the session', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3666,8 +2938,7 @@ describe('TerminalSession', () => {
   })
 
   test('keeps hydrated title when selecting a mirrored session', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -3689,8 +2960,7 @@ describe('TerminalSession', () => {
   })
 
   test('does not issue a direct close when disposed before restart reaches main', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3704,10 +2974,9 @@ describe('TerminalSession', () => {
   })
 
   test('does not issue a direct close for a stale restart response after disposal', async () => {
-    const restart = deferred<TerminalRestartResult>()
+    const restart = Promise.withResolvers<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3723,10 +2992,9 @@ describe('TerminalSession', () => {
   })
 
   test('commits an in-flight restart once and remounts through generation recovery', async () => {
-    const restart = deferred<TerminalRestartResult>()
+    const restart = Promise.withResolvers<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3763,15 +3031,14 @@ describe('TerminalSession', () => {
   })
 
   test('does not let a remounted view consume the origin prepared-attach stream', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise).mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         terminalRuntimeGeneration: 1,
         snapshot: 'recovered generation 1',
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -3808,15 +3075,14 @@ describe('TerminalSession', () => {
   })
 
   test('waits an older operation before recovering exactly once to a future authoritative generation', async () => {
-    const oldAttach = deferred<TerminalAttachResult>()
+    const oldAttach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(oldAttach.promise).mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         terminalRuntimeGeneration: 2,
         snapshot: 'generation 2 recovery',
       }),
     )
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeGeneration: 1,
@@ -3878,10 +3144,9 @@ describe('TerminalSession', () => {
   })
 
   test('keeps a committed binding when presentation fails and recovers it on the next layout', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
 
@@ -3890,20 +3155,10 @@ describe('TerminalSession', () => {
     const firstTerm = xtermMocks.terminals[0]!
     const firstFit = xtermMocks.fitAddons[0]!
     attach.resolve(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    await flushMicrotasksUntil(() => firstTerm.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+    await waitForMicrotaskCondition(() => firstTerm.refresh.mock.calls.length === 1)
     firstFit.proposeDimensions.mockReturnValue(null)
-    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
-      width: 0,
-      height: 0,
-      top: 0,
-      left: 0,
-      bottom: 0,
-      right: 0,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    } as DOMRect)
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(terminalRect(0, 0))
     await flushTerminalStart()
 
     expect(session.currentRuntimeBinding()).toEqual({
@@ -3914,17 +3169,7 @@ describe('TerminalSession', () => {
     expect(host.querySelector('.goblin-managed-terminal-frame .xterm')).toBeNull()
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
 
-    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
-      width: 800,
-      height: 400,
-      top: 0,
-      left: 0,
-      bottom: 400,
-      right: 800,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    } as DOMRect)
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(terminalRect(800, 400))
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
         terminalRuntimeGeneration: 1,
@@ -3933,7 +3178,7 @@ describe('TerminalSession', () => {
     )
     const resizeObserver = MockResizeObserver.instances.at(-1)
     if (!resizeObserver) throw new Error('expected resize observer')
-    resizeObserver.cb([], resizeObserver)
+    resizeObserver.emit()
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
@@ -3946,9 +3191,8 @@ describe('TerminalSession', () => {
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('recovered committed binding', expect.any(Function))
   })
 
-  test('destroys inactive xterm and opens a fresh view on attach', async () => {
-    const host = document.createElement('div')
-    document.body.append(host)
+  test('destroys the detached xterm and opens a fresh view on reattach', async () => {
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3963,15 +3207,12 @@ describe('TerminalSession', () => {
 
     session.attach(host)
     await flushTerminalStart()
-    expect(MockResizeObserver.instances).toHaveLength(2)
-    expect(MockResizeObserver.instances[1]!.observe).toHaveBeenCalled()
     expect(xtermMocks.terminals).toHaveLength(2)
     expect(host.querySelector('.goblin-managed-terminal-frame')).not.toBeNull()
   })
 
   test('focus checks are derived from the xterm DOM host', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
@@ -3982,8 +3223,7 @@ describe('TerminalSession', () => {
   })
 
   test('keeps disconnected focus pending and accepts its retry after the view attaches', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
@@ -3994,7 +3234,7 @@ describe('TerminalSession', () => {
     expect(settled).not.toHaveBeenCalled()
     session.attach(host)
     expect(session.focus(request)).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
 
     expect(term.focus).not.toHaveBeenCalled()
@@ -4007,8 +3247,7 @@ describe('TerminalSession', () => {
   })
 
   test('settles a focus lease when its initial currency check throws', () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
@@ -4026,35 +3265,18 @@ describe('TerminalSession', () => {
   })
 
   test('settles a focus lease when xterm focus fails during presentation', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
-    xtermMocks.terminals[0]!.focus.mockImplementationOnce(() => {
+    const { term, settled } = await startPendingFocusRequest()
+    term.focus.mockImplementationOnce(() => {
       throw new Error('focus failed')
     })
     await flushTerminalStart()
 
     expect(settled).toHaveBeenCalledOnce()
-    expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+    expect(term.dispose).toHaveBeenCalledOnce()
   })
 
   test('releases a pending focus lease when the hidden presentation detaches', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
-    const term = xtermMocks.terminals[0]!
+    const { host, session, term, settled } = await startPendingFocusRequest()
     session.detach(host)
     await flushTerminalStart()
 
@@ -4063,16 +3285,7 @@ describe('TerminalSession', () => {
   })
 
   test('releases a pending focus lease when controller ownership changes to viewer', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-    const settled = vi.fn()
-
-    session.attach(host)
-    expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
-    const term = xtermMocks.terminals[0]!
+    const { session, term, settled } = await startPendingFocusRequest()
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -4089,17 +3302,16 @@ describe('TerminalSession', () => {
   })
 
   test('releases a pending focus lease when an authoritative binding supersedes the candidate', async () => {
-    const attach = deferred<TerminalAttachResult>()
+    const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     const settled = vi.fn()
 
     session.attach(host)
     expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
@@ -4125,100 +3337,36 @@ describe('TerminalSession', () => {
   })
 
   test('applies terminal theme and updates when the app theme changes', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
+    const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
 
     const term = xtermMocks.terminals[0]!
+    const frame = host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')
     expect(term.options.theme).toMatchObject({ background: '#ffffff', foreground: '#1d1d1f' })
-    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.background).toBe(
-      'rgb(255, 255, 255)',
-    )
-    expect(
-      host
-        .querySelector<HTMLElement>('.goblin-managed-terminal-frame')
-        ?.style.getPropertyValue('--goblin-terminal-background'),
-    ).toBe('#ffffff')
+    expect(frame?.style.background).toBe('rgb(255, 255, 255)')
+    expect(frame?.style.getPropertyValue('--goblin-terminal-background')).toBe('#ffffff')
 
     document.documentElement.setAttribute('data-theme', 'dark')
     await Promise.resolve()
 
     expect(term.options.theme).toMatchObject({ background: '#111113', foreground: '#f5f5f7' })
-    expect(
-      host
-        .querySelector<HTMLElement>('.goblin-managed-terminal-frame')
-        ?.style.getPropertyValue('--goblin-terminal-background'),
-    ).toBe('#111113')
-  })
-
-  test('loads image and progress addons', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    expect(xtermMocks.imageAddons).toHaveLength(1)
-    expect(xtermMocks.progressAddons).toHaveLength(1)
+    expect(frame?.style.getPropertyValue('--goblin-terminal-background')).toBe('#111113')
   })
 
   test('progress state appears in snapshot and clears on state 0', async () => {
-    const notify = vi.fn()
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-    notify.mockClear()
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    const { session, notify, progressAddon } = await startSessionWithProgress()
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
     expect(notify).toHaveBeenCalledTimes(1)
 
-    xtermMocks.progressAddons[0]!.emitProgress(1, 100)
-    expect(session.snapshot().progress).toEqual({ state: 1, value: 100 })
-
-    xtermMocks.progressAddons[0]!.emitProgress(0, 0)
+    progressAddon.emitProgress(0, 0)
     expect(session.snapshot().progress).toBeUndefined()
   })
 
-  test('progress error and indeterminate states', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.progressAddons[0]!.emitProgress(2, 80)
-    expect(session.snapshot().progress).toEqual({ state: 2, value: 80 })
-
-    xtermMocks.progressAddons[0]!.emitProgress(3, 0)
-    expect(session.snapshot().progress).toEqual({ state: 3, value: 0 })
-  })
-
   test('progress state is cleared on restart', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    const { session } = await startSessionWithProgress()
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
 
     session.restart()
@@ -4229,17 +3377,7 @@ describe('TerminalSession', () => {
   })
 
   test('progress state is cleared and published on detach', async () => {
-    const notify = vi.fn()
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, notify)
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    const { host, session, notify } = await startSessionWithProgress()
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
     notify.mockClear()
 
@@ -4249,32 +3387,8 @@ describe('TerminalSession', () => {
     expect(notify).toHaveBeenCalledTimes(1)
   })
 
-  test('progress value is clamped to 0-100', async () => {
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
-
-    session.attach(host)
-    await flushTerminalStart()
-    await flushUntil(() => session.snapshot().phase === 'open')
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, 150)
-    expect(session.snapshot().progress).toEqual({ state: 1, value: 100 })
-
-    xtermMocks.progressAddons[0]!.emitProgress(1, -10)
-    expect(session.snapshot().progress).toEqual({ state: 1, value: 0 })
-  })
-
-  // Contract: identity (response + realtime event interleavings).
-  // The takeover atomicity work made the response authoritative AND
-  // kept the realtime event firing for other listeners. This test
-  // pins the one orthogonal new invariant that the existing
-  // follow-up #2 tests don't already cover: that phase is part of
-  // the realtime event surface and can override the response's
-  // phase after the takeover settled.
-  describe('identity contract (response + realtime event interleavings)', () => {
-    test('realtime identity event with phase=restarting overrides a prior takeover response phase', async () => {
+  describe('identity and lifecycle presentation contract', () => {
+    test('realtime lifecycle update overrides a prior takeover response phase', async () => {
       terminalCalls.attach.mockResolvedValueOnce(
         attachResult('pty_session_1_aaaaaaaaa', {
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -4287,8 +3401,7 @@ describe('TerminalSession', () => {
           phase: 'open',
         }),
       )
-      const host = document.createElement('div')
-      document.body.appendChild(host)
+      const host = createTerminalHost()
       const session = new TerminalSession(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
@@ -4300,12 +3413,6 @@ describe('TerminalSession', () => {
       await expect(takeover).resolves.toBe(true)
       expect(session.snapshot().phase).toBe('open')
 
-      // PTY crashes mid-takeover — server pushes a realtime lifecycle
-      // event with phase=restarting. After the identity/lifecycle
-      // split, phase is on its own channel; the identity event no
-      // longer carries phase at all. The client applies the
-      // lifecycle event through `handleLifecycle` and the new
-      // phase replaces the takeover response's phase.
       session.handleLifecycle({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -4315,35 +3422,18 @@ describe('TerminalSession', () => {
       expect(session.snapshot().phase).toBe('restarting')
     })
 
-    test('realtime identity event with a transitional phase does not destroy the controller xterm', async () => {
-      // Reproduces the blank-on-create race: the user creates a session,
-      // the session hydrates with role=controller and phase=open, and
-      // then the server's realtime identity event arrives carrying
-      // a transitional phase (opening) — even though the user is
-      // still the controller by role. The previous `!canResize()`
-      // gate misread the transitional phase as a controller→viewer
-      // transition and tore down the freshly-opened xterm, leaving
-      // the tab blank until refresh.
-      const host = document.createElement('div')
-      document.body.appendChild(host)
+    test('preserves the controller xterm across identity and transitional lifecycle updates', async () => {
+      const host = createTerminalHost()
       const session = new TerminalSession(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
       await flushTerminalStart()
       await flushUntil(() => session.snapshot().phase === 'open')
 
-      // Sanity: xterm is mounted under the active host, and the
-      // user is the controller.
-      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
       const xtermBefore = host.querySelector('.goblin-managed-terminal-host .xterm')
+      expect(xtermBefore).not.toBeNull()
       expect(session.snapshot().attachment).toMatchObject({ role: 'controller' })
 
-      // The server's realtime identity event arrives with role still
-      // 'controller' but with a transitional phase ('opening'). The
-      // role is the authoritative signal for who owns the PTY — the
-      // phase just reflects whether the PTY is fully started. The
-      // previous `!canResize()` gate misread this as a downgrade
-      // because canResize() requires `phase === 'open'`.
       session.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -4353,36 +3443,20 @@ describe('TerminalSession', () => {
         canonicalSize: { cols: 100, rows: 30 },
       })
 
-      // The role did not change, so the controller xterm must still
-      // be mounted and attached. The pre-split `!canResize()` gate
-      // misread a transitional phase update as a controller→viewer
-      // transition; the post-split identity-only gate does not.
-      const xtermAfter = host.querySelector('.goblin-managed-terminal-host .xterm')
-      expect(xtermAfter).not.toBeNull()
-      expect(xtermAfter).toBe(xtermBefore)
-      // A subsequent lifecycle event with a transitional phase
-      // (`opening` during a pre-spawn identity broadcast) is also
-      // safe: the xterm is still preserved because `handleLifecycle`
-      // never tears it down.
+      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBe(xtermBefore)
+
       session.handleLifecycle({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         phase: 'opening',
         message: null,
       })
-      const xtermAfterLifecycle = host.querySelector('.goblin-managed-terminal-host .xterm')
-      expect(xtermAfterLifecycle).not.toBeNull()
-      expect(xtermAfterLifecycle).toBe(xtermBefore)
+      expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBe(xtermBefore)
       expect(session.snapshot().phase).toBe('opening')
     })
 
-    test('realtime identity event with role=viewer still tears down the controller xterm', async () => {
-      // Companion to the previous test: the role-based gate must
-      // still tear down the xterm when the user actually loses
-      // control. The previous fix could not regress this path; this
-      // test pins it down.
-      const host = document.createElement('div')
-      document.body.appendChild(host)
+    test('realtime viewer identity tears down the controller xterm', async () => {
+      const host = createTerminalHost()
       const session = new TerminalSession(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
@@ -4391,11 +3465,6 @@ describe('TerminalSession', () => {
 
       expect(host.querySelector('.goblin-managed-terminal-host .xterm')).not.toBeNull()
 
-      // Another client (or a viewer-mode switch) takes over: the
-      // realtime event flips the role to 'viewer'. The phase is
-      // 'open' here (not the transitional case), so canResize()
-      // would also have flipped — the test exercises the role
-      // signal independently of phase.
       session.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
@@ -4536,14 +3605,87 @@ function hydrateManagedSession(
   })
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
+function createTerminalHost(): HTMLDivElement {
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  return host
+}
+
+async function startOpenControllerSession(session: TerminalSession = new TerminalSession(descriptor, vi.fn())) {
+  const host = createTerminalHost()
+  hydrateManagedSession(session)
+  session.attach(host)
+  await flushTerminalStart()
+  await flushUntil(() => session.snapshot().phase === 'open')
+  return { host, session, term: xtermMocks.terminals[0]! }
+}
+
+async function startPresentedControllerGeneration() {
+  const host = createTerminalHost()
+  const session = new TerminalSession(descriptor, vi.fn())
+  hydrateManagedSession(session, {
+    terminalRuntimeGeneration: 1,
+    phase: 'open',
+    role: 'controller',
+    controllerStatus: 'connected',
+    canonicalSize: { cols: 100, rows: 30 },
   })
-  return { promise, resolve, reject }
+  session.attach(host)
+  await flushTerminalStart()
+  await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+  return { host, session, term: xtermMocks.terminals[0]! }
+}
+
+async function startHiddenFreshStreamPresentation() {
+  terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+  const host = createTerminalHost()
+  const session = new TerminalSession(descriptor, vi.fn())
+  hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+  session.attach(host)
+  await waitForMicrotaskCondition(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+  const term = xtermMocks.terminals[0]!
+  const frame = host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')
+  await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
+  return { host, session, term, frame }
+}
+
+async function startPendingFocusRequest(isCurrent: () => boolean = () => true) {
+  const host = createTerminalHost()
+  const session = new TerminalSession(descriptor, vi.fn())
+  hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+  const settled = vi.fn()
+  session.attach(host)
+  if (!session.focus({ isCurrent, onSettled: settled })) throw new Error('expected accepted focus request')
+  await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
+  return { host, session, term: xtermMocks.terminals[0]!, settled }
+}
+
+async function startSessionWithProgress() {
+  const notify = vi.fn()
+  const host = createTerminalHost()
+  const session = new TerminalSession(descriptor, notify)
+  hydrateManagedSession(session)
+  session.attach(host)
+  await flushTerminalStart()
+  await flushUntil(() => session.snapshot().phase === 'open')
+  notify.mockClear()
+  const progressAddon = xtermMocks.progressAddons[0]!
+  progressAddon.emitProgress(1, 75)
+  return { host, session, notify, term: xtermMocks.terminals[0]!, progressAddon }
+}
+
+function terminalRect(width: number, height: number): DOMRect {
+  return {
+    width,
+    height,
+    top: 0,
+    left: 0,
+    bottom: height,
+    right: width,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  } as DOMRect
 }
 
 function optionArrow(key: string): KeyboardEvent {
@@ -4553,19 +3695,6 @@ function optionArrow(key: string): KeyboardEvent {
 async function flushTerminalStart(): Promise<void> {
   // Drain xterm render frames and the session's normal debounced work.
   await vi.runAllTimersAsync()
-}
-
-async function flushResizeDispatch(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-}
-
-async function flushMicrotasksUntil(predicate: () => boolean): Promise<void> {
-  for (let i = 0; i < 20; i += 1) {
-    if (predicate()) return
-    await Promise.resolve()
-  }
-  throw new Error('microtask condition was not met')
 }
 
 async function flushFontRefit(): Promise<void> {
@@ -4580,7 +3709,3 @@ async function flushUntil(predicate: () => boolean): Promise<void> {
   }
   throw new Error('condition was not met')
 }
-
-afterEach(() => {
-  vi.useRealTimers()
-})

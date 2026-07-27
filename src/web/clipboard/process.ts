@@ -78,9 +78,8 @@ export type PastePreview =
  *   These reach xterm.js as text rather than being silently routed
  *   to the file branch.
  *
- * Exported for unit testing.
  */
-export function shouldPreferFilesOverText(text: string, hasFiles: boolean): boolean {
+function shouldPreferFilesOverText(text: string, hasFiles: boolean): boolean {
   if (!hasFiles) return false
   if (text.length === 0) return true
   if (looksLikeUriList(text)) return true

@@ -170,16 +170,6 @@ describe('GET /api/whoami', () => {
     expect(await res.json()).toEqual({ ok: true })
   })
 
-  test('returns 200 when the header matches', async () => {
-    const app = buildApp()
-    const res = await app.request(
-      new Request('http://localhost/whoami', {
-        headers: { 'x-goblin-access-token': ACCESS_TOKEN },
-      }),
-    )
-    expect(res.status).toBe(200)
-  })
-
   test('returns 401 when the ?t= query matches because URL tokens are WebSocket-only', async () => {
     const app = buildApp()
     const res = await app.request(new Request(`http://localhost/whoami?t=${ACCESS_TOKEN}`))

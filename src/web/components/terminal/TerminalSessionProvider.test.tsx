@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, waitFor } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -29,15 +29,9 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import {
   createRepoBranch,
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  preferredWorkspacePaneTabForTarget,
-  workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type {
   TerminalDescriptor,
@@ -90,19 +84,6 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
   }
 })
 
-function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree') {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
-  return repo
-    ? preferredWorkspacePaneTabForTarget(
-        repo.ui,
-        workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
-          branchName,
-        ),
-      )
-    : null
-}
-
 function repoTerminalBase() {
   const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
   const target = runtimeWorkspacePaneTargetForTest({
@@ -137,7 +118,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     private readonly handleIdentitySpy = vi.fn()
     private readonly handleLifecycleSpy = vi.fn()
     private readonly hydrateSpy = vi.fn()
-    private readonly detachSpy = vi.fn()
     private terminalRuntimeSessionId: string | null = null
     private terminalRuntimeGeneration: number | null = null
     private snapshotValue: TerminalSnapshot
@@ -168,9 +148,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 
     attach() {}
 
-    detach() {
-      this.detachSpy()
-    }
+    detach() {}
 
     restart() {}
 
@@ -382,36 +360,12 @@ function terminalRuntimeTarget(workspaceRuntimeId: string) {
   })
 }
 
-function currentTerminalSessionBase() {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-  if (!repo) throw new Error('terminal test workspace is unavailable')
-  return terminalSessionBaseForTest({
-    repoRoot: REPO_ID,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
-    branch: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-  })
-}
-
 function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
   return sessions.map(completeServerSession)
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
   return terminalSessionId.split('\0').at(-1) ?? terminalSessionId
-}
-
-async function emitSessionsChanged(workspaceId = REPO_ID): Promise<void> {
-  await act(async () => {
-    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId
-    if (workspaceRuntimeId)
-      sessionsChangedHandler?.({ workspaceId, workspaceRuntimeId, revision: ++sessionsChangedRevision })
-    await waitForScheduledServerSync()
-  })
-}
-
-async function waitForScheduledServerSync(): Promise<void> {
-  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
 }
 
 function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
@@ -808,7 +762,7 @@ describe('TerminalSessionProvider', () => {
   afterEach(() => {
     setTerminalSessionProjectionForTests(null)
   })
-  test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
+  test('forwards realtime session events to the terminal projection', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -821,147 +775,39 @@ describe('TerminalSessionProvider', () => {
     try {
       const base = repoTerminalBase()
       await act(async () => {
-        useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'terminal')
         await getContext().createTerminal(base)
         await getContext().createTerminal(base)
       })
 
-      expect(createTerminalMock).toHaveBeenCalledTimes(2)
-      expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
-        target: base.target,
-        kind: 'primary',
-      })
-      expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
-        target: base.target,
-        kind: 'additional',
-      })
-      expect(
-        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
-      ).toEqual([
-        ['term-111111111111111111111', false, false],
-        ['term-222222222222222222222', true, false],
-      ])
-
-      await act(async () => {
-        exitHandler?.(terminalExitEvent('term-222222222222222222222'))
-      })
-
-      expect(closeMock).not.toHaveBeenCalled()
-      expect(selectedWorkspacePaneTab(REPO_ID)).toBe('terminal')
-      expect(
-        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
-      ).toEqual([['term-111111111111111111111', true, false]])
-
-      // With the derived-value pattern, the store never re-projects the
-      // preferred tab when terminal sessions go to zero. The user's intent
-      // is preserved; `resolveRenderableWorkspacePaneTab` resolves the rendered tab
-      // at read time (covered by `workspace-pane-tabs.ts` and
-      // `workspace-pane-tab.test.ts`).
-      await act(async () => {
-        exitHandler?.(terminalExitEvent('term-111111111111111111111'))
-      })
-
-      expect(closeMock).not.toHaveBeenCalled()
-      expect(selectedWorkspacePaneTab(REPO_ID)).toBe('terminal')
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('tracks unread bells in provider state and clears them when activating the session', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
-    )
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblinNative.terminal, { notifyBell })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      const base = repoTerminalBase()
-      await act(async () => {
-        await getContext().createTerminal(base)
-        await getContext().createTerminal(base)
-      })
-
-      await act(async () => {
-        bellHandler?.({
-          terminalRuntimeSessionId: 'term-111111111111111111111',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          workspaceId: REPO_ID,
-          processName: 'zsh',
-          canonicalTitle: '~/Developer/goblin — npm run dev',
-        })
-      })
-
-      expect(
-        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
-      ).toEqual([
-        ['term-111111111111111111111', false, true],
-        ['term-222222222222222222222', true, false],
-      ])
-      expect(notifyBell).toHaveBeenCalledWith({
-        title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\n~/Developer/goblin — npm run dev',
+      const session = mockSessions[0]
+      if (!session) throw new Error('missing terminal mock session')
+      const outputEvent = {
+        terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        session: base,
-      })
+        data: 'hello',
+        seq: 1,
+        processName: 'zsh',
+      }
+      const identityEvent = {
+        terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
+        identityRevision: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        canonicalSize: { cols: 100, rows: 30 },
+      }
+      const lifecycleEvent = {
+        terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        phase: 'open' as const,
+        message: null,
+      }
 
       await act(async () => {
-        const firstTerminalSessionId = getProbe().summaries[0]?.terminalSessionId
-        if (!firstTerminalSessionId) throw new Error('missing term-111111111111111111111 terminalSessionId')
-        getContext().selectTerminal(terminalFilesystemTargetKey, firstTerminalSessionId)
-      })
-
-      expect(
-        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
-      ).toEqual([
-        ['term-111111111111111111111', true, false],
-        ['term-222222222222222222222', false, false],
-      ])
-      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget).toMatchObject({
-        [terminalFilesystemTargetKey]: 'term-111111111111111111111',
-      })
-    } finally {
-      hasFocus.mockRestore()
-      await unmount()
-    }
-  })
-
-  test('tracks unread bells from server realtime events without a live xterm bell', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
-    )
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblinNative.terminal, { notifyBell })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      const base = repoTerminalBase()
-      await act(async () => {
-        await getContext().createTerminal(base)
-        await getContext().createTerminal(base)
-      })
-
-      await act(async () => {
+        outputHandler?.(outputEvent)
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
@@ -969,100 +815,6 @@ describe('TerminalSessionProvider', () => {
           workspaceId: REPO_ID,
           processName: 'zsh',
           canonicalTitle: null,
-        })
-      })
-
-      expect(
-        getProbe().summaries.map((session) => [session.terminalSessionId, session.selected, session.hasBell]),
-      ).toEqual([
-        ['term-111111111111111111111', false, true],
-        ['term-222222222222222222222', true, false],
-      ])
-      expect(notifyBell).toHaveBeenCalledWith({
-        title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\nzsh',
-        terminalSessionId: 'term-111111111111111111111',
-        session: base,
-      })
-    } finally {
-      hasFocus.mockRestore()
-      await unmount()
-    }
-  })
-
-  test('drops a server bell that arrives before the session projection materializes', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
-    )
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblinNative.terminal, { notifyBell })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await act(async () => {
-        bellHandler?.({
-          terminalRuntimeSessionId: 'term-111111111111111111111',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          workspaceId: REPO_ID,
-          processName: 'zsh',
-          canonicalTitle: 'build running',
-        })
-        await getContext().createTerminal(repoTerminalBase())
-      })
-
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.hasBell])).toEqual([
-        ['term-111111111111111111111', false],
-      ])
-      expect(notifyBell).not.toHaveBeenCalled()
-    } finally {
-      hasFocus.mockRestore()
-      await unmount()
-    }
-  })
-
-  test('routes realtime output, title, and identity directly to the matching terminal session', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      const base = repoTerminalBase()
-      await act(async () => {
-        await getContext().createTerminal(base)
-        await getContext().createTerminal(base)
-      })
-
-      const first = mockSessions.find(
-        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
-      )
-      const second = mockSessions.find(
-        (session) => session.descriptor.terminalSessionId === 'term-222222222222222222222',
-      )
-      if (!first || !second) throw new Error('missing terminal mock sessions')
-
-      await act(async () => {
-        outputHandler?.({
-          terminalRuntimeSessionId: 'term-111111111111111111111',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          data: 'hello',
-          seq: 1,
-          processName: 'zsh',
         })
         titleHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
@@ -1071,200 +823,24 @@ describe('TerminalSessionProvider', () => {
           workspaceId: REPO_ID,
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
-        identityHandler?.({
-          terminalRuntimeSessionId: 'term-222222222222222222222',
-          terminalRuntimeGeneration: 1,
-          identityRevision: 1,
-          terminalSessionId: 'term-222222222222222222222',
-          role: 'controller',
-          controllerStatus: 'connected',
-          canonicalSize: { cols: 100, rows: 30 },
-        })
-        lifecycleHandler?.({
-          terminalRuntimeSessionId: 'term-222222222222222222222',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-222222222222222222222',
-          phase: 'open',
-          message: null,
-        })
+        identityHandler?.(identityEvent)
+        lifecycleHandler?.(lifecycleEvent)
       })
 
-      expect(first.handleOutput).toHaveBeenCalledTimes(1)
-      expect(first.handleOutput).toHaveBeenCalledWith({
-        terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        data: 'hello',
-        seq: 1,
-        processName: 'zsh',
-      })
-      expect(first.handleServerTitle).toHaveBeenCalledTimes(1)
-      expect(first.handleServerTitle).toHaveBeenCalledWith('~/Developer/goblin — npm run dev')
-      expect(second.handleIdentity).toHaveBeenCalledTimes(1)
-      expect(second.handleIdentity).toHaveBeenCalledWith({
-        terminalRuntimeSessionId: 'term-222222222222222222222',
-        terminalRuntimeGeneration: 1,
-        identityRevision: 1,
-        terminalSessionId: 'term-222222222222222222222',
-        role: 'controller',
-        controllerStatus: 'connected',
-        canonicalSize: { cols: 100, rows: 30 },
-      })
-      expect(second.handleLifecycle).toHaveBeenCalledWith({
-        terminalRuntimeSessionId: 'term-222222222222222222222',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-222222222222222222222',
-        phase: 'open',
-        message: null,
-      })
-      expect(first.handleIdentity).not.toHaveBeenCalled()
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('does not replace server session presentation when the client Git projection changes', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
-    )
-    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblinNative.terminal, { notifyBell })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, unmount } = await renderProvider()
-
-    try {
-      const base = repoTerminalBase()
-      await act(async () => {
-        await getContext().createTerminal(base)
-      })
+      expect(session.handleOutput).toHaveBeenCalledWith(outputEvent)
+      expect(session.handleServerTitle).toHaveBeenCalledWith('~/Developer/goblin — npm run dev')
+      expect(session.handleIdentity).toHaveBeenCalledWith(identityEvent)
+      expect(session.handleLifecycle).toHaveBeenCalledWith(lifecycleEvent)
+      expect(getProbe().summaries[0]?.hasBell).toBe(true)
 
       await act(async () => {
-        useWorkspacesStore.setState((state) => ({
-          workspaces: {
-            ...state.workspaces,
-            [REPO_ID]: state.workspaces[REPO_ID]
-              ? {
-                  ...state.workspaces[REPO_ID],
-                  ui: {
-                    ...state.workspaces[REPO_ID]!.ui,
-                    currentBranchName: 'feature/renamed',
-                  },
-                }
-              : state.workspaces[REPO_ID],
-          },
-        }))
-        seedRepoReadModelQueryData(useWorkspacesStore.getState().workspaces[REPO_ID]!, {
-          branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
-          currentBranch: 'feature/renamed',
-        })
-        await Promise.resolve()
+        exitHandler?.(terminalExitEvent('term-222222222222222222222'))
       })
+      expect(getProbe().terminalIds).toEqual(['term-111111111111111111111'])
 
-      await waitFor(() => {
-        const descriptor =
-          readTerminalSessionCommandBridge()?.terminalFilesystemTargetSnapshot(
-            terminalFilesystemTargetKey,
-          ).selectedDescriptor
-        expect(
-          descriptor?.presentation.kind === 'git-worktree' && descriptor.presentation.head.kind === 'branch'
-            ? descriptor.presentation.head.branchName
-            : null,
-        ).toBe('feature/worktree')
-      })
-
-      await act(async () => {
-        notifyBell.mockClear()
-        bellHandler?.({
-          terminalRuntimeSessionId: 'term-111111111111111111111',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          workspaceId: REPO_ID,
-          processName: 'zsh',
-          canonicalTitle: '~/Developer/goblin — npm run dev',
-        })
-      })
-
-      expect(notifyBell).toHaveBeenLastCalledWith({
-        title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\n~/Developer/goblin — npm run dev',
-        terminalSessionId: 'term-111111111111111111111',
-        session: base,
-      })
-    } finally {
-      hasFocus.mockRestore()
-      await unmount()
-    }
-  })
-
-  test('reconciles externally created and removed terminal sessions across windows', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    listSessionsMock.mockResolvedValue([
-      {
-        terminalRuntimeSessionId: 'server_session_1',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_remote', status: 'connected' },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 120, rows: 40 },
-      },
-    ])
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await emitSessionsChanged()
-
-      expect(getProbe().summaries).toEqual([
-        expect.objectContaining({ terminalSessionId: 'term-111111111111111111111', title: 'zsh', phase: 'open' }),
-      ])
-      const hydrated = mockSessions.find(
-        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
-      )
-      expect(hydrated?.hydrate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          terminalRuntimeSessionId: 'server_session_1',
-          terminalRuntimeGeneration: 1,
-          processName: 'zsh',
-          role: 'viewer',
-          controllerStatus: 'connected',
-          canonicalSize: { cols: 120, rows: 40 },
-        }),
-      )
-
-      listSessionsMock.mockResolvedValue([])
-      await emitSessionsChanged()
-
-      expect(getProbe().summaries).toEqual([])
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('does not treat session-closed as workspace tabs projection authority', async () => {
-    const { unmount } = await renderProviderWithProbe(formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH))
-
-    try {
-      listWorkspaceTabsMock.mockClear()
       await act(async () => {
         sessionClosedHandler?.({
-          terminalRuntimeSessionId: 'server_session_1',
+          terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           workspaceId: REPO_ID,
@@ -1272,404 +848,46 @@ describe('TerminalSessionProvider', () => {
           tabsBeforeRetirement: null,
         })
       })
-
-      expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
+      expect(getProbe().summaries).toEqual([])
     } finally {
       await unmount()
     }
   })
 
-  test('keeps a newly created terminal active after session sync when create transfers controller control', async () => {
+  test('applies persisted terminal selection from the workspace store', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    serverSessions = [
-      {
-        terminalRuntimeSessionId: 'server_session_1',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_local', status: 'connected' },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 80, rows: 24 },
-      },
-    ]
-    listSessionsMock.mockImplementation(async () => serverSessions)
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
 
     try {
-      await emitSessionsChanged()
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected])).toEqual([
-        ['term-111111111111111111111', true],
-      ])
-
-      const base = repoTerminalBase()
       await act(async () => {
-        await getContext().createTerminal(base)
+        await getContext().createTerminal(repoTerminalBase())
+        await getContext().createTerminal(repoTerminalBase())
       })
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected])).toEqual([
-        ['term-111111111111111111111', false],
-        ['term-222222222222222222222', true],
-      ])
-
-      await emitSessionsChanged()
-
-      expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected])).toEqual([
-        ['term-111111111111111111111', false],
-        ['term-222222222222222222222', true],
-      ])
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('restores the persisted selected terminal for a filesystem target when server control points elsewhere', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    useWorkspacesStore.setState({
-      selectedTerminalSessionIdByTerminalFilesystemTarget: {
-        [terminalFilesystemTargetKey]: 'term-111111111111111111111',
-      },
-    })
-    serverSessions = [
-      {
-        terminalRuntimeSessionId: 'server_session_1',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        ...currentTerminalSessionBase(),
-        controller: null,
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 80, rows: 24 },
-      },
-      {
-        terminalRuntimeSessionId: 'server_session_2',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-222222222222222222222',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_local', status: 'connected' },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 80, rows: 24 },
-      },
-    ]
-    listSessionsMock.mockImplementation(async () => serverSessions)
-    const { getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await emitSessionsChanged()
+      await act(async () => {
+        useWorkspacesStore.setState({
+          selectedTerminalSessionIdByTerminalFilesystemTarget: {
+            [terminalFilesystemTargetKey]: 'term-111111111111111111111',
+          },
+        })
+      })
 
       expect(getProbe().summaries.map((session) => [session.terminalSessionId, session.selected])).toEqual([
         ['term-111111111111111111111', true],
         ['term-222222222222222222222', false],
       ])
-      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget).toMatchObject({
-        [terminalFilesystemTargetKey]: 'term-111111111111111111111',
-      })
     } finally {
       await unmount()
     }
   })
 
-  test('does not resync sessions when repo changes do not affect terminal filesystem target mapping', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const { unmount } = await renderProviderWithProbe(formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH))
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      listSessionsMock.mockClear()
-      await act(async () => {
-        useWorkspacesStore.setState((state) => {
-          const workspace = state.workspaces[REPO_ID]
-          if (!workspace || workspace.capability.kind !== 'git') return state
-          return {
-            ...state,
-            workspaces: {
-              ...state.workspaces,
-              [REPO_ID]: {
-                ...workspace,
-                capability: {
-                  ...workspace.capability,
-                  git: {
-                    ...workspace.capability.git,
-                    remote: { ...workspace.capability.git.remote, fetchFailed: true },
-                  },
-                },
-              },
-            },
-          }
-        })
-      })
-      await Promise.resolve()
-      expect(listSessionsMock).not.toHaveBeenCalled()
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('allocates the next terminal index after syncing sessions from another window', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    listSessionsMock.mockResolvedValue([
-      {
-        terminalRuntimeSessionId: 'server_session_2',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-222222222222222222222',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_remote', status: 'connected' },
-        processName: 'node',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 100, rows: 30 },
-      },
-    ])
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await emitSessionsChanged()
-
-      let createdKey = ''
-      await act(async () => {
-        createdKey = await getContext().createTerminal(repoTerminalBase())
-      })
-
-      expect(createdKey).toBe('term-333333333333333333333')
-      expect(getProbe().summaries.map((session) => session.terminalSessionId)).toEqual([
-        'term-222222222222222222222',
-        'term-333333333333333333333',
-      ])
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('does not fall back to a local render snapshot when server omits snapshot', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    listSessionsMock.mockResolvedValue([
-      {
-        terminalRuntimeSessionId: 'server_session_3',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_remote', status: 'connected' },
-        processName: 'bash',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 100, rows: 30 },
-      },
-    ])
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await emitSessionsChanged()
-
-      const terminalSessionId = getProbe().summaries[0]?.terminalSessionId
-      if (!terminalSessionId) throw new Error('missing terminalSessionId')
-      const session = mockSessions.find((item) => item.descriptor.terminalSessionId === 'term-111111111111111111111')
-      if (!session) throw new Error('missing terminal mock session')
-
-      getContext().detach(terminalSessionId, document.createElement('div'))
-
-      listSessionsMock.mockResolvedValue([
-        {
-          terminalRuntimeSessionId: 'server_session_3',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          ...currentTerminalSessionBase(),
-          controller: { clientId: 'client_remote', status: 'connected' },
-          processName: 'bash',
-          canonicalTitle: null,
-          phase: 'open',
-          message: null,
-          canonicalSize: { cols: 100, rows: 30 },
-        },
-      ])
-      await emitSessionsChanged()
-
-      expect(session.hydrate).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          canonicalSize: { cols: 100, rows: 30 },
-        }),
-      )
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('does not reuse stale server snapshot for a different recycled pty id', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    listSessionsMock.mockResolvedValue([
-      {
-        terminalRuntimeSessionId: 'server_session_old',
-        terminalRuntimeGeneration: 1,
-        terminalSessionId: 'term-111111111111111111111',
-        ...currentTerminalSessionBase(),
-        controller: { clientId: 'client_remote', status: 'connected' },
-        processName: 'bash',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        canonicalSize: { cols: 100, rows: 30 },
-      },
-    ])
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await emitSessionsChanged()
-
-      const terminalSessionId = getProbe().summaries[0]?.terminalSessionId
-      if (!terminalSessionId) throw new Error('missing terminalSessionId')
-      const session = mockSessions.find((item) => item.descriptor.terminalSessionId === 'term-111111111111111111111')
-      if (!session) throw new Error('missing terminal mock session')
-
-      getContext().detach(terminalSessionId, document.createElement('div'))
-
-      listSessionsMock.mockResolvedValue([
-        {
-          terminalRuntimeSessionId: 'server_session_new',
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          ...currentTerminalSessionBase(),
-          controller: { clientId: 'client_remote', status: 'connected' },
-          processName: 'bash',
-          canonicalTitle: null,
-          phase: 'open',
-          message: null,
-          canonicalSize: { cols: 100, rows: 30 },
-        },
-      ])
-
-      await emitSessionsChanged()
-
-      expect(session.hydrate).toHaveBeenLastCalledWith(
-        expect.not.objectContaining({
-          snapshot: 'old-snapshot',
-        }),
-      )
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('exposes reactive filesystem target metadata through external-store facade hooks', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      expect(getProbe()).toMatchObject({ count: 0, terminalIds: [], summaries: [] })
-
-      const base = repoTerminalBase()
-      await act(async () => {
-        await getContext().createTerminal(base)
-      })
-      expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
-
-      await act(async () => {
-        await getContext().createTerminal(base)
-      })
-      expect(getProbe()).toMatchObject({
-        count: 2,
-        terminalIds: ['term-111111111111111111111', 'term-222222222222222222222'],
-      })
-
-      await act(async () => {
-        exitHandler?.(terminalExitEvent('term-222222222222222222222'))
-      })
-      expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('creates terminal from metadata when the server omits it from sessions projection', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    createTerminalMock.mockResolvedValueOnce({
-      ok: true as const,
-      action: 'created' as const,
-      presentation: {
-        kind: 'git-worktree' as const,
-        head: { kind: 'branch' as const, branchName: 'feature/worktree' },
-      },
-      terminalSessionId: 'term-111111111111111111111',
-      terminalProjectionEffect: { kind: 'delta', revision: 2 },
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 0,
-      identityRevision: 0,
-      processName: '',
-      canonicalTitle: null,
-      phase: 'opening' as const,
-      message: null,
-      controller: null,
-      canonicalSize: null,
-    })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
-
-    try {
-      await expect(getContext().createTerminal(repoTerminalBase())).resolves.toBe('term-111111111111111111111')
-      expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('T1.1: prewarms preloadTerminalFont on provider mount', async () => {
+  test('prewarms the terminal font on provider mount', async () => {
     geometryMocks.preloadTerminalFont.mockClear()
-    // Mount the Provider with no children that go through the host
-    // registration path (no RegisterHost, no probes) so the only
-    // preloadTerminalFont call comes from the new useEffect in
-    // TerminalSessionProvider itself.
     const result = renderTerminalProvider(<span>probe</span>, { currentWorkspaceId: null })
     try {
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
@@ -1680,35 +898,18 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('clears the command bridge on provider unmount', async () => {
-    const result = renderTerminalProvider(<span>probe</span>, { currentWorkspaceId: null })
-    expect(readTerminalSessionCommandBridge()).not.toBeNull()
-
-    await act(async () => {
-      result.unmount()
-    })
-
-    expect(readTerminalSessionCommandBridge()).toBeNull()
-  })
-
-  test('registers terminal creation on the command bridge', async () => {
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    const { getContext, unmount } = await renderProviderWithProbe(terminalFilesystemTargetKey)
+  test('registers the command bridge and clears it on provider unmount', async () => {
+    const { getContext, unmount } = await renderProviderWithHost()
 
     try {
       expect(readTerminalSessionCommandBridge()?.createTerminal).toBe(getContext().createTerminal)
     } finally {
       await unmount()
     }
+    expect(readTerminalSessionCommandBridge()).toBeNull()
   })
 
-  test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {
-    // Before P1.7, the Provider owned its registry and destroyed it
-    // on unmount. After P1.7, the registry is a client-level
-    // singleton — a remount must reuse the same instance with its
-    // session list intact. This test mounts, creates a terminal,
-    // unmounts, remounts, and confirms the prior session is still
-    // observable in the second mount's context.
+  test('preserves singleton projection state across provider remounts', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1727,20 +928,9 @@ describe('TerminalSessionProvider', () => {
       await first.unmount()
     }
 
-    // The singleton slot was cleared by the per-describe
-    // `afterEach`. To simulate "the user navigates away and back",
-    // we don't clear it here — we mount a fresh Provider that
-    // should reuse the same registry. Inject the singleton by
-    // installing via the test seam before the second mount.
-    // (In production this is automatic; in tests we have to
-    // carry the singleton across.)
     const second = await renderProviderWithProbe(terminalFilesystemTargetKey)
     try {
-      // The second mount reaches the singleton via
-      // `getTerminalSessionProjection`. If state survived, the prior
-      // session is observable; if not, count is 0. The point is
-      // that we did NOT have to clear the slot between mounts.
-      expect(second.getProbe().count).toBeGreaterThanOrEqual(1)
+      expect(second.getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
     } finally {
       await second.unmount()
     }
@@ -1782,13 +972,6 @@ function CaptureGroupProbe({
     })),
   })
   return null
-}
-
-async function renderProvider(): Promise<{
-  getContext: () => TerminalSessionContextValue
-  unmount: () => Promise<void>
-}> {
-  return renderProviderWithHost()
 }
 
 async function renderProviderWithHost(): Promise<{

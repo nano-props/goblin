@@ -26,14 +26,16 @@ describe('workspace pane action queue', () => {
   test('serializes the same complete resource target and cleans up on idle', async () => {
     const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
+    const firstStarted = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(TARGET, async () => {
       workspaceOrder.push('first-start')
+      firstStarted.resolve()
       await release.promise
       workspaceOrder.push('first-end')
     })
     const second = runWorkspacePaneAction(TARGET, () => workspaceOrder.push('second'))
 
-    await Promise.resolve()
+    await firstStarted.promise
     expect(workspaceOrder).toEqual(['first-start'])
     release.resolve()
     await Promise.all([first, second])
@@ -49,13 +51,15 @@ describe('workspace pane action queue', () => {
     }
     const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
+    const firstStarted = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(workspaceTarget, async () => {
       workspaceOrder.push('first')
+      firstStarted.resolve()
       await release.promise
     })
     const second = runWorkspacePaneAction(workspaceTarget, () => workspaceOrder.push('second'))
 
-    await Promise.resolve()
+    await firstStarted.promise
     expect(workspaceOrder).toEqual(['first'])
     release.resolve()
     await Promise.all([first, second])

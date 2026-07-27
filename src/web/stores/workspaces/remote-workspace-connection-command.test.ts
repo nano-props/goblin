@@ -3,7 +3,6 @@ import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspaceRemoteAdmission } from '#/web/workspace-capability.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
@@ -63,7 +62,7 @@ describe('remote lifecycle command client', () => {
       { workspaceId, workspaceRuntimeId: runtimeId },
       undefined,
     )
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
     release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 3, target } })
@@ -82,7 +81,7 @@ describe('remote lifecycle command client', () => {
       kind: 'ready',
       target,
     })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'ready', target },
       lifecycleAttemptId: 3,
     })
@@ -119,7 +118,7 @@ describe('remote lifecycle command client', () => {
     }))
     release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 1, target } })
     await expect(pending).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
   })
@@ -131,7 +130,7 @@ describe('remote lifecycle command client', () => {
     ).resolves.toMatchObject({
       kind: 'superseded',
     })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
   })
@@ -144,7 +143,7 @@ describe('remote lifecycle command client', () => {
       kind: 'cancelled',
       workspaceId: workspaceId,
     })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
   })
@@ -158,7 +157,7 @@ describe('remote lifecycle command client', () => {
       workspaceId: workspaceId,
       reason: 'unknown',
     })
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
   })
@@ -197,9 +196,15 @@ describe('remote lifecycle command client', () => {
       runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
     ).resolves.toEqual({ kind: 'superseded', workspaceId })
     expect(requestRepoProjectionReadModelRefresh).not.toHaveBeenCalled()
-    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[workspaceId])).toMatchObject({
+    expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       lifecycleAttemptId: 4,
     })
   })
 })
+
+function remoteAdmission() {
+  const admission = useWorkspacesStore.getState().workspaces[workspaceId]?.admission
+  if (admission?.kind !== 'remote') throw new Error('expected remote workspace admission')
+  return admission
+}

@@ -5,6 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 
@@ -549,13 +550,13 @@ describe('FiletreeView — React Aria keyboard integration', () => {
     row('src').focus()
     await user.keyboard('{ArrowDown}')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await waitForNextMacrotask()
     })
     expect(document.activeElement).toBe(row('README.md'))
 
     await user.keyboard('{ArrowUp}')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await waitForNextMacrotask()
     })
     expect(document.activeElement).toBe(row('src'))
   })

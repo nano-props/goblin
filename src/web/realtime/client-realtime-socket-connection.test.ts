@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   ClientRealtimeRequestError,
   createClientRealtimeSocketConnection,
@@ -28,11 +29,6 @@ let wsMock: WebSocketMockHandle
 describe('client realtime socket connection', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
-    vi.useRealTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   test('sends typed requests and settles matching responses', async () => {
@@ -64,7 +60,7 @@ describe('client realtime socket connection', () => {
   })
 
   test('forwards feature realtime messages and sends heartbeat envelopes', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const onRealtimeMessage = vi.fn()
     const connection = createTestConnection({ onRealtimeMessage, hasRealtimeSubscribers: () => true })
     connection.openForRealtime()
@@ -98,7 +94,7 @@ describe('client realtime socket connection', () => {
   })
 
   test('cancels pending reconnect when realtime subscribers drain', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let subscribed = true
     const connection = createTestConnection({
       onRealtimeMessage: vi.fn(),
@@ -170,7 +166,7 @@ describe('client realtime socket connection', () => {
   })
 
   test('keeps one outage id across reconnect attempts and advances it after recovery', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
     connection.openForRealtime()
     wsMock.instances[0]?.emitOpen()
@@ -222,7 +218,7 @@ describe('client realtime socket connection', () => {
   })
 
   test('times out realtime-only sockets that never open', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const connection = createTestConnection({
       onRealtimeMessage: vi.fn(),
       hasRealtimeSubscribers: () => true,
@@ -242,7 +238,7 @@ describe('client realtime socket connection', () => {
   })
 
   test('keeps the open timeout when realtime demand drains before a connecting socket opens', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let subscribed = true
     const connection = createTestConnection({
       onRealtimeMessage: vi.fn(),

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -85,11 +85,16 @@ describe('RepoCloneDialog', () => {
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
-    await flush()
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
+      activateWorkspace.mock.invocationCallOrder[0]!,
+    )
+    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
+      onOpenChange.mock.invocationCallOrder[0]!,
+    )
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {
@@ -109,10 +114,11 @@ describe('RepoCloneDialog', () => {
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
-    await flush()
 
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
-      description: '/tmp/cloned-repo\nrecent write failed',
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
+        description: '/tmp/cloned-repo\nrecent write failed',
+      })
     })
   })
 })
@@ -152,12 +158,5 @@ function click(selector: string) {
   const element = button(selector)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
   })
 }

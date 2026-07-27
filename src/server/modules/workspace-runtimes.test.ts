@@ -20,6 +20,7 @@ import {
   runRemoteWorkspaceLifecycle,
   workspaceRuntimeHasGitCapability,
 } from '#/server/modules/workspace-runtimes.ts'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const USER_ID = 'user_repo_runtime'
@@ -200,10 +201,8 @@ describe('workspace runtimes', () => {
       workspaceRuntimeId: runtimeId,
       probe: initial,
     })
-    let finishFirst!: () => void
-    const firstGate = new Promise<void>((resolve) => {
-      finishFirst = resolve
-    })
+    const firstStarted = Promise.withResolvers<void>()
+    const firstGate = Promise.withResolvers<void>()
     const calls: string[] = []
     const first = runSerializedWorkspaceRefresh({
       userId: USER_ID,
@@ -211,7 +210,8 @@ describe('workspace runtimes', () => {
       workspaceRuntimeId: runtimeId,
       probe: async () => {
         calls.push('first')
-        await firstGate
+        firstStarted.resolve()
+        await firstGate.promise
         return {
           ...initial,
           capabilities: { ...initial.capabilities, git: { status: 'unavailable' as const } },
@@ -227,9 +227,9 @@ describe('workspace runtimes', () => {
         return { ...initial, diagnostics: [{ scope: 'git' as const, message: 'git timed out' }] }
       },
     })
-    await Promise.resolve()
+    await firstStarted.promise
     expect(calls).toEqual(['first'])
-    finishFirst()
+    firstGate.resolve()
     await expect(first).resolves.toMatchObject({ kind: 'committed' })
     await expect(second).resolves.toMatchObject({ kind: 'failed' })
     expect(calls).toEqual(['first', 'second'])
@@ -293,14 +293,8 @@ describe('workspace runtimes', () => {
       workspaceRuntimeId: runtimeId,
       probe: available,
     })
-    let releaseCleanup!: () => void
-    let markCleanupStarted!: () => void
-    const cleanupGate = new Promise<void>((resolve) => {
-      releaseCleanup = resolve
-    })
-    const cleanupStarted = new Promise<void>((resolve) => {
-      markCleanupStarted = resolve
-    })
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupGate = Promise.withResolvers<void>()
     let durableCleanupCommitted = false
     const oldRefresh = runSerializedWorkspaceRefresh({
       userId: USER_ID,
@@ -312,11 +306,11 @@ describe('workspace runtimes', () => {
       }),
       beforeCommit: async () => {
         durableCleanupCommitted = true
-        markCleanupStarted()
-        await cleanupGate
+        cleanupStarted.resolve()
+        await cleanupGate.promise
       },
     })
-    await cleanupStarted
+    await cleanupStarted.promise
     expect(durableCleanupCommitted).toBe(true)
     // The downgrade is the transition's linearization point. While derived
     // cleanup is pending, readers see neither the old Git authority nor a
@@ -336,9 +330,9 @@ describe('workspace runtimes', () => {
       workspaceRuntimeId: reopened,
       probe: nextProbe,
     })
-    await Promise.resolve()
+    await waitForNextMacrotask()
     expect(nextProbe).not.toHaveBeenCalled()
-    releaseCleanup()
+    cleanupGate.resolve()
     await expect(oldRefresh).resolves.toMatchObject({ kind: 'committed' })
     await expect(newRefresh).resolves.toMatchObject({ kind: 'committed' })
   })

@@ -14,6 +14,38 @@ function requiredWorkspaceLocator(input: string) {
 }
 
 describe('terminal session create provider', () => {
+  test('forwards an admitted create with its validated capability and operation signal', async () => {
+    const result = { ok: false as const, message: 'error.invalid-arguments' }
+    const createAdmitted = vi.fn(async () => result)
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const provider = createTerminalSessionCreateProvider({
+      sessionService: { createAdmitted },
+      worktreeOperations,
+    })
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/expected', {
+      userId: 'user-test',
+      workspaceId,
+      workspaceRuntimeId: 'repo-runtime-test',
+    })
+    const request = createRequest()
+
+    await expect(
+      worktreeOperations.runOperation(capability, async (permit) =>
+        provider.createAdmitted('client-test', 'user-test', request, {
+          physicalWorktreeCapability: capability,
+          permit,
+        }),
+      ),
+    ).resolves.toEqual({ admitted: true, value: result })
+    expect(createAdmitted).toHaveBeenCalledWith(
+      'client-test',
+      'user-test',
+      request,
+      capability,
+      expect.any(AbortSignal),
+    )
+  })
+
   test('rejects an active permit issued for a different physical worktree', async () => {
     const createAdmitted = vi.fn()
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
