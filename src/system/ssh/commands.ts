@@ -591,11 +591,7 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
     'fi',
     '[ -n "$root_namespace_fact" ] || exit 1',
     `canonical=$(cd -- ${shellQuote(worktreePath)} && pwd -P) || exit 1`,
-    'endpoint_stat=$(stat -c "%d %i" "$canonical" 2>/dev/null || stat -f "%d %i" "$canonical" 2>/dev/null) || exit 1',
-    'set -- $endpoint_stat',
-    '[ "$#" -eq 2 ] || exit 1',
-    'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
-    'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
+    'printf \'%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical"',
   ].join('\n')
 }
 

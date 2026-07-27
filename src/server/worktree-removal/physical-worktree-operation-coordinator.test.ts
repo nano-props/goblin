@@ -7,23 +7,13 @@ import {
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 describe('physical worktree operation coordinator', () => {
-  test('admits one queue for multiple generations of the same identity', async () => {
+  test('admits one queue for multiple captures of the same stable identity', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const oldCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
-      execution: {
-        kind: 'local',
-        canonicalWorktreePath: identity.endpoint,
-        endpointMarker: { deviceId: '1', inode: '1' },
-      },
     })
     const currentCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
-      execution: {
-        kind: 'local',
-        canonicalWorktreePath: identity.endpoint,
-        endpointMarker: { deviceId: '1', inode: '2' },
-      },
     })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
     let executions = 0

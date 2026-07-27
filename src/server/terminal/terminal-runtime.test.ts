@@ -150,7 +150,6 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
               kind: 'remote',
               canonicalWorktreePath: input.worktreePath,
               configFingerprint: 'terminal-runtime-test-config-fingerprint',
-              endpointMarker: { deviceId: '10', inode: '20' },
               target: {
                 id: input.workspaceId,
                 alias: 'prod',
@@ -164,10 +163,8 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
           : {
               kind: 'local',
               canonicalWorktreePath: input.worktreePath,
-              endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
             },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       })
     }
   }

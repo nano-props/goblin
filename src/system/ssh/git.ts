@@ -755,7 +755,6 @@ export async function removeRemoteWorktree(
     run?: RemoteGitRunner
     beforeRemove: () => Promise<ExecResult>
     afterWorktreeRemoved: () => Promise<ExecResult>
-    validateBeforeRemove?: () => Promise<ExecResult>
   },
 ): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -818,8 +817,6 @@ export async function removeRemoteWorktree(
 
   const prepared = await input.beforeRemove()
   if (!prepared.ok) return prepared
-  const exact = await input.validateBeforeRemove?.()
-  if (exact && !exact.ok) return exact
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
 
   const removeResult = await run(

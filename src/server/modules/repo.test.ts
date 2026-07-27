@@ -30,10 +30,8 @@ async function physicalWorktreeCapabilityForTest(workspaceId: WorkspaceId, workt
       execution: {
         kind: 'local',
         canonicalWorktreePath,
-        endpointMarker: { deviceId: '1', inode: '1' },
       },
       runtimeSignal: new AbortController().signal,
-      validateExecution: async () => undefined,
     },
   )
 }
@@ -777,10 +775,8 @@ describe('fetchRepo invalidation publishing', () => {
         execution: {
           kind: 'local',
           canonicalWorktreePath: '/tmp/repo-worktree',
-          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
         },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       },
     )
 
@@ -858,10 +854,8 @@ describe('fetchRepo invalidation publishing', () => {
         execution: {
           kind: 'local',
           canonicalWorktreePath: '/tmp/repo-worktree',
-          endpointMarker: { deviceId: '1', inode: '1' },
         },
         runtimeSignal: new AbortController().signal,
-        validateExecution: async () => undefined,
       },
     )
 

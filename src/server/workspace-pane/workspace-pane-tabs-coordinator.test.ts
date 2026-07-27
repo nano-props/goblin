@@ -1112,16 +1112,12 @@ describe('workspace pane tabs coordinator queues', () => {
   test('holds the old physical permit while removing a stale projection index', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     let live = true
-    let executionExists = true
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
-      validateExecution: async () => {
-        if (!executionExists) throw new Error('ENOENT')
-      },
     })
     let revision = 0
     const coordinator = createWorkspacePaneTabsCoordinator({
@@ -1182,7 +1178,6 @@ describe('workspace pane tabs coordinator queues', () => {
 
     releaseRemoval()
     await removal
-    executionExists = false
     await expect(coordinator.listWorkspaceTabs(input)).resolves.toMatchObject({ entries: [] })
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
   })
@@ -1190,16 +1185,12 @@ describe('workspace pane tabs coordinator queues', () => {
   test('restore holds an indexed stale target permit before removing its physical ref', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     let live = true
-    let executionExists = true
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
-      validateExecution: async () => {
-        if (!executionExists) throw new Error('ENOENT')
-      },
     })
     let revision = 0
     const coordinator = createWorkspacePaneTabsCoordinator({
@@ -1263,7 +1254,6 @@ describe('workspace pane tabs coordinator queues', () => {
 
     releaseRemoval()
     await removal
-    executionExists = false
     await expect(
       coordinator.restoreScope({
         ...listInput,
@@ -1274,23 +1264,15 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
   })
 
-  test('strictly validates the current capability when an indexed alias has the same identity', async () => {
+  test('rebinds an indexed alias to a fresh capability at the same stable identity', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree-x')
-    let oldValid = true
-    let currentValidationCount = 0
     const oldCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
       worktreePath: '/repo/worktree-x',
-      validateExecution: async () => {
-        if (!oldValid) throw new Error('stale physical generation')
-      },
     })
     const currentCapability = issueTestPhysicalWorktreeExecutionCapability({
       identity,
       worktreePath: '/repo/worktree-alias',
-      validateExecution: async () => {
-        currentValidationCount += 1
-      },
     })
     let useCurrentCapability = false
     let revision = 0
@@ -1333,12 +1315,11 @@ describe('workspace pane tabs coordinator queues', () => {
     }
     await coordinator.listWorkspaceTabs(input)
 
-    oldValid = false
     useCurrentCapability = true
     await expect(coordinator.listWorkspaceTabs(input)).resolves.toMatchObject({
       entries: [{ target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree-alias' } }],
     })
-    expect(currentValidationCount).toBeGreaterThan(0)
+    expect(coordinator.physicalWorktreeTargets(identity)).toHaveLength(1)
   })
 })
 

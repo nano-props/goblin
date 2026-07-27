@@ -90,7 +90,7 @@ export class WorktreeRemovalApplication {
                   this.deps.worktreeOperations.assertPermit(physicalCapability, permit)
                   // Reverse-index refs only identify stale runtime scopes. They
                   // cannot authorize durable retirement: a stable target may
-                  // already be rebound to a new physical generation.
+                  // already be rebound under a newer admission lease.
                   await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability)
                   this.broadcast(affectedScopes)
                   return { ok: true, message: '' }

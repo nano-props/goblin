@@ -75,7 +75,6 @@ function remotePhysicalWorktreeExecutionCapability() {
       kind: 'remote',
       canonicalWorktreePath: REMOTE_WORKTREE_PATH,
       configFingerprint: 'ensurer-test-config',
-      endpointMarker: { deviceId: '10', inode: '20' },
       target: {
         id: REMOTE_REPO_ROOT,
         alias: 'prod',

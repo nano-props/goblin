@@ -238,30 +238,6 @@ describe('WorktreeRemovalApplication', () => {
     expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
-  test('fails remote lifecycle when queued validation hits a remote runtime failure', async () => {
-    const failure = new RemoteWorkspaceRuntimeFailureError({
-      workspaceId: target.repoRoot,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      reason: 'unreachable',
-      message: 'connection refused',
-    })
-    const capability = issueTestPhysicalWorktreeExecutionCapability({
-      identity: testPhysicalWorktreeIdentity(target.worktreePath),
-      validateExecution: async () => {
-        throw failure
-      },
-    })
-    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
-    const application = createApplication({
-      physicalWorktrees: { capture: async () => capability },
-    })
-
-    await expect(
-      application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
-    ).resolves.toEqual({ ok: false, message: 'connection refused' })
-    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
-  })
-
   test('does not retire pane layout after worktree and branch removal', async () => {
     const retireTarget = vi.fn(async () => {})
     const application = createApplication({ retireTarget })
@@ -304,7 +280,7 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
-  test('does not retire durable layout from a removed physical generation', async () => {
+  test('does not retire durable layout from a removed physical binding', async () => {
     const retireTarget = vi.fn(async () => {})
     const physicalWorktreeTargets = [
       {

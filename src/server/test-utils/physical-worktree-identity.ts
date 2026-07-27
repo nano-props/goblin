@@ -30,7 +30,6 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
     worktreePath?: string
     execution?: PhysicalWorktreeExecutionBinding
     runtimeSignal?: AbortSignal
-    validateExecution?(signal: AbortSignal): Promise<void>
   }): PhysicalWorktreeExecutionCapability {
     const endpoint = input.worktreePath ?? input.identity.endpoint
     return this.issueCapability({
@@ -42,10 +41,8 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
       execution: input.execution ?? {
         kind: 'local',
         canonicalWorktreePath: input.identity.endpoint,
-        endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
       },
       runtimeSignal: input.runtimeSignal ?? new AbortController().signal,
-      validateExecution: input.validateExecution ?? (async () => undefined),
     })
   }
 }

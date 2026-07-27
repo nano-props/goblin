@@ -122,27 +122,17 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
   })
 
-  test('does not clear a rebound generation at the same physical identity', () => {
+  test('does not clear newly rebound ownership at the same physical identity', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const first = physicalWorktreeAdmissionLease(
       issueTestPhysicalWorktreeExecutionCapability({
         identity,
-        execution: {
-          kind: 'local',
-          canonicalWorktreePath: identity.endpoint,
-          endpointMarker: { deviceId: '1', inode: '1' },
-        },
       }),
     )
     const rebound = physicalWorktreeAdmissionLease(
       issueTestPhysicalWorktreeExecutionCapability({
         identity,
-        execution: {
-          kind: 'local',
-          canonicalWorktreePath: identity.endpoint,
-          endpointMarker: { deviceId: '1', inode: '2' },
-        },
       }),
     )
     overlay.registerPhysicalTarget({ ...scope, target, lease: first })

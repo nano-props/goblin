@@ -93,7 +93,6 @@ import {
 } from '#/shared/workspace-locator.ts'
 import {
   physicalWorktreeExecutionBinding,
-  validatePhysicalWorktreeExecution,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
@@ -710,22 +709,6 @@ function createLocalRepoSource(
       }
       const prepared = await lifecycle.beforeRemove()
       if (!prepared.ok) return prepared
-      if (physicalWorktreeCapability) {
-        try {
-          await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
-          const currentPath = await fs.realpath(removable.target.path)
-          const currentStat = await fs.stat(currentPath, { bigint: true })
-          if (
-            exactExecution?.kind !== 'local' ||
-            currentPath !== exactExecution.canonicalWorktreePath ||
-            currentStat.dev.toString(10) !== exactExecution.endpointMarker.deviceId ||
-            currentStat.ino.toString(10) !== exactExecution.endpointMarker.inode
-          )
-            throw new Error('error.workspace-runtime-stale')
-        } catch (error) {
-          return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
-        }
-      }
       let removed: Awaited<ReturnType<typeof removeWorktree>>
       try {
         removed = await removeWorktree(
@@ -875,17 +858,6 @@ async function createRemoteRepoSource(
         run,
         beforeRemove: lifecycle.beforeRemove,
         afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
-        validateBeforeRemove: physicalWorktreeCapability
-          ? async () => {
-              try {
-                await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
-                return { ok: true, message: '' }
-              } catch (error) {
-                if (isRemoteWorkspaceRuntimeFailure(error)) throw error
-                return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
-              }
-            }
-          : undefined,
       })
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },

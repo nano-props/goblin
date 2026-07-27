@@ -95,7 +95,6 @@ function remoteCapability(target: ReturnType<typeof remoteTarget>): PhysicalWork
       canonicalWorktreePath: REMOTE_PATH,
       target,
       configFingerprint: 'config-a',
-      endpointMarker: { deviceId: '10', inode: '20' },
     },
   })
 }
