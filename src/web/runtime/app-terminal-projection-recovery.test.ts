@@ -62,6 +62,60 @@ describe('AppTerminalProjectionRecovery', () => {
     )
   })
 
+  test('classifies a rejected active-runtime snapshot as a pending hydration failure', async () => {
+    const markFailed = vi.fn()
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => false),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions: async () => ({ revision: 1, sessions: [] }),
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'pending' }),
+      beginHydration: vi.fn(),
+      markReady: vi.fn(),
+      markFailed,
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 0 })
+
+    await vi.waitFor(() =>
+      expect(markFailed).toHaveBeenCalledWith(
+        TARGET.workspaceId,
+        TARGET.workspaceRuntimeId,
+        'Terminal sessions snapshot rejected by the active runtime membership',
+      ),
+    )
+  })
+
+  test('does not replace ready hydration after a background refresh fails', async () => {
+    const markFailed = vi.fn()
+    const logFailure = vi.fn()
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions: async () => await Promise.reject(new Error('network unavailable')),
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'ready' }),
+      beginHydration: vi.fn(),
+      markReady: vi.fn(),
+      markFailed,
+      isFocusRefreshDue: () => true,
+      logFailure,
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 0 })
+
+    await vi.waitFor(() => expect(logFailure).toHaveBeenCalledOnce())
+    expect(markFailed).not.toHaveBeenCalled()
+  })
+
   test('fails fast when the server snapshot does not reach the requested revision', async () => {
     const markFailed = vi.fn()
     const recoverSessions = vi.fn(async () => ({ revision: 2, sessions: [] }))

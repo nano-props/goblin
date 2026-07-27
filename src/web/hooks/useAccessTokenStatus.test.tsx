@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { act, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -12,14 +13,9 @@ vi.mock('#/web/lib/server-fetch.ts', () => ({
 }))
 
 beforeEach(() => {
-  vi.useRealTimers()
   vi.mocked(fetchServerJson).mockReset()
   vi.mocked(postServerJson).mockReset()
   window.history.replaceState({}, '', '/')
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('useAccessTokenStatus', () => {
@@ -56,7 +52,7 @@ describe('useAccessTokenStatus', () => {
   })
 
   test('aborts a hanging whoami probe after the auth status timeout', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.mocked(fetchServerJson).mockImplementation((_path, _decode, init) => {
       const signal = init?.signal
       return new Promise((_, reject) => {
@@ -90,12 +86,9 @@ describe('useAccessTokenStatus', () => {
 
     renderInJsdom(<Harness />)
 
-    expect(postServerJson).toHaveBeenCalledWith(
-      '/api/login',
-      { token: 'url-token' },
-      expect.any(Function),
-      { signal: expect.any(AbortSignal) },
-    )
+    expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'url-token' }, expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
     expect(window.location.search).toBe('?x=1')
 
     await act(async () => {
@@ -105,7 +98,7 @@ describe('useAccessTokenStatus', () => {
   })
 
   test('clears the auth timeout when URL token login fails before whoami', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.mocked(postServerJson).mockRejectedValueOnce(new Error('bad token'))
     window.history.replaceState({}, '', '/?accessToken=bad-token')
 

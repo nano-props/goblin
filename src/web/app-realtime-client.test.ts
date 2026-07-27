@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { createClientAppRealtime } from '#/web/app-realtime-client.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
@@ -9,11 +10,7 @@ let wsMock: WebSocketMockHandle
 describe('client app realtime', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
+    useFakeTimers()
   })
 
   test('notifies recovery subscribers only after a reconnect open', async () => {

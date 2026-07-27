@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import {
   returnToFromHref,
   parsedWorkspacePaneRouteFromTargetHref,
@@ -31,8 +32,7 @@ describe('primary window route navigation helpers', () => {
 
     await expect(committed).resolves.toBe(false)
     navigation.resolve()
-    await navigation.promise
-    await Promise.resolve()
+    await waitForNextMacrotask()
   })
 
   test('propagates a routed commit effect failure through the awaited transaction', async () => {
@@ -76,6 +76,7 @@ describe('primary window route navigation helpers', () => {
 
     await expect(committed).rejects.toThrow('abandon effect failed')
     navigation.resolve()
+    await waitForNextMacrotask()
   })
 
   test('accepts an operation route only after navigation lands on the requested href', async () => {

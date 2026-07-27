@@ -148,13 +148,10 @@ describe('theme store OS-appearance sync', () => {
   test('pref=light ignores OS flips — explicit pick pins the resolved theme', async () => {
     const mql = createMediaQuery(false) // OS starts light
     installWindow({ matchMedia: mql })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
@@ -173,13 +170,10 @@ describe('theme store OS-appearance sync', () => {
   test('pref=dark ignores OS flips — explicit pick pins the resolved theme', async () => {
     const mql = createMediaQuery(true) // OS starts dark
     installWindow({ matchMedia: mql })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'dark', colorTheme: 'github' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'dark', colorTheme: 'github' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
@@ -201,13 +195,10 @@ describe('theme store OS-appearance sync', () => {
     const addSpy = vi.spyOn(mql, 'addEventListener')
     const removeSpy = vi.spyOn(mql, 'removeEventListener')
     installWindow({ matchMedia: mql })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
 
@@ -239,13 +230,10 @@ describe('theme store OS-appearance sync', () => {
     // optional chain there yields `undefined` when matchMedia is
     // absent, and `.matches` would throw).
     installWindow({ matchMedia: 'absent' })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
@@ -257,13 +245,10 @@ describe('theme store OS-appearance sync', () => {
   test('pref=auto + auto→light→auto re-pins the resolved theme from matchMedia at each step', async () => {
     const mql = createMediaQuery(true) // OS is dark
     installWindow({ matchMedia: mql })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
@@ -298,13 +283,10 @@ describe('theme store OS-appearance sync', () => {
     // round-trip, even when the pref is explicit.
     const mql = createMediaQuery(true) // OS is dark
     installWindow({ matchMedia: mql })
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => settingsResponse({ theme: 'light', colorTheme: 'github' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'light', colorTheme: 'github' }),
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()

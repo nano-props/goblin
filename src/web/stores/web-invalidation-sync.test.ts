@@ -3,35 +3,14 @@ import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import {
+  installWebSocketMock,
+  type MockWebSocketInstance,
+  type WebSocketMockHandle,
+} from '#/web/test-utils/websocket-mock.ts'
 
-class FakeWebSocket {
-  static instances: FakeWebSocket[] = []
-  private listeners = new Map<string, Set<(event: any) => void>>()
-
-  public readonly url: string
-  constructor(url: string) {
-    this.url = url
-    FakeWebSocket.instances.push(this)
-  }
-
-  addEventListener(type: string, listener: (event: any) => void): void {
-    const next = this.listeners.get(type) ?? new Set()
-    next.add(listener)
-    this.listeners.set(type, next)
-  }
-
-  close(): void {
-    this.emit('close', {})
-  }
-
-  emitMessage(data: unknown): void {
-    this.emit('message', { data: JSON.stringify(data) })
-  }
-
-  private emit(type: string, event: any): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(event)
-  }
-}
+let wsMock: WebSocketMockHandle
 
 function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
   const documentElement = {
@@ -65,7 +44,7 @@ function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
       clearInterval,
     },
   })
-  vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+  wsMock = installWebSocketMock({ autoOpen: false })
 }
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
@@ -76,30 +55,14 @@ function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientB
   }
 }
 
-function latestSocket(): FakeWebSocket {
-  const socket = FakeWebSocket.instances.at(-1)
+function latestSocket(): MockWebSocketInstance {
+  const socket = wsMock.instances.at(-1)
   if (!socket) throw new Error('Expected websocket to be created')
   return socket
 }
 
-async function flushAsyncWork(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
-}
-
-async function waitUntil(assertion: () => void, attempts = 20): Promise<void> {
-  let lastError: unknown = null
-  for (let index = 0; index < attempts; index++) {
-    try {
-      assertion()
-      return
-    } catch (error) {
-      lastError = error
-      await flushAsyncWork()
-    }
-  }
-  throw lastError
+function emitServerMessage(message: unknown): void {
+  latestSocket().emitMessage(JSON.stringify(message))
 }
 
 function settingsSnapshotResponse(overrides: Record<string, unknown> & { colorTheme?: string } = {}) {
@@ -113,7 +76,6 @@ describe('web invalidation sync', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
-    FakeWebSocket.instances = []
   })
 
   afterEach(async () => {
@@ -124,24 +86,21 @@ describe('web invalidation sync', () => {
   test('theme store refetches theme state on theme invalidation', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let settingsReadCount = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => {
-          settingsReadCount++
-          return settingsSnapshotResponse({
-            theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
-          })
-        },
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => {
+        settingsReadCount++
+        return settingsSnapshotResponse({
+          theme: settingsReadCount > 1 ? 'dark' : 'auto',
+          colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
+        })
+      },
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['theme'] })
-    await waitUntil(() => {
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
+    await vi.waitFor(() => {
       expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
       expect(document.documentElement.getAttribute('data-color-theme')).toBe('github')
@@ -151,27 +110,24 @@ describe('web invalidation sync', () => {
   test('settings invalidation uses same-origin websocket when bootstrap has no server handoff', async () => {
     installWebBootstrap(webBootstrap({ initialServer: null }))
     let settingsReadCount = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => {
-          settingsReadCount++
-          return settingsSnapshotResponse({
-            theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
-          })
-        },
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => {
+        settingsReadCount++
+        return settingsSnapshotResponse({
+          theme: settingsReadCount > 1 ? 'dark' : 'auto',
+          colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
+        })
+      },
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
 
     expect(latestSocket().url).toBe('ws://127.0.0.1:32100/ws/invalidation')
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['theme'] })
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
 
-    await waitUntil(() => {
+    await vi.waitFor(() => {
       expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     })
   })
@@ -179,26 +135,23 @@ describe('web invalidation sync', () => {
   test('settings snapshot invalidation no longer refetches theme state', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let settingsReadCount = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => {
-          settingsReadCount++
-          return settingsSnapshotResponse({
-            theme: settingsReadCount > 1 ? 'dark' : 'auto',
-            colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
-          })
-        },
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => {
+        settingsReadCount++
+        return settingsSnapshotResponse({
+          theme: settingsReadCount > 1 ? 'dark' : 'auto',
+          colorTheme: settingsReadCount > 1 ? 'github' : 'macos',
+        })
+      },
+    }))
 
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().hydrate()
     const beforeInvalidationReadCount = settingsReadCount
 
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
-    await flushAsyncWork()
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    await flushMicrotasks()
 
     expect(settingsReadCount).toBe(beforeInvalidationReadCount)
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
@@ -214,8 +167,8 @@ describe('web invalidation sync', () => {
     await useThemeStore.getState().hydrate()
     const beforeInvalidationFetchCount = fetchMock.mock.calls.length
 
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['session'] })
-    await flushAsyncWork()
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['session'] })
+    await flushMicrotasks()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
@@ -224,26 +177,24 @@ describe('web invalidation sync', () => {
   test('i18n store refetches payload only on i18n invalidation', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let i18nReadCount = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string) => ({
-        ok: true,
-        json: async () => {
-          if (input.endsWith('/api/i18n')) {
-            i18nReadCount++
-            return i18nReadCount > 1
-              ? { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } }
-              : { lang: 'en', pref: 'auto', dict: { hello: 'hello' } }
-          }
-          throw new Error(`Unexpected fetch: ${input}`)
-        },
-      })),
-    )
+    mockFetch(async (input: RequestInfo | URL) => ({
+      ok: true,
+      json: async () => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+        if (url.endsWith('/api/i18n')) {
+          i18nReadCount++
+          return i18nReadCount > 1
+            ? { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } }
+            : { lang: 'en', pref: 'auto', dict: { hello: 'hello' } }
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      },
+    }))
 
     const { useI18nStore } = await import('#/web/stores/i18n.ts')
     await useI18nStore.getState().hydrate()
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['i18n'] })
-    await waitUntil(() => {
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['i18n'] })
+    await vi.waitFor(() => {
       expect(useI18nStore.getState()).toMatchObject({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
       expect(document.documentElement.getAttribute('lang')).toBe('ja')
     })
@@ -269,17 +220,17 @@ describe('web invalidation sync', () => {
       label: 'test-sync',
     })
 
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
-    await flushAsyncWork()
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    await flushMicrotasks()
 
     expect(fetch).toHaveBeenCalledTimes(1)
 
     const resolveFirstFetch = resolvers.shift()
     if (!resolveFirstFetch) throw new Error('Expected first fetch resolver')
     resolveFirstFetch(1)
-    await waitUntil(() => {
+    await vi.waitFor(() => {
       expect(apply).toHaveBeenCalledWith(1)
       expect(fetch).toHaveBeenCalledTimes(2)
     })
@@ -287,7 +238,7 @@ describe('web invalidation sync', () => {
     const resolveSecondFetch = resolvers.shift()
     if (!resolveSecondFetch) throw new Error('Expected second fetch resolver')
     resolveSecondFetch(2)
-    await waitUntil(() => {
+    await vi.waitFor(() => {
       expect(apply).toHaveBeenNthCalledWith(2, 2)
       expect(fetch).toHaveBeenCalledTimes(2)
     })

@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -8,10 +10,6 @@ if (!WORKSPACE_ID || !SECOND_WORKSPACE_ID) throw new Error('invalid workspace lo
 const TARGET = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-1' }
 
 describe('RuntimeProjectionScope', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   test('coalesces overlapping lane invalidations into one follow-up operation', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
@@ -24,8 +22,7 @@ describe('RuntimeProjectionScope', () => {
     scope.runLatest('recovery', runFirst, publish, reject)
     scope.runLatest('recovery', runSecond, publish, reject)
     second.resolve('new')
-    await Promise.resolve()
-    await Promise.resolve()
+
     expect(runFirst).toHaveBeenCalledOnce()
     expect(runSecond).not.toHaveBeenCalled()
     expect(publish).not.toHaveBeenCalled()
@@ -39,7 +36,7 @@ describe('RuntimeProjectionScope', () => {
   })
 
   test('dispose aborts operations, cancels timers, releases subscriptions, and blocks late results', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const deferred = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
@@ -62,7 +59,6 @@ describe('RuntimeProjectionScope', () => {
     scope.dispose()
     deferred.resolve('late')
     await vi.runAllTimersAsync()
-    await Promise.resolve()
 
     expect((taskSignal as AbortSignal | null)?.aborted).toBe(true)
     expect(unsubscribe).toHaveBeenCalledOnce()
@@ -73,7 +69,7 @@ describe('RuntimeProjectionScope', () => {
   })
 
   test('coalesces timers by lane', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const first = vi.fn()
     const second = vi.fn()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
@@ -103,8 +99,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     const replacement = registry.scopeFor({ workspaceId: TARGET.workspaceId, workspaceRuntimeId: currentRuntimeId })
     lateSuccess.resolve('stale')
     lateFailure.reject(new Error('stale failure'))
-    await Promise.resolve()
-    await Promise.resolve()
+    await waitForNextMacrotask()
 
     expect(oldScope.isActive()).toBe(false)
     expect(publish).not.toHaveBeenCalled()

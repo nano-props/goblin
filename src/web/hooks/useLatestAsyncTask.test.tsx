@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
+import { useLatestAsyncTask, type LatestAsyncTaskResult } from '#/web/hooks/useLatestAsyncTask.ts'
 
 describe('useLatestAsyncTask', () => {
   test('marks superseded task results as stale and keeps latest result current', async () => {
-    const first = createDeferred<string>()
-    const second = createDeferred<string>()
+    const first = Promise.withResolvers<string>()
+    const second = Promise.withResolvers<string>()
     let latestTask:
       | {
           pending: boolean
@@ -24,31 +24,30 @@ describe('useLatestAsyncTask', () => {
 
     render(<HookHost />)
 
-    let firstPromise!: Promise<unknown>
-    let secondPromise!: Promise<unknown>
-    await act(async () => {
+    let firstPromise!: Promise<LatestAsyncTaskResult<string>>
+    let secondPromise!: Promise<LatestAsyncTaskResult<string>>
+    act(() => {
       firstPromise = latestTask!.runLatest(() => first.promise)
       secondPromise = latestTask!.runLatest(() => second.promise)
-      await Promise.resolve()
     })
 
-    expect(latestTask!.pending).toBe(true)
+    await waitFor(() => {
+      expect(latestTask!.pending).toBe(true)
+    })
 
+    let results: Array<LatestAsyncTaskResult<string>> = []
     await act(async () => {
       first.resolve('first')
       second.resolve('second')
-      await Promise.resolve()
+      results = await Promise.all([firstPromise, secondPromise])
     })
 
-    await expect(firstPromise).resolves.toEqual({ status: 'stale' })
-    await expect(secondPromise).resolves.toEqual({ status: 'current', value: 'second' })
-
-    await flush()
+    expect(results).toEqual([{ status: 'stale' }, { status: 'current', value: 'second' }])
     expect(latestTask!.pending).toBe(false)
   })
 
   test('reset invalidates the in-flight task and clears pending', async () => {
-    const deferred = createDeferred<string>()
+    const deferred = Promise.withResolvers<string>()
     let latestTask: ReturnType<typeof useLatestAsyncTask> | undefined
 
     function HookHost() {
@@ -58,12 +57,13 @@ describe('useLatestAsyncTask', () => {
 
     render(<HookHost />)
 
-    let pendingPromise!: Promise<unknown>
-    await act(async () => {
+    let pendingPromise!: Promise<LatestAsyncTaskResult<string>>
+    act(() => {
       pendingPromise = latestTask!.runLatest(() => deferred.promise)
-      await Promise.resolve()
     })
-    expect(latestTask!.pending).toBe(true)
+    await waitFor(() => {
+      expect(latestTask!.pending).toBe(true)
+    })
 
     act(() => {
       latestTask!.reset()
@@ -71,30 +71,15 @@ describe('useLatestAsyncTask', () => {
 
     expect(latestTask!.pending).toBe(false)
 
+    let result: LatestAsyncTaskResult<string> | undefined
     await act(async () => {
       deferred.resolve('done')
-      await Promise.resolve()
+      result = await pendingPromise
     })
-    await expect(pendingPromise).resolves.toEqual({ status: 'stale' })
+    expect(result).toEqual({ status: 'stale' })
   })
 })
 
 function render(element: ReactNode) {
   return renderInJsdom(element)
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
 }

@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-
-const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+import { useFakeTimers } from '#/test-utils/timers.ts'
 
 let hydrate: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.resetModules()
   vi.clearAllMocks()
   document.body.innerHTML = '<div id="root"></div>'
@@ -64,9 +62,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  vi.useRealTimers()
   document.body.innerHTML = ''
-  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
 describe('client entrypoint', () => {
@@ -98,23 +94,25 @@ describe('client entrypoint', () => {
 
     await act(async () => {
       await import('#/web/main.tsx')
-      await Promise.resolve()
     })
 
-    expect(document.body.textContent).toContain('Unable to load application resources.')
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Unable to load application resources.')
+    })
     expect(document.body.textContent).not.toContain('app mounted')
 
-    await act(async () => {
+    act(() => {
       document.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
     })
 
-    expect(hydrate).toHaveBeenCalledTimes(2)
-    expect(document.body.textContent).toContain('app mounted')
+    await waitFor(() => {
+      expect(hydrate).toHaveBeenCalledTimes(2)
+      expect(document.body.textContent).toContain('app mounted')
+    })
   })
 
   test('aborts the initial i18n hydrate and shows retry after the boot timeout', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     hydrate.mockImplementation(({ signal }: { signal: AbortSignal }) => {
       return new Promise<void>((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
@@ -143,18 +141,20 @@ describe('client entrypoint', () => {
 
     await act(async () => {
       await import('#/web/main.tsx')
-      await Promise.resolve()
     })
 
-    expect(document.body.textContent).toContain('Unable to load application resources.')
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Unable to load application resources.')
+    })
     expect(document.body.textContent).not.toContain('app mounted')
 
-    await act(async () => {
+    act(() => {
       document.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
     })
 
-    expect(hydrateHostInfo).toHaveBeenCalledTimes(2)
-    expect(document.body.textContent).toContain('app mounted')
+    await waitFor(() => {
+      expect(hydrateHostInfo).toHaveBeenCalledTimes(2)
+      expect(document.body.textContent).toContain('app mounted')
+    })
   })
 })

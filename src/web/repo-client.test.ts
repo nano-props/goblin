@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
@@ -86,10 +87,6 @@ describe('repo-client', () => {
     vi.resetModules()
     vi.restoreAllMocks()
     setClientBridgeForTests(null)
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   test('opens repository branch URLs through the native host bridge when available', async () => {
@@ -248,7 +245,7 @@ describe('repo-client', () => {
   })
 
   test('times out long-running fetch requests with a stable error key', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     mockFetch((_url, init) => {
       const signal = (init as RequestInit | undefined)?.signal
@@ -277,7 +274,7 @@ describe('repo-client', () => {
   })
 
   test('aborts the clone request after the clone request watchdog fires', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let requestSignal: AbortSignal | undefined
     const fetchMock = mockFetch((_url, init) => {
@@ -302,13 +299,15 @@ describe('repo-client', () => {
   })
 
   test('gives remove-worktree a multi-step mutation request budget', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let requestSignal: AbortSignal | undefined
+    const requestStarted = Promise.withResolvers<void>()
     mockFetch((_url, init) => {
       requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
       return new Promise((_resolve, reject) => {
         requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+        requestStarted.resolve()
       })
     })
 
@@ -321,21 +320,24 @@ describe('repo-client', () => {
     })
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
-    await Promise.resolve()
+    await requestStarted.promise
+    if (!requestSignal) throw new Error('missing remove-worktree request signal')
     await vi.advanceTimersByTimeAsync(240_000)
-    expect(requestSignal?.aborted).toBe(false)
+    expect(requestSignal.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(360_000)
     await assertion
   })
 
   test('gives patch generation an explicit long-read request budget', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let requestSignal: AbortSignal | undefined
+    const requestStarted = Promise.withResolvers<void>()
     mockFetch((_url, init) => {
       requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
       return new Promise((_resolve, reject) => {
         requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+        requestStarted.resolve()
       })
     })
 
@@ -343,9 +345,10 @@ describe('repo-client', () => {
     const request = getRepoPatch(workspaceId, 'repo-runtime-test', '/tmp/repo-feature')
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
-    await Promise.resolve()
+    await requestStarted.promise
+    if (!requestSignal) throw new Error('missing patch request signal')
     await vi.advanceTimersByTimeAsync(120_000)
-    expect(requestSignal?.aborted).toBe(false)
+    expect(requestSignal.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(780_000)
     await assertion
   })

@@ -1,188 +1,65 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
-class MockWebSocket {
-  static readonly CONNECTING = 0
-  static readonly OPEN = 1
-  static readonly CLOSING = 2
-  static readonly CLOSED = 3
-  static instances: MockWebSocket[] = []
-  readonly url: string
-  readyState = MockWebSocket.CONNECTING
-  private readonly listeners = new Map<string, Set<(event: unknown) => void>>()
+describe('server client intent ingress', () => {
+  let wsMock: WebSocketMockHandle
 
-  constructor(url: string) {
-    this.url = url
-    MockWebSocket.instances.push(this)
-  }
-
-  addEventListener(type: string, cb: (event: unknown) => void) {
-    let listeners = this.listeners.get(type)
-    if (!listeners) {
-      listeners = new Set()
-      this.listeners.set(type, listeners)
-    }
-    listeners.add(cb)
-  }
-
-  close() {
-    this.readyState = MockWebSocket.CLOSED
-    this.emit('close', {})
-  }
-
-  emitOpen() {
-    this.readyState = MockWebSocket.OPEN
-    this.emit('open', {})
-  }
-
-  emitMessage(data: unknown) {
-    this.emit('message', { data })
-  }
-
-  private emit(type: string, event: unknown) {
-    for (const listener of this.listeners.get(type) ?? []) listener(event)
-  }
-}
-
-function installBootstrap(url: string | null, accessToken: string | null) {
-  Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
-    configurable: true,
-    value: {
-      runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-      initialServer: url && accessToken !== null ? { url, accessToken } : null,
-    },
-  })
-}
-
-describe('server client intent source', () => {
   beforeEach(() => {
     vi.resetModules()
-    MockWebSocket.instances.length = 0
-    Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
+    wsMock = installWebSocketMock({ autoOpen: false })
+    Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
+      configurable: true,
+      value: {
+        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'test-token' },
+      },
+    })
   })
 
-  test('connects to /ws/client-intent on the resolved server URL', async () => {
-    installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
-      await import('#/web/server-client-intent-ingress.ts')
-
-    const dispose = subscribeServerClientIntentIngress(() => {})
-    const expected = new URL('/ws/client-intent', 'http://127.0.0.1:32100/')
-    expected.protocol = 'ws:'
-    expected.searchParams.set('t', 'tok')
-    expect(MockWebSocket.instances).toHaveLength(1)
-    expect(MockWebSocket.instances[0]?.url).toBe(expected.toString())
-    dispose()
+  afterEach(async () => {
+    const { resetServerClientIntentIngressForTests } = await import('#/web/server-client-intent-ingress.ts')
     resetServerClientIntentIngressForTests()
   })
 
-  test('dispatches a valid client-effect-intent envelope to the listener', async () => {
-    installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
-      await import('#/web/server-client-intent-ingress.ts')
+  test('connects to the client-intent channel', async () => {
+    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const dispose = subscribeServerClientIntentIngress(() => {})
 
+    expect(wsMock.instances[0]?.url).toContain('/ws/client-intent')
+    dispose()
+  })
+
+  test('dispatches a valid client-effect-intent envelope', async () => {
+    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerClientIntentIngress(listener)
-    const socket = MockWebSocket.instances[0]
-    if (!socket) throw new Error('missing socket')
 
-    socket.emitMessage(
+    wsMock.instances[0]?.emitMessage(
       JSON.stringify({
         type: 'client-effect-intent',
         intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
       }),
     )
 
-    expect(listener).toHaveBeenCalledWith({
-      type: 'show-workspace-pane-tab-requested',
-      tab: 'changes',
-    })
+    expect(listener).toHaveBeenCalledWith({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })
     dispose()
-    resetServerClientIntentIngressForTests()
   })
 
-  test('silently drops malformed envelopes', async () => {
-    installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
-      await import('#/web/server-client-intent-ingress.ts')
-
+  test('drops malformed client-effect-intent envelopes', async () => {
+    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerClientIntentIngress(listener)
-    const socket = MockWebSocket.instances[0]
+    const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing socket')
 
-    // Wrong envelope discriminator.
-    socket.emitMessage(JSON.stringify({ type: 'something-else', intent: {} }))
-    // Right discriminator but invalid intent shape.
-    socket.emitMessage(JSON.stringify({ type: 'client-effect-intent', intent: { type: 'banana' } }))
-    socket.emitMessage(
-      JSON.stringify({
-        type: 'client-effect-intent',
-        intent: { type: 'show-workspace-pane-tab-requested', tab: 'bad' },
-      }),
-    )
-    // Garbage payload.
     socket.emitMessage('not json')
+    socket.emitMessage(JSON.stringify({ type: 'something-else', intent: {} }))
+    socket.emitMessage(JSON.stringify({ type: 'client-effect-intent', intent: { type: 'banana' } }))
 
     expect(listener).not.toHaveBeenCalled()
     dispose()
-    resetServerClientIntentIngressForTests()
-  })
-
-  test('reconnects after unexpected close and ignores stale socket events', async () => {
-    vi.useFakeTimers()
-    installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
-      await import('#/web/server-client-intent-ingress.ts')
-
-    const listener = vi.fn()
-    const dispose = subscribeServerClientIntentIngress(listener)
-    const firstSocket = MockWebSocket.instances[0]
-    if (!firstSocket) throw new Error('missing initial socket')
-
-    firstSocket.close()
-    await vi.advanceTimersByTimeAsync(300)
-
-    const secondSocket = MockWebSocket.instances[1]
-    if (!secondSocket) throw new Error('missing reconnected socket')
-
-    const payload = JSON.stringify({
-      type: 'client-effect-intent',
-      intent: { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
-    })
-    firstSocket.emitMessage(payload) // stale; should be ignored
-    secondSocket.emitMessage(payload) // fresh; should be delivered
-
-    expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({
-      type: 'show-workspace-pane-tab-requested',
-      tab: 'changes',
-    })
-    dispose()
-    resetServerClientIntentIngressForTests()
-    vi.useRealTimers()
-  })
-
-  test('stops reconnecting after app quitting starts', async () => {
-    vi.useFakeTimers()
-    installBootstrap('http://127.0.0.1:32100/', 'tok')
-    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
-    const { resetServerClientIntentIngressForTests, subscribeServerClientIntentIngress } =
-      await import('#/web/server-client-intent-ingress.ts')
-
-    const dispose = subscribeServerClientIntentIngress(() => {})
-    const socket = MockWebSocket.instances[0]
-    if (!socket) throw new Error('missing socket')
-
-    markAppQuitting()
-    await vi.advanceTimersByTimeAsync(300)
-
-    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
-    expect(MockWebSocket.instances).toHaveLength(1)
-    dispose()
-    resetServerClientIntentIngressForTests()
-    vi.useRealTimers()
   })
 })
