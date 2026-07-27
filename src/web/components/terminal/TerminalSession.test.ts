@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
@@ -470,11 +471,7 @@ const descriptor: TerminalDescriptor = {
 }
 
 beforeEach(() => {
-  // Use fake timers so font refit waits and the rAF chain fire deterministically when helpers advance the clock, instead of
-  // burning real wall time on every test.
-  vi.useFakeTimers({
-    toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame'],
-  })
+  useFakeTimers()
   xtermMocks.terminals.length = 0
   nextIdentityRevision = 0
   xtermMocks.fitAddons.length = 0
@@ -3712,7 +3709,3 @@ async function flushUntil(predicate: () => boolean): Promise<void> {
   }
   throw new Error('condition was not met')
 }
-
-afterEach(() => {
-  vi.useRealTimers()
-})
