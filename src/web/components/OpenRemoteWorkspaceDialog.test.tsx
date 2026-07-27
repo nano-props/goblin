@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
@@ -42,37 +44,34 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetWorkspacesStore()
   setClientBridgeForTests(null)
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (input: string | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === 'string' ? input : input.toString())
-      const body =
-        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
-      if (url.pathname === '/api/remote/ssh-hosts') {
-        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+  mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(fetchInputUrl(input))
+    const body =
+      typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+    if (url.pathname === '/api/remote/ssh-hosts') {
+      return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+    }
+    if (url.pathname === '/api/remote/resolve-target') {
+      return {
+        ok: true,
+        json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
       }
-      if (url.pathname === '/api/remote/resolve-target') {
-        return {
+    }
+    if (url.pathname === '/api/remote/test-workspace') {
+      return {
+        ok: true,
+        json: async () => ({
           ok: true,
-          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-        }
+          target: body.target,
+          stages: [{ name: 'path', label: 'path', status: 'passed' }],
+        }),
       }
-      if (url.pathname === '/api/remote/test-workspace') {
-        return {
-          ok: true,
-          json: async () => ({
-            ok: true,
-            target: body.target,
-            stages: [{ name: 'path', label: 'path', status: 'passed' }],
-          }),
-        }
-      }
-      if (url.pathname === '/api/remote/path-suggestions') {
-        return { ok: true, json: async () => [] }
-      }
-      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-    }),
-  )
+    }
+    if (url.pathname === '/api/remote/path-suggestions') {
+      return { ok: true, json: async () => [] }
+    }
+    throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+  })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
@@ -146,41 +145,36 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('shows a success tip after a passing connection test', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({
+            target: { ...target, alias: body.alias, remotePath: '/home/alice/repo' },
+          }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        return {
+          ok: true,
+          json: async () => ({
             ok: true,
-            json: async () => ({
-              target: { ...target, alias: body.alias, remotePath: '/home/alice/repo' },
-            }),
-          }
+            target: body.target,
+            stages: [{ name: 'path', label: 'path', status: 'passed' }],
+          }),
         }
-        if (url.pathname === '/api/remote/test-workspace') {
-          return {
-            ok: true,
-            json: async () => ({
-              ok: true,
-              target: body.target,
-              stages: [{ name: 'path', label: 'path', status: 'passed' }],
-            }),
-          }
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -199,38 +193,33 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
   test('shows a testing tip while connection test is running', async () => {
     let resolveTest: ((value: { ok: true; target: typeof target; stages: [] }) => void) | undefined
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
-            ok: true,
-            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-          }
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        return {
+          ok: true,
+          json: () =>
+            new Promise((resolve) => {
+              resolveTest = resolve as (value: { ok: true; target: typeof target; stages: [] }) => void
+            }),
         }
-        if (url.pathname === '/api/remote/test-workspace') {
-          return {
-            ok: true,
-            json: () =>
-              new Promise((resolve) => {
-                resolveTest = resolve as (value: { ok: true; target: typeof target; stages: [] }) => void
-              }),
-          }
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -251,42 +240,37 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('shows copy-details next to a failed status tip', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
-            ok: true,
-            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-          }
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: false,
+            target: body.target,
+            category: 'handshake-failed',
+            message: 'handshake-failed',
+            details: 'full diagnostic details',
+            stages: [],
+          }),
         }
-        if (url.pathname === '/api/remote/test-workspace') {
-          return {
-            ok: true,
-            json: async () => ({
-              ok: false,
-              target: body.target,
-              category: 'handshake-failed',
-              message: 'handshake-failed',
-              details: 'full diagnostic details',
-              stages: [],
-            }),
-          }
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -307,42 +291,37 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('does not reserve an empty helper row below the SSH alias select', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return {
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return {
+          ok: true,
+          json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
+        }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+        }
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        return {
+          ok: true,
+          json: async () => ({
             ok: true,
-            json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
-          }
+            target: body.target,
+            stages: [{ name: 'path', label: 'path', status: 'passed' }],
+          }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
-            ok: true,
-            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-          }
-        }
-        if (url.pathname === '/api/remote/test-workspace') {
-          return {
-            ok: true,
-            json: async () => ({
-              ok: true,
-              target: body.target,
-              stages: [{ name: 'path', label: 'path', status: 'passed' }],
-            }),
-          }
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -384,42 +363,37 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('focuses the remote path input when a host is already selected from ssh config', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return {
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return {
+          ok: true,
+          json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
+        }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+        }
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        return {
+          ok: true,
+          json: async () => ({
             ok: true,
-            json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
-          }
+            target: body.target,
+            stages: [{ name: 'path', label: 'path', status: 'passed' }],
+          }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
-            ok: true,
-            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-          }
-        }
-        if (url.pathname === '/api/remote/test-workspace') {
-          return {
-            ok: true,
-            json: async () => ({
-              ok: true,
-              target: body.target,
-              stages: [{ name: 'path', label: 'path', status: 'passed' }],
-            }),
-          }
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -483,32 +457,27 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('clears a previous connection error after editing the target', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL, init?: RequestInit) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        const body =
-          typeof init?.body === 'string' && init.body.length > 0
-            ? (JSON.parse(init.body) as Record<string, unknown>)
-            : {}
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
-        if (url.pathname === '/api/remote/resolve-target') {
-          return {
-            ok: true,
-            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
-          }
-        }
-        if (url.pathname === '/api/remote/test-workspace') {
-          throw new Error('Permission denied')
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        throw new Error('Permission denied')
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -530,19 +499,16 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('keeps the ssh host loading error visible while editing other inputs', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL) => {
-        const url = new URL(typeof input === 'string' ? input : input.toString())
-        if (url.pathname === '/api/remote/ssh-hosts') {
-          throw new Error('SSH config unavailable')
-        }
-        if (url.pathname === '/api/remote/path-suggestions') {
-          return { ok: true, json: async () => [] }
-        }
-        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
-      }),
-    )
+    mockFetch(async (input: RequestInfo | URL) => {
+      const url = new URL(fetchInputUrl(input))
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        throw new Error('SSH config unavailable')
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
@@ -566,6 +532,10 @@ function navigationWith(
     activateWorkspace: () => {},
     ...overrides,
   })
+}
+
+function fetchInputUrl(input: RequestInfo | URL): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
 }
 
 function render(element: ReactNode) {
@@ -615,9 +585,5 @@ function findButtonByText(text: string): HTMLButtonElement {
 }
 
 async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+  await act(() => flushMicrotasks())
 }

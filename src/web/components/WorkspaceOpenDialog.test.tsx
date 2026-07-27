@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
 import {
@@ -78,11 +78,16 @@ describe('WorkspaceOpenDialog', () => {
 
     setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
-    await flush()
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///Users/tester/Developer/repo')
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
+      activateWorkspace.mock.invocationCallOrder[0]!,
+    )
+    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
+      onOpenChange.mock.invocationCallOrder[0]!,
+    )
   })
 })
 
@@ -121,12 +126,5 @@ function click(selector: string) {
   const element = button(selector)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
   })
 }

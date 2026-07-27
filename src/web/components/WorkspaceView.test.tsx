@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { act, cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
@@ -1145,78 +1146,70 @@ describe('WorkspaceView workspace navigation', () => {
   })
 
   test('large-screen collapsed Zen Mode keeps the open reveal mounted while zen mode exits', () => {
-    vi.useFakeTimers()
-    try {
-      useWorkspacesStore.getState().setZenMode(true)
-      const { container } = render(branchWorkspaceView())
+    useFakeTimers()
+    useWorkspacesStore.getState().setZenMode(true)
+    const { container } = render(branchWorkspaceView())
 
-      act(() => {
-        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-      })
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    act(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-      act(() => {
-        useWorkspacesStore.getState().setZenMode(false)
-      })
+    act(() => {
+      useWorkspacesStore.getState().setZenMode(false)
+    })
 
-      expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('false')
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-      expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
-      expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
-      expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBe('true')
-      expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(true)
-      const retainedSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
-        '[data-testid="workspace-shell-sidebar-top"]',
-      )
-      expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
-      expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('false')
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
+    expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
+    expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBe('true')
+    expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(true)
+    const retainedSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
+      '[data-testid="workspace-shell-sidebar-top"]',
+    )
+    expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
-      act(() => {
-        document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS - 1)
-      })
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    act(() => {
+      document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
+      vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS - 1)
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-      act(() => {
-        vi.advanceTimersByTime(1)
-      })
-      expect(zenModeSidebarReveal(container)).toBeNull()
-    } finally {
-      vi.useRealTimers()
-    }
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(zenModeSidebarReveal(container)).toBeNull()
   })
 
   test('large-screen collapsed Zen Mode does not reopen the reveal while zen mode is exiting', () => {
-    vi.useFakeTimers()
-    try {
-      useWorkspacesStore.getState().setZenMode(true)
-      const { container } = render(branchWorkspaceView())
+    useFakeTimers()
+    useWorkspacesStore.getState().setZenMode(true)
+    const { container } = render(branchWorkspaceView())
 
-      act(() => {
-        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-      })
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    act(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-      mockZenRevealLayout(container, { panelLeft: 0, panelWidth: 360 })
+    mockZenRevealLayout(container, { panelLeft: 0, panelWidth: 360 })
 
-      act(() => {
-        useWorkspacesStore.getState().setZenMode(false)
-      })
+    act(() => {
+      useWorkspacesStore.getState().setZenMode(false)
+    })
 
-      expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-      expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
-      expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
-      expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
+    expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
+    expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
 
-      act(() => {
-        document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
-      })
+    act(() => {
+      document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))
+      vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+    })
 
-      expect(zenModeSidebarReveal(container)).toBeNull()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(zenModeSidebarReveal(container)).toBeNull()
   })
 
   test('compact branch activation slides Repo Workspace into the active pane', () => {
@@ -1253,32 +1246,28 @@ describe('WorkspaceView workspace navigation', () => {
   })
 
   test('compact back transition keeps the outgoing Repo Workspace content during slide-out', () => {
-    vi.useFakeTimers()
-    try {
-      responsiveMocks.mode = 'compact'
-      const { container, rerender } = render(branchWorkspaceView())
+    useFakeTimers()
+    responsiveMocks.mode = 'compact'
+    const { container, rerender } = render(branchWorkspaceView())
 
-      expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
-      expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('true')
+    expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
+    expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('true')
 
-      act(() => {
-        rerender(<WorkspaceView workspaceId={REPO_ID} />)
-      })
+    act(() => {
+      rerender(<WorkspaceView workspaceId={REPO_ID} />)
+    })
 
-      expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-      expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
-      expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
-      expect(workspacePane(container)?.dataset.workspacePaneRouteKind).toBe('inactive')
-      expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('false')
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
+    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
+    expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
+    expect(workspacePane(container)?.dataset.workspacePaneRouteKind).toBe('inactive')
+    expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('false')
 
-      act(() => {
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
-      })
+    act(() => {
+      vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+    })
 
-      expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
   })
 
   test('large-screen initial loading keeps the workspace pane empty when no branch is selected', () => {

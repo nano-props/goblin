@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import type * as ReactModule from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { act } from '@testing-library/react'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
@@ -178,40 +179,36 @@ describe('CompactWorkspaceLayout', () => {
   })
 
   test('retains the outgoing workspace pane content for the slide-out transition', () => {
-    vi.useFakeTimers()
-    try {
-      const { container, rerender } = renderInJsdom(
-        <CompactWorkspaceLayout
-          activePane="workspace"
-          sidebarPane={<button type="button">navigator</button>}
-          workspacePane={<div data-testid="workspace-a">workspace-a</div>}
-          transitionScopeKey="repo-a"
-        />,
-      )
+    useFakeTimers()
+    const { container, rerender } = renderInJsdom(
+      <CompactWorkspaceLayout
+        activePane="workspace"
+        sidebarPane={<button type="button">navigator</button>}
+        workspacePane={<div data-testid="workspace-a">workspace-a</div>}
+        transitionScopeKey="repo-a"
+      />,
+    )
 
-      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
+    expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
 
-      rerender(
-        <CompactWorkspaceLayout
-          activePane="navigator"
-          sidebarPane={<button type="button">navigator</button>}
-          workspacePane={<div data-testid="workspace-b">workspace-b</div>}
-          transitionScopeKey="repo-a"
-        />,
-      )
+    rerender(
+      <CompactWorkspaceLayout
+        activePane="navigator"
+        sidebarPane={<button type="button">navigator</button>}
+        workspacePane={<div data-testid="workspace-b">workspace-b</div>}
+        transitionScopeKey="repo-a"
+      />,
+    )
 
-      expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
-      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
-      expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-b')
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
+    expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
+    expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-b')
 
-      act(() => {
-        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
-      })
+    act(() => {
+      vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+    })
 
-      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-b')
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-b')
   })
 })
 

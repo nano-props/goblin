@@ -19,6 +19,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 describe('DirectoryPathSuggestions', () => {
   test('does not render the dropdown before any suggestion has landed', async () => {
@@ -487,9 +488,5 @@ function screenText(): string {
 }
 
 async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+  await act(() => flushMicrotasks())
 }
