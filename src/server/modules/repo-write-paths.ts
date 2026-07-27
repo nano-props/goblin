@@ -283,7 +283,7 @@ export async function fetchRepo(
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
   workspaceRuntimeId?: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<ExecResult> {
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     context: RepoWriteOperationContext,

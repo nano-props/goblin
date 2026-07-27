@@ -7,6 +7,8 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 let hydrate: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
+let appMount: () => void
+let appUnmount: () => void
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -15,6 +17,8 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>'
   hydrate = vi.fn()
   hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
+  appMount = vi.fn()
+  appUnmount = vi.fn()
   vi.doMock('#/web/stores/i18n.ts', () => ({
     useI18nStore: {
       getState: () => ({ hydrate }),
@@ -58,7 +62,13 @@ beforeEach(() => {
   vi.doMock('#/web/primary-window-router.tsx', async () => {
     const React = await import('react')
     return {
-      PrimaryWindowRouterProvider: () => React.createElement('div', null, 'app mounted'),
+      PrimaryWindowRouterProvider: () => {
+        React.useEffect(() => {
+          appMount()
+          return appUnmount
+        }, [])
+        return React.createElement('div', null, 'app mounted')
+      },
     }
   })
 })
@@ -91,6 +101,8 @@ describe('client entrypoint', () => {
     })
 
     expect(document.body.textContent).toContain('app mounted')
+    expect(appMount).toHaveBeenCalledTimes(2)
+    expect(appUnmount).toHaveBeenCalledTimes(1)
   })
 
   test('keeps the app unmounted and offers retry when the initial i18n hydrate fails', async () => {

@@ -25,15 +25,15 @@ describe('primary window query focus events', () => {
       focused = false
       window.dispatchEvent(new Event('blur'))
       focused = true
-      window.dispatchEvent(new Event('focus'))
-      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
       window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
       visibility = 'hidden'
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
       document.dispatchEvent(new Event('visibilitychange'))
       visibility = 'visible'
       document.dispatchEvent(new Event('visibilitychange'))
 
-      expect(states).toEqual([false, true, false, true])
+      expect(states).toEqual([false, true, true, false, true])
     } finally {
       unsubscribe()
     }

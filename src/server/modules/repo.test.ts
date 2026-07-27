@@ -545,14 +545,14 @@ describe('fetchRepo invalidation publishing', () => {
       expect(signal?.aborted).toBe(false)
       caller.abort('stopped')
       expect(signal?.aborted).toBe(true)
-      return { ok: false, message: 'cancelled' }
+      return { ok: false, message: 'cancelled', repositoryStateChanged: true }
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
-    expect(result).toEqual({ ok: false, message: 'cancelled' })
-    expectNoRepoSnapshotInvalidations()
+    expect(result).toEqual({ ok: false, message: 'cancelled', repositoryStateChanged: true })
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
   })
 
   test('records only successful fetches for the repository write boundary', async () => {
@@ -567,7 +567,11 @@ describe('fetchRepo invalidation publishing', () => {
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
     expect(getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
 
-    mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
+    mocks.fetchAll.mockResolvedValueOnce({
+      ok: false,
+      message: 'fatal: offline',
+      repositoryStateChanged: true,
+    })
     await fetchRepo(REPO_ID, 'background', undefined, runtimeId)
     expect(getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
   })
@@ -1393,14 +1397,18 @@ describe('fetchRepo invalidation publishing', () => {
     await expect(background).resolves.toEqual({ ok: true, message: 'fetched' })
   })
 
-  test('does not publish invalidations after a failed sync', async () => {
-    mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
+  test('publishes invalidation when a failed sync may have partially changed refs', async () => {
+    mocks.fetchAll.mockResolvedValueOnce({
+      ok: false,
+      message: 'fatal: offline',
+      repositoryStateChanged: true,
+    })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'background')
 
-    expect(result).toEqual({ ok: false, message: 'fatal: offline' })
-    expectNoRepoSnapshotInvalidations()
+    expect(result).toEqual({ ok: false, message: 'fatal: offline', repositoryStateChanged: true })
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
   })
 })
 
@@ -2066,12 +2074,22 @@ describe('repo mutation invalidation publishing', () => {
     })
   })
 
+  test('pullRepoBranch publishes invalidation when failure may follow partial ref updates', async () => {
+    mocks.pullBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'fatal: pull failed',
+      repositoryStateChanged: true,
+      affectedWorktreePaths: ['/tmp/repo'],
+    })
+    const repo = await import('#/server/modules/repo-write-paths.ts')
+
+    await repo.pullRepoBranch(REPO_ID, 'feature/a')
+
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expect(repoWorktreeSnapshotInvalidations()).toEqual([{ repoId: REPO_ID, query: 'repo-worktree-snapshot' }])
+  })
+
   test.each([
-    [
-      'pullRepoBranch',
-      () => mocks.pullBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: pull failed' }),
-      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
-    ],
     [
       'pushRepoBranch',
       () => mocks.pushBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: push failed' }),
@@ -2086,7 +2104,7 @@ describe('repo mutation invalidation publishing', () => {
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
         }),
     ],
-  ])('%s does not publish snapshot invalidation after failure', async (_name, setup, run) => {
+  ])('%s does not publish snapshot invalidation after a non-mutating failure', async (_name, setup, run) => {
     setup()
     const repo = await import('#/server/modules/repo-write-paths.ts')
 

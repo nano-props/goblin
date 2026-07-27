@@ -14,7 +14,13 @@ focusManager.setEventListener((setFocused) => {
     setFocused(document.visibilityState !== 'hidden' && document.hasFocus())
   }
   const handlePageShow = (event: PageTransitionEvent) => {
-    if (event.persisted) syncFocusedState()
+    if (!event.persisted) return
+    if (document.visibilityState !== 'hidden' && document.hasFocus()) {
+      if (focusManager.isFocused()) focusManager.onFocus()
+      else setFocused(true)
+      return
+    }
+    syncFocusedState()
   }
   window.addEventListener('focus', syncFocusedState)
   window.addEventListener('blur', syncFocusedState)

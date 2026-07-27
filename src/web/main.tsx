@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -36,7 +37,11 @@ async function boot(): Promise<void> {
   } finally {
     timeout.dispose()
   }
-  root.render(<AppRoot />)
+  root.render(
+    <StrictMode>
+      <AppRoot />
+    </StrictMode>,
+  )
 }
 
 function createTimeoutController(ms: number): { signal: AbortSignal; abort: (reason: unknown) => void; dispose: () => void } {

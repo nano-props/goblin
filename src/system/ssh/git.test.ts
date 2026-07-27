@@ -1106,6 +1106,50 @@ describe('remote git helpers', () => {
     expect(run).not.toHaveBeenCalledWith({ type: 'gitFetchAll', path: '/srv/repo' }, TARGET, expect.anything())
   })
 
+  test.each([
+    [true, { ok: false, message: 'fetch failed', repositoryStateChanged: true }],
+    [false, { ok: false, message: 'transport failed' }],
+  ] as const)(
+    'fetchRemoteRepo marks command failure only after the remote command starts',
+    async (remoteStarted, expected) => {
+      const message = remoteStarted ? 'fetch failed' : 'transport failed'
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        switch (command.type) {
+          case 'gitSnapshot':
+            return okRemoteResult(
+              '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\n',
+            )
+          case 'gitRemoteVerbose':
+            return okRemoteResult(
+              'origin\tgit@example.test:sample/repo.git (fetch)\norigin\tgit@example.test:sample/repo.git (push)',
+            )
+          case 'gitUpstream':
+            return okRemoteResult(upstreamOutput('origin', 'main'))
+          case 'gitFetchRemote':
+            return { ...failRemoteResult(message), remoteStarted }
+          default:
+            return okRemoteResult('')
+        }
+      })
+
+      await expect(fetchRemoteRepo(TARGET, { run })).resolves.toEqual(expected)
+    },
+  )
+
+  test('pullRemoteBranch marks a failed started command and its worktree as mutation-ambiguous', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({
+      ...failRemoteResult('pull failed'),
+      remoteStarted: true,
+    }))
+
+    await expect(pullRemoteBranch(TARGET, 'main', '/srv/repo-worktree', { run })).resolves.toEqual({
+      ok: false,
+      message: 'pull failed',
+      repositoryStateChanged: true,
+      affectedWorktreePaths: ['/srv/repo-worktree'],
+    })
+  })
+
   test.each(['gitSnapshot', 'gitRemoteVerbose', 'gitUpstream'] as const)(
     'fetchRemoteRepo rejects when authoritative %s discovery fails',
     async (failedCommand) => {

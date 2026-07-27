@@ -703,13 +703,13 @@ function createLocalRepoSource(
       if (!available.ok) return available
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const fetched = await fetchAll(repoId, signal)
-      return fetched.ok ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const pulled = await pullBranch(repoId, branch, worktreePath, signal)
-      return pulled.ok ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -914,12 +914,12 @@ async function createRemoteRepoSource(
     async fetch(signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const fetched = await fetchRemoteRepo(target, { signal, run })
-      return fetched.ok ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
     },
     async pull(branch, worktreePath, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
-      return pulled.ok ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
     },
     async push(branch, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)

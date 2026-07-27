@@ -616,6 +616,46 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
+  test('publishes filesystem invalidation when a failed pull command may have changed a worktree', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    const worktreePath = '/tmp/repo-worktree'
+    mocks.pullRepoBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'pull failed',
+      repositoryStateChanged: true,
+      affectedWorktreePaths: [worktreePath],
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/pull', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          branch: 'feature/work',
+          worktreePath,
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      message: 'pull failed',
+      repositoryStateChanged: true,
+    })
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
+      target: {
+        kind: 'git-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///tmp/repo-worktree'),
+      },
+    })
+  })
+
   test('returns 400 when count is below the minimum (1)', async () => {
     // Body schema is `v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))`
     // — POST body has no string coercion, so a wrong type also 400s.

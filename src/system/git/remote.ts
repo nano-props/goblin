@@ -294,7 +294,15 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
   if (remotes.length === 0) return { ok: true, message: '' }
   const remote = resolveFetchRemoteForRemotes(remotes, upstream)
   if (!remote) return { ok: true, message: '' }
-  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'fetch', '--prune', '--', remote)
+  const result = await gitResultWithOptions(
+    cwd,
+    { timeoutMs: NETWORK_TIMEOUT_MS, signal },
+    'fetch',
+    '--prune',
+    '--',
+    remote,
+  )
+  return result.ok ? result : { ...result, repositoryStateChanged: true }
 }
 
 export async function pullBranch(
@@ -305,19 +313,23 @@ export async function pullBranch(
 ): Promise<GitPullResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (worktreePath) {
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
     const result = await gitResultWithOptions(
       worktreePath,
       { timeoutMs: NETWORK_TIMEOUT_MS, signal },
       'pull',
       '--ff-only',
     )
-    return result.ok || result.repositoryStateChanged ? { ...result, affectedWorktreePaths: [worktreePath] } : result
+    return {
+      ...(result.ok ? result : { ...result, repositoryStateChanged: true }),
+      affectedWorktreePaths: [worktreePath],
+    }
   }
   const current = await getCurrentBranch(cwd, { signal })
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (branch === current) {
     const result = await gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
-    return result.ok || result.repositoryStateChanged ? { ...result, affectedWorktreePaths: [cwd] } : result
+    return { ...(result.ok ? result : { ...result, repositoryStateChanged: true }), affectedWorktreePaths: [cwd] }
   }
   const target = await getUpstreamParts(cwd, branch, signal)
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -327,7 +339,8 @@ export async function pullBranch(
   if (!remoteExists) {
     return { ok: false, message: 'error.pull-no-remote' }
   }
-  return gitResultWithOptions(
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  const result = await gitResultWithOptions(
     cwd,
     { timeoutMs: NETWORK_TIMEOUT_MS, signal },
     'fetch',
@@ -335,6 +348,7 @@ export async function pullBranch(
     target.remote,
     `${target.branch}:${branch}`,
   )
+  return result.ok ? result : { ...result, repositoryStateChanged: true }
 }
 
 export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {

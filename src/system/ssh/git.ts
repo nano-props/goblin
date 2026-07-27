@@ -440,7 +440,8 @@ export async function fetchRemoteRepo(
     signal: options.signal,
     timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
   })
-  return remoteExecResult(result)
+  const fetched = remoteExecResult(result)
+  return fetched.ok || !result.remoteStarted ? fetched : { ...fetched, repositoryStateChanged: true }
 }
 
 export async function pullRemoteBranch(
@@ -453,12 +454,17 @@ export async function pullRemoteBranch(
   if (worktreePath && !isValidRemotePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   if (worktreePath) {
+    if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
     const result = await run({ type: 'gitPullCurrent', path: worktreePath }, target, {
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
     const pulled = remoteExecResult(result)
-    return pulled.ok || pulled.repositoryStateChanged ? { ...pulled, affectedWorktreePaths: [worktreePath] } : pulled
+    if (!pulled.ok && !result.remoteStarted) return pulled
+    return {
+      ...(pulled.ok ? pulled : { ...pulled, repositoryStateChanged: true }),
+      affectedWorktreePaths: [worktreePath],
+    }
   }
 
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run })
@@ -469,9 +475,11 @@ export async function pullRemoteBranch(
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
     const pulled = remoteExecResult(result)
-    return pulled.ok || pulled.repositoryStateChanged
-      ? { ...pulled, affectedWorktreePaths: [target.remotePath] }
-      : pulled
+    if (!pulled.ok && !result.remoteStarted) return pulled
+    return {
+      ...(pulled.ok ? pulled : { ...pulled, repositoryStateChanged: true }),
+      affectedWorktreePaths: [target.remotePath],
+    }
   }
 
   const upstream = await getRemoteUpstream(target, branch, { signal: options.signal, run })
@@ -494,7 +502,8 @@ export async function pullRemoteBranch(
     target,
     { signal: options.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
-  return remoteExecResult(result)
+  const pulled = remoteExecResult(result)
+  return pulled.ok || !result.remoteStarted ? pulled : { ...pulled, repositoryStateChanged: true }
 }
 
 export async function pushRemoteBranch(
