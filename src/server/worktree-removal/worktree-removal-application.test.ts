@@ -99,7 +99,7 @@ describe('WorktreeRemovalApplication', () => {
     await expect(removal).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
-  test('reconciles every affected user scope after Git removal fails', async () => {
+  test('returns a Git removal failure without compensating closed resources', async () => {
     const affectedScopes = [
       {
         userId: 'user-a',
@@ -116,12 +116,10 @@ describe('WorktreeRemovalApplication', () => {
         worktreePath: '/repo/worktree',
       },
     ]
-    const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => {})
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createApplication({
       terminalScopes: affectedScopes,
-      reconcilePhysicalWorktreeAfterRemovalFailure,
       retireTarget,
       broadcastWorkspaceTabsChanged,
     })
@@ -132,29 +130,13 @@ describe('WorktreeRemovalApplication', () => {
         async remove(_capability, lifecycle) {
           const prepared = await lifecycle.beforeRemove()
           if (!prepared.ok) return prepared
-          await lifecycle.afterRemoveFailed()
           return { ok: false, message: 'git remove failed' }
         },
       }),
     ).resolves.toEqual({ ok: false, message: 'git remove failed' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledWith({
-      workspaceId: target.repoRoot,
-      worktreePath: target.worktreePath,
-      physicalWorktreeCapability: expect.objectContaining({
-        identity: testPhysicalWorktreeIdentity(target.worktreePath),
-      }),
-      permit: expect.objectContaining({ operationId: expect.any(Number) }),
-      scopes: affectedScopes.map(({ userId, scope, worktreePath }) => ({
-        userId,
-        scope,
-        workspaceId: target.repoRoot,
-        worktreePath,
-      })),
-    })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', target.repoRoot)
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-b', target.repoRoot)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('leaves runtime resources untouched when repository validation rejects removal', async () => {
@@ -174,10 +156,8 @@ describe('WorktreeRemovalApplication', () => {
 
   test('aborts before Git remove when terminal quiescence cannot be confirmed', async () => {
     const removeCommit = vi.fn()
-    const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const application = createApplication({
       terminalQuiescence: { ok: false, scopes: [], message: 'PTY close timed out' },
-      reconcilePhysicalWorktreeAfterRemovalFailure,
     })
 
     await expect(
@@ -192,7 +172,6 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
     expect(removeCommit).not.toHaveBeenCalled()
-    expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledOnce()
   })
 
   test('runtime close cancels an admitted removal before the destructive mutation settles', async () => {
@@ -394,7 +373,6 @@ function createApplication(
           message: string
         }
     closeSessionsForPhysicalWorktree?: (identity: PhysicalWorktreeIdentity) => Promise<TestTerminalScope[]>
-    reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
@@ -418,8 +396,6 @@ function createApplication(
     workspaceTabs: {
       physicalWorktreeTargets: () => options.physicalWorktreeTargets ?? [],
       clearPhysicalWorktreeIndex: options.clearPhysicalWorktreeIndex ?? (async () => {}),
-      reconcilePhysicalWorktreeAfterRemovalFailure:
-        options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
     isCurrentWorkspaceRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

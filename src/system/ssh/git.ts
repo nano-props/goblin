@@ -799,7 +799,6 @@ export async function removeRemoteWorktree(
     run?: RemoteGitRunner
     beforeRemove: () => Promise<ExecResult>
     afterWorktreeRemoved: () => Promise<ExecResult>
-    afterRemoveFailed: () => Promise<void>
     validateBeforeRemove?: () => Promise<ExecResult>
   },
 ): Promise<RemoteWorktreeMutationResult> {
@@ -825,13 +824,14 @@ export async function removeRemoteWorktree(
   if (invalid) return invalid
 
   const shouldForceDeleteBranch = input.forceDeleteBranch === true
-  const upstream = input.deleteBranch && (!shouldForceDeleteBranch || input.deleteUpstream)
-    ? await getRemoteUpstream(target, input.branch, {
-        signal: input.signal,
-        run,
-        path: mutationPath,
-      })
-    : null
+  const upstream =
+    input.deleteBranch && (!shouldForceDeleteBranch || input.deleteUpstream)
+      ? await getRemoteUpstream(target, input.branch, {
+          signal: input.signal,
+          run,
+          path: mutationPath,
+        })
+      : null
   if (input.deleteBranch) {
     const currentBranch = await getRemoteCurrentBranch(target, {
       signal: input.signal,
@@ -863,29 +863,18 @@ export async function removeRemoteWorktree(
   const prepared = await input.beforeRemove()
   if (!prepared.ok) return prepared
   const exact = await input.validateBeforeRemove?.()
-  if (exact && !exact.ok) {
-    await input.afterRemoveFailed()
-    return exact
-  }
-  if (input.signal?.aborted) {
-    await input.afterRemoveFailed()
-    return { ok: false, message: 'cancelled' }
-  }
+  if (exact && !exact.ok) return exact
+  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
 
-  let removeResult: RemoteCommandResult
-  try {
-    removeResult = await run({ type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path }, target, {
+  const removeResult = await run(
+    { type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path },
+    target,
+    {
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
       signal: input.signal,
-    })
-  } catch (error) {
-    await input.afterRemoveFailed()
-    throw error
-  }
-  if (!removeResult.ok) {
-    await input.afterRemoveFailed()
-    return remoteExecResult(removeResult)
-  }
+    },
+  )
+  if (!removeResult.ok) return remoteExecResult(removeResult)
   const finalized = await input.afterWorktreeRemoved()
   if (!finalized.ok) {
     return withAffectedWorktreePaths({ ...finalized, repositoryStateChanged: true }, affectedWorktreePaths)
@@ -906,8 +895,8 @@ export async function removeRemoteWorktree(
     mutationPath,
     input.deleteUpstream ? upstream : null,
     {
-    signal: input.signal,
-    run,
+      signal: input.signal,
+      run,
     },
   )
   return withAffectedWorktreePaths(upstreamDeleteResult ?? localDeleteResult, affectedWorktreePaths)
@@ -930,9 +919,10 @@ export async function deleteRemoteBranch(
   const snapshot = await getRemoteSnapshot(target, { signal: input.signal, run })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   const shouldForce = input.force === true
-  const upstream = !shouldForce || input.deleteUpstream
-    ? await getRemoteUpstream(target, input.branch, { signal: input.signal, run })
-    : null
+  const upstream =
+    !shouldForce || input.deleteUpstream
+      ? await getRemoteUpstream(target, input.branch, { signal: input.signal, run })
+      : null
   const mergeFacts = shouldForce
     ? { mergedToCurrent: false, mergedToUpstream: false }
     : await getRemoteBranchMergeFacts(target, input.branch, {
@@ -965,8 +955,7 @@ export async function deleteRemoteBranch(
     (await deleteRemoteUpstreamBranch(target, target.remotePath, input.deleteUpstream ? upstream : null, {
       signal: input.signal,
       run,
-    })) ??
-    localDeleteResult
+    })) ?? localDeleteResult
   )
 }
 
@@ -1224,11 +1213,9 @@ async function getRemoteIsAncestor(
   descendant: string,
   options: { signal?: AbortSignal; run: RemoteGitRunner; path: string },
 ): Promise<boolean> {
-  const result = await options.run(
-    { type: 'gitIsAncestor', path: options.path, ancestor, descendant },
-    target,
-    { signal: options.signal },
-  )
+  const result = await options.run({ type: 'gitIsAncestor', path: options.path, ancestor, descendant }, target, {
+    signal: options.signal,
+  })
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const value = result.stdout.trim()

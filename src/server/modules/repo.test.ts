@@ -14,7 +14,6 @@ const WORKTREE_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-worktree')
 const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
   afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
-  afterRemoveFailed: async () => {},
 }
 
 async function physicalWorktreeCapabilityForTest(workspaceId: WorkspaceId, worktreePath: string) {
@@ -862,7 +861,6 @@ describe('fetchRepo invalidation publishing', () => {
     const lifecycle = {
       beforeRemove,
       afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-      afterRemoveFailed: vi.fn(async () => {}),
     }
     const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
       import('#/server/modules/repo-write-paths.ts'),
@@ -912,7 +910,6 @@ describe('fetchRepo invalidation publishing', () => {
         {
           beforeRemove,
           afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
         },
       ),
     ).rejects.toThrow('error.repository-target-changed')
@@ -973,7 +970,6 @@ describe('fetchRepo invalidation publishing', () => {
       {
         beforeRemove,
         afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-        afterRemoveFailed: vi.fn(async () => {}),
       },
       physicalWorktreeCapability,
       undefined,
@@ -1019,7 +1015,6 @@ describe('fetchRepo invalidation publishing', () => {
     const lifecycle = {
       beforeRemove,
       afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-      afterRemoveFailed: vi.fn(async () => {}),
     }
     const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
       import('#/server/modules/repo-write-paths.ts'),
@@ -1070,7 +1065,6 @@ describe('fetchRepo invalidation publishing', () => {
         {
           beforeRemove,
           afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
         },
       ),
     ).resolves.toEqual({ ok: false, message: 'error.repository-target-changed' })
@@ -1136,7 +1130,6 @@ describe('fetchRepo invalidation publishing', () => {
         {
           beforeRemove,
           afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
-          afterRemoveFailed: vi.fn(async () => {}),
         },
         physicalWorktreeCapability,
       ),
@@ -2492,7 +2485,7 @@ describe('repo mutation invalidation publishing', () => {
     )
   })
 
-  test('removeRepoWorktree reconciles application state when Git removal fails after commit', async () => {
+  test('removeRepoWorktree returns the direct Git removal failure without finalization', async () => {
     mocks.removeWorktree.mockResolvedValueOnce({ ok: false, message: 'git remove failed' })
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
@@ -2503,7 +2496,6 @@ describe('repo mutation invalidation publishing', () => {
         isPrimary: false,
       },
     ])
-    const afterRemoveFailed = vi.fn(async () => {})
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
     await expect(
@@ -2514,11 +2506,10 @@ describe('repo mutation invalidation publishing', () => {
           worktreePath: '/tmp/repo-worktree',
           deleteBranch: false,
         },
-        { ...successfulRemovalLifecycle, afterRemoveFailed, afterWorktreeRemoved },
+        { ...successfulRemovalLifecycle, afterWorktreeRemoved },
       ),
     ).resolves.toEqual({ ok: false, message: 'git remove failed' })
 
-    expect(afterRemoveFailed).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })

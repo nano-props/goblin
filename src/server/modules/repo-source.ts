@@ -817,7 +817,6 @@ function createLocalRepoSource(
           )
             throw new Error('error.workspace-runtime-stale')
         } catch (error) {
-          await lifecycle.afterRemoveFailed()
           return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
         }
       }
@@ -829,13 +828,9 @@ function createLocalRepoSource(
           signal,
         )
       } catch (error) {
-        await lifecycle.afterRemoveFailed()
         throw error
       }
-      if (!removed.ok) {
-        await lifecycle.afterRemoveFailed()
-        return removed
-      }
+      if (!removed.ok) return removed
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repositoryStateChanged: true }, affectedRepoIds)
       if (!input.deleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
@@ -974,7 +969,6 @@ async function createRemoteRepoSource(
         run,
         beforeRemove: lifecycle.beforeRemove,
         afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
-        afterRemoveFailed: lifecycle.afterRemoveFailed,
         validateBeforeRemove: physicalWorktreeCapability
           ? async () => {
               try {

@@ -121,7 +121,6 @@ function createTestRepoRoutes(
         {
           beforeRemove: async () => ({ ok: true, message: '' }),
           afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-          afterRemoveFailed: async () => {},
         },
         new AbortController().signal,
       )
@@ -1013,7 +1012,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
             {
               beforeRemove,
               afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-              afterRemoveFailed: async () => {},
             },
             new AbortController().signal,
           ),
@@ -1062,7 +1060,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       {
         beforeRemove: expect.any(Function),
         afterWorktreeRemoved: expect.any(Function),
-        afterRemoveFailed: expect.any(Function),
       },
       expect.objectContaining({
         identity: expect.objectContaining({
@@ -1083,7 +1080,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
           {
             beforeRemove: async () => ({ ok: true, message: '' }),
             afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-            afterRemoveFailed: async () => {},
           },
           new AbortController().signal,
         )
