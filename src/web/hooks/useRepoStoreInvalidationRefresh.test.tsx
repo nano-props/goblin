@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -52,7 +53,7 @@ function Harness() {
 
 describe('useRepoStoreInvalidationRefresh', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     primaryWindowQueryClient.clear()
@@ -62,7 +63,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
   afterEach(() => {
     listeners.clear()
     primaryWindowQueryClient.clear()
-    vi.useRealTimers()
   })
 
   test('handles repo-snapshot invalidations through query invalidation only', async () => {

@@ -8,7 +8,7 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 
 describe('useBranchActionShortcutRegistry', () => {
-  test('runs the visible branch action handler', async () => {
+  test('runs the visible branch action handler', () => {
     const onPull = vi.fn()
 
     renderHookHost({
@@ -32,7 +32,7 @@ describe('useBranchActionShortcutRegistry', () => {
     expect(onPull).toHaveBeenCalledTimes(1)
   })
 
-  test('does not run hidden or disabled actions', async () => {
+  test('does not run hidden or disabled actions', () => {
     const hiddenPull = vi.fn()
     const disabledPush = vi.fn()
 
@@ -67,19 +67,17 @@ describe('useBranchActionShortcutRegistry', () => {
     expect(disabledPush).not.toHaveBeenCalled()
   })
 
-  test('uses the latest action callbacks after rerender', async () => {
+  test('uses the latest action callbacks after rerender', () => {
     const firstPull = vi.fn()
     const secondPull = vi.fn()
 
     const { rerender } = renderInJsdom(<HookHost actions={actionsWith(firstPull)} />)
-    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
     })
 
     rerender(<HookHost actions={actionsWith(secondPull)} />)
-    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
@@ -89,20 +87,23 @@ describe('useBranchActionShortcutRegistry', () => {
     expect(secondPull).toHaveBeenCalledTimes(1)
   })
 
-  test('clears the shortcut handler while disabled', async () => {
+  test('clears the shortcut handler while disabled', () => {
     const onPull = vi.fn()
 
     const { rerender } = renderInJsdom(<HookHost actions={actionsWith(onPull)} />)
-    await Promise.resolve()
+
+    act(() => {
+      runBranchActionShortcut('pull')
+    })
+    expect(onPull).toHaveBeenCalledTimes(1)
 
     rerender(<HookHost actions={actionsWith(onPull)} enabled={false} />)
-    await Promise.resolve()
 
     act(() => {
       runBranchActionShortcut('pull')
     })
 
-    expect(onPull).not.toHaveBeenCalled()
+    expect(onPull).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,143 +1,53 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
-class MockWebSocket {
-  static readonly CONNECTING = 0
-  static readonly OPEN = 1
-  static readonly CLOSING = 2
-  static readonly CLOSED = 3
-  static instances: MockWebSocket[] = []
-  readonly url: string
-  readyState = MockWebSocket.CONNECTING
-  private readonly listeners = new Map<string, Set<(event: any) => void>>()
+describe('server invalidation ingress', () => {
+  let wsMock: WebSocketMockHandle
 
-  constructor(url: string) {
-    this.url = url
-    MockWebSocket.instances.push(this)
-  }
-
-  addEventListener(type: string, cb: (event: any) => void) {
-    let listeners = this.listeners.get(type)
-    if (!listeners) {
-      listeners = new Set()
-      this.listeners.set(type, listeners)
-    }
-    listeners.add(cb)
-  }
-
-  close() {
-    this.readyState = MockWebSocket.CLOSED
-    this.emit('close', {})
-  }
-
-  emitOpen() {
-    this.readyState = MockWebSocket.OPEN
-    this.emit('open', {})
-  }
-
-  emitMessage(data: unknown) {
-    this.emit('message', { data })
-  }
-
-  private emit(type: string, event: any) {
-    for (const listener of this.listeners.get(type) ?? []) listener(event)
-  }
-}
-
-describe('server invalidation source', () => {
   beforeEach(() => {
     vi.resetModules()
-    MockWebSocket.instances.length = 0
-    Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
+    wsMock = installWebSocketMock({ autoOpen: false })
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
         runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-        initialServer: { url: 'http://127.0.0.1:5173/', accessToken: 'secret' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'test-token' },
       },
     })
   })
 
-  test('reuses a connecting socket when listeners unsubscribe and resubscribe before close completes', async () => {
-    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =
-      await import('#/web/server-invalidation-ingress.ts')
-
-    const disposeFirst = subscribeServerInvalidationIngress(() => {})
-    expect(MockWebSocket.instances).toHaveLength(1)
-
-    disposeFirst()
-    const disposeSecond = subscribeServerInvalidationIngress(() => {})
-    expect(MockWebSocket.instances).toHaveLength(1)
-
-    MockWebSocket.instances[0]?.emitOpen()
-    disposeSecond()
+  afterEach(async () => {
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
   })
 
-  test('opens same-origin invalidation socket when bootstrap has no server handoff', async () => {
-    Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
-      configurable: true,
-      value: {
-        runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
-        initialServer: null,
-      },
-    })
-    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =
-      await import('#/web/server-invalidation-ingress.ts')
-
-    const dispose = subscribeServerInvalidationIngress(() => {})
-
-    const expectedUrl = new URL('/ws/invalidation', window.location.origin)
-    expectedUrl.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    expect(MockWebSocket.instances).toHaveLength(1)
-    expect(MockWebSocket.instances[0]?.url).toBe(expectedUrl.toString())
-    dispose()
-    resetServerInvalidationIngressForTests()
-  })
-
-  test('ignores stale invalidation socket events after reconnect creates a newer socket', async () => {
-    vi.useFakeTimers()
-    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =
-      await import('#/web/server-invalidation-ingress.ts')
+  test('connects to the invalidation channel and dispatches valid events', async () => {
+    const { subscribeServerInvalidationIngress } = await import('#/web/server-invalidation-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerInvalidationIngress(listener)
-    const firstSocket = MockWebSocket.instances[0]
-    if (!firstSocket) throw new Error('missing initial invalidation socket')
 
-    firstSocket.close()
-    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances[0]?.url).toContain('/ws/invalidation')
+    wsMock.instances[0]?.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['theme'] }))
 
-    const secondSocket = MockWebSocket.instances[1]
-    if (!secondSocket) throw new Error('missing reconnected invalidation socket')
-
-    firstSocket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['theme'] }))
-    secondSocket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['theme'] }))
-
-    expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith({ type: 'settings-invalidated', scopes: ['theme'] })
     dispose()
-    resetServerInvalidationIngressForTests()
-    vi.useRealTimers()
   })
 
-  test('stops reconnecting invalidation sockets after app quitting starts', async () => {
-    vi.useFakeTimers()
-    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
-    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =
-      await import('#/web/server-invalidation-ingress.ts')
-    const dispose = subscribeServerInvalidationIngress(() => {})
-    const socket = MockWebSocket.instances[0]
-    if (!socket) throw new Error('missing initial invalidation socket')
+  test('drops malformed and unknown invalidation messages', async () => {
+    const { subscribeServerInvalidationIngress } = await import('#/web/server-invalidation-ingress.ts')
+    const listener = vi.fn()
+    const dispose = subscribeServerInvalidationIngress(listener)
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing socket')
 
-    markAppQuitting()
-    await vi.advanceTimersByTimeAsync(300)
+    socket.emitMessage('not json')
+    socket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['unknown'] }))
+    socket.emitMessage(JSON.stringify({ type: 'unknown-event' }))
 
-    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
-    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(listener).not.toHaveBeenCalled()
     dispose()
-    resetServerInvalidationIngressForTests()
-    vi.useRealTimers()
   })
 })

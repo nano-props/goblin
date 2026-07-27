@@ -11,6 +11,9 @@ const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const NESTED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo/src')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other')
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://prod/srv/repo')
+const USER_ID = 'user-test'
+const CLIENT_ID = 'client_test000000000000'
+const RUNTIME_ID = 'repo-runtime-test'
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -80,7 +83,7 @@ describe('restoreServerWorkspace', () => {
     mocks.workspaceProbes.clear()
     mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
       workspaceId,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
@@ -122,29 +125,20 @@ describe('restoreServerWorkspace', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 1, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({ snapshot: { revision: 1, entries: [] } })
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('restored')
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
@@ -154,13 +148,13 @@ describe('restoreServerWorkspace', () => {
         {
           entry: { id: 'goblin+file:///repo' },
           workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: RUNTIME_ID,
         },
       ],
       workspacePaneTabs: [
         {
           workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: RUNTIME_ID,
           snapshot: { revision: 1, entries: [] },
         },
       ],
@@ -174,21 +168,12 @@ describe('restoreServerWorkspace', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeWorkspace.mockResolvedValue(plainWorkspaceProbe())
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -220,37 +205,31 @@ describe('restoreServerWorkspace', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 3, entries: [] },
-        repaired: true,
-      })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({
+      snapshot: { revision: 3, entries: [] },
+      repaired: true,
+    })
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('repaired')
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
       {
         workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         snapshot: { revision: 3, entries: [] },
       },
     ])
@@ -263,21 +242,12 @@ describe('restoreServerWorkspace', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -287,20 +257,20 @@ describe('restoreServerWorkspace', () => {
     expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
         workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         gitProjection: null,
       }),
     ])
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: LOCAL_WORKSPACE_ID },
       targets: [{ kind: 'workspace-root' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
       {
         workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         snapshot: { revision: 0, entries: [] },
       },
     ])
@@ -318,8 +288,8 @@ describe('restoreServerWorkspace', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -330,7 +300,7 @@ describe('restoreServerWorkspace', () => {
       expect.objectContaining({
         entry,
         workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         gitProjection: null,
       }),
     ])
@@ -352,21 +322,12 @@ describe('restoreServerWorkspace', () => {
       status: 'unavailable',
       reason: 'error.workspace-transport-unavailable',
     })
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -375,7 +336,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
     expect(result.runtime.workspaces[0]).toMatchObject({
       workspaceId: remoteEntry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       gitProjection: null,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
       transport: { kind: 'ssh', lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' } },
@@ -398,28 +359,22 @@ describe('restoreServerWorkspace', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const commitError = new Error('commit failed')
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => {
-        throw commitError
-      }),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
+    workspacePaneTabsHost.restoreTabs.mockRejectedValue(commitError)
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspacePaneTabsHost,
       }),
     ).rejects.toBe(commitError)
 
-    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith(USER_ID, CLIENT_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     })
   })
@@ -449,32 +404,23 @@ describe('restoreServerWorkspace', () => {
         loadedAt: 1,
       }
     })
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 5, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspacePaneTabsHost,
         signal: controller.signal,
       }),
     ).rejects.toBe(abortReason)
 
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith(USER_ID, CLIENT_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     })
   })
@@ -489,21 +435,12 @@ describe('restoreServerWorkspace', () => {
     const abortReason = new Error('remote restore aborted')
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.runRemoteWorkspaceLifecycleWrite.mockImplementation(() => new Promise(() => {}))
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const restore = restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
       signal: controller.signal,
@@ -513,50 +450,9 @@ describe('restoreServerWorkspace', () => {
 
     await expect(restore).rejects.toBe(abortReason)
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledOnce()
-    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith(USER_ID, CLIENT_ID, {
       workspaceId: remoteEntry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
-      generation: 1,
-    })
-  })
-
-  test('releases opened runtimes when workspace repair persistence fails', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({
-      kind: 'git-branch',
-      workspaceId: LOCAL_WORKSPACE_ID,
-      branchName: 'missing',
-    })
-    const workspace: ServerWorkspaceState = {
-      ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
-      workspacePaneTabsByTargetByWorkspace: {
-        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
-      },
-    }
-    const persistError = new Error('settings write failed')
-    mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => {
-        throw persistError
-      }),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
-
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
-    await expect(
-      restoreServerWorkspace({
-        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toBe(persistError)
-
-    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     })
   })
@@ -588,21 +484,12 @@ describe('restoreServerWorkspace', () => {
     mocks.compareAndReplaceServerWorkspaceEntries
       .mockResolvedValueOnce({ matched: true, workspace: invalidWorkspace })
       .mockResolvedValueOnce({ matched: true, workspace: currentWorkspace })
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })

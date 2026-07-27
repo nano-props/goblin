@@ -97,8 +97,10 @@ beforeEach(() => {
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
   showWorkspaceRootPaneTabSpy.mockClear()
-  appDataClientMocks.clearRecentWorkspaceHistory.mockClear()
-  appDataClientMocks.removeWorkspaceFromSession.mockClear()
+  appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
+  appDataClientMocks.clearRecentWorkspaceHistory.mockResolvedValue(undefined)
+  appDataClientMocks.removeWorkspaceFromSession.mockReset()
+  appDataClientMocks.removeWorkspaceFromSession.mockResolvedValue(undefined)
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -196,12 +198,14 @@ describe('useClientEffectIntentRouter', () => {
     expect(nativeIntentSubscriptionStarts).toBe(1)
     expect(intentListeners.size).toBe(1)
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
-      await Promise.resolve()
     })
 
-    expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
+    await waitFor(() => {
+      expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
+      expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
+    })
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
@@ -344,13 +348,14 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
-      await Promise.resolve()
     })
 
-    expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
+    await waitFor(() => {
+      expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
+      expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
+    })
   })
 
   test('close-repo menu action reports shared membership write failures', async () => {
@@ -364,13 +369,12 @@ describe('useClientEffectIntentRouter', () => {
     appDataClientMocks.removeWorkspaceFromSession.mockRejectedValueOnce(new Error('workspace write failed'))
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
-      await Promise.resolve()
     })
 
-    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.workspace-close-failed'))
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {
@@ -385,12 +389,13 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     expect(useWorkspacesStore.getState().zenMode).toBe(false)
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'workspace-zen-mode-toggle-requested' })
-      await Promise.resolve()
     })
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    await waitFor(() => {
+      expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    })
   })
 
   test('current repo menu actions prefer the visible routed repo over restored repo id', async () => {
@@ -424,13 +429,14 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
-      await Promise.resolve()
     })
 
-    expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
-    expect(useWorkspacesStore.getState().workspaces[visibleRepo.id]).toBeUndefined()
+    await waitFor(() => {
+      expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
+      expect(useWorkspacesStore.getState().workspaces[visibleRepo.id]).toBeUndefined()
+    })
     expect(useWorkspacesStore.getState().workspaces[restoredRepo.id]).toBeDefined()
   })
 
@@ -444,20 +450,21 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) {
         listener({
           type: 'open-recent-workspace-requested',
           entry: { id: 'goblin+file:///tmp/recent-workspace' },
         })
       }
-      await Promise.resolve()
     })
 
-    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
-      id: 'goblin+file:///tmp/recent-workspace',
+    await waitFor(() => {
+      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
+        id: 'goblin+file:///tmp/recent-workspace',
+      })
+      expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')
     })
-    expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')
   })
 
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
@@ -470,19 +477,24 @@ describe('useClientEffectIntentRouter', () => {
     })
     currentWorkspaceId = repo.id
     workspaceShortcutSuppressed = true
+    const defaultWorkspacePaneSize = useWorkspacesStore.getState().workspacePaneSize
+    useWorkspacesStore.getState().setWorkspacePaneSize(defaultWorkspacePaneSize + 10)
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) {
         listener({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
         listener({ type: 'workspace-zen-mode-toggle-requested' })
         listener({ type: 'close-workspace-requested' })
+        listener({ type: 'layout-reset-requested' })
       }
-      await Promise.resolve()
     })
 
+    await waitFor(() => {
+      expect(useWorkspacesStore.getState().workspacePaneSize).toBe(defaultWorkspacePaneSize)
+    })
     const state = useWorkspacesStore.getState()
     expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
@@ -578,10 +590,8 @@ describe('useClientEffectIntentRouter', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'terminal-new-tab-requested' })
-      await Promise.resolve()
-      await Promise.resolve()
     })
 
     await waitFor(() => {
@@ -589,9 +599,8 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' }
-    await act(async () => {
+    act(() => {
       host.rerender(<HookHost />)
-      await Promise.resolve()
     })
     showRepoBranchWorkspacePaneTabSpy.mockClear()
     showRepoBranchTerminalSessionSpy.mockClear()
@@ -608,10 +617,8 @@ describe('useClientEffectIntentRouter', () => {
       route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
     })
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-requested' })
-      await Promise.resolve()
-      await Promise.resolve()
     })
 
     await waitFor(() => {
@@ -643,15 +650,15 @@ describe('useClientEffectIntentRouter', () => {
       .mockResolvedValueOnce([] as string[])
 
     await renderHookHost()
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'external-open-enqueued' })
-      await Promise.resolve()
-      await Promise.resolve()
     })
 
-    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
-    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
-    expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    await waitFor(() => {
+      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+      expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    })
   })
 
   test('theme menu intents update theme through the client store', async () => {
@@ -660,12 +667,13 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'theme-pref-set-requested', pref: 'dark' })
-      await Promise.resolve()
     })
 
-    expect(setPref).toHaveBeenCalledWith('dark')
+    await waitFor(() => {
+      expect(setPref).toHaveBeenCalledWith('dark')
+    })
   })
 
   test('language menu intents update i18n through the client store', async () => {
@@ -674,23 +682,25 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'lang-pref-set-requested', pref: 'ko' })
-      await Promise.resolve()
     })
 
-    expect(setPref).toHaveBeenCalledWith('ko')
+    await waitFor(() => {
+      expect(setPref).toHaveBeenCalledWith('ko')
+    })
   })
 
-  test('clear recent intent clears server-backed recents through the client client', async () => {
+  test('clear recent intent clears server-backed recents through the client', async () => {
     await renderHookHost()
 
-    await act(async () => {
+    act(() => {
       for (const listener of intentListeners) listener({ type: 'clear-recent-workspaces-requested' })
-      await Promise.resolve()
     })
 
-    expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
+    })
   })
 })
 

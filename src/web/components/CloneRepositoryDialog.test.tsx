@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/web/components/CloneRepositoryDialog.tsx'
@@ -76,7 +76,7 @@ describe('CloneRepositoryDialog', () => {
   })
 
   test('waits for clone success before closing and hides the close button while pending', async () => {
-    const deferred = createDeferred<CloneRepoResult>()
+    const deferred = Promise.withResolvers<CloneRepoResult>()
     const onClose = vi.fn()
     const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
 
@@ -97,9 +97,7 @@ describe('CloneRepositoryDialog', () => {
     expect(queryButtonByText('Close')).toBeNull()
 
     deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
-    await flush()
-
-    expect(onClose).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
   test('keeps the dialog open on clone failure and preserves user input', async () => {
@@ -111,16 +109,17 @@ describe('CloneRepositoryDialog', () => {
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
-    await flush()
 
-    expect(onClose).not.toHaveBeenCalled()
-    expect(input('#clone-url').value).toBe('https://example.com/repo.git')
-    expect(input('#clone-directory-name').value).toBe('repo')
-    expect(document.body.textContent).toContain('error.clone-failed')
+    await waitFor(() => {
+      expect(onClose).not.toHaveBeenCalled()
+      expect(input('#clone-url').value).toBe('https://example.com/repo.git')
+      expect(input('#clone-directory-name').value).toBe('repo')
+      expect(document.body.textContent).toContain('error.clone-failed')
+    })
   })
 
   test('cancel aborts an in-flight clone and closes the dialog', async () => {
-    const deferred = createDeferred<CloneRepoResult>()
+    const deferred = Promise.withResolvers<CloneRepoResult>()
     const onClose = vi.fn()
     const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
 
@@ -131,17 +130,18 @@ describe('CloneRepositoryDialog', () => {
     click('button[type="submit"]')
     const request = onClone.mock.calls[0]?.[0]
     clickButtonByText('dialog.cancel')
-    await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(request?.signal.aborted).toBe(true)
 
-    deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
-    await flush()
+    await act(async () => {
+      deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
+      await deferred.promise
+    })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  test('hides native parent picker button when no Electron bridge exists', async () => {
+  test('hides native parent picker button when no Electron bridge exists', () => {
     delete testWindow.goblinNative
     setClientBridgeForTests(null)
     const onClose = vi.fn()
@@ -200,20 +200,4 @@ function clickButtonByText(text: string) {
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
 }

@@ -17,7 +17,6 @@ import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/works
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
@@ -65,7 +64,7 @@ describe('workspace pane runtime tab command actions', () => {
     document.body.replaceChildren()
   })
 
-  test('resolves the ordinary workspace root while pane tabs are still pending', () => {
+  test('preserves the ordinary workspace root opener while pane tabs are still pending', () => {
     const repo = seedRepoWithReadModelForTest({
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
@@ -76,13 +75,6 @@ describe('workspace pane runtime tab command actions', () => {
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: repo.id }, 'files')
 
-    const workspaceId = canonicalWorkspaceLocator(repo.id)
-    if (!workspaceId) throw new Error('expected canonical workspace fixture')
-    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repo.workspaceRuntimeId }
-    expect(resolveWorkspacePaneTerminalExecutionTarget(target, { kind: 'workspace-root' })).toEqual({
-      target,
-      presentation: { kind: 'workspace-root' },
-    })
     expect(
       captureWorkspacePaneActiveTabIdentity({ kind: 'workspace-root', workspaceId: repo.id }, repo.workspaceRuntimeId, {
         workspacePaneRoute: undefined,
@@ -105,7 +97,7 @@ describe('workspace pane runtime tab command actions', () => {
     ).toBe('workspace-pane:files')
   })
 
-  test('resolves a Git worktree execution target while pane tabs are still pending', () => {
+  test('preserves a Git worktree target while pane tabs are still pending', () => {
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
@@ -115,9 +107,6 @@ describe('workspace pane runtime tab command actions', () => {
       currentBranchName: branchName,
     })
 
-    expect(resolveWorkspacePaneTerminalExecutionTarget(terminalBase.target, terminalBase.presentation)).toEqual(
-      terminalBase,
-    )
     expect(
       captureWorkspacePaneActiveTabIdentity(terminalPaneTarget, terminalCoordinates.workspaceRuntimeId, {
         workspacePaneRoute: undefined,
@@ -281,11 +270,8 @@ describe('workspace pane runtime tab command actions', () => {
   })
 
   test('primary terminal action queues existing-session focus behind workspace pane coordination', async () => {
-    let releaseCoordinator!: () => void
-    let markCoordinatorStarted!: () => void
-    const coordinatorStarted = new Promise<void>((resolve) => {
-      markCoordinatorStarted = resolve
-    })
+    const coordinatorStarted = Promise.withResolvers<void>()
+    const releaseCoordinator = Promise.withResolvers<void>()
     const coordinatorBlocker = runWorkspacePaneAction(
       {
         kind: 'git-worktree' as const,
@@ -294,13 +280,11 @@ describe('workspace pane runtime tab command actions', () => {
         worktreePath: terminalExecutionPath(terminalBase.target),
       },
       async () => {
-        markCoordinatorStarted()
-        await new Promise<void>((resolve) => {
-          releaseCoordinator = resolve
-        })
+        coordinatorStarted.resolve()
+        await releaseCoordinator.promise
       },
     )
-    await coordinatorStarted
+    await coordinatorStarted.promise
 
     let sessions = [terminalSession('term-111111111111111111111', true)]
     const createTerminal = vi.fn(async () => 'created-session')
@@ -308,16 +292,17 @@ describe('workspace pane runtime tab command actions', () => {
     const showTerminalSession = vi.fn((_sessionId, routeRequest) =>
       primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration),
     )
+    const terminalFilesystemTargetSnapshot = vi.fn(() => ({
+      terminalFilesystemTargetKey: '/repo\0/repo-worktree',
+      selectedDescriptor: null,
+      sessions,
+      count: sessions.length,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }))
     const bridge: TerminalSessionCommandBridge = {
-      terminalFilesystemTargetSnapshot: () => ({
-        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
-        selectedDescriptor: null,
-        sessions,
-        count: sessions.length,
-        bellCount: 0,
-        outputActiveCount: 0,
-        createPending: false,
-      }),
+      terminalFilesystemTargetSnapshot,
       createTerminal,
       createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal,
@@ -334,16 +319,17 @@ describe('workspace pane runtime tab command actions', () => {
         showCreatedTerminalSession: showTerminalSession,
       },
     })
-    await Promise.resolve()
 
+    expect(terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
     expect(showTerminalSession).not.toHaveBeenCalled()
 
     sessions = [terminalSession('term-222222222222222222222', true)]
     beginPrimaryWindowNavigation()
-    releaseCoordinator()
+    releaseCoordinator.resolve()
     await coordinatorBlocker
 
     await expect(actionPromise).resolves.toBe(false)
+    expect(terminalFilesystemTargetSnapshot).toHaveBeenCalledTimes(2)
     expect(showTerminalSession).toHaveBeenCalledWith(
       'term-222222222222222222222',
       expect.objectContaining({

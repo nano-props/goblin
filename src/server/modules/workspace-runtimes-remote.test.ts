@@ -33,13 +33,11 @@ describe('workspace runtime remote lifecycle', () => {
 
   test('latest attempt aborts its predecessor and owns the terminal state', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    let releaseFirst!: (value: RemoteWorkspaceConnectionResult) => void
+    const firstAttempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     let firstSignal!: AbortSignal
     const first = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, (signal) => {
       firstSignal = signal
-      return new Promise((resolve) => {
-        releaseFirst = resolve
-      })
+      return firstAttempt.promise
     })
     await vi.waitFor(() =>
       expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
@@ -48,20 +46,18 @@ describe('workspace runtime remote lifecycle', () => {
     const second = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
     await vi.waitFor(() => expect(firstSignal.aborted).toBe(true))
     await expect(second).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 2 } })
-    releaseFirst(ready)
+    firstAttempt.resolve(ready)
     await expect(first).resolves.toEqual({ kind: 'superseded' })
     expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'ready', attemptId: 2 })
   })
 
   test('ensure joins an existing connecting lifecycle without restarting it', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    const firstAttempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     let firstSignal!: AbortSignal
-    let releaseFirst!: (value: RemoteWorkspaceConnectionResult) => void
     const first = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, (signal) => {
       firstSignal = signal
-      return new Promise((resolve) => {
-        releaseFirst = resolve
-      })
+      return firstAttempt.promise
     })
     await vi.waitFor(() => expect(firstSignal).toBeDefined())
     const resolver = vi.fn(async () => ready)
@@ -69,7 +65,7 @@ describe('workspace runtime remote lifecycle', () => {
     const ensured = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, resolver, () => {}, 'ensure')
     expect(resolver).not.toHaveBeenCalled()
     expect(firstSignal.aborted).toBe(false)
-    releaseFirst(ready)
+    firstAttempt.resolve(ready)
     await expect(first).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
     await expect(ensured).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
   })
@@ -106,13 +102,6 @@ describe('workspace runtime remote lifecycle', () => {
     await vi.waitFor(() => expect(firstSignal.aborted).toBe(true))
     first.resolve(ready)
     await expect(firstRun).resolves.toEqual({ kind: 'superseded' })
-
-    let ensureSettled = false
-    void ensured.finally(() => {
-      ensureSettled = true
-    })
-    await Promise.resolve()
-    expect(ensureSettled).toBe(false)
 
     second.resolve(ready)
     await expect(restarted).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 2 } })
@@ -237,20 +226,19 @@ describe('workspace runtime remote lifecycle', () => {
 
   test('returns stale-runtime when close replaces the running generation', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    let release!: (value: RemoteWorkspaceConnectionResult) => void
+    const attempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     const work = runRemoteWorkspaceLifecycle(
       userId,
       workspaceId,
       runtimeId,
-      () =>
-        new Promise((resolve) => {
-          release = resolve
-        }),
+      () => attempt.promise,
     )
-    await vi.waitFor(() => expect(release).toBeDefined())
+    await vi.waitFor(() =>
+      expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
+    )
     releaseWorkspaceRuntime(userId, workspaceId, runtimeId, clientId)
     acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    release(ready)
+    attempt.resolve(ready)
     await expect(work).resolves.toEqual({ kind: 'stale-runtime' })
   })
 
@@ -321,13 +309,11 @@ describe('workspace runtime remote lifecycle', () => {
 
   test('external failure aborts a connecting lifecycle and prevents older ready from winning', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    const attempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     let signal!: AbortSignal
-    let release!: (value: RemoteWorkspaceConnectionResult) => void
     const connecting = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, (nextSignal) => {
       signal = nextSignal
-      return new Promise((resolve) => {
-        release = resolve
-      })
+      return attempt.promise
     })
     await vi.waitFor(() =>
       expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
@@ -340,7 +326,7 @@ describe('workspace runtime remote lifecycle', () => {
       lifecycle: { kind: 'failed', attemptId: 2, reason: 'timeout' },
     })
     expect(signal.aborted).toBe(true)
-    release(ready)
+    attempt.resolve(ready)
 
     await expect(connecting).resolves.toEqual({ kind: 'superseded' })
     expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({

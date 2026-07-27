@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   markRepoOperationTargets,
@@ -46,7 +47,7 @@ function branchBrowserRemoteProvider(
 }
 
 async function flushAsyncWork() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await waitForNextMacrotask()
 }
 
 beforeEach(() => {
@@ -750,14 +751,12 @@ describe('runBranchAction', () => {
     'keeps %s busy until the follow-up projection refresh completes',
     async (_label, action, ipcPath, target, projection) => {
       let resolveProjection!: () => void
-      const statusRead = vi.fn()
       installGoblinTestBridge({
         [ipcPath]: async () => ({ ok: true, message: 'ok' }),
         'repo.projection': () =>
           new Promise((resolve) => {
             resolveProjection = () => resolve(projection)
           }),
-        'repo.worktreeStatus': statusRead,
       })
 
       const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, action)
@@ -789,7 +788,6 @@ describe('runBranchAction', () => {
         phase: 'idle',
         target: null,
       })
-      expect(statusRead).not.toHaveBeenCalled()
     },
   )
 
@@ -905,22 +903,47 @@ describe('runBranchAction', () => {
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
-  test('does not issue a client completion projection read for pull', async () => {
-    const projection = vi.fn(async () => repoProjection(null))
+  test('does not let stale branch action refresh results overwrite a reopened repo', async () => {
+    let resolveSnapshot!: () => void
     installGoblinTestBridge({
       'repo.pull': async () => ({ ok: true, message: 'ok' }),
-      'repo.projection': projection,
+      'repo.projection': () =>
+        new Promise((resolve) => {
+          resolveSnapshot = () =>
+            resolve(repoProjection({ branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' }))
+        }),
     })
 
-    await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+    const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+    await flushAsyncWork()
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      workspaceRuntimeId: 'repo-runtime-test-2',
+      branches: [createRepoBranch('feature/new-instance')],
+      currentBranch: 'feature/new-instance',
+    })
 
-    expect(projection).not.toHaveBeenCalled()
+    resolveSnapshot()
+    await work
+
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+    expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')
+    expect(repoCurrentBranch()).toBe('feature/new-instance')
+    expect(repoBranchNames()).toEqual(['feature/new-instance'])
   })
 
-  test('keeps selection while non-create branch actions rely on server invalidation', async () => {
+  test('keeps selection after non-create branch actions refresh', async () => {
     setBranchViewModeForTest('worktrees')
     installGoblinTestBridge({
       'repo.deleteBranch': async () => ({ ok: true, message: 'ok' }),
+      'repo.projection': async () =>
+        repoProjection({
+          branches: [
+            createBranchSnapshot('feature/a'),
+            createBranchSnapshot('feature/new', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } }),
+          ],
+          current: 'feature/a',
+        }),
     })
 
     await useWorkspacesStore

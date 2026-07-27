@@ -66,8 +66,10 @@ import a helper from inside another test file.
 - Importing `act` from `react` in tests. Use `act` from
   `@testing-library/react` so the act environment flag is scoped to the
   callback.
-- Inline `class MockTerminal` / `class MockWebSocket` outside
-  `src/web/test-utils/`.
+- Defining or installing a WebSocket mock outside
+  `src/web/test-utils/websocket-mock.ts`. An inline xterm mock is allowed only
+  for the `vi.hoisted` boundary documented in §5; do not duplicate that
+  exception in component or provider tests.
 - Redefining `window.localStorage` or `window.sessionStorage` in any test
   file.
 - `vi.stubGlobal('fetch', …)` for routes already covered by
@@ -130,23 +132,19 @@ Exports:
   plus a microtask drain. Use this any time a test step needs both fake
   time and pending promises.
 
-### `src/web/test-utils/xterm-mock.ts`
+### `TerminalSession.test.ts` local xterm mock
 
 `@xterm/xterm` and the `@xterm/addon-*` packages ship no official test
-helper. The current terminal tests avoid the problem by _not instantiating
-xterm at all_: `TerminalSessionView.test.tsx` and
-`TerminalSessionProvider.test.tsx` render
-`<TerminalSessionContext.Provider value={fakeContext}>` and feed a fake
-`worktreeSnapshot`, so the real `@xterm/*` modules are never imported and
-there is no `MockTerminal` to share.
-
-If a future test needs to drive the real `Terminal` (e.g. paste-handling
-edge cases that must reach into xterm's input pipeline), Vitest v4's
-`vi.mock` factory closures can only see variables declared with
-`vi.hoisted` **in the calling file**, so the mock classes must live in
-the test file that registers the mocks. A new shared module will be
-possible when Vitest lifts the per-file hoist restriction or when
-upstream `@xterm/*` ships its own test helper.
+helper. Component and provider tests avoid instantiating xterm by rendering
+`<TerminalSessionContext.Provider value={fakeContext}>`. The core
+`TerminalSession.test.ts` suite is the single exception: it exercises the
+xterm input and addon boundary, and its `vi.mock` factories can only see
+classes declared with `vi.hoisted` in that calling file under Vitest v4.
+Keep those mock classes local to that suite; do not copy them into view,
+provider, feature, or additional `TerminalSession` test files. Until Vitest
+lifts the per-file hoist restriction or upstream ships a test helper, reduce
+that suite through focused harness cleanup rather than duplicating its xterm
+boundary to satisfy the usual file-size split guideline.
 
 ### `src/web/test-utils/websocket-mock.ts`
 
@@ -216,6 +214,9 @@ upstream `@xterm/*` ships its own test helper.
   and reviewable.
 - Use `await vi.waitFor(() => …)` (Vitest) or `await waitFor(() => …)`
   (RTL) for retries. Hard-coding `setTimeout(…, 50)` is forbidden.
+- Use `await waitForNextMacrotask()` when ordering depends on crossing one
+  real event-loop turn. Do not spell this as a local zero-delay `setTimeout`
+  promise; the shared helper makes the boundary explicit and reviewable.
 - `expect(...).resolves` / `expect(...).rejects` are the standard way to
   await a single promise. Don't write `let err; try { ... } catch (e) { err = e }`.
 
@@ -274,63 +275,17 @@ deterministic seam, not to raise the timeout. The default
 `testTimeout: 10_000` is a ceiling for genuinely slow setup (real timers,
 real IPC), not a target.
 
-## 11. Current refactoring status (this branch)
+## 11. Keeping this spec current
 
-The PR that introduced this spec made the following changes. Later
-work should continue from here rather than re-litigating these
-items:
+This document records maintained rules, not migration history or snapshots
+of suite size. Do not add file counts, test counts, timing claims, or
+"migration complete" statements here; they become false as the suite grows.
 
-- **Vitest project split** — `vitest.config.ts` now has two projects
-  (`node` and `jsdom`) so DOM startup costs are not paid for server /
-  shared / system tests.
-- **Shared test helpers** — `src/test-utils/` holds `renderInJsdom`,
-  `flushMicrotasks`, `useFakeTimers`, `advanceTimersAndFlush`, and
-  `mockFetch`. `src/web/test-utils/` holds `installWebSocketMock`,
-  `installHostBootstrap`, and `installGoblinTestBridge`. (There is no
-  `xterm-mock.ts` — see §5 for why the terminal tests skip xterm
-  entirely rather than mock it.)
-- **Fetch mock consolidation** — tests that previously hand-rolled
-  `const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock)` now
-  use `mockFetch(...)`.
-- **WebSocket mock single source** — `bridge.ts` no longer contains an
-  inline `MockWebSocket`; it wraps the shared `installWebSocketMock`.
-- **Lifecycle mock backed by real server composition** —
-  `src/web/stores/workspaces/workspace-session-test-utils.ts` injects test doubles
-  into the real `resolveServerRemoteWorkspaceConnection` instead of
-  duplicating its compose logic.
-
-### Known follow-ups (out of scope for this PR)
-
-1. **jsdom → `@testing-library/react` migration** — Done. The 58 web
-   `.test.tsx`/`.test.ts` files that used hand-rolled `createRoot` +
-   `container` + `act` boilerplate now go through `renderInJsdom`.
-   Verified by `grep -rl 'createRoot(' src/web --include='*.test.{ts,tsx}'`
-   returning no matches and the full `bun run test` run (259 files /
-   2103 tests) staying green.
-2. **React act warnings in jsdom** — Resolved by removing the
-   `renderInJsdom` helper's permanent `IS_REACT_ACT_ENVIRONMENT = true`
-   flip (see §5). React 19's `warnIfUpdatesNotWrappedWithActDEV` only
-   fires when that global is set and no `act` is on the call stack —
-   the previous `renderInJsdom` left the worker in exactly that
-   state, producing one warning per post-mount commit. Returning to
-   RTL's own pattern (the global is set only inside an `act` callback
-   and restored on the way out) clears the warnings without any
-   filter layer and without touching the hooks or Radix. Tests that
-   genuinely need an `act` boundary now wrap their own
-   `renderInJsdom(...)` calls.
-3. **Extract `MockTerminal` / split `TerminalSession.test.ts`** —
-   Resolved by _avoiding the mock in the first place_. The terminal
-   tests (`TerminalSessionView.test.tsx`,
-   `TerminalSessionProvider.test.tsx`) render
-   `<TerminalSessionContext.Provider value={fakeContext}>` and feed a
-   fake `worktreeSnapshot` rather than instantiating `@xterm/xterm` +
-   seven addons, so there is no `MockTerminal` class to share and no
-   `vi.hoisted` cross-file barrier to work around. If a future test
-   needs to drive the real `Terminal` class (e.g. paste-handling edge
-   cases inside xterm), re-open this item and lift the `vi.mock` /
-   inline addon stubs into `src/web/test-utils/xterm-mock.ts` once
-   Vitest v4 lifts the per-file `vi.hoisted` restriction or the project
-   switches to a non-hoisted mock mechanism.
+`src/test-utils/test-harness-policy.test.ts` guards the repository-wide
+harness invariants that are cheap to verify statically: React tests do not
+hand-roll roots or mutate the global act flag, and web tests use the canonical
+WebSocket mock. Behavioral conventions that require judgment remain review
+rules rather than source-text checks.
 
 ## 12. Adding a new test — checklist
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   beginRepoServerOperation,
   listRepoServerOperations,
@@ -12,12 +13,11 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
   resetRepoServerOperationRegistryForTests()
-  vi.useFakeTimers()
+  useFakeTimers()
 })
 
 afterEach(() => {
   resetRepoServerOperationRegistryForTests()
-  vi.useRealTimers()
 })
 
 describe('repo operation registry', () => {

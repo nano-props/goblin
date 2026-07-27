@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { createRuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
@@ -36,15 +37,12 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
   })
 
   test('drops a membership result invalidated while it was in flight', async () => {
-    let resolveMembership!: (value: { kind: 'settled'; targets: [typeof TARGET] }) => void
-    const membership = new Promise<{ kind: 'settled'; targets: [typeof TARGET] }>((resolve) => {
-      resolveMembership = resolve
-    })
+    const membership = Promise.withResolvers<{ kind: 'settled'; targets: [typeof TARGET] }>()
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const workspaceTabsRecovery = { request: vi.fn() }
     const recovery = new WorkspaceRuntimeReconnectRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
-      reconcileMemberships: async () => await membership,
+      reconcileMemberships: async () => await membership.promise,
       currentWorkspaceRuntimeId: () => TARGET.workspaceRuntimeId,
       terminalRecovery,
       workspaceTabsRecovery,
@@ -53,9 +51,8 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
 
     recovery.request()
     recovery.invalidate()
-    resolveMembership({ kind: 'settled', targets: [TARGET] })
-    await Promise.resolve()
-    await Promise.resolve()
+    membership.resolve({ kind: 'settled', targets: [TARGET] })
+    await waitForNextMacrotask()
 
     expect(terminalRecovery.begin).not.toHaveBeenCalled()
     expect(workspaceTabsRecovery.request).not.toHaveBeenCalled()
@@ -74,8 +71,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     })
 
     recovery.request()
-    await Promise.resolve()
-    await Promise.resolve()
+    await waitForNextMacrotask()
 
     expect(terminalRecovery.begin).not.toHaveBeenCalled()
     expect(workspaceTabsRecovery.request).not.toHaveBeenCalled()

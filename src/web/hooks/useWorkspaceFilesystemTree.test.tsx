@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { StrictMode, act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act } from '@testing-library/react'
+import { StrictMode, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
 import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
@@ -73,41 +75,38 @@ function mockExecutionTarget(
     : ({ kind: 'git-worktree', workspaceId, workspaceRuntimeId, root } as const)
 }
 
-let container: HTMLDivElement | null = null
-let root: Root | null = null
+let rendered: ReturnType<typeof renderInJsdom> | null = null
 let lastSnapshot: HarnessSnapshot | null = null
 let queryClient: QueryClient
 let stopInvalidationSync: (() => void) | null = null
 
 beforeEach(() => {
-  ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   mocks.getWorkspaceFilesystemTree.mockReset()
   listeners.clear()
   stopInvalidationSync = startWorkspaceFilesystemQueryInvalidationSync(queryClient)
   lastSnapshot = null
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
 })
 
 afterEach(() => {
-  act(() => root?.unmount())
+  rendered?.unmount()
+  rendered = null
   stopInvalidationSync?.()
   stopInvalidationSync = null
   queryClient.clear()
-  container?.remove()
-  root = null
-  container = null
   lastSnapshot = null
   listeners.clear()
   mocks.getWorkspaceFilesystemTree.mockReset()
-  ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
 })
 
 function render(props: HarnessProps): Promise<void> {
+  return renderElement(<Harness {...props} />)
+}
+
+function setProps(props: HarnessProps): Promise<void> {
   return act(async () => {
-    root!.render(
+    if (!rendered) throw new Error('expected rendered filesystem tree harness')
+    rendered.rerender(
       <QueryClientProvider client={queryClient}>
         <Harness {...props} />
       </QueryClientProvider>,
@@ -115,13 +114,9 @@ function render(props: HarnessProps): Promise<void> {
   })
 }
 
-function setProps(props: HarnessProps): Promise<void> {
+function renderElement(element: ReactNode): Promise<void> {
   return act(async () => {
-    root!.render(
-      <QueryClientProvider client={queryClient}>
-        <Harness {...props} />
-      </QueryClientProvider>,
-    )
+    rendered = renderInJsdom(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
   })
 }
 
@@ -144,7 +139,7 @@ function makeDeferred<T>(): Deferred<T> {
 async function flush() {
   await act(async () => {
     await Promise.resolve()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitForNextMacrotask()
   })
 }
 
@@ -305,21 +300,17 @@ describe('useWorkspaceFilesystemTree', () => {
     }
     mocks.getWorkspaceFilesystemTree.mockResolvedValue(result)
 
-    await act(async () => {
-      root!.render(
-        <QueryClientProvider client={queryClient}>
-          <StrictMode>
-            <Harness
-              workspaceRootPath="/repo-a"
-              worktreePath="/repo-a/main"
-              onSnapshot={(snapshot) => {
-                lastSnapshot = snapshot
-              }}
-            />
-          </StrictMode>
-        </QueryClientProvider>,
-      )
-    })
+    await renderElement(
+      <StrictMode>
+        <Harness
+          workspaceRootPath="/repo-a"
+          worktreePath="/repo-a/main"
+          onSnapshot={(snapshot) => {
+            lastSnapshot = snapshot
+          }}
+        />
+      </StrictMode>,
+    )
     await flush()
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
@@ -417,7 +408,8 @@ describe('useWorkspaceFilesystemTree', () => {
         lastSnapshot = snapshot
       },
     })
-    act(() => root?.unmount())
+    rendered?.unmount()
+    rendered = null
     await act(async () => {
       deferred.resolve({ nodes: [], truncated: false })
       await deferred.promise
@@ -846,14 +838,12 @@ describe('useWorkspaceFilesystemTree', () => {
       truncated: false,
     })
 
-    await act(async () => {
-      root!.render(
-        <QueryClientProvider client={queryClient}>
-          <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
-          <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
-        </QueryClientProvider>,
-      )
-    })
+    await renderElement(
+      <>
+        <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+        <Harness workspaceRootPath="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+      </>,
+    )
     await flush()
     expect(listeners.size).toBe(1)
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
@@ -881,14 +871,14 @@ describe('useWorkspaceFilesystemTree', () => {
     await render({ workspaceRootPath: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
     await flush()
 
-    act(() => root?.unmount())
+    rendered?.unmount()
+    rendered = null
     for (const listener of listeners) {
       listener({
         type: 'workspace-filesystem-invalidated',
         target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
       })
     }
-    root = createRoot(container!)
     await render({ workspaceRootPath: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
     await flush()
 

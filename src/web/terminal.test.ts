@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { installHostBootstrap } from '#/web/test-utils/host-bootstrap.ts'
@@ -250,9 +251,7 @@ describe('terminal web host client', () => {
 
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent
-      .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'recover-sessions')
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
     socket.emitMessage(
       JSON.stringify({
         type: 'response',
@@ -268,129 +267,107 @@ describe('terminal web host client', () => {
   })
 
   test('closes an idle terminal socket after a one-shot websocket request times out without subscribers', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const recoverPromise = terminalClient.recoverSessions({
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      })
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
 
-      socket.emitOpen()
-      await Promise.resolve()
-      const request = socket.sent
-        .map((payload) => JSON.parse(payload))
-        .find((message) => message.action === 'recover-sessions')
-      expect(request).toMatchObject({
-        type: 'request',
-        action: 'recover-sessions',
-        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      })
-      const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
+    socket.emitOpen()
+    await Promise.resolve()
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'recover-sessions',
+      input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+    })
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
 
-      await vi.advanceTimersByTimeAsync(30_000)
+    await vi.advanceTimersByTimeAsync(30_000)
 
-      await expectation
-      expect(socket.readyState).toBe(wsMock.CLOSED)
-    } finally {
-      vi.useRealTimers()
-    }
+    await expectation
+    expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
   test('sends terminal heartbeat messages while the realtime socket is open', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
 
-      await vi.advanceTimersByTimeAsync(30_000)
+    await vi.advanceTimersByTimeAsync(30_000)
 
-      expect(socket.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(socket.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
+    dispose()
   })
 
   test('heartbeat send failure closes and reconnects an unhealthy realtime socket', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
-      await vi.advanceTimersByTimeAsync(1_000)
-      const recoverPromise = terminalClient.recoverSessions({
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      })
-      await Promise.resolve()
-      const request = socket.sent
-        .map((payload) => JSON.parse(payload))
-        .find((message) => message.action === 'recover-sessions')
-      expect(request).toMatchObject({
-        type: 'request',
-        action: 'recover-sessions',
-        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      })
-      socket.send = vi.fn(() => {
-        throw new Error('send failed')
-      })
-      const expectation = expect(recoverPromise).rejects.toThrow('App realtime heartbeat send failed')
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
+    await vi.advanceTimersByTimeAsync(1_000)
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
+    await Promise.resolve()
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'recover-sessions',
+      input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+    })
+    socket.send = vi.fn(() => {
+      throw new Error('send failed')
+    })
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime heartbeat send failed')
 
-      await vi.advanceTimersByTimeAsync(29_000)
+    await vi.advanceTimersByTimeAsync(29_000)
 
-      await expectation
-      expect(socket.readyState).toBe(wsMock.CLOSED)
-      await vi.advanceTimersByTimeAsync(300)
-      expect(wsMock.instances).toHaveLength(2)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    await expectation
+    expect(socket.readyState).toBe(wsMock.CLOSED)
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
+    dispose()
   })
 
   test('request timeout closes an unhealthy socket even while subscribers keep realtime open', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
-      await Promise.resolve()
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
+    await Promise.resolve()
 
-      const recoverPromise = terminalClient.recoverSessions({
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      })
-      await Promise.resolve()
-      const request = socket.sent
-        .map((payload) => JSON.parse(payload))
-        .find((message) => message.action === 'recover-sessions')
-      expect(request).toMatchObject({
-        type: 'request',
-        action: 'recover-sessions',
-        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      })
-      const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
+    const recoverPromise = terminalClient.recoverSessions({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
+    await Promise.resolve()
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'recover-sessions',
+      input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+    })
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime request timed out')
 
-      await vi.advanceTimersByTimeAsync(30_000)
-      await expectation
-      expect(socket.readyState).toBe(wsMock.CLOSED)
+    await vi.advanceTimersByTimeAsync(30_000)
+    await expectation
+    expect(socket.readyState).toBe(wsMock.CLOSED)
 
-      await vi.advanceTimersByTimeAsync(300)
-      expect(wsMock.instances).toHaveLength(2)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
+    dispose()
   })
 
   test('forwards terminal output, bell, title, and exit events from the web socket', async () => {
@@ -608,97 +585,81 @@ describe('terminal web host client', () => {
   })
 
   test('kickReconnect health-probes an open app realtime socket and keeps it when pong arrives', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
 
-      appRealtimeClient.kickReconnect()
-      const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
-      expect(ping).toMatchObject({ type: 'ping' })
-      socket.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
-      await vi.advanceTimersByTimeAsync(5_000)
+    appRealtimeClient.kickReconnect()
+    const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+    expect(ping).toMatchObject({ type: 'ping' })
+    socket.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
+    await vi.advanceTimersByTimeAsync(5_000)
 
-      expect(socket.readyState).toBe(wsMock.OPEN)
-      expect(wsMock.instances).toHaveLength(1)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(socket.readyState).toBe(wsMock.OPEN)
+    expect(wsMock.instances).toHaveLength(1)
+    dispose()
   })
 
   test('kickReconnect does not stack duplicate health probes for the same open socket', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
 
-      appRealtimeClient.kickReconnect()
-      appRealtimeClient.kickReconnect()
+    appRealtimeClient.kickReconnect()
+    appRealtimeClient.kickReconnect()
 
-      expect(
-        socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping'),
-      ).toHaveLength(1)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping')).toHaveLength(
+      1,
+    )
+    dispose()
   })
 
   test('kickReconnect reconnects an open app realtime socket when health probe send fails', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
-      socket.send = vi.fn(() => {
-        throw new Error('send failed')
-      })
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
+    socket.send = vi.fn(() => {
+      throw new Error('send failed')
+    })
 
-      appRealtimeClient.kickReconnect()
+    appRealtimeClient.kickReconnect()
 
-      expect(socket.readyState).toBe(wsMock.CLOSED)
-      await vi.advanceTimersByTimeAsync(300)
-      expect(wsMock.instances).toHaveLength(2)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(socket.readyState).toBe(wsMock.CLOSED)
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
+    dispose()
   })
 
   test('kickReconnect reconnects an open app realtime socket when health probe times out', async () => {
-    vi.useFakeTimers()
-    try {
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
-      const dispose = terminalClient.onOutput(() => {})
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      socket.emitOpen()
+    useFakeTimers()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.emitOpen()
 
-      appRealtimeClient.kickReconnect()
-      const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
-      expect(ping).toMatchObject({ type: 'ping' })
-      await vi.advanceTimersByTimeAsync(5_000)
-      expect(socket.readyState).toBe(wsMock.CLOSED)
+    appRealtimeClient.kickReconnect()
+    const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+    expect(ping).toMatchObject({ type: 'ping' })
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(socket.readyState).toBe(wsMock.CLOSED)
 
-      await vi.advanceTimersByTimeAsync(300)
-      expect(wsMock.instances).toHaveLength(2)
-      dispose()
-    } finally {
-      vi.useRealTimers()
-    }
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
+    dispose()
   })
 
   test('kickReconnect replaces a closing app realtime socket while realtime subscribers remain', async () => {
@@ -749,7 +710,7 @@ describe('terminal web host client', () => {
   })
 
   test('ignores stale terminal socket events after reconnect creates a newer socket', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const { terminalClient } = await import('#/web/terminal.ts')
     const onOutput = vi.fn()
     const dispose = terminalClient.onOutput(onOutput)
@@ -799,11 +760,10 @@ describe('terminal web host client', () => {
       processName: 'zsh',
     })
     dispose()
-    vi.useRealTimers()
   })
 
   test('stops reconnecting terminal sockets after app quitting starts', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
@@ -816,7 +776,6 @@ describe('terminal web host client', () => {
     expect(socket.readyState).toBe(wsMock.CLOSED)
     expect(wsMock.instances).toHaveLength(1)
     dispose()
-    vi.useRealTimers()
   })
 
   test('emits terminal bell click events from browser notifications in web host mode', async () => {

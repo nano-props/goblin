@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 
 const mocks = vi.hoisted(() => {
   const closeHttpServer = vi.fn()
@@ -56,13 +57,12 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 
 describe('bootstrap server shutdown', () => {
   beforeEach(() => {
-    vi.useRealTimers()
     vi.clearAllMocks()
     mocks.websocketClients.clear()
   })
 
   test('gracefully shuts down realtime clients and forces lingering sockets closed without owning process exit', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const socket = { on: vi.fn(), once: vi.fn(), destroy: vi.fn() }
     const client = { close: vi.fn(), terminate: vi.fn() }
     mocks.websocketClients.add(client)

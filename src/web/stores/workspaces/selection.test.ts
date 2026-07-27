@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspacePaneStaticTabType,
@@ -104,7 +105,7 @@ function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | nul
 }
 
 async function flushAsyncWork() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await waitForNextMacrotask()
 }
 
 function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEntry[] {

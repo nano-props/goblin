@@ -5,6 +5,8 @@
 
 import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import type { PtyWorkerMessage } from '#/server/terminal/pty-worker-protocol.ts'
 
@@ -80,7 +82,6 @@ describe('WorkerBackedPtySupervisor', () => {
   let worker: FakeWorker
 
   beforeEach(() => {
-    vi.useRealTimers()
     worker = new FakeWorker()
   })
 
@@ -180,7 +181,7 @@ describe('WorkerBackedPtySupervisor', () => {
   })
 
   test('invalidates a connected worker whose spawn acknowledgement never arrives', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const workerA = new FakeWorker()
     const workerB = new FakeWorker()
     const workers = [workerA, workerB]
@@ -254,7 +255,7 @@ describe('WorkerBackedPtySupervisor', () => {
   })
 
   test('clears spawn deadlines after successful and failed acknowledgements', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const supervisor = buildSupervisor(worker, { spawnAckTimeoutMs: 25 })
 
     const successful = supervisor.spawn({ cwd: '/repo/success', cols: 80, rows: 24 })
@@ -588,12 +589,7 @@ describe('WorkerBackedPtySupervisor', () => {
     const handle = await spawnSession(supervisor, worker)
     const acceptedResize = supervisor.resize(handle, 100, 30)
     const acceptedRequest = worker.sent.at(-1) as { requestId: string }
-    let settled = false
-    void acceptedResize.then(() => {
-      settled = true
-    })
-    await Promise.resolve()
-    expect(settled).toBe(false)
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(1)
 
     worker.emit('message', {
       type: 'pty-resize-result',
@@ -639,7 +635,7 @@ describe('WorkerBackedPtySupervisor', () => {
   })
 
   test('retires an indeterminate worker when a resize acknowledgement times out', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const supervisor = buildSupervisor(worker, { resizeAckTimeoutMs: 25 })
     const spawning = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
     const spawnRequest = worker.sent.at(-1) as SpawnRequest
@@ -675,7 +671,7 @@ describe('WorkerBackedPtySupervisor', () => {
   })
 
   test('settles a pending write immediately when its PTY exits before acknowledgement', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const supervisor = buildSupervisor(worker)
     const handle = await spawnSession(supervisor, worker)
     const write = supervisor.write(handle, 'input')
@@ -741,7 +737,7 @@ describe('WorkerBackedPtySupervisor', () => {
   })
 
   test('retires an indeterminate worker when a write acknowledgement times out', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const supervisor = new WorkerBackedPtySupervisor({
       workerEntry: '/tmp/pty-worker.js',
       spawnWorker: () => worker as never,
@@ -820,7 +816,7 @@ describe('WorkerBackedPtySupervisor', () => {
     const closing = supervisor.killAndWait(result.handle).then(() => {
       settled = true
     })
-    await Promise.resolve()
+    await flushMicrotasks()
     expect(settled).toBe(false)
     expect(durableExitSettled).toBe(false)
     expect(worker.sent.at(-1)).toEqual({ type: 'pty-kill', ptySessionId: request.ptySessionId })

@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   createGitHubApiQueue,
   GITHUB_API_CONCURRENCY,
@@ -37,25 +38,21 @@ describe('GitHub API request queue', () => {
   })
 
   test('limits task starts per interval', async () => {
-    vi.useFakeTimers()
-    try {
-      const queue = createGitHubApiQueue({ concurrency: 10, intervalCap: 2, interval: 40 })
-      let started = 0
+    useFakeTimers()
+    const queue = createGitHubApiQueue({ concurrency: 10, intervalCap: 2, interval: 40 })
+    let started = 0
 
-      const tasks = Array.from({ length: 3 }, () =>
-        queue.add(() => {
-          started += 1
-        }),
-      )
+    const tasks = Array.from({ length: 3 }, () =>
+      queue.add(() => {
+        started += 1
+      }),
+    )
 
-      await vi.advanceTimersByTimeAsync(0)
-      expect(started).toBe(2)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(started).toBe(2)
 
-      await vi.advanceTimersByTimeAsync(40)
-      await Promise.all(tasks)
-      expect(started).toBe(3)
-    } finally {
-      vi.useRealTimers()
-    }
+    await vi.advanceTimersByTimeAsync(40)
+    await Promise.all(tasks)
+    expect(started).toBe(3)
   })
 })

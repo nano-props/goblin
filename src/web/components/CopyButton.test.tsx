@@ -21,12 +21,8 @@ describe('CopyButton', () => {
   })
 
   test('does not show copied feedback for a stale clipboard write after value changes', async () => {
-    let resolveFirst!: () => void
-    writeText.mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        resolveFirst = resolve
-      }),
-    )
+    const firstWrite = Promise.withResolvers<void>()
+    writeText.mockReturnValueOnce(firstWrite.promise)
 
     const { container, rerender } = renderInJsdom(<CopyButton value="first" copyLabel="Copy" copiedLabel="Copied" />)
     act(() => {
@@ -36,9 +32,8 @@ describe('CopyButton', () => {
     rerender(<CopyButton value="second" copyLabel="Copy" copiedLabel="Copied" />)
 
     await act(async () => {
-      resolveFirst()
-      await Promise.resolve()
-      await Promise.resolve()
+      firstWrite.resolve()
+      await firstWrite.promise
     })
 
     expect(writeText).toHaveBeenCalledWith('first')

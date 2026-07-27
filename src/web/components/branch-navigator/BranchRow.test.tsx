@@ -41,6 +41,7 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 
 import { createRef } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -60,7 +61,6 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 afterEach(() => {
-  vi.useRealTimers()
   responsiveMocks.compact = false
 })
 
@@ -466,7 +466,7 @@ describe('BranchRow', () => {
   })
 
   test('shows the relative commit time without the last commit author', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-05T12:00:00.000Z'))
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {

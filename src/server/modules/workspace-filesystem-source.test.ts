@@ -187,27 +187,26 @@ vi.mock('#/system/ssh/git.ts', () => ({
 }))
 vi.mock('#/system/ssh/filesystem.ts', () => ({ getRemoteDirectoryWalk: remoteMocks.getRemoteDirectoryWalk }))
 
-function remoteTarget(): RemoteWorkspaceTarget {
-  return {
-    id: workspaceIdForTest('goblin+ssh://mybox/myrepo'),
-    alias: 'mybox',
-    remotePath: '/srv/repos/myrepo',
-    displayName: 'mybox:myrepo',
-    host: 'mybox.local',
-    user: 'git',
-    port: 22,
-  }
+const remoteTarget: RemoteWorkspaceTarget = {
+  id: workspaceIdForTest('goblin+ssh://example/myrepo'),
+  alias: 'example',
+  remotePath: '/srv/repos/myrepo',
+  displayName: 'example:myrepo',
+  host: 'example.test',
+  user: 'developer',
+  port: 22,
 }
 
 const NUL = String.fromCharCode(0)
+const REMOTE_WORKTREE_PATH = '/srv/repos/myrepo/.worktrees/feature'
 
 function makeRemoteInput(
-  worktreePath: string,
+  worktreePath = REMOTE_WORKTREE_PATH,
   options: WorkspaceFilesystemSourceOptions = {},
   signal: AbortSignal | undefined = undefined,
 ) {
   return {
-    target: remoteTarget(),
+    target: remoteTarget,
     worktreePath,
     options,
     signal,
@@ -224,9 +223,7 @@ describe('workspace-filesystem-source — remote direct children', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(
-      readGitWorktreeFilesystemSourceRemote(
-        makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal),
-      ),
+      readGitWorktreeFilesystemSourceRemote(makeRemoteInput(REMOTE_WORKTREE_PATH, {}, controller.signal)),
     ).rejects.toThrow('aborted')
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
   })
@@ -239,7 +236,7 @@ describe('workspace-filesystem-source — remote direct children', () => {
       ),
     })
 
-    const result = await readGitWorktreeFilesystemSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    const result = await readGitWorktreeFilesystemSourceRemote(makeRemoteInput())
     expect(result.nodes).toEqual([
       expect.objectContaining({ id: 'src', parentId: null, kind: 'directory', hasChildren: true }),
       expect.objectContaining({ id: 'README.md', parentId: null, kind: 'file' }),
@@ -251,11 +248,7 @@ describe('workspace-filesystem-source — remote direct children', () => {
 
     const result = await readWorkspaceFilesystemSourceRemote(makeRemoteInput('/srv/workspace'))
 
-    expect(remoteMocks.getRemoteDirectoryWalk).toHaveBeenCalledWith(
-      remoteTarget(),
-      '/srv/workspace',
-      expect.any(Object),
-    )
+    expect(remoteMocks.getRemoteDirectoryWalk).toHaveBeenCalledWith(remoteTarget, '/srv/workspace', expect.any(Object))
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
     expect(result.nodes).toHaveLength(1)
   })
@@ -263,13 +256,11 @@ describe('workspace-filesystem-source — remote direct children', () => {
   test('passes prefix to the remote tree walk', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: true, message: 'src/a.ts' })
 
-    await readGitWorktreeFilesystemSourceRemote(
-      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }),
-    )
+    await readGitWorktreeFilesystemSourceRemote(makeRemoteInput(REMOTE_WORKTREE_PATH, { prefix: 'src' }))
 
     expect(remoteMocks.getRemoteTreeWalk).toHaveBeenCalledWith(
-      remoteTarget(),
-      '/srv/repos/myrepo/.worktrees/feature',
+      remoteTarget,
+      REMOTE_WORKTREE_PATH,
       expect.objectContaining({ prefix: 'src' }),
     )
   })
@@ -285,20 +276,12 @@ describe('workspace-filesystem-source — remote direct children', () => {
       ].join(NUL),
     })
 
-    const result = await readGitWorktreeFilesystemSourceRemote(
-      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }),
-    )
+    const result = await readGitWorktreeFilesystemSourceRemote(makeRemoteInput(REMOTE_WORKTREE_PATH, { prefix: 'src' }))
     expect(result.nodes.map((node) => node.id)).toEqual(['src/a.ts'])
   })
 
   test('rejects when the remote walk fails', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: false, message: 'no worktree found' })
-    await expect(
-      readGitWorktreeFilesystemSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature')),
-    ).rejects.toThrow('no worktree found')
+    await expect(readGitWorktreeFilesystemSourceRemote(makeRemoteInput())).rejects.toThrow('no worktree found')
   })
-})
-
-afterEach(() => {
-  vi.restoreAllMocks()
 })

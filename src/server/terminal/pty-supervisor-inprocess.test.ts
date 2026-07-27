@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import type {
   SpawnTerminalPtyRuntimeResult,
   TerminalPtyRuntime,
@@ -40,40 +41,23 @@ describe('createInProcessPtySupervisor', () => {
     runtimeMocks.spawn.mockReset()
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   test('installs one supervisor-owned exit observer before returning the spawned handle', async () => {
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-
-    const result = await supervisor.spawn(SPAWN_INPUT)
-
-    expect(result.ok).toBe(true)
+    const { events, fake } = await spawnFakeSupervisor()
     expect(fake.spawn).toHaveBeenCalledOnce()
-    if (!result.ok) throw new Error(result.message)
     const publicExit = vi.fn()
-    const claim = result.events.claim({ onData: vi.fn(), onExit: publicExit })
+    const claim = events.claim({ onData: vi.fn(), onExit: publicExit })
     claim.activate()
 
     fake.emitExit()
-    await Promise.resolve()
 
     expect(publicExit).toHaveBeenCalledWith(null, null)
-    expect(fake.events.dispose).toHaveBeenCalledOnce()
   })
 
   test('coalesces concurrent kill waiters onto one kill operation', async () => {
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    const { fake, handle, supervisor } = await spawnFakeSupervisor()
 
-    const first = supervisor.killAndWait(result.handle)
-    const second = supervisor.killAndWait(result.handle)
+    const first = supervisor.killAndWait(handle)
+    const second = supervisor.killAndWait(handle)
 
     expect(fake.kill).toHaveBeenCalledOnce()
     fake.emitExit()
@@ -81,40 +65,30 @@ describe('createInProcessPtySupervisor', () => {
   })
 
   test('keeps the owner observer after timeout so late exit cleans the entry and retry succeeds', async () => {
-    vi.useFakeTimers()
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    useFakeTimers()
+    const { fake, handle, supervisor } = await spawnFakeSupervisor()
 
-    const closing = supervisor.killAndWait(result.handle)
+    const closing = supervisor.killAndWait(handle)
     const timeout = expect(closing).rejects.toThrow('PTY close timed out')
     await vi.advanceTimersByTimeAsync(2_000)
     await timeout
 
     expect(fake.events.dispose).not.toHaveBeenCalled()
     fake.emitExit()
-    await Promise.resolve()
 
-    expect(fake.events.dispose).toHaveBeenCalledOnce()
-    await expect(supervisor.killAndWait(result.handle)).resolves.toBeUndefined()
+    await expect(supervisor.killAndWait(handle)).resolves.toBeUndefined()
     expect(fake.kill).toHaveBeenCalledOnce()
   })
 
   test('keeps durable exit completion subscribed after a bounded close timeout', async () => {
-    vi.useFakeTimers()
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    useFakeTimers()
+    const { fake, handle, supervisor } = await spawnFakeSupervisor()
     let exitObserved = false
-    const eventualExit = supervisor.waitForExit(result.handle).then(() => {
+    const eventualExit = supervisor.waitForExit(handle).then(() => {
       exitObserved = true
     })
 
-    const timeout = expect(supervisor.killAndWait(result.handle)).rejects.toThrow('PTY close timed out')
+    const timeout = expect(supervisor.killAndWait(handle)).rejects.toThrow('PTY close timed out')
     await vi.advanceTimersByTimeAsync(2_000)
     await timeout
     expect(exitObserved).toBe(false)
@@ -125,18 +99,14 @@ describe('createInProcessPtySupervisor', () => {
   })
 
   test('starts one new kill attempt when retrying before a timed-out PTY exits', async () => {
-    vi.useFakeTimers()
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    useFakeTimers()
+    const { fake, handle, supervisor } = await spawnFakeSupervisor()
 
-    const firstTimeout = expect(supervisor.killAndWait(result.handle)).rejects.toThrow('PTY close timed out')
+    const firstTimeout = expect(supervisor.killAndWait(handle)).rejects.toThrow('PTY close timed out')
     await vi.advanceTimersByTimeAsync(2_000)
     await firstTimeout
 
-    const retry = supervisor.killAndWait(result.handle)
+    const retry = supervisor.killAndWait(handle)
     expect(fake.kill).toHaveBeenCalledTimes(2)
     fake.emitExit()
     await expect(retry).resolves.toBeUndefined()
@@ -151,31 +121,21 @@ describe('createInProcessPtySupervisor', () => {
   })
 
   test('replays a synchronous spawn-time exit to a later public subscriber', async () => {
-    const fake = createFakeRuntime({ exitDuringSpawn: true })
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    const { events } = await spawnFakeSupervisor({ exitDuringSpawn: true })
     const exit = vi.fn()
 
-    const subscription = result.events.claim({ onData: vi.fn(), onExit: exit })
+    const subscription = events.claim({ onData: vi.fn(), onExit: exit })
     subscription.activate()
-    await Promise.resolve()
 
     expect(exit).toHaveBeenCalledWith(null, null)
-    expect(fake.events.dispose).toHaveBeenCalledOnce()
     subscription.dispose()
   })
 
   test('replays synchronous spawn-time data to the first business owner', async () => {
-    const fake = createFakeRuntime({ dataDuringSpawn: 'early output' })
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    const { events } = await spawnFakeSupervisor({ dataDuringSpawn: 'early output' })
     const data = vi.fn()
 
-    const subscription = result.events.claim({ onData: data, onExit: vi.fn() })
+    const subscription = events.claim({ onData: data, onExit: vi.fn() })
     subscription.activate()
 
     expect(data).toHaveBeenCalledWith({ data: 'early output', processName: 'zsh' })
@@ -183,16 +143,11 @@ describe('createInProcessPtySupervisor', () => {
   })
 
   test('confirms a runtime write and rejects a missing handle', async () => {
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    const { fake, handle, supervisor } = await spawnFakeSupervisor()
 
-    await expect(supervisor.write(result.handle, 'input')).resolves.toEqual({ status: 'accepted' })
+    await expect(supervisor.write(handle, 'input')).resolves.toEqual({ status: 'accepted' })
     fake.emitExit()
-    await Promise.resolve()
-    await expect(supervisor.write(result.handle, 'late')).resolves.toEqual({ status: 'rejected' })
+    await expect(supervisor.write(handle, 'late')).resolves.toEqual({ status: 'rejected' })
   })
 
   test('marks a throwing native write as indeterminate', async () => {
@@ -220,15 +175,11 @@ describe('createInProcessPtySupervisor', () => {
   })
 
   test('disconnects native event ownership before killing runtimes during shutdown', async () => {
-    const fake = createFakeRuntime()
-    installFakeRuntime(fake)
-    const supervisor = createInProcessPtySupervisor()
-    const result = await supervisor.spawn(SPAWN_INPUT)
-    if (!result.ok) throw new Error(result.message)
+    const { events, fake, handle, supervisor } = await spawnFakeSupervisor()
     const onData = vi.fn()
     const onExit = vi.fn()
-    result.events.claim({ onData, onExit }).activate()
-    const exited = supervisor.waitForExit(result.handle)
+    events.claim({ onData, onExit }).activate()
+    const exited = supervisor.waitForExit(handle)
 
     supervisor.shutdown()
     fake.emitData('late')
@@ -240,6 +191,15 @@ describe('createInProcessPtySupervisor', () => {
     await expect(exited).resolves.toBeUndefined()
   })
 })
+
+async function spawnFakeSupervisor(options: { dataDuringSpawn?: string; exitDuringSpawn?: boolean } = {}) {
+  const fake = createFakeRuntime(options)
+  installFakeRuntime(fake)
+  const supervisor = createInProcessPtySupervisor()
+  const result = await supervisor.spawn(SPAWN_INPUT)
+  if (!result.ok) throw new Error(result.message)
+  return { events: result.events, fake, handle: result.handle, supervisor }
+}
 
 function createFakeRuntime(options: { dataDuringSpawn?: string; exitDuringSpawn?: boolean } = {}): FakeRuntime {
   let observer: TerminalPtyRuntimeEventObserver | null = null

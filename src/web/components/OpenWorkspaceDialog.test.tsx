@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -85,7 +85,7 @@ describe('OpenWorkspaceDialog', () => {
     )
 
     await setInputValue('#open-workspace-path', '/Users/tester/Dev')
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(document.body.querySelector('[role="option"]')?.textContent).toContain('/Users/tester/Developer'),
     )
 
@@ -107,7 +107,7 @@ describe('OpenWorkspaceDialog', () => {
       />,
     )
     await setInputValue('#open-workspace-path', '/Users/tester/Dev')
-    await vi.waitFor(() => expect(document.querySelector('[role="listbox"]')).not.toBeNull())
+    await waitFor(() => expect(document.querySelector('[role="listbox"]')).not.toBeNull())
     const user = userEvent.setup()
     expect(document.querySelector('[role="listbox"]')).not.toBeNull()
 
@@ -169,7 +169,7 @@ describe('OpenWorkspaceDialog', () => {
   })
 
   test('waits for open success before closing', async () => {
-    const deferred = createDeferred<OpenWorkspaceResult>()
+    const deferred = Promise.withResolvers<OpenWorkspaceResult>()
     const onClose = vi.fn()
     const onOpen = vi.fn(() => deferred.promise)
 
@@ -184,9 +184,7 @@ describe('OpenWorkspaceDialog', () => {
     expect(queryButtonByText('Close')).toBeNull()
 
     deferred.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
-    await flush()
-
-    expect(onClose).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
   test('can fill the path from the native picker and keeps the dialog open on failure', async () => {
@@ -199,19 +197,18 @@ describe('OpenWorkspaceDialog', () => {
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await clickButtonByText('workspace-picker.open-path-choose')
-    await flush()
+    await waitFor(() => expect(input('#open-workspace-path').value).toBe('~/Developer/repo'))
     expect(testWindow.goblinNative).toEqual(
       expect.objectContaining({
         host: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
       }),
     )
-    expect(input('#open-workspace-path').value).toBe('~/Developer/repo')
 
     await click('button[type="submit"]')
-    await flush()
-
-    expect(onClose).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain('error.workspace-git-unavailable')
+    await waitFor(() => {
+      expect(onClose).not.toHaveBeenCalled()
+      expect(document.body.textContent).toContain('error.workspace-git-unavailable')
+    })
   })
 
   test('allows retry after an unexpected open error', async () => {
@@ -228,22 +225,21 @@ describe('OpenWorkspaceDialog', () => {
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
-    await flush()
-
-    expect(document.body.textContent).toContain('boom')
-    expect(button('button[type="submit"]').disabled).toBe(false)
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('boom')
+      expect(button('button[type="submit"]').disabled).toBe(false)
+    })
 
     await click('button[type="submit"]')
-    await flush()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
 
     expect(onOpen).toHaveBeenNthCalledWith(1, '/Users/tester/Developer/repo')
     expect(onOpen).toHaveBeenNthCalledWith(2, '/Users/tester/Developer/repo')
-    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   test('ignores an older submit result after the dialog is reopened', async () => {
-    const first = createDeferred<OpenWorkspaceResult>()
-    const second = createDeferred<OpenWorkspaceResult>()
+    const first = Promise.withResolvers<OpenWorkspaceResult>()
+    const second = Promise.withResolvers<OpenWorkspaceResult>()
     const onClose = vi.fn()
     const onOpen = vi.fn(() => (onOpen.mock.calls.length === 0 ? first.promise : second.promise))
 
@@ -255,8 +251,10 @@ describe('OpenWorkspaceDialog', () => {
     rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
     rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    first.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
-    await flush()
+    await act(async () => {
+      first.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
+      await first.promise
+    })
 
     expect(onClose).not.toHaveBeenCalled()
     expect(button('button[type="submit"]').disabled).toBe(true)
@@ -264,9 +262,7 @@ describe('OpenWorkspaceDialog', () => {
     await setInputValue('#open-workspace-path', '~/Developer/repo-next')
     await click('button[type="submit"]')
     second.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo-next') })
-    await flush()
-
-    expect(onClose).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
   test('clears a previous inline error after editing the path', async () => {
@@ -277,9 +273,7 @@ describe('OpenWorkspaceDialog', () => {
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
-    await flush()
-
-    expect(document.body.textContent).toContain('boom')
+    await waitFor(() => expect(document.body.textContent).toContain('boom'))
 
     await setInputValue('#open-workspace-path', '~/Developer/repo-next')
 
@@ -346,20 +340,4 @@ async function clickButtonByText(text: string) {
 
 function setupUser() {
   return userEvent.setup()
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
 }

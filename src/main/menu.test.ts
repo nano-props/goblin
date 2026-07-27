@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -121,10 +122,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-workspace')
-    await Promise.resolve()
+    await expectClientIntent({ type: 'open-workspace-requested' })
 
     expect(mocks.activatePrimaryWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('reuses an existing primary window for menu actions', async () => {
@@ -133,10 +133,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-workspace')
-    await Promise.resolve()
+    await expectClientIntent({ type: 'open-workspace-requested' })
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('ignores close commands when no window exists', async () => {
@@ -145,7 +144,6 @@ describe('app menu actions', () => {
 
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
     clickMenuItem('menu.file', 'menu.file.close-workspace')
-    await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
     expect(mocks.sendClientEffectIntent).not.toHaveBeenCalled()
@@ -157,12 +155,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
-    await Promise.resolve()
+    await expectClientIntent({ type: 'workspace-pane-close-tab-requested' })
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'workspace-pane-close-tab-requested',
-    })
   })
 
   test('sends the path dialog action from the file menu', async () => {
@@ -171,9 +166,7 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-workspace-path')
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-path-requested' })
+    await expectClientIntent({ type: 'open-workspace-path-requested' })
   })
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
@@ -230,9 +223,7 @@ describe('app menu actions', () => {
     expect(closeWindowItem?.accelerator).toBeUndefined()
     expect(shortcutsItem?.enabled).not.toBe(false)
     shortcutsItem.click()
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'open-settings-requested',
       page: 'shortcuts',
     })
@@ -243,9 +234,7 @@ describe('app menu actions', () => {
 
     buildAppMenu()
     clickMenuItem('Goblin', 'menu.app.settings')
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'open-settings-requested',
       page: 'general',
     })
@@ -256,9 +245,7 @@ describe('app menu actions', () => {
 
     buildAppMenu()
     clickNestedMenuItem('Goblin', 'settings.appearance', 'settings.appearance.dark')
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'theme-pref-set-requested',
       pref: 'dark',
     })
@@ -269,9 +256,7 @@ describe('app menu actions', () => {
 
     buildAppMenu()
     clickNestedMenuItem('Goblin', 'settings.lang', 'settings.lang.ko')
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'lang-pref-set-requested',
       pref: 'ko',
     })
@@ -335,16 +320,12 @@ describe('app menu actions', () => {
     expect(oldPrimaryItem).toBeUndefined()
 
     terminalItem.click()
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'terminal-primary-action-requested',
     })
 
     zenModeItem.click()
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'workspace-zen-mode-toggle-requested',
     })
   })
@@ -426,12 +407,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.window', 'menu.window.reset-window')
-    await Promise.resolve()
+    await expectClientIntent({ type: 'layout-reset-requested' })
 
     expect(mocks.resetPrimaryWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'layout-reset-requested',
-    })
   })
 
   test('routes clear recent through client intent', async () => {
@@ -447,9 +425,7 @@ describe('app menu actions', () => {
     const clearItem = recentMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.clear-recent')
     expect(clearItem?.click).toBeTypeOf('function')
     clearItem.click()
-    await Promise.resolve()
-
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+    await expectClientIntent({
       type: 'clear-recent-workspaces-requested',
     })
   })
@@ -459,7 +435,6 @@ describe('app menu actions', () => {
 
     buildAppMenu()
     clickMenuItem('menu.file', 'menu.file.open-in-browser')
-    await Promise.resolve()
 
     expect(mocks.openHttpExternal).toHaveBeenCalledWith('http://127.0.0.1:32100')
   })
@@ -478,4 +453,10 @@ function clickNestedMenuItem(menuLabel: string, parentItemLabel: string, itemLab
   const item = parent?.submenu?.find((entry: any) => entry.label === itemLabel)
   expect(item?.click).toBeTypeOf('function')
   item.click()
+}
+
+async function expectClientIntent(intent: ClientEffectIntent): Promise<void> {
+  await vi.waitFor(() => {
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, intent)
+  })
 }

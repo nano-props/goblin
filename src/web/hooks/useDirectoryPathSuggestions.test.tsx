@@ -116,13 +116,8 @@ describe('useDirectoryPathSuggestions', () => {
   })
 
   test('reports loading once the debounced request has started', async () => {
-    let resolveFetch: ((value: string[]) => void) | null = null
-    mockedFetch.mockImplementation(
-      () =>
-        new Promise<string[]>((resolve) => {
-          resolveFetch = resolve
-        }),
-    )
+    const fetch = Promise.withResolvers<string[]>()
+    mockedFetch.mockReturnValue(fetch.promise)
 
     const snapshots = await renderHookLifecycle({
       enabled: true,
@@ -137,8 +132,8 @@ describe('useDirectoryPathSuggestions', () => {
     })
 
     await act(async () => {
-      resolveFetch?.(['/srv/a'])
-      await Promise.resolve()
+      fetch.resolve(['/srv/a'])
+      await fetch.promise
     })
 
     expect(snapshots.at(-1)).toEqual({
@@ -150,13 +145,9 @@ describe('useDirectoryPathSuggestions', () => {
 
   test('clears loading while a new query is waiting out debounce', async () => {
     useFakeTimers()
-    let resolveFetch: ((value: string[]) => void) | null = null
-    mockedFetch.mockImplementation(
-      () =>
-        new Promise<string[]>((resolve) => {
-          resolveFetch = resolve
-        }),
-    )
+    const firstFetch = Promise.withResolvers<string[]>()
+    const secondFetch = Promise.withResolvers<string[]>()
+    mockedFetch.mockReturnValueOnce(firstFetch.promise).mockReturnValueOnce(secondFetch.promise)
 
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
@@ -197,8 +188,8 @@ describe('useDirectoryPathSuggestions', () => {
     })
 
     await act(async () => {
-      resolveFetch?.(['/srv/result'])
-      await Promise.resolve()
+      secondFetch.resolve(['/srv/result'])
+      await secondFetch.promise
     })
 
     expect(snapshots.at(-1)).toEqual({
@@ -256,13 +247,13 @@ describe('useDirectoryPathSuggestions', () => {
 
     await act(async () => {
       second.resolve(['/srv/current'])
-      await Promise.resolve()
+      await second.promise
     })
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
 
     await act(async () => {
       first.resolve(['/srv/stale'])
-      await Promise.resolve()
+      await first.promise
     })
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
   })

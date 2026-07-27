@@ -52,13 +52,10 @@ describe('settings-client', () => {
 
   test('reads theme state from embedded server settings when no Electron bridge exists', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'github' }),
-      })),
-    )
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'github' }),
+    }))
 
     const { getThemeState } = await import('#/web/settings-client.ts')
     await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'github' })
@@ -463,7 +460,9 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).resolves.toMatchObject({ ok: true })
+    await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).resolves.toMatchObject({
+      ok: true,
+    })
     expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

@@ -1,5 +1,6 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -354,7 +355,7 @@ describe('runLatestOperation active-task cancellation', () => {
     // decrements `active` and `drain()` shifts the new task
     // over). Yield a few times so the microtask queue drains.
     expect(activeAborted).toBe(true)
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(5)
     expect(secondStarted).toBe(true)
 
     await first
@@ -407,7 +408,7 @@ describe('runLatestOperation active-task cancellation', () => {
     // microtasks; without it, the second run would never
     // start (the first's promise would never settle on its
     // own).
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(5)
     expect(secondStarted).toBe(true)
 
     await first
@@ -435,7 +436,7 @@ describe('runLatestOperation active-task cancellation', () => {
           releaseRead = () => resolve({ ok: true })
         }),
     })
-    await new Promise((r) => setTimeout(r, 0))
+    await waitForNextMacrotask()
     expect(reads).toEqual(['started'])
 
     // Submit a same-lane read with a different `operationKey`
@@ -456,7 +457,7 @@ describe('runLatestOperation active-task cancellation', () => {
     // `read` is still running. The cancelActiveByKey for
     // `read:repo-read-model` finds no active match (the active one is
     // keyed `undefined`). So the original read is NOT aborted.
-    await new Promise((r) => setTimeout(r, 0))
+    await waitForNextMacrotask()
     expect(reads).toEqual(['started'])
 
     releaseRead()

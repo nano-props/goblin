@@ -2,6 +2,7 @@
 
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
@@ -20,7 +21,6 @@ vi.mock('#/web/client-workspace-state.ts', () => ({
 }))
 
 beforeEach(() => {
-  vi.useRealTimers()
   resetWorkspacesStore()
   useFiletreeInteractionStore.setState({ interactionByScope: {} })
   writePresentationMock.mockReset()
@@ -148,7 +148,7 @@ describe('useClientWorkspacePersistence', () => {
   })
 
   test('debounces high-frequency presentation changes to the latest state', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
@@ -191,7 +191,7 @@ describe('useClientWorkspacePersistence', () => {
   })
 
   test('flushes a pending local presentation synchronously on pagehide', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],

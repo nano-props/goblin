@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   enqueueRepoWriteOperation,
   getRepoBoundaryLastFetchAt,
@@ -58,12 +59,8 @@ beforeEach(() => {
   mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => workspaceId)
   mocks.publishRepoQueryInvalidation.mockReset()
   mocks.workspaceRuntimeClosed = null
-  vi.useFakeTimers()
+  useFakeTimers()
   vi.setSystemTime(0)
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('repo write operation coordinator', () => {
@@ -664,7 +661,7 @@ describe('repo write operation coordinator', () => {
       },
     )
 
-    await Promise.resolve()
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(1))
     expect(secondTask).not.toHaveBeenCalled()
 
     releaseFirst.resolve()

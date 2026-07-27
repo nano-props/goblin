@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from 'react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   defaultClientWorkspaceState,
   defaultServerWorkspaceState,
@@ -68,7 +69,6 @@ const mockedReadClientWorkspaceState = vi.mocked(readClientWorkspaceState)
 const mockedWriteClientWorkspaceState = vi.mocked(writeClientWorkspaceState)
 
 beforeEach(() => {
-  vi.useRealTimers()
   resetWorkspacesStore()
   resetFiletreeInteractionStore()
   primaryWindowQueryClient.clear()
@@ -82,10 +82,6 @@ beforeEach(() => {
   mockedWriteClientWorkspaceState.mockReset()
   mockedWriteClientWorkspaceState.mockResolvedValue(undefined)
   mockServerRestore(defaultWorkspaceRestoreFixture())
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('app bootstrap hooks', () => {
@@ -388,7 +384,7 @@ describe('app bootstrap hooks', () => {
   })
 
   test('times out authenticated workspace restore when settings hangs', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     mockedGetSettingsSnapshot.mockImplementation(({ signal }: { signal?: AbortSignal } = {}) => {
       return new Promise((_, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
@@ -409,7 +405,7 @@ describe('app bootstrap hooks', () => {
   })
 
   test('cancels a timed-out shared query so retry starts fresh work', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     mockedGetSettingsSnapshot.mockImplementationOnce(({ signal }: { signal?: AbortSignal } = {}) => {
       return new Promise((_, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
@@ -430,7 +426,7 @@ describe('app bootstrap hooks', () => {
   })
 
   test('reports timeout when server workspace restore does not return after abort', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -451,7 +447,7 @@ describe('app bootstrap hooks', () => {
   })
 
   test('reports timeout when repo session hydration does not return after abort', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const session = workspaceRestoreFixture(
       {
         openWorkspaceEntries: [{ id: workspaceIdForTest('goblin+file:///tmp/repo') }],

@@ -41,12 +41,16 @@ describe('app lifecycle', () => {
         return () => {}
       },
     )
+    const listenerStarted = Promise.withResolvers<void>()
     const drained = Promise.withResolvers<void>()
     const { subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
-    subscribeAppQuitting(async () => await drained.promise)
+    subscribeAppQuitting(async () => {
+      listenerStarted.resolve()
+      await drained.promise
+    })
 
     listeners[0]?.({ type: 'app-quitting' })
-    await Promise.resolve()
+    await listenerStarted.promise
     expect(window.goblinNative.notifyAppQuitDrained).not.toHaveBeenCalled()
 
     drained.resolve()
@@ -76,15 +80,19 @@ describe('app lifecycle', () => {
   })
 
   test('waits for all quit listeners to settle before reporting failure', async () => {
+    const slowListenerStarted = Promise.withResolvers<void>()
     const slow = Promise.withResolvers<void>()
     const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
     subscribeAppQuitting(async () => {
       throw new Error('save failed')
     })
-    subscribeAppQuitting(async () => await slow.promise)
+    subscribeAppQuitting(async () => {
+      slowListenerStarted.resolve()
+      await slow.promise
+    })
 
     const quitting = markAppQuitting()
-    await Promise.resolve()
+    await slowListenerStarted.promise
     expect(window.goblinNative.notifyAppQuitDrained).not.toHaveBeenCalled()
 
     slow.resolve()

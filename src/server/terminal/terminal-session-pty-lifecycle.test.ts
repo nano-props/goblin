@@ -16,6 +16,7 @@ import {
 import { createPtyEventChannel } from '#/server/terminal/pty-event-lease.ts'
 import { MAX_PENDING_TERMINAL_RENDER_BYTES } from '#/server/terminal/terminal-render-state.ts'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const ACCEPT_BINDING_FOR_TEST: TerminalPtyBindingAdmission = {
   commit: () => {},
@@ -186,7 +187,7 @@ describe('TerminalPtyBinding detached retirement', () => {
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledOnce())
-    await Promise.resolve()
+    await flushMicrotasks()
     expect(disposed).toBe(false)
 
     eventualExit.resolve()
@@ -202,24 +203,24 @@ describe('TerminalPtyBinding input acknowledgement', () => {
 
     const first = binding.write(session, 'a')
     const second = binding.write(session, 'b')
-    await Promise.resolve()
-
-    expect(supervisor.write).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 'ab')
+    await vi.waitFor(() =>
+      expect(supervisor.write).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 'ab'),
+    )
     deferredWrite.resolve({ status: 'accepted' })
     await expect(Promise.all([first, second])).resolves.toEqual([{ status: 'accepted' }, { status: 'accepted' }])
   })
 
   test('settles an in-flight old-handle batch as indeterminate on disposal', async () => {
     const deferredWrite = Promise.withResolvers<TerminalWriteResult>()
-    const { binding, session } = await createBoundBinding(() => deferredWrite.promise)
+    const { binding, session, supervisor } = await createBoundBinding(() => deferredWrite.promise)
     const write = binding.write(session, 'input')
-    await Promise.resolve()
+    await vi.waitFor(() => expect(supervisor.write).toHaveBeenCalledOnce())
 
     binding.dispose(session)
 
     await expect(write).resolves.toEqual({ status: 'indeterminate' })
     deferredWrite.resolve({ status: 'accepted' })
-    await Promise.resolve()
+    await flushMicrotasks()
   })
 
   test('rejects queued input before restart can bind a replacement handle', async () => {
@@ -275,7 +276,7 @@ describe('TerminalPtyBinding input acknowledgement', () => {
     await expect(oldWrite).resolves.toEqual({ status: 'indeterminate' })
 
     oldWriteAcknowledged.resolve({ status: 'accepted' })
-    await Promise.resolve()
+    await flushMicrotasks()
     await expect(binding.write(session, 'replacement input')).resolves.toEqual({ status: 'accepted' })
 
     expect(supervisor.write).toHaveBeenCalledTimes(2)
@@ -303,9 +304,9 @@ describe('TerminalPtyBinding geometry boundary', () => {
     void snapshot.then(() => {
       snapshotSettled = true
     })
-    await Promise.resolve()
-
-    expect(supervisor.resize).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 100, 30)
+    await vi.waitFor(() =>
+      expect(supervisor.resize).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 100, 30),
+    )
     expect(session.ptyState).toMatchObject({ kind: 'bound', cols: 80, rows: 24 })
     expect(snapshotSettled).toBe(false)
 
@@ -363,13 +364,13 @@ describe('TerminalPtyBinding geometry boundary', () => {
 
   test('rejects an old-generation resize acknowledgement after restart publishes a replacement binding', async () => {
     const nativeResize = Promise.withResolvers<boolean>()
-    const { binding, session } = await createBoundBinding(
+    const { binding, session, supervisor } = await createBoundBinding(
       async () => ({ status: 'accepted' }),
       async () => await nativeResize.promise,
     )
 
     const resize = binding.resize(session, 1, 100, 30, ACCEPT_MUTATION_FOR_TEST)
-    await Promise.resolve()
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
     expect(session.ptyState).toMatchObject({ kind: 'bound', generation: 1, cols: 80, rows: 24 })
 
     await expect(binding.restart(session, 120, 40, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
@@ -385,13 +386,13 @@ describe('TerminalPtyBinding geometry boundary', () => {
 
   test('rejects a native resize acknowledgement after the binding starts closing', async () => {
     const nativeResize = Promise.withResolvers<boolean>()
-    const { binding, session } = await createBoundBinding(
+    const { binding, session, supervisor } = await createBoundBinding(
       async () => ({ status: 'accepted' }),
       async () => await nativeResize.promise,
     )
 
     const resize = binding.resize(session, 1, 100, 30, ACCEPT_MUTATION_FOR_TEST)
-    await Promise.resolve()
+    await vi.waitFor(() => expect(supervisor.resize).toHaveBeenCalledOnce())
     binding.dispose(session)
 
     nativeResize.resolve(true)
@@ -402,26 +403,10 @@ describe('TerminalPtyBinding geometry boundary', () => {
 
 describe('TerminalPtyBinding adoption boundary', () => {
   test('fails a committed binding closed when pending render output exceeds capacity', async () => {
-    const channel = createPtyEventChannel()
-    const handle = createPtyHandle('pty_render_capacity_123456')
-    const supervisor = createChannelSupervisor(channel.lease, handle)
-    const emitLifecycle = vi.fn()
-    const binding = new TerminalPtyBinding(supervisor, {
-      isSessionLive: () => true,
-      emitLifecycle,
-      emitOutput: vi.fn(),
-      emitBell: vi.fn(),
-      emitTitle: vi.fn(),
-      emitExit: vi.fn(),
-    })
-    const session: TerminalPtySessionState<string> = {
-      id: 'pty_runtime_render_capacity_123456',
-      userId: 'user-test',
-      cwd: '/repo/worktree',
-      phase: 'opening',
-      message: null,
-      ptyState: { kind: 'prepared' },
-    }
+    const { binding, channel, events, handle, session, supervisor } = createChannelBinding(
+      'pty_runtime_render_capacity_123456',
+      'pty_render_capacity_123456',
+    )
 
     await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
       result: { ok: true },
@@ -437,32 +422,19 @@ describe('TerminalPtyBinding adoption boundary', () => {
     })
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
-    expect(emitLifecycle).toHaveBeenLastCalledWith(session)
+    expect(events.emitLifecycle).toHaveBeenLastCalledWith(session)
   })
 
   test('fails a committed binding closed when output publication throws', async () => {
-    const channel = createPtyEventChannel()
-    const handle = createPtyHandle('pty_observer_failure_123456')
-    const supervisor = createChannelSupervisor(channel.lease, handle)
-    const emitLifecycle = vi.fn()
-    const binding = new TerminalPtyBinding(supervisor, {
-      isSessionLive: () => true,
-      emitLifecycle,
-      emitOutput: () => {
-        throw new Error('output sink failed')
+    const { binding, channel, events, handle, session, supervisor } = createChannelBinding(
+      'pty_runtime_observer_failure_123456',
+      'pty_observer_failure_123456',
+      {
+        emitOutput: () => {
+          throw new Error('output sink failed')
+        },
       },
-      emitBell: vi.fn(),
-      emitTitle: vi.fn(),
-      emitExit: vi.fn(),
-    })
-    const session: TerminalPtySessionState<string> = {
-      id: 'pty_runtime_observer_failure_123456',
-      userId: 'user-test',
-      cwd: '/repo/worktree',
-      phase: 'opening',
-      message: null,
-      ptyState: { kind: 'prepared' },
-    }
+    )
 
     await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
       result: { ok: true },
@@ -477,33 +449,21 @@ describe('TerminalPtyBinding adoption boundary', () => {
     expect(session.ptyState.kind === 'bound' && session.ptyState.render.screen.disposed).toBe(true)
     expect(supervisor.kill).toHaveBeenCalledWith(handle)
     await expect(binding.write(session, 'rejected input')).resolves.toEqual({ status: 'rejected' })
-    expect(emitLifecycle).toHaveBeenLastCalledWith(session)
+    expect(events.emitLifecycle).toHaveBeenLastCalledWith(session)
   })
 
   test('does not roll admission back when buffered output fails after commit', async () => {
-    const channel = createPtyEventChannel()
-    channel.sink.data({ data: 'startup output', processName: 'zsh' })
-    const handle = createPtyHandle('pty_buffered_observer_failure_123456')
-    const supervisor = createChannelSupervisor(channel.lease, handle)
-    const admission = { commit: vi.fn(), rollback: vi.fn() }
-    const binding = new TerminalPtyBinding(supervisor, {
-      isSessionLive: () => true,
-      emitLifecycle: vi.fn(),
-      emitOutput: () => {
-        throw new Error('output sink failed')
+    const { binding, channel, handle, session, supervisor } = createChannelBinding(
+      'pty_runtime_buffered_observer_failure_123456',
+      'pty_buffered_observer_failure_123456',
+      {
+        emitOutput: () => {
+          throw new Error('output sink failed')
+        },
       },
-      emitBell: vi.fn(),
-      emitTitle: vi.fn(),
-      emitExit: vi.fn(),
-    })
-    const session: TerminalPtySessionState<string> = {
-      id: 'pty_runtime_buffered_observer_failure_123456',
-      userId: 'user-test',
-      cwd: '/repo/worktree',
-      phase: 'opening',
-      message: null,
-      ptyState: { kind: 'prepared' },
-    }
+    )
+    channel.sink.data({ data: 'startup output', processName: 'zsh' })
+    const admission = { commit: vi.fn(), rollback: vi.fn() }
 
     await expect(binding.spawn(session, 80, 24, admission)).resolves.toMatchObject({
       result: { ok: false, message: 'error.unavailable' },
@@ -520,27 +480,15 @@ describe('TerminalPtyBinding adoption boundary', () => {
   })
 
   test('contains a synchronous exit handler failure', async () => {
-    const channel = createPtyEventChannel()
-    const handle = createPtyHandle('pty_exit_publication_failure_123456')
-    const supervisor = createChannelSupervisor(channel.lease, handle)
-    const binding = new TerminalPtyBinding(supervisor, {
-      isSessionLive: () => true,
-      emitLifecycle: vi.fn(),
-      emitOutput: vi.fn(),
-      emitBell: vi.fn(),
-      emitTitle: vi.fn(),
-      emitExit: () => {
-        throw new Error('exit sink failed')
+    const { binding, channel, session } = createChannelBinding(
+      'pty_runtime_exit_publication_failure_123456',
+      'pty_exit_publication_failure_123456',
+      {
+        emitExit: () => {
+          throw new Error('exit sink failed')
+        },
       },
-    })
-    const session: TerminalPtySessionState<string> = {
-      id: 'pty_runtime_exit_publication_failure_123456',
-      userId: 'user-test',
-      cwd: '/repo/worktree',
-      phase: 'opening',
-      message: null,
-      ptyState: { kind: 'prepared' },
-    }
+    )
 
     await expect(binding.spawn(session, 80, 24, ACCEPT_BINDING_FOR_TEST)).resolves.toMatchObject({
       result: { ok: true },
@@ -606,6 +554,35 @@ describe('TerminalPtyBinding adoption boundary', () => {
     })
   })
 })
+
+function createChannelBinding(
+  terminalRuntimeSessionId: string,
+  ptySessionId: string,
+  eventOverrides: Partial<TerminalPtyBindingEvents<TerminalPtySessionState<string>>> = {},
+) {
+  const channel = createPtyEventChannel()
+  const handle = createPtyHandle(ptySessionId)
+  const supervisor = createChannelSupervisor(channel.lease, handle)
+  const events = {
+    isSessionLive: vi.fn(() => true),
+    emitLifecycle: vi.fn(),
+    emitOutput: vi.fn(),
+    emitBell: vi.fn(),
+    emitTitle: vi.fn(),
+    emitExit: vi.fn(),
+    ...eventOverrides,
+  } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
+  const binding = new TerminalPtyBinding(supervisor, events)
+  const session: TerminalPtySessionState<string> = {
+    id: terminalRuntimeSessionId,
+    userId: 'user-test',
+    cwd: '/repo/worktree',
+    phase: 'opening',
+    message: null,
+    ptyState: { kind: 'prepared' },
+  }
+  return { binding, channel, events, handle, session, supervisor }
+}
 
 async function createBoundBinding(
   write: () => Promise<TerminalWriteResult>,
