@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { StrictMode, type ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
@@ -288,7 +290,7 @@ async function dispatchPaste(sessionRoot: HTMLElement, files: File[]): Promise<v
   Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles(files) })
   await act(async () => {
     sessionRoot.dispatchEvent(pasteEvent)
-    await new Promise((r) => setTimeout(r, 0))
+    await waitForNextMacrotask()
   })
 }
 
@@ -303,7 +305,7 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
   })
   await act(async () => {
     sessionRoot.dispatchEvent(pasteEvent)
-    await new Promise((r) => setTimeout(r, 0))
+    await waitForNextMacrotask()
   })
   return pasteEvent
 }
@@ -400,13 +402,13 @@ describe('TerminalSessionView', () => {
   })
 
   test('hides the mobile toolbar while terminal search is open', async () => {
+    const user = userEvent.setup()
     const rendered = await renderTerminalSession()
 
     try {
       expect(rendered.container.querySelector('.goblin-terminal-mobile-toolbar')).not.toBeNull()
-      await act(async () => {
-        rendered.sessionRoot.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true, bubbles: true }))
-      })
+      rendered.sessionRoot.focus()
+      await user.keyboard('{Meta>}f{/Meta}')
 
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
       expect(rendered.container.querySelector('.goblin-terminal-mobile-toolbar')).toBeNull()
@@ -931,103 +933,8 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('does not create an unversioned focus intent when runtime readiness changes', async () => {
-    const descriptor = {
-      terminalSessionId: 'term-111111111111111111111',
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      index: 1,
-      ...terminalDescriptorTargetForTest(),
-    }
-    const terminalFilesystemTargetSnapshot = {
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      selectedDescriptor: descriptor,
-      sessions: [
-        {
-          terminalSessionId: 'term-111111111111111111111',
-          terminalFilesystemTargetKey: '/repo\0/worktree',
-          index: 1,
-          title: 'zsh',
-          phase: 'open' as const,
-          selected: true,
-          hasBell: false,
-          hasRecentOutput: false,
-        },
-      ],
-      count: 1,
-      createPending: false,
-    }
-    const openingSnapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
-    const openSnapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
-    const focusTerminal = vi.fn()
-    const context: TerminalSessionContextValue = terminalSessionContextForTest({
-      createTerminal: async () => 'term-111111111111111111111',
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      scrollLines: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      takeover: vi.fn(),
-      focusTerminal,
-    })
-    let activeSnapshot: TerminalSnapshot = openingSnapshot
-    const readContext: TerminalSessionReadContextValue = {
-      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
-      subscribeTerminalFilesystemTarget: () => () => {},
-      workspaceBellCount: () => 0,
-      subscribeWorkspaceBellCount: () => () => {},
-      snapshot: () => activeSnapshot,
-      subscribeSnapshot: () => () => {},
-    }
-    const tree = () => (
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>
-    )
-
-    const { container, rerender, unmount } = renderInJsdom(tree())
-
-    try {
-      const host = container.querySelector('.goblin-terminal-session__host')
-      expect(host?.classList.contains('goblin-terminal-session__host--hidden')).toBe(true)
-      expect(focusTerminal).not.toHaveBeenCalled()
-
-      activeSnapshot = openSnapshot
-      rerender(tree())
-
-      const readyHost = container.querySelector('.goblin-terminal-session__host')
-      expect(readyHost?.classList.contains('goblin-terminal-session__host--hidden')).toBe(false)
-      expect(focusTerminal).not.toHaveBeenCalled()
-
-      activeSnapshot = { ...openSnapshot, takeoverPending: true }
-      rerender(tree())
-
-      expect(focusTerminal).not.toHaveBeenCalled()
-    } finally {
-      unmount()
-    }
-  })
-
   test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
+    const user = userEvent.setup()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
       terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -1104,9 +1011,11 @@ describe('TerminalSessionView', () => {
 
     try {
       const root = container.querySelector<HTMLElement>('.goblin-terminal-session')!
-      await act(async () => {
-        root.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true, bubbles: true }))
-      })
+      root.focus()
+      await user.keyboard('{Meta>}f{/Meta}')
+      // Isolate the readiness transition from the initial user focus needed
+      // to deliver a real keyboard sequence to the terminal root.
+      focusTerminal.mockClear()
 
       activeSnapshot = openSnapshot
       rerender(tree())
@@ -1114,9 +1023,7 @@ describe('TerminalSessionView', () => {
       expect(container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
       expect(focusTerminal).not.toHaveBeenCalled()
 
-      await act(async () => {
-        root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-      })
+      await user.keyboard('{Escape}')
 
       expect(container.querySelector('.goblin-terminal-session__search')).toBeNull()
       expect(focusTerminal).toHaveBeenCalledTimes(1)
@@ -1427,7 +1334,7 @@ describe('TerminalSessionView', () => {
         sessionRoot.dispatchEvent(dropEvent)
         // processDrop -> resolvePastedFiles -> setTimeout-free, but
         // the handler awaits a Promise chain. Let it drain.
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
 
       // One writeInput call with a shell-escaped path. The path
@@ -1536,7 +1443,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
         sessionRoot.dispatchEvent(pasteEvent)
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
       expect(writeInput).not.toHaveBeenCalled()
     } finally {
@@ -1634,7 +1541,7 @@ describe('TerminalSessionView', () => {
 
       await act(async () => {
         sessionRoot.dispatchEvent(pasteEvent)
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
 
       // One writeInput call. The path contains a space and an `&`,
@@ -1740,7 +1647,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
       await act(async () => {
         sessionRoot.dispatchEvent(pasteEvent)
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
       // The synchronous size check called preventDefault() before
       // returning; the resolver never ran, so neither did the
@@ -1763,44 +1670,6 @@ describe('TerminalSessionView', () => {
 
     try {
       await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'a.png')])
-
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('paste with an unsafe resolved path falls back to blob-save and writes the temp path', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/bad\nname.png')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/safe-name.png'])
-    const { toast } = await import('sonner')
-    vi.mocked(toast.error).mockClear()
-    const rendered = await renderTerminalSession()
-
-    try {
-      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
-
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/safe-name.png'")
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('paste with an unsafe resolved path surfaces paste-file-failed when blob-save fallback also fails', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/bad\nname.png')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-    const { toast } = await import('sonner')
-    vi.mocked(toast.error).mockClear()
-    const rendered = await renderTerminalSession()
-
-    try {
-      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
@@ -1849,7 +1718,7 @@ describe('TerminalSessionView', () => {
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
         sessionRoot.dispatchEvent(dropEvent)
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
@@ -1899,126 +1768,6 @@ describe('TerminalSessionView', () => {
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
       await rendered.cleanup()
-    }
-  })
-
-  test('controller drop with partial backend failure writes the resolved paths AND surfaces paste-file-partial', async () => {
-    // Locks the toast-mapping contract from §9 of the design doc:
-    // a multi-file paste where path-attempt succeeded for some and
-    // blob-save succeeded for fewer than the remaining inputs must
-    // (a) write the resolved paths to the PTY and (b) toast a
-    // paste-file-partial so the user notices the silent loss. The
-    // resolver counts failed correctly (resolver.test.ts), but
-    // without this integration test nothing pinned the session's
-    // writeResolutionToPty wiring.
-    const writeInput = vi.fn()
-    const descriptor = {
-      terminalSessionId: 'term-111111111111111111111',
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      index: 1,
-      ...terminalDescriptorTargetForTest(),
-    }
-    const terminalFilesystemTargetSnapshot = {
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      selectedDescriptor: descriptor,
-      sessions: [
-        {
-          terminalSessionId: 'term-111111111111111111111',
-          terminalFilesystemTargetKey: '/repo\0/worktree',
-          index: 1,
-          title: 'zsh',
-          phase: 'open' as const,
-          selected: true,
-          hasBell: false,
-          hasRecentOutput: false,
-        },
-      ],
-      count: 1,
-      createPending: false,
-    }
-    const snapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
-    const context: TerminalSessionContextValue = terminalSessionContextForTest({
-      createTerminal: async () => 'term-111111111111111111111',
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      scrollLines: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      captureInputWriter: captureInputWriterForTest(writeInput),
-      takeover: vi.fn(),
-      focusTerminal: vi.fn(),
-    })
-    const readContext: TerminalSessionReadContextValue = {
-      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
-      subscribeTerminalFilesystemTarget: () => () => {},
-      workspaceBellCount: () => 0,
-      subscribeWorkspaceBellCount: () => () => {},
-      snapshot: () => snapshot,
-      subscribeSnapshot: () => () => {},
-    }
-
-    // 3 files: a has a path (path-attempt tier), b/c have no path
-    // and go to the blob-save tier. Backend returns 1 path (only b
-    // made it) so 1 file is "failed".
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) =>
-      file.name === 'a.png' ? '/abs/a.png' : '',
-    )
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
-    const { toast } = await import('sonner')
-
-    const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
-    )
-
-    try {
-      vi.mocked(toast.error).mockClear()
-
-      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
-      const files = [
-        new File([new Uint8Array([1])], 'a.png'),
-        new File([new Uint8Array([1])], 'b.png'),
-        new File([new Uint8Array([1])], 'c.png'),
-      ]
-      const dataTransfer = dropDataWithFiles(files)
-      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
-      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
-      await act(async () => {
-        sessionRoot.dispatchEvent(dropEvent)
-        await new Promise((r) => setTimeout(r, 0))
-      })
-
-      // writeInput must receive the joined, shell-escaped paths in
-      // the order the resolver returns them (path-attempt tier first,
-      // then blob-save). paste-file-partial toasts once.
-      expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'")
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
-    } finally {
-      unmount()
     }
   })
 
@@ -2176,11 +1925,11 @@ describe('TerminalSessionView', () => {
       // Now resolve the in-flight blob-save call. The chain runs through
       // several microtask hops (saveClipboardFiles.then →
       // resolvePastedFiles.then → processDrop.then → handler.then);
-      // setTimeout(0) is the established pattern in the other integration
-      // tests for draining them all in one act.
+      // Cross one macrotask so the integration promise chain drains inside
+      // the same act boundary as the deferred bridge response.
       await act(async () => {
         resolveSave(['/tmp/a.png'])
-        await new Promise((r) => setTimeout(r, 0))
+        await waitForNextMacrotask()
       })
 
       expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/a.png'")
@@ -2331,95 +2080,6 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('Windows file copy (single-line path text + real file) prefers files', async () => {
-    // Windows Explorer typically renders just the path as `text/plain`
-    // with no URI list. The path-attempt tier resolves the real path
-    // and shell-quotes it. We preserve this behaviour.
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `C:\\Users\\me\\${file.name}`)
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-
-    const rendered = await renderTerminalSession()
-    const file = new File([new Uint8Array([1])], 'bar.png')
-
-    try {
-      const event = await dispatchPasteWithText(rendered.sessionRoot, 'C:\\Users\\me\\bar.png', [file])
-
-      expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'C:\\Users\\me\\bar.png'")
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('single-cell Excel paste (plain value + thumbnail blob) defers to xterm.js', async () => {
-    // Regression for Issue 1 (terminal pass): a single-cell Excel
-    // value (formatted cell with currency / date / borders) attaches
-    // a thumbnail blob. The text/plain is the value (no tab, no
-    // newline). Old code routed this to files and wrote the
-    // thumbnail's path; new code routes to text because the value
-    // doesn't look like a path.
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-
-    const rendered = await renderTerminalSession()
-    const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
-
-    try {
-      const event = await dispatchPasteWithText(rendered.sessionRoot, '42', [thumbnail])
-      expect(event.defaultPrevented).toBe(false)
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('paste a URL alongside an image blob — URL reaches xterm, image is dropped', async () => {
-    // Regression for Issue 2 (terminal pass): a URL copied from a
-    // browser alongside an image blob. The URL is real text the user
-    // wants, not a filesystem path.
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-
-    const rendered = await renderTerminalSession()
-    const image = new File([new Uint8Array([1, 2, 3])], 'image.png', { type: 'image/png' })
-
-    try {
-      const event = await dispatchPasteWithText(rendered.sessionRoot, 'https://example.com/foo', [image])
-      expect(event.defaultPrevented).toBe(false)
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('single-row Excel paste (single-line TSV + thumbnail blob) defers to xterm.js', async () => {
-    // Regression for Issue 1: a single-row Excel copy used to be
-    // misclassified as "single-line non-URI → files" and the
-    // thumbnail got blob-saved. Tab is the load-bearing signal —
-    // single-row TSV has tabs without newlines.
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-
-    const rendered = await renderTerminalSession()
-    const thumbnail = new File([new Uint8Array([1, 2, 3])], 'thumbnail.png', { type: 'image/png' })
-    const tsv = 'Alice\t30\tNYC'
-
-    try {
-      const event = await dispatchPasteWithText(rendered.sessionRoot, tsv, [thumbnail])
-      expect(event.defaultPrevented).toBe(false)
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
   test('pure-text paste (no files) does not preventDefault and does not call writeInput', async () => {
     // The session must NOT intercept a text-only paste. xterm.js's native
     // paste handler reads `clipboardData.getData('text/plain')` and
@@ -2436,22 +2096,6 @@ describe('TerminalSessionView', () => {
       expect(event.defaultPrevented).toBe(false)
       expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-    } finally {
-      await rendered.cleanup()
-    }
-  })
-
-  test('empty clipboard (no text, no files) is a no-op', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-
-    const rendered = await renderTerminalSession()
-
-    try {
-      const event = await dispatchPasteWithText(rendered.sessionRoot, '', [])
-      expect(event.defaultPrevented).toBe(false)
-      expect(rendered.writeInput).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
     }

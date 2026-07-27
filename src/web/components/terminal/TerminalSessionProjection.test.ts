@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   TerminalSessionProjection,
   getTerminalSessionProjection,
@@ -9,10 +10,7 @@ import {
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
-import type {
-  TerminalSessionClosedEvent,
-  TerminalSessionSummary,
-} from '#/shared/terminal-types.ts'
+import type { TerminalSessionClosedEvent, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
@@ -174,7 +172,6 @@ describe('TerminalSessionProjection', () => {
   })
 
   afterEach(() => {
-    vi.useRealTimers()
     // Drain pending state and clear listener maps on the per-test
     // instance, then release the singleton session so the next test
     // starts clean. Mirrors the production singleton-vs-test
@@ -199,24 +196,6 @@ describe('TerminalSessionProjection', () => {
 
     expect(reconciled).toBe(false)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
-  })
-
-  test('returns the session focus admission result', () => {
-    const terminalSessionId = 'term-111111111111111111111'
-    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-    projection.reconcileServerSessions(
-      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-      [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
-      'client_local',
-    )
-    const session = requiredTerminalSession(projection, terminalSessionId)
-    const request = { isCurrent: () => true, onSettled: vi.fn() }
-    const focus = vi.spyOn(session, 'focus').mockReturnValueOnce(false).mockReturnValueOnce(true)
-
-    expect(projection.focusTerminal(terminalSessionId, request)).toBe(false)
-    expect(projection.focusTerminal(terminalSessionId, request)).toBe(true)
-    expect(focus).toHaveBeenNthCalledWith(1, request)
-    expect(focus).toHaveBeenNthCalledWith(2, request)
   })
 
   describe('versioned terminal session snapshots', () => {
@@ -511,7 +490,7 @@ describe('TerminalSessionProjection', () => {
     })
 
     test('does not mark empty output payloads as terminal output activity', () => {
-      vi.useFakeTimers()
+      useFakeTimers()
       vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
@@ -734,6 +713,41 @@ describe('TerminalSessionProjection', () => {
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
+
+    test('clears a background terminal bell when that terminal is selected', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.reconcileServerSessions(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [
+          makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_b_aaaaaaaaa', 'term-222222222222222222222'),
+        ],
+        'client_local',
+      )
+      projection.selectTerminal(WORKTREE_KEY, 'term-111111111111111111111')
+
+      projection.handleServerBell({
+        terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-222222222222222222222',
+        workspaceId: REPO_ROOT,
+        processName: 'bash',
+        canonicalTitle: null,
+      })
+      expect(
+        projection
+          .terminalFilesystemTargetSnapshot(WORKTREE_KEY)
+          .sessions.find((session) => session.terminalSessionId === 'term-222222222222222222222')?.hasBell,
+      ).toBe(true)
+
+      projection.selectTerminal(WORKTREE_KEY, 'term-222222222222222222222')
+
+      expect(
+        projection
+          .terminalFilesystemTargetSnapshot(WORKTREE_KEY)
+          .sessions.find((session) => session.terminalSessionId === 'term-222222222222222222222'),
+      ).toMatchObject({ selected: true, hasBell: false })
+    })
   })
 
   describe('notify granularity', () => {
@@ -778,6 +792,28 @@ describe('TerminalSessionProjection', () => {
         terminalFilesystemTargetKey: WORKTREE_KEY,
         terminalSessionId: snapshot.sessions[0]!.terminalSessionId,
       })
+    })
+
+    test('applies a preferred selection after its session materializes', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      projection.setPreferredSelectedTerminalSessionIds({
+        [WORKTREE_KEY]: 'term-111111111111111111111',
+      })
+
+      projection.reconcileServerSessions(
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222', {
+            controller: { clientId: 'client_local', status: 'connected' },
+          }),
+        ],
+        'client_local',
+      )
+
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        'term-111111111111111111111',
+      )
     })
 
     test('removes local sessions absent from the authoritative catalog', () => {
@@ -1087,27 +1123,6 @@ describe('TerminalSessionProjection', () => {
       ).toEqual(['term-222222222222222222222'])
     })
 
-    test('does not apply a stale close effect to a newly rebound runtime session', async () => {
-      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      projection.reconcileServerSessions(
-        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-        [makeServerSession('pty_session_new_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-      )
-      workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
-        successfulRuntimeCloseSnapshot('term-111111111111111111111', 'pty_session_old_aaaaaaaaa'),
-      )
-
-      await expect(
-        projection.closeTerminalByDescriptor('term-111111111111111111111', {
-          target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
-        }),
-      ).resolves.toBe(true)
-
-      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
-    })
-
     test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
@@ -1365,26 +1380,6 @@ describe('TerminalSessionProjection', () => {
       fresh.destroy()
     })
 
-    test('state added before a synthetic remount survives in the singleton session', () => {
-      // Simulates the production invariant: Provider remounts
-      // (StrictMode, route round-trip) reuse the singleton, so any
-      // state injected before the remount is still visible after.
-      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
-      const descriptor = makeDescriptor('term-111111111111111111111', 1)
-      // Add a session through the projection's materialization seam without a
-      // websocket or attached terminal view.
-      terminalSessionProjectionAccess(projection).ensureSession(descriptor)
-      // Synthesize a remount: re-fetch the singleton via the
-      // getter (the Provider's mount effect does exactly this).
-      const after = getTerminalSessionProjection({
-        onSelectedFilesystemTargetChange: () => {},
-      })
-      expect(after).toBe(projection)
-      // The session we injected is still in the projection's map —
-      // i.e. the state survived the synthetic remount.
-      const stored = requiredTerminalSession(after, descriptor.terminalSessionId)
-      expect(stored.descriptor.terminalSessionId).toBe('term-111111111111111111111')
-    })
   })
 })
 

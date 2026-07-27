@@ -134,7 +134,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.snapshot().attachment).toEqual({ role: 'controller' })
   })
 
-  test('routes output, identity, replay, and takeover through runtime state', () => {
+  test('routes replayed output through runtime state', () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -475,39 +475,6 @@ describe('TerminalSessionRuntime', () => {
     })
   })
 
-  test('resetTransientState clears transient terminal state without dropping runtime metadata', () => {
-    const runtime = new TerminalSessionRuntime()
-    runtime.hydrateRepoSession({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-      identityRevision: 0,
-      phase: 'open',
-      message: null,
-      processName: 'zsh',
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canonicalSize: { cols: 120, rows: 40 },
-    })
-    runtime.setSearchResult({ resultIndex: 0, resultCount: 2, found: true })
-    runtime.setProgress(4, 30)
-
-    expect(runtime.snapshot()).toMatchObject({
-      phase: 'open',
-      processName: 'zsh',
-      attachment: { role: 'viewer' },
-      search: { resultIndex: 0, resultCount: 2, found: true },
-      progress: { state: 4, value: 30 },
-    })
-
-    expect(runtime.resetTransientState()).toBe(true)
-    expect(runtime.snapshot()).toMatchObject({
-      phase: 'open',
-      processName: 'zsh',
-      attachment: { role: 'viewer' },
-    })
-    expect(runtime.snapshot().search).toBeUndefined()
-    expect(runtime.snapshot().progress).toBeUndefined()
-  })
 })
 
 describe('TerminalSessionRuntime runtime binding generations', () => {

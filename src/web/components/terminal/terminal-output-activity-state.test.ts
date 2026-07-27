@@ -1,13 +1,10 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { createTerminalOutputActivityState } from '#/web/components/terminal/terminal-output-activity-state.ts'
-
-afterEach(() => {
-  vi.useRealTimers()
-})
 
 describe('terminal output activity state', () => {
   test('does not enter active immediately after the first output sample', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -23,7 +20,7 @@ describe('terminal output activity state', () => {
   })
 
   test('enters active after output continues across the confirmation delay', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -50,7 +47,7 @@ describe('terminal output activity state', () => {
   })
 
   test('exits active as soon as the idle timeout elapses', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -74,7 +71,7 @@ describe('terminal output activity state', () => {
   })
 
   test('expires active output using monotonic time when the wall clock moves backward', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -100,7 +97,7 @@ describe('terminal output activity state', () => {
   })
 
   test('keeps active visible until the idle timeout once shown', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -124,7 +121,7 @@ describe('terminal output activity state', () => {
   })
 
   test('extends the active idle timeout without notifying again', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -151,7 +148,7 @@ describe('terminal output activity state', () => {
   })
 
   test('re-entering active after exit requires a fresh confirmation delay', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
@@ -187,7 +184,7 @@ describe('terminal output activity state', () => {
   })
 
   test('remove clears pending activity without an expiry notification', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)

@@ -247,6 +247,15 @@ describe('TerminalSessionState', () => {
     })
   })
 
+  test('clamps progress values at the state boundary', () => {
+    const state = new TerminalSessionState()
+
+    expect(state.setProgress(1, 150)).toBe(true)
+    expect(state.snapshot(null).progress).toEqual({ state: 1, value: 100 })
+    expect(state.setProgress(1, -10)).toBe(true)
+    expect(state.snapshot(null).progress).toEqual({ state: 1, value: 0 })
+  })
+
   test('normalizes empty titles back to null', () => {
     const state = new TerminalSessionState()
 
