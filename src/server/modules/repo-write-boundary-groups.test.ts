@@ -6,19 +6,12 @@ const mocks = vi.hoisted(() => ({ resolveRepoWriteBoundaryKey: vi.fn() }))
 vi.mock('#/server/modules/repo-source.ts', () => ({
   captureRepoWriteExecution: async (repoId: typeof REMOTE_REPO) => {
     const key = await mocks.resolveRepoWriteBoundaryKey(repoId)
-    return { coordinationKey: key, repositoryKey: key }
+    return { boundaryKey: key }
   },
-  repoWriteExecutionBoundaryKey: (capability: { repositoryKey: string }) => capability.repositoryKey,
-  repoWriteExecutionCoordinationKey: (capability: { coordinationKey: string }) => capability.coordinationKey,
-  resolveRepoWriteBoundaryIdentity: async (repoId: typeof REMOTE_REPO) => {
-    const key = await mocks.resolveRepoWriteBoundaryKey(repoId)
-    return { coordinationKey: key, repositoryKey: key }
-  },
-  runWithCapturedRepoWriteExecution: async (
-    _capability: unknown,
-    task: (source: object) => Promise<unknown>,
-  ) => await task({}),
-  validateRepoWriteExecution: async () => true,
+  repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
+  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
+  runWithCapturedRepoWriteExecution: async (_capability: unknown, task: (source: object) => Promise<unknown>) =>
+    await task({}),
 }))
 
 const REMOTE_REPO = workspaceIdForTest('goblin+ssh://example/repo')
@@ -74,9 +67,7 @@ describe('repo write boundary groups', () => {
   test('keeps distinct repository boundaries isolated', async () => {
     const registry = await import('#/server/modules/repo-write-operation-coordinator.ts')
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId) =>
-      repoId === REMOTE_REPO
-        ? 'remote-git:goblin+ssh://host/repo'
-        : 'remote-git:goblin+ssh://host/other',
+      repoId === REMOTE_REPO ? 'remote-git:goblin+ssh://host/repo' : 'remote-git:goblin+ssh://host/other',
     )
 
     const firstKey = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
