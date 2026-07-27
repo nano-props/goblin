@@ -73,6 +73,15 @@ const REMOTE_BRANCH_OP_TIMEOUT_MS = 180_000
 const REMOTE_PATCH_TIMEOUT_MS = 90_000
 const REMOTE_COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/
 
+class RemotePatchFileReadError extends Error {
+  readonly result: ExecResult
+
+  constructor(result: ExecResult) {
+    super(result.message)
+    this.result = result
+  }
+}
+
 export interface RemoteRepoSnapshot {
   branches: BranchSnapshotInfo[]
   current: string
@@ -381,22 +390,26 @@ export async function getRemotePatch(
   const untrackedPaths = decodeRemoteStatus(status.stdout)
     .filter((entry) => entry.x === '?' && entry.y === '?')
     .map((entry) => entry.path)
-  const untrackedPatches = await mapWithConcurrency(
-    untrackedPaths,
-    REMOTE_PATCH_UNTRACKED_DIFF_CONCURRENCY,
-    async (filePath): Promise<string | ExecResult> => {
-      const result = await run({ type: 'gitDiffNoIndex', path: known.path, filePath }, target, {
-        signal: options.signal,
-        timeoutMs: REMOTE_PATCH_TIMEOUT_MS,
-      })
-      if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
-      return result.ok ? result.stdout : remoteExecResult(result)
-    },
-    options.signal,
-  )
-  const failedPatch = untrackedPatches.find((patch): patch is ExecResult => typeof patch !== 'string')
-  if (failedPatch) return failedPatch
-  const patchTexts = untrackedPatches.filter((patch): patch is string => typeof patch === 'string')
+  let patchTexts: string[]
+  try {
+    patchTexts = await mapWithConcurrency(
+      untrackedPaths,
+      REMOTE_PATCH_UNTRACKED_DIFF_CONCURRENCY,
+      async (filePath): Promise<string> => {
+        const result = await run({ type: 'gitDiffNoIndex', path: known.path, filePath }, target, {
+          signal: options.signal,
+          timeoutMs: REMOTE_PATCH_TIMEOUT_MS,
+        })
+        options.signal?.throwIfAborted()
+        if (!result.ok) throw new RemotePatchFileReadError(remoteExecResult(result))
+        return result.stdout
+      },
+      options.signal,
+    )
+  } catch (err) {
+    if (err instanceof RemotePatchFileReadError) return err.result
+    throw err
+  }
   const combined = [tracked.stdout, ...patchTexts].filter((part) => part.length > 0).join('\n')
   return { ok: true, message: combined.length > 0 ? `${combined}\n` : '' }
 }
