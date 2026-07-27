@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { appRealtimeClient } from '#/web/app-realtime.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { terminalClient } from '#/web/terminal.ts'
@@ -16,8 +16,6 @@ import {
 } from '#/web/runtime/runtime-projection-scope.ts'
 import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { invalidateRepoWorktreeSnapshotQueries } from '#/web/repo-query-runtime.ts'
-import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { AppTerminalProjectionRecovery } from '#/web/runtime/app-terminal-projection-recovery.ts'
 import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
@@ -92,31 +90,16 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
         },
       }),
   )
-  const refreshCurrentWorkspaceStatus = useCallback(() => {
-    if (!workspaceMembershipReady || !currentWorkspaceId || !currentWorkspaceRuntimeId) return
-    const workspace = useWorkspacesStore.getState().workspaces[currentWorkspaceId]
-    if (
-      !workspace ||
-      workspace.workspaceRuntimeId !== currentWorkspaceRuntimeId ||
-      !gitWorkspaceCanExecute(workspace)
-    ) {
-      return
-    }
-    invalidateRepoWorktreeSnapshotQueries(currentWorkspaceId, currentWorkspaceRuntimeId)
-  }, [currentWorkspaceId, currentWorkspaceRuntimeId, workspaceMembershipReady])
-
   useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])
 
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
       appRealtimeClient.kickReconnect()
-      refreshCurrentWorkspaceStatus()
     }
     const onPageShow = (event: PageTransitionEvent) => {
       if (!event.persisted) return
       appRealtimeClient.kickReconnect()
-      refreshCurrentWorkspaceStatus()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pageshow', onPageShow)
@@ -128,18 +111,16 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
       offVisibility()
       offPageShow()
     }
-  }, [refreshCurrentWorkspaceStatus, scopeRegistry])
+  }, [scopeRegistry])
 
   useEffect(() => {
     if (!workspaceMembershipReady || !currentWorkspaceId || !currentWorkspaceRuntimeId) return
     const target = { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
     const scope = scopeRegistry.scopeFor(target)
-    refreshCurrentWorkspaceStatus()
     terminalRecovery.begin(scope)
     terminalRecovery.request(scope, { kind: 'minimum-revision', revision: 0 })
 
     const handleFocus = () => {
-      refreshCurrentWorkspaceStatus()
       const currentScope = scopeRegistry.scopeFor(target)
       currentScope.commit(() => {
         if (!terminalRecovery.isFocusRefreshDue(currentScope.target)) return
@@ -154,7 +135,6 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     currentWorkspaceRuntimeId,
     terminalRecovery,
     scopeRegistry,
-    refreshCurrentWorkspaceStatus,
   ])
 
   useEffect(() => {

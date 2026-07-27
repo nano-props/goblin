@@ -25,5 +25,4 @@ export async function handleRepoInvalidationRefresh(
     return
   }
   invalidateRepoSnapshotQueries(repoId, workspaceRuntimeId)
-  invalidateRepoOperationsQueries(repoId, workspaceRuntimeId)
 }

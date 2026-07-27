@@ -76,6 +76,7 @@ describe('repo refresh actions', () => {
       },
       { cancelRefetch: false },
     )
+    expect(invalidateSpy).toHaveBeenCalledOnce()
     invalidateSpy.mockRestore()
   })
 

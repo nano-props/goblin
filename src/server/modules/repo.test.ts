@@ -377,8 +377,12 @@ function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-type TestRepoQueryInvalidation = { repoId: string; query: 'repo-snapshot' | 'repo-runtime' }
+type TestRepoQueryInvalidation = {
+  repoId: string
+  query: 'repo-snapshot' | 'repo-worktree-snapshot' | 'repo-runtime'
+}
 type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
+type TestRepoWorktreeSnapshotInvalidation = { repoId: string; query: 'repo-worktree-snapshot' }
 
 function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
   return mocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
@@ -396,6 +400,16 @@ function expectRepoSnapshotInvalidations(...events: TestRepoSnapshotInvalidation
 
 function expectNoRepoSnapshotInvalidations(): void {
   expectRepoSnapshotInvalidations()
+}
+
+function repoWorktreeSnapshotInvalidations(): TestRepoWorktreeSnapshotInvalidation[] {
+  return repoQueryInvalidationEvents().filter(
+    (event): event is TestRepoWorktreeSnapshotInvalidation => event.query === 'repo-worktree-snapshot',
+  )
+}
+
+function expectNoRepoWorktreeSnapshotInvalidations(): void {
+  expect(repoWorktreeSnapshotInvalidations()).toEqual([])
 }
 
 describe('getRepoSnapshot', () => {
@@ -521,6 +535,8 @@ describe('fetchRepo invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
+    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expectNoRepoWorktreeSnapshotInvalidations()
   })
 
   test('merges caller abort signal into fetch operations', async () => {
@@ -537,19 +553,6 @@ describe('fetchRepo invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
     expectNoRepoSnapshotInvalidations()
-  })
-
-  test('publishes snapshot invalidation after a successful sync', async () => {
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
-
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'user')
-
-    expect(result).toEqual({ ok: true, message: 'fetched' })
-    expectRepoSnapshotInvalidations({
-      repoId: REPO_ID,
-      query: 'repo-snapshot',
-    })
   })
 
   test('records only successful fetches for the repository write boundary', async () => {
@@ -1478,17 +1481,18 @@ describe('cloneRepo cancellation', () => {
 
 describe('repo mutation invalidation publishing', () => {
   test.each([
-    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
-    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
+    ['pullRepoBranch', true, async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', false, async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
     [
       'createRepoWorktree',
+      true,
       async (repo: typeof RepoWritePaths) =>
         repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
         }),
     ],
-  ])('%s publishes snapshot invalidation after success', async (_name, run) => {
+  ])('%s publishes its authoritative snapshot invalidations after success', async (_name, changesWorktree, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await run(repo)
@@ -1498,6 +1502,14 @@ describe('repo mutation invalidation publishing', () => {
       repoId: REPO_ID,
       query: 'repo-snapshot',
     })
+    if (changesWorktree) {
+      expect(repoWorktreeSnapshotInvalidations()).toContainEqual({
+        repoId: REPO_ID,
+        query: 'repo-worktree-snapshot',
+      })
+    } else {
+      expectNoRepoWorktreeSnapshotInvalidations()
+    }
   })
 
   test('createRepoWorktree publishes snapshot invalidations for existing siblings and the new worktree', async () => {
@@ -2244,6 +2256,7 @@ describe('repo mutation invalidation publishing', () => {
       repoId: REPO_ID,
       query: 'repo-snapshot',
     })
+    expectNoRepoWorktreeSnapshotInvalidations()
   })
 
   test('remote deleteRepoBranch forwards upstream deletion and refreshes affected remote worktrees after partial failure', async () => {
@@ -2594,7 +2607,9 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
     expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
-    expect(mocks.getUpstream.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
+    expect(mocks.getUpstream.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.removeWorktree.mock.invocationCallOrder[0]!,
+    )
   })
 
   test('removeRepoWorktree does not use a missing tracking ref for branch deletion admission', async () => {

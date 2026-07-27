@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -54,16 +53,14 @@ function createTimeoutController(ms: number): { signal: AbortSignal; abort: (rea
 
 function AppRoot() {
   return (
-    <StrictMode>
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <ResponsiveUiProvider>
-          <AuthProvider>
-            <PrimaryWindowRouterProvider />
-          </AuthProvider>
-        </ResponsiveUiProvider>
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
-      </QueryClientProvider>
-    </StrictMode>
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <ResponsiveUiProvider>
+        <AuthProvider>
+          <PrimaryWindowRouterProvider />
+        </AuthProvider>
+      </ResponsiveUiProvider>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
+    </QueryClientProvider>
   )
 }
 
