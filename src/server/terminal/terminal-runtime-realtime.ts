@@ -38,9 +38,6 @@ export function createTerminalRealtimeHandlers(
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)
     },
-    prune(clientId, userId, input) {
-      return host.prune(clientId, userId, input)
-    },
   }
 }
 

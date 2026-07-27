@@ -18,7 +18,6 @@ function makeTerminalActionHost(overrides: Partial<ServerTerminalActionHost>): S
     close: () => false,
     listSessions: () => [],
     recoverSessions: () => ({ revision: 0, sessions: [] }),
-    prune: () => ({ pruned: 0, remaining: 0 }),
     ...overrides,
   }
 }

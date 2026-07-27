@@ -110,7 +110,6 @@ describe('client bootstrap', () => {
         resize: async () => ({ ok: false, message: 'not configured' }),
         takeover: async () => ({ ok: false as const, message: 'error.invalid-arguments' }),
         close: async () => false,
-        pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         recoverSessions: async () => ({ revision: 0, sessions: [] }),
         notifyBell: async () => false,
         sendTestNotification: async () => false,

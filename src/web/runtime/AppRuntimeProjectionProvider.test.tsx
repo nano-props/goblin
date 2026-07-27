@@ -1022,7 +1022,6 @@ function testBridge(): ClientBridge {
         phase: 'open' as const,
       })),
       close: vi.fn(async () => true),
-      pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: recoverSessionsMock,
       notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),

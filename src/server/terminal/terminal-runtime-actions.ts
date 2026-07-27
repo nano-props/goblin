@@ -4,7 +4,6 @@ import type {
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalListSessionsInput,
-  TerminalPruneInput,
   TerminalMutationResult,
   TerminalRestartInput,
   TerminalRestartResult,
@@ -32,13 +31,6 @@ import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-rem
 import type { TerminalCloseOutcome, TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 interface TerminalSessionServiceLike {
-  prune(
-    clientId: string,
-    userId: string,
-    workspaceId: WorkspaceId,
-    workspaceRuntimeId: string,
-    assertCurrentMembership: () => void,
-  ): Promise<{ pruned: number; remaining: number }>
   listSessions(
     userId: string,
     workspaceId: WorkspaceId,
@@ -134,24 +126,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         })
       }
       return result
-    },
-
-    async prune(
-      clientId: string,
-      userId: string,
-      input: TerminalPruneInput,
-    ): Promise<{ pruned: number; remaining: number }> {
-      if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
-      if (!isValidWorkspaceLocatorInput(input.workspaceId)) return { pruned: 0, remaining: 0 }
-      const assertCurrentMembership = membershipAssertion(clientId, userId, input)
-      assertCurrentMembership()
-      return await sessionService.prune(
-        clientId,
-        userId,
-        input.workspaceId,
-        input.workspaceRuntimeId,
-        assertCurrentMembership,
-      )
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {

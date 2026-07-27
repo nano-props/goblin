@@ -50,9 +50,6 @@ export function createServerTerminalClient(options: {
     takeover(input) {
       return options.realtime.request('takeover', input)
     },
-    pruneTerminals(workspaceId, workspaceRuntimeId) {
-      return options.realtime.request('prune', { workspaceId, workspaceRuntimeId })
-    },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {
         const catalog = normalizeTerminalSessionsSnapshot(value)

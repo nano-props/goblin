@@ -43,7 +43,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'resize',
   'takeover',
   'recover-sessions',
-  'prune',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
 const TERMINAL_SESSION_PHASE_VALUES = [
@@ -123,10 +122,6 @@ export const TerminalCreateInputSchema = v.strictObject({
   kind: v.picklist(['primary', 'additional']),
   startupShellCommand: v.optional(TerminalWriteDataSchema),
   target: WorkspacePaneFilesystemExecutionTargetSchema,
-})
-const TerminalPruneInputSchema = v.strictObject({
-  workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
@@ -309,10 +304,6 @@ const TerminalWriteResultSchema = v.variant('status', [
   v.object({ status: v.literal('rejected') }),
   v.object({ status: v.literal('indeterminate') }),
 ])
-const TerminalPruneResultSchema = v.object({
-  pruned: v.number(),
-  remaining: v.number(),
-})
 const TerminalOutputEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalBoundRuntimeGenerationSchema,
@@ -446,12 +437,6 @@ const TerminalClientMessageSchema = v.variant('type', [
     requestId: TerminalRequestIdSchema,
     action: v.literal('recover-sessions'),
     input: TerminalListSessionsInputSchema,
-  }),
-  v.strictObject({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
-    action: v.literal('prune'),
-    input: TerminalPruneInputSchema,
   }),
 ])
 
@@ -591,8 +576,6 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'recover-sessions':
       return normalizeTerminalSessionsSnapshot(payload)
-    case 'prune':
-      return normalizeWithSchema(TerminalPruneResultSchema, payload)
   }
 }
 

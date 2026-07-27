@@ -15,7 +15,7 @@ import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
  *
  * This is the **single source of truth** for session scope. Any
  * caller that needs to ask the manager about a workspace (create,
- * list, reorder, prune) must normalize through here first, otherwise
+ * list or reorder) must normalize through here first, otherwise
  * string-equality lookups will silently miss.
  */
 export function terminalSessionScope(workspaceId: WorkspaceId): string {

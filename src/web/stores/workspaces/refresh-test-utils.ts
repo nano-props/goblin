@@ -71,5 +71,4 @@ export function resetRefreshTest(): void {
     status: [],
     loadedAt: Date.now(),
   })
-  ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
 }

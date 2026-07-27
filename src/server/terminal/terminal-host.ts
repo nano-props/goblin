@@ -2,7 +2,6 @@ import type {
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalListSessionsInput,
-  TerminalPruneInput,
   TerminalMutationResult,
   TerminalResizeInput,
   TerminalResizeResult,
@@ -86,11 +85,6 @@ export interface ServerTerminalActionHost {
     userId: string,
     input: TerminalListSessionsInput,
   ): MaybePromise<TerminalSessionsSnapshot>
-  prune(
-    clientId: string,
-    userId: string,
-    input: TerminalPruneInput,
-  ): MaybePromise<{ pruned: number; remaining: number }>
 }
 
 export interface ServerTerminalHost extends ServerAppRealtimeHost, ServerTerminalActionHost {}

@@ -1,7 +1,7 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
+import { refreshStatusLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
@@ -1457,55 +1457,5 @@ describe('projection refresh request ordering', () => {
           )
         : null,
     ).toBe('terminal')
-  })
-
-  test('repo read-model projection refresh prunes terminal sessions to current worktree paths', async () => {
-    const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const calls: Array<{ workspaceId: string; workspaceRuntimeId: string }> = []
-    ipcHandlers['terminal.prune'] = async (input: { workspaceId: string; workspaceRuntimeId: string }) => {
-      calls.push(input)
-      return { pruned: 1, remaining: 1 }
-    }
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [
-          branch('main', undefined, { worktree: { path: '/repo' } }),
-          branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } }),
-          branch('feature/plain'),
-        ],
-        current: 'main',
-      })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-
-    expect(calls).toEqual([
-      expect.objectContaining({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId,
-      }),
-    ])
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
-    expect(worktreesByPath?.['/tmp/stale-worktree']).toBeUndefined()
-    expect(Object.keys(worktreesByPath ?? {}).sort()).toEqual(['/repo', '/tmp/worktree-a'])
-  })
-
-  test('repo read-model projection refresh warns when pruning terminal sessions fails', async () => {
-    const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const err = new Error('prune failed')
-    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
-    ipcHandlers['terminal.prune'] = async () => {
-      throw err
-    }
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [branch('main', undefined, { worktree: { path: '/repo' } })],
-        current: 'main',
-      })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(warnSpy).toHaveBeenCalledWith('failed to prune repo sessions', { err })
   })
 })

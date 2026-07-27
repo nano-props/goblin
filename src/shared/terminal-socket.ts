@@ -5,7 +5,6 @@ import type {
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
-  TerminalPruneInput,
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalResizeResult,
@@ -51,7 +50,6 @@ export interface TerminalSocketRequestInputs {
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
   'recover-sessions': TerminalListSessionsInput
-  prune: TerminalPruneInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -61,7 +59,6 @@ export interface TerminalSocketResponseOutputs {
   resize: TerminalResizeResult
   takeover: TerminalTakeoverResult
   'recover-sessions': TerminalSessionsSnapshot
-  prune: { pruned: number; remaining: number }
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
