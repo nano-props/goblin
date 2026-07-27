@@ -142,6 +142,8 @@ const hoistedMocks = vi.hoisted(() => ({
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
   getServerWorkspaceSettings: vi.fn(),
+  getServerFetchIntervalSec: vi.fn(),
+  subscribeServerFetchInterval: vi.fn(),
   pruneServerWorkspaceSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
   trustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
@@ -224,6 +226,8 @@ vi.mock('#/shared/input-validation.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceSettings: hoistedMocks.getServerWorkspaceSettings,
+  getServerFetchIntervalSec: hoistedMocks.getServerFetchIntervalSec,
+  subscribeServerFetchInterval: hoistedMocks.subscribeServerFetchInterval,
   pruneServerWorkspaceSettingsForRemovedWorktree: hoistedMocks.pruneServerWorkspaceSettingsForRemovedWorktree,
   trustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.trustServerWorkspaceWorktreeBootstrapConfig,
   untrustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.untrustServerWorkspaceWorktreeBootstrapConfig,
@@ -313,6 +317,8 @@ beforeEach(async () => {
     },
   })
   hoistedMocks.getServerWorkspaceSettings.mockResolvedValue([])
+  hoistedMocks.getServerFetchIntervalSec.mockResolvedValue(5)
+  hoistedMocks.subscribeServerFetchInterval.mockImplementation(() => () => {})
   hoistedMocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValue(false)
   hoistedMocks.resolveRemoteTarget.mockResolvedValue({
     target: {
@@ -334,7 +340,9 @@ beforeEach(async () => {
   hoistedMocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   hoistedMocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched' })
   hoistedMocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
-  hoistedMocks.resolveRemoteRepoCommonDir.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
+  hoistedMocks.resolveRemoteRepoCommonDir.mockImplementation(
+    async (target: { remotePath: string }) => target.remotePath,
+  )
   hoistedMocks.getCurrentBranch.mockResolvedValue('main')
   hoistedMocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
