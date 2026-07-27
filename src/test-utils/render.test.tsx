@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from 'vitest'
-import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom } from '#/test-utils/index.ts'
+import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom, waitForNextMacrotask } from '#/test-utils/index.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
 describe('renderInJsdom', () => {
@@ -34,6 +34,19 @@ describe('flushMicrotasks', () => {
     })
     await flushMicrotasks(3)
     expect(order).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
+describe('waitForNextMacrotask', () => {
+  test('crosses one real timer boundary', async () => {
+    let settled = false
+    setTimeout(() => {
+      settled = true
+    }, 0)
+
+    expect(settled).toBe(false)
+    await waitForNextMacrotask()
+    expect(settled).toBe(true)
   })
 })
 
