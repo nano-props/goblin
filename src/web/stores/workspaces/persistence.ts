@@ -16,7 +16,7 @@ function cachedBranches(
   return stripBranchWorktreeMetadata(branches)
 }
 
-const BranchSchema = v.object({
+const BranchSchema = v.strictObject({
   name: v.string(),
   isCurrent: v.boolean(),
   isDefault: v.optional(v.boolean()),
@@ -25,12 +25,12 @@ const BranchSchema = v.object({
   ahead: FiniteNumber,
   behind: FiniteNumber,
   lastCommitHash: v.string(),
-  lastCommitShortHash: v.optional(v.string(), ''),
+  lastCommitShortHash: v.string(),
   lastCommitMessage: v.string(),
   lastCommitDate: v.string(),
   lastCommitAuthor: v.string(),
   worktree: v.optional(
-    v.object({
+    v.strictObject({
       path: v.string(),
     }),
   ),
@@ -39,11 +39,11 @@ const BranchSchema = v.object({
 
 const RepoSnapshotCacheEntrySchema = v.strictObject({
   savedAt: FiniteNumber,
-  data: v.object({
+  data: v.strictObject({
     branches: v.array(BranchSchema),
     currentBranch: v.string(),
   }),
-  ui: v.object({
+  ui: v.strictObject({
     branchViewMode: v.picklist(['all', 'worktrees']),
   }),
 })
@@ -107,15 +107,5 @@ function isExpired(savedAt: number): boolean {
 function normalizeRepoSnapshotCacheEntry(value: unknown): RepoSnapshotCacheEntry | null {
   const parsed = v.safeParse(RepoSnapshotCacheEntrySchema, value)
   if (!parsed.success) return null
-  const snapshot = parsed.output
-  return {
-    savedAt: snapshot.savedAt,
-    data: {
-      ...snapshot.data,
-      branches: cachedBranches(snapshot.data.branches),
-    },
-    ui: {
-      branchViewMode: snapshot.ui.branchViewMode,
-    },
-  }
+  return parsed.output
 }
