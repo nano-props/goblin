@@ -1,6 +1,6 @@
 import path from 'node:path'
 import PQueue from 'p-queue'
-import { runWithQueuedAdmission } from '#/system/git/concurrency.ts'
+import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import {
   parseBootstrapConfig,
   validateBootstrapConfigPaths,
@@ -169,7 +169,7 @@ async function sampleRemoteWorktreeStatus(
     [...worktrees],
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
     async (worktree) => await sampleRemoteWorktreeStatusForTarget(target, worktree, options),
-    options.signal,
+    { signal: options.signal, abort: 'throw' },
   )
   return sampled.filter((status): status is WorktreeStatus => status !== null)
 }
@@ -404,7 +404,7 @@ export async function getRemotePatch(
         if (!result.ok) throw new RemotePatchFileReadError(remoteExecResult(result))
         return result.stdout
       },
-      options.signal,
+      { signal: options.signal, abort: 'throw' },
     )
   } catch (err) {
     if (err instanceof RemotePatchFileReadError) return err.result
@@ -712,7 +712,7 @@ async function readRemoteTrackingAuthority(
       if (!specs.ok) throw new Error(specs.message || 'error.failed-read-repo')
       return { name: remote.name, fetchSpecs: specs.stdout ? specs.stdout.split('\n') : [] }
     },
-    options.signal,
+    { signal: options.signal, abort: 'throw' },
   )
   return { refs: result.stdout, remotes: authorities }
 }
@@ -1228,37 +1228,4 @@ function decodeRemoteStatus(output: string) {
   } catch {
     throw new Error('error.failed-read-repo')
   }
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-  signal?: AbortSignal,
-): Promise<R[]> {
-  signal?.throwIfAborted()
-  if (items.length === 0) return []
-  const results = new Array<R | undefined>(items.length)
-  let cursor = 0
-  // Running commands settle normally, but no worker claims more input after
-  // the aggregate operation has already failed.
-  let stopped = false
-  const worker = async () => {
-    while (true) {
-      if (stopped) return
-      signal?.throwIfAborted()
-      const index = cursor++
-      if (index >= items.length) return
-      try {
-        results[index] = await fn(items[index]!)
-      } catch (err) {
-        signal?.throwIfAborted()
-        stopped = true
-        throw err
-      }
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  signal?.throwIfAborted()
-  return results.filter((r): r is R => r !== undefined)
 }
