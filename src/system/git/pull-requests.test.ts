@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { pullRequestsNodeLog } from '#/node/logger.ts'
 import { PULL_REQUEST_TRANSIENT_CACHE_TTL_MS } from '#/shared/pull-request-state.ts'
 import {
@@ -80,7 +81,6 @@ function installGhGraphqlMock(
 }
 
 afterEach(() => {
-  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -214,7 +214,7 @@ describe('branch pull request lookup', () => {
 
 describe('getBranchPullRequests request coordination', () => {
   test('re-fetches transient unknown merge-status branch results after the short cache ttl', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const repo = '/tmp/repo'
     let mergeable: 'UNKNOWN' | 'MERGEABLE' = 'UNKNOWN'
     installGhGraphqlMock(async () =>

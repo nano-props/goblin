@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import {
   nativeProjectionFromSnapshots,
@@ -7,11 +8,14 @@ import {
   stopNativeSettingsProjectionSync,
 } from '#/main/native-settings-projection-sync.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { applyNativeHostProjection } from '#/main/native-host-settings-effects.ts'
 import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
 import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 
-const websocketState = vi.hoisted(() => ({ instances: [] as Array<EventEmitter & { close: ReturnType<typeof vi.fn> }> }))
+const websocketState = vi.hoisted(() => ({
+  instances: [] as Array<EventEmitter & { close: ReturnType<typeof vi.fn> }>,
+}))
 
 vi.mock('ws', () => ({
   default: class extends EventEmitter {
@@ -41,13 +45,10 @@ afterEach(() => {
   stopNativeSettingsProjectionSync()
   websocketState.instances.length = 0
   vi.clearAllMocks()
-  vi.useRealTimers()
 })
 
 async function flushRefreshQueue(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
+  await flushMicrotasks()
 }
 
 test('derives native effects from complete authoritative settings snapshots', () => {
@@ -93,7 +94,7 @@ test('reconciles the complete server snapshot whenever the socket opens', async 
 })
 
 test('reconnect open reconciles settings changed while disconnected', async () => {
-  vi.useFakeTimers()
+  useFakeTimers()
   const initial = defaultSettingsSnapshot()
   vi.mocked(getSettingsSnapshot)
     .mockResolvedValueOnce(initial)
