@@ -24,7 +24,7 @@ import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/we
 import {
   invalidateRepoOperationsQueries,
   invalidateRepoSnapshotQueries,
-  invalidateRepoWorktreeSnapshotQueries,
+  invalidateRepoWorktreeStatusQueries,
   refreshRepoProjectionReadModel,
   refreshRepoWorktreeStatusReadModel,
 } from '#/web/repo-query-runtime.ts'
@@ -192,7 +192,7 @@ describe('repo projection query data', () => {
       queryClient.setQueryData(queryKey, {})
     }
 
-    invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+    invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
 
     expect(queryClient.getQueryState(projectionKey)?.isInvalidated).toBe(false)
     expect(queryClient.getQueryState(statusKey)?.isInvalidated).toBe(true)
@@ -396,7 +396,7 @@ describe('repo projection query data', () => {
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(1))
       invalidateRepoOperationsQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       releases[0]!(repoProjectionForTest(1))
       await vi.waitFor(() => expect(observer.getCurrentResult().data?.loadedAt).toBe(1))
       expect(releases).toHaveLength(1)
@@ -856,7 +856,7 @@ describe('repo worktree status query data', () => {
       expect(releases).toHaveLength(2)
       expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
 
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       await vi.waitFor(() => expect(releases).toHaveLength(3))
       releases[2]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 3 })
       await vi.waitFor(() =>
@@ -932,7 +932,7 @@ describe('repo worktree status query data', () => {
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(1))
-      invalidateRepoWorktreeSnapshotQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+      invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
       releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
 
       await vi.waitFor(() => expect(observer.getCurrentResult().isError).toBe(true))

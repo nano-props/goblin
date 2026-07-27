@@ -504,7 +504,7 @@ export function invalidateRepoSnapshotQueries(
   invalidateActiveRepoSnapshotQueries(repoRoot, workspaceRuntimeId, queryClient)
 }
 
-export function invalidateRepoWorktreeSnapshotQueries(
+export function invalidateRepoWorktreeStatusQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,

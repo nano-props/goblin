@@ -28,7 +28,7 @@ import {
   setRepoWorktreeStatusQueryData,
 } from '#/web/repo-query-cache.ts'
 import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
-import { invalidateRepoWorktreeSnapshotQueries } from '#/web/repo-query-runtime.ts'
+import { invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
@@ -1115,7 +1115,7 @@ describe('projection refresh request ordering', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    invalidateRepoWorktreeSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
     resolveStatus({ workspaceRuntimeId, status: staleStatus, loadedAt: Date.now() })
     await refresh
 
@@ -1139,7 +1139,7 @@ describe('projection refresh request ordering', () => {
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
-    invalidateRepoWorktreeSnapshotQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
 
     rejectStatus(new Error('error.path-not-found'))
     await refresh
