@@ -1,6 +1,6 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -355,7 +355,7 @@ describe('runLatestOperation active-task cancellation', () => {
     // decrements `active` and `drain()` shifts the new task
     // over). Yield a few times so the microtask queue drains.
     expect(activeAborted).toBe(true)
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(5)
     expect(secondStarted).toBe(true)
 
     await first
@@ -408,7 +408,7 @@ describe('runLatestOperation active-task cancellation', () => {
     // microtasks; without it, the second run would never
     // start (the first's promise would never settle on its
     // own).
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(5)
     expect(secondStarted).toBe(true)
 
     await first

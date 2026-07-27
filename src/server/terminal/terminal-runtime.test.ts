@@ -349,10 +349,6 @@ function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void
   return { promise, resolve }
 }
 
-async function flushPromiseQueue(): Promise<void> {
-  for (let i = 0; i < 5; i++) await Promise.resolve()
-}
-
 function sentSocketMessages(socket: {
   send: ReturnType<typeof vi.fn>
 }): Array<{ type?: string; [key: string]: unknown }> {

@@ -97,6 +97,7 @@ describe('test harness policy', () => {
     ['act imported directly from React', "import { act as reactAct } from 'react'"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
     ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve(); await Promise.resolve()'],
+    ['repeated manual microtask drain', 'for (let i = 0; i < 3; i += 1) await Promise.resolve()'],
     ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
     ['test-local Storage replacement', "Object.defineProperty(window, 'localStorage', { value: storage })"],
@@ -152,6 +153,21 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     },
     BlockStatement(path) {
       detectRepeatedMicrotaskDrain(path.get('body'), violations)
+    },
+    ForStatement(path) {
+      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
+    },
+    ForInStatement(path) {
+      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
+    },
+    ForOfStatement(path) {
+      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
+    },
+    WhileStatement(path) {
+      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
+    },
+    DoWhileStatement(path) {
+      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
     },
     AssignmentExpression(path) {
       if (isActEnvironmentTarget(path.get('left'))) violations.add('manual React act-environment mutation')
@@ -308,6 +324,29 @@ function isAwaitPromiseResolve(statement: NodePath): boolean {
     memberPropertyName(callee) === 'resolve' &&
     isUnboundIdentifier(callee.get('object'), 'Promise')
   )
+}
+
+function containsAwaitPromiseResolve(path: NodePath): boolean {
+  let found = false
+  path.traverse({
+    Function(innerPath) {
+      innerPath.skip()
+    },
+    AwaitExpression(innerPath) {
+      const argument = innerPath.get('argument')
+      if (!argument.isCallExpression() || argument.node.arguments.length !== 0) return
+      const callee = argument.get('callee')
+      if (
+        callee.isMemberExpression() &&
+        memberPropertyName(callee) === 'resolve' &&
+        isUnboundIdentifier(callee.get('object'), 'Promise')
+      ) {
+        found = true
+        innerPath.stop()
+      }
+    },
+  })
+  return found
 }
 
 function stringArgument(path: NodePath, index: number): string | null {

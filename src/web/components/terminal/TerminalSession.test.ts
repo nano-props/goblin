@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
@@ -660,7 +660,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     await flushTerminalStart()
     await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
 
@@ -682,13 +682,13 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     expect(term.refresh).not.toHaveBeenCalled()
 
     attach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     await flushTerminalStart()
 
@@ -702,9 +702,9 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     session.handleIdentity({
@@ -735,11 +735,11 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     const fitAddon = xtermMocks.fitAddons[0]!
     firstAttach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     fitAddon.proposeDimensions.mockReturnValue({ cols: 90, rows: 25 })
     await flushTerminalStart()
@@ -852,7 +852,7 @@ describe('TerminalSession', () => {
   test('transfers automatic focus when a fresh stream presentation is complete', async () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const { host, session, term, settled } = await startPendingFocusRequest()
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
 
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
     term.emitUserData('typed-before-render')
@@ -886,7 +886,7 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     let focusIsCurrent = true
     const { host, term, settled } = await startPendingFocusRequest(() => focusIsCurrent)
-    await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
     focusIsCurrent = false
 
     await flushTerminalStart()
@@ -907,7 +907,7 @@ describe('TerminalSession', () => {
     expect(frame?.style.visibility).toBe('hidden')
 
     term.emitRender()
-    await flushMicrotasksUntil(() => term.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => term.write.mock.calls.length === 1)
 
     expect(frame?.style.visibility).toBe('')
     expect(term.write).toHaveBeenCalledTimes(1)
@@ -921,7 +921,7 @@ describe('TerminalSession', () => {
 
     expect(frame?.style.visibility).toBe('hidden')
     term.emitRender()
-    await flushMicrotasksUntil(() => frame?.style.visibility === '')
+    await waitForMicrotaskCondition(() => frame?.style.visibility === '')
 
     emitSessionOutput(session, 1, 'later output')
     await flushTerminalStart()
@@ -972,7 +972,7 @@ describe('TerminalSession', () => {
     expect(terminalCalls.write).not.toHaveBeenCalled()
 
     term.emitRender()
-    await flushMicrotasksUntil(() => terminalCalls.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.write.mock.calls.length === 1)
 
     expect(frame?.style.visibility).toBe('')
     expect(terminalCalls.write).toHaveBeenCalledWith({
@@ -990,7 +990,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     term.write.mockImplementationOnce((_data: string, callback?: () => void) => {
       term.emitData('\x1b[1;1R')
@@ -1013,7 +1013,7 @@ describe('TerminalSession', () => {
     expect(frame?.style.visibility).toBe('hidden')
 
     term.emitRender()
-    await flushMicrotasksUntil(() => frame?.style.visibility === '')
+    await waitForMicrotaskCondition(() => frame?.style.visibility === '')
 
     expect(term.write).not.toHaveBeenCalled()
     emitSessionOutput(session, 1, 'current prompt')
@@ -1194,7 +1194,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.attach(host)
-    await flushMicrotasksUntil(() => geometryMocks.preloadTerminalFont.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => geometryMocks.preloadTerminalFont.mock.calls.length === 1)
     session.detach(host)
     preload.resolve()
     await flushTerminalStart()
@@ -1478,7 +1478,7 @@ describe('TerminalSession', () => {
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
-    await flushMicrotasksUntil(() => xtermMocks.terminals[0]?.write.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => xtermMocks.terminals[0]?.write.mock.calls.length === 1)
 
     xtermMocks.deferWriteCallbacks(false)
     session.restart()
@@ -1880,7 +1880,7 @@ describe('TerminalSession', () => {
     const { term } = await startOpenControllerSession()
 
     term.resize(101, 31)
-    await flushMicrotasksUntil(() => terminalCalls.resize.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 1)
     term.resize(102, 32)
     term.resize(103, 33)
     await flushMicrotasks(2)
@@ -1897,7 +1897,7 @@ describe('TerminalSession', () => {
       canonicalSize: { cols: 101, rows: 31 },
     })
     nextIdentityRevision = 1
-    await flushMicrotasksUntil(() => terminalCalls.resize.mock.calls.length === 2)
+    await waitForMicrotaskCondition(() => terminalCalls.resize.mock.calls.length === 2)
 
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -3158,8 +3158,8 @@ describe('TerminalSession', () => {
     const firstTerm = xtermMocks.terminals[0]!
     const firstFit = xtermMocks.fitAddons[0]!
     attach.resolve(streamAttachResult('pty_session_1_aaaaaaaaa'))
-    await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
-    await flushMicrotasksUntil(() => firstTerm.refresh.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+    await waitForMicrotaskCondition(() => firstTerm.refresh.mock.calls.length === 1)
     firstFit.proposeDimensions.mockReturnValue(null)
     vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue(terminalRect(0, 0))
     await flushTerminalStart()
@@ -3237,7 +3237,7 @@ describe('TerminalSession', () => {
     expect(settled).not.toHaveBeenCalled()
     session.attach(host)
     expect(session.focus(request)).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
 
     expect(term.focus).not.toHaveBeenCalled()
@@ -3314,7 +3314,7 @@ describe('TerminalSession', () => {
 
     session.attach(host)
     expect(session.focus({ isCurrent: () => true, onSettled: settled })).toBe(true)
-    await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+    await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
     const term = xtermMocks.terminals[0]!
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
@@ -3614,9 +3614,7 @@ function createTerminalHost(): HTMLDivElement {
   return host
 }
 
-async function startOpenControllerSession(
-  session: TerminalSession = new TerminalSession(descriptor, vi.fn()),
-) {
+async function startOpenControllerSession(session: TerminalSession = new TerminalSession(descriptor, vi.fn())) {
   const host = createTerminalHost()
   hydrateManagedSession(session)
   session.attach(host)
@@ -3647,10 +3645,10 @@ async function startHiddenFreshStreamPresentation() {
   const session = new TerminalSession(descriptor, vi.fn())
   hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
   session.attach(host)
-  await flushMicrotasksUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
+  await waitForMicrotaskCondition(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 1)
   const term = xtermMocks.terminals[0]!
   const frame = host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')
-  await flushMicrotasksUntil(() => term.refresh.mock.calls.length === 1)
+  await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
   return { host, session, term, frame }
 }
 
@@ -3661,7 +3659,7 @@ async function startPendingFocusRequest(isCurrent: () => boolean = () => true) {
   const settled = vi.fn()
   session.attach(host)
   if (!session.focus({ isCurrent, onSettled: settled })) throw new Error('expected accepted focus request')
-  await flushMicrotasksUntil(() => terminalCalls.attach.mock.calls.length === 1)
+  await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
   return { host, session, term: xtermMocks.terminals[0]!, settled }
 }
 
@@ -3700,14 +3698,6 @@ function optionArrow(key: string): KeyboardEvent {
 async function flushTerminalStart(): Promise<void> {
   // Drain xterm render frames and the session's normal debounced work.
   await vi.runAllTimersAsync()
-}
-
-async function flushMicrotasksUntil(predicate: () => boolean): Promise<void> {
-  for (let i = 0; i < 20; i += 1) {
-    if (predicate()) return
-    await Promise.resolve()
-  }
-  throw new Error('microtask condition was not met')
 }
 
 async function flushFontRefit(): Promise<void> {
