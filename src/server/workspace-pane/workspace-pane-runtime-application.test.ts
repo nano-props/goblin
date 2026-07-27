@@ -359,12 +359,18 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('does not close a terminal when membership is released while reading the session projection', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const sessions = deferred<(typeof session)[]>()
+    const sessionsReadStarted = deferred<void>()
     let current = true
     const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalSessions: { listSessionsForUser: async () => await sessions.promise },
+      terminalSessions: {
+        listSessionsForUser: async () => {
+          sessionsReadStarted.resolve()
+          return await sessions.promise
+        },
+      },
       terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
       isCurrentWorkspaceRuntimeMembership: () => current,
@@ -376,7 +382,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       sessionId: session.terminalSessionId,
       target: { target: request.target },
     })
-    await Promise.resolve()
+    await sessionsReadStarted.promise
     current = false
     sessions.resolve([session])
 
@@ -745,6 +751,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('serializes open and close through the shared user/runtime/worktree queue', async () => {
     const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
+    const createStarted = deferred<void>()
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const listSessions = vi.fn().mockResolvedValueOnce([session]).mockResolvedValueOnce([])
     const application = createWorkspacePaneRuntimeApplication({
@@ -752,7 +759,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: testPhysicalWorktrees,
       terminalSessions: { listSessionsForUser: listSessions },
       terminal: {
-        createAdmitted: async () => await createResult.promise,
+        createAdmitted: async () => {
+          createStarted.resolve()
+          return await createResult.promise
+        },
         close: () => ({ kind: 'closed' as const }),
       },
       workspaceTabsCoordinator: runtimeTabsCoordinator({
@@ -766,6 +776,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
 
     const open = application.open('client-test', 'user-test', { runtimeType: 'terminal', request })
+    await createStarted.promise
     const close = application.close('client-test', 'user-test', {
       runtimeType: 'terminal',
       sessionId: session.terminalSessionId,
@@ -773,7 +784,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         target: request.target,
       },
     })
-    await Promise.resolve()
     expect(listSessions).not.toHaveBeenCalled()
 
     createResult.resolve(terminalCreateSuccess())
@@ -1032,10 +1042,6 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
   }
 }
 
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-  return { promise, resolve }
+function deferred<T>() {
+  return Promise.withResolvers<T>()
 }

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   resolveRemoteWorkspaceTarget: vi.fn(),
@@ -51,6 +51,13 @@ const remoteTarget: RemoteWorkspaceTarget = {
   port: 22,
 }
 const RUNTIME_ID = 'repo-runtime-tree-test'
+const emptyTree = { nodes: [], truncated: false }
+const localTree = treeWithNode('src', 'directory')
+const remoteTree = treeWithNode('README.md', 'file')
+
+function treeWithNode(name: string, kind: 'directory' | 'file') {
+  return { nodes: [{ id: name, path: name, name, parentId: null, kind, status: 'clean' as const }], truncated: false }
+}
 
 function workspaceRootTarget(workspaceId: WorkspaceId) {
   const target = canonicalRuntimeWorkspacePaneTarget({
@@ -99,28 +106,18 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
 describe('workspace filesystem tree read layer', () => {
   test('reads the exact workspace root without requiring Git worktree membership', async () => {
-    mocks.readWorkspaceFilesystemSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
+    mocks.readWorkspaceFilesystemSourceLocal.mockResolvedValueOnce(emptyTree)
 
-    await expect(readWorkspaceFilesystemTree(workspaceRootTarget(LOCAL_REPO_ID))).resolves.toEqual({
-      nodes: [],
-      truncated: false,
-    })
+    await expect(readWorkspaceFilesystemTree(workspaceRootTarget(LOCAL_REPO_ID))).resolves.toEqual(emptyTree)
 
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
     expect(mocks.readWorkspaceFilesystemSourceLocal).toHaveBeenCalledWith('/tmp/repo', expect.any(Object), undefined)
   })
 
   test('validates a local worktree and forwards to the local source', async () => {
-    mocks.readGitWorktreeFilesystemSourceLocal.mockResolvedValueOnce({
-      nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-      truncated: false,
-    })
+    mocks.readGitWorktreeFilesystemSourceLocal.mockResolvedValueOnce(localTree)
 
     const result = await readWorkspaceFilesystemTree(localWorktreeTarget(), { prefix: 'src' })
 
@@ -132,11 +129,11 @@ describe('workspace filesystem tree read layer', () => {
       expect.objectContaining({ prefix: 'src' }),
       undefined,
     )
-    expect(result.nodes).toHaveLength(1)
+    expect(result).toEqual(localTree)
   })
 
   test('threads request cancellation through Git membership and directory I/O', async () => {
-    mocks.readGitWorktreeFilesystemSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
+    mocks.readGitWorktreeFilesystemSourceLocal.mockResolvedValueOnce(emptyTree)
     const signal = new AbortController().signal
 
     await readWorkspaceFilesystemTree(localWorktreeTarget(), { signal })
@@ -174,10 +171,7 @@ describe('workspace filesystem tree read layer', () => {
 
   test('resolves a remote target and forwards to the remote source', async () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
-    mocks.readGitWorktreeFilesystemSourceRemote.mockResolvedValueOnce({
-      nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
-      truncated: false,
-    })
+    mocks.readGitWorktreeFilesystemSourceRemote.mockResolvedValueOnce(remoteTree)
 
     const result = await readWorkspaceFilesystemTree(remoteWorktreeTarget(), { prefix: 'src' })
 
@@ -194,12 +188,12 @@ describe('workspace filesystem tree read layer', () => {
         options: expect.objectContaining({ prefix: 'src' }),
       }),
     )
-    expect(result.nodes).toHaveLength(1)
+    expect(result).toEqual(remoteTree)
   })
 
   test('reads a remote workspace root without Git worktree membership', async () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
-    mocks.readWorkspaceFilesystemSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
+    mocks.readWorkspaceFilesystemSourceRemote.mockResolvedValueOnce(emptyTree)
 
     await readWorkspaceFilesystemTree(workspaceRootTarget(remoteWorkspaceId))
 
@@ -215,7 +209,7 @@ describe('workspace filesystem tree read layer', () => {
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
-    mocks.readGitWorktreeFilesystemSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
+    mocks.readGitWorktreeFilesystemSourceRemote.mockResolvedValueOnce(emptyTree)
 
     const signal = new AbortController().signal
     await readWorkspaceFilesystemTree(remoteWorktreeTarget(), { signal })
@@ -223,11 +217,11 @@ describe('workspace filesystem tree read layer', () => {
     expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(
       remoteRepoId,
       {
-        workspaceRuntimeId: 'repo-runtime-tree-test',
+        workspaceRuntimeId: RUNTIME_ID,
       },
       signal,
     )
-    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(remoteRepoId, 'repo-runtime-tree-test', remoteTarget)
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(remoteRepoId, RUNTIME_ID, remoteTarget)
     expect(mocks.readGitWorktreeFilesystemSourceRemote).toHaveBeenCalledWith(expect.objectContaining({ run }))
   })
 

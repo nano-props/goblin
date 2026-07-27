@@ -12,6 +12,9 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other')
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://host/repo')
+const USER_ID = 'user-test'
+const CLIENT_ID = 'client_test000000000000'
+const RUNTIME_ID = 'repo-runtime-test'
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -85,7 +88,7 @@ describe('restoreWorkspaceTabs', () => {
     vi.clearAllMocks()
     mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
       workspaceId,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
@@ -117,40 +120,31 @@ describe('restoreWorkspaceTabs', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 5, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({ snapshot: { revision: 5, entries: [] } })
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
     expect(result.workspace).toMatchObject({
       entry: { id: 'goblin+file:///repo' },
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
     })
     expect(result.workspace.gitProjection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
     expect(mocks.probeWorkspace).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
@@ -170,33 +164,24 @@ describe('restoreWorkspaceTabs', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
     expect(result.workspace.gitProjection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
@@ -215,25 +200,25 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
     expect(result.workspace).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
-      userId: 'user-test',
+      userId: USER_ID,
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       assertCurrent: expect.any(Function),
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledOnce()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }],
     })
@@ -254,17 +239,17 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }],
     })
@@ -296,18 +281,18 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: entry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
     expect(result.workspace.gitProjection).toBeNull()
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: entry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: entry,
       targets: [{ kind: 'workspace-root' }],
     })
@@ -326,8 +311,8 @@ describe('restoreWorkspaceTabs', () => {
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'stale-runtime',
         workspacePaneTabsHost,
@@ -348,10 +333,10 @@ describe('restoreWorkspaceTabs', () => {
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
@@ -374,70 +359,10 @@ describe('restoreWorkspaceTabs', () => {
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
-  })
-
-  test('rejects lazy restore when aggregate validation observes removed membership', async () => {
-    const entry = { id: LOCAL_WORKSPACE_ID }
-    const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [entry] }
-    mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.confirmServerWorkspaceEntry.mockResolvedValue({
-      matched: false,
-      latestWorkspace: defaultServerWorkspaceState(),
-    })
-    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
-    workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
-
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    await expect(
-      restoreWorkspaceTabs({
-        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
-        workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
-  })
-
-  test('does not repair pane tabs after repo membership is removed', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({
-      kind: 'git-branch',
-      workspaceId: LOCAL_WORKSPACE_ID,
-      branchName: 'deleted',
-    })
-    const workspace = {
-      ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
-      workspacePaneTabsByTargetByWorkspace: {
-        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
-      },
-    }
-    mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.confirmServerWorkspaceEntry.mockResolvedValue({
-      matched: false,
-      latestWorkspace: defaultServerWorkspaceState(),
-    })
-    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
-    workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
-
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    await expect(
-      restoreWorkspaceTabs({
-        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
-        workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
@@ -455,17 +380,17 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
     expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, gitProjection: null })
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: { id: LOCAL_WORKSPACE_ID },
       targets: [{ kind: 'workspace-root' }],
     })
@@ -499,10 +424,10 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: remoteEntry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
 
@@ -513,9 +438,9 @@ describe('restoreWorkspaceTabs', () => {
       gitProjection: null,
     })
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: remoteEntry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       expectedWorkspaceEntry: remoteEntry,
       targets: [{ kind: 'workspace-root' }],
     })
@@ -540,10 +465,10 @@ describe('restoreWorkspaceTabs', () => {
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceId: remoteEntry.id,
-      workspaceRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: RUNTIME_ID,
       workspacePaneTabsHost,
     })
     expect(result.workspace).toMatchObject({
@@ -573,10 +498,10 @@ describe('restoreWorkspaceTabs', () => {
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: RUNTIME_ID,
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })

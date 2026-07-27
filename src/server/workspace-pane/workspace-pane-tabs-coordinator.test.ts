@@ -17,6 +17,7 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
@@ -651,16 +652,17 @@ describe('workspace pane tabs coordinator queues', () => {
         },
       ],
     }
-    let releaseFirstLoad!: () => void
-    const firstLoad = new Promise<void>((resolve) => {
-      releaseFirstLoad = resolve
-    })
+    const firstLoadStarted = Promise.withResolvers<void>()
+    const firstLoad = Promise.withResolvers<void>()
     let loadCount = 0
     let blockLoad = false
     const repository: WorkspacePaneLayoutRepository = {
       async load() {
         loadCount += 1
-        if (blockLoad && loadCount === 1) await firstLoad
+        if (blockLoad && loadCount === 1) {
+          firstLoadStarted.resolve()
+          await firstLoad.promise
+        }
         return { layout: structuredClone(layout) }
       },
       async compareAndSwap(input) {
@@ -707,7 +709,7 @@ describe('workspace pane tabs coordinator queues', () => {
       assertCurrent: () => {},
     }
     const list = coordinator.listWorkspaceTabs(input)
-    await vi.waitFor(() => expect(loadCount).toBe(1))
+    await firstLoadStarted.promise
     let updateSettled = false
     const update = coordinator
       .updateTabs({
@@ -724,9 +726,9 @@ describe('workspace pane tabs coordinator queues', () => {
         updateSettled = true
       })
 
-    await Promise.resolve()
+    await waitForNextMacrotask()
     expect(updateSettled).toBe(false)
-    releaseFirstLoad()
+    firstLoad.resolve()
 
     await expect(list).resolves.toMatchObject({
       revision: 1,
@@ -931,12 +933,9 @@ describe('workspace pane tabs coordinator queues', () => {
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
-    let releaseFinalSample!: () => void
-    const finalSampleGate = new Promise<void>((resolve) => {
-      releaseFinalSample = resolve
-    })
+    const finalSampleStarted = Promise.withResolvers<void>()
+    const finalSampleGate = Promise.withResolvers<void>()
     let captureCount = 0
-    let finalSampleStarted = false
     const aggregate = aggregateFor(memoryRepository())
     const coordinator = createWorkspacePaneTabsCoordinator({
       layoutAggregate: aggregate,
@@ -946,8 +945,8 @@ describe('workspace pane tabs coordinator queues', () => {
           async captureSnapshotForUser() {
             captureCount += 1
             if (captureCount === 2) {
-              finalSampleStarted = true
-              await finalSampleGate
+              finalSampleStarted.resolve()
+              await finalSampleGate.promise
             }
             return {
               revision: captureCount,
@@ -977,15 +976,14 @@ describe('workspace pane tabs coordinator queues', () => {
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     })
-    await vi.waitFor(() => expect(finalSampleStarted).toBe(true))
+    await finalSampleStarted.promise
     let removalTaskStarted = false
     const removal = operations.runRemoval(capability, async () => {
       removalTaskStarted = true
     })
-    await Promise.resolve()
     expect(removalTaskStarted).toBe(false)
 
-    releaseFinalSample()
+    finalSampleGate.resolve()
     await expect(list).resolves.toMatchObject({
       entries: [{ target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree' } }],
     })
@@ -1010,12 +1008,9 @@ describe('workspace pane tabs coordinator queues', () => {
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
-    let releaseStableSample!: () => void
-    const stableSampleGate = new Promise<void>((resolve) => {
-      releaseStableSample = resolve
-    })
+    const stableSampleStarted = Promise.withResolvers<void>()
+    const stableSampleGate = Promise.withResolvers<void>()
     let captureCount = 0
-    let stableSampleStarted = false
     const coordinator = createWorkspacePaneTabsCoordinator({
       layoutAggregate: aggregateFor(memoryRepository()),
       runtimeProviders: [
@@ -1024,8 +1019,8 @@ describe('workspace pane tabs coordinator queues', () => {
           async captureSnapshotForUser() {
             captureCount += 1
             if (captureCount === 3) {
-              stableSampleStarted = true
-              await stableSampleGate
+              stableSampleStarted.resolve()
+              await stableSampleGate.promise
             }
             return {
               revision: captureCount,
@@ -1072,15 +1067,14 @@ describe('workspace pane tabs coordinator queues', () => {
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     })
-    await vi.waitFor(() => expect(stableSampleStarted).toBe(true))
+    await stableSampleStarted.promise
     let removalStarted = false
     const removal = operations.runRemoval(capabilityC, async () => {
       removalStarted = true
     })
-    await Promise.resolve()
     expect(removalStarted).toBe(false)
 
-    releaseStableSample()
+    stableSampleGate.resolve()
     await expect(list).resolves.toMatchObject({
       entries: [
         { target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree-a' } },

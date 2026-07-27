@@ -16,6 +16,8 @@ const REPO_A_ID = workspaceIdForTest('goblin+file:///repo-a')
 const REPO_B_ID = workspaceIdForTest('goblin+file:///repo-b')
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://prod/srv/repo')
+const USER_ID = 'user-test'
+const CLIENT_ID = 'client_test000000000000'
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -115,22 +117,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
       openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, { id: STUB_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspacePaneTabsHost,
     })
 
@@ -185,24 +178,16 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
     expect(result.openWorkspaceEntries).toEqual([repoA, repoB])
     expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledTimes(2)
-    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(
-      'user-test',
-      'goblin+file:///repo-a',
-      'client_test000000000000',
-    )
-    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(
-      'user-test',
-      'goblin+file:///repo-b',
-      'client_test000000000000',
-    )
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(USER_ID, 'goblin+file:///repo-a', CLIENT_ID)
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(USER_ID, 'goblin+file:///repo-b', CLIENT_ID)
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
@@ -220,8 +205,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -230,8 +215,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledTimes(2)
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledTimes(1)
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith(
-      'user-test',
-      'client_test000000000000',
+      USER_ID,
+      CLIENT_ID,
       expect.objectContaining({ workspaceId: 'goblin+file:///repo-a' }),
     )
   })
@@ -251,8 +236,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -275,8 +260,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     await expect(
       restoreServerWorkspace({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
+        userId: USER_ID,
+        clientId: CLIENT_ID,
         workspacePaneTabsHost,
       }),
     ).rejects.toThrow('workspace membership restore was superseded too many times')
@@ -291,22 +276,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
       openWorkspaceEntries: [{ id: REPO_A_ID }, { id: REPO_B_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 5, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({ snapshot: { revision: 5, entries: [] } })
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       activeWorkspaceId: REPO_B_ID,
       workspacePaneTabsHost,
     })
@@ -334,21 +310,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.probeWorkspace.mockImplementation(async (workspaceId: string) =>
       workspaceId === NESTED_STUB_WORKSPACE_ID ? plainWorkspaceProbe() : gitProbe(),
     )
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -362,7 +329,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
-      userId: 'user-test',
+      userId: USER_ID,
       workspaceId: 'goblin+file:///repo-stub/src',
       workspaceRuntimeId: 'runtime-goblin_file____repo_stub_src',
       assertCurrent: expect.any(Function),
@@ -378,21 +345,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
       openWorkspaceEntries: [{ id: ACTIVE_WORKSPACE_ID }, remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -422,21 +380,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({
-        kind: 'restored' as const,
-        snapshot: { revision: 0, entries: [] },
-        repaired: false,
-      })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -464,8 +413,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
+      userId: USER_ID,
+      clientId: CLIENT_ID,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
@@ -473,7 +422,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.runtime.workspaces[0]).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId,
       workspaceRuntimeId: expect.any(String),
       expectedWorkspaceEntry: { id: workspaceId },
