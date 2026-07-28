@@ -368,6 +368,8 @@ export const en = {
   'terminal.loading': 'Loading terminals…',
   'terminal.load-failed': 'Could not load terminals',
   'terminal.restarting': 'Restarting terminal…',
+  'terminal.restoring': 'Restoring terminal…',
+  'terminal.restore-failed': 'Unable to restore terminal',
   'terminal.restart': 'Restart terminal',
   'terminal.search-placeholder': 'Search terminal',
   'terminal.search-no-results': 'No results',
@@ -388,8 +390,10 @@ export const en = {
   'terminal.mirror-controlled': 'Another session is currently controlling this terminal.',
   'terminal.unowned': 'No session is currently controlling this terminal.',
   'terminal.takeover': 'Take over terminal',
+  'terminal.taking-over': 'Taking over…',
   'terminal.takeover-failed':
     'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',
+  'terminal.takeover-delivery-uncertain': 'Connection interrupted. Takeover status will refresh after reconnection.',
   'terminal.write-not-sent': 'Connection unavailable. Input was not sent; try again in a moment.',
   'terminal.write-delivery-uncertain':
     'Connection interrupted. Recent input may not have arrived; check before retrying.',

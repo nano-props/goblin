@@ -435,6 +435,12 @@ Control is a business concept, not just a transport detail.
   offline controller intent projects to no effective controller, so the next
   online attachment may claim through the ordinary attach rule.
 - Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
+- The client keeps the takeover command result narrow: an authoritative negative
+  result is a normal failure, while a realtime request whose delivery is
+  indeterminate is reported as uncertain and is never replayed automatically.
+  Existing reconnect/catalog recovery later projects the authoritative role.
+- Only a true `viewer` receives the takeover action. `unowned` has no effective
+  controller, so ordinary attach owns auto-claim and presentation recovery.
 
 ### Why this matters
 
@@ -504,6 +510,16 @@ The system supports replay and snapshot hydration so users can reattach to runni
   generation-bearing writer rejects local user input and snapshot-generated
   protocol replies.
 - Same-session active-view replay is not a generic repair mechanism.
+- Rebuilding an already-open local xterm publishes client-only
+  `presentationRecovery: 'pending' | 'failed'` feedback. It is neither PTY
+  lifecycle nor input authority and never crosses the server boundary.
+- A stable local recovery failure stops layout/font auto-admission and offers
+  one explicit attach-only retry. The retry does not resend takeover, restart
+  or recreate the PTY, mutate controller intent, or install a retry loop.
+- Cancellation or an unmeasurable host is not a stable recovery failure; the
+  next ordinary layout signal may admit presentation again. Detach, disposal,
+  viewer ownership, stale work, and superseding bindings clear local recovery
+  feedback.
 
 ### Input during presentation
 

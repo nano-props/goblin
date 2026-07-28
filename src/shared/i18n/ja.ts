@@ -366,6 +366,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.loading': 'ターミナルを読み込み中…',
   'terminal.load-failed': 'ターミナルを読み込めませんでした',
   'terminal.restarting': 'ターミナルを再起動しています…',
+  'terminal.restoring': 'ターミナルを復元しています…',
+  'terminal.restore-failed': 'ターミナルを復元できませんでした',
   'terminal.restart': 'ターミナルを再起動',
   'terminal.search-placeholder': 'ターミナルを検索',
   'terminal.search-no-results': '結果なし',
@@ -386,8 +388,10 @@ export const ja: Record<DictKey, string> = {
   'terminal.mirror-controlled': '別のセッションが現在このターミナルを制御しています。',
   'terminal.unowned': '現在このターミナルを制御しているセッションはありません。',
   'terminal.takeover': 'ターミナルを引き継ぐ',
+  'terminal.taking-over': '引き継いでいます…',
   'terminal.takeover-failed':
     'ターミナルを引き継げませんでした。閉じられたか、接続の準備ができていない可能性があります。もう一度お試しください。',
+  'terminal.takeover-delivery-uncertain': '接続が中断されました。再接続後にターミナルの引き継ぎ状態が更新されます。',
   'terminal.write-not-sent': '接続できません。入力は送信されませんでした。しばらく経ってから再試行してください。',
   'terminal.write-delivery-uncertain':
     '接続が中断されました。直前の入力が届いていない可能性があります。確認してから再試行してください。',

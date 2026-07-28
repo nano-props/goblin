@@ -14,6 +14,7 @@ import type {
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalFilesystemTargetSnapshot,
+  TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -27,7 +28,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
+  toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn(), message: vi.fn() },
 }))
 
 vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
@@ -138,7 +139,10 @@ export function completeFilesystemTargetSnapshot(
   }
 }
 
-export async function renderTerminalSession(contextOverrides: Partial<TerminalSessionContextValue> = {}) {
+export async function renderTerminalSession(
+  contextOverrides: Partial<TerminalSessionContextValue> = {},
+  options: { snapshot?: TerminalSnapshot; projectionPhase?: 'pending' | 'ready' | 'failed' } = {},
+) {
   const writeInput = vi.fn()
   const descriptor = {
     terminalSessionId: 'term-111111111111111111111',
@@ -164,7 +168,7 @@ export async function renderTerminalSession(contextOverrides: Partial<TerminalSe
     count: 1,
     createPending: false,
   }
-  const snapshot = {
+  let snapshot: TerminalSnapshot = options.snapshot ?? {
     phase: 'open' as const,
     message: null,
     processName: 'zsh',
@@ -193,13 +197,17 @@ export async function renderTerminalSession(contextOverrides: Partial<TerminalSe
     focusTerminal: vi.fn(),
     ...contextOverrides,
   })
+  const snapshotListeners = new Set<() => void>()
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => snapshot,
-    subscribeSnapshot: () => () => {},
+    subscribeSnapshot: (_terminalSessionId, listener) => {
+      snapshotListeners.add(listener)
+      return () => snapshotListeners.delete(listener)
+    },
   }
 
   const { container, unmount } = renderInJsdom(
@@ -210,6 +218,7 @@ export async function renderTerminalSession(contextOverrides: Partial<TerminalSe
           workspaceRuntimeId={'repo-runtime-test'}
           branch="feature"
           worktreePath="/worktree"
+          projectionPhase={options.projectionPhase}
         />
       </TerminalSessionReadContext>
     </TerminalSessionContext>,
@@ -219,6 +228,12 @@ export async function renderTerminalSession(contextOverrides: Partial<TerminalSe
     container,
     sessionRoot: container.querySelector('.goblin-terminal-session') as HTMLElement,
     writeInput,
+    async publishSnapshot(next: TerminalSnapshot) {
+      snapshot = next
+      await act(async () => {
+        for (const listener of snapshotListeners) listener()
+      })
+    },
     async cleanup() {
       unmount()
     },

@@ -3,12 +3,16 @@ import type { TerminalSessionContextValue } from '#/web/components/terminal/type
 
 type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,
-  'createTerminalWithAdmission' | 'captureInputWriter' | 'capturePasteWriter' | 'sendVirtualKey'
+  'createTerminalWithAdmission' | 'captureInputWriter' | 'capturePasteWriter' | 'sendVirtualKey' | 'retryPresentation'
 > &
   Partial<
     Pick<
       TerminalSessionContextValue,
-      'createTerminalWithAdmission' | 'captureInputWriter' | 'capturePasteWriter' | 'sendVirtualKey'
+      | 'createTerminalWithAdmission'
+      | 'captureInputWriter'
+      | 'capturePasteWriter'
+      | 'sendVirtualKey'
+      | 'retryPresentation'
     >
   >
 type CreatedAdmissionTestTerminalSessionContextValue = Omit<
@@ -37,7 +41,15 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
   const capturePasteWriter = context.capturePasteWriter ?? unexpectedContextCapability('capturePasteWriter')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
-  return { ...context, createTerminalWithAdmission, captureInputWriter, capturePasteWriter, sendVirtualKey }
+  const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
+  return {
+    ...context,
+    createTerminalWithAdmission,
+    captureInputWriter,
+    capturePasteWriter,
+    sendVirtualKey,
+    retryPresentation,
+  }
 }
 
 /** Explicit adapter for tests whose create callback represents one successful new-session admission. */

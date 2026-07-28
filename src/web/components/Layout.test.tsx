@@ -108,6 +108,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     capturePasteWriter: vi.fn(() => null),
     sendVirtualKey: vi.fn(),
     takeover: vi.fn(async () => false),
+    retryPresentation: vi.fn(() => false),
   }
   return {
     TerminalSessionProvider: ({ children }: { children: ReactNode }) =>

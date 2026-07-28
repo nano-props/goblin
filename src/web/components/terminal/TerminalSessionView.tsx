@@ -35,6 +35,7 @@ import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/t
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
 import type { TerminalInputWriter, TerminalPasteWriter } from '#/web/components/terminal/types.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -78,6 +79,7 @@ export function TerminalSessionView({
     capturePasteWriter,
     sendVirtualKey,
     takeover,
+    retryPresentation,
     restart,
     focusTerminal,
   } = context
@@ -267,11 +269,13 @@ export function TerminalSessionView({
   }, [isController, terminalSessionId])
 
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
-  const showViewerOverlay = sessionPhase === 'open-viewer'
+  const presentationRecovery = snapshot.presentationRecovery
+  const showViewerOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'viewer' && !presentationRecovery
+  const showUnownedOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'unowned' && !presentationRecovery
   const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
   const canRestart = sessionPhase === 'error-controller'
   const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
-  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
+  const readonlyBadge = t('terminal.mirror-controlled')
   // Status-chip visibility is derived here (not in a JSX branch chain)
   // so the chip's mount identity stays stable across the `!hasSessions`
   // ↔ `hasSessions` flip during a normal terminal open. Stable mount
@@ -281,18 +285,26 @@ export function TerminalSessionView({
   // which is the standard polite-live-region contract.
   const projectionPending = projectionPhase === 'pending'
   const projectionFailed = projectionPhase === 'failed'
+  const showPresentationFailure = !showErrorChip && !isAttaching && presentationRecovery === 'failed'
+  const showProjectionRecoveryFailure =
+    !showErrorChip &&
+    projectionFailed &&
+    ((sessionPhase === 'opening' && !hasSessions) || (!isAttaching && presentationRecovery === 'pending'))
   const showEmptyCta = sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending
-  const showStatusOverlay = isAttaching && !showEmptyCta
+  const showStatusOverlay =
+    (isAttaching && !showEmptyCta && !(sessionPhase === 'opening' && !hasSessions && projectionFailed)) ||
+    (!showErrorChip && !isAttaching && presentationRecovery === 'pending' && !projectionFailed)
   const statusOverlayLabel =
     sessionPhase === 'restarting'
       ? t('terminal.restarting')
       : sessionPhase === 'opening' && !hasSessions && projectionPending
         ? t('terminal.loading')
-        : sessionPhase === 'opening' && !hasSessions && projectionFailed
-          ? projectionErrorMessage
-            ? `${t('terminal.load-failed')} (${projectionErrorMessage})`
-            : t('terminal.load-failed')
+        : presentationRecovery === 'pending'
+          ? t('terminal.restoring')
           : t('terminal.opening')
+  const projectionFailureLabel = projectionErrorMessage
+    ? `${t('terminal.load-failed')} (${projectionErrorMessage})`
+    : t('terminal.load-failed')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -559,29 +571,38 @@ export function TerminalSessionView({
         </form>
       </FormDialog>
       {showViewerOverlay && (
-        <ViewerOverlay
+        <AttachmentOverlay
           badge={readonlyBadge}
-          takeoverLabel={t('terminal.takeover')}
           snapshot={snapshot}
-          takeoverSessionId={terminalSessionId}
-          onTakeover={(takeoverSessionId) => {
-            // `takeover` returns `false` when the server rejected the
-            // request. The client cannot reliably distinguish a
-            // closed session from an attachment that has not connected
-            // yet, so surface a concise retry hint instead of silently
-            // clearing the pending state.
-            void takeover(takeoverSessionId).then((ok) => {
-              if (ok) return
-              toast.error(t('action.result-error'), {
-                description: t('terminal.takeover-failed'),
-              })
-            })
+          takeover={{
+            label: t('terminal.takeover'),
+            pendingLabel: t('terminal.taking-over'),
+            terminalSessionId,
+            pending: snapshot.takeoverPending,
+            run: (takeoverSessionId) => {
+              // A negative result is authoritative; a rejected request still
+              // carries its delivery classification to this feedback boundary.
+              void takeover(takeoverSessionId).then(
+                (ok) => {
+                  if (!ok) showTerminalTakeoverFailure(null, t)
+                },
+                (error: unknown) => showTerminalTakeoverFailure(error, t),
+              )
+            },
           }}
-          takeoverPending={snapshot.takeoverPending}
         />
       )}
+      {showUnownedOverlay && <AttachmentOverlay badge={t('terminal.unowned')} snapshot={snapshot} />}
       {/* Stable mount — see the constants block above for the aria-live rationale. */}
       {showStatusOverlay && <StatusOverlay label={statusOverlayLabel} />}
+      {showProjectionRecoveryFailure && <PresentationFailureOverlay label={projectionFailureLabel} />}
+      {showPresentationFailure && (
+        <PresentationFailureOverlay
+          label={t('terminal.restore-failed')}
+          retryLabel={t('error.try-again')}
+          onRetry={() => terminalSessionId && retryPresentation(terminalSessionId)}
+        />
+      )}
       {showEmptyCta && (
         // Empty state: the worktree has no terminals yet. The bare
         // host <div> renders a featureless black box otherwise, which
@@ -622,13 +643,16 @@ export function TerminalSessionView({
   )
 }
 
-interface ViewerOverlayProps {
+interface AttachmentOverlayProps {
   badge: string
-  takeoverLabel: string
   snapshot: ReturnType<typeof useTerminalSnapshot>
-  takeoverSessionId: string | null
-  onTakeover: (terminalSessionId: string) => unknown
-  takeoverPending?: boolean
+  takeover?: {
+    label: string
+    pendingLabel: string
+    terminalSessionId: string | null
+    pending?: boolean
+    run: (terminalSessionId: string) => void
+  }
 }
 
 interface EmptyTerminalCtaProps {
@@ -692,14 +716,7 @@ function StatusOverlay({ label }: StatusOverlayProps) {
   )
 }
 
-function ViewerOverlay({
-  badge,
-  takeoverLabel,
-  snapshot,
-  takeoverSessionId,
-  onTakeover,
-  takeoverPending,
-}: ViewerOverlayProps) {
+function AttachmentOverlay({ badge, snapshot, takeover }: AttachmentOverlayProps) {
   return (
     <div className="goblin-terminal-session__viewer-overlay">
       <div className="goblin-terminal-session__viewer-content">
@@ -710,18 +727,58 @@ function ViewerOverlay({
             <span className="goblin-terminal-session__viewer-title">{snapshot.canonicalTitle}</span>
           )}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => takeoverSessionId && onTakeover(takeoverSessionId)}
-          disabled={!takeoverSessionId || takeoverPending}
-        >
-          {takeoverPending ? `${takeoverLabel}…` : takeoverLabel}
-        </Button>
+        {takeover && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => takeover.terminalSessionId && takeover.run(takeover.terminalSessionId)}
+            disabled={!takeover.terminalSessionId || takeover.pending}
+            aria-busy={takeover.pending || undefined}
+          >
+            {takeover.pending ? takeover.pendingLabel : takeover.label}
+          </Button>
+        )}
       </div>
     </div>
   )
+}
+
+function PresentationFailureOverlay({
+  label,
+  retryLabel,
+  onRetry,
+}: {
+  label: string
+  retryLabel?: string
+  onRetry?: () => void
+}) {
+  return (
+    <div
+      className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error"
+      role="alert"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <span>{label}</span>
+      {retryLabel && onRetry && (
+        <Button type="button" size="sm" variant="ghost" onClick={onRetry}>
+          {retryLabel}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function showTerminalTakeoverFailure(error: unknown, t: (key: string) => string): void {
+  if (error instanceof ClientRealtimeRequestError) {
+    if (error.kind === 'app-quitting') return
+    if (error.delivery === 'indeterminate') {
+      toast.warning(t('terminal.takeover-delivery-uncertain'))
+      return
+    }
+  }
+  toast.error(t('action.result-error'), { description: t('terminal.takeover-failed') })
 }
 
 function isTerminalSearchShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {

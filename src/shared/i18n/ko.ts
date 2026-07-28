@@ -359,6 +359,8 @@ export const ko: Record<DictKey, string> = {
   'terminal.loading': '터미널 불러오는 중…',
   'terminal.load-failed': '터미널을 불러오지 못했습니다',
   'terminal.restarting': '터미널 다시 시작 중…',
+  'terminal.restoring': '터미널 복원 중…',
+  'terminal.restore-failed': '터미널을 복원할 수 없습니다',
   'terminal.restart': '터미널 다시 시작',
   'terminal.search-placeholder': '터미널 검색',
   'terminal.search-no-results': '결과 없음',
@@ -379,8 +381,10 @@ export const ko: Record<DictKey, string> = {
   'terminal.mirror-controlled': '다른 세션이 현재 이 터미널을 제어하고 있습니다.',
   'terminal.unowned': '현재 이 터미널을 제어하는 세션이 없습니다.',
   'terminal.takeover': '터미널 제어 가져오기',
+  'terminal.taking-over': '제어 가져오는 중…',
   'terminal.takeover-failed':
     '터미널을 제어할 수 없습니다. 터미널이 닫혔거나 연결이 아직 준비되지 않았을 수 있습니다. 다시 시도하세요.',
+  'terminal.takeover-delivery-uncertain': '연결이 중단되었습니다. 다시 연결되면 터미널 제어 상태가 새로 고쳐집니다.',
   'terminal.write-not-sent': '연결할 수 없어 입력을 보내지 못했습니다. 잠시 후 다시 시도하세요.',
   'terminal.write-delivery-uncertain':
     '연결이 끊어졌습니다. 최근 입력이 전달되지 않았을 수 있으니 확인 후 다시 시도하세요.',

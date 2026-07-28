@@ -62,6 +62,7 @@ const projection = vi.hoisted(() => ({
   capturePasteWriter: vi.fn(),
   sendVirtualKey: vi.fn(),
   takeover: vi.fn(),
+  retryPresentation: vi.fn(),
 }))
 
 const geometryMocks = vi.hoisted(() => ({ preloadTerminalFont: vi.fn(async () => {}) }))
@@ -262,6 +263,7 @@ describe('TerminalSessionProvider', () => {
       capturePasteWriter: projection.capturePasteWriter,
       sendVirtualKey: projection.sendVirtualKey,
       takeover: projection.takeover,
+      retryPresentation: projection.retryPresentation,
     })
     expect(captured.read).toEqual({
       terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
