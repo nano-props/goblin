@@ -1,27 +1,22 @@
-import { updateIfFresh, workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import {
-  applyFetchDataLoadError,
-  applyFetchDataLoadResult,
   canRunRemoteFetchNow,
   repoIfFresh,
   resolveActionWorkspaceRuntimeId,
   shouldAttemptFetch,
 } from '#/web/stores/workspaces/refresh-state.ts'
-import { startDataLoad } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
-import { waitForRepoOperationsIdle } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { fetchRepo } from '#/web/repo-client.ts'
 import type { RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 
 export function createRefreshSyncHelpers(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  options: { refreshProjectionReadModel: (id: WorkspaceId, workspaceRuntimeId: string) => Promise<void> },
+  options: { refreshReadModels: (id: WorkspaceId, workspaceRuntimeId: string, signal: AbortSignal) => Promise<void> },
 ) {
   async function runNetworkTask(
     id: WorkspaceId,
@@ -32,11 +27,6 @@ export function createRefreshSyncHelpers(
     if (!resolved) return null
     const { repo: repoBefore, workspaceRuntimeId } = resolved
     if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
-    updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-      if (!isGitWorkspace(r)) return
-      const fetch = gitWorkspaceProjection(r).dataLoads.fetch
-      startDataLoad(fetch, { hasData: fetch.loadedAt !== null })
-    })
     return runExclusiveOperation({
       set,
       get,
@@ -49,16 +39,6 @@ export function createRefreshSyncHelpers(
       busyResult: { ok: false, message: 'error.network-op-in-progress' },
       task: (signal) => task(signal),
       errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
-      onResult: (result) => {
-        updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-          applyFetchDataLoadResult(r, result)
-        })
-      },
-      onError: (message) => {
-        updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-          applyFetchDataLoadError(r, message)
-        })
-      },
       rethrow: true,
     })
   }
@@ -67,11 +47,6 @@ export function createRefreshSyncHelpers(
     let repo = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repo || !shouldAttemptFetch(repo, workspaceRuntimeId)) return null
     if (!canStartRemoteFetch(repo)) {
-      try {
-        await waitForRepoOperationsIdle(id, ['repoReadModel'])
-      } catch {
-        return null
-      }
       repo = repoIfFresh(get, id, workspaceRuntimeId)
       if (!repo || !workspaceCanExecute(repo)) return null
       if (!canStartRemoteFetch(repo)) return null
@@ -89,14 +64,15 @@ export function createRefreshSyncHelpers(
 
   function finalizeSyncFetchResult(id: WorkspaceId, workspaceRuntimeId: string, fetchResult: ExecResult | null): void {
     if (!fetchResult) return
-    if (fetchResult.ok) {
-      get().clearFetchFailed(id, workspaceRuntimeId)
-      return
-    }
+    if (fetchResult.ok) return
     if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, workspaceRuntimeId)
   }
 
-  async function runManualSyncPipeline(id: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
+  async function runManualSyncPipeline(
+    id: WorkspaceId,
+    workspaceRuntimeId: string,
+    signal: AbortSignal,
+  ): Promise<void> {
     let fetchResult: ExecResult | null = null
     const repoBeforeFetch = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repoBeforeFetch) return
@@ -104,7 +80,7 @@ export function createRefreshSyncHelpers(
       fetchResult = await attemptFetch(id, workspaceRuntimeId)
     }
     if (repoIfFresh(get, id, workspaceRuntimeId)) {
-      await options.refreshProjectionReadModel(id, workspaceRuntimeId)
+      await options.refreshReadModels(id, workspaceRuntimeId, signal)
     }
     finalizeSyncFetchResult(id, workspaceRuntimeId, fetchResult)
   }

@@ -6,7 +6,8 @@ import {
 } from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import {
   workspacePaneTabsQueryKey,
@@ -41,6 +42,20 @@ const DIRECTORY_WORKSPACE_PROBE = {
   capabilities: { ...GIT_WORKSPACE_PROBE.capabilities, git: { status: 'unavailable' as const } },
 }
 
+function snapshotForTest(current: string): RepoSnapshot {
+  return {
+    branches: [branchSnapshot(current)],
+    current,
+    remote: {
+      remotes: [],
+      hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
+      hasGitHubRemote: false,
+    },
+  }
+}
+
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
@@ -55,7 +70,7 @@ describe('repo session hydration', () => {
             workspaceRuntimeId: 'repo-runtime-server-a',
             transport: { kind: 'file' as const },
             workspaceProbe: DIRECTORY_WORKSPACE_PROBE,
-            gitProjection: null,
+            repoSnapshot: null,
           },
         ],
         workspacePaneTabs: [
@@ -112,12 +127,7 @@ describe('repo session hydration', () => {
             workspaceRuntimeId: 'repo-runtime-server-a',
             transport: { kind: 'file' as const },
             workspaceProbe: GIT_WORKSPACE_PROBE,
-            gitProjection: {
-              snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-              pullRequests: null,
-              requested: { branch: null, pullRequestMode: 'full' },
-              loadedAt: 10,
-            },
+            repoSnapshot: snapshotForTest('main'),
           },
         ],
         workspacePaneTabs: [
@@ -179,12 +189,7 @@ describe('repo session hydration', () => {
           workspaceRuntimeId: 'repo-runtime-server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: {
-            snapshot: { branches: [branchSnapshot('server-main')], current: 'server-main' },
-            pullRequests: null,
-            requested: { branch: null, pullRequestMode: 'full' },
-            loadedAt: 10,
-          },
+          repoSnapshot: snapshotForTest('server-main'),
         },
       ],
       workspacePaneTabs: [
@@ -204,7 +209,7 @@ describe('repo session hydration', () => {
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
-    expect(readRepoBranchSnapshotQueryProjection(repo!)?.currentBranch).toBe('server-main')
+    expect(getRepoSnapshotQueryData(repo!.id, repo!.workspaceRuntimeId)?.current).toBe('server-main')
     expect(primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())).toEqual({
       runtimes: [
         { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
@@ -232,44 +237,6 @@ describe('repo session hydration', () => {
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
   })
 
-  test('hydrateRestoredWorkspaceRuntime does not promote warm cache to authoritative loaded state', async () => {
-    const savedAt = Date.now()
-    useWorkspacesStore.setState({
-      repoSnapshotCache: {
-        [REPO_A]: {
-          savedAt,
-          data: {
-            branches: [branchSnapshot('cached-main')],
-            currentBranch: 'cached-main',
-          },
-          ui: { branchViewMode: 'all' },
-        },
-      },
-    })
-
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
-      workspaces: [
-        {
-          entry: localWorkspaceSessionEntry(REPO_A),
-          workspaceId: REPO_A,
-          workspaceRuntimeId: 'repo-runtime-server-a',
-          transport: { kind: 'file' as const },
-          workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: null,
-        },
-      ],
-      workspacePaneTabs: [],
-      restoredWorkspaceId: REPO_A,
-    })
-
-    const repo = useWorkspacesStore.getState().workspaces[REPO_A]
-    expect(repo?.session).toEqual({
-      entry: localWorkspaceSessionEntry(REPO_A),
-      projectionState: 'stub',
-    })
-    expect(repo?.capability.kind === 'git' ? repo.capability.git.dataLoads.repoReadModel.loadedAt : null).toBeNull()
-  })
-
   test('promotes only the matching existing stub without changing workspace membership', async () => {
     await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
@@ -279,18 +246,13 @@ describe('repo session hydration', () => {
           workspaceRuntimeId: 'repo-runtime-server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: null,
+          repoSnapshot: null,
         },
       ],
       workspacePaneTabs: [],
       restoredWorkspaceId: REPO_A,
     })
-    const projection = {
-      snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' as const },
-      loadedAt: 10,
-    }
+    const projection = snapshotForTest('main')
 
     expect(
       useWorkspacesStore.getState().promoteRestoredWorkspace({
@@ -300,7 +262,7 @@ describe('repo session hydration', () => {
           workspaceRuntimeId: 'repo-runtime-server-a',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: projection,
+          repoSnapshot: projection,
         },
         snapshot: { revision: 3, entries: [] },
       }),
@@ -310,7 +272,9 @@ describe('repo session hydration', () => {
     expect(state.workspaceOrder).toEqual([REPO_A])
     expect(state.restoredWorkspaceId).toBe(REPO_A)
     expect(state.workspaces[REPO_A]?.session.projectionState).toBe('projected')
-    expect(readRepoBranchSnapshotQueryProjection(state.workspaces[REPO_A]!)?.currentBranch).toBe('main')
+    expect(
+      getRepoSnapshotQueryData(state.workspaces[REPO_A]!.id, state.workspaces[REPO_A]!.workspaceRuntimeId)?.current,
+    ).toBe('main')
     expect(primaryWindowQueryClient.getQueryData(workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'))).toEqual({
       revision: 3,
       entries: [],
@@ -332,7 +296,7 @@ describe('repo session hydration', () => {
             workspaceRuntimeId: 'repo-runtime-server-a',
             transport: { kind: 'file' as const },
             workspaceProbe: GIT_WORKSPACE_PROBE,
-            gitProjection: null,
+            repoSnapshot: null,
           },
         ],
         workspacePaneTabs: [],
@@ -353,12 +317,7 @@ describe('repo session hydration', () => {
         workspaceRuntimeId: 'repo-runtime-server-a',
         transport: { kind: 'file' as const },
         workspaceProbe: GIT_WORKSPACE_PROBE,
-        gitProjection: {
-          snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-          pullRequests: null,
-          requested: { branch: null, pullRequestMode: 'full' },
-          loadedAt: 10,
-        },
+        repoSnapshot: snapshotForTest('main'),
       },
       snapshot: {
         revision: 1,
@@ -395,7 +354,7 @@ describe('repo session hydration', () => {
           workspaceRuntimeId: 'repo-runtime-old',
           transport: { kind: 'file' as const },
           workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: null,
+          repoSnapshot: null,
         },
       ],
       workspacePaneTabs: [],
@@ -408,12 +367,7 @@ describe('repo session hydration', () => {
         workspaceRuntimeId: 'repo-runtime-old',
         transport: { kind: 'file' as const },
         workspaceProbe: GIT_WORKSPACE_PROBE,
-        gitProjection: {
-          snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-          pullRequests: null,
-          requested: { branch: null, pullRequestMode: 'full' as const },
-          loadedAt: 10,
-        },
+        repoSnapshot: snapshotForTest('main'),
       },
       snapshot: null,
     }
@@ -455,7 +409,7 @@ describe('repo session hydration', () => {
             status: 'unavailable',
             reason: 'error.workspace-transport-unavailable',
           },
-          gitProjection: null,
+          repoSnapshot: null,
         },
       ],
       workspacePaneTabs: [],
@@ -494,7 +448,7 @@ describe('repo session hydration', () => {
           workspaceRuntimeId,
           transport: { kind: 'ssh', lifecycle: { kind: 'ready', attemptId: 1, target } },
           workspaceProbe: GIT_WORKSPACE_PROBE,
-          gitProjection: null,
+          repoSnapshot: null,
         },
       ],
       workspacePaneTabs: [],
@@ -519,7 +473,7 @@ describe('repo session hydration', () => {
             status: 'unavailable',
             reason: 'error.workspace-transport-unavailable',
           },
-          gitProjection: null,
+          repoSnapshot: null,
         },
         snapshot: null,
       }),

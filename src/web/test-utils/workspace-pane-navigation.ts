@@ -10,7 +10,7 @@ import {
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 
@@ -75,7 +75,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
   const repoId = state.restoredWorkspaceId
   const repo = repoId ? state.workspaces[repoId] : null
   if (!repoId || !repo) return false
-  const branchName = readRepoBranchQueryProjection(repo)?.currentBranch
+  const branchName = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current
   if (!branchName) return false
   const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
   if (!target?.branchName) return false

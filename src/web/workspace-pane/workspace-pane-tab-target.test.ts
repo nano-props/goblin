@@ -1,6 +1,6 @@
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -22,7 +22,7 @@ import {
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -78,10 +78,12 @@ describe('workspace pane tab target read model', () => {
   test('does not resolve an interaction target from cached data after projection refresh fails', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/query',
     })
-    const queryKey = repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'full')
+    const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
     const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('missing repo projection query')
     query.setState({ ...query.state, status: 'error', error: new Error('projection unavailable') })
@@ -103,8 +105,10 @@ describe('workspace pane tab target read model', () => {
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
       restoredWorkspaceId: REPO_ID,
     }))
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/query',
     })
     primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
@@ -127,8 +131,10 @@ describe('workspace pane tab target read model', () => {
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/query',
     })
     primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
@@ -150,7 +156,9 @@ describe('workspace pane tab target read model', () => {
   test('invalidates a worktree command lease when the status refresh fails with cached data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
@@ -180,7 +188,9 @@ describe('workspace pane tab target read model', () => {
   test('invalidates a branch command lease when the projection refresh fails with cached data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
@@ -188,7 +198,7 @@ describe('workspace pane tab target read model', () => {
       kind: 'branch',
       branchName: 'feature/query',
     })
-    const queryKey = repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'full')
+    const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
 
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
 
@@ -209,12 +219,16 @@ describe('workspace pane tab target read model', () => {
   test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/old',
       preferredWorkspacePaneTab: 'status',
     })
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/old',
     })
     setWorkspacePaneTabsForTargetQueryData({
@@ -239,7 +253,9 @@ describe('workspace pane tab target read model', () => {
   test('treats an explicit bare branch route as an empty workspace pane', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -260,7 +276,7 @@ describe('workspace pane tab target read model', () => {
       branches: [],
       currentBranchName: 'feature/query',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/query')],
       currentBranch: 'feature/query',
     })
@@ -282,7 +298,9 @@ describe('workspace pane tab target read model', () => {
   test('scopes worktree tab openers by workspace pane target instead of branch name', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/old',
     })
 
@@ -298,8 +316,10 @@ describe('workspace pane tab target read model', () => {
         'workspace-pane:status',
       ),
     ).toBe('recorded')
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/new', { worktree: { path: WORKTREE_PATH } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/new', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/new',
     })
 

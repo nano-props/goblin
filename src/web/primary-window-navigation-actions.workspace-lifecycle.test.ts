@@ -86,7 +86,9 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
   test('does not replace a blocked repo history restore with the dashboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -254,7 +256,9 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
   test('closes the current repo into the next repo dashboard when its history restore is blocked', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

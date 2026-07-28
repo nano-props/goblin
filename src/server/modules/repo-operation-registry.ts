@@ -7,7 +7,7 @@ import type {
   RepoServerOperationState,
   RepoServerOperationTarget,
 } from '#/shared/api-types.ts'
-import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface BeginRepoServerOperationInput {
@@ -164,7 +164,7 @@ export function settleRepoServerOperation(
 
 function publishRepoRuntimeInvalidation(operation: Pick<RepoServerOperationState, 'repoId'>): void {
   if (!operation.repoId) return
-  publishRepoQueryInvalidation({ repoId: operation.repoId, query: 'repo-runtime' })
+  publishRepoReadInvalidation({ repoId: operation.repoId, domain: 'operations' })
 }
 
 export function listRepoServerOperations(options: ListRepoServerOperationsOptions = {}): RepoServerOperationState[] {

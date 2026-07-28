@@ -15,7 +15,7 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
-import type { GitWorkspaceProjection } from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceClientState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const NOOP = () => {}
@@ -24,7 +24,7 @@ type WorkspaceShellSidebarChromeRegion = 'drag' | 'none'
 
 interface WorkspaceShellSidebarProps {
   workspaceId?: WorkspaceId
-  git: GitWorkspaceProjection | null
+  git: GitWorkspaceClientState | null
   compact: boolean
   branchContent?: ReactNode
   chromeRegion?: WorkspaceShellSidebarChromeRegion

@@ -32,15 +32,15 @@ describe('background sync projection convergence', () => {
     const unsubscribe = observer.subscribe(() => {})
     const socket = {
       send(payload: string) {
-        const event = JSON.parse(payload) as { type?: string; repoId?: string; query?: string }
-        if (event.type === 'repo-query-invalidated' && event.repoId === REPO_ID && event.query === 'repo-snapshot') {
+        const event = JSON.parse(payload) as { type?: string; repoId?: string; domain?: string }
+        if (event.type === 'repo-read-invalidated' && event.repoId === REPO_ID && event.domain === 'metadata') {
           void queryClient.invalidateQueries({ queryKey: projectionQueryKey, exact: true, refetchType: 'active' })
         }
       },
       close: vi.fn(),
     }
     broker.registerInvalidationSocket(socket)
-    mocks.publishRepoQueryInvalidation.mockImplementation((event) => broker.publishRepoQueryInvalidation(event))
+    mocks.publishRepoReadInvalidation.mockImplementation((event) => broker.publishRepoReadInvalidation(event))
     mocks.fetchAll.mockImplementation(async () => {
       projection = 'after-fetch'
       return { ok: true, message: 'fetched' }

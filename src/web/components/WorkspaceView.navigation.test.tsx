@@ -44,7 +44,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
   })
 
   test('invalidates the Git projection and worktree status once when leaving a terminal for a static pane', () => {
-    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
       kind: 'branch' as const,
@@ -75,7 +75,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
   })
 
   test('does not invalidate Git reads for terminal-to-terminal or static-to-static navigation', () => {
-    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
       kind: 'branch' as const,
@@ -124,7 +124,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
       branches: [createRepoBranch('main')],
       currentBranchName: null,
     })
-    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const result = render(
       <WorkspaceView
@@ -153,7 +153,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
 
   test('does not invalidate Git reads when leaving a filesystem terminal', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
-    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoSnapshotQueries')
+    const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const result = render(
       <WorkspaceView

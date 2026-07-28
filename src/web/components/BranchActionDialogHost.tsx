@@ -48,7 +48,7 @@ import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-acti
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { dispatchDeleteBranch, dispatchPush, dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
@@ -61,7 +61,7 @@ interface Props {
   currentBranchName: string | null
 }
 
-function hasUpstream(branch: RepoBranchState): boolean {
+function hasUpstream(branch: BranchSnapshotInfo): boolean {
   return !!branch.tracking && !branch.trackingGone
 }
 

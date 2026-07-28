@@ -1,23 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PullRequestFetchMode } from '#/shared/git-types.ts'
+import type { RepoPullRequestScope } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   repoLogQueryOptions,
   repoOperationsReadModelQueryOptions,
-  repoProjectionReadModelQueryOptions,
+  repoPullRequestsReadModelQueryOptions,
+  repoSnapshotReadModelQueryOptions,
   repoRemoteBranchesQueryOptions,
   repoWorktreeStatusReadModelQueryOptions,
 } from '#/web/repo-query-options.ts'
 import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 
-export function useRepoProjectionReadModel(
+export function useRepoSnapshotReadModel(repoRoot: WorkspaceId | null, workspaceRuntimeId: string, enabled: boolean) {
+  return useQuery(repoSnapshotReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
+}
+
+export function useRepoPullRequestsReadModel(
   repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
+  scope: RepoPullRequestScope,
   enabled: boolean,
 ) {
-  return useQuery(repoProjectionReadModelQueryOptions(repoRoot, workspaceRuntimeId, branch, mode, enabled))
+  return useQuery(repoPullRequestsReadModelQueryOptions(repoRoot, workspaceRuntimeId, scope, enabled))
 }
 
 export function useRepoWorktreeStatusReadModel(

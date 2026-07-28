@@ -26,7 +26,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRootPath,
@@ -46,7 +46,6 @@ import {
   formatTerminalFilesystemTargetKeyForPath,
 } from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   observedPrimaryWindowNavigationActionsForTest,
@@ -92,7 +91,9 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
   if (options.branchName) {
     const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
     const branch = repo
-      ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find((candidate) => candidate.name === options.branchName)
+      ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.find(
+          (candidate) => candidate.name === options.branchName,
+        )
       : null
     if (repo?.capability.kind === 'git' && branch?.worktree) {
       return {
@@ -210,7 +211,10 @@ export function preferredWorkspacePaneTab(branch = 'feature/worktree') {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          {
+            workspaceId: repo.id,
+            branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+          },
           branch,
         ),
       )
@@ -225,7 +229,10 @@ export function tabsFor(branch: string): WorkspacePaneTabEntry[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        {
+          workspaceId: repo.id,
+          branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+        },
         branch,
       )
     : null

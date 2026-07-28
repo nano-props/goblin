@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   openWorkspaceTerminal: vi.fn(),
   openWorkspaceEditor: vi.fn(),
   openWorkspaceInFinder: vi.fn(),
-  publishUserRepoQueryInvalidation: vi.fn(),
+  publishUserRepoReadInvalidation: vi.fn(),
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
   getLocalPathSuggestions: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock('#/server/modules/local-path-suggestions.ts', () => ({
   getLocalPathSuggestions: mocks.getLocalPathSuggestions,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
-  publishUserRepoQueryInvalidation: mocks.publishUserRepoQueryInvalidation,
+  publishUserRepoReadInvalidation: mocks.publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
@@ -374,7 +374,7 @@ describe('workspace routes', () => {
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(target, 'vscode', expect.any(AbortSignal))
     expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(target, expect.any(AbortSignal))
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
-    expect(mocks.publishUserRepoQueryInvalidation).not.toHaveBeenCalled()
+    expect(mocks.publishUserRepoReadInvalidation).not.toHaveBeenCalled()
   })
 
   test('publishes Git projection invalidation only for a Git worktree trash mutation', async () => {
@@ -390,9 +390,9 @@ describe('workspace routes', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
-    expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith(USER_ID, {
+    expect(mocks.publishUserRepoReadInvalidation).toHaveBeenCalledWith(USER_ID, {
       repoId: WORKSPACE_ID,
-      query: 'repo-worktree-snapshot',
+      domain: 'worktree-status',
     })
   })
 

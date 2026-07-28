@@ -1,8 +1,6 @@
-import { seedRepoReadModelQueryData } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import {
   branch,
@@ -10,13 +8,12 @@ import {
   resetRefreshTest,
   ipcHandlers,
   seedRepo,
-  repoProjection,
+  repoSnapshotResponse,
   refreshStoreAccess,
   updateRepoForTest,
 } from '#/web/stores/workspaces/refresh-test-utils.ts'
-import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
-import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 beforeEach(resetRefreshTest)
 
@@ -34,7 +31,7 @@ describe('workspace refresh capability', () => {
       diagnostics: [],
     })
     useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
-    const projection = vi.fn(async () => repoProjection({ branches: [branch('main')], current: 'main' }))
+    const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
     ipcHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
       probe: {
@@ -47,7 +44,7 @@ describe('workspace refresh capability', () => {
         diagnostics: [],
       },
     })
-    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['repo.snapshot'] = projection
 
     await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
@@ -70,9 +67,9 @@ describe('workspace refresh capability', () => {
     useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refresh = vi.fn(() => response.promise)
-    const projection = vi.fn(async () => repoProjection({ branches: [branch('main')], current: 'main' }))
+    const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
     ipcHandlers['workspace.refresh'] = refresh
-    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['repo.snapshot'] = projection
 
     const first = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     const second = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
@@ -100,7 +97,7 @@ describe('workspace refresh capability', () => {
     const fetch = vi.fn()
     const projection = vi.fn()
     ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['repo.snapshot'] = projection
     ipcHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
       probe: {
@@ -143,7 +140,7 @@ describe('workspace refresh capability', () => {
     const fetch = vi.fn()
     const projection = vi.fn()
     ipcHandlers['repo.fetch'] = fetch
-    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['repo.snapshot'] = projection
     ipcHandlers['workspace.refresh'] = () => ({
       kind: 'failed',
       probe: {
@@ -247,9 +244,9 @@ describe('workspace refresh capability', () => {
         diagnostics: [],
       },
     })
-    const projectionResponse = Promise.withResolvers<GitWorkspaceRuntimeProjection>()
+    const projectionResponse = Promise.withResolvers<RepoSnapshotResponse>()
     const projection = vi.fn(() => projectionResponse.promise)
-    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['repo.snapshot'] = projection
 
     const closing = useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     await vi.waitFor(() => expect(removeWorkspaceEntry).toHaveBeenCalledOnce())
@@ -260,34 +257,5 @@ describe('workspace refresh capability', () => {
     await expect(closing).resolves.toEqual({ ok: true })
     await expect(refresh).resolves.toEqual({ ok: true })
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
-  })
-
-  test('repo read-model projection refresh treats query projection branches as existing data while loading', async () => {
-    const workspaceRuntimeId = seedRepo([])
-    seedRepoReadModelQueryData(
-      { id: REPO_ID, workspaceRuntimeId: workspaceRuntimeId },
-      {
-        branches: [branch('feature/query')],
-        currentBranch: 'feature/query',
-      },
-    )
-    let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
-    ipcHandlers['repo.projection'] = () =>
-      new Promise((resolve) => {
-        resolveSnapshot = (snapshot) => resolve(repoProjection(snapshot))
-      })
-
-    const work = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    await vi.waitFor(() => {
-      expect(resolveSnapshot).toEqual(expect.any(Function))
-    })
-
-    expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads
-        .repoReadModel.phase,
-    ).toBe('refreshing')
-
-    resolveSnapshot({ branches: [branch('feature/query')], current: 'feature/query' })
-    await work
   })
 })

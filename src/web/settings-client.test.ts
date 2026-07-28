@@ -153,7 +153,7 @@ describe('settings-client', () => {
         workspaceRuntimeId: 'repo_runtime_test',
         workspaceProbe: { status: 'unavailable', reason: 'error.workspace-path-not-found' },
         transport: { kind: 'file' },
-        gitProjection: null,
+        repoSnapshot: null,
       },
       snapshot: null,
     }

@@ -7,7 +7,7 @@ import {
   type RepoSource,
   type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
-import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
@@ -272,7 +272,7 @@ function publishRepoRuntimeInvalidation(
   const repoIds = new Set(runtime.repoIds)
   if (operation.repoId) repoIds.add(operation.repoId)
   for (const repoId of repoIds) {
-    publishRepoQueryInvalidation({ repoId, query: 'repo-runtime' })
+    publishRepoReadInvalidation({ repoId, domain: 'operations' })
   }
 }
 

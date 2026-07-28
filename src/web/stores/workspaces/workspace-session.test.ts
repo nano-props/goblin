@@ -5,10 +5,10 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
-import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
@@ -40,7 +40,7 @@ describe('repo lifecycle', () => {
     if (!target) throw new Error('expected normalized remote target')
 
     const result = insertPlaceholderWorkspace(
-      { workspaces: {}, repoSnapshotCache: {}, workspaceOrder: [] },
+      { workspaces: {}, workspaceOrder: [] },
       remoteWorkspaceSessionEntry(target),
       'workspace-runtime-test',
     )
@@ -74,7 +74,7 @@ describe('repo lifecycle', () => {
     const workspaceId = workspaceIdForTest(target.id)
 
     const result = addResolvedWorkspace(
-      { workspaces: { [workspaceId]: workspace }, repoSnapshotCache: {}, workspaceOrder: [workspaceId] },
+      { workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] },
       {
         id: workspaceId,
         target,
@@ -327,10 +327,32 @@ describe('repo lifecycle', () => {
     installGoblin({
       projection: () =>
         new Promise<{
-          snapshot: { branches: BranchSnapshotInfo[]; current: string }
-          pullRequests: null
+          snapshot: {
+            branches: BranchSnapshotInfo[]
+            current: string
+            remote: {
+              remotes: []
+              hasRemotes: false
+              hasBrowserRemote: false
+              remoteProviders: {}
+              hasGitHubRemote: false
+            }
+          }
         }>((resolve) => {
-          snapshotResolvers.push((value) => resolve({ snapshot: value, pullRequests: null }))
+          snapshotResolvers.push((value) =>
+            resolve({
+              snapshot: {
+                ...value,
+                remote: {
+                  remotes: [],
+                  hasRemotes: false,
+                  hasBrowserRemote: false,
+                  remoteProviders: {},
+                  hasGitHubRemote: false,
+                },
+              },
+            }),
+          )
         }),
     })
 
@@ -354,7 +376,7 @@ describe('repo lifecycle', () => {
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
       const repo = useWorkspacesStore.getState().workspaces[REPO_A]
-      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.currentBranch : null).toBe('fresh')
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current : null).toBe('fresh')
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
@@ -362,7 +384,7 @@ describe('repo lifecycle', () => {
 
     {
       const repo = useWorkspacesStore.getState().workspaces[REPO_A]
-      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.currentBranch : null).toBe('fresh')
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current : null).toBe('fresh')
     }
   })
 
@@ -499,44 +521,6 @@ describe('repo lifecycle', () => {
     await expect(useWorkspacesStore.getState().retryRemoteWorkspaceConnection(target!.id)).resolves.toEqual({
       ok: false,
       reason: 'unknown',
-    })
-  })
-
-  test('ensureWorkspaceOpen does not reuse a stale cached remote projection', async () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'alice',
-      port: 22,
-      remotePath: '/srv/repo',
-      displayName: 'example:/',
-    })
-    expect(target).not.toBeNull()
-    useWorkspacesStore.setState({
-      repoSnapshotCache: {
-        [target!.id]: {
-          savedAt: Date.now(),
-          data: {
-            branches: [branchSnapshot('cached')],
-            currentBranch: 'cached',
-          },
-          ui: {
-            branchViewMode: 'all',
-          },
-        },
-      },
-    })
-    installGoblin()
-
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
-
-    expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
-    expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeDefined()
-    await vi.waitFor(() => {
-      const repo = useWorkspacesStore.getState().workspaces[target!.id]
-      expect(repo ? readRepoBranchSnapshotQueryProjection(repo)?.branches.map((branch) => branch.name) : null).toEqual(
-        [],
-      )
     })
   })
 

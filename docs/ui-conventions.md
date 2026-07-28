@@ -2,6 +2,16 @@
 
 Use this doc for UI language and presentation rules.
 
+## Loading and dependent reads
+
+- A surface may render its base skeleton while it has no accepted authoritative
+  data. Once base data is accepted, keep that UI mounted while independent
+  enrichment reads load or fail; localize pending, unavailable, and error
+  presentation to the dependent section.
+- Do not hide a legitimate skeleton with persisted, previous-key, or store-backed
+  fallback data. Do not turn missing enrichment into an empty, zero, clean, or
+  otherwise successful state.
+
 - Use Title Case for native menu items.
 - Use sentence case for buttons, actions, headings, and help text.
 - Use lowercase for status chips such as `open`, `dirty`, and `no upstream`.

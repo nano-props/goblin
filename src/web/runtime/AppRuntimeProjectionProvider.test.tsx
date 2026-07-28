@@ -483,7 +483,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
       const changedRepo = structuredClone(repo)
       if (changedRepo.capability.kind !== 'git') throw new Error('expected Git workspace')
-      changedRepo.capability.git.remote.fetchFailed = true
+      changedRepo.capability.git.ui.branchViewMode = 'worktrees'
 
       await act(async () => {
         useWorkspacesStore.setState((state) => ({
@@ -610,7 +610,7 @@ function RuntimeProbe({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId 
 function seedCurrentRepo() {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } })],
     currentBranchName: BRANCH_NAME,
     preferredWorkspacePaneTab: 'terminal',
   })
@@ -620,7 +620,11 @@ function seedSecondRepo() {
   const current = useWorkspacesStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
     id: workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo-2'),
-    branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/goblin-runtime-provider-worktree-2' } })],
+    branches: [
+      createRepoBranch('feature/other', {
+        worktree: { path: '/tmp/goblin-runtime-provider-worktree-2', isPrimary: false, isLocked: false },
+      }),
+    ],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',
     workspaceRuntimeId: 'repo-runtime-second',

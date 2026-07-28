@@ -37,7 +37,7 @@ Representative examples:
 - `useThemeStore`
 - `useI18nStore`
 - recent repos
-- workspace runtime projections, including branch, status, pull request, and operation state
+- workspace runtime shells plus independent repository snapshot, worktree-status, pull-request, and operation queries
 - terminal sessions and control
 
 Notes:
@@ -45,10 +45,10 @@ Notes:
 - `useWorkspacesStore` is not a shared cross-window store.
 - `RuntimeCoherentWorkspaceState` names the runtime-coherent workspace projection slice.
 - `useWorkspacesStore.workspaces` is a client-local projection of runtime-coherent workspace truth.
-- Each `WorkspaceState` is a capability-neutral shell. Its discriminated `capability` owns the accepted probe and, only in the `git` variant, the complete `GitWorkspaceProjection`; plain and probing workspaces do not carry empty Git state. Its separate `admission` owns remote filesystem-transport lifecycle, so SSH readiness is not inferred from Git remotes.
-- React Query is the client read model for server-owned workspace runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useWorkspacesStore.workspaces[*]` fields as authoritative runtime truth.
+- Each `WorkspaceState` is a capability-neutral shell. Its discriminated `capability` owns the accepted probe and, only in the `git` variant, client UI/event/branch-action state; plain and probing workspaces do not carry empty Git state. Its separate `admission` owns remote filesystem-transport lifecycle, so SSH readiness is not inferred from Git remotes.
+- React Query owns the client repository read models. `RepoSnapshot` is branch-independent; worktree status and pull requests have separate keys and failure lifecycles. UI code composes only the facts it needs at the presentation edge. Zustand must not mirror these values or their loading/error state.
 - React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
-- Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
+- Store Git state is limited to client UI intent, event presentation, and the currently admitted branch action. Runtime repository reads never fall back to store data.
 - `WorkspacesStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
 - A transport payload may also bundle multiple runtime-coherent projections,
@@ -60,7 +60,7 @@ Notes:
 - Never coordinate with out-of-band Git through compensation writes, rollback/replay, compatibility fallbacks, hidden retries, polling, filesystem watchers, recovery jobs, repeated admission checks, or a second authoritative cache. A successful app/background Git write may publish query invalidation so the next supported read converges; it must not reconstruct or repair external authority.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane facts have one owner each: the layout repository owns durable static layout, the repo projection owns target validity and branch metadata, the epoch overlay owns runtime placement/index/revision facts, the aggregate owns the canonical projection clock, and runtime providers own live membership. Every list or mutation returns their pure canonical `WorkspacePaneTabsSnapshot { revision, entries }` projection for the workspace-runtime epoch. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
+- Workspace pane facts have one owner each: the layout repository owns durable static layout; the server `WorkspacePaneTargetCatalog` captures command-time target validity directly from the repository source; the client `RepoSnapshot` owns only client route/presentation facts; the epoch overlay owns runtime placement/index/revision facts; the aggregate owns the canonical projection clock; and runtime providers own live membership. A client cache never authorizes a server command.
 - Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime should be rejected by the server, not locally guessed away by the client.
 - Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
@@ -96,7 +96,6 @@ Representative examples:
 
 - server-owned open-workspace membership/order and durable static workspace-pane layout
 - client-local workspace state (active repo, route, layout, selection, and filetree view)
-- `repoSnapshotCache` for warm restore
 - boot-only `useSessionRestoreStore`
 
 Notes:
@@ -114,10 +113,8 @@ Notes:
   workspace membership. Do not carry membership or server layout in a client
   restore intent or baseline write-back.
 - Boot keeps `ClientWorkspaceState` and `ServerWorkspaceState` separate. The client never constructs or writes a combined session snapshot.
-- `repoSnapshotCache` names the warm-start repo cache slice.
-- `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
-- `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
+- A successful server restore may return the active repository snapshot, which is seeded directly into its runtime-scoped React Query key. There is no persisted client warm-cache or compatibility fallback.
 - `hydrateRestoredWorkspaceRuntime` belongs to the restorable boot path, while
   `ensureWorkspaceOpen` and `closeWorkspace` belong to runtime workspace lifecycle.
 - Restorable state is not runtime-coherent shared state.

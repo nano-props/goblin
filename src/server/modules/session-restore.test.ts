@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
   probeWorkspace: vi.fn(),
-  readRepoProjection: vi.fn(),
+  readRepoSnapshot: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbes: new Map<string, unknown>(),
 }))
@@ -66,7 +66,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  readRepoProjection: mocks.readRepoProjection,
+  readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
@@ -88,11 +88,18 @@ describe('restoreServerWorkspace', () => {
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
-    mocks.readRepoProjection.mockResolvedValue({
-      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: 1,
+    mocks.readRepoSnapshot.mockResolvedValue({
+      snapshot: {
+        current: 'main',
+        branches: [{ name: 'main', worktree: { path: '/repo', isPrimary: false, isLocked: false } }],
+        remote: {
+          remotes: [],
+          hasRemotes: false,
+          hasBrowserRemote: false,
+          remoteProviders: {},
+          hasGitHubRemote: false,
+        },
+      },
     })
     mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(
       async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
@@ -183,7 +190,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
         workspaceId: 'goblin+file:///repo/src',
-        gitProjection: null,
+        repoSnapshot: null,
         workspaceProbe: expect.objectContaining({
           capabilities: expect.objectContaining({ git: { status: 'unavailable' } }),
         }),
@@ -235,46 +242,26 @@ describe('restoreServerWorkspace', () => {
     ])
   })
 
-  test('restores root layout for an active Workspace when its Git projection is temporarily unavailable', async () => {
+  test('fails directly and releases the attempt lease when the active snapshot is unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
+    mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspace({
-      userId: USER_ID,
-      clientId: CLIENT_ID,
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      workspacePaneTabsHost,
-    })
-
-    expect(result.status).toBe('restored')
-    expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.workspaces).toEqual([
-      expect.objectContaining({
-        workspaceId: 'goblin+file:///repo',
-        workspaceRuntimeId: RUNTIME_ID,
-        gitProjection: null,
+    await expect(
+      restoreServerWorkspace({
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+        workspacePaneTabsHost,
       }),
-    ])
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: LOCAL_WORKSPACE_ID },
-      targets: [{ kind: 'workspace-root' }],
-    })
-    expect(result.runtime.workspacePaneTabs).toEqual([
-      {
-        workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: RUNTIME_ID,
-        snapshot: { revision: 0, entries: [] },
-      },
-    ])
-    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
+    ).rejects.toThrow('snapshot unavailable')
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalled()
   })
 
   test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
@@ -301,7 +288,7 @@ describe('restoreServerWorkspace', () => {
         entry,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: RUNTIME_ID,
-        gitProjection: null,
+        repoSnapshot: null,
       }),
     ])
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
@@ -337,7 +324,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.runtime.workspaces[0]).toMatchObject({
       workspaceId: remoteEntry.id,
       workspaceRuntimeId: RUNTIME_ID,
-      gitProjection: null,
+      repoSnapshot: null,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
       transport: { kind: 'ssh', lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' } },
     })
@@ -395,13 +382,20 @@ describe('restoreServerWorkspace', () => {
     const controller = new AbortController()
     const abortReason = new Error('request aborted')
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.readRepoProjection.mockImplementation(async () => {
+    mocks.readRepoSnapshot.mockImplementation(async () => {
       controller.abort(abortReason)
       return {
-        snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
-        pullRequests: null,
-        requested: { branch: null, pullRequestMode: 'full' },
-        loadedAt: 1,
+        snapshot: {
+          current: 'main',
+          branches: [{ name: 'main', worktree: { path: '/repo', isPrimary: false, isLocked: false } }],
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
+        },
       }
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()

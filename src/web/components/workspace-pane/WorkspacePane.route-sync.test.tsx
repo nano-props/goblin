@@ -52,7 +52,9 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -98,7 +100,9 @@ describe('WorkspacePane route synchronization', () => {
     const missingSessionId = 'term-222222222222222222222'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       workspacePaneTabsByBranch: {
         [branchName]: [workspacePaneRuntimeTabEntry('terminal', retainedSessionId)],
@@ -161,7 +165,9 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -213,7 +219,9 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -352,7 +360,9 @@ describe('WorkspacePane route synchronization', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: '/tmp/repo-workspace-inactive-worktree' } }),
+        createBranchSnapshot(branchName, {
+          worktree: { path: '/tmp/repo-workspace-inactive-worktree', isPrimary: false, isLocked: false },
+        }),
       ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
@@ -389,7 +399,9 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {

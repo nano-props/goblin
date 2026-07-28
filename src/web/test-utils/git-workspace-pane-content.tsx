@@ -12,7 +12,7 @@ import {
   type GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   useTerminalSessionReadContext,
@@ -139,21 +139,26 @@ function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | nul
 }
 
 export function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
-  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false })
+  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false }, undefined, {
+    state: 'empty',
+    error: null,
+    retrying: false,
+    retry: () => {},
+  })
 }
 
 export function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePaneProjection {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
-  const branchModel = readRepoBranchQueryProjection(repo)
-  if (!branchModel) throw new Error('missing branch read model')
-  const currentBranchName = branchModel.currentBranch || branchModel.branches[0]?.name || null
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  if (!snapshot) throw new Error('missing repository snapshot')
+  const currentBranchName = snapshot.current || snapshot.branches[0]?.name || null
   return {
     ...repo,
     ui: { ...repo.ui, currentBranchName },
     branchAction: repo.capability.git.operations.branchAction,
-    branchModel,
+    snapshot,
+    status: getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status,
     probe: repo.capability.probe,
-    remote: repo.capability.git.remote,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
   }
 }

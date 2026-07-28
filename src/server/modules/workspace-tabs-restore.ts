@@ -1,6 +1,6 @@
 import { IpcError, type RestoredWorkspaceRuntime, type WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
+import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import {
   isCurrentWorkspaceRuntimeMembership,
   runSerializedInitialWorkspaceProbe,
@@ -101,7 +101,7 @@ async function projectWorkspace(
         workspaceRuntimeId: input.workspaceRuntimeId,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
-        gitProjection: null,
+        repoSnapshot: null,
       }
     }
     if (!workspaceGitAvailable(workspaceProbe)) {
@@ -111,32 +111,21 @@ async function projectWorkspace(
         workspaceRuntimeId: input.workspaceRuntimeId,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         workspaceProbe,
-        gitProjection: null,
+        repoSnapshot: null,
       }
     }
-    const projection = await readRepoProjection(entry.id, {
+    const { snapshot } = await readRepoSnapshot(entry.id, {
       workspaceRuntimeId: input.workspaceRuntimeId,
       signal: input.signal,
-      mode: 'full',
     })
     assertCurrentWorkspaceRuntimeMembership(input)
-    if (!projection.snapshot) {
-      return {
-        entry,
-        workspaceId: entry.id,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
-        workspaceProbe,
-        gitProjection: null,
-      }
-    }
     return {
       entry,
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
       workspaceProbe,
-      gitProjection: projection,
+      repoSnapshot: snapshot,
     }
   }
   let probe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
@@ -171,32 +160,21 @@ async function projectWorkspace(
       workspaceRuntimeId: input.workspaceRuntimeId,
       transport: { kind: 'file' },
       workspaceProbe: probe,
-      gitProjection: null,
+      repoSnapshot: null,
     }
   }
-  const projection = await readRepoProjection(entry.id, {
+  const { snapshot } = await readRepoSnapshot(entry.id, {
     workspaceRuntimeId: input.workspaceRuntimeId,
     signal: input.signal,
-    mode: 'full',
   })
   assertCurrentWorkspaceRuntimeMembership(input)
-  if (!projection.snapshot) {
-    return {
-      entry,
-      workspaceId: entry.id,
-      workspaceRuntimeId: input.workspaceRuntimeId,
-      transport: { kind: 'file' },
-      workspaceProbe: probe,
-      gitProjection: null,
-    }
-  }
   return {
     entry,
     workspaceId: entry.id,
     workspaceRuntimeId: input.workspaceRuntimeId,
     transport: { kind: 'file' },
     workspaceProbe: probe,
-    gitProjection: projection,
+    repoSnapshot: snapshot,
   }
 }
 

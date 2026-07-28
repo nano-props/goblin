@@ -67,14 +67,10 @@ afterEach(() => {
 describe('BranchRow', () => {
   test('shows the generic dirty label for dirty worktrees', () => {
     const repo = branchRowRepo()
-    repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
-      path: '/tmp/worktree-a',
-      branch: 'feature/a',
-      isMain: false,
-      isDirty: true,
-      changeCount: 7,
-    }
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    markDirty(repo, 7)
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -94,15 +90,12 @@ describe('BranchRow', () => {
     expect(icon?.querySelector('svg')?.className.baseVal).toContain('text-attention')
   })
 
-  test('keeps the generic dirty label even when exact counts are unavailable', () => {
+  test('keeps status-derived dirty presentation unknown when status is unavailable', () => {
     const repo = branchRowRepo()
-    repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
-      path: '/tmp/worktree-a',
-      branch: 'feature/a',
-      isMain: false,
-      isDirty: true,
-    }
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    repo.status = undefined
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -117,30 +110,24 @@ describe('BranchRow', () => {
       </ul>,
     )
 
-    expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="工作树"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).toBeNull()
   })
 
   test.each(['branch:createWorktree', 'branch:removeWorktree'] as const)(
     'shows the worktree icon as clean while %s targets the row',
     (reason) => {
       const repo = branchRowRepo()
-      repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
-        path: '/tmp/worktree-a',
-        branch: 'feature/a',
-        isMain: false,
-        isDirty: true,
-        changeCount: 7,
-      }
+      markDirty(repo, 7)
       repo.branchAction = {
         operationId: 1,
         phase: 'running',
         reason,
         target: 'feature/a',
-        startedAt: 1,
-        settledAt: null,
-        error: null,
       }
-      const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+      const branch = createRepoBranch('feature/a', {
+        worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+      })
 
       const { container } = renderInJsdom(
         <ul>
@@ -165,23 +152,16 @@ describe('BranchRow', () => {
 
   test('keeps the dirty worktree icon when a worktree operation targets another row', () => {
     const repo = branchRowRepo()
-    repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
-      path: '/tmp/worktree-a',
-      branch: 'feature/a',
-      isMain: false,
-      isDirty: true,
-      changeCount: 7,
-    }
+    markDirty(repo, 7)
     repo.branchAction = {
       operationId: 1,
       phase: 'running',
       reason: 'branch:createWorktree',
       target: 'feature/b',
-      startedAt: 1,
-      settledAt: null,
-      error: null,
     }
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -201,7 +181,9 @@ describe('BranchRow', () => {
 
   test('shows terminal bell count badges in the action slot in non-compact mode', () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -228,7 +210,9 @@ describe('BranchRow', () => {
 
   test('shows terminal output activity in the action slot in non-compact mode', () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -255,7 +239,9 @@ describe('BranchRow', () => {
 
   test('hides terminal output activity when the branch row is selected in non-compact mode', () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -277,7 +263,9 @@ describe('BranchRow', () => {
 
   test('gives terminal bell priority over terminal output activity', () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -409,14 +397,10 @@ describe('BranchRow', () => {
   test('lets compact terminal output activity take the leading slot over the dirty worktree icon', () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
-    repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
-      path: '/tmp/worktree-a',
-      branch: 'feature/a',
-      isMain: false,
-      isDirty: true,
-      changeCount: 3,
-    }
-    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+    markDirty(repo, 3)
+    const branch = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
+    })
 
     const { container } = renderInJsdom(
       <ul>
@@ -570,7 +554,17 @@ function branchRowRepo() {
       branches: [],
       currentBranch: '',
       status: [],
-      worktreesByPath: {},
     },
   )
+}
+
+function markDirty(repo: ReturnType<typeof branchRowRepo>, count: number): void {
+  repo.status = [
+    {
+      path: '/tmp/worktree-a',
+      branch: 'feature/a',
+      isMain: false,
+      entries: Array.from({ length: count }, (_, index) => ({ x: 'M', y: ' ', path: `file-${index}.ts` })),
+    },
+  ]
 }

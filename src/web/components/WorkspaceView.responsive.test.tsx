@@ -82,16 +82,16 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
   })
 
-  test('large-screen initial loading keeps the workspace pane empty when no branch is selected', () => {
+  test('large-screen missing snapshot data keeps stable shell chrome without a synthetic skeleton', () => {
     setReadModelLoading(REPO_ID)
     const { container } = render(<WorkspaceView workspaceId={REPO_ID} />)
 
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(container.querySelector('[data-testid="workspace-picker"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
   test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', () => {
@@ -127,14 +127,15 @@ describe('WorkspaceView responsive layout', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('compact initial loading shows the selected Repo Workspace skeleton as the single pane', () => {
+  test('compact missing snapshot data keeps the selected Repo Workspace shell as the single pane', () => {
     responsiveMocks.mode = 'compact'
     setReadModelLoading(REPO_ID)
 
     const { container } = render(branchWorkspaceView())
 
     expect(workspaceLayout(container)).toBeNull()
-    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
+    expect(workspacePane(container)).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })

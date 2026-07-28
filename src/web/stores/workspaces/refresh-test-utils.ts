@@ -1,5 +1,5 @@
-import type { GitWorkspaceRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
-import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
+import type { RepoSnapshot, RepoSnapshotResponse } from '#/shared/api-types.ts'
+import type { BranchSnapshotInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
 import {
   createBranchSnapshot,
   resetWorkspacesStore,
@@ -9,10 +9,8 @@ import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/b
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
-import { getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
@@ -32,21 +30,18 @@ export function updateRepoForTest(mutator: (repo: TestRepo) => void): void {
 
 export function repoBranchNames(): string[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-  return repo ? (readRepoBranchQueryProjection(repo)?.branches.map((candidate) => candidate.name) ?? []) : []
+  return repo
+    ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.map((candidate) => candidate.name) ?? [])
+    : []
 }
 
 export function repoCurrentBranch(): string | null {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-  return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
+  return repo ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current ?? null) : null
 }
 
-export function cachedRepoProjection(
-  workspaceRuntimeId: string,
-  branchName: string | null = null,
-): GitWorkspaceRuntimeProjection | undefined {
-  return primaryWindowQueryClient.getQueryData<GitWorkspaceRuntimeProjection>(
-    repoProjectionQueryKey(REPO_ID, workspaceRuntimeId, branchName, 'full'),
-  )
+export function cachedRepoSnapshot(workspaceRuntimeId: string): RepoSnapshot | undefined {
+  return getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
 }
 
 export function cachedRepoStatus(workspaceRuntimeId: string): WorktreeStatus[] | undefined {
@@ -64,33 +59,30 @@ export function createWorktreeAction(): TestCreateWorktreeAction {
   }
 }
 
-export function branch(
-  name: string,
-  pullRequest?: PullRequestInfo,
-  options: Partial<BranchSnapshotInfo> = {},
-): BranchSnapshotInfo {
-  return createBranchSnapshot(name, { ...options, ...(pullRequest ? { pullRequest } : {}) })
+export function branch(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
+  return createBranchSnapshot(name, options)
 }
 
-export function repoProjection(
-  snapshot: RepoSnapshot | null,
-  options: Partial<Pick<GitWorkspaceRuntimeProjection, 'pullRequests' | 'requested' | 'loadedAt'>> = {},
-): GitWorkspaceRuntimeProjection {
-  return {
-    snapshot,
-    pullRequests: options.pullRequests ?? null,
-    requested: options.requested ?? { branch: null, pullRequestMode: 'full' },
-    loadedAt: options.loadedAt ?? Date.now(),
-  }
+export function repoSnapshotResponse(
+  snapshot: Omit<RepoSnapshot, 'remote'> & { remote?: RepoRemoteInfo },
+): RepoSnapshotResponse {
+  return { snapshot: { ...snapshot, remote: snapshot.remote ?? testRemoteInfo() } }
 }
 
 export function seedRepo(branches: BranchSnapshotInfo[], workspaceRuntimeId = 'repo-runtime-test'): string {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: branches,
+    currentBranch: branches[0]?.name ?? '',
     workspaceRuntimeId,
     remote: {
-      remotes: ['origin'],
+      remotes: [
+        {
+          name: 'origin',
+          fetchUrl: 'https://example.invalid/repository.git',
+          pushUrl: 'https://example.invalid/repository.git',
+        },
+      ],
       hasRemotes: true,
       hasBrowserRemote: true,
       browserRemoteProvider: 'github',
@@ -98,6 +90,16 @@ export function seedRepo(branches: BranchSnapshotInfo[], workspaceRuntimeId = 'r
       hasGitHubRemote: true,
     },
   }).workspaceRuntimeId
+}
+
+function testRemoteInfo(): RepoRemoteInfo {
+  return {
+    remotes: [],
+    hasRemotes: false,
+    hasBrowserRemote: false,
+    remoteProviders: {},
+    hasGitHubRemote: false,
+  }
 }
 
 export function resetRefreshTest(): void {

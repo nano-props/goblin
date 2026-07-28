@@ -3,10 +3,12 @@ import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-f
 import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
-  GitWorkspaceRuntimeProjection,
+  RepoPullRequestScope,
+  RepoPullRequestsResponse,
+  RepoSnapshotResponse,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
-import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
+import type { ExecResult, LogEntry, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -20,7 +22,8 @@ import {
   CloneRepoResponseSchema,
   RepoLogResponseSchema,
   RepoOperationsResponseSchema,
-  RepoProjectionResponseSchema,
+  RepoPullRequestsResponseSchema,
+  RepoSnapshotResponseSchema,
   RepoRemoteBranchesResponseSchema,
   RepoWorktreeStatusResponseSchema,
   WorktreeBootstrapPreviewResponseSchema,
@@ -103,18 +106,35 @@ export async function getRepoRemoteBranches(
   )
 }
 
-export async function getRepoProjection(
+export async function getRepoSnapshot(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
-  branch?: string | null,
-  options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
-): Promise<GitWorkspaceRuntimeProjection> {
-  return await postServerJson(
-    '/api/repo/projection',
-    { cwd, workspaceRuntimeId, branch: branch || undefined, mode: options?.mode },
-    decodeWith(RepoProjectionResponseSchema),
-    { signal },
+): Promise<RepoSnapshotResponse> {
+  return await runRepoReadWithStableErrorKey(
+    async () =>
+      await postServerJson('/api/repo/snapshot', { cwd, workspaceRuntimeId }, decodeWith(RepoSnapshotResponseSchema), {
+        signal,
+      }),
+    signal,
+  )
+}
+
+export async function getRepoPullRequests(
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
+  scope: RepoPullRequestScope,
+  signal?: AbortSignal,
+): Promise<RepoPullRequestsResponse> {
+  return await runRepoReadWithStableErrorKey(
+    async () =>
+      await postServerJson(
+        '/api/repo/pull-requests',
+        { cwd, workspaceRuntimeId, scope },
+        decodeWith(RepoPullRequestsResponseSchema),
+        { signal },
+      ),
+    signal,
   )
 }
 

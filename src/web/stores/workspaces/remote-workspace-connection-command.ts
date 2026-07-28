@@ -8,7 +8,7 @@ import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { acceptWorkspaceProbeSnapshot } from '#/web/stores/workspaces/workspace-probe-projection.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -102,7 +102,7 @@ export async function runRemoteWorkspaceConnection(
       runtime.workspaceProbe.status === 'ready' &&
       runtime.workspaceProbe.capabilities.git.status === 'available'
     ) {
-      void requestRepoProjectionReadModelRefresh({ get, set }, workspaceId, { workspaceRuntimeId })
+      void requestRepoSnapshotRefresh({ get, set }, workspaceId, { workspaceRuntimeId })
     }
   }
   return commandOutcome(result, workspaceId)

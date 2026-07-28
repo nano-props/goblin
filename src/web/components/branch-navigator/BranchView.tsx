@@ -14,7 +14,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
@@ -34,13 +34,14 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   const navigation = usePrimaryWindowNavigation()
   const workspaceRuntimeId = useWorkspacesStore((state) => state.workspaces[repoId]?.workspaceRuntimeId ?? null)
   const statusReadModel = useRepoWorktreeStatusReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)
+  const snapshotReadModel = useRepoSnapshotReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
     () =>
       repo
         ? visibleBranches({
-            branches: repo.branchModel.branches,
+            branches: repo.snapshot.branches,
             viewMode: repo.ui.branchViewMode,
           })
         : [],
@@ -65,7 +66,7 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   }
 
   const emptyLabel = repo
-    ? repo.branchModel.branches.length === 0
+    ? repo.snapshot.branches.length === 0
       ? 'branches.empty'
       : 'branches.filter-empty'
     : 'branches.empty'
@@ -76,6 +77,20 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   const retryStatus = () => {
     if (!workspaceRuntimeId) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoId, workspaceRuntimeId)
+  }
+
+  const snapshotError = snapshotReadModel.error
+  const snapshotErrorKey =
+    snapshotError instanceof Error ? snapshotError.message : snapshotError ? String(snapshotError) : null
+
+  if (!repo && snapshotReadModel.isError) {
+    return (
+      <RepoStatusFailureView
+        messageKey={snapshotErrorKey ?? 'error.failed-read-repo'}
+        retrying={snapshotReadModel.isFetching}
+        onRetry={() => void snapshotReadModel.refetch()}
+      />
+    )
   }
 
   if (!repo && !statusReadModel.data && statusReadModel.isError && workspaceRuntimeId) {
@@ -91,6 +106,13 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   return (
     <>
+      {snapshotReadModel.isError && snapshotErrorKey && (
+        <RepoStatusStaleNotice
+          messageKey={snapshotErrorKey}
+          retrying={snapshotReadModel.isFetching}
+          onRetry={() => void snapshotReadModel.refetch()}
+        />
+      )}
       {statusReadModel.data && statusReadModel.isError && statusErrorKey && (
         <RepoStatusStaleNotice
           messageKey={statusErrorKey}

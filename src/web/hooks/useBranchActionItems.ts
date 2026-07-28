@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Diff, FolderTree, GitBranch, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { type BranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -44,7 +44,7 @@ export function visibleBranchActionItems({
 
 export function useBranchActionItems(
   repo: BranchActionRepo,
-  branch: RepoBranchState,
+  branch: BranchSnapshotInfo,
   branchActions: BranchActions,
   options: { workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined },
 ): BranchActionSurface {

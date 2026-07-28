@@ -6,6 +6,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -468,27 +470,9 @@ function domRect({ left, top, width, height }: { left: number; top: number; widt
 function setReadModelLoading(repoId: string) {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
-  if (repo.capability.kind !== 'git') throw new Error(`expected Git repo ${repoId}`)
-  const dataLoads = {
-    ...repo.capability.git.dataLoads,
-    repoReadModel: {
-      ...repo.capability.git.dataLoads.repoReadModel,
-      phase: 'loading' as const,
-      loadedAt: null,
-      error: null,
-      stale: false,
-    },
-  }
-  useWorkspacesStore.setState({
-    workspaces: {
-      [repoId]: {
-        ...repo,
-        capability: {
-          ...repo.capability,
-          git: { ...repo.capability.git, dataLoads },
-        },
-      },
-    },
+  primaryWindowQueryClient.removeQueries({
+    queryKey: repoSnapshotQueryKey(repo.id, repo.workspaceRuntimeId),
+    exact: true,
   })
 }
 

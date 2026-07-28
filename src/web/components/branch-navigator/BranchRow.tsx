@@ -1,5 +1,5 @@
 import { type RefObject } from 'react'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -12,7 +12,7 @@ import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx
 
 export interface BranchRowProps {
   repo: BranchActionRepo
-  branch: RepoBranchState
+  branch: BranchSnapshotInfo
   selected: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void

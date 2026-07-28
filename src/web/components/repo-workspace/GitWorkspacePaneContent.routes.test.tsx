@@ -66,7 +66,7 @@ describe('GitWorkspacePaneContent routes', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/first-open', {
-          worktree: { path: '/tmp/goblin-first-open' },
+          worktree: { path: '/tmp/goblin-first-open', isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/first-open',
@@ -160,7 +160,11 @@ describe('GitWorkspacePaneContent routes', () => {
     const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/hook-terminal-empty', { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/hook-terminal-empty', {
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/hook-terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/hook-terminal-empty': [staticEntry('status')] },
@@ -190,7 +194,11 @@ describe('GitWorkspacePaneContent routes', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/terminal-empty', { worktree: { path: worktreePath } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/terminal-empty', {
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },

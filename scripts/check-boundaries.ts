@@ -104,14 +104,28 @@ const RULES: Rule[] = [
 
 const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
   {
+    fromPrefix: '/src/',
+    disallow: [
+      {
+        label: 'legacy repo query invalidation event',
+        pattern: /\bRepoQueryInvalidationEvent\b|repo-query-invalidated/,
+      },
+      {
+        label: 'legacy query-shaped repo invalidation field',
+        pattern: /\bquery:\s*['"]repo-(?:snapshot|worktree-snapshot|runtime)['"]/,
+      },
+    ],
+    reason: 'repo read invalidation must use bounded metadata, worktree-status, and operations domains',
+  },
+  {
     fromPrefix: '/src/web/',
     disallow: [
-      { label: 'legacy repo IPC read route', pattern: /['"`]repo\.(?:snapshot|status|composite)['"`]/ },
-      { label: 'legacy repo HTTP read route', pattern: /['"`]\/api\/repo\/(?:snapshot|status|composite)\b/ },
-      { label: 'legacy repo read helper', pattern: /\bgetRepo(?:Snapshot|Status|Composite)\b/ },
+      { label: 'legacy repo IPC read route', pattern: /['"`]repo\.(?:projection|status|composite)['"`]/ },
+      { label: 'legacy repo HTTP read route', pattern: /['"`]\/api\/repo\/(?:projection|status|composite)\b/ },
+      { label: 'legacy repo read helper', pattern: /\bgetRepo(?:Projection|Status|Composite)\b/ },
       {
         label: 'legacy repo procedure schema key',
-        pattern: /\b(?:REPO_QUERY_SCHEMAS|REPO_PROCEDURE_SCHEMAS)\.(?:snapshot|status|composite)\b/,
+        pattern: /\b(?:REPO_QUERY_SCHEMAS|REPO_PROCEDURE_SCHEMAS)\.(?:projection|status|composite)\b/,
       },
       { label: 'projection-owned worktree status', pattern: /\bprojection\.status\b/ },
       {
@@ -119,7 +133,7 @@ const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
         pattern: /\b(?:dataLoads|operations)\.visibleStatus\b/,
       },
     ],
-    reason: 'web repo reads must compose runtime projections with the independent worktree-status React Query surface',
+    reason: 'web repo reads must use independent repo-snapshot and worktree-status React Query models',
   },
 ]
 

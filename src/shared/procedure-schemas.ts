@@ -9,6 +9,7 @@
 
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
+import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   CwdInput,
   RemoteConnectionInputSchema,
@@ -190,11 +191,23 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, worktreePath: v.string() }),
-  projection: v.object({
+  snapshot: v.strictObject({
     cwd: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    branch: v.optional(v.string()),
-    mode: v.optional(v.picklist(['summary', 'full'])),
+  }),
+  pullRequests: v.strictObject({
+    cwd: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+    scope: v.variant('kind', [
+      v.strictObject({
+        kind: v.literal('branch-detail'),
+        branch: v.pipe(
+          v.string(),
+          v.check((branch) => isValidBranch(branch), 'invalid branch'),
+        ),
+      }),
+      v.strictObject({ kind: v.literal('repository-summary') }),
+    ]),
   }),
   worktreeStatus: v.object({
     cwd: WorkspaceIdSchema,

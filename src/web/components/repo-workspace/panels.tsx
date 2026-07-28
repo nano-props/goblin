@@ -31,9 +31,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'> & {
-    branchModel: GitWorkspacePaneProjection['branchModel']
-  }
+  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'snapshot' | 'status' | 'ui' | 'probe'>
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
@@ -222,13 +220,15 @@ function BranchChangesTab({
   statusLoading: boolean
 }) {
   const t = useT()
-  const totalEntries = currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
+  const totalEntries = currentBranchStatus?.reduce((n, wt) => n + wt.entries.length, 0)
 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
       {branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {totalEntries > 0 ? (
+          {currentBranchStatus === undefined ? (
+            <EmptyState title={t(statusLoading ? 'dashboard.loading' : 'error.failed-read-repo')} />
+          ) : totalEntries && totalEntries > 0 ? (
             <ScrollPane>
               <StatusList status={currentBranchStatus} />
             </ScrollPane>

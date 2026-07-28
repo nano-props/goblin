@@ -4,12 +4,12 @@ import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-wor
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/web/remote-workspace-client.ts', () => ({ resolveRemoteWorkspaceConnection: vi.fn() }))
-vi.mock('#/web/stores/workspaces/refresh.ts', () => ({ requestRepoProjectionReadModelRefresh: vi.fn(async () => {}) }))
+vi.mock('#/web/stores/workspaces/refresh.ts', () => ({ requestRepoSnapshotRefresh: vi.fn(async () => {}) }))
 vi.mock('#/web/workspace-runtime-query.ts', () => ({ invalidateWorkspaceRuntimes: vi.fn() }))
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
@@ -85,7 +85,7 @@ describe('remote lifecycle command client', () => {
       lifecycle: { kind: 'ready', target },
       lifecycleAttemptId: 3,
     })
-    expect(requestRepoProjectionReadModelRefresh).toHaveBeenCalledWith(expect.anything(), workspaceId, {
+    expect(requestRepoSnapshotRefresh).toHaveBeenCalledWith(expect.anything(), workspaceId, {
       workspaceRuntimeId: runtimeId,
     })
   })
@@ -195,7 +195,7 @@ describe('remote lifecycle command client', () => {
     await expect(
       runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
     ).resolves.toEqual({ kind: 'superseded', workspaceId })
-    expect(requestRepoProjectionReadModelRefresh).not.toHaveBeenCalled()
+    expect(requestRepoSnapshotRefresh).not.toHaveBeenCalled()
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       lifecycleAttemptId: 4,

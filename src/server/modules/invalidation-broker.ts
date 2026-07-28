@@ -1,4 +1,4 @@
-import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
+import type { RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runtime-invalidation.ts'
 import type { WorkspaceFilesystemInvalidationEvent } from '#/shared/workspace-filesystem-invalidation.ts'
 import type { SettingsInvalidationEvent, SettingsInvalidationScope } from '#/shared/server-invalidation.ts'
@@ -57,18 +57,15 @@ export function disconnectAllInvalidationSockets(): void {
   sockets.clear()
 }
 
-export function publishRepoQueryInvalidation(event: Omit<RepoQueryInvalidationEvent, 'type'>): void {
+export function publishRepoReadInvalidation(event: Omit<RepoReadInvalidationEvent, 'type'>): void {
   publishInvalidationPayload(
-    JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent),
+    JSON.stringify({ type: 'repo-read-invalidated', ...event } satisfies RepoReadInvalidationEvent),
   )
 }
 
-export function publishUserRepoQueryInvalidation(
-  userId: string,
-  event: Omit<RepoQueryInvalidationEvent, 'type'>,
-): void {
+export function publishUserRepoReadInvalidation(userId: string, event: Omit<RepoReadInvalidationEvent, 'type'>): void {
   publishInvalidationPayload(
-    JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent),
+    JSON.stringify({ type: 'repo-read-invalidated', ...event } satisfies RepoReadInvalidationEvent),
     userId,
   )
 }

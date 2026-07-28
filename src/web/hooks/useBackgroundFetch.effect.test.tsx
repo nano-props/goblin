@@ -9,6 +9,8 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
@@ -40,11 +42,15 @@ describe('useBackgroundFetch request lifecycle', () => {
   })
 
   test('cancels superseded and unmounted registration requests', async () => {
-    const view = renderInJsdom(<BackgroundFetchHost workspaceId={WORKSPACE_ID} />)
+    const view = renderBackgroundFetchHost(WORKSPACE_ID)
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
     const firstSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
 
-    view.rerender(<BackgroundFetchHost workspaceId={null} />)
+    view.rerender(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <BackgroundFetchHost workspaceId={null} />
+      </QueryClientProvider>,
+    )
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
     const secondSignal = mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]
 
@@ -55,7 +61,7 @@ describe('useBackgroundFetch request lifecycle', () => {
   })
 
   test('does not call the Git registration endpoint for an initial empty or plain Workspace target', async () => {
-    const empty = renderInJsdom(<BackgroundFetchHost workspaceId={null} />)
+    const empty = renderBackgroundFetchHost(null)
     await Promise.resolve()
     expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
     empty.unmount()
@@ -71,7 +77,7 @@ describe('useBackgroundFetch request lifecycle', () => {
       diagnostics: [],
     })
     useWorkspacesStore.setState({ workspaces: { [WORKSPACE_ID]: workspace } })
-    const plain = renderInJsdom(<BackgroundFetchHost workspaceId={WORKSPACE_ID} />)
+    const plain = renderBackgroundFetchHost(WORKSPACE_ID)
     await Promise.resolve()
     expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
     plain.unmount()
@@ -81,4 +87,12 @@ describe('useBackgroundFetch request lifecycle', () => {
 function BackgroundFetchHost({ workspaceId }: { workspaceId: WorkspaceId | null }) {
   useBackgroundFetch({ currentWorkspaceId: workspaceId })
   return null
+}
+
+function renderBackgroundFetchHost(workspaceId: WorkspaceId | null) {
+  return renderInJsdom(
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <BackgroundFetchHost workspaceId={workspaceId} />
+    </QueryClientProvider>,
+  )
 }

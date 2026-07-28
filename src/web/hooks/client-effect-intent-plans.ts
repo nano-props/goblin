@@ -7,7 +7,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
-import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -96,7 +96,7 @@ interface WorkspaceIntentPlanContext {
 
 export function createTerminalBellIntentPlan(
   workspace: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> | undefined,
-  branchReadModel: RepoBranchReadModelData | null,
+  repositoryFacts: { snapshot: RepoSnapshot } | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!workspace) return { kind: 'noop' }
@@ -112,12 +112,12 @@ export function createTerminalBellIntentPlan(
     if (event.session.target.kind !== 'git-worktree' || event.session.presentation.kind !== 'git-worktree') {
       return { kind: 'noop' }
     }
-    if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
+    if (!repositoryFacts) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
     const worktreePath = parseCanonicalWorkspaceLocator(event.session.target.root)?.path
-    if (!worktreePath || !branchReadModel.worktreesByPath[worktreePath]) return { kind: 'noop' }
+    if (!worktreePath) return { kind: 'noop' }
     const head = event.session.presentation.head
     if (head.kind === 'branch') {
-      const branch = branchReadModel.branches.find((candidate) => candidate.name === head.branchName)
+      const branch = repositoryFacts.snapshot.branches.find((candidate) => candidate.name === head.branchName)
       if (branch?.worktree?.path !== worktreePath) return { kind: 'noop' }
       return {
         kind: 'show-worktree-terminal',

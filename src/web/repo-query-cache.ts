@@ -1,13 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type {
-  GitWorkspaceRuntimeProjection,
+  RepoSnapshot,
+  RepoSnapshotResponse,
   RepoOperationsSnapshot,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
-import type { PullRequestFetchMode } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoOperationsQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoOperationsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 
 export function getRepoOperationsQueryData(
   repoRoot: WorkspaceId,
@@ -34,31 +34,31 @@ export function setRepoOperationsQueryData(
   queryClient.setQueryData(repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled), operations)
 }
 
-export function getRepoProjectionQueryData(
+export function getRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const projection = queryClient.getQueryData<GitWorkspaceRuntimeProjection>(
-    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
-  )
-  return projection && projection.loadedAt > 0 ? projection : undefined
+): RepoSnapshot | undefined {
+  return queryClient.getQueryData<RepoSnapshotResponse>(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId))?.snapshot
 }
 
-export function getSuccessfulRepoProjectionQueryData(
+export function getSuccessfulRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
-): GitWorkspaceRuntimeProjection | undefined {
-  const query = queryClient.getQueryState<GitWorkspaceRuntimeProjection>(
-    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
-  )
-  const projection = query?.status === 'success' ? query.data : undefined
-  return projection && projection.loadedAt > 0 ? projection : undefined
+): RepoSnapshot | undefined {
+  const query = queryClient.getQueryState<RepoSnapshotResponse>(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId))
+  return query?.status === 'success' ? query.data?.snapshot : undefined
+}
+
+export function requireRepoSnapshotQueryData(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): RepoSnapshot {
+  const snapshot = getRepoSnapshotQueryData(repoRoot, workspaceRuntimeId, queryClient)
+  if (!snapshot) throw new Error(`repository snapshot query data unavailable for workspace: ${repoRoot}`)
+  return snapshot
 }
 
 export function getRepoWorktreeStatusQueryData(
@@ -90,31 +90,21 @@ export function setRepoWorktreeStatusQueryData(
   queryClient.setQueryData(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId), snapshot)
 }
 
-export function setRepoProjectionQueryData(
+export function setRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
-  projection: GitWorkspaceRuntimeProjection,
+  snapshot: RepoSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData(repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode), projection)
+  queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId), { snapshot })
 }
 
-export function seedRepoProjectionQueryData(
+export function seedRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  projection: GitWorkspaceRuntimeProjection | null,
+  snapshot: RepoSnapshot | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  if (!projection) return
-  queryClient.setQueryData(
-    repoProjectionQueryKey(
-      repoRoot,
-      workspaceRuntimeId,
-      projection.requested.branch,
-      projection.requested.pullRequestMode,
-    ),
-    projection,
-  )
+  if (!snapshot) return
+  queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId), { snapshot })
 }

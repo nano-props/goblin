@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { decodeWith } from '#/shared/http-response-schema.ts'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
-import { WorkspaceTabsRestoreResponseSchema } from '#/shared/settings-response-schema.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
@@ -23,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
-  readRepoProjection: vi.fn(),
+  readRepoSnapshot: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbeStateForRuntime: vi.fn(),
   probeWorkspace: vi.fn(),
@@ -53,7 +51,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  readRepoProjection: mocks.readRepoProjection,
+  readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
@@ -94,11 +92,18 @@ describe('restoreWorkspaceTabs', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
-    mocks.readRepoProjection.mockResolvedValue({
-      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: 1,
+    mocks.readRepoSnapshot.mockResolvedValue({
+      snapshot: {
+        current: 'main',
+        branches: [{ name: 'main', worktree: { path: '/repo', isPrimary: false, isLocked: false } }],
+        remote: {
+          remotes: [],
+          hasRemotes: false,
+          hasBrowserRemote: false,
+          remoteProviders: {},
+          hasGitHubRemote: false,
+        },
+      },
     })
     mocks.confirmServerWorkspaceEntry.mockImplementation(async () => ({
       matched: true,
@@ -137,7 +142,7 @@ describe('restoreWorkspaceTabs', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: RUNTIME_ID,
     })
-    expect(result.workspace.gitProjection).not.toBeNull()
+    expect(result.workspace.repoSnapshot).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
     expect(mocks.probeWorkspace).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
@@ -177,7 +182,7 @@ describe('restoreWorkspaceTabs', () => {
     })
 
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(result.workspace.gitProjection).not.toBeNull()
+    expect(result.workspace.repoSnapshot).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: 'goblin+file:///repo',
@@ -207,8 +212,8 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
-    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(result.workspace).toMatchObject({ repoSnapshot: null, workspaceProbe: { status: 'ready' } })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: USER_ID,
       workspaceId: 'goblin+file:///repo',
@@ -288,8 +293,8 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace.gitProjection).toBeNull()
-    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(result.workspace.repoSnapshot).toBeNull()
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: entry.id,
       workspaceRuntimeId: RUNTIME_ID,
@@ -369,36 +374,31 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
-  test('keeps the existing membership and restores root tabs when lazy local Git projection fails', async () => {
+  test('fails directly without mutating membership when a local snapshot read fails', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
     })
-    mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
+    mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    const result = await restoreWorkspaceTabs({
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: USER_ID,
-      clientId: CLIENT_ID,
-      workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: RUNTIME_ID,
-      workspacePaneTabsHost,
-    })
-    expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, gitProjection: null })
-    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: LOCAL_WORKSPACE_ID,
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: LOCAL_WORKSPACE_ID },
-      targets: [{ kind: 'workspace-root' }],
-    })
+    await expect(
+      restoreWorkspaceTabs({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceId: LOCAL_WORKSPACE_ID,
+        workspaceRuntimeId: RUNTIME_ID,
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toThrow('snapshot unavailable')
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
-  test('keeps the existing membership and restores root tabs when lazy remote Git projection fails', async () => {
+  test('fails directly when a ready remote snapshot read fails', async () => {
     const remoteEntry = { id: REMOTE_WORKSPACE_ID }
     const remoteTarget = {
       id: REMOTE_WORKSPACE_ID,
@@ -418,32 +418,21 @@ describe('restoreWorkspaceTabs', () => {
       lifecycle: { kind: 'ready', attemptId: 3, target: remoteTarget },
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
-    mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
+    mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    const result = await restoreWorkspaceTabs({
-      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-      userId: USER_ID,
-      clientId: CLIENT_ID,
-      workspaceId: remoteEntry.id,
-      workspaceRuntimeId: RUNTIME_ID,
-      workspacePaneTabsHost,
-    })
-
-    expect(decodeWith(WorkspaceTabsRestoreResponseSchema)(result)).toEqual(result)
-    expect(result.workspace).toMatchObject({
-      workspaceId: remoteEntry.id,
-      transport: { kind: 'ssh', lifecycle: { kind: 'ready', attemptId: 3, target: remoteTarget } },
-      gitProjection: null,
-    })
-    expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: remoteEntry.id,
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: remoteEntry,
-      targets: [{ kind: 'workspace-root' }],
-    })
+    await expect(
+      restoreWorkspaceTabs({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceId: remoteEntry.id,
+        workspaceRuntimeId: RUNTIME_ID,
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toThrow('snapshot unavailable')
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
 
   test('keeps the existing membership when lazy remote ensure fails', async () => {
@@ -475,7 +464,7 @@ describe('restoreWorkspaceTabs', () => {
       workspaceId: remoteEntry.id,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
       transport: { kind: 'ssh', lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' } },
-      gitProjection: null,
+      repoSnapshot: null,
     })
     expect(result.snapshot).toBeNull()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()

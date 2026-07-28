@@ -13,7 +13,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
-  readRepoProjection: vi.fn(),
+  readRepoSnapshot: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
 }))
 
@@ -31,7 +31,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  readRepoProjection: mocks.readRepoProjection,
+  readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 
 vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
@@ -49,10 +49,22 @@ describe('session restore runtime ownership', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ id: REPO_ROOT }],
     })
-    mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
+    mocks.readRepoSnapshot.mockResolvedValue({
+      snapshot: {
+        current: 'main',
+        branches: [],
+        remote: {
+          remotes: [],
+          hasRemotes: false,
+          hasBrowserRemote: false,
+          remoteProviders: {},
+          hasGitHubRemote: false,
+        },
+      },
+    })
   })
 
-  test('preserves membership and restores workspace-root layout while the Git projection is deferred', async () => {
+  test('preserves membership while restoring the accepted repository snapshot', async () => {
     const lease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
     commitWorkspaceProbeState({
       userId: USER_ID,
@@ -81,7 +93,7 @@ describe('session restore runtime ownership', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, gitProjection: null })
+    expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, repoSnapshot: { current: 'main' } })
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId: REPO_ROOT,

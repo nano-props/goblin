@@ -1,14 +1,16 @@
 import { describe, expect, test } from 'vitest'
 import { WORKSPACE_ID } from '#/web/test-utils/repo-query-runtime.ts'
-import { repoOperationsQueryKey, repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
+import { repoOperationsQueryKey, repoPullRequestsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 
 describe('repo query keys', () => {
-  test('separates projection branch and fetch mode', () => {
-    expect(repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'summary')).not.toEqual(
-      repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'full'),
+  test('keeps snapshots branch-independent and separates pull-request scopes', () => {
+    expect(repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1')).toEqual(
+      repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1'),
     )
-    expect(repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/a', 'full')).not.toEqual(
-      repoProjectionQueryKey(WORKSPACE_ID, 'repo-runtime-1', 'feature/b', 'full'),
+    expect(
+      repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', { kind: 'branch-detail', branch: 'feature/a' }),
+    ).not.toEqual(
+      repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', { kind: 'branch-detail', branch: 'feature/b' }),
     )
   })
 

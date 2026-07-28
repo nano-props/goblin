@@ -5,7 +5,7 @@ import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.t
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/operation-runner')
 
@@ -36,9 +36,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'repo-read-model',
+      operationKey: 'branch-action-test',
       priority: 1,
-      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
+      targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: () =>
         new Promise<string>((resolve) => {
           starts.push('active')
@@ -51,9 +51,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'repo-read-model',
+      operationKey: 'branch-action-test',
       priority: 1,
-      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
+      targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: async () => {
         starts.push('replaced')
         return 'replaced'
@@ -65,19 +65,19 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'repo-read-model',
+      operationKey: 'branch-action-test',
       priority: 1,
-      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
+      targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: async () => {
         starts.push('latest')
         return 'latest'
       },
     })
 
-    expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('queued')
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .repoReadModel.phase,
+        .branchAction.phase,
     ).toBe('queued')
     releaseActive()
 
@@ -85,10 +85,10 @@ describe('runLatestOperation', () => {
     await expect(replaced).resolves.toBeNull()
     await expect(latest).resolves.toBe('latest')
     expect(starts).toEqual(['active', 'latest'])
-    expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .repoReadModel.phase,
+        .branchAction.phase,
     ).toBe('idle')
   })
 })
@@ -164,13 +164,6 @@ describe('runExclusiveOperation', () => {
       reason: 'branch:pull',
       target: 'feature/a',
     })
-    expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch,
-    ).toMatchObject({
-      phase: 'running',
-      reason: 'pull',
-      target: null,
-    })
 
     release()
     await expect(work).resolves.toBe('ok')
@@ -181,12 +174,6 @@ describe('runExclusiveOperation', () => {
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
         .branchAction,
-    ).toMatchObject({
-      phase: 'idle',
-      target: null,
-    })
-    expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch,
     ).toMatchObject({
       phase: 'idle',
       target: null,
@@ -247,14 +234,7 @@ describe('runExclusiveOperation', () => {
     })
 
     expect(result).toEqual({ ok: false, message: 'fetch failed' })
-    expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch,
-    ).toMatchObject({
-      phase: 'idle',
-      reason: 'fetch',
-      target: null,
-      error: 'fetch failed',
-    })
+    expect(repoOperation(REPO_ID, 'fetch')).toMatchObject({ phase: 'idle', reason: null, target: null })
   })
 
   test('treats any busy target as blocked before scheduling', async () => {
@@ -429,7 +409,7 @@ describe('runLatestOperation active-task cancellation', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
       priority: 1,
-      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
+      targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: () =>
         new Promise<{ ok: true }>((resolve) => {
           reads.push('started')
@@ -449,13 +429,13 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
-      operationKey: 'repo-read-model',
+      operationKey: 'branch-action-test',
       priority: 1,
-      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
+      targets: [{ key: 'branchAction', reason: 'branch:pull' }],
       task: async () => ({ ok: true }),
     })
     // `read` is still running. The cancelActiveByKey for
-    // `read:repo-read-model` finds no active match (the active one is
+    // The unrelated read target finds no active match (the active one is
     // keyed `undefined`). So the original read is NOT aborted.
     await waitForNextMacrotask()
     expect(reads).toEqual(['started'])
@@ -523,10 +503,10 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
-      operationKey: 'repo-read-model',
+      operationKey: 'branch-action-test',
       priority: 50,
       targets: [
-        { key: 'repoReadModel', reason: 'repo-read-model' },
+        { key: 'branchAction', reason: 'branch:pull' },
         { key: 'manualRefresh', reason: 'manual-refresh' },
       ],
       task: () =>
@@ -556,10 +536,9 @@ describe('runLatestOperation active-task cancellation', () => {
     expect(onStale).toHaveBeenCalledTimes(1)
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .repoReadModel,
+        .branchAction,
     ).toMatchObject({
       phase: 'idle',
-      error: null,
     })
   })
 

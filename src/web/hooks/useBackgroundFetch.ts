@@ -5,17 +5,14 @@ import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/ty
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { hasClientServerConfig } from '#/web/lib/server-config.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { goblinLog } from '#/web/logger.ts'
 
-function isBackgroundSyncEligible(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
-  return (
-    !!repo &&
-    workspaceCanExecute(repo) &&
-    repo.capability.kind === 'git' &&
-    repo.capability.git.remote.hasRemotes === true
-  )
+function isExecutableGitWorkspace(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
+  return !!repo && workspaceCanExecute(repo) && repo.capability.kind === 'git'
 }
 
 export function backgroundSyncTargetsFromStore(
@@ -23,7 +20,10 @@ export function backgroundSyncTargetsFromStore(
   currentWorkspaceId: WorkspaceId | null,
 ): GitBackgroundSyncTarget[] {
   const currentWorkspace = currentWorkspaceId ? state.workspaces[currentWorkspaceId] : null
-  return isBackgroundSyncEligible(currentWorkspace)
+  const snapshot = currentWorkspace
+    ? getRepoSnapshotQueryData(currentWorkspace.id, currentWorkspace.workspaceRuntimeId)
+    : undefined
+  return isExecutableGitWorkspace(currentWorkspace) && snapshot?.remote.hasRemotes === true
     ? [{ workspaceId: currentWorkspace.id, workspaceRuntimeId: currentWorkspace.workspaceRuntimeId }]
     : []
 }
@@ -33,7 +33,13 @@ export function useBackgroundFetch({ currentWorkspaceId }: { currentWorkspaceId:
   const currentWorkspace = useWorkspacesStore((state) =>
     currentWorkspaceId ? state.workspaces[currentWorkspaceId] : undefined,
   )
-  const eligible = isBackgroundSyncEligible(currentWorkspace)
+  const executableGitWorkspace = isExecutableGitWorkspace(currentWorkspace)
+  const snapshotReadModel = useRepoSnapshotReadModel(
+    executableGitWorkspace ? currentWorkspace.id : null,
+    executableGitWorkspace ? currentWorkspace.workspaceRuntimeId : '',
+    executableGitWorkspace,
+  )
+  const eligible = executableGitWorkspace && snapshotReadModel.data?.snapshot.remote.hasRemotes === true
   const eligibleWorkspaceId = eligible ? currentWorkspace.id : null
   const eligibleWorkspaceRuntimeId = eligible ? currentWorkspace.workspaceRuntimeId : null
   const eligibleTarget = useMemo(

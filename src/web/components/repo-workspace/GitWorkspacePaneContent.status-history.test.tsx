@@ -37,7 +37,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/changes',
@@ -60,11 +60,16 @@ describe('GitWorkspacePaneContent status-history', () => {
       ],
     })
     const presentationRepo = gitWorkspacePaneProjection(repo)
-    const detail = buildGitWorkspacePanePresentation(presentationRepo, {
-      loading: true,
-      error: null,
-      stale: false,
-    })
+    const detail = buildGitWorkspacePanePresentation(
+      presentationRepo,
+      {
+        loading: true,
+        error: null,
+        stale: false,
+      },
+      undefined,
+      { state: 'empty', error: null, retrying: false, retry: vi.fn() },
+    )
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
     const { container } = renderInJsdom(
@@ -109,7 +114,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/copy-success', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/copy-success',
@@ -175,7 +180,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/clean', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/clean',
@@ -224,7 +229,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/status-links',
@@ -320,7 +325,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/status-links',
@@ -390,7 +395,10 @@ describe('GitWorkspacePaneContent status-history', () => {
         'feature/open-links': [staticEntry('status')],
       },
       remote: {
-        remotes: ['origin', 'origin/team'],
+        remotes: [
+          { name: 'origin', fetchUrl: 'https://example.test/repo.git', pushUrl: 'https://example.test/repo.git' },
+          { name: 'origin/team', fetchUrl: 'https://example.test/team.git', pushUrl: 'https://example.test/team.git' },
+        ],
         hasRemotes: true,
         hasBrowserRemote: true,
         browserRemoteProvider: 'github',
@@ -449,7 +457,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/hidden', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/hidden',
@@ -498,7 +506,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes-panel', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/changes-panel',
@@ -551,7 +559,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/stale-changes', {
-          worktree: { path: worktreePath },
+          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranchName: 'feature/stale-changes',
@@ -569,11 +577,16 @@ describe('GitWorkspacePaneContent status-history', () => {
       ],
     })
     const presentationRepo = gitWorkspacePaneProjection(repo)
-    const detail = buildGitWorkspacePanePresentation(presentationRepo, {
-      loading: false,
-      error: 'status failed',
-      stale: true,
-    })
+    const detail = buildGitWorkspacePanePresentation(
+      presentationRepo,
+      {
+        loading: false,
+        error: 'status failed',
+        stale: true,
+      },
+      undefined,
+      { state: 'empty', error: null, retrying: false, retry: vi.fn() },
+    )
     const onRetryStatus = vi.fn()
 
     const { container } = renderInJsdom(
@@ -705,7 +718,11 @@ describe('GitWorkspacePaneContent status-history', () => {
   test('labels worktree history panels with the static tab id', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/history', {
+          worktree: { path: '/tmp/history-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },

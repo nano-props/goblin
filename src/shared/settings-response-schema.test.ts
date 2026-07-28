@@ -84,7 +84,7 @@ describe('settings response schemas', () => {
               },
               diagnostics: [],
             },
-            gitProjection: null,
+            repoSnapshot: null,
           },
         ],
         workspacePaneTabs: [],

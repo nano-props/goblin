@@ -7,7 +7,7 @@ import {
   createWorkspacePaneTabModel,
   isWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { readSuccessfulRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getSuccessfulRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -29,7 +29,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
-  const branchModel = readSuccessfulRepoBranchSnapshotQueryProjection(repo)
+  const branchModel = getSuccessfulRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const target = workspacePaneTabsTargetForRepoBranch(
     { workspaceId: repo.id, branches: branchModel.branches },

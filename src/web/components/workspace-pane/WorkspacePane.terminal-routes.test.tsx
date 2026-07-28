@@ -25,7 +25,6 @@ import {
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -344,12 +343,6 @@ describe('WorkspacePane terminal routes', () => {
       branchSnapshots: [],
       currentBranchName: null,
     })
-    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, 'feature/removed', 'full', {
-      snapshot: { branches: [], current: '' },
-      pullRequests: null,
-      requested: { branch: 'feature/removed', pullRequestMode: 'full' },
-      loadedAt: Date.now(),
-    })
     const onBackToBranchNavigator = vi.fn()
 
     render(
@@ -375,7 +368,9 @@ describe('WorkspacePane terminal routes', () => {
 
   test('records workspace history when creating a terminal from the status tab', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branch = createBranchSnapshot('feature/a', { worktree: { path: worktreePath } })
+    const branch = createBranchSnapshot('feature/a', {
+      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch],

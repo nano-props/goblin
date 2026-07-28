@@ -63,13 +63,21 @@ describe('useBranchActions', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const branch = createRepoBranch('feature/remote', {
+      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        remotes: ['origin'],
+        remotes: [
+          {
+            name: 'origin',
+            fetchUrl: 'https://example.invalid/repository.git',
+            pushUrl: 'https://example.invalid/repository.git',
+          },
+        ],
         hasRemotes: true,
         hasBrowserRemote: true,
         browserRemoteProvider: 'github',
@@ -95,7 +103,9 @@ describe('useBranchActions', () => {
   })
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
-    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
@@ -131,13 +141,21 @@ describe('useBranchActions', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const branch = createRepoBranch('feature/remote', {
+      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        remotes: ['origin'],
+        remotes: [
+          {
+            name: 'origin',
+            fetchUrl: 'https://example.invalid/repository.git',
+            pushUrl: 'https://example.invalid/repository.git',
+          },
+        ],
         hasRemotes: true,
         hasBrowserRemote: true,
         browserRemoteProvider: 'github',
@@ -171,13 +189,21 @@ describe('useBranchActions', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const branch = createRepoBranch('feature/remote', {
+      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        remotes: ['origin'],
+        remotes: [
+          {
+            name: 'origin',
+            fetchUrl: 'https://example.invalid/repository.git',
+            pushUrl: 'https://example.invalid/repository.git',
+          },
+        ],
         hasRemotes: true,
         hasBrowserRemote: true,
         browserRemoteProvider: 'github',
@@ -211,7 +237,9 @@ describe('useBranchActions', () => {
   })
 
   test('openTerminal uses the embedded server route for non-remote repos', async () => {
-    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
@@ -234,7 +262,9 @@ describe('useBranchActions', () => {
   })
 
   test('openEditor forwards an explicit editor app for local repos', async () => {
-    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
@@ -257,7 +287,9 @@ describe('useBranchActions', () => {
   })
 
   test('openFinder uses the embedded server route for non-remote repos', async () => {
-    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
@@ -280,8 +312,12 @@ describe('useBranchActions', () => {
 
   test('clears local pending state when the branch action target changes', async () => {
     const firstOpen = deferred<ExecResult>()
-    const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/local-feature-a' } })
-    const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/local-feature-b' } })
+    const branchA = createRepoBranch('feature/a', {
+      worktree: { path: '/tmp/local-feature-a', isPrimary: false, isLocked: false },
+    })
+    const branchB = createRepoBranch('feature/b', {
+      worktree: { path: '/tmp/local-feature-b', isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branchA, branchB],
@@ -358,7 +394,7 @@ function BranchActionsHarnessInner({
   repo: RepoPresentationForTest
   onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
 }) {
-  const branch = repo.branchModel.branches[0]!
+  const branch = repo.snapshot.branches[0]!
   const { actions } = useBranchActions(repo, branch)
   React.useEffect(() => {
     onReady(actions)
@@ -391,7 +427,7 @@ function BranchActionsSurfaceHarnessInner({
   branchIndex: number
   onReady: (surface: ReturnType<typeof useBranchActions>) => void
 }) {
-  const branch = repo.branchModel.branches[branchIndex]!
+  const branch = repo.snapshot.branches[branchIndex]!
   const surface = useBranchActions(repo, branch)
   React.useEffect(() => {
     onReady(surface)

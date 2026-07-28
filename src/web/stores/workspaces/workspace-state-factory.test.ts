@@ -7,7 +7,7 @@ import {
   workspaceOperationalFailureReason,
   acceptWorkspaceProbeState,
 } from '#/web/stores/workspaces/workspace-guards.ts'
-import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 
 const REMOTE_ID = 'goblin+ssh://example/srv/repo'
 
@@ -51,10 +51,8 @@ describe('deriveWorkspaceConnectivity', () => {
 
     expect(workspace.capability.kind).toBe('git')
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
-    expect(workspace.capability.git.dataLoads.repoReadModel.phase).toBe('idle')
-    expect(workspace.capability.git.operations.repoReadModel.phase).toBe('idle')
+    expect(workspace.capability.git.operations.branchAction.phase).toBe('idle')
     expect(workspace.capability.git.ui).toEqual({ branchViewMode: 'all' })
-    expect(workspace.capability.git.remote.fetchFailed).toBe(false)
     expect(workspace.capability.git.events).toEqual([])
 
     acceptWorkspaceProbeState(workspace, {
@@ -83,7 +81,7 @@ describe('deriveWorkspaceConnectivity', () => {
     acceptWorkspaceProbeState(workspace, gitProbe)
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     const acceptedProjection = workspace.capability.git
-    acceptedProjection.remote.fetchFailed = true
+    acceptedProjection.ui.branchViewMode = 'worktrees'
     const refreshedProbe = {
       ...gitProbe,
       diagnostics: [{ scope: 'transport' as const, message: 'Connection recovered' }],
@@ -94,7 +92,7 @@ describe('deriveWorkspaceConnectivity', () => {
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     expect(workspace.capability.probe).toEqual(refreshedProbe)
     expect(workspace.capability.git).toBe(acceptedProjection)
-    expect(workspace.capability.git.remote.fetchFailed).toBe(true)
+    expect(workspace.capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test.each([

@@ -17,11 +17,11 @@ import {
   type WorkspacePanePanelLabel,
 } from '#/web/workspace-pane/tab-providers.ts'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
-import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadFailureNotice, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
-  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'>
+  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'snapshot' | 'status' | 'ui' | 'probe'>
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   workspacePaneTabModel: WorkspacePaneTabModel
@@ -81,13 +81,21 @@ export function GitWorkspacePaneContent({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {(renderedTab === 'status' || renderedTab === 'changes') && detail.stale.status && detail.errors.status && (
-        <RepoStatusStaleNotice
-          messageKey={detail.errors.status}
-          retrying={detail.loading.status}
-          onRetry={onRetryStatus}
-        />
-      )}
+      {(renderedTab === 'status' || renderedTab === 'changes') &&
+        detail.errors.status &&
+        (detail.stale.status ? (
+          <RepoStatusStaleNotice
+            messageKey={detail.errors.status}
+            retrying={detail.loading.status}
+            onRetry={onRetryStatus}
+          />
+        ) : (
+          <RepoReadFailureNotice
+            messageKey={detail.errors.status}
+            retrying={detail.loading.status}
+            onRetry={onRetryStatus}
+          />
+        ))}
       {renderedTab
         ? renderGitWorkspacePanePanel({
             type: renderedTab,

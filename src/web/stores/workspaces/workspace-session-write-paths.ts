@@ -4,7 +4,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   closeWorkspaceRuntime,
   openWorkspaceRuntime,
@@ -23,6 +23,7 @@ import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { markRemoteLifecycleReady } from '#/web/stores/workspaces/remote-workspace-admission.ts'
@@ -161,6 +162,8 @@ async function closeWorkspaceRuntimeWithCacheNow(workspaceId: WorkspaceId, works
     throw err
   } finally {
     clearWorkspacePaneTabsProjectionState(workspaceId, workspaceRuntimeId)
+    disposeRepoRuntimeReadState(workspaceId, workspaceRuntimeId)
+    primaryWindowQueryClient.removeQueries({ queryKey: ['repo-data', workspaceId, workspaceRuntimeId] })
   }
 }
 
@@ -268,6 +271,7 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     primaryWindowQueryClient.removeQueries({
       queryKey: ['repo-data', changed.workspaceId, changed.previousWorkspaceRuntimeId],
     })
+    disposeRepoRuntimeReadState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
   }
   const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
@@ -577,7 +581,7 @@ function capabilityAcrossRuntimeTransition(
  *    any in-place update that returns a non-null value, false when
  *    the existing workspace was preserved (no-op or update returned null). */
 function upsertWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
+  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
   id: WorkspaceId,
   options: {
     rankById?: ReadonlyMap<string, number>
@@ -606,7 +610,7 @@ function upsertWorkspace(
 }
 
 export function addResolvedWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
+  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
   resolvedWorkspace: ResolvedWorkspace,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
@@ -692,9 +696,9 @@ export function addResolvedWorkspace(
 
 /**
  * Insert a placeholder workspace for a session entry whose probe is still in
- * flight. The placeholder paints the cached branch projection (if any)
- * immediately; the derived connectivity naturally reads as 'connecting'
- * because no remote target has been resolved yet. The probe resolution
+ * flight. The placeholder carries only the workspace shell; repository reads
+ * remain unavailable until capability promotion. Connectivity reads as
+ * 'connecting' because no remote target has been resolved yet. Probe resolution
  * then promotes it to 'connected' or 'unreachable' via addResolvedWorkspace /
  * the authoritative runtime projection. No-op if the workspace is already in the store (so
  * calling this twice for the same entry is safe).
@@ -707,7 +711,7 @@ export function addResolvedWorkspace(
  * branch on rather than reading target fields.
  */
 export function insertPlaceholderWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
+  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
   entry: WorkspaceSessionEntry,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
@@ -731,7 +735,7 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   const workspace = get().workspaces[refresh.id]
   if (!workspace || workspace.workspaceRuntimeId !== refresh.workspaceRuntimeId) return
   if (workspace.capability.kind !== 'git') return
-  void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, {
+  void requestRepoSnapshotRefresh({ get, set }, refresh.id, {
     workspaceRuntimeId: refresh.workspaceRuntimeId,
   })
 }
@@ -823,7 +827,6 @@ async function openRemoteWorkspace(
           const result = insertPlaceholderWorkspace(
             {
               workspaces: state.workspaces,
-              repoSnapshotCache: state.repoSnapshotCache,
               workspaceOrder: state.workspaceOrder,
             },
             entry,

@@ -3,8 +3,8 @@ import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
-  expectNoRepoSnapshotInvalidations,
-  expectRepoSnapshotInvalidations,
+  expectNoRepoMetadataInvalidations,
+  expectRepoMetadataInvalidations,
   mocks,
   removeLocalRepoWorktreeForTest,
 } from '#/server/test-utils/repo-module.ts'
@@ -17,7 +17,7 @@ describe('fetchRepo canonical boundaries', () => {
 
     await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('worktree discovery failed')
     expect(mocks.fetchAll).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('does not execute remote fetch when affected-worktree discovery fails', async () => {
@@ -28,7 +28,7 @@ describe('fetchRepo canonical boundaries', () => {
 
     await expect(fetchRepo(repoId, 'user')).rejects.toThrow('remote worktree discovery failed')
     expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test.each([
@@ -42,7 +42,7 @@ describe('fetchRepo canonical boundaries', () => {
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
-    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 
   test('merges caller abort signal into fetch operations', async () => {
@@ -58,7 +58,7 @@ describe('fetchRepo canonical boundaries', () => {
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled', repositoryStateChanged: true })
-    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
@@ -68,9 +68,9 @@ describe('fetchRepo canonical boundaries', () => {
     const result = await fetchRepo(REPO_ID, 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
-    expectRepoSnapshotInvalidations({
+    expectRepoMetadataInvalidations({
       repoId: REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
   })
 
@@ -99,14 +99,14 @@ describe('fetchRepo canonical boundaries', () => {
     const result = await fetchRepo(REPO_ID, 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -136,22 +136,22 @@ describe('fetchRepo canonical boundaries', () => {
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
     expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -177,22 +177,22 @@ describe('fetchRepo canonical boundaries', () => {
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: linkedRepoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: linkedRepoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })

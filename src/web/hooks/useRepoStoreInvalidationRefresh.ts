@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
-import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
+import { subscribeRepoReadInvalidation } from '#/web/repo-read-invalidation-ingress.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { goblinLog } from '#/web/logger.ts'
 export function useRepoStoreInvalidationRefresh() {
   useEffect(() => {
-    return subscribeRepoQueryInvalidation((event) => {
+    return subscribeRepoReadInvalidation((event) => {
       const state = useWorkspacesStore.getState()
       const repo = state.workspaces[event.repoId]
       if (!repo) return
@@ -15,7 +15,7 @@ export function useRepoStoreInvalidationRefresh() {
         event,
         workspaceRuntimeId,
       ).catch((error) => {
-        goblinLog.warn('repo invalidation refresh failed', { repoId: event.repoId, query: event.query, error })
+        goblinLog.warn('repo invalidation refresh failed', { repoId: event.repoId, domain: event.domain, error })
       })
     })
   }, [])

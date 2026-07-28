@@ -11,21 +11,22 @@
 
 import { ArrowDown, ArrowUp, FolderTree, GitBranch } from 'lucide-react'
 import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
-import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/workspaces/worktree-state.ts'
+import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 
-export type BranchSummaryInlineRepo = BranchWorktreeRepo & {
-  branchModel: BranchWorktreeRepo['branchModel']
+export interface BranchSummaryInlineRepo {
+  status: WorktreeStatus[] | undefined
 }
 
 interface BranchSummaryInlineProps {
   repo: BranchSummaryInlineRepo
-  branch: RepoBranchState
+  branch: BranchSnapshotInfo
   selected?: boolean
   leadingTerminalBellCount?: number
   leadingTerminalOutputActive?: boolean
@@ -55,10 +56,9 @@ function Delta({ direction, count, label }: { direction: 'ahead' | 'behind'; cou
 // (branch, repo) pair. Single source of truth shared by the icon, the
 // meta strip, and the outer title — recomputing these in three places
 // is what originally kept this file sprawling.
-export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchSummaryInlineRepo, lang: Lang) {
+export function computeBranchSummaryState(branch: BranchSnapshotInfo, repo: BranchSummaryInlineRepo, lang: Lang) {
   const hasWorktree = !!branch.worktree?.path
-  const worktreeState = getBranchWorktreeState(repo, branch)
-  const worktreeDirty = worktreeState?.dirty ?? false
+  const worktreeDirty = branchWorktreeChanges(repo.status, branch)?.dirty
   const commitMeta = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
   return { hasWorktree, worktreeDirty, commitMeta }
 }
@@ -69,12 +69,12 @@ type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
 // tooltip stays consistent across the branch navigator.
 export function buildBranchSummaryTitle(
   state: BranchSummaryState,
-  branch: RepoBranchState,
+  branch: BranchSnapshotInfo,
   t: (key: string, params?: Record<string, string | number>) => string,
   leadingTerminalBellCount = 0,
   leadingTerminalOutputActive = false,
 ): string {
-  const worktreeStateLabelKey = state.worktreeDirty ? 'branches.dirty' : 'branches.worktree'
+  const worktreeStateLabelKey = state.worktreeDirty === true ? 'branches.dirty' : 'branches.worktree'
   return [
     branch.name,
     branch.isDefault ? t('branches.default') : null,
@@ -104,7 +104,7 @@ export function BranchSummaryIcon({
   ariaLabel,
 }: {
   hasWorktree: boolean
-  worktreeDirty: boolean
+  worktreeDirty: boolean | undefined
   selected: boolean
   // Screen-reader text for the glyph. The icon is otherwise decorative —
   // passing a label keeps the worktree / dirty state announced when the
@@ -119,7 +119,11 @@ export function BranchSummaryIcon({
       className="flex w-4 shrink-0 items-center justify-center"
     >
       {hasWorktree ? (
-        <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} aria-hidden="true" />
+        <FolderTree
+          size={14}
+          className={worktreeDirty === true ? 'text-attention' : 'text-brand-text'}
+          aria-hidden="true"
+        />
       ) : (
         <GitBranch
           size={14}

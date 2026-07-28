@@ -6,7 +6,7 @@ import { LANG_PREF_VALUES, THEME_PREF_VALUES } from '#/shared/settings.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { WorkspacePaneStaticTabEntrySchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import { WorkspacePaneTabsSnapshotSchema, WorkspaceRuntimeIdSchema } from '#/shared/workspace-pane-tabs-validators.ts'
-import { RepoProjectionResponseSchema } from '#/shared/repo-response-schema.ts'
+import { RepoSnapshotResponseSchema } from '#/shared/repo-response-schema.ts'
 import {
   RemoteWorkspaceTargetResponseSchema,
   WorkspaceGitReadyProbeResponseSchema,
@@ -130,22 +130,20 @@ const SshTransportSchema = v.strictObject({
 })
 const RestoredWorkspaceTransportSchema = v.variant('kind', [FileTransportSchema, SshTransportSchema])
 
-// Projection presence, not transport or probed Git capability, owns this
-// result union. A Git-ready workspace can legitimately have no projection
-// while startup defers its read or when a later projection read has no
-// snapshot. Probe capability and projection lifecycle are separate state.
+// Snapshot presence, not transport or probed Git capability, owns this result
+// union. A Git-ready workspace can legitimately defer its snapshot read.
 export const RestoredWorkspaceRuntimeSchema = v.union([
   v.strictObject({
     ...RestoredWorkspaceRuntimeBaseEntries,
     transport: RestoredWorkspaceTransportSchema,
     workspaceProbe: WorkspaceGitReadyProbeResponseSchema,
-    gitProjection: RepoProjectionResponseSchema,
+    repoSnapshot: RepoSnapshotResponseSchema.entries.snapshot,
   }),
   v.strictObject({
     ...RestoredWorkspaceRuntimeBaseEntries,
     transport: RestoredWorkspaceTransportSchema,
     workspaceProbe: WorkspaceProbeStateResponseSchema,
-    gitProjection: v.null(),
+    repoSnapshot: v.null(),
   }),
 ])
 

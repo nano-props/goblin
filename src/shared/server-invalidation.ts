@@ -1,4 +1,4 @@
-import { isRepoQueryInvalidationEvent, type RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
+import { isRepoReadInvalidationEvent, type RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import {
   isWorkspaceRuntimeInvalidationEvent,
   type WorkspaceRuntimeInvalidationEvent,
@@ -18,7 +18,7 @@ export interface SettingsInvalidationEvent {
 }
 
 export type ServerInvalidationEvent =
-  | RepoQueryInvalidationEvent
+  | RepoReadInvalidationEvent
   | WorkspaceRuntimeInvalidationEvent
   | WorkspaceFilesystemInvalidationEvent
   | SettingsInvalidationEvent
@@ -39,7 +39,7 @@ export function isSettingsInvalidationEvent(value: unknown): value is SettingsIn
 
 export function isServerInvalidationEvent(value: unknown): value is ServerInvalidationEvent {
   return (
-    isRepoQueryInvalidationEvent(value) ||
+    isRepoReadInvalidationEvent(value) ||
     isWorkspaceRuntimeInvalidationEvent(value) ||
     isWorkspaceFilesystemInvalidationEvent(value) ||
     isSettingsInvalidationEvent(value)

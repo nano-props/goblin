@@ -1,6 +1,7 @@
 // Repo/store fixtures for tests that drive the authoritative Zustand and query projections.
 
-import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+import type { RepoRemoteInfo } from '#/shared/git-types.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
@@ -12,70 +13,74 @@ import {
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import {
+  getRepoSnapshotQueryData,
+  getRepoWorktreeStatusQueryData,
+  setRepoSnapshotQueryData,
+  setRepoWorktreeStatusQueryData,
+} from '#/web/repo-query-cache.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type {
-  GitRemoteProjection,
-  GitWorkspaceProjection,
-  RepoBranchState,
-  WorkspaceState,
-} from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 
 export type RepoPresentationForTest = WorkspaceState & {
-  operations: GitWorkspaceProjection['operations']
-  remote: GitRemoteProjection
+  operations: GitWorkspaceClientState['operations']
   remoteLifecycle: Extract<WorkspaceState['admission'], { kind: 'remote' }>['lifecycle']
-  ui: WorkspaceState['ui'] & GitWorkspaceProjection['ui']
-  branchAction: GitWorkspaceProjection['operations']['branchAction']
-  branchModel: RepoBranchReadModelData
+  ui: WorkspaceState['ui'] & GitWorkspaceClientState['ui']
+  branchAction: GitWorkspaceClientState['operations']['branchAction']
+  snapshot: RepoSnapshot
+  status: WorktreeStatus[] | undefined
+}
+
+interface RepoPresentationFactsForTest {
+  branches: BranchSnapshotInfo[]
+  currentBranch: string
+  status?: WorktreeStatus[]
+  remote?: Partial<RepoRemoteInfo>
 }
 
 export function repoPresentationForTest(
   repo: WorkspaceState,
-  branchReadModel: RepoBranchReadModelData,
+  facts: RepoPresentationFactsForTest,
 ): RepoPresentationForTest {
   if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
   const git = repo.capability.git
   return {
     ...repo,
     operations: git.operations,
-    remote: git.remote,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
     ui: { ...repo.ui, ...git.ui },
     branchAction: git.operations.branchAction,
-    branchModel: branchReadModel,
+    snapshot: testRepoSnapshot(facts.branches, facts.currentBranch, facts.remote),
+    status: facts.status,
   }
 }
 
 export function createGitRepoPresentationForTest(
   repo: WorkspaceState,
-  branchReadModel: RepoBranchReadModelData,
+  facts: RepoPresentationFactsForTest,
 ): RepoPresentationForTest {
   acceptWorkspaceProbeState(repo, createGitWorkspaceProbeForTest())
-  return repoPresentationForTest(repo, branchReadModel)
+  return repoPresentationForTest(repo, facts)
 }
 
 export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPresentationForTest {
   if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
   const git = repo.capability.git
-  const readModel = readRepoBranchQueryProjection(repo)
-  if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  if (!snapshot) throw new Error(`missing repository snapshot for test repo: ${repo.id}`)
   return {
     ...repo,
     operations: git.operations,
-    remote: git.remote,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
     ui: { ...repo.ui, ...git.ui },
     branchAction: git.operations.branchAction,
-    branchModel: readModel,
+    snapshot,
+    status: getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status,
   }
 }
 
@@ -83,7 +88,6 @@ export function seedRepoShellForTest(options: {
   id: string
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
-  remote?: Partial<GitRemoteProjection>
   remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
@@ -98,15 +102,11 @@ export function seedRepoShellForTest(options: {
     },
   }
   acceptWorkspaceProbeState(repo, options.workspaceProbe ?? base.capability.probe)
-  if (repo.capability.kind === 'git' && options.remote) {
-    repo.capability.git.remote = { ...repo.capability.git.remote, ...options.remote }
-  }
   if (options.remoteLifecycle !== undefined && repo.admission.kind === 'remote') {
     repo.admission.lifecycle = options.remoteLifecycle
   }
   useWorkspacesStore.setState({
     workspaces: { [workspaceId]: repo },
-    repoSnapshotCache: {},
     workspaceOrder: [workspaceId],
     restoredWorkspaceId: workspaceId,
     workspaceMembershipReady: true,
@@ -144,8 +144,8 @@ export function createBranchSnapshot(name: string, options: Partial<BranchSnapsh
   }
 }
 
-export function createRepoBranch(name: string, options: Partial<RepoBranchState> = {}): RepoBranchState {
-  return stripBranchWorktreeMetadata([createBranchSnapshot(name, options)])[0]!
+export function createRepoBranch(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
+  return createBranchSnapshot(name, options)
 }
 
 export function createGitWorkspaceProbeForTest(): WorkspaceProbeState {
@@ -172,11 +172,9 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 
 export function resetWorkspacesStore(): void {
   disposeAllRepoOperationSchedulers()
-  resetAcceptedRepoProjectionReadModelState()
   primaryWindowQueryClient.clear()
   useWorkspacesStore.setState({
     workspaces: {},
-    repoSnapshotCache: {},
     workspaceOrder: [],
     restoredWorkspaceId: null,
     workspaceMembershipReady: false,
@@ -193,7 +191,7 @@ export function resetWorkspacesStore(): void {
 
 export function seedRepoWithReadModelForTest(options: {
   id: string
-  branches?: RepoBranchState[]
+  branches?: BranchSnapshotInfo[]
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   currentBranchName?: string | null
@@ -202,13 +200,12 @@ export function seedRepoWithReadModelForTest(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   workspaceRuntimeId?: string
   status?: WorktreeStatus[]
-  remote?: Partial<GitRemoteProjection>
+  remote?: Partial<RepoRemoteInfo>
   remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
   const workspaceId = workspaceIdForTest(options.id)
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
-  const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? []
   const currentBranchName = options.currentBranchName ?? null
   const preferredWorkspacePaneTabByTarget =
@@ -229,7 +226,6 @@ export function seedRepoWithReadModelForTest(options: {
     id: options.id,
     workspaceRuntimeId: options.workspaceRuntimeId,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
-    remote: options.remote,
     remoteLifecycle: options.remoteLifecycle,
     workspaceProbe: options.workspaceProbe ?? {
       status: 'ready',
@@ -241,10 +237,11 @@ export function seedRepoWithReadModelForTest(options: {
       diagnostics: [],
     },
   })
-  seedRepoReadModelQueryData(repo, {
+  seedRepoQueryDataForTest(repo, {
     branches: branchesWithSnapshotWorktreeMetadata,
     currentBranch: options.currentBranch ?? currentBranchName ?? '',
     status,
+    remote: options.remote,
   })
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
     const branch = branchesWithSnapshotWorktreeMetadata.find((candidate) => candidate.name === branchName)
@@ -258,40 +255,43 @@ export function seedRepoWithReadModelForTest(options: {
   return repo
 }
 
-export function seedRepoReadModelQueryData(
+export function seedRepoQueryDataForTest(
   repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   readModel: {
     branches: BranchSnapshotInfo[]
     currentBranch: string
     status?: WorktreeStatus[]
+    remote?: Partial<RepoRemoteInfo>
   },
 ): void {
   const loadedAt = Date.now()
-  const projection: GitWorkspaceRuntimeProjection = {
-    snapshot: {
-      branches: readModel.branches,
-      current: readModel.currentBranch,
-    },
-    pullRequests: null,
-    requested: {
-      branch: null,
-      pullRequestMode: 'full',
-    },
-    loadedAt,
-  }
-  setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', projection)
+  setRepoSnapshotQueryData(
+    repo.id,
+    repo.workspaceRuntimeId,
+    testRepoSnapshot(readModel.branches, readModel.currentBranch, readModel.remote),
+  )
   setRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId, {
     workspaceRuntimeId: repo.workspaceRuntimeId,
     status: readModel.status ?? [],
     loadedAt,
   })
-  if (readModel.currentBranch) {
-    setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, readModel.currentBranch, 'full', {
-      ...projection,
-      requested: {
-        branch: readModel.currentBranch,
-        pullRequestMode: 'full',
-      },
-    })
+}
+
+function testRepoSnapshot(
+  branches: BranchSnapshotInfo[],
+  current: string,
+  remote: Partial<RepoRemoteInfo> = {},
+): RepoSnapshot {
+  return {
+    branches,
+    current,
+    remote: {
+      remotes: [],
+      hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
+      hasGitHubRemote: false,
+      ...remote,
+    },
   }
 }

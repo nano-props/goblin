@@ -173,7 +173,11 @@ describe('workspace pane tab select action', () => {
 function seedTarget(tabTypes: WorkspacePaneStaticTabType[]) {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    branchSnapshots: [
+      createBranchSnapshot('feature/worktree', {
+        worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+      }),
+    ],
     currentBranchName: 'feature/worktree',
     workspacePaneTabsByBranch: {
       'feature/worktree': tabTypes.map(workspacePaneStaticTabEntry),

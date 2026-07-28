@@ -44,7 +44,7 @@ describe('filetree-session-state', () => {
       },
       {
         [WORKSPACE_ID]: {
-          gitTargets: { branches: [{ worktree: { path: '/tmp/worktree' } }] },
+          gitTargets: { branches: [{ worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false } }] },
         },
       },
       [WORKSPACE_ID],

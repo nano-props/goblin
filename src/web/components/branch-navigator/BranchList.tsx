@@ -17,14 +17,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 
 interface Props {
   /** May be null while repo data is not loaded yet; the list falls
    *  through to the empty-state slot in that case. */
   repo: BranchListRepo | null
-  branches: RepoBranchState[]
+  branches: BranchSnapshotInfo[]
   /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
   onSelectBranch: (branch: string) => void

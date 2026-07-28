@@ -102,7 +102,11 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
   test('opens a detached worktree through its filesystem execution target', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     const projection = gitWorkspacePaneProjection(repo)
     if (projection.probe.status !== 'ready') throw new Error('expected ready Git workspace fixture')
@@ -323,7 +327,11 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     const { container, rerender } = renderInJsdom(
       <QueryClientProvider

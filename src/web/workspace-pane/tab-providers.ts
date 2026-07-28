@@ -39,7 +39,7 @@ export interface WorkspacePaneTabAvailabilityContext {
 export interface WorkspacePaneStaticTabMetadataInput {
   t: T
   branchName: string | null
-  statusCount: number
+  statusCount: number | undefined
 }
 
 export interface WorkspacePaneRuntimeTabMetadataInput<
@@ -47,7 +47,7 @@ export interface WorkspacePaneRuntimeTabMetadataInput<
 > {
   t: T
   branchName: string | null
-  statusCount: number
+  statusCount: number | undefined
   view: Extract<WorkspacePaneTabSummary, { type: TType }>
 }
 
@@ -193,12 +193,12 @@ class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'ch
 
   label(input: WorkspacePaneStaticTabMetadataInput): string {
     const count = input.statusCount
-    const labelKey = count > 0 ? 'tab.changes-with-count' : 'tab.changes'
-    if (count > 0) return input.t(labelKey, { count })
-    return input.t(labelKey)
+    if (count !== undefined && count > 0) return input.t('tab.changes-with-count', { count })
+    return input.t('tab.changes')
   }
 
   tooltip(input: WorkspacePaneStaticTabMetadataInput): string {
+    if (input.statusCount === undefined) return input.t('tab.changes')
     return input.t('workspace-pane-tabs.changes-tooltip', { count: input.statusCount })
   }
 }

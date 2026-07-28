@@ -127,7 +127,7 @@ const hoistedMocks = vi.hoisted(() => ({
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
   removeWorktree: vi.fn(),
-  publishRepoQueryInvalidation: vi.fn(),
+  publishRepoReadInvalidation: vi.fn(),
   publishSettingsInvalidation: vi.fn(),
   bootstrapWorktreeAfterCreate: vi.fn(),
   bootstrapRemoteWorktreeAfterCreate: vi.fn(),
@@ -266,7 +266,7 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
 }))
 
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
-  publishRepoQueryInvalidation: hoistedMocks.publishRepoQueryInvalidation,
+  publishRepoReadInvalidation: hoistedMocks.publishRepoReadInvalidation,
   publishSettingsInvalidation: hoistedMocks.publishSettingsInvalidation,
 }))
 
@@ -383,6 +383,13 @@ export function repoSnapshot(branch = 'main'): RepoSnapshot {
       },
     ],
     current: branch,
+    remote: {
+      remotes: [],
+      hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
+      hasGitHubRemote: false,
+    },
   }
 }
 
@@ -395,33 +402,33 @@ export function pullRequest(number: number): PullRequestInfo {
   }
 }
 
-type TestRepoQueryInvalidation = {
+type TestRepoReadInvalidation = {
   repoId: string
-  query: 'repo-snapshot' | 'repo-worktree-snapshot' | 'repo-runtime'
+  domain: 'metadata' | 'worktree-status' | 'operations'
 }
-type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
-type TestRepoWorktreeSnapshotInvalidation = { repoId: string; query: 'repo-worktree-snapshot' }
+type TestRepoMetadataInvalidation = { repoId: string; domain: 'metadata' }
+type TestRepoWorktreeStatusInvalidation = { repoId: string; domain: 'worktree-status' }
 
-function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
-  return hoistedMocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
+function repoReadInvalidationEvents(): TestRepoReadInvalidation[] {
+  return hoistedMocks.publishRepoReadInvalidation.mock.calls.map(([event]) => event as TestRepoReadInvalidation)
 }
 
-export function repoSnapshotInvalidations(): TestRepoSnapshotInvalidation[] {
-  return repoQueryInvalidationEvents().filter(
-    (event): event is TestRepoSnapshotInvalidation => event.query === 'repo-snapshot',
+export function repoMetadataInvalidations(): TestRepoMetadataInvalidation[] {
+  return repoReadInvalidationEvents().filter(
+    (event): event is TestRepoMetadataInvalidation => event.domain === 'metadata',
   )
 }
 
-export function repoWorktreeSnapshotInvalidations(): TestRepoWorktreeSnapshotInvalidation[] {
-  return repoQueryInvalidationEvents().filter(
-    (event): event is TestRepoWorktreeSnapshotInvalidation => event.query === 'repo-worktree-snapshot',
+export function repoWorktreeStatusInvalidations(): TestRepoWorktreeStatusInvalidation[] {
+  return repoReadInvalidationEvents().filter(
+    (event): event is TestRepoWorktreeStatusInvalidation => event.domain === 'worktree-status',
   )
 }
 
-export function expectRepoSnapshotInvalidations(...events: TestRepoSnapshotInvalidation[]): void {
-  expect(repoSnapshotInvalidations()).toEqual(events)
+export function expectRepoMetadataInvalidations(...events: TestRepoMetadataInvalidation[]): void {
+  expect(repoMetadataInvalidations()).toEqual(events)
 }
 
-export function expectNoRepoSnapshotInvalidations(): void {
-  expectRepoSnapshotInvalidations()
+export function expectNoRepoMetadataInvalidations(): void {
+  expectRepoMetadataInvalidations()
 }

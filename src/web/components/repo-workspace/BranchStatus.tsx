@@ -37,14 +37,14 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
+import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import type { CurrentGitWorkspacePane } from '#/web/components/repo-workspace/model.ts'
+import type { CurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 interface Props {
-  detail: CurrentGitWorkspacePane
+  detail: CurrentGitWorkspacePanePresentation
   workspaceRuntimeId: string
 }
 
@@ -158,7 +158,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
   const navigation = usePrimaryWindowNavigation()
-  const { branch, statusCount } = detail
+  const { branch, statusCount, pullRequest } = detail
   const branchName = branch?.name
   const worktreePathRaw = branch?.worktree?.path
   // Phase 4: pull the target off the lifecycle union. The
@@ -231,14 +231,12 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   if (!branch) return <EmptyState title={t('branches.empty')} />
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
-  const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
-  const pullRequest =
-    branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
+  const worktreeChangeCount = detail.worktreeChanges?.changeCount ?? statusCount
   const hasRole = branch.isDefault || protectedBranch
   // Gate on the same value the chip displays. If `worktreeChangeCount` is 0,
   // the row shows "0 changes" and there's nothing to copy — keep the
   // button hidden so we don't surface an action next to a contradictory chip.
-  const hasWorktreeChanges = !!branch.worktree?.path && worktreeChangeCount > 0
+  const hasWorktreeChanges = !!branch.worktree?.path && worktreeChangeCount !== undefined && worktreeChangeCount > 0
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
   const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
@@ -255,7 +253,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const mergeTone: Tone = !mergeKnown ? 'neutral' : branch.mergedToDefault ? 'success' : 'attention'
   const upstreamTone: Tone = branch.trackingGone || !branch.tracking ? 'attention' : 'brand'
   const syncTone: Tone = !branch.tracking ? 'attention' : branch.behind > 0 ? 'attention' : 'success'
-  const worktreeLocked = detail.worktreeState?.isLocked ?? false
+  const worktreeLocked = branch.worktree?.isLocked ?? false
   // The "dirty worktree" signal moved to its own row below; the worktree
   // row only needs to surface lock state on its own.
   const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
@@ -455,6 +453,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         workspaceRuntimeId={workspaceRuntimeId}
         branchName={branch.name}
         pullRequest={pullRequest}
+        read={detail.pullRequestRead}
         tooltipSide={compact ? 'top' : 'bottom'}
       />
     </StatusRows>

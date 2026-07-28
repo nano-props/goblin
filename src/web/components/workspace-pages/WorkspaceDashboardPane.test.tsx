@@ -12,20 +12,24 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoWorktreeStatusQueryKey, repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
+import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as RepoClient from '#/web/repo-client.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
+  getRepoSnapshot: vi.fn(),
   getRepoWorktreeStatus: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof RepoClient>()
-  return { ...actual, getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus }
+  return {
+    ...actual,
+    getRepoSnapshot: repoClientMocks.getRepoSnapshot,
+    getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
+  }
 })
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -34,6 +38,7 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   repoClientMocks.getRepoWorktreeStatus.mockReset()
+  repoClientMocks.getRepoSnapshot.mockReset()
   repoClientMocks.getRepoWorktreeStatus.mockImplementation(async (_workspaceId, workspaceRuntimeId) => ({
     workspaceRuntimeId,
     status: [],
@@ -51,7 +56,7 @@ describe('WorkspaceDashboardPane', () => {
     const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, { status: 'probing' })
     primaryWindowQueryClient.removeQueries({
-      queryKey: repoProjectionQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary'),
+      queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     })
     primaryWindowQueryClient.removeQueries({
       queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
@@ -64,7 +69,7 @@ describe('WorkspaceDashboardPane', () => {
     )
 
     const projectionState = primaryWindowQueryClient.getQueryState(
-      repoProjectionQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary'),
+      repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
     const statusState = primaryWindowQueryClient.getQueryState(
       repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
@@ -115,17 +120,11 @@ describe('WorkspaceDashboardPane', () => {
     ).not.toBe('fetching')
   })
 
-  test('shows a retryable error when worktree status is unavailable', async () => {
+  test('keeps dashboard snapshot content visible with unknown dirty state when status is unavailable', async () => {
     const workspace = seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
-    })
-    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
-      snapshot: { current: 'main', branches: [createRepoBranch('main')] },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'summary' },
-      loadedAt: 123,
     })
     const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
     primaryWindowQueryClient.removeQueries({ queryKey: statusQueryKey })
@@ -139,8 +138,26 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
-    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
-    await vi.waitFor(() => expect(container.textContent).toContain('error.failed-read-repo'))
+    await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
+    expect(container.textContent).toContain('error.try-again')
+    expect(container.textContent).not.toContain('dashboard.loading')
+    expect(container.textContent).toContain('dashboard.metric.branches')
+  })
+
+  test('shows a retryable failure instead of loading forever when the initial snapshot fails', async () => {
+    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
+    primaryWindowQueryClient.removeQueries({
+      queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+    })
+    repoClientMocks.getRepoSnapshot.mockRejectedValue(new Error('snapshot failed'))
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
+      </QueryClientProvider>,
+    )
+
+    await vi.waitFor(() => expect(container.textContent).toContain('snapshot failed'))
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
   })
@@ -151,12 +168,6 @@ describe('WorkspaceDashboardPane', () => {
       id: WORKSPACE_ID,
       branches: [mainBranch],
       currentBranchName: 'main',
-    })
-    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
-      snapshot: { current: 'main', branches: [mainBranch] },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'summary' },
-      loadedAt: 123,
     })
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(async () => {
       throw new Error('status failed')
@@ -199,20 +210,20 @@ describe('WorkspaceDashboardPane', () => {
       branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
-      snapshot: { current: 'main', branches: [featureBranch, mainBranch] },
-      pullRequests: [
-        {
-          branch: 'feature/pr',
-          pullRequest: createPullRequest(42, {
-            headRefName: 'feature/pr',
-            checks: { total: 2, passing: 1, failing: 1, pending: 0 },
-          }),
-        },
-      ],
-      requested: { branch: null, pullRequestMode: 'summary' },
-      loadedAt: 123,
-    })
+    primaryWindowQueryClient.setQueryData(
+      repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, { kind: 'repository-summary' }),
+      {
+        pullRequests: [
+          {
+            branch: 'feature/pr',
+            pullRequest: createPullRequest(42, {
+              headRefName: 'feature/pr',
+              checks: { total: 2, passing: 1, failing: 1, pending: 0 },
+            }),
+          },
+        ],
+      },
+    )
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -232,12 +243,6 @@ describe('WorkspaceDashboardPane', () => {
       id: WORKSPACE_ID,
       branches: [createRepoBranch('feature/open')],
       currentBranchName: 'feature/open',
-    })
-    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
-      snapshot: { branches: [createRepoBranch('feature/open')], current: 'feature/open' },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'summary' },
-      loadedAt: Date.now(),
     })
 
     const { getByTestId } = renderInJsdom(

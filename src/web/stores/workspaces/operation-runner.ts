@@ -9,7 +9,7 @@ import {
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { isExpectedRepoOperationCancellation } from '#/web/stores/workspaces/operation-cancellation.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
-import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import {
   markRepoOperationViews,
   settleRepoOperationViews,
@@ -17,7 +17,6 @@ import {
 } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-export type { RepoOperationTarget }
 
 export interface RepoOperationContext {
   id: WorkspaceId
@@ -89,7 +88,16 @@ function markOperationState<T>(
   markRepoOperationTargets(options.id, operationId, options.targets, phase, wasQueued)
   updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
     if (!isGitWorkspace(repo)) return
-    markRepoOperationViews(gitWorkspaceProjection(repo).operations, operationId, options.targets, phase, wasQueued)
+    const presentationTargets = options.targets.filter((target) => target.key === 'branchAction')
+    if (presentationTargets.length > 0) {
+      markRepoOperationViews(
+        gitWorkspaceClientState(repo).operations,
+        operationId,
+        presentationTargets,
+        phase,
+        wasQueued,
+      )
+    }
   })
 }
 
@@ -102,7 +110,10 @@ function settleOperationState<T>(
   settleRepoOperationTargets(options.id, operationId, options.targets, error)
   updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
     if (!isGitWorkspace(repo)) return
-    settleRepoOperationViews(gitWorkspaceProjection(repo).operations, operationId, options.targets, error)
+    const presentationTargets = options.targets.filter((target) => target.key === 'branchAction')
+    if (presentationTargets.length > 0) {
+      settleRepoOperationViews(gitWorkspaceClientState(repo).operations, operationId, presentationTargets, error)
+    }
   })
 }
 

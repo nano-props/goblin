@@ -29,7 +29,7 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   terminalExecutionPath,
@@ -182,7 +182,12 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     const host = await renderHookHost()
 
@@ -214,8 +219,13 @@ describe('useClientEffectIntentRouter', () => {
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
-        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
-        createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-main', isPrimary: false, isLocked: false },
+        }),
+        createBranchSnapshot('feature/test', {
+          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
+        }),
       ],
     })
     currentWorkspaceId = repo.id
@@ -287,8 +297,13 @@ describe('useClientEffectIntentRouter', () => {
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
       branchSnapshots: [
-        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
-        createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-main', isPrimary: false, isLocked: false },
+        }),
+        createBranchSnapshot('feature/test', {
+          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
+        }),
       ],
     })
     const routeNavigationCalls: Array<{ repoId: string; branch: string; terminalSessionId: string }> = []
@@ -341,7 +356,12 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     currentWorkspaceId = repo.id
 
@@ -362,7 +382,12 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     currentWorkspaceId = repo.id
     appDataClientMocks.removeWorkspaceFromSession.mockRejectedValueOnce(new Error('workspace write failed'))
@@ -381,7 +406,12 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     currentWorkspaceId = repo.id
 
@@ -403,7 +433,10 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [
-        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/restored-repo-worktree' } }),
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/restored-repo-worktree', isPrimary: false, isLocked: false },
+        }),
       ],
     })
     const visibleRepo = seedRepoWithReadModelForTest({
@@ -411,7 +444,10 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'feature',
       currentBranchName: 'feature',
       branchSnapshots: [
-        createBranchSnapshot('feature', { isCurrent: true, worktree: { path: '/tmp/visible-repo-worktree' } }),
+        createBranchSnapshot('feature', {
+          isCurrent: true,
+          worktree: { path: '/tmp/visible-repo-worktree', isPrimary: false, isLocked: false },
+        }),
       ],
     })
     useWorkspacesStore.setState((state) => ({
@@ -472,7 +508,12 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     currentWorkspaceId = repo.id
     workspaceShortcutSuppressed = true
@@ -506,7 +547,9 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
-      branches: [createRepoBranch('main', { worktree: { path: '/tmp/repo-worktree' } })],
+      branches: [
+        createRepoBranch('main', { worktree: { path: '/tmp/repo-worktree', isPrimary: false, isLocked: false } }),
+      ],
       workspacePaneTabsByBranch: {
         main: [
           workspacePaneStaticTabEntry('status'),
@@ -709,7 +752,7 @@ function preferredWorkspacePaneTab(repoId: string) {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
           'main',
         ),
       )

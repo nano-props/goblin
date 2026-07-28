@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
   probeWorkspace: vi.fn(),
-  readRepoProjection: vi.fn(),
+  readRepoSnapshot: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbes: new Map<string, unknown>(),
 }))
@@ -70,7 +70,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  readRepoProjection: mocks.readRepoProjection,
+  readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
@@ -97,11 +97,18 @@ describe('restoreServerWorkspace — active-only restore', () => {
       repoId: 'goblin+ssh://prod/srv/repo',
       lifecycle: { kind: 'ready', target: { id: 'goblin+ssh://prod/srv/repo' } },
     })
-    mocks.readRepoProjection.mockImplementation(async (workspaceId: string) => ({
-      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: workspaceId } }] },
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: 1,
+    mocks.readRepoSnapshot.mockImplementation(async (workspaceId: string) => ({
+      snapshot: {
+        current: 'main',
+        branches: [{ name: 'main', worktree: { path: workspaceId, isPrimary: false, isLocked: false } }],
+        remote: {
+          remotes: [],
+          hasRemotes: false,
+          hasBrowserRemote: false,
+          remoteProviders: {},
+          hasGitHubRemote: false,
+        },
+      },
     }))
     mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(
       async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
@@ -136,15 +143,15 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-stub', expect.any(String), {
       signal: undefined,
     })
-    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledTimes(1)
     const repos = result.runtime.workspaces
     const active = repos.find((r) => r.workspaceId === 'goblin+file:///repo-active')!
     const stub = repos.find((r) => r.workspaceId === 'goblin+file:///repo-stub')!
     // Keep the deferred-stub producer and its HTTP consumer contract
     // connected. This state is easy to omit from hand-built schema fixtures.
     expect(decodeWith(RestoredWorkspaceRuntimeSchema)(stub)).toEqual(stub)
-    expect(active.gitProjection).not.toBeNull()
-    expect(stub.gitProjection).toBeNull()
+    expect(active.repoSnapshot).not.toBeNull()
+    expect(stub.repoSnapshot).toBeNull()
     expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')
     // Git targets remain deferred until lazy projection, but workspace-root
     // layout is capability-invariant and can bind immediately.
@@ -294,10 +301,10 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-b', expect.any(String), {
       signal: undefined,
     })
-    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.gitProjection).toBeNull()
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledTimes(1)
+    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.repoSnapshot).toBeNull()
     expect(
-      result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.gitProjection,
+      result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.repoSnapshot,
     ).not.toBeNull()
   })
 
@@ -325,7 +332,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.runtime.workspaces).toHaveLength(2)
     expect(result.runtime.workspaces[1]).toMatchObject({
       workspaceId: 'goblin+file:///repo-stub/src',
-      gitProjection: null,
+      repoSnapshot: null,
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
@@ -335,7 +342,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       assertCurrent: expect.any(Function),
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledOnce()
-    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledTimes(1)
   })
 
   test('non-active remote Workspaces are probed without loading their Git projection', async () => {
@@ -359,7 +366,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(remoteStub).toMatchObject({
       entry: remoteEntry,
       workspaceId: remoteEntry.id,
-      gitProjection: null,
+      repoSnapshot: null,
     })
     expect(mocks.runRemoteWorkspaceLifecycleWrite).toHaveBeenCalledOnce()
   })
@@ -419,8 +426,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.runtime.workspaces[0]).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
-    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(result.runtime.workspaces[0]).toMatchObject({ repoSnapshot: null, workspaceProbe: { status: 'ready' } })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
       workspaceId,

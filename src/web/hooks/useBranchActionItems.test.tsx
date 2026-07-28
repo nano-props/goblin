@@ -5,7 +5,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -132,7 +132,7 @@ describe('useBranchActionItems', () => {
 
   function renderHookHost(
     onReady: (actions: ReturnType<typeof useBranchActionItems>) => void,
-    options: { branch?: RepoBranchState } = {},
+    options: { branch?: BranchSnapshotInfo } = {},
   ) {
     return renderInJsdom(<HookHost onReady={onReady} branch={options.branch} />)
   }
@@ -143,7 +143,7 @@ function HookHost({
   branch: inputBranch,
 }: {
   onReady: (actions: ReturnType<typeof useBranchActionItems>) => void
-  branch?: RepoBranchState
+  branch?: BranchSnapshotInfo
 }) {
   const branchActions = mocks.useBranchActions()
   onReady(useBranchActionItems(repo(), inputBranch ?? branch(), branchActions, { workspacePaneRoute: undefined }))
@@ -169,24 +169,25 @@ function repo(): BranchActionRepo {
   return {
     id: workspaceIdForTest('goblin+file:///tmp/goblin-action-items'),
     workspaceRuntimeId: 'repo-runtime-test',
-    branchModel: {
-      currentBranch: 'main',
-      status: [],
-      worktreesByPath: {},
+    snapshot: {
+      current: 'main',
+      branches: [],
+      remote: {
+        remotes: [],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        hasGitHubRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+      },
     },
+    status: [],
     branchAction: idleOperation(),
-    remote: {
-      hasRemotes: true,
-      hasBrowserRemote: true,
-      hasGitHubRemote: true,
-      browserRemoteProvider: 'github',
-      remoteProviders: { origin: 'github' },
-    },
     remoteLifecycle: null,
   }
 }
 
-function branch(): RepoBranchState {
+function branch(): BranchSnapshotInfo {
   return {
     name: 'feature/action-order',
     isCurrent: false,
@@ -198,6 +199,6 @@ function branch(): RepoBranchState {
     lastCommitDate: '',
     lastCommitAuthor: '',
     tracking: 'origin/feature/action-order',
-    worktree: { path: '/tmp/goblin-action-items-worktree' },
+    worktree: { path: '/tmp/goblin-action-items-worktree', isPrimary: false, isLocked: false },
   }
 }

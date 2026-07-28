@@ -654,26 +654,28 @@ function restoredRuntimeForWorkspace(
           },
           diagnostics: [],
         },
-        gitProjection: {
-          snapshot: {
-            current: 'main',
-            branches: [
-              {
-                name: 'main',
-                isCurrent: true,
-                ahead: 0,
-                behind: 0,
-                lastCommitHash: 'abc123',
-                lastCommitShortHash: 'abc123',
-                lastCommitMessage: 'Initial commit',
-                lastCommitDate: '2024-01-01T00:00:00.000Z',
-                lastCommitAuthor: 'Test User',
-              },
-            ],
+        repoSnapshot: {
+          current: 'main',
+          branches: [
+            {
+              name: 'main',
+              isCurrent: true,
+              ahead: 0,
+              behind: 0,
+              lastCommitHash: 'abc123',
+              lastCommitShortHash: 'abc123',
+              lastCommitMessage: 'Initial commit',
+              lastCommitDate: '2024-01-01T00:00:00.000Z',
+              lastCommitAuthor: 'Test User',
+            },
+          ],
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
           },
-          pullRequests: null,
-          requested: { branch: null, pullRequestMode: 'full' as const },
-          loadedAt: 1,
         },
       }
     }),

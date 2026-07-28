@@ -6,7 +6,8 @@ import {
   prepareBackgroundSync,
 } from '#/server/modules/background-sync.ts'
 import {
-  readRepoProjection,
+  readRepoPullRequests,
+  readRepoSnapshot,
   readRepoWorktreeStatus,
   readRepoOperationsSnapshot,
   getRepoLog,
@@ -27,7 +28,7 @@ import {
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import {
-  publishRepoQueryInvalidation,
+  publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
 } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
@@ -142,16 +143,30 @@ export function createRepoRoutes(options: {
       ),
     )
   })
-  app.post('/projection', async (c) => {
-    const { cwd, workspaceRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+  app.post('/snapshot', async (c) => {
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.snapshot, c)
     const userId = userIdFromContext(c)
     assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal, workspaceRuntimeId }),
-        'projection',
+        () => readRepoSnapshot(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
+        'snapshot',
+        c.req.raw.signal,
+      ),
+    )
+  })
+  app.post('/pull-requests', async (c) => {
+    const { cwd, workspaceRuntimeId, scope } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
+    const userId = userIdFromContext(c)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => readRepoPullRequests(cwd, scope, { signal: c.req.raw.signal, workspaceRuntimeId }),
+        'pull-requests',
         c.req.raw.signal,
       ),
     )

@@ -198,11 +198,11 @@ describe('architecture boundary rules', () => {
         },
         {
           relativeFilePath: '/src/web/repo-client.ts',
-          source: "await postServerJson('/api/repo/snapshot', { cwd })\n",
+          source: "await postServerJson('/api/repo/projection', { cwd })\n",
         },
         {
           relativeFilePath: '/src/web/repo-client.ts',
-          source: 'await getRepoSnapshot(cwd)\n',
+          source: 'await getRepoProjection(cwd)\n',
         },
         {
           relativeFilePath: '/src/web/repo-client.ts',
@@ -216,6 +216,11 @@ describe('architecture boundary rules', () => {
           relativeFilePath: '/src/web/stores/workspaces/refresh.ts',
           source: 'repo.dataLoads.visibleStatus.error = message\n',
         },
+        {
+          relativeFilePath: '/src/shared/repo-events.ts',
+          source:
+            "const event: RepoQueryInvalidationEvent = { type: 'repo-query-invalidated', repoId, query: 'repo-snapshot' }\n",
+        },
       ]),
     ).toEqual([
       expect.stringContaining('legacy repo IPC read route'),
@@ -224,10 +229,12 @@ describe('architecture boundary rules', () => {
       expect.stringContaining('legacy repo procedure schema key'),
       expect.stringContaining('projection-owned worktree status'),
       expect.stringContaining('store-owned worktree status lifecycle'),
+      expect.stringContaining('legacy repo query invalidation event'),
+      expect.stringContaining('legacy query-shaped repo invalidation field'),
     ])
   })
 
-  test('allows independent status composition and projection invalidation names in web code', () => {
+  test('allows independent status composition and domain invalidation names in web code', () => {
     expect(
       checkArchitectureSources([
         {
@@ -236,7 +243,7 @@ describe('architecture boundary rules', () => {
         },
         {
           relativeFilePath: '/src/web/hooks/useRepoStoreInvalidationRefresh.ts',
-          source: "if (event.query === 'repo-snapshot') invalidateRepoSnapshotQueries(event.repoId)\n",
+          source: "if (event.domain === 'metadata') invalidateRepoMetadataQueries(event.repoId)\n",
         },
       ]),
     ).toEqual([])
