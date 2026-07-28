@@ -16,6 +16,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { seedInitialObservedWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
@@ -34,7 +35,6 @@ import {
   runCloseWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runShowWorkspacePaneTabCommand,
-  staticEntry,
   terminalEntry,
   worktreeSnapshotForSessions,
   worktreeSnapshotWithSecondTerminalSelected,

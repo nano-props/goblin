@@ -39,8 +39,8 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import {
   formatTerminalFilesystemTargetKey,
   formatTerminalFilesystemTargetKeyForPath,
@@ -67,7 +67,7 @@ interface WorkspaceCommandFixtureOptions {
   filesystemTarget?: ReturnType<typeof filesystemTargetForTest> | null
 }
 
-export function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
+function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
   if (options.filesystemTarget) {
     return options.branchName
       ? {
@@ -292,10 +292,6 @@ export function recordCreatedTerminalSelection(base: TerminalSessionBase, termin
   })
 }
 
-export function baseForWorktree(): TerminalSessionBase {
-  return expectedTerminalBase()
-}
-
 export function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, terminalSessionId: string): void {
   const coordinates = terminalSessionCoordinates(base)
   const branchName = terminalPresentationBranch(base.presentation)
@@ -307,10 +303,6 @@ export function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionB
     worktreePath: terminalExecutionPath(base.target),
     terminalSessionId,
   })
-}
-
-export function staticEntry(type: WorkspacePaneStaticTabType) {
-  return workspacePaneStaticTabEntry(type)
 }
 
 export function terminalEntry(id: string) {

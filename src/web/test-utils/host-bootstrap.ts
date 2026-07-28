@@ -14,7 +14,7 @@
 
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
-export interface HostBootstrapOptions {
+interface HostBootstrapOptions {
   runtime?: 'electron' | 'web'
   initialServer?: { url: string; accessToken: string }
   bridgeVersion?: number

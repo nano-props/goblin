@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   runtimeWorkspacePaneTarget,
   requiredGitWorkspacePaneTabsTarget,
@@ -60,22 +60,6 @@ export function setWorkspacePaneTabsForTargetQueryData(
         },
       ],
     },
-    queryClient,
-  )
-}
-
-export function replaceWorkspacePaneTabsQueryData(
-  workspaceId: string,
-  workspaceRuntimeId: string,
-  entries: readonly WorkspacePaneTabsEntry[],
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
-  const current = currentSnapshot(canonicalWorkspaceId, workspaceRuntimeId, queryClient)
-  writeWorkspacePaneTabsSnapshotQueryData(
-    canonicalWorkspaceId,
-    workspaceRuntimeId,
-    { revision: current.revision, entries: [...entries] },
     queryClient,
   )
 }

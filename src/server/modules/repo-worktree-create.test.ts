@@ -7,7 +7,6 @@ import {
   WORKTREE_BOOTSTRAP_CONFIG_HASH,
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
-  deferred,
   expectRepoSnapshotInvalidations,
   mocks,
   removeRepoWorktreeForTest,
@@ -178,8 +177,8 @@ describe('repo worktree creation', () => {
 
   test('createRepoWorktree serializes concurrent repo write service operations for the same repo', async () => {
     const configHash = WORKTREE_BOOTSTRAP_CONFIG_HASH
-    const firstCreate = deferred<{ ok: true; message: string }>()
-    const secondCreate = deferred<{ ok: true; message: string }>()
+    const firstCreate = Promise.withResolvers<{ ok: true; message: string }>()
+    const secondCreate = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
@@ -286,8 +285,8 @@ describe('repo worktree creation', () => {
   })
 
   test('repo write service operations serialize across mutation kinds for the same repo', async () => {
-    const firstDelete = deferred<{ ok: true; message: string }>()
-    const secondRemove = deferred<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
+    const secondRemove = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
     mocks.readWorktreeMembership.mockResolvedValueOnce([]).mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
@@ -349,8 +348,8 @@ describe('repo worktree creation', () => {
   })
 
   test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
-    const firstDelete = deferred<{ ok: true; message: string }>()
-    const secondRemove = deferred<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
+    const secondRemove = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
@@ -417,8 +416,8 @@ describe('repo worktree creation', () => {
   })
 
   test('repo write service operations serialize linked worktree network mutations by common git dir', async () => {
-    const firstDelete = deferred<{ ok: true; message: string }>()
-    const secondPull = deferred<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
+    const secondPull = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )

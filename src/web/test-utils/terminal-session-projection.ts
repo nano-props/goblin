@@ -29,7 +29,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsSnapshot: hoistedWorkspacePaneTabsCommitMocks.writeCanonicalSnapshot,
 }))
 
-export function workspaceIdFixture(input: string) {
+function workspaceIdFixture(input: string) {
   const workspaceId = canonicalWorkspaceLocator(input)
   if (!workspaceId) throw new Error('invalid workspace locator fixture')
   return workspaceId
@@ -37,10 +37,10 @@ export function workspaceIdFixture(input: string) {
 
 export const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 export const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
-export const WORKTREE_PATH = '/repo'
+const WORKTREE_PATH = '/repo'
 export const BRANCH = 'main'
 export const WORKTREE_KEY = formatTerminalFilesystemTargetKey(REPO_ROOT, REPO_ROOT)
-export const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
 export const RUNTIME_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: WORKSPACE_ID,
@@ -71,7 +71,7 @@ export function tabsBeforeRetirement(terminalSessionId: string) {
   ]
 }
 
-export function requiredWorkspaceLocator(input: string) {
+function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)
   if (!locator) throw new Error('invalid workspace locator fixture')
   return locator

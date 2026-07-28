@@ -3,14 +3,14 @@
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
-  WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
   runtimeWorkspacePaneTarget,
@@ -21,10 +21,6 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import {
-  workspacePaneTabsWithStaticTab,
-  workspacePaneTabsWithoutStaticTab,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   readWorkspacePaneTabsForTarget,
   writeWorkspacePaneTabsSnapshotQueryData,
@@ -63,9 +59,6 @@ export function installWorkspacePaneTabsTestBridge(
     updateWorkspaceTabs?: (
       input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-    listWorkspaceTabs?: (
-      input: WorkspacePaneTabsListInput,
-    ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
@@ -202,17 +195,11 @@ export function installWorkspacePaneTabsTestBridge(
         if (options.updateWorkspaceTabs) serverTabsForTarget(legacyInput)
         const tabs = options.updateWorkspaceTabs
           ? await options.updateWorkspaceTabs(input)
-          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(legacyInput))
+          : workspacePaneTabsWithUpdateOperation(serverTabsForTarget(legacyInput), input.operation)
         replaceServerTarget(legacyInput, tabs)
         return commitServerSnapshot()
       },
       list: async (input) => {
-        if (options.listWorkspaceTabs) {
-          serverEntries = (await options.listWorkspaceTabs(input)).map((entry) => ({
-            ...entry,
-            tabs: [...entry.tabs],
-          }))
-        }
         return {
           revision: serverRevision,
           entries: serverEntries.filter((entry) => entry.target.workspaceId === input.workspaceId),
@@ -311,70 +298,4 @@ export function installWorkspacePaneTabsTestBridge(
       commitServerSnapshot()
     },
   }
-}
-
-export function defaultWorkspacePaneTabsOperationResult(
-  input: Pick<WorkspacePaneTabsUpdateInput, 'operation'>,
-  currentTabs: readonly WorkspacePaneTabEntry[],
-): WorkspacePaneTabEntry[] {
-  switch (input.operation.type) {
-    case 'open-static':
-      return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
-        insertAfterIdentity: input.operation.insertAfterIdentity,
-      })
-    case 'close-static':
-      return workspacePaneTabsWithoutStaticTab(currentTabs, input.operation.tabType)
-    case 'reorder':
-      return workspacePaneTabsWithIdentityOrder(currentTabs, input.operation.tabIdentities)
-  }
-}
-
-export function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneTabsUpdateInput {
-  if (!value || typeof value !== 'object') return false
-  const input = value as { workspaceId?: unknown; workspaceRuntimeId?: unknown; target?: unknown; operation?: unknown }
-  return (
-    typeof input.workspaceId === 'string' &&
-    typeof input.workspaceRuntimeId === 'string' &&
-    Boolean(input.target) &&
-    !!input.operation &&
-    typeof input.operation === 'object'
-  )
-}
-
-export function isWorkspacePaneTabsReplaceInput(value: unknown): value is WorkspacePaneTabsReplaceInput {
-  if (!value || typeof value !== 'object') return false
-  const input = value as {
-    workspaceId?: unknown
-    workspaceRuntimeId?: unknown
-    target?: unknown
-    tabs?: unknown
-  }
-  return (
-    typeof input.workspaceId === 'string' &&
-    typeof input.workspaceRuntimeId === 'string' &&
-    Boolean(input.target) &&
-    Array.isArray(input.tabs)
-  )
-}
-
-function workspacePaneTabsWithIdentityOrder(
-  currentTabs: readonly WorkspacePaneTabEntry[],
-  tabIdentities: readonly string[],
-): WorkspacePaneTabEntry[] {
-  const tabByIdentity = new Map(currentTabs.map((tab) => [workspacePaneTabEntryIdentity(tab), tab]))
-  const used = new Set<string>()
-  const ordered: WorkspacePaneTabEntry[] = []
-  for (const identity of tabIdentities) {
-    const tab = tabByIdentity.get(identity)
-    if (!tab || used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  for (const tab of currentTabs) {
-    const identity = workspacePaneTabEntryIdentity(tab)
-    if (used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  return ordered
 }

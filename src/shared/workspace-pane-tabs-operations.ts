@@ -23,13 +23,11 @@ export function workspacePaneTabsWithUpdateOperation(
   }
 }
 
-export function workspacePaneTabsWithStaticTab(
+function workspacePaneTabsWithStaticTab(
   current: readonly WorkspacePaneTabEntry[],
   tabType: WorkspacePaneStaticTabType,
   options?: { insertAfterIdentity?: string | null },
 ): WorkspacePaneTabEntry[] {
-  // Reopening an existing static tab should preserve the current user-managed
-  // order and simply focus that tab on the client side.
   if (current.some((entry) => entry.type === tabType)) return [...current]
   return workspacePaneTabsInsertAfterIdentity(
     current,
@@ -38,14 +36,14 @@ export function workspacePaneTabsWithStaticTab(
   )
 }
 
-export function workspacePaneTabsWithoutStaticTab(
+function workspacePaneTabsWithoutStaticTab(
   current: readonly WorkspacePaneTabEntry[],
   tabType: WorkspacePaneStaticTabType,
 ): WorkspacePaneTabEntry[] {
   return current.filter((entry) => entry.type !== tabType)
 }
 
-export function workspacePaneTabsWithIdentityOrder(
+function workspacePaneTabsWithIdentityOrder(
   currentTabs: readonly WorkspacePaneTabEntry[],
   tabIdentities: readonly string[],
 ): WorkspacePaneTabEntry[] {
@@ -65,18 +63,4 @@ export function workspacePaneTabsWithIdentityOrder(
     ordered.push(tab)
   }
   return ordered
-}
-
-export function workspacePaneTabEntryArraysEqual(
-  a: readonly WorkspacePaneTabEntry[],
-  b: readonly WorkspacePaneTabEntry[],
-): boolean {
-  if (a.length !== b.length) return false
-  for (let index = 0; index < a.length; index += 1) {
-    const current = a[index]
-    const next = b[index]
-    if (!current || !next) return false
-    if (workspacePaneTabEntryIdentity(current) !== workspacePaneTabEntryIdentity(next)) return false
-  }
-  return true
 }

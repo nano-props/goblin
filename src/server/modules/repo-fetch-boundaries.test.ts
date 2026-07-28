@@ -3,7 +3,6 @@ import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
-  deferred,
   expectNoRepoSnapshotInvalidations,
   expectRepoSnapshotInvalidations,
   mocks,
@@ -120,7 +119,7 @@ describe('fetchRepo canonical boundaries', () => {
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
-    const fetch = deferred<{ ok: true; message: string }>()
+    const fetch = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
@@ -161,7 +160,7 @@ describe('fetchRepo canonical boundaries', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
-    const fetch = deferred<{ ok: true; message: string }>()
+    const fetch = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
     mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
@@ -297,8 +296,8 @@ describe('fetchRepo canonical boundaries', () => {
   test('rejects real captured removal when its runtime closes during physical capture', async () => {
     const userId = 'test-user-runtime-capture'
     const clientId = 'test-client-runtime-capture'
-    const captureStarted = deferred<void>()
-    const releaseCapture = deferred<void>()
+    const captureStarted = Promise.withResolvers<void>()
+    const releaseCapture = Promise.withResolvers<void>()
     let commonDirReads = 0
     mocks.resolveRepoCommonDir.mockImplementation(async () => {
       commonDirReads += 1

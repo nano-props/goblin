@@ -78,8 +78,8 @@ export function historyTraversal(target: WorkspaceNavigationHistoryEntry): Works
   }
 }
 
-export type PrimaryWindowNavigationActionOptions = Parameters<typeof createPrimaryWindowNavigationActionsCore>[0]
-export type PrimaryWindowNavigationActionTestOptions = Omit<
+type PrimaryWindowNavigationActionOptions = Parameters<typeof createPrimaryWindowNavigationActionsCore>[0]
+type PrimaryWindowNavigationActionTestOptions = Omit<
   PrimaryWindowNavigationActionOptions,
   'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
 > &

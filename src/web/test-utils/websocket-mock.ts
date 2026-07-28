@@ -39,7 +39,7 @@ export interface WebSocketMockHandle {
   reset: () => void
 }
 
-export interface MockNotificationInstance {
+interface MockNotificationInstance {
   readonly title: string
   readonly options?: NotificationOptions
   onclick: (() => void) | null
@@ -159,8 +159,4 @@ export function installWebSocketMock(options: { autoOpen?: boolean } = {}): WebS
   })
 
   return handle
-}
-
-export function resetWebSocketMock(handle: WebSocketMockHandle): void {
-  handle.reset()
 }

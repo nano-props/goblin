@@ -112,7 +112,7 @@ const hoistedToastMocks = vi.hoisted(() => ({
 
 export const toolbarResponsiveMocks = hoistedToolbarResponsiveMocks
 export const runtimeExternalAppSettings = hoistedRuntimeExternalAppSettings
-export const appShellMocks = hoistedAppShellMocks
+const appShellMocks = hoistedAppShellMocks
 export const workspaceExternalAppMocks = hoistedWorkspaceExternalAppMocks
 export const toastMocks = hoistedToastMocks
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
@@ -172,12 +172,12 @@ type GitWorkspacePaneToolbarHarnessProps = Omit<
   'workspacePaneTabModel'
 > & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
-export function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessProps) {
+function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessProps) {
   const workspacePaneTabModel = useGitWorkspacePaneTabModel(props.repo, props.detail, props.workspacePaneRoute)
   return <GitWorkspacePaneToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
-export function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
+function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
   return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false })
 }
 
@@ -519,7 +519,7 @@ export function renderToolbar(options: {
   }
 }
 
-export function workspacePaneRouteForPreferredTab(
+function workspacePaneRouteForPreferredTab(
   preferredTab: WorkspacePaneTabType,
   sessions: readonly TerminalSessionSummary[],
 ): WorkspacePaneRoute | null {

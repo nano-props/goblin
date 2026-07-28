@@ -90,14 +90,14 @@ export function GitWorkspacePaneContentHarness(props: GitWorkspacePaneContentHar
   )
 }
 
-export function GitWorkspacePaneContentInner(props: GitWorkspacePaneContentHarnessProps) {
+function GitWorkspacePaneContentInner(props: GitWorkspacePaneContentHarnessProps) {
   const { workspacePaneRouteMode, ...contentProps } = props
   const workspacePaneRoute = useHarnessWorkspacePaneRoute(props)
   const workspacePaneTabModel = useGitWorkspacePaneTabModel(contentProps.repo, contentProps.detail, workspacePaneRoute)
   return <GitWorkspacePaneContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
-export function useHarnessWorkspacePaneRoute(
+function useHarnessWorkspacePaneRoute(
   props: GitWorkspacePaneContentHarnessProps,
 ): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return null
@@ -134,7 +134,7 @@ export function useHarnessWorkspacePaneRoute(
   return workspacePaneRouteForStaticPreferredTab(preferredTab)
 }
 
-export function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): WorkspacePaneRoute | null {
+function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): WorkspacePaneRoute | null {
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 

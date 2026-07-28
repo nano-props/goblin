@@ -12,13 +12,13 @@ import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-p
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   REPO_ID,
   WORKTREE_KEY,
   WORKTREE_PANE_TARGET,
   WORKTREE_PATH,
-  baseForWorktree,
   createTerminalWithProjection,
   emptyWorktreeSnapshot,
   expectedTerminalBase,
@@ -33,7 +33,6 @@ import {
   runSelectWorkspacePaneTabByIndexCommand,
   runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
-  staticEntry,
   tabsFor,
   terminalEntry,
   toastMocks,
@@ -181,7 +180,7 @@ describe('workspace commands open', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
-      removeTerminalFromWorkspacePaneTabsServer(baseForWorktree(), terminalSessionId)
+      removeTerminalFromWorkspacePaneTabsServer(expectedTerminalBase(), terminalSessionId)
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
