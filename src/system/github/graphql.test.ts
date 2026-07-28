@@ -22,10 +22,6 @@ import {
 
 const repo = { host: 'github.com', owner: 'acme', name: 'repo' }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 beforeEach(() => {
   execaMock.mockReset()
 })
@@ -169,6 +165,7 @@ describe('graphqlRequestResult transport', () => {
   })
 
   test('limits concurrent GraphQL requests', async () => {
+    const gate = Promise.withResolvers<void>()
     let active = 0
     let maxActive = 0
     let calls = 0
@@ -176,16 +173,19 @@ describe('graphqlRequestResult transport', () => {
       calls += 1
       active += 1
       maxActive = Math.max(maxActive, active)
-      await sleep(10)
+      await gate.promise
       active -= 1
       return { stdout: JSON.stringify({ data: { ok: true } }) }
     })
 
-    const results = await Promise.all(
+    const requests = Promise.all(
       Array.from({ length: GITHUB_API_CONCURRENCY + 1 }, (_, index) =>
         graphqlRequestResult<{ ok: boolean }>('/tmp/repo', repo, 'query Test { viewer { login } }', {}, `Test${index}`),
       ),
     )
+    await vi.waitFor(() => expect(active).toBe(GITHUB_API_CONCURRENCY))
+    gate.resolve()
+    const results = await requests
 
     expect(calls).toBe(GITHUB_API_CONCURRENCY + 1)
     expect(maxActive).toBe(GITHUB_API_CONCURRENCY)

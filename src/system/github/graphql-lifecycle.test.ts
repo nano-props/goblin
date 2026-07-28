@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 
@@ -84,15 +85,16 @@ describe('graphqlRequestResult lifecycle', () => {
       ctrl.signal,
     )
 
+    let settled = false
+    void queued.then(() => {
+      settled = true
+    })
     ctrl.abort()
-    const settled = await Promise.race([
-      queued.then(() => 'settled'),
-      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 25)),
-    ])
+    await flushMicrotasks()
     releases.forEach((release) => release())
     await Promise.all(running)
 
-    expect(settled).toBe('settled')
+    expect(settled).toBe(true)
     expect(execaMock).toHaveBeenCalledTimes(3)
     await expect(queued).resolves.toMatchObject({ ok: false })
   })
