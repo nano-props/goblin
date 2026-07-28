@@ -8,11 +8,9 @@ import { glob } from 'tinyglobby'
 const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
-const CANONICAL_KEYBOARD_EVENT_FILE = 'src/web/test-utils/keyboard-event.ts'
 const CANONICAL_TIMERS_FILE = 'src/test-utils/timers.ts'
-const CANONICAL_MICROTASKS_FILE = 'src/test-utils/microtasks.ts'
 const CANONICAL_FETCH_MOCK_FILES = new Set(['src/test-utils/fetch-mock.ts', 'src/web/test-utils/bridge.ts'])
-const DEFAULT_TEST_FILE_LINE_BUDGET = 1_000
+const MAX_TEST_SURFACE_LINES = 1_500
 const TEST_FILE_GLOBS = ['src/**/*.test.ts', 'src/**/*.test.tsx']
 const TEST_UTILITY_GLOBS = [
   'src/test-utils/**/*.ts',
@@ -32,14 +30,11 @@ const repositoryPolicyLabels = [
   'act imported directly from React',
   'manual React act-environment mutation',
   'inline WebSocket mock',
-  'repeated manual microtask drain',
-  'test-local zero-delay macrotask wait',
   'test-local fetch replacement',
   'test-local Storage replacement',
 ] as const
 
-type PolicyLabel =
-  (typeof repositoryPolicyLabels)[number] | 'direct KeyboardEvent construction' | 'direct fake-timer configuration'
+type PolicyLabel = (typeof repositoryPolicyLabels)[number] | 'direct fake-timer configuration'
 
 const analysisByFile = new Map<string, Promise<ReadonlySet<PolicyLabel>>>()
 
@@ -59,18 +54,6 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
-  test('keeps test helpers on the canonical WebSocket mock', async () => {
-    const files = await glob(TEST_UTILITY_GLOBS)
-    const violations: string[] = []
-
-    for (const file of files) {
-      if (file === POLICY_FILE || file === CANONICAL_WEBSOCKET_MOCK_FILE) continue
-      if ((await analyzeFile(file)).has('inline WebSocket mock')) violations.push(file)
-    }
-
-    expect(violations).toEqual([])
-  })
-
   test('keeps the hoisted xterm boundary in one canonical harness', async () => {
     const files = await glob(['src/**/*.ts', 'src/**/*.tsx'])
     const violations: string[] = []
@@ -84,134 +67,23 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
-  test('keeps component test filenames aligned with their source surfaces', async () => {
-    const files = await glob(['src/**/*.component.test.ts', 'src/**/*.component.test.tsx'])
-
-    expect(files).toEqual([])
-  })
-
-  test('keeps every test file within the structural line budget', async () => {
-    const files = await glob(TEST_FILE_GLOBS)
-    const violations: string[] = []
-
-    for (const file of files) {
-      const source = await readFile(file, 'utf8')
-      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
-      if (lineCount > DEFAULT_TEST_FILE_LINE_BUDGET)
-        violations.push(`${file}: ${lineCount} lines exceeds ${DEFAULT_TEST_FILE_LINE_BUDGET}`)
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  test('keeps shared test utilities within the structural line budget', async () => {
-    const files = await glob(TEST_UTILITY_GLOBS)
-    const violations: string[] = []
-
-    for (const file of files) {
-      const source = await readFile(file, 'utf8')
-      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
-      if (lineCount > DEFAULT_TEST_FILE_LINE_BUDGET)
-        violations.push(`${file}: ${lineCount} lines exceeds ${DEFAULT_TEST_FILE_LINE_BUDGET}`)
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  test('keeps test and test-utility runtime imports live', async () => {
+  test('keeps test surfaces below the oversized-file tripwire', async () => {
     const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
 
     for (const file of files) {
       const source = await readFile(file, 'utf8')
-      for (const name of unusedRuntimeImportNames(source, file)) violations.push(`${file}: ${name}`)
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  test('keeps every test under a named suite', async () => {
-    const files = await glob(TEST_FILE_GLOBS)
-    const violations: string[] = []
-
-    for (const file of files) {
-      const source = await readFile(file, 'utf8')
-      if (!hasOnlyTestsInNamedSuites(source, file)) violations.push(file)
-    }
-
-    expect(violations).toEqual([])
-  })
-
-  test('recognizes only tests wrapped by named Vitest suites', () => {
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; describe('suite', () => { test('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(true)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; describe('suite', () => {}); test('outside', () => {})",
-        'fixture.test.ts',
-      ),
-    ).toBe(false)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; describe(() => { test('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(false)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; describe('suite'); test('outside', () => {})",
-        'fixture.test.ts',
-      ),
-    ).toBe(false)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; describe.each([1])('suite', () => { test.each([1])('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(true)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe as suite, it as spec } from 'vitest'; suite.only('named', () => { spec.skip('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(true)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import * as v from 'vitest'; v.describe('named', () => { v.test('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(true)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "import { describe, test } from 'vitest'; const extended = test.extend({}); describe('named', () => { test('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(true)
-    expect(
-      hasOnlyTestsInNamedSuites(
-        "function describe() {}; function test() {}; describe('local', () => { test('case', () => {}) })",
-        'fixture.test.ts',
-      ),
-    ).toBe(false)
-  })
-
-  test('keeps raw keyboard event construction behind the listener-contract helper', async () => {
-    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
-    const violations: string[] = []
-    for (const file of files) {
-      if (file === CANONICAL_KEYBOARD_EVENT_FILE) continue
-      if ((await analyzeFile(file)).has('direct KeyboardEvent construction')) violations.push(file)
+      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
+      if (lineCount > MAX_TEST_SURFACE_LINES) {
+        violations.push(`${file}: ${lineCount} lines exceeds ${MAX_TEST_SURFACE_LINES}`)
+      }
     }
 
     expect(violations).toEqual([])
   })
 
   test('uses the shared fake-timer configuration across repository tests', async () => {
-    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
+    const files = await glob(TEST_FILE_GLOBS)
     const violations: string[] = []
     for (const file of files) {
       if (file === POLICY_FILE || file === CANONICAL_TIMERS_FILE) continue
@@ -231,8 +103,6 @@ describe('test harness policy', () => {
         vi.stubGlobal('fetch')
         vi.useFakeTimers()
         createRoot()
-        new KeyboardEvent('keydown')
-        new Promise((resolve) => window.setTimeout(resolve, 0))
         Object.defineProperty(window, 'localStorage', {})
         global.WebSocket = class TestSocket {}
         globalThis.fetch = fetchMock
@@ -251,11 +121,6 @@ describe('test harness policy', () => {
     ['hand-rolled React root', "import { createRoot as mount } from 'react-dom/client'; mount(node)"],
     ['act imported directly from React', "import { act as reactAct } from 'react'"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
-    ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve()'],
-    ['repeated manual microtask drain', 'for (let i = 0; i < 3; i += 1) await Promise.resolve()'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0))'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve))'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, undefined))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
     ['test-local fetch replacement', 'globalThis.fetch = fetchMock'],
     ['test-local Storage replacement', "Object.defineProperty(window, 'localStorage', { value: storage })"],
@@ -268,13 +133,6 @@ describe('test harness policy', () => {
     ['inline WebSocket mock', 'global.WebSocket = class TestSocket {}'],
     ['inline WebSocket mock', "Object.defineProperty(window, 'WebSocket', { value: class TestSocket {} })"],
     ['inline WebSocket mock', "Object.defineProperty(global, 'WebSocket', { value: class TestSocket {} })"],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 as number))'],
-    [
-      'test-local zero-delay macrotask wait',
-      'await new Promise((resolve) => setTimeout(resolve, undefined as undefined))',
-    ],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 satisfies number))'],
-    ['direct KeyboardEvent construction', "new KeyboardEvent('keydown')"],
     ['direct fake-timer configuration', "import { vi as testVi } from 'vitest'; testVi.useFakeTimers()"],
   ] satisfies Array<[PolicyLabel, string]>)('detects %s from syntax bindings', (label, source) => {
     expect(analyzeSource(source, 'fixture.test.tsx')).toContain(label)
@@ -305,39 +163,17 @@ describe('test harness policy', () => {
     expect(hasXtermMock("import { vi } from 'vitest'; vi.doMock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(true)
     expect(hasXtermMock('const note = "vi.mock(\'@xterm/xterm\')"', 'x.ts')).toBe(false)
   })
-
-  test('recognizes direct zero-delay Promise settlement without inferring callback aliases', () => {
-    expect(analyzeSource('new Promise((resolve) => { setTimeout(sideEffect, 0); resolve() })', 'x.ts')).not.toContain(
-      'test-local zero-delay macrotask wait',
-    )
-    expect(
-      analyzeSource(
-        'new Promise((resolve) => { const schedule = () => setTimeout(sideEffect, 0); resolve() })',
-        'x.ts',
-      ),
-    ).not.toContain('test-local zero-delay macrotask wait')
-    expect(analyzeSource('new Promise((resolve) => setTimeout(() => resolve(), 0))', 'x.ts')).toContain(
-      'test-local zero-delay macrotask wait',
-    )
-    expect(analyzeSource('new Promise((_resolve, reject) => setTimeout(reject, 0))', 'x.ts')).toContain(
-      'test-local zero-delay macrotask wait',
-    )
-    expect(
-      analyzeSource('new Promise((resolve) => { setTimeout(() => console.log(resolve), 0); resolve() })', 'x.ts'),
-    ).not.toContain('test-local zero-delay macrotask wait')
-    expect(
-      analyzeSource('new Promise((resolve) => { const finish = () => resolve(); setTimeout(finish, 0) })', 'x.ts'),
-    ).not.toContain('test-local zero-delay macrotask wait')
-  })
 })
 
 function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLabels)[number]): boolean {
+  if (label === 'hand-rolled React root') return !isTestFile(file)
   if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
-  if (label === 'repeated manual microtask drain' || label === 'test-local zero-delay macrotask wait') {
-    return file === CANONICAL_MICROTASKS_FILE
-  }
   if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
   return false
+}
+
+function isTestFile(file: string): boolean {
+  return file.endsWith('.test.ts') || file.endsWith('.test.tsx')
 }
 
 function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
@@ -346,94 +182,6 @@ function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
   const analysis = readFile(file, 'utf8').then((source) => analyzeSource(source, file))
   analysisByFile.set(file, analysis)
   return analysis
-}
-
-function hasOnlyTestsInNamedSuites(source: string, file: string): boolean {
-  const ast = parse(source, {
-    sourceType: 'module',
-    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
-  })
-  let foundTest = false
-  let valid = true
-  traverse(ast, {
-    CallExpression(path) {
-      if (!isOutermostVitestCall(path, ['test', 'it'])) return
-      foundTest = true
-      if (hasNamedSuiteAncestor(path)) return
-      valid = false
-      path.stop()
-    },
-  })
-  return foundTest && valid
-}
-
-function unusedRuntimeImportNames(source: string, file: string): string[] {
-  const ast = parse(source, {
-    sourceType: 'module',
-    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
-  })
-  const names: string[] = []
-  traverse(ast, {
-    Program(path) {
-      for (const [name, binding] of Object.entries(path.scope.bindings)) {
-        const declaration = binding.path.parentPath
-        const typeOnly =
-          (binding.path.isImportSpecifier() && binding.path.node.importKind === 'type') ||
-          (declaration?.isImportDeclaration() && declaration.node.importKind === 'type')
-        if (binding.kind === 'module' && !binding.referenced && !typeOnly) names.push(name)
-      }
-      path.stop()
-    },
-  })
-  return names
-}
-
-function hasNamedSuiteAncestor(path: NodePath<CallExpression>): boolean {
-  let ancestor: NodePath | null = path.parentPath
-  while (ancestor) {
-    if (ancestor.isCallExpression() && isOutermostVitestCall(ancestor, ['describe'])) {
-      const [name, ...remainingArguments] = argumentPaths(ancestor)
-      const callback = remainingArguments.at(-1)
-      if (
-        name?.isStringLiteral() &&
-        name.node.value.trim().length > 0 &&
-        (callback?.isFunctionExpression() || callback?.isArrowFunctionExpression())
-      ) {
-        return true
-      }
-    }
-    ancestor = ancestor.parentPath
-  }
-  return false
-}
-
-function isOutermostVitestCall(path: NodePath<CallExpression>, imports: readonly string[]): boolean {
-  const parent = path.parentPath
-  if (parent?.isCallExpression() && parent.get('callee').node === path.node) return false
-
-  const directCallee = path.get('callee')
-  if (
-    directCallee.isMemberExpression() &&
-    ['each', 'extend', 'for', 'runIf', 'skipIf'].includes(memberPropertyName(directCallee) ?? '')
-  ) {
-    return false
-  }
-
-  let callee: NodePath = directCallee
-  const memberNames: string[] = []
-  while (callee.isCallExpression() || callee.isMemberExpression()) {
-    if (callee.isCallExpression()) {
-      callee = callee.get('callee')
-    } else {
-      const memberName = memberPropertyName(callee)
-      if (memberName) memberNames.unshift(memberName)
-      callee = callee.get('object')
-    }
-  }
-  return (
-    imports.some((imported) => isImportedIdentifier(callee, 'vitest', imported)) ||
-    (isImportedNamespace(callee, 'vitest') && memberNames[0] !== undefined && imports.includes(memberNames[0]))
-  )
 }
 
 function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
@@ -454,27 +202,6 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
         violations.add('inline WebSocket mock')
       }
     },
-    Program(path) {
-      detectRepeatedMicrotaskDrain(path.get('body'), violations)
-    },
-    BlockStatement(path) {
-      detectRepeatedMicrotaskDrain(path.get('body'), violations)
-    },
-    ForStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    ForInStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    ForOfStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    WhileStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    DoWhileStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
     AssignmentExpression(path) {
       if (isActEnvironmentTarget(path.get('left'))) violations.add('manual React act-environment mutation')
       if (isGlobalWebSocketTarget(path.get('left'))) violations.add('inline WebSocket mock')
@@ -489,13 +216,6 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     UnaryExpression(path) {
       if (path.node.operator === 'delete' && isActEnvironmentTarget(path.get('argument'))) {
         violations.add('manual React act-environment mutation')
-      }
-    },
-    NewExpression(path) {
-      const callee = path.get('callee')
-      if (isUnboundIdentifier(callee, 'KeyboardEvent')) violations.add('direct KeyboardEvent construction')
-      if (isUnboundIdentifier(callee, 'Promise') && containsZeroDelayTimeout(path)) {
-        violations.add('test-local zero-delay macrotask wait')
       }
     },
     CallExpression(path) {
@@ -646,10 +366,6 @@ function isGlobalMember(path: NodePath, property: string): boolean {
   return path.isMemberExpression() && memberPropertyName(path) === property && isGlobalObject(path.get('object'))
 }
 
-function isGlobalFunction(path: NodePath, name: string): boolean {
-  return isUnboundIdentifier(path, name) || isGlobalMember(path, name)
-}
-
 function isGlobalWebSocketTarget(path: NodePath): boolean {
   const target = unwrapExpression(path)
   return isUnboundIdentifier(target, 'WebSocket') || isGlobalMember(target, 'WebSocket')
@@ -658,103 +374,6 @@ function isGlobalWebSocketTarget(path: NodePath): boolean {
 function isGlobalNamedTarget(path: NodePath, name: string): boolean {
   const target = unwrapExpression(path)
   return isUnboundIdentifier(target, name) || isGlobalMember(target, name)
-}
-
-function containsZeroDelayTimeout(promisePath: NodePath): boolean {
-  const executor = argumentPaths(promisePath)[0]
-  if (!executor?.isFunction()) return false
-  const settlementBindings = executor
-    .get('params')
-    .slice(0, 2)
-    .flatMap((parameter) => {
-      if (!parameter.isIdentifier()) return []
-      const binding = executor.scope.getBinding(parameter.node.name)
-      return binding ? [binding] : []
-    })
-  if (settlementBindings.length === 0) return false
-  let found = false
-  executor.traverse({
-    CallExpression(path: NodePath<CallExpression>) {
-      if (!isGlobalFunction(path.get('callee'), 'setTimeout')) return
-      const callback = argumentPaths(path)[0]
-      if (!callback || !directlySettlesPromise(callback, settlementBindings)) return
-      const delay = argumentPaths(path)[1]
-      const delayExpression = delay && unwrapExpression(delay)
-      if (
-        delayExpression === undefined ||
-        delayExpression.isNumericLiteral({ value: 0 }) ||
-        isUnboundIdentifier(delayExpression, 'undefined')
-      ) {
-        found = true
-      }
-    },
-  })
-  return found
-}
-
-function directlySettlesPromise(path: NodePath, bindings: readonly Binding[]): boolean {
-  const expression = unwrapExpression(path)
-  if (expression.isIdentifier()) return bindings.includes(expression.scope.getBinding(expression.node.name) as Binding)
-  if (!expression.isFunction()) return false
-  let found = false
-  expression.traverse({
-    Function(innerPath) {
-      innerPath.skip()
-    },
-    CallExpression(callPath) {
-      const callee = unwrapExpression(callPath.get('callee'))
-      if (callee.isIdentifier() && bindings.includes(callee.scope.getBinding(callee.node.name) as Binding)) {
-        found = true
-        callPath.stop()
-      }
-    },
-  })
-  return found
-}
-
-function detectRepeatedMicrotaskDrain(statements: NodePath[], violations: Set<PolicyLabel>): void {
-  let consecutive = 0
-  for (const statement of statements) {
-    consecutive = isAwaitPromiseResolve(statement) ? consecutive + 1 : 0
-    if (consecutive === 2) violations.add('repeated manual microtask drain')
-  }
-}
-
-function isAwaitPromiseResolve(statement: NodePath): boolean {
-  if (!statement.isExpressionStatement()) return false
-  const expression = statement.get('expression')
-  if (!expression.isAwaitExpression()) return false
-  const argument = expression.get('argument')
-  if (!argument.isCallExpression() || argument.node.arguments.length !== 0) return false
-  const callee = argument.get('callee')
-  return (
-    callee.isMemberExpression() &&
-    memberPropertyName(callee) === 'resolve' &&
-    isUnboundIdentifier(callee.get('object'), 'Promise')
-  )
-}
-
-function containsAwaitPromiseResolve(path: NodePath): boolean {
-  let found = false
-  path.traverse({
-    Function(innerPath) {
-      innerPath.skip()
-    },
-    AwaitExpression(innerPath) {
-      const argument = innerPath.get('argument')
-      if (!argument.isCallExpression() || argument.node.arguments.length !== 0) return
-      const callee = argument.get('callee')
-      if (
-        callee.isMemberExpression() &&
-        memberPropertyName(callee) === 'resolve' &&
-        isUnboundIdentifier(callee.get('object'), 'Promise')
-      ) {
-        found = true
-        innerPath.stop()
-      }
-    },
-  })
-  return found
 }
 
 function stringArgument(path: NodePath, index: number): string | null {

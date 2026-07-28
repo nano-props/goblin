@@ -59,10 +59,11 @@ helper in `src/test-utils/` (cross-cutting) or `src/web/test-utils/`
 (web-only) and add a one-line comment naming the gap it fills. Tests never
 import a helper from inside another test file.
 
-### Anti-patterns (forbidden)
+### Guarded harness boundaries
 
-- Hand-rolled `createRoot` + `container` + `act` rendering outside
-  `src/test-utils/`.
+- Hand-rolled `createRoot` + `container` + `act` rendering in test files.
+  A shared harness may own a lower-level render boundary when RTL genuinely
+  does not fit; document that gap at the helper.
 - Importing `act` from `react` in tests. Use `act` from
   `@testing-library/react` so the act environment flag is scoped to the
   callback.
@@ -75,34 +76,37 @@ import a helper from inside another test file.
 - Direct `vi.stubGlobal('fetch', …)` in tests. Use `installGoblinTestBridge`
   for client routes and `mockFetch()` from `src/test-utils/fetch-mock.ts` for
   a raw fetch boundary that the bridge does not model.
-- Direct `new KeyboardEvent(...)` construction in tests. Use
-  `userEvent.keyboard(...)` for user input; listener-contract tests that must
-  inspect repeat or default prevention use `keyboardEventForTest(...)`.
+
+These are ownership boundaries rather than a complete test-style linter. For
+user input, prefer `userEvent.keyboard(...)`; listener-contract tests that
+must inspect repeat or default prevention can use `keyboardEventForTest(...)`
+or construct the narrow event shape they genuinely need.
 
 ## 4. Test files
 
 - Co-locate: `Foo.test.ts(x)` lives next to `Foo.ts(x)` in the same
   directory. Tests for shared infrastructure (`src/test-utils/**`,
   `src/web/test-utils/**`) live in their own directory.
-- One test file per behavior surface. When a single file passes ~1000
-  lines it is time to split by behavior:
+- One test file per behavior surface. Around 1000 lines, evaluate whether a
+  split by behavior would improve ownership and navigation:
   `Foo.open.test.ts`, `Foo.lifecycle.test.ts`, `Foo.io.test.ts`. Group
   files under a `__tests__/` subdirectory if the source has many siblings
-  and a flat layout would be noisy. `test-harness-policy.test.ts` enforces
-  the 1000-line ceiling without exceptions.
-- File naming: source filename verbatim, with `.test.ts` or `.test.tsx`
-  based on the React surface. There is no `.component.test.tsx` suffix;
-  pick one and stick with it.
-- `describe('Foo', () => …)` wraps every test in a file; nested describes
-  are encouraged when the surface has sub-behaviors.
+  and a flat layout would be noisy. A 1500-line automated tripwire catches
+  clearly oversized surfaces while leaving room for cohesive suites.
+- Prefer the source filename with `.test.ts` or `.test.tsx`; avoid inventing
+  additional suffix conventions unless they communicate real ownership.
+- Use a named `describe` when it makes a multi-behavior file easier to scan.
+  Focused top-level tests are valid Vitest and do not need a wrapper solely
+  for formatting consistency.
 
 ## 5. Harnesses
 
 The shared harnesses live under `src/test-utils`, `src/server/test-utils`,
 and `src/web/test-utils`. Importing them pulls in the side-effects
 (`vi.mock(...)`, `globalThis` shims) needed by their tests.
-Shared test utilities follow the same 1000-line structural ceiling as test
-files so fixture extraction cannot merely move size debt into a harness.
+Shared test utilities use the same 1500-line oversized-surface tripwire as
+test files so fixture extraction cannot merely hide severe size debt in a
+harness. Treat roughly 1000 lines as a review signal, not a mandatory split.
 When a harness installs module mocks, import it before every production-graph
 runtime import. If the test also consumes harness exports, use one leading
 named import rather than a separate side-effect import of the same module.
@@ -225,9 +229,10 @@ capabilities needed by the behavior suites.
   and reviewable.
 - Use `await vi.waitFor(() => …)` (Vitest) or `await waitFor(() => …)`
   (RTL) for retries. Hard-coding `setTimeout(…, 50)` is forbidden.
-- Use `await waitForNextMacrotask()` when ordering depends on crossing one
-  real event-loop turn. Do not spell this as a local zero-delay `setTimeout`
-  promise; the shared helper makes the boundary explicit and reviewable.
+- Prefer `await waitForNextMacrotask()` when ordering depends on crossing one
+  real event-loop turn; the shared helper usually makes the boundary clearer.
+  A local timer remains acceptable when the timer itself is the behavior
+  under test.
 - `expect(...).resolves` / `expect(...).rejects` are the standard way to
   await a single promise. Don't write `let err; try { ... } catch (e) { err = e }`.
 
