@@ -11,7 +11,11 @@ import { REALTIME_HEARTBEAT_DEADLINE_MS as HEARTBEAT_DEADLINE_MS } from '#/serve
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import {
+  normalizeWorkspacePaneDurableLayout,
+  workspacePaneDurableLayoutsEqual,
+  type WorkspacePaneLayoutRepository,
+} from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
@@ -255,12 +259,15 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
   },
   async compareAndSwap(input) {
     if (testWorkspacePaneLayoutWriteError) return { kind: 'write-failure', error: testWorkspacePaneLayoutWriteError }
-    if (JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.expected)) {
+    if (!workspacePaneDurableLayoutsEqual(input.workspaceId, testWorkspacePaneLayout, input.expected)) {
       return { kind: 'conflict', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
     }
-    const changed = JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.replacement)
-    testWorkspacePaneLayout = structuredClone(input.replacement)
-    return { kind: 'accepted', changed, snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+    const replacement = normalizeWorkspacePaneDurableLayout(input.workspaceId, input.replacement)
+    if (workspacePaneDurableLayoutsEqual(input.workspaceId, testWorkspacePaneLayout, replacement)) {
+      return { kind: 'accepted', changed: false, snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+    }
+    testWorkspacePaneLayout = structuredClone(replacement)
+    return { kind: 'accepted', changed: true, snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
   },
 }
 
