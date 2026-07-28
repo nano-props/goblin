@@ -3,6 +3,7 @@ import {
   invalidateRepoOperationsQueries,
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
+  refreshActiveRepoPullRequestQueries,
 } from '#/web/repo-query-runtime.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
@@ -25,4 +26,17 @@ export async function handleRepoInvalidationRefresh(
     return
   }
   invalidateRepoMetadataQueries(repoId, workspaceRuntimeId)
+}
+
+export async function resyncActiveRepoReadQueries(store: RepoRefreshStoreAccess): Promise<void> {
+  const pullRequestRefreshes: Promise<void>[] = []
+  for (const repo of Object.values(store.get().workspaces)) {
+    if (!gitWorkspaceCanExecute(repo)) continue
+    const workspaceRuntimeId = repo.workspaceRuntimeId
+    invalidateRepoMetadataQueries(repo.id, workspaceRuntimeId)
+    invalidateRepoWorktreeStatusQueries(repo.id, workspaceRuntimeId)
+    invalidateRepoOperationsQueries(repo.id, workspaceRuntimeId)
+    pullRequestRefreshes.push(refreshActiveRepoPullRequestQueries(repo.id, workspaceRuntimeId))
+  }
+  await Promise.all(pullRequestRefreshes)
 }

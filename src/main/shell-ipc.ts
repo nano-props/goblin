@@ -5,7 +5,7 @@ import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
-import type { SettingsPage } from '#/shared/api-types.ts'
+import type { SettingsPage } from '#/shared/settings-pages.ts'
 import {
   HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,

@@ -52,7 +52,6 @@ import type {
 import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
 import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 
-export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
   EditorApp,
   EditorAppAvailability,
@@ -380,9 +379,6 @@ export interface RepoWorktreeStatusSnapshot {
   status: WorktreeStatus[]
   loadedAt: number
 }
-
-export type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-export { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 /** Request envelope for the native Electron bridge IPC layer. */
 export interface IpcRequest {

@@ -6,19 +6,24 @@ import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-in
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((event: ServerInvalidationEvent) => void) | null,
+  onOpen: null as (() => void) | null,
   dispose: vi.fn(),
 }))
 
 vi.mock('#/web/server-invalidation-ingress.ts', () => ({
-  subscribeServerInvalidationIngress: vi.fn((listener: (event: ServerInvalidationEvent) => void) => {
-    mocks.listener = listener
-    return mocks.dispose
-  }),
+  subscribeServerInvalidationIngress: vi.fn(
+    (listener: (event: ServerInvalidationEvent) => void, onOpen?: () => void) => {
+      mocks.listener = listener
+      mocks.onOpen = onOpen ?? null
+      return mocks.dispose
+    },
+  ),
 }))
 
 describe('repo read invalidation ingress', () => {
   beforeEach(() => {
     mocks.listener = null
+    mocks.onOpen = null
     mocks.dispose.mockReset()
   })
 
@@ -45,5 +50,14 @@ describe('repo read invalidation ingress', () => {
     mocks.listener?.({ type: 'settings-invalidated', scopes: ['theme'] })
 
     expect(listener).not.toHaveBeenCalled()
+  })
+
+  test('forwards the shared connection-open signal', () => {
+    const onOpen = vi.fn()
+    subscribeRepoReadInvalidation(vi.fn(), onOpen)
+
+    mocks.onOpen?.()
+
+    expect(onOpen).toHaveBeenCalledOnce()
   })
 })

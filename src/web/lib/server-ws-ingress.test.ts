@@ -99,6 +99,33 @@ describe('server websocket ingress', () => {
     ingress.resetForTests()
   })
 
+  test('notifies subscribers when the connection opens and after reconnect', async () => {
+    useFakeTimers()
+    const onOpen = vi.fn()
+    const ingress = await createIngress('/ws/example')
+    const dispose = ingress.subscribe(() => {}, onOpen)
+    const firstSocket = wsMock.instances[0]
+    if (!firstSocket) throw new Error('missing initial socket')
+
+    firstSocket.emitOpen()
+    expect(onOpen).toHaveBeenCalledOnce()
+
+    firstSocket.close()
+    await advanceTimersAndFlush(300)
+    const secondSocket = wsMock.instances[1]
+    if (!secondSocket) throw new Error('missing reconnected socket')
+    secondSocket.emitOpen()
+
+    expect(onOpen).toHaveBeenCalledTimes(2)
+    const lateOnOpen = vi.fn()
+    const disposeLate = ingress.subscribe(() => {}, lateOnOpen)
+    expect(lateOnOpen).toHaveBeenCalledOnce()
+
+    disposeLate()
+    dispose()
+    ingress.resetForTests()
+  })
+
   test('closes the active socket and suppresses reconnect when app shutdown starts', async () => {
     useFakeTimers()
     const ingress = await createIngress('/ws/example')

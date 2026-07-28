@@ -303,8 +303,10 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
       openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
+    // The successful create command already owns this target. Its Query
+    // projection converges asynchronously and must not re-admit the route.
     onReplaceRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
-      openWorkspacePaneRoute(routeActions, workspaceId, branchName, { replace: true }),
+      routeActions.openRepoBranch(workspaceId, branchName, { replace: true }),
   }
 }
 

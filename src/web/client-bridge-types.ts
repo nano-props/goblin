@@ -1,5 +1,6 @@
 import type { ClientBootstrapSnapshot, ClientNativeCapability, ClientRuntimeKind } from '#/shared/bootstrap.ts'
-import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
+import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
+import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {

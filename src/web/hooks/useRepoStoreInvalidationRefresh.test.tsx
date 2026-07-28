@@ -23,6 +23,7 @@ vi.mock('#/web/repo-client.ts', () => repoClientMocks)
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const listeners = new Set<(event: any) => void>()
+const openListeners = new Set<() => void>()
 function workspace() {
   const value = emptyWorkspace(WORKSPACE_ID, 'repo-runtime-test-7')
   acceptWorkspaceProbeState(value, {
@@ -43,9 +44,13 @@ const storeState = {
 }
 
 vi.mock('#/web/repo-read-invalidation-ingress.ts', () => ({
-  subscribeRepoReadInvalidation(listener: (event: any) => void) {
+  subscribeRepoReadInvalidation(listener: (event: any) => void, onOpen?: () => void) {
     listeners.add(listener)
-    return () => listeners.delete(listener)
+    if (onOpen) openListeners.add(onOpen)
+    return () => {
+      listeners.delete(listener)
+      if (onOpen) openListeners.delete(onOpen)
+    }
   },
 }))
 
@@ -72,12 +77,14 @@ describe('useRepoStoreInvalidationRefresh', () => {
     useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
+    openListeners.clear()
     primaryWindowQueryClient.clear()
     storeState.workspaces[WORKSPACE_ID] = workspace()
   })
 
   afterEach(() => {
     listeners.clear()
+    openListeners.clear()
     primaryWindowQueryClient.clear()
   })
 
@@ -139,6 +146,60 @@ describe('useRepoStoreInvalidationRefresh', () => {
     await vi.waitFor(() => {
       expect(projectionReads).toBe(2)
       expect(document.body.textContent).toContain('after-fetch')
+    })
+  })
+
+  test('connection open invalidates an in-flight projection and accepts a current read', async () => {
+    let resolveFirstRead!: (value: Awaited<ReturnType<typeof repoClientMocks.getRepoSnapshot>>) => void
+    let projectionReads = 0
+    repoClientMocks.getRepoSnapshot.mockImplementation(async () => {
+      projectionReads += 1
+      if (projectionReads === 1) {
+        return await new Promise((resolve) => {
+          resolveFirstRead = resolve
+        })
+      }
+      return {
+        snapshot: {
+          branches: [],
+          current: 'after-connect',
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
+        },
+      }
+    })
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <ProjectionObserverHarness />
+      </QueryClientProvider>,
+    )
+    await vi.waitFor(() => expect(projectionReads).toBe(1))
+
+    await act(async () => {
+      for (const listener of openListeners) listener()
+      resolveFirstRead({
+        snapshot: {
+          branches: [],
+          current: 'before-connect',
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
+        },
+      })
+    })
+
+    await vi.waitFor(() => {
+      expect(projectionReads).toBe(2)
+      expect(document.body.textContent).toContain('after-connect')
     })
   })
 

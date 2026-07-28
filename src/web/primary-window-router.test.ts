@@ -447,6 +447,16 @@ describe('primary window route callback facades', () => {
     expect(routeActions.openHome).toHaveBeenCalledOnce()
   })
 
+  test('created worktree replacement commits its accepted branch route without snapshot admission', () => {
+    const routeActions = {
+      openRepoBranch: vi.fn(() => true),
+    } as unknown as PrimaryWindowRouteNavigation
+
+    primaryWindowRouterCallbacks(routeActions).onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'feature/new')
+
+    expect(routeActions.openRepoBranch).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID, 'feature/new', { replace: true })
+  })
+
   test.each([
     ['/settings/general', { status: 'ready' as const }],
     ['/', { status: 'restoring-workspace' as const }],

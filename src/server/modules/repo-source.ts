@@ -71,15 +71,13 @@ import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system
 import type { GitUpstream } from '#/system/git/upstream.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
+import type { PullRequestEntry, RepoPullRequestScope, RepoSnapshot } from '#/shared/api-types.ts'
 import {
   isRemoteWorkspaceId,
+  normalizeRemoteWorkspaceRef,
   parseRemoteWorkspaceId,
-  type PullRequestEntry,
   type RemoteWorkspaceTarget,
-  type RepoPullRequestScope,
-  type RepoSnapshot,
-} from '#/shared/api-types.ts'
-import { normalizeRemoteWorkspaceRef } from '#/shared/remote-workspace.ts'
+} from '#/shared/remote-workspace.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import {
   isRemoteWorkspaceRuntimeFailure,
@@ -934,6 +932,6 @@ async function remotePullRequestRepoRef(
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<GitHubRepoRef | null> {
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run: options.run })
-  if (!snapshot?.remote?.hasGitHubRemote) return null
+  if (!snapshot?.remote.hasGitHubRemote) return null
   return preferredGitHubRepoRef(snapshot.remote.remotes)
 }

@@ -383,7 +383,7 @@ export function createRepoRoutes(options: {
               })
               const snapshot = await source.getSnapshot(signal)
               signal.throwIfAborted()
-              if (snapshot?.remote?.hasRemotes !== true) {
+              if (snapshot?.remote.hasRemotes !== true) {
                 throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
               }
             }
