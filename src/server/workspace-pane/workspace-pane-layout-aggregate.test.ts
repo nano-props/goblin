@@ -8,7 +8,7 @@ import {
   type WorkspacePaneLayoutValidationInput,
 } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
-import { createMemoryWorkspacePaneLayoutRepository as memoryRepository } from '#/server/test-utils/workspace-pane-layout-repository.ts'
+import { createMemoryWorkspacePaneLayoutRepository } from '#/server/test-utils/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -20,6 +20,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other-repo')
 const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
 import {
   issueTestPhysicalWorktreeExecutionCapability,
@@ -31,6 +32,10 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const scope = { userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
+
+function memoryRepository(initial?: WorkspacePaneDurableLayout) {
+  return createMemoryWorkspacePaneLayoutRepository(WORKSPACE_ID, initial)
+}
 const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
@@ -87,6 +92,17 @@ function replacementCapability() {
 }
 
 describe('workspace pane layout aggregate', () => {
+  test('memory repository preserves raw fixtures within its bound workspace', async () => {
+    const status = workspacePaneStaticTabEntry('status')
+    const raw = { entries: [{ target: { kind: 'git-branch' as const, branch: 'main' }, tabs: [status, status] }] }
+    const repository = memoryRepository(raw)
+
+    await expect(repository.load(WORKSPACE_ID)).resolves.toEqual({ layout: raw })
+    await expect(repository.load(OTHER_WORKSPACE_ID)).rejects.toThrow(
+      'memory workspace pane layout repository scope mismatch',
+    )
+  })
+
   test('memory repository rejects a stale expected layout without replacing authority', async () => {
     const current = {
       entries: [{ target: { kind: 'git-branch' as const, branch: 'main' }, tabs: [] }],
@@ -496,7 +512,9 @@ describe('workspace pane layout aggregate', () => {
 
   test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {
     const branchTarget = branchProjection('main')
-    const repository = memoryRepository({ entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }] })
+    const repository = memoryRepository({
+      entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
+    })
     const aggregate = aggregateFor(repository)
     const validated = await validate(aggregate, {
       ...scope,

@@ -9,6 +9,7 @@ import {
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
+import { createMemoryWorkspacePaneLayoutRepository } from '#/server/test-utils/workspace-pane-layout-repository.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -16,12 +17,15 @@ import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import {
   WORKSPACE_ID,
   LOCAL_WORKSPACE_ENTRY,
-  memoryRepository,
   aggregateFor,
   testTargetProjection,
   testRuntimeTargetProjection,
   type TestWorkspacePaneTarget,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.test-utils.ts'
+
+function memoryRepository(initial?: WorkspacePaneDurableLayout) {
+  return createMemoryWorkspacePaneLayoutRepository(WORKSPACE_ID, initial)
+}
 
 describe('workspace pane tabs coordinator admission queues', () => {
   test('does not commit admission when the target projection no longer contains the worktree', async () => {
