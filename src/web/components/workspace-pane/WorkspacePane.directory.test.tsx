@@ -26,6 +26,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   directoryWorkspaceProbe,
@@ -249,6 +250,54 @@ describe('WorkspacePane directory workspaces', () => {
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
     expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy()
+  })
+
+  test('keeps a detached-worktree pane visible after a background status failure', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-stale-detached')
+    const worktreePath = '/workspace/detached-stale'
+    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      status: [{ path: worktreePath, isMain: false, entries: [] }],
+      loadedAt: 1,
+    })
+    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
+    if (!target) throw new Error('expected canonical detached worktree fixture')
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+    const statusQuery = primaryWindowQueryClient.getQueryCache().find({
+      queryKey: repoWorktreeStatusQueryKey(workspaceId, repo.workspaceRuntimeId),
+      exact: true,
+    })
+    if (!statusQuery) throw new Error('missing worktree-status query')
+    statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status refresh failed') })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'static', tab: 'files' },
+                }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(screen.getByText('status.stale-title')).toBeTruthy()
+    expect(screen.getByText(/status refresh failed/)).toBeTruthy()
   })
 
   test('keeps the saved detached-worktree preference on a bare filesystem route', async () => {

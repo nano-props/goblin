@@ -7,7 +7,7 @@ import {
   createWorkspacePaneTabModel,
   isWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { getSuccessfulRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -21,7 +21,7 @@ export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
   | {
       kind: 'unavailable'
-      reason: 'branch-read-model-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
+      reason: 'snapshot-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
     }
   | { kind: 'route'; route: WorkspacePaneRoute | null }
 
@@ -29,8 +29,8 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
-  const branchModel = getSuccessfulRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
-  if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
+  const branchModel = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  if (!branchModel) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
   const target = workspacePaneTabsTargetForRepoBranch(
     { workspaceId: repo.id, branches: branchModel.branches },
     branchName,
@@ -90,7 +90,7 @@ export function openWorkspacePaneRoute(
   const resolution = resolveWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing') return false
   if (resolution.kind === 'unavailable') {
-    if (resolution.reason === 'branch-read-model-unavailable') return false
+    if (resolution.reason === 'snapshot-unavailable') return false
     return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
   }
   return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)

@@ -17,11 +17,7 @@ import {
 import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import {
-  useRepoOperationsReadModel,
-  useRepoSnapshotReadModel,
-  useRepoWorktreeStatusReadModel,
-} from '#/web/repo-queries.ts'
+import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -30,7 +26,7 @@ import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hoo
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
@@ -60,11 +56,6 @@ export function CreateWorktreePagePane({
   const git = liveRepo?.capability.kind === 'git' ? liveRepo.capability.git : null
   const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
   const snapshotReadModel = useRepoSnapshotReadModel(
-    liveRepo?.id ?? null,
-    liveRepo?.workspaceRuntimeId ?? '',
-    git !== null,
-  )
-  const statusReadModel = useRepoWorktreeStatusReadModel(
     liveRepo?.id ?? null,
     liveRepo?.workspaceRuntimeId ?? '',
     git !== null,
@@ -217,6 +208,17 @@ export function CreateWorktreePagePane({
 
   return (
     <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
+      {snapshotReadModel.isError && (
+        <RepoStatusStaleNotice
+          messageKey={
+            snapshotReadModel.error instanceof Error
+              ? snapshotReadModel.error.message
+              : String(snapshotReadModel.error || 'error.failed-read-repo')
+          }
+          retrying={snapshotReadModel.isFetching}
+          onRetry={() => void snapshotReadModel.refetch()}
+        />
+      )}
       <ScrollPane>
         <CreateWorktreePageBody
           repo={{
@@ -226,7 +228,6 @@ export function CreateWorktreePagePane({
                 workspaceRuntimeId: liveRepo.workspaceRuntimeId,
                 operations: { branchAction: git.operations.branchAction },
                 snapshot,
-                status: statusReadModel.data?.status,
                 remoteLifecycle: liveRepo.admission.kind === 'remote' ? liveRepo.admission.lifecycle : null,
               },
               operationsReadModel.data?.operations,

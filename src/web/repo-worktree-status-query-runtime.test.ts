@@ -3,11 +3,7 @@ import { focusManager, QueryClient, QueryClientProvider, QueryObserver } from '@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoWorktreeStatusSnapshot } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import {
-  getRepoWorktreeStatusQueryData,
-  getSuccessfulRepoWorktreeStatusQueryData,
-  setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+import { getRepoWorktreeStatusQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
 import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import {
@@ -256,7 +252,6 @@ describe('repo worktree status query data', () => {
       'transport failed',
     )
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toEqual(accepted)
-    expect(getSuccessfulRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
   test('accepts a successful empty collection as clean', async () => {

@@ -6,7 +6,20 @@ import {
   RepoPullRequestsResponseSchema,
   RepoRemoteBranchesResponseSchema,
   RepoSnapshotResponseSchema,
+  RepoWorktreeMutationResponseSchema,
 } from '#/shared/repo-response-schema.ts'
+
+const snapshot = {
+  branches: [],
+  current: 'main',
+  remote: {
+    remotes: [],
+    hasRemotes: false,
+    hasBrowserRemote: false,
+    remoteProviders: {},
+    hasGitHubRemote: false,
+  },
+}
 
 describe('repo response schemas', () => {
   test('accepts legal empty repository reads', () => {
@@ -33,6 +46,21 @@ describe('repo response schemas', () => {
   test('rejects malformed and forward-incompatible mutation envelopes', () => {
     expect(v.safeParse(ExecResultResponseSchema, { ok: true }).success).toBe(false)
     expect(v.safeParse(ExecResultResponseSchema, { ok: true, message: 'ok', legacy: true }).success).toBe(false)
+  })
+
+  test('requires a strict snapshot on successful worktree mutations only', () => {
+    expect(v.parse(RepoWorktreeMutationResponseSchema, { ok: true, message: 'created', snapshot })).toEqual({
+      ok: true,
+      message: 'created',
+      snapshot,
+    })
+    expect(v.safeParse(RepoWorktreeMutationResponseSchema, { ok: true, message: 'created' }).success).toBe(false)
+    expect(v.safeParse(RepoWorktreeMutationResponseSchema, { ok: false, message: 'failed', snapshot }).success).toBe(
+      false,
+    )
+    expect(
+      v.safeParse(RepoWorktreeMutationResponseSchema, { ok: true, message: 'created', snapshot, legacy: true }).success,
+    ).toBe(false)
   })
 
   test('rejects a malformed member instead of turning a list into an empty result', () => {

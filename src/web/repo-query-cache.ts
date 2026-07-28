@@ -42,15 +42,6 @@ export function getRepoSnapshotQueryData(
   return queryClient.getQueryData<RepoSnapshotResponse>(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId))?.snapshot
 }
 
-export function getSuccessfulRepoSnapshotQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): RepoSnapshot | undefined {
-  const query = queryClient.getQueryState<RepoSnapshotResponse>(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId))
-  return query?.status === 'success' ? query.data?.snapshot : undefined
-}
-
 export function requireRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
@@ -67,17 +58,6 @@ export function getRepoWorktreeStatusQueryData(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoWorktreeStatusSnapshot | undefined {
   return queryClient.getQueryData<RepoWorktreeStatusSnapshot>(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId))
-}
-
-export function getSuccessfulRepoWorktreeStatusQueryData(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): RepoWorktreeStatusSnapshot | undefined {
-  const query = queryClient.getQueryState<RepoWorktreeStatusSnapshot>(
-    repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
-  )
-  return query?.status === 'success' ? query.data : undefined
 }
 
 export function setRepoWorktreeStatusQueryData(

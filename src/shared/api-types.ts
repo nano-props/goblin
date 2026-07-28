@@ -39,7 +39,6 @@ import type {
   ResolvedRemoteWorkspaceTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
-import type { RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -320,6 +319,9 @@ export interface RepoSnapshotResponse {
   snapshot: RepoSnapshot
 }
 
+export type RepoWorktreeMutationResponse =
+  (ExecResult & { ok: false }) | (ExecResult & { ok: true; snapshot: RepoSnapshot })
+
 export interface RepoPullRequestsResponse {
   pullRequests: PullRequestEntry[] | null
 }
@@ -407,7 +409,6 @@ export type IpcEvent =
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
-  | RepoReadInvalidationEvent
 
 export interface AppIpcHandlers {
   workspace: {
@@ -461,8 +462,8 @@ export interface AppIpcHandlers {
       deleteBranch: boolean
       forceDeleteBranch?: boolean
       deleteUpstream?: boolean
-    }) => Promise<ExecResult>
-    createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
+    }) => Promise<RepoWorktreeMutationResponse>
+    createWorktree: (input: CreateWorktreeIpcInput) => Promise<RepoWorktreeMutationResponse>
     worktreeBootstrapPreview: (input: {
       cwd: WorkspaceId
       workspaceRuntimeId: string

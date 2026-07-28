@@ -3,6 +3,7 @@ import type {
   RepoOperationsSnapshot,
   RepoPullRequestScope,
   RepoPullRequestsResponse,
+  RepoSnapshot,
   RepoSnapshotResponse,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
@@ -195,6 +196,23 @@ export async function refreshRepoSnapshotReadModel(
     queryFn: ({ signal }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
   })
   return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead
+}
+
+export async function acceptWorktreeMutationSnapshot(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  snapshot: RepoSnapshot,
+  signal: AbortSignal,
+  assertCurrent: () => void,
+  client: QueryClient = primaryWindowQueryClient,
+): Promise<void> {
+  signal.throwIfAborted()
+  assertCurrent()
+  const queryKey = repoSnapshotQueryKey(repoRoot, workspaceRuntimeId)
+  await client.cancelQueries({ queryKey, exact: true }, { revert: true })
+  signal.throwIfAborted()
+  assertCurrent()
+  client.setQueryData(queryKey, { snapshot })
 }
 
 export function refreshActiveRepoPullRequestQueries(

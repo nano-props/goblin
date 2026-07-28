@@ -1,8 +1,4 @@
-import {
-  runExclusiveOperation,
-  runLatestOperation,
-  type RepoOperationContext,
-} from '#/web/stores/workspaces/operation-runner.ts'
+import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type {
@@ -27,7 +23,8 @@ import {
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+import { acceptWorktreeMutationSnapshot } from '#/web/repo-query-runtime.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -156,14 +153,11 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
   return false
 }
 
-function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
-  return result.ok && (action.kind === 'createWorktree' || action.kind === 'removeWorktree')
-}
-
-function runBranchActionIpc(
+async function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
+  acceptSnapshot: (snapshot: RepoSnapshot) => Promise<void>,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   switch (action.kind) {
@@ -172,7 +166,10 @@ function runBranchActionIpc(
     case 'push':
       return pushRepoBranch(repoId, workspaceRuntimeId, action.branch, signal)
     case 'createWorktree':
-      return createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal)
+      return await acceptWorktreeMutationResponse(
+        await createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal),
+        acceptSnapshot,
+      )
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
@@ -182,21 +179,34 @@ function runBranchActionIpc(
         signal,
       )
     case 'removeWorktree':
-      return removeRepoWorktree(
-        repoId,
-        workspaceRuntimeId,
-        {
-          branch: action.branch,
-          worktreePath: action.worktreePath,
-          deleteBranch: action.deleteBranch,
-          forceDeleteBranch: action.forceDeleteBranch,
-          deleteUpstream: action.deleteUpstream,
-        },
-        signal,
+      return await acceptWorktreeMutationResponse(
+        await removeRepoWorktree(
+          repoId,
+          workspaceRuntimeId,
+          {
+            branch: action.branch,
+            worktreePath: action.worktreePath,
+            deleteBranch: action.deleteBranch,
+            forceDeleteBranch: action.forceDeleteBranch,
+            deleteUpstream: action.deleteUpstream,
+          },
+          signal,
+        ),
+        acceptSnapshot,
       )
   }
   const exhaustive: never = action
   return exhaustive
+}
+
+async function acceptWorktreeMutationResponse(
+  response: Awaited<ReturnType<typeof createRepoWorktree>>,
+  acceptSnapshot: (snapshot: RepoSnapshot) => Promise<void>,
+): Promise<ExecResult> {
+  if (!response.ok) return response
+  const { snapshot, ...result } = response
+  await acceptSnapshot(snapshot)
+  return result
 }
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
@@ -232,12 +242,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         get().setLastResult(id, result, workspaceRuntimeId)
         return result
       }
-      const refreshMembershipProjection = async (): Promise<void> => {
-        const repo = get().workspaces[id]
-        if (repo?.workspaceRuntimeId !== workspaceRuntimeId) return
-        await requestRepoSnapshotRefresh({ get, set }, id, { workspaceRuntimeId })
-      }
-      const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
+      const handleResult = async (result: ExecResult) => {
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }
@@ -250,11 +255,17 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
         throwIfStale(get, id, workspaceRuntimeId)
         ctx.setPhase('running')
-        return runBranchActionIpc(action, id, workspaceRuntimeId, signal)
-      }
-
-      const completionBarrier = async (result: ExecResult) => {
-        if (requiresProjectionRefreshBeforeCompletion(action, result)) await refreshMembershipProjection()
+        return runBranchActionIpc(
+          action,
+          id,
+          workspaceRuntimeId,
+          async (snapshot) => {
+            await acceptWorktreeMutationSnapshot(id, workspaceRuntimeId, snapshot, signal, () =>
+              throwIfStale(get, id, workspaceRuntimeId),
+            )
+          },
+          signal,
+        )
       }
 
       if (network) {
@@ -268,7 +279,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
           priority: 100,
           targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
           task: runActionTask,
-          completionBarrier,
           queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
           queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
           errorFromResult: branchActionErrorFromResult,
@@ -289,7 +299,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         targets: [branchActionTarget(action)],
         busyResult: branchActionErrorResult('cancelled'),
         task: runActionTask,
-        completionBarrier,
         errorFromResult: branchActionErrorFromResult,
         errorResult: branchActionErrorResult,
         onResult: handleResult,

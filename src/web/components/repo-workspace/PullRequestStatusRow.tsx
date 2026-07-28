@@ -230,7 +230,7 @@ export function PullRequestStatusRow({
         value={
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{t(labelKey)}</span>
-            {read.state === 'error' && (
+            {(read.state === 'error' || read.stale) && (
               <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
                 <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
                 {t('error.try-again')}
@@ -268,7 +268,7 @@ export function PullRequestStatusRow({
             tooltipSide={tooltipSide}
             onOpenExternally={handleOpenExternally}
           />
-          {read.state === 'stale' && (
+          {read.stale && (
             <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
               <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
               {t('error.try-again')}

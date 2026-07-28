@@ -561,3 +561,120 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(json.code).toBe('BAD_REQUEST')
   })
 })
+
+describe('repo routes — worktree mutation snapshots', () => {
+  const snapshot = {
+    branches: [],
+    current: 'main',
+    remote: {
+      remotes: [],
+      hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
+      hasGitHubRemote: false,
+    },
+  }
+
+  test('returns the authoritative snapshot with a successful create', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.createRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'created' })
+    mocks.readRepoSnapshot.mockResolvedValueOnce({ snapshot })
+
+    const response = await app.request(
+      new Request('http://localhost/create-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          worktreePath: '/tmp/repo-feature',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+          worktreeBootstrap: { kind: 'skip' },
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: true, message: 'created', snapshot })
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, {
+      workspaceRuntimeId,
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('does not read a snapshot after a failed create', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.createRepoWorktree.mockResolvedValueOnce({ ok: false, message: 'create failed' })
+
+    const response = await app.request(
+      new Request('http://localhost/create-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          worktreePath: '/tmp/repo-feature',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+          worktreeBootstrap: { kind: 'skip' },
+        }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual({ ok: false, message: 'create failed' })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
+  })
+
+  test('reports a changed repository when the post-create snapshot cannot be produced', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.createRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'created' })
+    mocks.readRepoSnapshot.mockRejectedValueOnce(new Error('snapshot failed'))
+
+    const response = await app.request(
+      new Request('http://localhost/create-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          worktreePath: '/tmp/repo-feature',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+          worktreeBootstrap: { kind: 'skip' },
+        }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      message: 'error.failed-read-repo',
+      repositoryStateChanged: true,
+    })
+  })
+
+  test('returns the authoritative snapshot with a successful remove', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.removeCapturedRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'removed' })
+    mocks.readRepoSnapshot.mockResolvedValueOnce({ snapshot })
+
+    const response = await app.request(
+      new Request('http://localhost/remove-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          branch: 'feature/a',
+          worktreePath: '/tmp/repo-feature',
+          deleteBranch: false,
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: true, message: 'removed', snapshot })
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledOnce()
+  })
+})

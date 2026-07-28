@@ -36,7 +36,6 @@ interface RepoOperationBaseFields<T> {
   priority: number
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
   task: (signal: AbortSignal, ctx: RepoOperationContext) => Promise<T>
-  completionBarrier?: (result: T, ctx: RepoOperationContext) => void | Promise<void>
   operationKey?: string
   errorFromResult?: (result: T) => string | null
   errorResult?: (message: string) => T
@@ -147,8 +146,6 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     },
   }
 
-  // The task and its optional completion barrier share one scheduled lifetime.
-  // Operation state settles only after both have completed.
   type Outcome =
     | { kind: 'stale' }
     | { kind: 'error'; error: string; original: unknown }
@@ -170,9 +167,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       options.lane,
       async (signal) => {
         operationSignal = signal
-        const taskResult = await options.task(signal, ctx)
-        if (ctx.isCurrent()) await options.completionBarrier?.(taskResult, ctx)
-        return taskResult
+        return await options.task(signal, ctx)
       },
       options.queuedTimeoutMs === undefined
         ? scheduleOptions

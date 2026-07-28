@@ -48,7 +48,7 @@ export interface RestoreServerWorkspaceInput {
   userId: string
   clientId: string
   // The workspace the user is currently viewing. Only this workspace gets the
-  // full projection read + pane-tab restore at cold start. Other workspaces are
+  // snapshot read + pane-tab restore at cold start. Other workspaces are
   // validated/canonicalized, then returned as stub leases and restored lazily
   // when the user navigates to them.
   activeWorkspaceId?: WorkspaceId | null

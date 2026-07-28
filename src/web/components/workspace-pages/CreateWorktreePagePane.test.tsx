@@ -20,7 +20,7 @@ import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import type * as SettingsClient from '#/web/settings-client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -110,6 +110,38 @@ async function renderPaneInAct(element: ReactElement): Promise<ReturnType<typeof
 }
 
 describe('CreateWorktreePagePane', () => {
+  test('does not start a worktree-status query for the create form', async () => {
+    primaryWindowQueryClient.removeQueries({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
+      exact: true,
+    })
+
+    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
+    expect(
+      primaryWindowQueryClient.getQueryCache().find({
+        queryKey: repoWorktreeStatusQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
+        exact: true,
+      }),
+    ).toBeUndefined()
+  })
+
+  test('keeps the accepted snapshot visible when its background refresh fails', async () => {
+    const snapshotQuery = primaryWindowQueryClient.getQueryCache().find({
+      queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
+      exact: true,
+    })
+    if (!snapshotQuery) throw new Error('missing snapshot query')
+    snapshotQuery.setState({ ...snapshotQuery.state, status: 'error', error: new Error('snapshot refresh failed') })
+
+    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
+    expect(container.textContent).toContain('status.stale-title')
+    expect(container.textContent).toContain('snapshot refresh failed')
+  })
+
   test('keeps stable page chrome while branch data is loading', () => {
     primaryWindowQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID) })
 

@@ -152,7 +152,7 @@ describe('setBranchViewMode', () => {
     expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('main')
   })
 
-  test('changes branch view mode without mutating the React Query projection read model', () => {
+  test('changes branch view mode without mutating the React Query snapshot', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
@@ -217,7 +217,7 @@ describe('setWorkspacePaneTab', () => {
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBe(before)
   })
 
-  test('uses the React Query projection read model to resolve workspace pane tab targets', () => {
+  test('uses the React Query snapshot to resolve workspace pane tab targets', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],

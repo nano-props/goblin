@@ -70,31 +70,29 @@ describe('workspace pane tab target read model', () => {
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
     ).toEqual({
       kind: 'unavailable',
-      reason: 'branch-read-model-unavailable',
+      reason: 'snapshot-unavailable',
     })
     expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
   })
 
-  test('does not resolve an interaction target from cached data after projection refresh fails', () => {
+  test('resolves an interaction target from accepted data after a background snapshot refresh fails', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
       ],
       currentBranchName: 'feature/query',
+      workspacePaneTabsByBranch: { 'feature/query': [workspacePaneStaticTabEntry('status')] },
     })
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
     const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('missing repo projection query')
-    query.setState({ ...query.state, status: 'error', error: new Error('projection unavailable') })
+    if (!query) throw new Error('missing repo snapshot query')
+    query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
 
     expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
     expect(
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
-    ).toEqual({
-      kind: 'unavailable',
-      reason: 'branch-read-model-unavailable',
-    })
+    ).toMatchObject({ kind: 'ready', target: { branchName: 'feature/query', worktreePath: WORKTREE_PATH } })
   })
 
   test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
@@ -124,7 +122,7 @@ describe('workspace pane tab target read model', () => {
     ).toBe(true)
   })
 
-  test('resolves branch targets from the React Query projection when store branches are stale', () => {
+  test('resolves branch targets from the React Query snapshot when store branches are stale', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -153,7 +151,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.renderedTab).toBe('status')
   })
 
-  test('invalidates a worktree command lease when the status refresh fails with cached data', async () => {
+  test('keeps a worktree command lease current when a background status refresh fails with accepted data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -182,10 +180,10 @@ describe('workspace pane tab target read model', () => {
     expect(
       primaryWindowQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)),
     ).toBeDefined()
-    expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
+    expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 
-  test('invalidates a branch command lease when the projection refresh fails with cached data', async () => {
+  test('keeps a branch command lease current when a background snapshot refresh fails with accepted data', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -206,14 +204,14 @@ describe('workspace pane tab target read model', () => {
       primaryWindowQueryClient.fetchQuery({
         queryKey,
         queryFn: async () => {
-          throw new Error('projection unavailable')
+          throw new Error('snapshot unavailable')
         },
         retry: false,
       }),
-    ).rejects.toThrow('projection unavailable')
+    ).rejects.toThrow('snapshot unavailable')
 
     expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
-    expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(false)
+    expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 
   test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {
@@ -270,7 +268,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.renderedTab).toBeNull()
   })
 
-  test('records tab openers from the React Query projection when store branches are stale', () => {
+  test('records tab openers from the React Query snapshot when store branches are stale', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],

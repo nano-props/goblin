@@ -31,7 +31,7 @@ type ClientWorkspaceIntent = Extract<
 
 export type TerminalBellIntentPlan =
   | { kind: 'noop' }
-  | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
+  | { kind: 'unavailable'; reason: 'snapshot-unavailable' }
   | { kind: 'show-workspace-root-terminal'; workspaceId: WorkspaceId; terminalSessionId: string }
   | {
       kind: 'show-worktree-terminal'
@@ -112,7 +112,7 @@ export function createTerminalBellIntentPlan(
     if (event.session.target.kind !== 'git-worktree' || event.session.presentation.kind !== 'git-worktree') {
       return { kind: 'noop' }
     }
-    if (!repositoryFacts) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
+    if (!repositoryFacts) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
     const worktreePath = parseCanonicalWorkspaceLocator(event.session.target.root)?.path
     if (!worktreePath) return { kind: 'noop' }
     const head = event.session.presentation.head

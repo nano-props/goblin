@@ -11,12 +11,10 @@ function decision(input: {
   actionKind: RepoBranchActionKind
   fetchBusy?: boolean
   branchOperationPhase?: RepoOperationPhase
-  projectionReadBusy?: boolean
 }) {
   return evaluateBranchActionSchedule({
     fetchBusy: false,
     branchOperationPhase: 'idle',
-    projectionReadBusy: false,
     ...input,
   })
 }
@@ -41,9 +39,5 @@ describe('evaluateBranchActionSchedule', () => {
     ).toEqual({
       blockedMessage: 'error.network-op-in-progress',
     })
-  })
-
-  test.each(ACTIONS)('queues %s behind projection read work', (actionKind) => {
-    expect(decision({ actionKind, projectionReadBusy: true })).toEqual({})
   })
 })

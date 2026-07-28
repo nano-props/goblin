@@ -109,7 +109,7 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ id: REPO_A }])
     await vi.waitFor(() => {
-      expect(calls.projection).toEqual([REPO_A])
+      expect(calls.snapshot).toEqual([REPO_A])
     })
   })
 
@@ -273,7 +273,7 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.projection).toEqual([REPO_A, REPO_B])
+      expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -287,7 +287,7 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.projection).toEqual([REPO_A, REPO_B])
+      expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -311,21 +311,20 @@ describe('repo lifecycle', () => {
     const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_B)
     if (second.ok) useWorkspacesStore.setState({ restoredWorkspaceId: second.workspaceId })
     // Opening REPO_A again is a focus action: the repo is already
-    // resolved and its data is coherent, so we skip the runtime projection
-    // pipeline.
+    // resolved and its data is coherent, so we skip the runtime snapshot read.
     const third = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
     if (third.ok) useWorkspacesStore.setState({ restoredWorkspaceId: third.workspaceId })
 
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.projection).toEqual([REPO_A, REPO_B])
+      expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed workspace runtime do not overwrite a reopened repo', async () => {
     const snapshotResolvers: Array<(value: { branches: BranchSnapshotInfo[]; current: string }) => void> = []
     installGoblin({
-      projection: () =>
+      'repo.snapshot': () =>
         new Promise<{
           snapshot: {
             branches: BranchSnapshotInfo[]
@@ -573,7 +572,7 @@ describe('repo lifecycle', () => {
       target: newTarget,
     })
     await vi.waitFor(() => {
-      expect(calls.projection).toEqual([newTarget!.id])
+      expect(calls.snapshot).toEqual([newTarget!.id])
     })
   })
 

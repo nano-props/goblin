@@ -118,7 +118,7 @@ describe('workspace pane destination navigation', () => {
     expect(setWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
-  test('rejects cached branch data after a failed refresh without writing supplements', async () => {
+  test('commits accepted branch data after a background refresh failure', async () => {
     const repo = seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
@@ -130,12 +130,12 @@ describe('workspace pane destination navigation', () => {
     await routeNavigation.started
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
     const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('missing repo projection query')
-    query.setState({ ...query.state, status: 'error', error: new Error('projection unavailable') })
+    if (!query) throw new Error('missing repo snapshot query')
+    query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
     routeCommit.resolve(true)
 
-    await expect(committed).resolves.toEqual({ kind: 'superseded' })
-    expect(setWorkspacePaneTab).not.toHaveBeenCalled()
+    await expect(committed).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/destination', 'status')
   })
 
   test('uses a primary-window presentation generation so the latest destination wins', async () => {

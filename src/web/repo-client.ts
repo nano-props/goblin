@@ -6,6 +6,7 @@ import type {
   RepoPullRequestScope,
   RepoPullRequestsResponse,
   RepoSnapshotResponse,
+  RepoWorktreeMutationResponse,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, RepoUrlTarget } from '#/shared/git-types.ts'
@@ -24,6 +25,7 @@ import {
   RepoOperationsResponseSchema,
   RepoPullRequestsResponseSchema,
   RepoSnapshotResponseSchema,
+  RepoWorktreeMutationResponseSchema,
   RepoRemoteBranchesResponseSchema,
   RepoWorktreeStatusResponseSchema,
   WorktreeBootstrapPreviewResponseSchema,
@@ -217,11 +219,11 @@ export async function createRepoWorktree(
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoWorktreeMutationResponse> {
   return await postServerJson(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
-    decodeWith(ExecResultResponseSchema),
+    decodeWith(RepoWorktreeMutationResponseSchema),
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
@@ -265,11 +267,11 @@ export async function removeRepoWorktree(
     deleteUpstream?: boolean
   },
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoWorktreeMutationResponse> {
   return await postServerJson(
     '/api/repo/remove-worktree',
     { cwd, workspaceRuntimeId, ...options },
-    decodeWith(ExecResultResponseSchema),
+    decodeWith(RepoWorktreeMutationResponseSchema),
     {
       signal,
       timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,

@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 
 describe('BranchView', () => {
-  test('uses the React Query projection read model for branch rows when available', () => {
+  test('uses the React Query snapshot for branch rows when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],

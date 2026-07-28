@@ -2,9 +2,10 @@ import { ArrowDown, ArrowUp, Diff, FolderTree, GitBranch, History, Trash2 } from
 import { createElement, type ReactNode } from 'react'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { type BranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
+import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
   branchActionDisplayPhase,
+  type BranchActionItemId,
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
