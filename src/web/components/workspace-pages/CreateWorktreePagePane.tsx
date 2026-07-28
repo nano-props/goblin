@@ -27,6 +27,10 @@ import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import {
+  beginPrimaryWindowNavigation,
+  type PrimaryWindowNavigationGeneration,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
@@ -42,7 +46,7 @@ interface CreateWorktreePagePaneProps {
   compact?: boolean
   trafficLightOffset?: boolean
   onCancel: () => void
-  onCreated: (branchName: string) => void
+  onCreated: (branchName: string, navigationGeneration: PrimaryWindowNavigationGeneration) => void
 }
 
 export function CreateWorktreePagePane({
@@ -197,12 +201,13 @@ export function CreateWorktreePagePane({
       operationsReadModel.data?.operations,
     )
     if (branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
+    const navigationGeneration = beginPrimaryWindowNavigation()
     const result = await runBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
       { workspaceRuntimeId: liveRepo.workspaceRuntimeId },
     )
-    if (result?.ok) onCreated(createWorktreeTargetBranch(request.input))
+    if (result?.ok) onCreated(createWorktreeTargetBranch(request.input), navigationGeneration)
     return false
   }
 

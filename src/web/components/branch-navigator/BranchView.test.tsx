@@ -193,7 +193,8 @@ describe('BranchView', () => {
 
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect((await screen.findByRole('alert')).textContent).toContain('error.failed-read-repo')
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
     expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 

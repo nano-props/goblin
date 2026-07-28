@@ -185,6 +185,7 @@ export async function refreshRepoSnapshotReadModel(
   options.signal?.throwIfAborted()
   const client = options.queryClient ?? primaryWindowQueryClient
   const queryKey = repoSnapshotQueryKey(repoRoot, workspaceRuntimeId)
+  bump(metadataVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
   options.signal?.throwIfAborted()
   const sharedRead = client.fetchQuery({
@@ -217,6 +218,7 @@ export async function refreshRepoWorktreeStatusReadModel(
   options.signal?.throwIfAborted()
   const client = options.queryClient ?? primaryWindowQueryClient
   const queryKey = repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId)
+  bump(statusVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
   options.signal?.throwIfAborted()
   const sharedRead = client.fetchQuery({

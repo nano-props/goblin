@@ -8,6 +8,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -114,7 +115,7 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
   }: {
     compact?: boolean
     onCancel: () => void
-    onCreated: (branchName: string) => void
+    onCreated: (branchName: string, navigationGeneration: PrimaryWindowNavigationGeneration) => void
   }) => (
     <div data-testid="create-worktree-page" data-compact={compact ? 'true' : 'false'}>
       <button
@@ -130,7 +131,7 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
         data-testid="create-worktree-created"
         onClick={() => {
           createWorktreePageMocks.created('feature/new-worktree')
-          onCreated('feature/new-worktree')
+          onCreated('feature/new-worktree', 1)
         }}
       />
     </div>

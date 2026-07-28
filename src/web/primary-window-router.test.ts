@@ -432,7 +432,7 @@ describe('primary window route callback facades', () => {
     routerCallbacks.onOpenRepoBranch(ROUTE_WORKSPACE_ID, 'main')
     routerCallbacks.onOpenRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onCancelRepoNewWorktree(ROUTE_WORKSPACE_ID)
-    routerCallbacks.onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'main')
+    routerCallbacks.onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'main', 1)
     applyPrimaryWindowSettingsRouteChange(routeActions, null)
     layoutCallbacks.navigateToSettingsShortcuts()
     layoutCallbacks.navigateToIndex()
@@ -452,9 +452,12 @@ describe('primary window route callback facades', () => {
       openRepoBranch: vi.fn(() => true),
     } as unknown as PrimaryWindowRouteNavigation
 
-    primaryWindowRouterCallbacks(routeActions).onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'feature/new')
+    primaryWindowRouterCallbacks(routeActions).onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'feature/new', 7)
 
-    expect(routeActions.openRepoBranch).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID, 'feature/new', { replace: true })
+    expect(routeActions.openRepoBranch).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID, 'feature/new', {
+      replace: true,
+      navigationGeneration: 7,
+    })
   })
 
   test.each([

@@ -140,6 +140,28 @@ describe('repository query authorities', () => {
     unsubscribe()
   })
 
+  test('does not accept a snapshot read that started before an explicit refresh', async () => {
+    const client = new QueryClient()
+    const reads: Array<PromiseWithResolvers<RepoSnapshotResponse>> = []
+    repoClientMocks.getRepoSnapshot.mockImplementation(() => {
+      const read = Promise.withResolvers<RepoSnapshotResponse>()
+      reads.push(read)
+      return read.promise
+    })
+    const observer = new QueryObserver(client, repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true))
+    const unsubscribe = observer.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+
+    const refresh = refreshRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
+    reads[0]!.resolve(snapshot('before-refresh'))
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    reads[1]!.resolve(snapshot('after-refresh'))
+
+    await expect(refresh).resolves.toEqual(snapshot('after-refresh'))
+    expect(getRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', client)?.current).toBe('after-refresh')
+    unsubscribe()
+  })
+
   test('forwards caller cancellation to an imperative cold snapshot refresh', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     repoClientMocks.getRepoSnapshot.mockImplementation(

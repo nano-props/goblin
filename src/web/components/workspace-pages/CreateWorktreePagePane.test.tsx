@@ -21,6 +21,11 @@ import type * as SettingsClient from '#/web/settings-client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import {
+  beginPrimaryWindowNavigation,
+  currentPrimaryWindowNavigationGeneration,
+  resetPrimaryWindowNavigationForTest,
+} from '#/web/primary-window-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -74,6 +79,7 @@ vi.mock('#/web/repo-client.ts', () => ({
 }))
 
 beforeEach(() => {
+  resetPrimaryWindowNavigationForTest()
   vi.clearAllMocks()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
@@ -386,9 +392,12 @@ describe('CreateWorktreePagePane', () => {
       expect(button(container).dataset.loading).toBe('false')
     })
 
+    const generationBeforeSubmit = currentPrimaryWindowNavigationGeneration()
     await act(async () => {
       button(container).click()
     })
+    const navigationGeneration = currentPrimaryWindowNavigationGeneration()
+    expect(navigationGeneration).toBeGreaterThan(generationBeforeSubmit)
 
     expect(onCreated).not.toHaveBeenCalled()
 
@@ -397,9 +406,37 @@ describe('CreateWorktreePagePane', () => {
     })
 
     await waitFor(() => {
-      expect(onCreated).toHaveBeenCalledWith('feature/new')
+      expect(onCreated).toHaveBeenCalledWith('feature/new', navigationGeneration)
     })
     expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  test('retains the submitting navigation generation when creation settles after newer navigation', async () => {
+    const onCreated = vi.fn()
+    let resolveAction!: (value: ExecResult) => void
+    useWorkspacesStore.setState({
+      runBranchAction: vi.fn(
+        () =>
+          new Promise<ExecResult>((resolve) => {
+            resolveAction = resolve
+          }),
+      ),
+    })
+    const { container } = renderPane(
+      <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />,
+    )
+    await waitFor(() => expect(button(container).dataset.loading).toBe('false'))
+
+    await act(async () => {
+      button(container).click()
+    })
+    const submittingGeneration = currentPrimaryWindowNavigationGeneration()
+    beginPrimaryWindowNavigation()
+    await act(async () => {
+      resolveAction({ ok: true, message: 'ok' })
+    })
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('feature/new', submittingGeneration))
   })
 
   test('does not reload bootstrap preview when the repo presentation refreshes', async () => {
