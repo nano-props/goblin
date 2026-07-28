@@ -1,4 +1,8 @@
-import type { TerminalProjectionEffect, TerminalSessionSummary, WorkspaceRuntimeScope } from '#/shared/terminal-types.ts'
+import type {
+  TerminalProjectionEffect,
+  TerminalSessionSummary,
+  WorkspaceRuntimeScope,
+} from '#/shared/terminal-types.ts'
 import type { TerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import type { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import type { TerminalSessionProjection } from '#/web/components/terminal/TerminalSessionProjection.ts'

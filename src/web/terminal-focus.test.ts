@@ -12,6 +12,7 @@ import {
   terminalHasKeyboardFocus,
 } from '#/web/terminal-focus.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 
 type RequiredTerminalFocusRequest = Required<TerminalFocusRequest>
 
@@ -105,7 +106,7 @@ describe('terminal presentation focus', () => {
     lease.commit('term-created', focusTerminal)
     const request = focusTerminal.mock.calls[0]![1]
     await Promise.resolve()
-    const input = new KeyboardEvent('keydown', {
+    const input = keyboardEventForTest('keydown', {
       key: 'w',
       code: 'KeyW',
       metaKey: true,
@@ -126,7 +127,7 @@ describe('terminal presentation focus', () => {
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
     const request = focusTerminal.mock.calls[0]![1]
-    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    const tab = keyboardEventForTest('keydown', { key: 'Tab', cancelable: true })
 
     document.body.dispatchEvent(tab)
 

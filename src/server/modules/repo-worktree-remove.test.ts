@@ -75,10 +75,7 @@ describe('repo worktree removal', () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
     await expect(
-      removeLocalRepoWorktreeForTest(
-        { deleteBranch: false },
-        { ...successfulRemovalLifecycle, afterWorktreeRemoved },
-      ),
+      removeLocalRepoWorktreeForTest({ deleteBranch: false }, { ...successfulRemovalLifecycle, afterWorktreeRemoved }),
     ).resolves.toEqual({ ok: false, message: 'git remove failed' })
 
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
@@ -349,9 +346,9 @@ describe('repo worktree removal', () => {
     ])
     mocks.sampleWorktreeStatusForTarget.mockRejectedValueOnce(new Error('status failed'))
 
-    await expect(
-      removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle),
-    ).rejects.toThrow('status failed')
+    await expect(removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)).rejects.toThrow(
+      'status failed',
+    )
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
   })
 })

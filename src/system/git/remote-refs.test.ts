@@ -31,11 +31,9 @@ describe('getRemoteTrackingBranches', () => {
     expect(gitMock).toHaveBeenCalledWith('/repo', ['for-each-ref', '--format=%(refname)', 'refs/remotes/'], {
       signal,
     })
-    expect(gitLookupMock).toHaveBeenCalledWith(
-      '/repo',
-      ['config', '--get-all', '--', 'remote.origin.fetch'],
-      { signal },
-    )
+    expect(gitLookupMock).toHaveBeenCalledWith('/repo', ['config', '--get-all', '--', 'remote.origin.fetch'], {
+      signal,
+    })
     expect(gitMock).toHaveBeenCalledTimes(2)
     expect(gitLookupMock).toHaveBeenCalledOnce()
   })

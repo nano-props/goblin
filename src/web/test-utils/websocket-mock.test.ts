@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from 'vitest'
-import { flushMicrotasks } from '#/test-utils/index.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
 describe('installWebSocketMock', () => {

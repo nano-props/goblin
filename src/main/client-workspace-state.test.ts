@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -7,121 +7,123 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 let tmp: string | null = null
 
-afterEach(() => {
-  if (tmp) rmSync(tmp, { recursive: true, force: true })
-  tmp = null
-  vi.resetModules()
-  vi.doUnmock('electron')
-  vi.doUnmock('node:fs/promises')
-})
-
-test('persists client workspace independently of the embedded server origin', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  const state = {
-    ...defaultClientWorkspaceState(),
-    restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-d'),
-  }
-
-  await persistence.writeNativeClientWorkspaceState(state)
-
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({
-    kind: 'loaded',
-    state,
+describe('client workspace state persistence', () => {
+  afterEach(() => {
+    if (tmp) rmSync(tmp, { recursive: true, force: true })
+    tmp = null
+    vi.resetModules()
+    vi.doUnmock('electron')
+    vi.doUnmock('node:fs/promises')
   })
-})
 
-test('creates defaults for a missing workspace file and replaces invalid JSON', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
+  test('persists client workspace independently of the embedded server origin', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    const state = {
+      ...defaultClientWorkspaceState(),
+      restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-d'),
+    }
 
-  const state = defaultClientWorkspaceState()
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
-  expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
+    await persistence.writeNativeClientWorkspaceState(state)
 
-  writeFileSync(path.join(tmp, 'client-workspace.json'), '{invalid json', 'utf-8')
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
-  expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
-})
-
-test('reads the current state directly without an envelope', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  const state = defaultClientWorkspaceState()
-  writeFileSync(path.join(tmp, 'client-workspace.json'), JSON.stringify(state), 'utf-8')
-
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
-  expect(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8')).toBe(JSON.stringify(state))
-})
-
-test('replaces an obsolete version envelope with defaults', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  writeFileSync(path.join(tmp, 'client-workspace.json'), JSON.stringify({ version: 2, state: {} }), 'utf-8')
-
-  const state = defaultClientWorkspaceState()
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
-  expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
-  expect(readdirSync(tmp)).toEqual(['client-workspace.json'])
-})
-
-test('replaces state with unknown fields', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  const raw = JSON.stringify({ ...defaultClientWorkspaceState(), unknownRoot: 'preserve' })
-  writeFileSync(path.join(tmp, 'client-workspace.json'), raw, 'utf-8')
-
-  const state = defaultClientWorkspaceState()
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
-  expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
-})
-
-test('serializes corrupt reads before a concurrent write so the committed state is not quarantined', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  const file = path.join(tmp, 'client-workspace.json')
-  writeFileSync(file, '{invalid json', 'utf-8')
-  const state = {
-    ...defaultClientWorkspaceState(),
-    restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-after-corruption'),
-  }
-
-  const [readResult, writeResult] = await Promise.allSettled([
-    persistence.readNativeClientWorkspaceState(),
-    persistence.writeNativeClientWorkspaceState(state),
-  ])
-
-  expect(readResult).toEqual({ status: 'fulfilled', value: { kind: 'loaded', state: defaultClientWorkspaceState() } })
-  expect(writeResult.status).toBe('fulfilled')
-  await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({
-    kind: 'loaded',
-    state,
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({
+      kind: 'loaded',
+      state,
+    })
   })
-  expect(readdirSync(tmp)).toEqual(['client-workspace.json'])
-})
 
-test('serializes concurrent corrupt reads through one authoritative default rewrite', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
-  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
-  const persistence = await import('#/main/client-workspace-state.ts')
-  writeFileSync(path.join(tmp, 'client-workspace.json'), '{invalid json', 'utf-8')
+  test('creates defaults for a missing workspace file and replaces invalid JSON', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
 
-  const results = await Promise.allSettled([
-    persistence.readNativeClientWorkspaceState(),
-    persistence.readNativeClientWorkspaceState(),
-  ])
-  const loaded = { kind: 'loaded', state: defaultClientWorkspaceState() }
-  expect(results).toEqual([
-    { status: 'fulfilled', value: loaded },
-    { status: 'fulfilled', value: loaded },
-  ])
-  expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(
-    defaultClientWorkspaceState(),
-  )
+    const state = defaultClientWorkspaceState()
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
+    expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
+
+    writeFileSync(path.join(tmp, 'client-workspace.json'), '{invalid json', 'utf-8')
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
+    expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
+  })
+
+  test('reads the current state directly without an envelope', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    const state = defaultClientWorkspaceState()
+    writeFileSync(path.join(tmp, 'client-workspace.json'), JSON.stringify(state), 'utf-8')
+
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
+    expect(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8')).toBe(JSON.stringify(state))
+  })
+
+  test('replaces an obsolete version envelope with defaults', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    writeFileSync(path.join(tmp, 'client-workspace.json'), JSON.stringify({ version: 2, state: {} }), 'utf-8')
+
+    const state = defaultClientWorkspaceState()
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
+    expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
+    expect(readdirSync(tmp)).toEqual(['client-workspace.json'])
+  })
+
+  test('replaces state with unknown fields', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    const raw = JSON.stringify({ ...defaultClientWorkspaceState(), unknownRoot: 'preserve' })
+    writeFileSync(path.join(tmp, 'client-workspace.json'), raw, 'utf-8')
+
+    const state = defaultClientWorkspaceState()
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({ kind: 'loaded', state })
+    expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(state)
+  })
+
+  test('serializes corrupt reads before a concurrent write so the committed state is not quarantined', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    const file = path.join(tmp, 'client-workspace.json')
+    writeFileSync(file, '{invalid json', 'utf-8')
+    const state = {
+      ...defaultClientWorkspaceState(),
+      restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-after-corruption'),
+    }
+
+    const [readResult, writeResult] = await Promise.allSettled([
+      persistence.readNativeClientWorkspaceState(),
+      persistence.writeNativeClientWorkspaceState(state),
+    ])
+
+    expect(readResult).toEqual({ status: 'fulfilled', value: { kind: 'loaded', state: defaultClientWorkspaceState() } })
+    expect(writeResult.status).toBe('fulfilled')
+    await expect(persistence.readNativeClientWorkspaceState()).resolves.toEqual({
+      kind: 'loaded',
+      state,
+    })
+    expect(readdirSync(tmp)).toEqual(['client-workspace.json'])
+  })
+
+  test('serializes concurrent corrupt reads through one authoritative default rewrite', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-client-workspace-test-'))
+    vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+    const persistence = await import('#/main/client-workspace-state.ts')
+    writeFileSync(path.join(tmp, 'client-workspace.json'), '{invalid json', 'utf-8')
+
+    const results = await Promise.allSettled([
+      persistence.readNativeClientWorkspaceState(),
+      persistence.readNativeClientWorkspaceState(),
+    ])
+    const loaded = { kind: 'loaded', state: defaultClientWorkspaceState() }
+    expect(results).toEqual([
+      { status: 'fulfilled', value: loaded },
+      { status: 'fulfilled', value: loaded },
+    ])
+    expect(JSON.parse(readFileSync(path.join(tmp, 'client-workspace.json'), 'utf-8'))).toEqual(
+      defaultClientWorkspaceState(),
+    )
+  })
 })

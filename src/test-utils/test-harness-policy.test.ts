@@ -7,6 +7,8 @@ import { glob } from 'tinyglobby'
 
 const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
+const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
+const DEFAULT_TEST_FILE_LINE_BUDGET = 1_000
 
 const repositoryPolicyLabels = [
   'hand-rolled React root',
@@ -57,14 +59,53 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
+  test('keeps the hoisted xterm boundary in one canonical harness', async () => {
+    const files = await glob(['src/**/*.ts', 'src/**/*.tsx'])
+    const violations: string[] = []
+
+    for (const file of files) {
+      if (file === CANONICAL_XTERM_MOCK_FILE) continue
+      const source = await readFile(file, 'utf8')
+      if (/vi\.mock\(\s*['"]@xterm\//u.test(source)) violations.push(file)
+    }
+
+    expect(violations).toEqual([])
+  })
+
   test('keeps component test filenames aligned with their source surfaces', async () => {
     const files = await glob(['src/**/*.component.test.ts', 'src/**/*.component.test.tsx'])
 
     expect(files).toEqual([])
   })
 
-  test('drives component keyboard input through userEvent', async () => {
-    const files = await glob('src/web/components/**/*.test.tsx')
+  test('keeps every test file within the structural line budget', async () => {
+    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+    const violations: string[] = []
+
+    for (const file of files) {
+      const source = await readFile(file, 'utf8')
+      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
+      if (lineCount > DEFAULT_TEST_FILE_LINE_BUDGET)
+        violations.push(`${file}: ${lineCount} lines exceeds ${DEFAULT_TEST_FILE_LINE_BUDGET}`)
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  test('keeps every test file under a named suite', async () => {
+    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+    const violations: string[] = []
+
+    for (const file of files) {
+      const source = await readFile(file, 'utf8')
+      if (!/\bdescribe\s*\(/u.test(source)) violations.push(file)
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  test('keeps raw keyboard event construction behind the listener-contract helper', async () => {
+    const files = await glob(['src/web/**/*.test.ts', 'src/web/**/*.test.tsx'])
     const violations: string[] = []
     for (const file of files) {
       if ((await analyzeFile(file)).has('direct KeyboardEvent construction')) violations.push(file)
@@ -75,12 +116,9 @@ describe('test harness policy', () => {
 
   test('uses the shared fake-timer configuration across repository tests', async () => {
     const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
-    // TerminalSession intentionally leaves Date and performance real because
-    // they participate in its terminal protocol and activity calculations.
-    const exceptions = new Set(['src/web/components/terminal/TerminalSession.test.ts'])
     const violations: string[] = []
     for (const file of files) {
-      if (file === POLICY_FILE || exceptions.has(file)) continue
+      if (file === POLICY_FILE) continue
       if ((await analyzeFile(file)).has('direct fake-timer configuration')) violations.push(file)
     }
 

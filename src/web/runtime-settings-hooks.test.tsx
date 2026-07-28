@@ -132,10 +132,7 @@ describe('runtime settings hooks', () => {
 
     await renderWithPrimaryWindowQueryClient(<HookHost />)
 
-    expect(result).toEqual([
-      { id: 'goblin+file:///tmp/repo-a' },
-      { id: 'goblin+file:///tmp/repo-b' },
-    ])
+    expect(result).toEqual([{ id: 'goblin+file:///tmp/repo-a' }, { id: 'goblin+file:///tmp/repo-b' }])
   })
 })
 

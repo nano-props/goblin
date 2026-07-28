@@ -12,7 +12,7 @@
 //     debounce / reconnect code paths.
 
 import { afterEach, vi } from 'vitest'
-import { flushMicrotasks } from './microtasks.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const FAKE_TIMER_OPTIONS: Parameters<typeof vi.useFakeTimers>[0] = {
   toFake: [

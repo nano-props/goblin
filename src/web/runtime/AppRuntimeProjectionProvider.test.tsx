@@ -593,7 +593,6 @@ describe('AppRuntimeProjectionProvider', () => {
     expect(recoverSessionsMock).not.toHaveBeenCalled()
     expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
   })
-
 })
 
 function renderRuntimeProvider(currentWorkspaceId: WorkspaceId | null) {

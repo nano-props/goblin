@@ -1,9 +1,5 @@
 export function validateBranchName(branch: string): { ok: true } | { ok: false } {
-  if (
-    branch === 'HEAD' ||
-    branch.startsWith('-') ||
-    !isSafeRefName(branch)
-  ) {
+  if (branch === 'HEAD' || branch.startsWith('-') || !isSafeRefName(branch)) {
     return { ok: false }
   }
   return { ok: true }

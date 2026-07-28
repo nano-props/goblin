@@ -83,19 +83,17 @@ describe('getWorkingStatus', () => {
   })
 
   test('returns complete status for branch and detached worktrees', async () => {
-    const membership = [
-      'worktree /tmp/repo',
-      'HEAD f00ba4a',
-      'branch refs/heads/main',
-      '',
-      'worktree /tmp/detached-worktree',
-      'HEAD ba5eba1',
-      'detached',
-    ].join('\0') + '\0\0'
-    mocks.git
-      .mockResolvedValueOnce(membership)
-      .mockResolvedValueOnce('')
-      .mockResolvedValueOnce('?? detached.ts\0')
+    const membership =
+      [
+        'worktree /tmp/repo',
+        'HEAD f00ba4a',
+        'branch refs/heads/main',
+        '',
+        'worktree /tmp/detached-worktree',
+        'HEAD ba5eba1',
+        'detached',
+      ].join('\0') + '\0\0'
+    mocks.git.mockResolvedValueOnce(membership).mockResolvedValueOnce('').mockResolvedValueOnce('?? detached.ts\0')
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 
     await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([

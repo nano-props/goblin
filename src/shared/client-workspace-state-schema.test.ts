@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  parseClientWorkspaceStateJson,
-  stringifyClientWorkspaceState,
-} from '#/shared/client-workspace-state-schema.ts'
+import { parseClientWorkspaceStateJson, stringifyClientWorkspaceState } from '#/shared/client-workspace-state-schema.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 
 describe('client workspace state JSON codec', () => {

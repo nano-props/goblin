@@ -1,9 +1,6 @@
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
-import type {
-  TerminalRuntimeMembership,
-  TerminalRuntimeMembershipIndex,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalRuntimeMembership, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 

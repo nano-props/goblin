@@ -58,10 +58,7 @@ describe('restorable-workspace-state', () => {
   })
 
   test('persists a plain Workspace root without synthetic Git targets', () => {
-    const workspace = emptyWorkspace(
-      'goblin+file:///tmp/repo-without-query-model',
-      'repo-runtime-without-query',
-    )
+    const workspace = emptyWorkspace('goblin+file:///tmp/repo-without-query-model', 'repo-runtime-without-query')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
       capabilities: {

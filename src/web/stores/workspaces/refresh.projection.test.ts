@@ -344,5 +344,4 @@ describe('workspace refresh projection', () => {
         : null,
     ).toBe('terminal')
   })
-
 })

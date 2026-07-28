@@ -85,9 +85,7 @@ describe('WorkspaceOpenDialog', () => {
     expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
       activateWorkspace.mock.invocationCallOrder[0]!,
     )
-    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
-      onOpenChange.mock.invocationCallOrder[0]!,
-    )
+    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
 })
 

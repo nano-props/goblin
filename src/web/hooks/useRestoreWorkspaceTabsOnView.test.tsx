@@ -3,6 +3,7 @@
 import { act, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
@@ -291,12 +292,10 @@ describe('useRestoreWorkspaceTabsOnView', () => {
       workspaces: { [RETRY_WORKSPACE_ID]: stubRepo(RETRY_WORKSPACE_ID, 'rtr') },
       promoteRestoredWorkspace: mocks.promoteRestoredWorkspace,
     }
-    mocks.restoreWorkspaceTabsOnView
-      .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({
-        workspace: { workspaceId: RETRY_WORKSPACE_ID, workspaceRuntimeId: 'rtr' },
-        snapshot: null,
-      })
+    mocks.restoreWorkspaceTabsOnView.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
+      workspace: { workspaceId: RETRY_WORKSPACE_ID, workspaceRuntimeId: 'rtr' },
+      snapshot: null,
+    })
 
     const host = renderInJsdom(<Host />)
     await waitFor(() => expect(host.container.textContent).toBe('boom'))
@@ -328,7 +327,7 @@ describe('useRestoreWorkspaceTabsOnView', () => {
     const hostA = renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.restoreWorkspaceTabsOnView).toHaveBeenCalledTimes(1))
     const hostB = renderInJsdom(<Host />)
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await flushMicrotasks()
     expect(mocks.restoreWorkspaceTabsOnView).toHaveBeenCalledTimes(1)
 
     await act(async () => {

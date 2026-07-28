@@ -24,5 +24,8 @@ export function broadcastWorkspacePaneTabsRevision(
   workspaceRuntimeId: string,
   revision: number,
 ): void {
-  broadcaster.broadcastToUser(userId, workspacePaneTabsRevisionRealtimeMessage(workspaceId, workspaceRuntimeId, revision))
+  broadcaster.broadcastToUser(
+    userId,
+    workspacePaneTabsRevisionRealtimeMessage(workspaceId, workspaceRuntimeId, revision),
+  )
 }

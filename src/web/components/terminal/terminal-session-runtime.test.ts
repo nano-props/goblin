@@ -474,7 +474,6 @@ describe('TerminalSessionRuntime', () => {
       output: 'tick',
     })
   })
-
 })
 
 describe('TerminalSessionRuntime runtime binding generations', () => {

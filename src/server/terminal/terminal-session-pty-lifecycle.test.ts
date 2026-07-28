@@ -203,9 +203,7 @@ describe('TerminalPtyBinding input acknowledgement', () => {
 
     const first = binding.write(session, 'a')
     const second = binding.write(session, 'b')
-    await vi.waitFor(() =>
-      expect(supervisor.write).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 'ab'),
-    )
+    await vi.waitFor(() => expect(supervisor.write).toHaveBeenCalledWith({ ptySessionId: 'pty_bound_123456' }, 'ab'))
     deferredWrite.resolve({ status: 'accepted' })
     await expect(Promise.all([first, second])).resolves.toEqual([{ status: 'accepted' }, { status: 'accepted' }])
   })

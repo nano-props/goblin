@@ -4,7 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),

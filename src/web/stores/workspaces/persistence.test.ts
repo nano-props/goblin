@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import {
-  normalizeRepoSnapshotCache,
-  persistRepoSnapshotCacheEntry,
-} from '#/web/stores/workspaces/persistence.ts'
+import { normalizeRepoSnapshotCache, persistRepoSnapshotCacheEntry } from '#/web/stores/workspaces/persistence.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,

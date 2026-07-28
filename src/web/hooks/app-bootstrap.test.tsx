@@ -8,7 +8,8 @@ import {
   defaultServerWorkspaceState,
   defaultSettingsSnapshot,
 } from '#/shared/settings-defaults.ts'
-import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'

@@ -203,9 +203,7 @@ function DirectoryDashboard({
   return (
     <>
       <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4')}>
-        <h1 className="truncate text-base font-semibold text-foreground">
-          {workspaceNameFromLocator(workspace.id)}
-        </h1>
+        <h1 className="truncate text-base font-semibold text-foreground">{workspaceNameFromLocator(workspace.id)}</h1>
         <div className="mt-1 truncate text-xs text-muted-foreground" title={displayLocation}>
           {displayLocation}
         </div>

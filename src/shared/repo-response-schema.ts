@@ -82,9 +82,7 @@ const RepoSnapshotSchema = v.strictObject({
 })
 export const RepoProjectionResponseSchema = v.strictObject({
   snapshot: v.nullable(RepoSnapshotSchema),
-  pullRequests: v.nullable(
-    v.array(v.strictObject({ branch: v.string(), pullRequest: PullRequestSchema })),
-  ),
+  pullRequests: v.nullable(v.array(v.strictObject({ branch: v.string(), pullRequest: PullRequestSchema }))),
   requested: v.strictObject({ branch: v.nullable(v.string()), pullRequestMode: v.picklist(['summary', 'full']) }),
   loadedAt: v.number(),
 })
@@ -115,7 +113,16 @@ export const RepoOperationsResponseSchema = v.strictObject({
       id: v.string(),
       repoId: v.nullable(WorkspaceIdSchema),
       workspaceRuntimeId: v.nullable(v.string()),
-      kind: v.picklist(['fetch', 'clone', 'pull', 'push', 'create-worktree', 'delete-branch', 'remove-worktree', 'network']),
+      kind: v.picklist([
+        'fetch',
+        'clone',
+        'pull',
+        'push',
+        'create-worktree',
+        'delete-branch',
+        'remove-worktree',
+        'network',
+      ]),
       phase: v.picklist(['queued', 'running', 'cancelling', 'done', 'failed']),
       source: v.picklist(['user', 'background', 'system']),
       target: v.nullable(

@@ -70,9 +70,7 @@ export interface WorkspaceRuntimeMembershipLease {
 type TerminalRemoteLifecycle = Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
 
 export type RemoteWorkspaceLifecycleRunResult =
-  | { kind: 'settled'; lifecycle: TerminalRemoteLifecycle }
-  | { kind: 'superseded' }
-  | { kind: 'stale-runtime' }
+  { kind: 'settled'; lifecycle: TerminalRemoteLifecycle } | { kind: 'superseded' } | { kind: 'stale-runtime' }
 
 export type RemoteWorkspaceLifecycleFailResult =
   | { kind: 'settled'; lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'failed' }> }
@@ -325,12 +323,7 @@ export function expireWorkspaceRuntimeMembershipLease(
       continue
     }
     state.members.delete(lease.clientId)
-    emitWorkspaceRuntimeMembershipReleasedFor(
-      lease.userId,
-      lease.clientId,
-      entry.workspaceId,
-      entry.workspaceRuntimeId,
-    )
+    emitWorkspaceRuntimeMembershipReleasedFor(lease.userId, lease.clientId, entry.workspaceId, entry.workspaceRuntimeId)
     if (workspaceRuntimeHasOwners(state)) continue
     const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
     if (!workspaceRuntimeId) continue
@@ -443,10 +436,7 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
   return listWorkspaceRuntimes(userId)
 }
 
-function admitWorkspaceRuntimeMembershipDeclaration(
-  clientId: string,
-  workspaceIds: readonly WorkspaceId[],
-): void {
+function admitWorkspaceRuntimeMembershipDeclaration(clientId: string, workspaceIds: readonly WorkspaceId[]): void {
   if (!isOpaqueId(clientId)) throw new Error('workspace runtime reconcile requires a valid clientId')
   if (workspaceIds.length > 100) throw new Error('workspace runtime reconcile accepts at most 100 workspace ids')
 }
@@ -963,9 +953,7 @@ function stopWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string | null 
 }
 
 function workspaceRuntimeHasOwners(state: WorkspaceRuntimeState): boolean {
-  return (
-    state.members.size > 0 || state.resourceRetainers.size > 0 || state.activeWorkspaceLifecycleOperations > 0
-  )
+  return state.members.size > 0 || state.resourceRetainers.size > 0 || state.activeWorkspaceLifecycleOperations > 0
 }
 
 export function onWorkspaceRuntimeClosed(listener: (event: WorkspaceRuntimeClosedEvent) => void): () => void {

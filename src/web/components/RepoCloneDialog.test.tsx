@@ -92,9 +92,7 @@ describe('RepoCloneDialog', () => {
     expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
       activateWorkspace.mock.invocationCallOrder[0]!,
     )
-    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
-      onOpenChange.mock.invocationCallOrder[0]!,
-    )
+    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {

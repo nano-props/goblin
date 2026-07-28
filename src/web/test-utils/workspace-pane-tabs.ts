@@ -119,11 +119,7 @@ export function runtimeWorkspacePaneTargetForTest(
   const paneTarget =
     'kind' in input
       ? input
-      : requiredGitWorkspacePaneTabsTarget(
-          workspaceIdForTest(input.workspaceId),
-          input.branchName,
-          input.worktreePath,
-        )
+      : requiredGitWorkspacePaneTabsTarget(workspaceIdForTest(input.workspaceId), input.branchName, input.worktreePath)
   const target = runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')
   return target

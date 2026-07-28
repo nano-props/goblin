@@ -278,7 +278,9 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                           value={remoteTrackingBranchKey(remote)}
                           textValue={`${remote.remote}/${remote.branch}`}
                         >
-                          <span className="truncate">{remote.remote}/{remote.branch}</span>
+                          <span className="truncate">
+                            {remote.remote}/{remote.branch}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -105,7 +105,8 @@ function worktreeTargetIdentity(
 
 export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
   const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
-  if (workspaceId !== target.workspaceId) throw new Error('workspace pane target requires a canonical workspace locator')
+  if (workspaceId !== target.workspaceId)
+    throw new Error('workspace pane target requires a canonical workspace locator')
   if (target.kind === 'workspace-root') return `${workspaceId}\0workspace-root`
   if (target.kind === 'worktree') {
     if (

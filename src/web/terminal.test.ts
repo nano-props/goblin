@@ -251,7 +251,9 @@ describe('terminal web host client', () => {
 
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    const request = socket.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'recover-sessions')
     socket.emitMessage(
       JSON.stringify({
         type: 'response',
@@ -278,7 +280,9 @@ describe('terminal web host client', () => {
 
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    const request = socket.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
       action: 'recover-sessions',
@@ -319,7 +323,9 @@ describe('terminal web host client', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    const request = socket.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
       action: 'recover-sessions',
@@ -353,7 +359,9 @@ describe('terminal web host client', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'recover-sessions')
+    const request = socket.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'recover-sessions')
     expect(request).toMatchObject({
       type: 'request',
       action: 'recover-sessions',

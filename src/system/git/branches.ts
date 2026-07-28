@@ -55,10 +55,7 @@ export async function getRepoName(cwd: string): Promise<string> {
 }
 
 /** Authoritative HEAD read. `null` means a valid detached HEAD; failures throw. */
-export async function getCurrentBranch(
-  cwd: string,
-  options?: { signal?: AbortSignal },
-): Promise<string | null> {
+export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string | null> {
   // Unlike `rev-parse --abbrev-ref HEAD`, `branch --show-current` also
   // reports the configured branch for a valid repository with an unborn
   // HEAD. Its only successful empty result is detached HEAD.

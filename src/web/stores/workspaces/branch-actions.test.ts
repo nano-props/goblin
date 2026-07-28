@@ -564,9 +564,7 @@ describe('runBranchAction', () => {
         repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
-    const result = await useWorkspacesStore
-      .getState()
-      .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+    const result = await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
     expect(result).toEqual({ ok: false, message: 'boom' })
     expect(

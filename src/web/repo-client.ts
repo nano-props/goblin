@@ -153,15 +153,10 @@ export async function fetchRepo(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson(
-    '/api/repo/fetch',
-    { cwd, workspaceRuntimeId },
-    decodeWith(ExecResultResponseSchema),
-    {
-      signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
-    },
-  )
+  return await postServerJson('/api/repo/fetch', { cwd, workspaceRuntimeId }, decodeWith(ExecResultResponseSchema), {
+    signal,
+    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+  })
 }
 
 export async function pullRepoBranch(

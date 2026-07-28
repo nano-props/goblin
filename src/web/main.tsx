@@ -44,7 +44,11 @@ async function boot(): Promise<void> {
   )
 }
 
-function createTimeoutController(ms: number): { signal: AbortSignal; abort: (reason: unknown) => void; dispose: () => void } {
+function createTimeoutController(ms: number): {
+  signal: AbortSignal
+  abort: (reason: unknown) => void
+  dispose: () => void
+} {
   const controller = new AbortController()
   const id = window.setTimeout(() => {
     controller.abort(new Error(`initial public bootstrap timed out after ${ms}ms`))

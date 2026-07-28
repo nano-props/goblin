@@ -2,17 +2,13 @@
 // hand-rolling `createRoot` + `container` + `act` boilerplate.
 //
 // Why a helper rather than `@testing-library/react` directly:
-//   - RTL's `render` is synchronous and does not wrap the call in an
-//     `act()` boundary of its own; React 18+ trusts the test author to
-//     pass an `await act(async () => render(...))` wrapper when the test
-//     drives async updates, timers, or intermediate state. Most tests
-//     in this repo call `renderInJsdom(...)` without an explicit
-//     `act()` wrapper — they only need to verify final DOM state, not
-//     observe every intermediate commit. `renderInJsdom` mirrors
-//     RTL's behavior and does not impose an `act` boundary itself.
+//   - RTL's `render` already wraps the synchronous mount in its own
+//     `act()` boundary. Tests only add an explicit async `act()` around
+//     the later operation that schedules React work, such as advancing
+//     fake timers; wrapping the render again does not cover that work.
 //   - `cleanup` is registered with `afterEach` so callers don't repeat
 //     the import.
-//   - `flushAnimationFrames` and `flushMicrotasks` exist because
+//   - `flushAnimationFrames` and the shared microtask helpers exist because
 //     several tests need to drive microtasks or rAF deterministically;
 //     without these, tests reach for ad-hoc
 //     `for (let i = 0; i < 5; i++) await Promise.resolve()` loops,
@@ -36,7 +32,7 @@
 //     Tests that need an `act` boundary — typically those that drive
 //     fake timers, await async updates, or assert on intermediate
 //     state — should import `act` from `@testing-library/react` and
-//     wrap their calls in `await act(async () => …)` themselves.
+//     wrap the state-changing operation in `await act(async () => …)`.
 //     Importing `act` from `react` directly does not set the test
 //     environment flag and can emit "The current testing environment is
 //     not configured to support act(...)". `renderInJsdom` does not
@@ -44,17 +40,14 @@
 
 import { afterEach } from 'vitest'
 import { cleanup, render, type RenderOptions, type RenderResult } from '@testing-library/react'
-export { flushMicrotasks } from './microtasks.ts'
 
 afterEach(() => {
   cleanup()
 })
 
 /**
- * Render a React element under jsdom without imposing an `act`
- * boundary. Replaces the 20-line hand-rolled `createRoot` + container
- * + `act` boilerplate used by ~60 test files before this helper
- * existed.
+ * Render a React element under jsdom through RTL's synchronous `act`
+ * boundary. Replaces hand-rolled `createRoot` + container boilerplate.
  *
  * Returns the standard RTL result plus a `flushAnimationFrames`
  * helper for tests that drive `requestAnimationFrame` directly.

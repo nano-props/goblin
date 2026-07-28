@@ -19,13 +19,7 @@ import {
   WORKTREE_BOOTSTRAP_CONFIG_HASH_RE,
 } from '#/shared/workspace-settings.ts'
 
-export const FetchIntervalSecSchema = v.pipe(
-  v.number(),
-  v.finite(),
-  v.integer(),
-  v.minValue(0),
-  v.maxValue(3600),
-)
+export const FetchIntervalSecSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(3600))
 
 export const GlobalShortcutSchema = v.pipe(
   v.string(),

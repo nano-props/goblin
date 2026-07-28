@@ -22,12 +22,9 @@ import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
 
 const retryStaleRepoRuntimeRead = (_failureCount: number, error: unknown): boolean => isStaleRepoRuntimeReadError(error)
 
-function refetchStatusWhenFirstObserverMounts<
-  TQueryFnData,
-  TError,
-  TData,
-  TQueryKey extends readonly unknown[],
->(query: Query<TQueryFnData, TError, TData, TQueryKey>): boolean | 'always' {
+function refetchStatusWhenFirstObserverMounts<TQueryFnData, TError, TData, TQueryKey extends readonly unknown[]>(
+  query: Query<TQueryFnData, TError, TData, TQueryKey>,
+): boolean | 'always' {
   // Revalidate a cached workspace when it becomes visible again, but do not
   // multiply reads as the sidebar, dashboard, and workspace panes subscribe.
   return query.getObserversCount() === 1 ? 'always' : false

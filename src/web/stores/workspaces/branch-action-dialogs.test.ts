@@ -72,7 +72,9 @@ describe('useBranchActionDialogsStore', () => {
       },
       { isProtectedBranch: true },
     )
-    expect(useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'main')]).toEqual({
+    expect(
+      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'main')],
+    ).toEqual({
       removeAlsoDeletes: false,
       removeAlsoUpstream: false,
       deleteAlsoUpstream: false,
@@ -109,7 +111,10 @@ describe('useBranchActionDialogsStore', () => {
     const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
     useBranchActionDialogsStore
       .getState()
-      .openRemoveWorktreeConfirm({ repoId: WORKSPACE_1, branchName: 'feature/x', payload }, { isProtectedBranch: false })
+      .openRemoveWorktreeConfirm(
+        { repoId: WORKSPACE_1, branchName: 'feature/x', payload },
+        { isProtectedBranch: false },
+      )
     expect(useBranchActionDialogsStore.getState().removeConfirm).not.toBeNull()
 
     useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import {
@@ -32,99 +32,101 @@ vi.mock('#/main/native-host-settings-effects.ts', () => ({ applyNativeHostProjec
 vi.mock('#/main/settings-server-client.ts', () => ({ getSettingsSnapshot: vi.fn() }))
 vi.mock('#/main/embedded-server-lifecycle.ts', () => ({ getEmbeddedServerRuntime: vi.fn() }))
 
-beforeEach(() => {
-  vi.mocked(getEmbeddedServerRuntime).mockReturnValue({
-    url: 'http://127.0.0.1:32099',
-    host: '127.0.0.1',
-    port: 32099,
-    accessToken: 'test-token',
-  })
-})
-
-afterEach(() => {
-  stopNativeSettingsProjectionSync()
-  websocketState.instances.length = 0
-  vi.clearAllMocks()
-})
-
-async function flushRefreshQueue(): Promise<void> {
-  await flushMicrotasks()
-}
-
-test('derives native effects from complete authoritative settings snapshots', () => {
-  const previous = defaultSettingsSnapshot()
-  const current = defaultSettingsSnapshot({
-    lang: 'ja',
-    theme: 'dark',
-    globalShortcut: 'Alt+K',
-    recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///repo') }],
+describe('native settings projection sync', () => {
+  beforeEach(() => {
+    vi.mocked(getEmbeddedServerRuntime).mockReturnValue({
+      url: 'http://127.0.0.1:32099',
+      host: '127.0.0.1',
+      port: 32099,
+      accessToken: 'test-token',
+    })
   })
 
-  expect(nativeProjectionFromSnapshots(previous, current)).toEqual({
-    prefs: {
-      patch: { lang: 'ja', theme: 'dark', globalShortcut: 'Alt+K' },
-      settings: {
-        lang: 'ja',
-        theme: 'dark',
-        colorTheme: 'macos',
-        shortcutsDisabled: false,
-        globalShortcutDisabled: false,
-        globalShortcut: 'Alt+K',
+  afterEach(() => {
+    stopNativeSettingsProjectionSync()
+    websocketState.instances.length = 0
+    vi.clearAllMocks()
+  })
+
+  async function flushRefreshQueue(): Promise<void> {
+    await flushMicrotasks()
+  }
+
+  test('derives native effects from complete authoritative settings snapshots', () => {
+    const previous = defaultSettingsSnapshot()
+    const current = defaultSettingsSnapshot({
+      lang: 'ja',
+      theme: 'dark',
+      globalShortcut: 'Alt+K',
+      recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///repo') }],
+    })
+
+    expect(nativeProjectionFromSnapshots(previous, current)).toEqual({
+      prefs: {
+        patch: { lang: 'ja', theme: 'dark', globalShortcut: 'Alt+K' },
+        settings: {
+          lang: 'ja',
+          theme: 'dark',
+          colorTheme: 'macos',
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          globalShortcut: 'Alt+K',
+        },
       },
-    },
-    recentWorkspaces: { recentWorkspaces: [{ id: 'goblin+file:///repo' }] },
+      recentWorkspaces: { recentWorkspaces: [{ id: 'goblin+file:///repo' }] },
+    })
   })
-})
 
-test('does not emit native work for an unchanged authoritative snapshot', () => {
-  const snapshot = defaultSettingsSnapshot()
-  expect(nativeProjectionFromSnapshots(snapshot, structuredClone(snapshot))).toBeNull()
-})
+  test('does not emit native work for an unchanged authoritative snapshot', () => {
+    const snapshot = defaultSettingsSnapshot()
+    expect(nativeProjectionFromSnapshots(snapshot, structuredClone(snapshot))).toBeNull()
+  })
 
-test('reconciles the complete server snapshot whenever the socket opens', async () => {
-  const initial = defaultSettingsSnapshot()
-  const current = defaultSettingsSnapshot({ theme: 'dark' })
-  vi.mocked(getSettingsSnapshot).mockResolvedValue(current)
+  test('reconciles the complete server snapshot whenever the socket opens', async () => {
+    const initial = defaultSettingsSnapshot()
+    const current = defaultSettingsSnapshot({ theme: 'dark' })
+    vi.mocked(getSettingsSnapshot).mockResolvedValue(current)
 
-  startNativeSettingsProjectionSync(initial)
-  websocketState.instances[0]?.emit('open')
-  await flushRefreshQueue()
+    startNativeSettingsProjectionSync(initial)
+    websocketState.instances[0]?.emit('open')
+    await flushRefreshQueue()
 
-  expect(applyNativeHostProjection).toHaveBeenCalledWith(expect.objectContaining({ prefs: expect.any(Object) }))
-})
+    expect(applyNativeHostProjection).toHaveBeenCalledWith(expect.objectContaining({ prefs: expect.any(Object) }))
+  })
 
-test('reconnect open reconciles settings changed while disconnected', async () => {
-  useFakeTimers()
-  const initial = defaultSettingsSnapshot()
-  vi.mocked(getSettingsSnapshot)
-    .mockResolvedValueOnce(initial)
-    .mockResolvedValueOnce(defaultSettingsSnapshot({ lang: 'ja' }))
+  test('reconnect open reconciles settings changed while disconnected', async () => {
+    useFakeTimers()
+    const initial = defaultSettingsSnapshot()
+    vi.mocked(getSettingsSnapshot)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(defaultSettingsSnapshot({ lang: 'ja' }))
 
-  startNativeSettingsProjectionSync(initial)
-  websocketState.instances[0]?.emit('open')
-  await flushRefreshQueue()
-  websocketState.instances[0]?.emit('close')
-  await vi.advanceTimersByTimeAsync(300)
-  websocketState.instances[1]?.emit('open')
-  await flushRefreshQueue()
+    startNativeSettingsProjectionSync(initial)
+    websocketState.instances[0]?.emit('open')
+    await flushRefreshQueue()
+    websocketState.instances[0]?.emit('close')
+    await vi.advanceTimersByTimeAsync(300)
+    websocketState.instances[1]?.emit('open')
+    await flushRefreshQueue()
 
-  expect(applyNativeHostProjection).toHaveBeenCalledTimes(1)
-})
+    expect(applyNativeHostProjection).toHaveBeenCalledTimes(1)
+  })
 
-test('retries a failed native effect without advancing the authoritative baseline', async () => {
-  const initial = defaultSettingsSnapshot()
-  const current = defaultSettingsSnapshot({ theme: 'dark' })
-  vi.mocked(getSettingsSnapshot).mockResolvedValue(current)
-  vi.mocked(applyNativeHostProjection).mockRejectedValueOnce(new Error('effect failed')).mockResolvedValueOnce()
+  test('retries a failed native effect without advancing the authoritative baseline', async () => {
+    const initial = defaultSettingsSnapshot()
+    const current = defaultSettingsSnapshot({ theme: 'dark' })
+    vi.mocked(getSettingsSnapshot).mockResolvedValue(current)
+    vi.mocked(applyNativeHostProjection).mockRejectedValueOnce(new Error('effect failed')).mockResolvedValueOnce()
 
-  startNativeSettingsProjectionSync(initial)
-  websocketState.instances[0]?.emit('open')
-  await flushRefreshQueue()
-  websocketState.instances[0]?.emit(
-    'message',
-    JSON.stringify({ type: 'settings-invalidated', scopes: ['settings-snapshot'] }),
-  )
-  await flushRefreshQueue()
+    startNativeSettingsProjectionSync(initial)
+    websocketState.instances[0]?.emit('open')
+    await flushRefreshQueue()
+    websocketState.instances[0]?.emit(
+      'message',
+      JSON.stringify({ type: 'settings-invalidated', scopes: ['settings-snapshot'] }),
+    )
+    await flushRefreshQueue()
 
-  expect(applyNativeHostProjection).toHaveBeenCalledTimes(2)
+    expect(applyNativeHostProjection).toHaveBeenCalledTimes(2)
+  })
 })
