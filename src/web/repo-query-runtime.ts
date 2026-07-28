@@ -222,7 +222,8 @@ export async function refreshRepoWorktreeStatusReadModel(
   const sharedRead = client.fetchQuery({
     queryKey,
     staleTime: 0,
-    retry: false,
+    retry: (_count, error) => isStaleRepoRuntimeReadError(error),
+    retryDelay: 0,
     queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
   })
   return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead

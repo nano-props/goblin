@@ -159,6 +159,28 @@ describe('repo worktree status query data', () => {
     }
   })
 
+  test('retries a stale explicit status refresh after invalidation', async () => {
+    const queryClient = new QueryClient()
+    const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(
+      () =>
+        new Promise<RepoWorktreeStatusSnapshot>((resolve) => {
+          releases.push(resolve)
+        }),
+    )
+
+    const refresh = refreshRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient })
+    await vi.waitFor(() => expect(releases).toHaveLength(1))
+    invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', queryClient)
+    releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+
+    await vi.waitFor(() => expect(releases).toHaveLength(2))
+    releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+    await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+    expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2)
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+  })
+
   test('does not create status data when the first refresh fails', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('transport failed'))
