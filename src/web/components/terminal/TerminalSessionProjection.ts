@@ -962,6 +962,10 @@ export class TerminalSessionProjection {
     return session.takeover()
   }
 
+  retryPresentation = (terminalSessionId: string): boolean => {
+    return this.sessions.get(terminalSessionId)?.retryPresentation() ?? false
+  }
+
   private notifyFilesystemTarget(terminalFilesystemTargetKey: string): void {
     this.filesystemTargetSnapshotCache.delete(terminalFilesystemTargetKey)
     const listeners = this.filesystemTargetListeners.get(terminalFilesystemTargetKey)

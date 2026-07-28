@@ -18,9 +18,11 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 import {
   TerminalSessionView,
   completeFilesystemTargetSnapshot,
+  renderTerminalSession,
   terminalDescriptorTargetForTest,
 } from '#/web/test-utils/terminal-session-view.tsx'
 
@@ -719,6 +721,172 @@ describe('TerminalSessionView presentation and focus', () => {
       })
     } finally {
       unmount()
+    }
+  })
+
+  test('shows passive restoring feedback for an open local presentation rebuild', async () => {
+    const view = await renderTerminalSession(
+      {},
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          attachment: { role: 'controller' },
+          presentationRecovery: 'pending',
+        },
+      },
+    )
+
+    try {
+      const status = view.container.querySelector('[role="status"]')
+      expect(status?.textContent).toContain('terminal.restoring')
+      expect(status?.getAttribute('aria-busy')).toBe('true')
+      expect(view.container.querySelector('[role="alert"]')).toBeNull()
+    } finally {
+      await view.cleanup()
+    }
+  })
+
+  test('shows an accessible attach-only retry and replaces it when recovery becomes pending', async () => {
+    const retryPresentation = vi.fn(() => true)
+    const view = await renderTerminalSession(
+      { retryPresentation },
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          attachment: { role: 'controller' },
+          presentationRecovery: 'failed',
+        },
+      },
+    )
+
+    try {
+      const alert = view.container.querySelector('[role="alert"]')
+      expect(alert?.textContent).toContain('terminal.restore-failed')
+      expect(alert?.getAttribute('aria-live')).toBe('polite')
+      expect(alert?.getAttribute('aria-atomic')).toBe('true')
+      const retry = Array.from(view.container.querySelectorAll('button')).find(
+        (button) => button.textContent === 'error.try-again',
+      )
+
+      await act(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      expect(retryPresentation).toHaveBeenCalledWith('term-111111111111111111111')
+
+      await view.publishSnapshot({
+        phase: 'open',
+        message: null,
+        processName: 'zsh',
+        attachment: { role: 'controller' },
+        presentationRecovery: 'pending',
+      })
+      expect(view.container.querySelector('[role="alert"]')).toBeNull()
+      expect(view.container.textContent).toContain('terminal.restoring')
+      expect(view.container.textContent).not.toContain('error.try-again')
+    } finally {
+      await view.cleanup()
+    }
+  })
+
+  test('renders workspace projection failure as static feedback during presentation recovery', async () => {
+    const view = await renderTerminalSession(
+      {},
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          attachment: { role: 'controller' },
+          presentationRecovery: 'pending',
+        },
+        projectionPhase: 'failed',
+      },
+    )
+
+    try {
+      const alert = view.container.querySelector('[role="alert"]')
+      expect(alert?.textContent).toContain('terminal.load-failed')
+      expect(alert?.hasAttribute('aria-busy')).toBe(false)
+      expect(view.container.querySelector('.goblin-terminal-session__status-dot')).toBeNull()
+      expect(alert?.querySelector('button')).toBeNull()
+    } finally {
+      await view.cleanup()
+    }
+  })
+
+  test('keeps unowned attachment passive and reserves takeover for true viewers', async () => {
+    const unowned = await renderTerminalSession(
+      {},
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          attachment: { role: 'unowned' },
+        },
+      },
+    )
+
+    try {
+      expect(unowned.container.textContent).toContain('terminal.unowned')
+      expect(unowned.container.textContent).not.toContain('terminal.takeover')
+      expect(unowned.container.querySelector('button')).toBeNull()
+    } finally {
+      await unowned.cleanup()
+    }
+
+    const viewer = await renderTerminalSession(
+      {},
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          attachment: { role: 'viewer' },
+          takeoverPending: true,
+        },
+      },
+    )
+    try {
+      const button = viewer.container.querySelector('button')
+      expect(button?.textContent).toBe('terminal.taking-over')
+      expect(button?.getAttribute('aria-busy')).toBe('true')
+      expect(button?.hasAttribute('disabled')).toBe(true)
+    } finally {
+      await viewer.cleanup()
+    }
+  })
+
+  test.each([
+    ['not-sent', 'unavailable', 'not-sent', 'error'],
+    ['indeterminate', 'disconnected', 'indeterminate', 'warning'],
+    ['app quitting', 'app-quitting', 'indeterminate', 'silent'],
+  ] as const)('maps %s takeover transport failure at the feedback boundary', async (_label, kind, delivery, tone) => {
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    vi.mocked(toast.warning).mockClear()
+    const takeover = vi.fn().mockRejectedValue(
+      new ClientRealtimeRequestError('takeover failed', {
+        kind,
+        delivery,
+        outageId: kind === 'app-quitting' ? null : 1,
+      }),
+    )
+    const view = await renderTerminalSession(
+      { takeover },
+      { snapshot: { phase: 'open', message: null, processName: 'zsh', attachment: { role: 'viewer' } } },
+    )
+
+    try {
+      const button = view.container.querySelector('button')
+      await act(async () => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+
+      expect(toast.error).toHaveBeenCalledTimes(tone === 'error' ? 1 : 0)
+      expect(toast.warning).toHaveBeenCalledTimes(tone === 'warning' ? 1 : 0)
+    } finally {
+      await view.cleanup()
     }
   })
 

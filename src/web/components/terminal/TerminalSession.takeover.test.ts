@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  MockResizeObserver,
   attachResult,
   createTerminalHost,
   descriptor,
@@ -18,6 +19,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 
 const xtermMocks = terminalXtermMocks()
 const geometryMocks = terminalGeometryMocks()
@@ -70,6 +72,87 @@ describe('TerminalSession takeover and identity', () => {
     expect(session.snapshot().takeoverPending).toBeUndefined()
   })
 
+  test.each([
+    ['not-sent', 'unavailable', 'not-sent'],
+    ['indeterminate', 'disconnected', 'indeterminate'],
+  ] as const)('preserves %s realtime takeover failure at the UI boundary', async (_label, kind, delivery) => {
+    const error = new ClientRealtimeRequestError('takeover transport failed', {
+      kind,
+      delivery,
+      outageId: delivery === 'indeterminate' ? 1 : null,
+    })
+    terminalCalls.takeover.mockRejectedValueOnce(error)
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    session.attach(host)
+
+    await expect(session.takeover()).rejects.toBe(error)
+
+    expect(session.snapshot().takeoverPending).toBeUndefined()
+    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
+    expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+    expect(terminalCalls.takeover).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).not.toHaveBeenCalled()
+  })
+
+  test('rethrows unexpected takeover failures after retiring the candidate view', async () => {
+    const error = new Error('unexpected takeover failure')
+    terminalCalls.takeover.mockRejectedValueOnce(error)
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    session.attach(host)
+
+    await expect(session.takeover()).rejects.toBe(error)
+
+    expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+    expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
+  })
+
+  test('keeps post-takeover presentation pending when attach delivery is indeterminate', async () => {
+    terminalCalls.takeover.mockResolvedValueOnce(takeoverResult('pty_session_1_aaaaaaaaa'))
+    terminalCalls.attach.mockRejectedValueOnce(
+      new ClientRealtimeRequestError('attach response was lost', {
+        kind: 'disconnected',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+    )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      terminalRuntimeGeneration: 1,
+      phase: 'open',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 120, rows: 40 },
+    })
+    session.attach(host)
+
+    await expect(session.takeover()).resolves.toBe(true)
+    await flushTerminalStart()
+
+    expect(session.snapshot()).toMatchObject({
+      attachment: { role: 'controller' },
+      presentationRecovery: 'pending',
+    })
+    expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledOnce()
+  })
+
   test('ignores a takeover response superseded by a newer identity revision', async () => {
     const takeoverResponse = Promise.withResolvers<TerminalTakeoverResult>()
     terminalCalls.takeover.mockReturnValueOnce(takeoverResponse.promise)
@@ -108,9 +191,13 @@ describe('TerminalSession takeover and identity', () => {
     expect(terminalCalls.attach).not.toHaveBeenCalled()
   })
 
-  test('reports a committed takeover as successful when its recovery presentation fails', async () => {
+  test('reports committed takeover success and admits one explicit attach-only retry after recovery fails', async () => {
     terminalCalls.takeover.mockResolvedValueOnce(takeoverResult('pty_session_1_aaaaaaaaa'))
-    terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'recovery unavailable' })
+    terminalCalls.attach
+      .mockResolvedValueOnce({ ok: false, message: 'recovery unavailable' })
+      .mockResolvedValueOnce(
+        recoveryAttachResult('pty_session_1_aaaaaaaaa', 1, { snapshot: 'restored after explicit retry' }),
+      )
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
@@ -126,7 +213,27 @@ describe('TerminalSession takeover and identity', () => {
     await flushTerminalStart()
 
     expect(session.snapshot().attachment).toEqual({ role: 'controller' })
+    expect(session.snapshot().presentationRecovery).toBe('failed')
     expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
+
+    const resizeObserver = MockResizeObserver.instances.at(-1)
+    if (!resizeObserver) throw new Error('expected resize observer')
+    resizeObserver.emit()
+    await flushTerminalStart()
+    expect(terminalCalls.attach).toHaveBeenCalledOnce()
+
+    expect(session.retryPresentation()).toBe(true)
+    expect(session.retryPresentation()).toBe(false)
+    expect(session.snapshot().presentationRecovery).toBe('pending')
+    await flushTerminalStart()
+
+    expect(terminalCalls.takeover).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
+    expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith(
+      'restored after explicit retry',
+      expect.any(Function),
+    )
   })
 
   test('takeover response is the authoritative handshake (no realtime event required)', async () => {

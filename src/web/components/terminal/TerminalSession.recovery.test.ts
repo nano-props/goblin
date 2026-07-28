@@ -24,6 +24,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalAttachResult, TerminalRestartResult } from '#/shared/terminal-types.ts'
 import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 const xtermMocks = terminalXtermMocks()
@@ -374,6 +375,118 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('generation 2 recovery', expect.any(Function))
   })
 
+  test.each(['negative response', 'not-sent transport rejection'] as const)(
+    'does not let a superseded recovery %s overwrite the newer authoritative recovery',
+    async (settlement) => {
+      const oldAttach = Promise.withResolvers<TerminalAttachResult>()
+      const newAttach = Promise.withResolvers<TerminalAttachResult>()
+      terminalCalls.attach.mockReturnValueOnce(oldAttach.promise).mockReturnValueOnce(newAttach.promise)
+      const host = createTerminalHost()
+      let session: TerminalSession
+      session = new TerminalSession(descriptor, () => {
+        const pending = session.pendingAuthoritativeRuntimeBinding()
+        if (pending) session.commitPendingAuthoritativeHydration(pending)
+      })
+      hydrateManagedSession(session, {
+        terminalRuntimeGeneration: 1,
+        phase: 'open',
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalSize: { cols: 100, rows: 30 },
+      })
+
+      session.attach(host)
+      await flushUntil(() => terminalCalls.attach.mock.calls.length === 1)
+      session.hydrate({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+        identityRevision: 0,
+        phase: 'open',
+        message: null,
+        processName: 'zsh',
+        canonicalTitle: null,
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalSize: { cols: 100, rows: 30 },
+      })
+
+      if (settlement === 'negative response') {
+        oldAttach.resolve({ ok: false, message: 'error.unavailable' })
+      } else {
+        oldAttach.reject(
+          new ClientRealtimeRequestError('attach was not sent', {
+            kind: 'unavailable',
+            delivery: 'not-sent',
+            outageId: null,
+          }),
+        )
+      }
+      await flushUntil(() => terminalCalls.attach.mock.calls.length === 2)
+
+      expect(session.currentRuntimeBinding()).toEqual({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 2,
+      })
+      expect(session.snapshot().presentationRecovery).toBe('pending')
+
+      newAttach.resolve(
+        attachResult('pty_session_1_aaaaaaaaa', {
+          terminalRuntimeGeneration: 2,
+          snapshot: 'generation 2 recovery',
+        }),
+      )
+      await flushTerminalStart()
+
+      expect(session.snapshot().presentationRecovery).toBeUndefined()
+      expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('generation 2 recovery', expect.any(Function))
+    },
+  )
+
+  test.each(['negative response', 'not-sent transport rejection', 'invalid controller geometry'] as const)(
+    'publishes a restored recovery %s as one atomic metadata change',
+    async (settlement) => {
+      const attach = Promise.withResolvers<TerminalAttachResult>()
+      terminalCalls.attach.mockReturnValueOnce(attach.promise)
+      const host = createTerminalHost()
+      const notify = vi.fn()
+      const session = new TerminalSession(descriptor, notify)
+      hydrateManagedSession(session, {
+        terminalRuntimeGeneration: 1,
+        phase: 'open',
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalSize: { cols: 100, rows: 30 },
+      })
+
+      session.attach(host)
+      await flushUntil(() => terminalCalls.attach.mock.calls.length === 1)
+      expect(session.snapshot().presentationRecovery).toBe('pending')
+      notify.mockClear()
+
+      if (settlement === 'negative response') {
+        attach.resolve({ ok: false, message: 'error.unavailable' })
+      } else if (settlement === 'not-sent transport rejection') {
+        attach.reject(
+          new ClientRealtimeRequestError('attach was not sent', {
+            kind: 'unavailable',
+            delivery: 'not-sent',
+            outageId: null,
+          }),
+        )
+      } else {
+        attach.resolve(
+          attachResult('pty_session_1_aaaaaaaaa', {
+            canonicalSize: { cols: 99, rows: 29 },
+          }),
+        )
+      }
+      await flushTerminalStart()
+
+      expect(session.snapshot().presentationRecovery).toBe('failed')
+      expect(notify).toHaveBeenCalledTimes(1)
+    },
+  )
+
   test('keeps a committed binding when presentation fails and recovers it on the next layout', async () => {
     const attach = Promise.withResolvers<TerminalAttachResult>()
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
@@ -397,6 +510,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
       terminalRuntimeGeneration: 1,
     })
     expect(firstTerm.dispose).toHaveBeenCalledOnce()
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
     expect(host.querySelector('.goblin-managed-terminal-frame .xterm')).toBeNull()
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
 
@@ -410,6 +524,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     const resizeObserver = MockResizeObserver.instances.at(-1)
     if (!resizeObserver) throw new Error('expected resize observer')
     resizeObserver.emit()
+    expect(session.snapshot().presentationRecovery).toBe('pending')
     await flushTerminalStart()
 
     expect(terminalCalls.attach).toHaveBeenCalledTimes(2)
@@ -420,6 +535,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
       rows: 30,
     })
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('recovered committed binding', expect.any(Function))
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
   })
 
   test('destroys the detached xterm and opens a fresh view on reattach', async () => {

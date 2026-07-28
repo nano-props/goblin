@@ -117,6 +117,8 @@ export type TerminalPasteWriter = (data: string) => boolean
 export type TerminalVirtualKey =
   'tab' | 'arrow-up' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'escape' | 'interrupt'
 
+export type TerminalPresentationRecovery = 'pending' | 'failed'
+
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase
   message: string | null
@@ -128,6 +130,8 @@ export interface TerminalSnapshot {
   progress?: TerminalProgressState | null
   /** True while a takeover request has been sent but control has not yet been confirmed. */
   takeoverPending?: boolean
+  /** Client-only feedback for rebuilding an already-open local terminal view. */
+  presentationRecovery?: TerminalPresentationRecovery
 }
 
 export interface TerminalSearchResult {
@@ -210,6 +214,8 @@ export interface TerminalSessionContextValue {
   capturePasteWriter: (terminalSessionId: string) => TerminalPasteWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
   takeover: (terminalSessionId: string) => Promise<boolean>
+  /** Retries only the local attach/presentation path after a stable recovery failure. */
+  retryPresentation: (terminalSessionId: string) => boolean
 }
 
 export interface TerminalSessionReadContextValue {

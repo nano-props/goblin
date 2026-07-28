@@ -41,6 +41,7 @@ import type {
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalPasteWriter,
+  TerminalPresentationRecovery,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
   TerminalVirtualKey,
@@ -85,6 +86,7 @@ export class TerminalSession {
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   private takeoverOperation: Promise<boolean> | null = null
+  private presentationRecovery: TerminalPresentationRecovery | undefined
   private startEpoch = 0
   private presentationAbortController: AbortController | null = null
   private resizeDispatch: TerminalResizeDispatch = { kind: 'idle' }
@@ -128,7 +130,7 @@ export class TerminalSession {
     if (this.disposed || !this.view.isConnected()) return
     const term = this.view.currentTerminal()
     if (!term) {
-      if (this.shouldStartAttachedSession()) this.start()
+      if (this.presentationRecovery !== 'failed' && this.shouldStartAttachedSession()) this.start()
       return
     }
     if (!this.view.isPresented()) return
@@ -173,12 +175,15 @@ export class TerminalSession {
 
   resynchronizeConnectedView(): void {
     if (this.disposed || !this.view.isConnected()) return
+    this.setPresentationRecovery(undefined)
     const transientChanged = this.replaceActiveView()
     if (transientChanged) this.notify('metadata')
   }
 
   detach(host: HTMLElement): void {
-    if (this.view.detach(host) && this.destroyActiveView()) this.notify('metadata')
+    if (!this.view.detach(host)) return
+    this.setPresentationRecovery(undefined)
+    if (this.destroyActiveView()) this.notify('metadata')
   }
 
   restart(): void {
@@ -192,6 +197,7 @@ export class TerminalSession {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.presentationRecovery = undefined
     this.presentationAbortController?.abort()
     this.presentationAbortController = null
     this.view.blurIfFocused()
@@ -202,7 +208,12 @@ export class TerminalSession {
 
   snapshot() {
     const snapshot = this.runtime.snapshot()
-    return this.takeoverOperation ? { ...snapshot, takeoverPending: true } : snapshot
+    if (!this.takeoverOperation && !this.presentationRecovery) return snapshot
+    return {
+      ...snapshot,
+      ...(this.takeoverOperation ? { takeoverPending: true } : {}),
+      ...(this.presentationRecovery ? { presentationRecovery: this.presentationRecovery } : {}),
+    }
   }
 
   isVisible(): boolean {
@@ -502,12 +513,16 @@ export class TerminalSession {
     // existing xterm.
     const changed = this.runtime.handleLifecycle(event)
     if (!changed) return
+    if (this.runtime.phase() !== 'open') this.setPresentationRecovery(undefined)
     this.notify('metadata')
   }
 
   private reconcileViewOwnership(previousBinding: TerminalRuntimeBinding | null): void {
     const binding = this.runtime.currentRuntimeBinding()
     const bindingChanged = previousBinding !== null && !sameRuntimeBinding(previousBinding, binding)
+    if (this.presentationRecovery === 'failed' || bindingChanged || !this.runtime.isController()) {
+      this.setPresentationRecovery(undefined)
+    }
     if (this.view.currentTerminal() && (bindingChanged || !this.runtime.isController())) {
       if (bindingChanged && this.runtime.isController()) {
         this.replaceActiveView(undefined, { preserveTransientState: true })
@@ -577,6 +592,7 @@ export class TerminalSession {
         if (metadata.changed) this.notify('metadata')
         return false
       }
+      this.setPresentationRecovery('pending')
       if (metadata.changed) this.notify('metadata')
       if (!this.isCurrentStart(epoch, term)) {
         if (this.view.isConnected()) this.start()
@@ -593,12 +609,36 @@ export class TerminalSession {
           error,
         })
       }
-      return false
+      if (error instanceof StartCancelledError) return false
+      throw error
     }
   }
 
+  retryPresentation(): boolean {
+    if (
+      this.disposed ||
+      this.presentationRecovery !== 'failed' ||
+      this.view.currentTerminal() ||
+      !this.view.isConnected() ||
+      !this.view.canOpenTerminal() ||
+      !this.shouldStartAttachedSession()
+    ) {
+      return false
+    }
+    this.setPresentationRecovery('pending')
+    this.start()
+    return true
+  }
+
   private start(preparedAttempt?: TerminalRuntimeAttemptToken): void {
-    if (this.disposed || this.view.currentTerminal() || !this.view.isConnected() || !this.view.canOpenTerminal()) return
+    if (
+      this.disposed ||
+      this.presentationRecovery === 'failed' ||
+      this.view.currentTerminal() ||
+      !this.view.isConnected() ||
+      !this.view.canOpenTerminal()
+    )
+      return
     const epoch = (this.startEpoch += 1)
     let attempt = preparedAttempt ?? null
     const currentAttempt = this.runtime.currentAttemptToken()
@@ -613,6 +653,7 @@ export class TerminalSession {
   }
 
   private async startAsync(epoch: number, attempt: TerminalRuntimeAttemptToken): Promise<void> {
+    if (this.runtime.phase() === 'open') this.setPresentationRecovery('pending')
     const presentationAbortController = this.beginPendingPresentation()
     let term: XTermTerminal
     try {
@@ -656,7 +697,7 @@ export class TerminalSession {
           this.destroyActiveView({ preserveTransientState: true })
           return false
         }
-        if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
+        if (!this.view.fitNow()) throw new StartCancelledError()
         const canonicalSize = this.runtime.currentCanonicalSize()
         if (
           this.runtime.phase() === 'open' &&
@@ -669,7 +710,7 @@ export class TerminalSession {
         const presentation = await this.view.present(term, presentationAbortController.signal)
         if (presentation === 'cancelled') throw new StartCancelledError()
         if (presentation === 'presented') break binding
-        if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
+        if (!this.view.fitNow()) throw new StartCancelledError()
         this.assertCurrentStart(epoch, term)
         if (this.runtime.phase() === 'open') {
           currentAttempt = this.runtime.startAttaching()
@@ -678,6 +719,7 @@ export class TerminalSession {
       }
       this.assertCurrentStart(epoch, term)
       if (this.presentationAbortController === presentationAbortController) this.presentationAbortController = null
+      this.setPresentationRecovery(undefined)
       this.flushOutput()
       this.queueResize(term.cols, term.rows)
       return true
@@ -689,13 +731,17 @@ export class TerminalSession {
 
   private failPresentationStart(epoch: number, attempt: TerminalRuntimeAttemptToken, error: unknown): void {
     if (!this.isCurrentStartEpoch(epoch)) return
+    const indeterminate = this.runtime.currentAttemptIsIndeterminate()
     const resolution = this.runtime.cancelStartAttempt(attempt)
     if (resolution === 'staged') {
       this.applySettledStagedHydration()
+    }
+    this.destroyActiveView({ preserveTransientState: true })
+    if (resolution === 'restored' && this.presentationRecovery === 'pending' && !indeterminate) {
+      this.setPresentationRecovery(error instanceof StartCancelledError ? undefined : 'failed')
     } else if (resolution === 'restored') {
       this.notify('metadata')
     }
-    this.destroyActiveView({ preserveTransientState: true })
     if (!(error instanceof StartCancelledError)) {
       terminalLog.warn('terminal presentation failed', {
         terminalRuntimeSessionId: this.runtime.addressableRuntimeBinding()?.terminalRuntimeSessionId ?? null,
@@ -714,7 +760,7 @@ export class TerminalSession {
       isCheckpointRendered: (checkpoint) => this.isCheckpointRendered(checkpoint),
       markOutputRendered: (checkpoint) => this.markOutputRendered(checkpoint),
     })
-    if (!this.view.fitNow()) throw new Error('terminal fit measurement failed')
+    if (!this.view.fitNow()) throw new StartCancelledError()
     this.assertCurrentStart(epoch, term)
     return term
   }
@@ -801,7 +847,10 @@ export class TerminalSession {
       }
       const resolution = this.runtime.cancelStartAttempt(attempt)
       if (resolution === 'staged') this.applySettledStagedHydration()
-      else if (resolution === 'restored') this.notify('metadata')
+      else if (resolution === 'restored') {
+        if (this.presentationRecovery === 'pending') this.setPresentationRecovery('failed')
+        else this.notify('metadata')
+      }
       terminalLog.warn('terminal start request failed before an authoritative response', {
         terminalRuntimeSessionId,
         operation: attempt.operation,
@@ -811,6 +860,7 @@ export class TerminalSession {
     }
 
     if (!result.ok) {
+      if (this.failPresentationRecoveryAttempt(attempt)) return null
       const failed = this.runtime.failStartAttempt(attempt, result.message)
       if (failed.resolution === 'staged') this.applySettledStagedHydration()
       else if (failed.accepted && failed.changed) this.notify('metadata')
@@ -830,6 +880,13 @@ export class TerminalSession {
       const admittedAttempt = this.runtime.currentAttemptToken()
       const attemptStillCurrent = admittedAttempt !== null && sameAttempt(admittedAttempt, attempt)
       if (attemptStillCurrent) {
+        if (this.failPresentationRecoveryAttempt(attempt)) {
+          terminalLog.warn('terminal recovery attach response violated the admitted generation transition', {
+            terminalRuntimeSessionId,
+            terminalRuntimeGeneration: projected.terminalRuntimeGeneration,
+          })
+          return null
+        }
         const failed = this.runtime.failStartAttempt(attempt, 'error.unavailable')
         if (failed.resolution === 'staged') this.applySettledStagedHydration()
         else if (failed.accepted && failed.changed) this.notify('metadata')
@@ -852,6 +909,24 @@ export class TerminalSession {
 
   private clearInFlightStartOperation(operation: InFlightTerminalStartOperation): void {
     if (this.inFlightStartOperation === operation) this.inFlightStartOperation = null
+  }
+
+  private failPresentationRecoveryAttempt(attempt: TerminalRuntimeAttemptToken): boolean {
+    if (attempt.operation !== 'attach' || this.presentationRecovery !== 'pending') return false
+    const resolution = this.runtime.cancelStartAttempt(attempt)
+    if (resolution === 'staged') {
+      this.applySettledStagedHydration()
+      return true
+    }
+    if (resolution !== 'restored') return false
+    this.setPresentationRecovery('failed')
+    return true
+  }
+
+  private setPresentationRecovery(next: TerminalPresentationRecovery | undefined): void {
+    if (this.presentationRecovery === next) return
+    this.presentationRecovery = next
+    this.notify('metadata')
   }
 
   private async replayPhase(
