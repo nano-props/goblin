@@ -17,7 +17,8 @@ const mocks = vi.hoisted(() => ({
   probeWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
-  readRepoProjection: vi.fn(),
+  readRepoSnapshot: vi.fn(),
+  readRepoPullRequests: vi.fn(),
   readRepoWorktreeStatus: vi.fn(),
   readRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
@@ -35,7 +36,7 @@ const mocks = vi.hoisted(() => ({
   prepareBackgroundSync: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
-  publishRepoQueryInvalidation: vi.fn(),
+  publishRepoReadInvalidation: vi.fn(),
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
   getBackgroundSyncSnapshot: vi.fn(),
@@ -52,7 +53,8 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
-  readRepoProjection: mocks.readRepoProjection,
+  readRepoSnapshot: mocks.readRepoSnapshot,
+  readRepoPullRequests: mocks.readRepoPullRequests,
   readRepoWorktreeStatus: mocks.readRepoWorktreeStatus,
   readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
@@ -75,7 +77,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
-  publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
+  publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))

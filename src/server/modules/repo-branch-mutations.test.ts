@@ -7,9 +7,9 @@ import {
   WORKTREE_BOOTSTRAP_CONFIG_HASH,
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
-  expectNoRepoSnapshotInvalidations,
-  expectRepoSnapshotInvalidations,
-  repoWorktreeSnapshotInvalidations,
+  expectNoRepoMetadataInvalidations,
+  expectRepoMetadataInvalidations,
+  repoWorktreeStatusInvalidations,
   mocks,
 } from '#/server/test-utils/repo-module.ts'
 
@@ -66,8 +66,8 @@ describe('repo branch mutations', () => {
 
     await repo.pullRepoBranch(REPO_ID, 'feature/a')
 
-    expectRepoSnapshotInvalidations({ repoId: REPO_ID, query: 'repo-snapshot' })
-    expect(repoWorktreeSnapshotInvalidations()).toEqual([{ repoId: REPO_ID, query: 'repo-worktree-snapshot' }])
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(repoWorktreeStatusInvalidations()).toEqual([{ repoId: REPO_ID, domain: 'worktree-status' }])
   })
 
   test.each([
@@ -96,7 +96,7 @@ describe('repo branch mutations', () => {
 
     await run(repo)
 
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
@@ -126,13 +126,13 @@ describe('repo branch mutations', () => {
       signal: undefined,
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: WORKTREE_REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
     expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
@@ -172,13 +172,13 @@ describe('repo branch mutations', () => {
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       repositoryStateChanged: true,
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: worktreeRepoId,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
   })
 
@@ -211,7 +211,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {
@@ -227,9 +227,9 @@ describe('repo branch mutations', () => {
       phase: 'done',
       target: { branch: 'feature/a' },
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
   })
 
@@ -253,14 +253,14 @@ describe('repo branch mutations', () => {
       deleteUpstream: true,
       signal: undefined,
     })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: linkedRepoId,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -279,14 +279,14 @@ describe('repo branch mutations', () => {
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -299,7 +299,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('deleteRepoBranch uses current HEAD semantics for safe deletes', async () => {
@@ -385,6 +385,6 @@ describe('repo branch mutations', () => {
 
     await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 })

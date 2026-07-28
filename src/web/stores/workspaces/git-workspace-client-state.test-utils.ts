@@ -1,5 +1,5 @@
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { isGitWorkspace, type GitWorkspaceState } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import { isGitWorkspace, type GitWorkspaceState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 
 export function requireGitWorkspaceForTest(workspace: WorkspaceState | undefined): GitWorkspaceState {
   if (!workspace || !isGitWorkspace(workspace)) throw new Error('expected Git workspace capability')

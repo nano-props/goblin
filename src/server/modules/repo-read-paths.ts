@@ -15,13 +15,14 @@ import {
   DEFAULT_REPOSITORY_LOG_COUNT,
   type ExecResult,
   type LogEntry,
-  type PullRequestFetchMode,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type {
   PullRequestEntry,
+  RepoPullRequestScope,
+  RepoPullRequestsResponse,
+  RepoSnapshotResponse,
   RepoOperationsSnapshot,
-  GitWorkspaceRuntimeProjection,
   RepoWorktreeStatusSnapshot,
   RepoServerOperationState,
   RepoSnapshot,
@@ -38,6 +39,7 @@ export async function getRepoSnapshot(
     cwd,
     async (source) => await source.getSnapshot(options.signal),
     repoReadRuntime(options),
+    options.signal,
   )
 }
 
@@ -71,27 +73,19 @@ export async function getRepoStatus(
 
 export async function getRepoPullRequests(
   cwd: WorkspaceId,
-  branches?: string[],
-  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal; workspaceRuntimeId?: string },
+  scope: RepoPullRequestScope,
+  options?: { signal?: AbortSignal; workspaceRuntimeId?: string },
 ): Promise<PullRequestEntry[] | null> {
-  if (branches !== undefined && !Array.isArray(branches)) return null
-  const mode: PullRequestFetchMode = options?.mode === 'summary' ? 'summary' : 'full'
-  const branchSet =
-    branches === undefined
-      ? undefined
-      : new Set(
-          branches.filter((branch): branch is string => {
-            return typeof branch === 'string' && branch.length > 0
-          }),
-        )
-  if (branchSet?.size === 0) return []
-  const branchNames = branchSet ? Array.from(branchSet) : undefined
   const prs = await runWithRepoSource(
     cwd,
-    async (source) => await source.getPullRequests(branchNames, { mode, signal: options?.signal }),
+    async (source) => await source.getPullRequests(scope, { signal: options?.signal }),
     repoReadRuntime(options),
+    options?.signal,
   )
   if (!prs) return null
+  if (scope.kind === 'branch-detail' && (prs.length > 1 || prs.some((entry) => entry.branch !== scope.branch))) {
+    throw new Error('repository pull request response did not match requested branch')
+  }
   return prs
 }
 
@@ -137,36 +131,20 @@ export async function getRepoWorktreeBootstrapPreview(
   )
 }
 
-interface RepoProjectionSections {
-  snapshot: RepoSnapshot | null
-  pullRequests: PullRequestEntry[] | null
-}
-
 /**
- * Default deadline for an individual repository read. Each included
- * projection section (snapshot / pullRequests) gets its own
- * timer; the slowest leg is bounded by `timeoutMs` regardless of what
+ * Default deadline for an individual repository snapshot or pull-request
+ * read. Each endpoint owns its timer independently. The read is bounded by
+ * `timeoutMs` regardless of what
  * the underlying git / network operation would have done. Set to
  * `0` to disable the timeout.
  */
 export const DEFAULT_REPO_READ_TIMEOUT_MS = 15_000
 
-interface RepoProjectionSectionReadOptions {
-  branches?: string[]
-  includePullRequests: boolean
-  mode?: PullRequestFetchMode
+export interface RepoReadOptions {
   signal?: AbortSignal
   workspaceRuntimeId?: string
-  /** Per-section timeout in ms. `0` disables. Default 15 000. */
+  /** Per-read timeout in ms. `0` disables. Default 15 000. */
   timeoutMs?: number
-}
-
-export interface RepoProjectionReadOptions {
-  branch?: string
-  mode?: PullRequestFetchMode
-  signal?: AbortSignal
-  timeoutMs?: number
-  workspaceRuntimeId?: string
 }
 
 export interface RepoOperationsReadOptions {
@@ -184,16 +162,17 @@ function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOpe
 }
 
 /**
- * Build a per-section `AbortSignal` that fires when either the
+ * Build a per-read boundary that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
  * independent of any source-specific backoff; its job is to bound
  * how long a repository read can block the request worker.
  */
-function composeSectionSignal(
+function createRepoReadBoundary(
   callerSignal: AbortSignal | undefined,
   timeoutMs: number,
 ): {
   signal: AbortSignal
+  waitFor: <T>(read: Promise<T>) => Promise<T>
   cancel: () => void
 } {
   // Fast path: no caller signal and no timeout — return a fresh,
@@ -201,7 +180,11 @@ function composeSectionSignal(
   // return value uniformly without `as unknown as AbortSignal`
   // casts or `signal?.aborted` short-circuits everywhere.
   if (!callerSignal && (!timeoutMs || timeoutMs <= 0)) {
-    return { signal: new AbortController().signal, cancel: () => {} }
+    return {
+      signal: new AbortController().signal,
+      waitFor: async <T>(read: Promise<T>) => await read,
+      cancel: () => {},
+    }
   }
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -215,6 +198,13 @@ function composeSectionSignal(
   }
   return {
     signal: controller.signal,
+    waitFor: async <T>(read: Promise<T>) => {
+      if (controller.signal.aborted) throw controller.signal.reason
+      const aborted = new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })
+      })
+      return await Promise.race([read, aborted])
+    },
     cancel: () => {
       if (timer) clearTimeout(timer)
       if (callerSignal) callerSignal.removeEventListener('abort', onCallerAbort)
@@ -222,70 +212,36 @@ function composeSectionSignal(
   }
 }
 
-/**
- * Fetch the requested projection sections in parallel. If any requested
- * section fails, the projection read fails; callers must not mistake a missing
- * section for authoritative empty repo data. The shared
- * request is aborted when the caller's signal fires, and each section
- * additionally gets a hard `timeoutMs` deadline so a slow git / network
- * operation cannot pin the request worker.
- */
-async function readRepoProjectionSections(
-  cwd: WorkspaceId,
-  options: RepoProjectionSectionReadOptions,
-): Promise<RepoProjectionSections> {
-  const { branches, includePullRequests, mode, signal, timeoutMs = DEFAULT_REPO_READ_TIMEOUT_MS } = options
-
-  // One signal per section so the slow leg can be cancelled
-  // independently — the others keep going. We materialise the
-  // controllers up front and only attach a timeout where the caller
-  // asked for one.
-  const snapshotCtl = composeSectionSignal(signal, timeoutMs)
-  const prsCtl = includePullRequests ? composeSectionSignal(signal, timeoutMs) : null
-
+export async function readRepoSnapshot(cwd: WorkspaceId, options: RepoReadOptions = {}): Promise<RepoSnapshotResponse> {
+  const ctl = createRepoReadBoundary(options.signal, options.timeoutMs ?? DEFAULT_REPO_READ_TIMEOUT_MS)
   try {
-    const [snapshot, pullRequests] = await Promise.all([
-      getRepoSnapshot(cwd, { signal: snapshotCtl.signal, workspaceRuntimeId: options.workspaceRuntimeId }).finally(() =>
-        snapshotCtl.cancel(),
-      ),
-      prsCtl
-        ? getRepoPullRequests(cwd, branches, {
-            mode,
-            signal: prsCtl.signal,
-            workspaceRuntimeId: options.workspaceRuntimeId,
-          }).finally(() => prsCtl.cancel())
-        : Promise.resolve(null as PullRequestEntry[] | null),
-    ])
-    return { snapshot, pullRequests }
+    const snapshot = await ctl.waitFor(
+      getRepoSnapshot(cwd, { signal: ctl.signal, workspaceRuntimeId: options.workspaceRuntimeId }),
+    )
+    if (!snapshot) throw new Error('repository snapshot unavailable')
+    return { snapshot }
   } finally {
-    snapshotCtl.cancel()
-    prsCtl?.cancel()
+    ctl.cancel()
   }
 }
 
-export async function readRepoProjection(
+export async function readRepoPullRequests(
   cwd: WorkspaceId,
-  options: RepoProjectionReadOptions = {},
-): Promise<GitWorkspaceRuntimeProjection> {
-  const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
-  const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
-  const includePullRequests = !!branch || mode === 'summary'
-  const result = await readRepoProjectionSections(cwd, {
-    branches: branch ? [branch] : undefined,
-    includePullRequests,
-    mode,
-    signal: options.signal,
-    timeoutMs: options.timeoutMs,
-    workspaceRuntimeId: options.workspaceRuntimeId,
-  })
-  return {
-    snapshot: result.snapshot,
-    pullRequests: result.pullRequests,
-    requested: {
-      branch,
-      pullRequestMode: mode,
-    },
-    loadedAt: Date.now(),
+  scope: RepoPullRequestScope,
+  options: RepoReadOptions = {},
+): Promise<RepoPullRequestsResponse> {
+  const ctl = createRepoReadBoundary(options.signal, options.timeoutMs ?? DEFAULT_REPO_READ_TIMEOUT_MS)
+  try {
+    return {
+      pullRequests: await ctl.waitFor(
+        getRepoPullRequests(cwd, scope, {
+          signal: ctl.signal,
+          workspaceRuntimeId: options.workspaceRuntimeId,
+        }),
+      ),
+    }
+  } finally {
+    ctl.cancel()
   }
 }
 

@@ -10,10 +10,10 @@ import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { repoProjectionQueryOptions } from '#/web/repo-query-options.ts'
+import { repoSnapshotQueryOptions } from '#/web/repo-query-options.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
-  getRepoProjection: vi.fn(),
+  getRepoSnapshot: vi.fn(),
   getRepoOperations: vi.fn(),
   getRepoWorktreeStatus: vi.fn(),
 }))
@@ -42,8 +42,8 @@ const storeState = {
   },
 }
 
-vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
-  subscribeRepoQueryInvalidation(listener: (event: any) => void) {
+vi.mock('#/web/repo-read-invalidation-ingress.ts', () => ({
+  subscribeRepoReadInvalidation(listener: (event: any) => void) {
     listeners.add(listener)
     return () => listeners.delete(listener)
   },
@@ -63,10 +63,7 @@ function Harness() {
 
 function ProjectionObserverHarness() {
   useRepoStoreInvalidationRefresh()
-  const projection = useQuery(
-    repoProjectionQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7', null, 'full'),
-    primaryWindowQueryClient,
-  )
+  const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), primaryWindowQueryClient)
   return <output>{projection.data?.snapshot?.current ?? 'loading'}</output>
 }
 
@@ -84,13 +81,13 @@ describe('useRepoStoreInvalidationRefresh', () => {
     primaryWindowQueryClient.clear()
   })
 
-  test('handles repo-snapshot invalidations through query invalidation only', async () => {
+  test('handles metadata invalidations through query invalidation only', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-snapshot' })
+        listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'metadata' })
     })
 
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -105,15 +102,22 @@ describe('useRepoStoreInvalidationRefresh', () => {
     invalidateSpy.mockRestore()
   })
 
-  test('repo-snapshot invalidation makes an active observer accept the final projection', async () => {
+  test('metadata invalidation makes an active observer accept the final projection', async () => {
     let projectionReads = 0
-    repoClientMocks.getRepoProjection.mockImplementation(async () => {
+    repoClientMocks.getRepoSnapshot.mockImplementation(async () => {
       projectionReads += 1
       return {
-        snapshot: { branches: [], current: projectionReads === 1 ? 'before-fetch' : 'after-fetch' },
-        pullRequests: null,
-        requested: { branch: null, pullRequestMode: 'full' },
-        loadedAt: projectionReads,
+        snapshot: {
+          branches: [],
+          current: projectionReads === 1 ? 'before-fetch' : 'after-fetch',
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
+        },
       }
     })
     renderInJsdom(
@@ -128,7 +132,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-snapshot' })
+        listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'metadata' })
       }
     })
 
@@ -144,7 +148,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-runtime' })
+        listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'operations' })
     })
 
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -165,9 +169,9 @@ describe('useRepoStoreInvalidationRefresh', () => {
     await act(async () => {
       for (const listener of listeners)
         listener({
-          type: 'repo-query-invalidated',
+          type: 'repo-read-invalidated',
           repoId: WORKSPACE_ID,
-          query: 'repo-snapshot',
+          domain: 'metadata',
           ignoredMetadata: 'repo_manual_other',
         })
     })

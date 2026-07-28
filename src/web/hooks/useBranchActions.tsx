@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
@@ -13,7 +13,7 @@ import {
   openWorkspaceTerminal,
 } from '#/web/workspace-external-app-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { getBranchWorktreeState } from '#/web/stores/workspaces/worktree-state.ts'
+import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
 import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
@@ -60,13 +60,16 @@ export interface BranchActions {
   }
 }
 
-export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
-  const isCurrent = branch.name === repo.branchModel.currentBranch
+export function getBranchActionCapabilities(
+  repo: BranchActionRepo,
+  branch: BranchSnapshotInfo,
+): BranchActionCapabilities {
+  const isCurrent = branch.name === repo.snapshot.current
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktree?.path && !isProtected
-  const worktreeState = getBranchWorktreeState(repo, branch)
-  const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
-  const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
+  const worktreeChanges = branchWorktreeChanges(repo.status, branch)
+  const canRemoveWorktree = !!branch.worktree && branch.worktree.isPrimary === false
+  const canCopyPatch = !!branch.worktree && worktreeChanges?.dirty === true
   const hasWorktree = !!branch.worktree?.path
   const isRemoteRepo = isRemoteWorkspaceId(repo.id)
   return {
@@ -74,7 +77,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
     isRegularBranch,
     canCopyPatch,
     canPull: !!branch.tracking,
-    canPush: repo.remote.hasRemotes === true,
+    canPush: repo.snapshot.remote.hasRemotes,
     canOpenTerminal: hasWorktree,
     canOpenEditor: hasWorktree,
     canOpenFinder: hasWorktree && !isRemoteRepo,
@@ -89,7 +92,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
  * workspace-level render point and `branchActionDispatch` for the
  * dispatch functions the dialog uses to commit a confirmed action.
  */
-export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState): BranchActions {
+export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotInfo): BranchActions {
   const setLastResult = useWorkspacesStore((s) => s.setLastResult)
   const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({

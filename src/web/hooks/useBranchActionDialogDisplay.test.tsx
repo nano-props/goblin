@@ -12,7 +12,7 @@
 
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -30,7 +30,7 @@ import {
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -87,7 +87,7 @@ function setupRepo(): void {
       createRepoBranch('feature/y', {
         tracking: 'origin/feature/y',
         trackingGone: false,
-        worktree: { path: '/tmp/y' },
+        worktree: { path: '/tmp/y', isPrimary: false, isLocked: false },
       }),
     ],
     currentBranchName: 'main',
@@ -96,13 +96,13 @@ function setupRepo(): void {
 
 function dropBranch(repoId: string, branchName: string): void {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
-  const readModel = repo ? readRepoBranchQueryProjection(repo) : null
-  const nextBranches = readModel?.branches.filter((b) => b.name !== branchName) ?? []
+  const readModel = repo ? repoPresentationFromQueryForTest(repo) : null
+  const nextBranches = readModel?.snapshot.branches.filter((b) => b.name !== branchName) ?? []
   act(() => {
     if (repo) {
-      seedRepoReadModelQueryData(repo, {
+      seedRepoQueryDataForTest(repo, {
         branches: nextBranches,
-        currentBranch: readModel?.currentBranch ?? '',
+        currentBranch: readModel?.snapshot.current ?? '',
         status: readModel?.status ?? [],
       })
     }
@@ -148,7 +148,7 @@ describe('useBranchActionDialogDisplay', () => {
       branches: [],
       currentBranchName: 'feature/query',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
       currentBranch: 'feature/query',
     })

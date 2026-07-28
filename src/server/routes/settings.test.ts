@@ -225,11 +225,16 @@ describe('settings routes', () => {
           },
           diagnostics: [],
         },
-        gitProjection: {
-          snapshot: { current: 'main', branches: [] },
-          pullRequests: null,
-          requested: { branch: null, pullRequestMode: 'full' as const },
-          loadedAt: 1,
+        repoSnapshot: {
+          current: 'main',
+          branches: [],
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
         },
       },
       snapshot: null,

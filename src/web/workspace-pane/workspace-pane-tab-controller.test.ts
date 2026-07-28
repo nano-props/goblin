@@ -1,6 +1,6 @@
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -45,7 +45,9 @@ describe('workspace pane tab controller transactions', () => {
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-1',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-a' } })],
+      branches: [
+        createRepoBranch('feature/a', { worktree: { path: '/worktree-a', isPrimary: false, isLocked: false } }),
+      ],
       status: [{ path: '/worktree-a', branch: 'feature/a', isMain: false, entries: [] }],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
@@ -388,8 +390,10 @@ describe('workspace pane tab controller transactions', () => {
       navigation,
     )
     const repo = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]!
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-b' } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/a', { worktree: { path: '/worktree-b', isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/a',
       status: [],
     })

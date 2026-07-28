@@ -1,11 +1,11 @@
 import { useCallback, useId, useMemo } from 'react'
-import { omit } from 'es-toolkit'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   getCurrentGitWorkspacePanePresentation,
   type GitWorkspacePaneProjection,
   type CurrentGitWorkspacePanePresentation,
+  type PullRequestReadPresentation,
 } from '#/web/components/repo-workspace/model.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
@@ -21,17 +21,21 @@ import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActio
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   useRepoOperationsReadModel,
-  useRepoProjectionReadModel,
+  useRepoPullRequestsReadModel,
+  useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repo-queries.ts'
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
-import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
-import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { GitWorkspaceProjection, WorkspaceCapabilityState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type {
+  GitWorkspaceClientState,
+  WorkspaceCapabilityState,
+  WorkspaceState,
+} from '#/web/stores/workspaces/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
@@ -72,8 +76,8 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by WorkspacePane children.
-type GitWorkspacePaneShell = Omit<GitWorkspacePaneProjection, 'branchModel' | 'branchAction'> & {
-  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
+type GitWorkspacePaneShell = Omit<GitWorkspacePaneProjection, 'snapshot' | 'status' | 'branchAction'> & {
+  operations: Pick<GitWorkspaceClientState['operations'], 'branchAction'>
   probe: WorkspaceReadyProbeState
 }
 
@@ -222,7 +226,6 @@ function gitWorkspacePaneShell(
     ui: workspace.ui,
     probe: capability.probe,
     operations: { branchAction: git.operations.branchAction },
-    remote: git.remote,
     remoteLifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
   }
 }
@@ -252,7 +255,14 @@ function GitWorktreeFilesystemPane({
     return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
   if (statusReadModel.isError) {
-    return <EmptyState title={t('dashboard.directory.read-failed')} />
+    const error = statusReadModel.error
+    return (
+      <RepoStatusFailureView
+        messageKey={error instanceof Error ? error.message : String(error)}
+        retrying={statusReadModel.isFetching}
+        onRetry={() => void statusReadModel.refetch()}
+      />
+    )
   }
   if (!target || !worktree) {
     return <EmptyState title={t('workspace-route.not-found-title')} />
@@ -367,80 +377,91 @@ function GitWorkspacePaneLoaded({
   onBackToBranchNavigator?: () => void
 }) {
   const currentBranchName = gitWorkspace.ui.currentBranchName
-  const projectionReadModel = useRepoProjectionReadModel(
+  const snapshotReadModel = useRepoSnapshotReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, true)
+  const snapshot = snapshotReadModel.data?.snapshot
+  const pullRequestsReadModel = useRepoPullRequestsReadModel(
     gitWorkspace.id,
     gitWorkspace.workspaceRuntimeId,
-    currentBranchName,
-    'full',
-    true,
+    { kind: 'branch-detail', branch: currentBranchName ?? '' },
+    currentBranchName !== null,
   )
-  const projection = projectionReadModel.data
   const operationsReadModel = useRepoOperationsReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId)
   const statusReadModel = useRepoWorktreeStatusReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, true)
   const statusSnapshot = statusReadModel.data
-  if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
-    const statusErrorKey =
-      statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
+  if (!snapshot && snapshotReadModel.isError) {
+    const snapshotError = snapshotReadModel.error
+    const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
     return (
-      <section className="flex min-h-0 flex-1 flex-col bg-background">
-        <RepoStatusFailureView
-          messageKey={statusErrorKey}
-          retrying={statusReadModel.isFetching}
-          onRetry={() => {
-            void refreshRepoWorktreeStatus(
-              { get: useWorkspacesStore.getState },
-              gitWorkspace.id,
-              gitWorkspace.workspaceRuntimeId,
-            )
-          }}
-        />
-      </section>
+      <RepoStatusFailureView
+        messageKey={messageKey}
+        retrying={snapshotReadModel.isFetching}
+        onRetry={() => void snapshotReadModel.refetch()}
+      />
     )
   }
-  const branchReadModel =
-    projection?.snapshot && statusSnapshot
-      ? repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)
-      : null
-  if (!branchReadModel || !projection) {
+  if (!snapshot) {
     return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  let presentationBranchModel: GitWorkspacePaneProjection['branchModel'] = branchReadModel
-  if (currentBranchName && Array.isArray(projection.pullRequests)) {
-    const pullRequest = projection.pullRequests.find((entry) => entry.branch === currentBranchName)?.pullRequest
-    presentationBranchModel = {
-      ...presentationBranchModel,
-      branches: presentationBranchModel.branches.map((branch) => {
-        if (branch.name !== currentBranchName) return branch
-        if (pullRequest) return { ...branch, pullRequest }
-        return omit(branch, ['pullRequest'])
-      }),
-    }
+  const pullRequest = pullRequestsReadModel.data?.pullRequests?.[0]?.pullRequest
+  const pullRequestError = pullRequestsReadModel.error
+  const pullRequestErrorKey =
+    pullRequestError instanceof Error ? pullRequestError.message : pullRequestError ? String(pullRequestError) : null
+  const pullRequestRead: PullRequestReadPresentation = {
+    state: !pullRequestsReadModel.data
+      ? pullRequestsReadModel.isError
+        ? 'error'
+        : 'pending'
+      : pullRequestsReadModel.isError
+        ? 'stale'
+        : pullRequestsReadModel.data.pullRequests === null
+          ? 'unavailable'
+          : pullRequestsReadModel.data.pullRequests.length === 0
+            ? 'empty'
+            : 'ready',
+    error: pullRequestErrorKey,
+    retrying: pullRequestsReadModel.isFetching,
+    retry: () => void pullRequestsReadModel.refetch(),
   }
-  const gitWorkspaceProjection: GitWorkspacePaneProjection = {
+  const gitWorkspacePaneProjection: GitWorkspacePaneProjection = {
     ...projectBranchActionRepo(gitWorkspace, operationsReadModel.data?.operations, currentBranchName),
-    branchModel: presentationBranchModel,
+    snapshot,
+    status: statusSnapshot?.status,
     probe: gitWorkspace.probe,
   }
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
-  const detailBase = getCurrentGitWorkspacePanePresentation(gitWorkspaceProjection, {
-    loading: statusReadModel.isFetching,
-    error: statusErrorKey,
-    stale: !!statusSnapshot && statusReadModel.isError,
-  })
+  const detailBase = getCurrentGitWorkspacePanePresentation(
+    gitWorkspacePaneProjection,
+    {
+      loading: statusReadModel.isPending || statusReadModel.isFetching,
+      error: statusErrorKey,
+      stale: !!statusSnapshot && statusReadModel.isError,
+    },
+    pullRequest,
+    pullRequestRead,
+  )
   const detail: CurrentGitWorkspacePanePresentation = {
     ...detailBase,
     loading: {
       ...detailBase.loading,
-      pullRequests: projectionReadModel.isFetching && !projectionReadModel.dataUpdatedAt,
+      pullRequests: pullRequestsReadModel.isPending || pullRequestsReadModel.isFetching,
     },
   }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
+      {snapshotReadModel.isError && (
+        <RepoStatusStaleNotice
+          messageKey={
+            snapshotReadModel.error instanceof Error ? snapshotReadModel.error.message : String(snapshotReadModel.error)
+          }
+          retrying={snapshotReadModel.isFetching}
+          onRetry={() => void snapshotReadModel.refetch()}
+        />
+      )}
       {detail.branch ? (
         <GitBranchActionWorkspacePane
-          repo={gitWorkspaceProjection}
+          repo={gitWorkspacePaneProjection}
           detail={detail}
           workspacePaneRouteContext={workspacePaneRouteContext}
           branch={detail.branch}
@@ -451,7 +472,7 @@ function GitWorkspacePaneLoaded({
         />
       ) : (
         <GitWorkspacePaneSurface
-          repo={gitWorkspaceProjection}
+          repo={gitWorkspacePaneProjection}
           detail={detail}
           workspacePaneRouteContext={workspacePaneRouteContext}
           workspacePaneId={workspacePaneId}

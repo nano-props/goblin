@@ -8,7 +8,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('workspace pane layout restore admission', () => {
-  test('restores the workspace-root layout while the Git projection is deferred', async () => {
+  test('restores the workspace-root layout when the Git snapshot is unavailable', async () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     const confirmMembership = vi.fn(async () => ({
       matched: true as const,
@@ -28,12 +28,7 @@ describe('workspace pane layout restore admission', () => {
         },
         diagnostics: [],
       },
-      gitProjection: {
-        snapshot: null,
-        pullRequests: null,
-        requested: { branch: null, pullRequestMode: 'full' as const },
-        loadedAt: 1,
-      },
+      repoSnapshot: null,
     } satisfies RestoredWorkspaceRuntime
 
     const result = await projectWorkspacePaneTabsWithMembershipGuard({

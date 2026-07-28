@@ -1,8 +1,7 @@
 import PQueue from 'p-queue'
 import {
-  hasRestoredWorkspaceGitProjection,
-  type GitProjectedRestoredWorkspaceRuntime,
-  type GitWorkspaceRuntimeProjection,
+  type SnapshotRestoredWorkspaceRuntime,
+  type RepoSnapshot,
   type RestoredWorkspaceRuntime,
   type WorkspaceRestoreResult,
   type WorkspaceRuntimeRestoreSnapshot,
@@ -16,7 +15,7 @@ import {
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
+import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireWorkspaceRuntimeLease,
   isCurrentWorkspaceRuntimeMembership,
@@ -62,7 +61,7 @@ type OpenWorkspaceResult = { kind: 'opened'; opened: OpenedWorkspaceRuntime } | 
 type OpenedWorkspaceRuntime = RestoredWorkspaceRuntime & {
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }
-type OpenedGitProjectedWorkspace = GitProjectedRestoredWorkspaceRuntime & {
+type OpenedSnapshotWorkspace = SnapshotRestoredWorkspaceRuntime & {
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }
 
@@ -163,9 +162,9 @@ async function restoreServerWorkspaceSnapshot(
   }
 
   // Only the active workspace's tabs are validated and restored at startup.
-  // Non-active workspaces carry `gitProjection: null` and are restored lazily.
+  // Non-active workspaces carry `repoSnapshot: null` and are restored lazily.
   const openedForLayoutRestore = opened.filter(
-    (workspace) => isOpenedGitProjectedWorkspace(workspace) || readableWorkspace(workspace.workspaceProbe),
+    (workspace) => isOpenedSnapshotWorkspace(workspace) || readableWorkspace(workspace.workspaceProbe),
   )
   const expectedMembership = membership.workspace.openWorkspaceEntries
   const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
@@ -251,31 +250,18 @@ async function openWorkspaceRuntime(
         }),
       }
     }
-    const projection = await readRepoProjection(entry.id, {
+    const { snapshot } = await readRepoSnapshot(entry.id, {
       workspaceRuntimeId: lease.workspaceRuntimeId,
       signal: input.signal,
-      mode: 'full',
     })
-    if (!projection.snapshot) {
-      return {
-        kind: 'opened',
-        opened: stubWorkspace({
-          entry,
-          workspaceId: lease.workspaceId,
-          workspaceProbe: authoritativeProbe,
-          transport: { kind: 'file' },
-          lease,
-        }),
-      }
-    }
     return {
       kind: 'opened',
-      opened: gitProjectedWorkspace({
+      opened: snapshotWorkspace({
         entry,
         workspaceId: lease.workspaceId,
         workspaceProbe: authoritativeProbe,
         transport: { kind: 'file' },
-        gitProjection: projection,
+        repoSnapshot: snapshot,
         lease,
       }),
     }
@@ -328,31 +314,18 @@ async function openRemoteWorkspace(
         }),
       }
     }
-    const projection = await readRepoProjection(entry.id, {
+    const { snapshot } = await readRepoSnapshot(entry.id, {
       workspaceRuntimeId: lease.workspaceRuntimeId,
       signal: input.signal,
-      mode: 'full',
     })
-    if (!projection.snapshot) {
-      return {
-        kind: 'opened',
-        opened: stubWorkspace({
-          entry,
-          workspaceId: lease.workspaceId,
-          workspaceProbe,
-          transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
-          lease,
-        }),
-      }
-    }
     return {
       kind: 'opened',
-      opened: gitProjectedWorkspace({
+      opened: snapshotWorkspace({
         entry,
         workspaceId: lease.workspaceId,
         workspaceProbe,
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
-        gitProjection: projection,
+        repoSnapshot: snapshot,
         lease,
       }),
     }
@@ -447,15 +420,15 @@ function stubWorkspace(input: OpenedWorkspaceRuntimeInput): OpenedWorkspaceRunti
   return {
     ...input,
     workspaceRuntimeId: input.lease.workspaceRuntimeId,
-    gitProjection: null,
+    repoSnapshot: null,
   }
 }
 
-function gitProjectedWorkspace(
+function snapshotWorkspace(
   input: Omit<OpenedWorkspaceRuntimeInputBase, 'workspaceProbe'> &
     OpenedWorkspaceRuntimeTransport & {
       workspaceProbe: WorkspaceGitReadyProbeState
-      gitProjection: GitWorkspaceRuntimeProjection
+      repoSnapshot: RepoSnapshot
     },
 ): OpenedWorkspaceRuntime {
   return {
@@ -464,8 +437,8 @@ function gitProjectedWorkspace(
   }
 }
 
-function isOpenedGitProjectedWorkspace(workspace: OpenedWorkspaceRuntime): workspace is OpenedGitProjectedWorkspace {
-  return hasRestoredWorkspaceGitProjection(workspace)
+function isOpenedSnapshotWorkspace(workspace: OpenedWorkspaceRuntime): workspace is OpenedSnapshotWorkspace {
+  return workspace.repoSnapshot !== null
 }
 
 function activeWorkspaceIdForOpened(

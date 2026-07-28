@@ -1,24 +1,25 @@
 import { queryOptions, skipToken, type Query } from '@tanstack/react-query'
-import type { PullRequestFetchMode } from '#/shared/git-types.ts'
+import type { RepoPullRequestScope } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
-  normalizeRepoProjectionBranch,
-  normalizeRepoProjectionMode,
   repoLogQueryKey,
   repoOperationsQueryKey,
-  repoProjectionQueryKey,
+  repoPullRequestsQueryKey,
+  repoSnapshotQueryKey,
   repoRemoteBranchesQueryKey,
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
 import {
   fetchRepoOperationsReadModel,
-  fetchRepoProjectionReadModel,
-  fetchRepoSnapshotQuery,
+  fetchRepoMetadataQuery,
+  fetchRepoPullRequestsReadModel,
+  fetchRepoSnapshotReadModel,
   fetchRepoWorktreeStatusReadModel,
   isStaleRepoRuntimeReadError,
 } from '#/web/repo-query-runtime.ts'
 import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
+import { pullRequestCollectionCacheTtlMs } from '#/shared/pull-request-state.ts'
 
 const retryStaleRepoRuntimeRead = (_failureCount: number, error: unknown): boolean => isStaleRepoRuntimeReadError(error)
 
@@ -30,18 +31,10 @@ function refetchStatusWhenFirstObserverMounts<TQueryFnData, TError, TData, TQuer
   return query.getObserversCount() === 1 ? 'always' : false
 }
 
-export function repoProjectionQueryOptions(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch?: string | null,
-  mode?: PullRequestFetchMode,
-) {
-  const requestedBranch = normalizeRepoProjectionBranch(branch)
-  const requestedMode = normalizeRepoProjectionMode(mode)
+export function repoSnapshotQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
-    queryKey: repoProjectionQueryKey(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode),
-    queryFn: ({ signal, client }) =>
-      fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
+    queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
+    queryFn: ({ signal, client }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
@@ -52,7 +45,8 @@ export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceR
   return queryOptions({
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: false,
+    retry: retryStaleRepoRuntimeRead,
+    retryDelay: 0,
     refetchOnMount: refetchStatusWhenFirstObserverMounts,
     refetchOnWindowFocus: 'always',
     staleTime: Number.POSITIVE_INFINITY,
@@ -76,32 +70,47 @@ export function repoOperationsQueryOptions(
   })
 }
 
-export function repoProjectionReadModelQueryOptions(
+export function repoSnapshotReadModelQueryOptions(
   repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
-  branch: string | null | undefined,
-  mode: PullRequestFetchMode | undefined,
   enabled: boolean,
 ) {
   const active = enabled && repoRoot !== null
-  const requestedBranch = normalizeRepoProjectionBranch(branch)
-  const requestedMode = normalizeRepoProjectionMode(mode)
   return queryOptions({
-    queryKey: [
-      'repo-data',
-      repoRoot,
-      workspaceRuntimeId,
-      'projection',
-      { branch: requestedBranch, mode: requestedMode },
-    ] as const,
+    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'snapshot'] as const,
     queryFn:
       repoRoot === null
         ? skipToken
-        : ({ signal, client }) =>
-            fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
+        : ({ signal, client }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
+    enabled: active,
+    subscribed: active,
+  })
+}
+
+export function repoPullRequestsReadModelQueryOptions(
+  repoRoot: WorkspaceId | null,
+  workspaceRuntimeId: string,
+  scope: RepoPullRequestScope,
+  enabled: boolean,
+) {
+  const active = enabled && repoRoot !== null
+  return queryOptions({
+    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'pull-requests', scope] as const,
+    queryFn:
+      repoRoot === null
+        ? skipToken
+        : ({ signal, client }) => fetchRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope, signal, client),
+    retry: false,
+    staleTime: (query) =>
+      pullRequestCollectionCacheTtlMs(
+        scope.kind === 'branch-detail' ? 'full' : 'summary',
+        query.state.data?.pullRequests?.map((entry) => entry.pullRequest) ?? [],
+      ),
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     enabled: active,
     subscribed: active,
   })
@@ -119,7 +128,8 @@ export function repoWorktreeStatusReadModelQueryOptions(
       repoRoot === null
         ? skipToken
         : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
-    retry: false,
+    retry: retryStaleRepoRuntimeRead,
+    retryDelay: 0,
     refetchOnMount: refetchStatusWhenFirstObserverMounts,
     refetchOnWindowFocus: 'always',
     staleTime: Number.POSITIVE_INFINITY,
@@ -139,7 +149,7 @@ export function repoLogQueryOptions(
   return queryOptions({
     queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, branch, count, skip),
     queryFn: ({ signal, client }) =>
-      fetchRepoSnapshotQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
+      fetchRepoMetadataQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
         getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip, signal }),
       ),
     retry: retryStaleRepoRuntimeRead,
@@ -156,7 +166,7 @@ export function repoRemoteBranchesQueryOptions(
   return queryOptions({
     queryKey: repoRemoteBranchesQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal, client }) =>
-      fetchRepoSnapshotQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
+      fetchRepoMetadataQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
         getRepoRemoteBranches(repoRoot, workspaceRuntimeId, signal),
       ),
     retry: retryStaleRepoRuntimeRead,

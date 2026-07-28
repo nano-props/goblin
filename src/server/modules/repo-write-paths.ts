@@ -2,7 +2,7 @@ import path from 'node:path'
 import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoReadInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
   requestRepoServerOperationCancel,
@@ -36,7 +36,7 @@ import { isValidCwd, isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from
 import { isWorkspaceWorktreeBootstrapConfigTrusted } from '#/shared/workspace-settings.ts'
 import { type CloneRepoResult } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoQueryKind } from '#/shared/repo-query-invalidation.ts'
+import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
@@ -101,21 +101,21 @@ function isValidCloneDirectoryName(value: unknown): value is string {
 function execResultAfterMutationInvalidations(
   workspaceId: WorkspaceId,
   result: RepoMutationResult,
-  queries: readonly RepoQueryKind[],
+  domains: readonly RepoReadInvalidationDomain[],
 ): ExecResult {
-  return execResultOnly(publishMutationInvalidations(workspaceId, result, queries))
+  return execResultOnly(publishMutationInvalidations(workspaceId, result, domains))
 }
 
 function publishMutationInvalidations(
   workspaceId: WorkspaceId,
   result: RepoMutationResult,
-  queries: readonly RepoQueryKind[],
+  domains: readonly RepoReadInvalidationDomain[],
 ): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
   if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
     const uniqueRepoIds = Array.from(new Set([workspaceId, ...affectedRepoIds]))
     for (const repoId of uniqueRepoIds) {
-      for (const query of queries) publishRepoQueryInvalidation({ repoId, query })
+      for (const domain of domains) publishRepoReadInvalidation({ repoId, domain })
     }
   }
   return result
@@ -129,7 +129,7 @@ async function runUserNetworkMutation(
   cwd: WorkspaceId,
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
-  invalidatedQueries: readonly RepoQueryKind[],
+  invalidatedDomains: readonly RepoReadInvalidationDomain[],
   target: { branch?: string; worktreePath?: string } | null,
   task: (source: RepoSource, signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
   options: { workspaceRuntimeId?: string } = {},
@@ -149,7 +149,7 @@ async function runUserNetworkMutation(
       const result = await context.runWithRepoSource(
         async (source) => await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
       )
-      return publishMutationInvalidations(cwd, result, invalidatedQueries)
+      return publishMutationInvalidations(cwd, result, invalidatedDomains)
     },
   )
 }
@@ -289,7 +289,7 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    return await execResultAfterMutationInvalidations(cwd, result, ['repo-snapshot'])
+    return await execResultAfterMutationInvalidations(cwd, result, ['metadata'])
   }
   return await enqueueRepoWriteOperation(
     cwd,
@@ -318,7 +318,7 @@ export async function pullRepoBranch(
       cwd,
       signal,
       'pull',
-      ['repo-snapshot', 'repo-worktree-snapshot'],
+      ['metadata', 'worktree-status'],
       { branch, worktreePath },
       async (source, mergedSignal) => {
         return await source.pull(branch, worktreePath, mergedSignal)
@@ -339,7 +339,7 @@ export async function pushRepoBranch(
       cwd,
       signal,
       'push',
-      ['repo-snapshot'],
+      ['metadata'],
       { branch },
       async (source, mergedSignal) => {
         return await source.push(branch, mergedSignal)
@@ -375,10 +375,7 @@ export async function createRepoWorktree(
           worktreeBootstrap,
         })
         const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-        return await execResultAfterMutationInvalidations(cwd, trustSyncedResult, [
-          'repo-snapshot',
-          'repo-worktree-snapshot',
-        ])
+        return await execResultAfterMutationInvalidations(cwd, trustSyncedResult, ['metadata', 'worktree-status'])
       })
     },
   })
@@ -437,7 +434,7 @@ export async function deleteRepoBranch(
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
         return await execResultAfterMutationInvalidations(cwd, await source.deleteBranch(branch, options, signal), [
-          'repo-snapshot',
+          'metadata',
         ])
       })
     },
@@ -491,10 +488,7 @@ async function removeRepoWorktreeWithBinding(
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
         const mutation = await source.removeWorktree(input, signal, lifecycle)
-        const result = await execResultAfterMutationInvalidations(cwd, mutation, [
-          'repo-snapshot',
-          'repo-worktree-snapshot',
-        ])
+        const result = await execResultAfterMutationInvalidations(cwd, mutation, ['metadata', 'worktree-status'])
         if (!mutation.ok && !mutation.repositoryStateChanged) return result
         try {
           const workspaceId = toSafeWorkspaceLocator(cwd)

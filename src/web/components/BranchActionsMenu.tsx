@@ -1,4 +1,4 @@
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   useBranchActionItems,
@@ -12,7 +12,7 @@ import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover
 import { cn } from '#/web/lib/cn.ts'
 interface Props {
   repo: BranchActionRepo
-  branch: RepoBranchState
+  branch: BranchSnapshotInfo
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }

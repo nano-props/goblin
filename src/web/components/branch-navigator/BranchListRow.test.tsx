@@ -96,15 +96,14 @@ function branchListRowRepo(): BranchActionRepo {
       branches: [],
       currentBranch: '',
       status: [],
-      worktreesByPath: {},
     },
   )
   return {
     id: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    branchModel: repo.branchModel,
+    snapshot: repo.snapshot,
+    status: repo.status,
     branchAction: repo.operations.branchAction,
-    remote: repo.remote,
     remoteLifecycle: repo.remoteLifecycle,
   }
 }

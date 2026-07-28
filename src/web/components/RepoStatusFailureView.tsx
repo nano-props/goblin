@@ -64,3 +64,29 @@ export function RepoStatusStaleNotice({
     </div>
   )
 }
+
+export function RepoReadFailureNotice({
+  messageKey,
+  retrying = false,
+  onRetry,
+}: {
+  messageKey: string
+  retrying?: boolean
+  onRetry?: () => void
+}) {
+  const t = useT()
+  return (
+    <div
+      role="alert"
+      className="flex items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive"
+    >
+      <span className="min-w-0 break-words">{t(messageKey)}</span>
+      {onRetry && (
+        <Button type="button" size="sm" variant="ghost" disabled={retrying} onClick={onRetry}>
+          <RefreshCw className={retrying ? 'animate-spin' : undefined} />
+          {t('error.try-again')}
+        </Button>
+      )}
+    </div>
+  )
+}

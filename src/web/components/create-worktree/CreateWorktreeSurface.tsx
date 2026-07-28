@@ -26,7 +26,7 @@ import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/works
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-queries.ts'
-import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
@@ -45,7 +45,7 @@ const MODE_OPTIONS = [
 interface CreateWorktreeRepo {
   id: WorkspaceState['id']
   workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
-  branchModel: RepoBranchReadModelData
+  snapshot: RepoSnapshot
   branchAction: RepoOperationState
   remoteLifecycle: Extract<WorkspaceAdmissionState, { kind: 'remote' }>['lifecycle']
 }
@@ -86,7 +86,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const compact = useIsCompactUi()
 
   const [mode, setMode] = useState<CreateWorktreeMode>('newBranch')
-  const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
+  const initialBase = repo.snapshot.current || repo.snapshot.branches[0]?.name || ''
   const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
   const [existingBranch, setExistingBranch] = useState(initialBase)
@@ -194,10 +194,10 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                       <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {repo.branchModel.branches.map((b) => (
+                      {repo.snapshot.branches.map((b) => (
                         <SelectItem key={b.name} value={b.name} textValue={b.name}>
                           <span className="truncate">{b.name}</span>
-                          {b.name === repo.branchModel.currentBranch && (
+                          {b.name === repo.snapshot.current && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               {t('action.create-worktree-base-current')}
                             </span>
@@ -243,7 +243,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                     <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {repo.branchModel.branches.map((b) => (
+                    {repo.snapshot.branches.map((b) => (
                       <SelectItem key={b.name} value={b.name} textValue={b.name}>
                         <span className="truncate">{b.name}</span>
                       </SelectItem>

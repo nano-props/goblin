@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
+import { repoDataQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -48,25 +48,17 @@ describe('repo refresh actions', () => {
     const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'filesystem')
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
 
-    await handleRepoInvalidationRefresh(
-      store,
-      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
-      'workspace-runtime-test-9',
-    )
+    await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
     expect(invalidateSpy).not.toHaveBeenCalled()
     invalidateSpy.mockRestore()
   })
 
-  test('routes repo snapshot invalidation through query invalidation only', async () => {
+  test('routes metadata invalidation through query invalidation only', async () => {
     const store = repoRefreshStoreAccess()
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
 
-    await handleRepoInvalidationRefresh(
-      store,
-      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
-      'workspace-runtime-test-9',
-    )
+    await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
@@ -80,21 +72,19 @@ describe('repo refresh actions', () => {
     invalidateSpy.mockRestore()
   })
 
-  test('routes worktree snapshot invalidation through its narrower query domain', async () => {
+  test('routes worktree-status invalidation through its narrower query domain', async () => {
     const store = repoRefreshStoreAccess()
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
 
     await handleRepoInvalidationRefresh(
       store,
-      { repoId: WORKSPACE_ID, query: 'repo-worktree-snapshot' },
+      { repoId: WORKSPACE_ID, domain: 'worktree-status' },
       'workspace-runtime-test-9',
     )
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: repoDataQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'),
-        refetchType: 'active',
-        predicate: expect.any(Function),
+        queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, 'workspace-runtime-test-9'),
       },
       { cancelRefetch: false },
     )

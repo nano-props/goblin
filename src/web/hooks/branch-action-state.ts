@@ -4,9 +4,9 @@ import {
   isBranchActionReason,
   type RepoOperationState,
 } from '#/web/stores/workspaces/operations.ts'
-import type { GitWorkspaceProjection, WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { RepoServerOperationState, RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
 export type BranchActionItemId =
   'status' | 'history' | 'changes' | 'files' | 'copyPatch' | 'pull' | 'push' | 'deleteBranch' | 'removeWorktree'
 
@@ -25,17 +25,14 @@ export interface BranchCopyPatchAction {
 export interface BranchActionRepo {
   id: WorkspaceState['id']
   workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
-  branchModel: Pick<RepoBranchReadModelData, 'currentBranch' | 'status' | 'worktreesByPath'>
+  snapshot: RepoSnapshot
+  status: WorktreeStatus[] | undefined
   branchAction: RepoOperationState
-  remote: Pick<
-    GitWorkspaceProjection['remote'],
-    'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'browserRemoteProvider' | 'remoteProviders'
-  >
   remoteLifecycle: Extract<WorkspaceAdmissionState, { kind: 'remote' }>['lifecycle']
 }
 
 interface BranchActionLocalFallbackRepo {
-  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
+  operations: { branchAction: RepoOperationState }
 }
 
 export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'branchAction'>): boolean {
@@ -82,9 +79,6 @@ export function branchActionOperationFromServer(
     phase: operation.phase === 'queued' ? 'queued' : 'running',
     reason: serverBranchActionReason(operation),
     target: operation.target?.branch ?? null,
-    startedAt: operation.startedAt,
-    settledAt: operation.settledAt,
-    error: operation.error?.message ?? null,
   }
 }
 

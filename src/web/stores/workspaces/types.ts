@@ -1,5 +1,5 @@
 import type { StoreApi } from 'zustand'
-import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
+import type { ExecResult } from '#/web/types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   ClientWorkspaceState,
@@ -10,7 +10,6 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/workspaces/operations.ts'
-import type { RepoDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type {
   WorkspaceFilesystemReadyProbeState,
   WorkspaceGitReadyProbeState,
@@ -18,9 +17,6 @@ import type {
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
-  worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
-}
 
 export type RepoEventAction =
   | { kind: 'pull'; branch: string }
@@ -51,39 +47,11 @@ export type OpenWorkspaceResult =
 
 export type CloseWorkspaceResult = { ok: true } | { ok: false; message: string }
 
-export interface RepoWorktreeState {
-  path: string
-  branch?: string
-  isMain: boolean
-  isDirty?: boolean
-  changeCount?: number
-  isLocked?: boolean
-}
-
 export interface WorkspaceUiState {
   /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
    *  worktree path; branch-only panes are keyed by branch name. `null` is an
    *  intentional empty workspace pane, not a missing preference. */
   preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
-}
-
-export interface GitRemoteProjection {
-  remotes?: string[]
-  remoteDetails?: GitRemoteInfo[]
-  hasRemotes?: boolean
-  hasBrowserRemote?: boolean
-  browserRemoteProvider?: BrowserRemoteProvider
-  remoteProviders?: Record<string, BrowserRemoteProvider>
-  hasGitHubRemote?: boolean
-  /** Sticky connectivity badge for background fetch failures. Unlike
-   *  `dataLoads.fetch.error`, this persists after the operation settles and
-   *  is cleared by the next successful network operation. */
-  fetchFailed: boolean
-  /** Last fetch failure message — populated when fetchFailed flips
-   *  true. Surfaced as the title of the red badge so the user can
-   *  hover and read why fetch is failing instead of just seeing a
-   *  red dot. */
-  fetchError: string | null
 }
 
 /** Filesystem-transport admission state, independent from optional Git capability. */
@@ -92,11 +60,9 @@ export type WorkspaceAdmissionState =
   | { kind: 'remote'; lifecycle: RemoteWorkspaceConnectionLifecycle | null; lifecycleAttemptId: number | null }
 
 /** Git-only client state, owned exclusively by the Git capability. */
-export interface GitWorkspaceProjection {
-  dataLoads: RepoDataLoadBundle
+export interface GitWorkspaceClientState {
   operations: RepoOperationsState
   ui: { branchViewMode: BranchViewMode }
-  remote: GitRemoteProjection
   events: RepoEvent[]
 }
 
@@ -107,7 +73,7 @@ export type WorkspaceCapabilityState =
   | {
       kind: 'git'
       probe: WorkspaceGitReadyProbeState
-      git: GitWorkspaceProjection
+      git: GitWorkspaceClientState
     }
 
 export type WorkspaceSessionProjectionState = 'projected' | 'stub'
@@ -119,15 +85,6 @@ export interface WorkspaceSessionState {
   /** Whether target-scoped session state is client-owned yet. Stub workspaces keep
    *  the server baseline until the workspace is projected on view. */
   projectionState: WorkspaceSessionProjectionState
-}
-
-export interface RepoSnapshotCacheEntry {
-  savedAt: number
-  data: {
-    branches: RepoBranchState[]
-    currentBranch: string
-  }
-  ui: { branchViewMode: BranchViewMode }
 }
 
 export interface WorkspaceState {
@@ -144,11 +101,6 @@ export interface WorkspaceState {
 export interface RuntimeCoherentWorkspaceState {
   /** Client-local projection of runtime-coherent workspace state. */
   workspaces: Record<string, WorkspaceState>
-}
-
-interface RepoSnapshotCacheState {
-  /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
-  repoSnapshotCache: Record<string, RepoSnapshotCacheEntry>
 }
 
 export interface RestorableWorkspaceState {
@@ -303,7 +255,7 @@ interface WorkspacePanePreferenceActions {
   setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
 }
 
-interface GitWorkspaceProjectionActions {
+interface GitWorkspaceClientActions {
   setWorkspacePaneTab: (id: WorkspaceId, branch: string, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: WorkspaceId, viewMode: BranchViewMode) => void
   setLastResult: (
@@ -313,8 +265,6 @@ interface GitWorkspaceProjectionActions {
     options?: RepoResultEventOptions,
   ) => void
   clearEvents: (id: WorkspaceId, eventIds: number[]) => void
-  /** Clear the fetchFailed flag after a successful Git fetch or explicit Git refresh. */
-  clearFetchFailed: (id: WorkspaceId, workspaceRuntimeId: string) => void
 }
 
 interface GitWorkspaceMutationActions {
@@ -332,14 +282,13 @@ interface GitWorkspaceMutationActions {
 export interface WorkspacesStore
   extends
     RuntimeCoherentWorkspaceState,
-    RepoSnapshotCacheState,
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,
     LocalWorkspaceActions,
     WorkspaceLifecycleActions,
     WorkspacePanePreferenceActions,
-    GitWorkspaceProjectionActions,
+    GitWorkspaceClientActions,
     GitWorkspaceMutationActions {}
 
 export type WorkspacesSet = StoreApi<WorkspacesStore>['setState']

@@ -20,6 +20,11 @@ vi.mock('#/web/repo-client.ts', () => ({
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-open-upstream-test'
+const remote = (name: string) => ({
+  name,
+  fetchUrl: `https://example.invalid/${name}/repository.git`,
+  pushUrl: `https://example.invalid/${name}/repository.git`,
+})
 
 beforeEach(() => {
   resetWorkspacesStore()
@@ -56,7 +61,11 @@ describe('openBranchExternalTarget', () => {
 describe('openUpstreamBranchExternalTarget', () => {
   test('parses `remote/branch` and opens the named remote', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      remote: { remotes: [remote('origin')] },
+    })
 
     await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/main')
 
@@ -69,7 +78,11 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('preserves slashes in the branch name', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      remote: { remotes: [remote('origin')] },
+    })
 
     await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/feature/foo')
 
@@ -85,9 +98,10 @@ describe('openUpstreamBranchExternalTarget', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       remote: {
-        remotes: ['origin', 'origin/team'],
+        remotes: [remote('origin'), remote('origin/team')],
         remoteProviders: { origin: 'github', 'origin/team': 'gitlab' },
       },
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
 
     await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/team/main')

@@ -15,7 +15,7 @@ import {
 
 interface ClientWorkspaceFilesystemTargetsProjection {
   gitTargets?: {
-    branches: ReadonlyArray<{ worktree?: { path?: string } | undefined }>
+    branches: ReadonlyArray<{ worktree?: { path?: string; isPrimary?: boolean; isLocked?: boolean } | undefined }>
   }
 }
 

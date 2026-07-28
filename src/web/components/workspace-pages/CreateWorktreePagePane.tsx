@@ -17,8 +17,11 @@ import {
 import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
+import {
+  useRepoOperationsReadModel,
+  useRepoSnapshotReadModel,
+  useRepoWorktreeStatusReadModel,
+} from '#/web/repo-queries.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -27,6 +30,7 @@ import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hoo
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
@@ -55,7 +59,17 @@ export function CreateWorktreePagePane({
   const liveRepo = useWorkspacesStore((s) => s.workspaces[repoId])
   const git = liveRepo?.capability.kind === 'git' ? liveRepo.capability.git : null
   const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
-  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', git !== null)
+  const snapshotReadModel = useRepoSnapshotReadModel(
+    liveRepo?.id ?? null,
+    liveRepo?.workspaceRuntimeId ?? '',
+    git !== null,
+  )
+  const statusReadModel = useRepoWorktreeStatusReadModel(
+    liveRepo?.id ?? null,
+    liveRepo?.workspaceRuntimeId ?? '',
+    git !== null,
+  )
+  const snapshot = snapshotReadModel.data?.snapshot
   const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', {
     enabled: git !== null,
   })
@@ -111,9 +125,23 @@ export function CreateWorktreePagePane({
   })
   const bootstrapDecisionReady =
     !bootstrapLoading && (bootstrapPreviewError || (bootstrapPreview !== null && !worktreeBootstrapTrustLoading))
-  const pageReady = !!liveRepo && git !== null && !!branchReadModel && bootstrapDecisionReady
+  const pageReady = !!liveRepo && git !== null && !!snapshot && bootstrapDecisionReady
   const showLoadingSkeleton = useLoadingVisibility(!pageReady)
   const holdLoadingPage = !pageReady || showLoadingSkeleton
+
+  if (!snapshot && snapshotReadModel.isError) {
+    const snapshotError = snapshotReadModel.error
+    const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
+    return (
+      <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
+        <RepoStatusFailureView
+          messageKey={messageKey || 'error.failed-read-repo'}
+          retrying={snapshotReadModel.isFetching}
+          onRetry={() => void snapshotReadModel.refetch()}
+        />
+      </CreateWorktreePageShell>
+    )
+  }
 
   if (holdLoadingPage) {
     return (
@@ -197,12 +225,12 @@ export function CreateWorktreePagePane({
                 id: liveRepo.id,
                 workspaceRuntimeId: liveRepo.workspaceRuntimeId,
                 operations: { branchAction: git.operations.branchAction },
-                remote: git.remote,
+                snapshot,
+                status: statusReadModel.data?.status,
                 remoteLifecycle: liveRepo.admission.kind === 'remote' ? liveRepo.admission.lifecycle : null,
               },
               operationsReadModel.data?.operations,
             ),
-            branchModel: branchReadModel,
           }}
           worktreeBootstrap={worktreeBootstrap}
           onCancel={onCancel}

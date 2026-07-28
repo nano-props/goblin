@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { REPO_ID, expectNoRepoSnapshotInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
+import { REPO_ID, expectNoRepoMetadataInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo coordination', () => {
   test('serializes different SSH aliases for the same resolved repository', async () => {
@@ -147,7 +147,7 @@ describe('fetchRepo coordination', () => {
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.fetchAll).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
     await expect(readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).resolves.toMatchObject({
       operations: expect.arrayContaining([
         expect.objectContaining({
@@ -178,7 +178,7 @@ describe('fetchRepo coordination', () => {
     const result = await fetchRepo(REPO_ID, 'background')
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 })
 

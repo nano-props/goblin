@@ -11,7 +11,6 @@ import type {
   BranchSnapshotInfo,
   ExecResult,
   LogEntry,
-  PullRequestFetchMode,
   PullRequestInfo,
   RepoRemoteInfo,
   RepoUrlTarget,
@@ -40,7 +39,7 @@ import type {
   ResolvedRemoteWorkspaceTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
-import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
+import type { RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -160,27 +159,20 @@ interface RestoredWorkspaceTransport {
       }
 }
 
-export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
+export type SnapshotRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
   RestoredWorkspaceTransport & {
     workspaceProbe: WorkspaceGitReadyProbeState
-    gitProjection: GitWorkspaceRuntimeProjection
+    repoSnapshot: RepoSnapshot
   }
 
-export type RestoredWorkspaceRuntimeWithoutGitProjection = RestoredWorkspaceRuntimeBase &
+export type RestoredWorkspaceRuntimeWithoutSnapshot = RestoredWorkspaceRuntimeBase &
   RestoredWorkspaceTransport & {
     // Git may be conclusively unavailable or its projection may be deferred.
     // Workspace session projection state is derived separately from the probe.
-    gitProjection: null
+    repoSnapshot: null
   }
 
-export type RestoredWorkspaceRuntime =
-  GitProjectedRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutGitProjection
-
-export function hasRestoredWorkspaceGitProjection(
-  workspace: RestoredWorkspaceRuntime,
-): workspace is GitProjectedRestoredWorkspaceRuntime {
-  return workspace.gitProjection !== null
-}
+export type RestoredWorkspaceRuntime = SnapshotRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutSnapshot
 
 export interface WorkspaceRuntimeRestoreSnapshot {
   workspaces: RestoredWorkspaceRuntime[]
@@ -264,7 +256,7 @@ export interface RepoSnapshot {
   current: string
   /** Short commit hash when HEAD is detached (no branch checked out). */
   currentHEAD?: string
-  remote?: RepoRemoteInfo
+  remote: RepoRemoteInfo
 }
 
 // Workspace-filesystem-scoped tree types — see docs/filetree.md. Wire and
@@ -322,6 +314,16 @@ export interface PullRequestEntry {
   pullRequest: PullRequestInfo
 }
 
+export type RepoPullRequestScope = { kind: 'branch-detail'; branch: string } | { kind: 'repository-summary' }
+
+export interface RepoSnapshotResponse {
+  snapshot: RepoSnapshot
+}
+
+export interface RepoPullRequestsResponse {
+  pullRequests: PullRequestEntry[] | null
+}
+
 export type RepoServerOperationPhase = 'queued' | 'running' | 'cancelling' | 'done' | 'failed'
 export type RepoServerOperationKind =
   'fetch' | 'clone' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
@@ -374,16 +376,6 @@ export interface RepoOperationsSnapshot {
   loadedAt: number
 }
 
-export interface GitWorkspaceRuntimeProjection {
-  snapshot: RepoSnapshot | null
-  pullRequests: PullRequestEntry[] | null
-  requested: {
-    branch: string | null
-    pullRequestMode: PullRequestFetchMode
-  }
-  loadedAt: number
-}
-
 export interface RepoWorktreeStatusSnapshot {
   workspaceRuntimeId: string
   status: WorktreeStatus[]
@@ -415,7 +407,7 @@ export type IpcEvent =
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
-  | RepoQueryInvalidationEvent
+  | RepoReadInvalidationEvent
 
 export interface AppIpcHandlers {
   workspace: {
@@ -444,12 +436,12 @@ export interface AppIpcHandlers {
   }
   repo: {
     clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
-    projection: (input: {
+    snapshot: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RepoSnapshotResponse>
+    pullRequests: (input: {
       cwd: WorkspaceId
       workspaceRuntimeId: string
-      branch?: string
-      mode?: PullRequestFetchMode
-    }) => Promise<GitWorkspaceRuntimeProjection>
+      scope: RepoPullRequestScope
+    }) => Promise<RepoPullRequestsResponse>
     operations: (
       input: { includeSettled?: boolean } | { cwd: WorkspaceId; workspaceRuntimeId: string; includeSettled?: boolean },
     ) => Promise<RepoOperationsSnapshot>

@@ -20,13 +20,12 @@ export interface BranchSnapshotInfo {
   lastCommitAuthor: string
   worktree?: BranchWorktreeSnapshot
   mergedToDefault?: boolean
-  pullRequest?: PullRequestInfo
 }
 
 export interface BranchWorktreeSnapshot {
   path: string
-  isPrimary?: boolean
-  isLocked?: boolean
+  isPrimary: boolean
+  isLocked: boolean
 }
 
 export interface PullRequestInfo {
@@ -49,20 +48,6 @@ export interface PullRequestInfo {
   }
   reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
   mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
-}
-
-export function branchPullRequestBelongsToBranch(
-  branch: Pick<BranchSnapshotInfo, 'name' | 'isDefault'>,
-  pullRequest: PullRequestInfo,
-): boolean {
-  if (branch.isDefault === true) {
-    return pullRequest.headRefName === branch.name && pullRequest.baseRefName === branch.name
-  }
-  // Refresh results are already keyed by the branch they were requested for.
-  // If a PR omits headRefName, keep it attached for regular branches, but
-  // never allow an explicit head mismatch.
-  if (pullRequest.headRefName && pullRequest.headRefName !== branch.name) return false
-  return true
 }
 
 export type PullRequestFetchMode = 'summary' | 'full'

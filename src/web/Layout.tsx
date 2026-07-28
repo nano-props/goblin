@@ -28,7 +28,6 @@ import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
-import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
@@ -56,8 +55,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
-import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -166,11 +164,9 @@ function AuthenticatedWorkspaceShell() {
       ? commandWorkspace.capability.probe.capabilities
       : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
-  const commandBranchProjection = useRepoProjectionReadModel(
+  const commandBranchProjection = useRepoSnapshotReadModel(
     commandWorkspace?.capability.kind === 'git' ? commandWorkspace.id : null,
     commandWorkspace?.workspaceRuntimeId ?? '',
-    routeContext?.kind === 'branch' ? routeContext.branchName : null,
-    'full',
     routeContext?.kind === 'branch' && commandWorkspace?.capability.kind === 'git',
   )
   const commandWorktreeStatus = useRepoWorktreeStatusReadModel(
@@ -188,22 +184,12 @@ function AuthenticatedWorkspaceShell() {
     routeContext?.kind === 'branch' &&
     routeContext.branchName &&
     commandBranchProjection.isSuccess &&
-    commandWorktreeStatus.isSuccess &&
-    commandBranchProjection.data?.snapshot &&
-    commandWorktreeStatus.data
-      ? (repoBranchSnapshotDataFromSnapshot(commandBranchProjection.data.snapshot).branches.find(
-          (branch) => branch.name === routeContext.branchName,
-        ) ?? null)
+    commandBranchProjection.data?.snapshot
+      ? (commandBranchProjection.data.snapshot.branches.find((branch) => branch.name === routeContext.branchName) ??
+        null)
       : null
   const commandBranchCandidateWorktreePath = commandBranch?.worktree?.path ?? null
-  const commandBranchWorktreePath =
-    routeContext?.kind === 'branch' &&
-    commandBranchCandidateWorktreePath &&
-    commandWorktreeStatus.data?.status.some(
-      (worktree) => worktree.path === commandBranchCandidateWorktreePath && worktree.branch === routeContext.branchName,
-    )
-      ? commandBranchCandidateWorktreePath
-      : null
+  const commandBranchWorktreePath = routeContext?.kind === 'branch' ? commandBranchCandidateWorktreePath : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
     routeContext?.kind === 'branch' && routeContext.branchName && commandWorkspace
       ? commandWorkspace?.capability.kind === 'git' && commandBranchWorktreePath
@@ -577,7 +563,6 @@ function AuthenticatedWorkspaceSideEffects({
   useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ currentWorkspaceId: hydratedRouteWorkspaceId })
   useNetworkReconnect()
-  useRepoProjectionQueryEffects()
   useRepoStoreInvalidationRefresh()
   useWorkspaceRuntimeInvalidationRefresh()
   useSettingsQueryInvalidationSync()

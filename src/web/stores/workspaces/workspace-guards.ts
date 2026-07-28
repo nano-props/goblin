@@ -7,7 +7,7 @@ import {
 } from '#/shared/remote-workspace.ts'
 import { workspaceConnectivityLog } from '#/web/logger.ts'
 import type {
-  GitWorkspaceProjection,
+  GitWorkspaceClientState,
   WorkspaceCapabilityState,
   WorkspaceState,
   WorkspacesSet,
@@ -15,7 +15,7 @@ import type {
 } from '#/web/stores/workspaces/types.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { emptyGitWorkspaceClientState } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 /** The sole transition boundary for authoritative workspace capability state. */
 export function acceptWorkspaceProbeState(workspace: WorkspaceState, workspaceProbe: WorkspaceProbeState): void {
@@ -39,20 +39,20 @@ function workspaceCapabilityAfterProbe(
     return {
       kind: 'git',
       probe: workspaceProbe,
-      git: gitProjectionAcrossProbeTransition(workspace),
+      git: gitClientStateAcrossProbeTransition(workspace),
     }
   }
   throw new Error('Workspace ready probe has an unsupported Git capability')
 }
 
-function gitProjectionAcrossProbeTransition(workspace: WorkspaceState): GitWorkspaceProjection {
+function gitClientStateAcrossProbeTransition(workspace: WorkspaceState): GitWorkspaceClientState {
   switch (workspace.capability.kind) {
     case 'git':
       return workspace.capability.git
     case 'probing':
     case 'unavailable':
     case 'filesystem':
-      return emptyGitWorkspaceProjection()
+      return emptyGitWorkspaceClientState()
   }
 }
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
+import { subscribeRepoReadInvalidation } from '#/web/repo-read-invalidation-ingress.ts'
 import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-ingress.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -16,19 +16,19 @@ vi.mock('#/web/server-invalidation-ingress.ts', () => ({
   }),
 }))
 
-describe('repo query invalidation ingress', () => {
+describe('repo read invalidation ingress', () => {
   beforeEach(() => {
     mocks.listener = null
     mocks.dispose.mockReset()
   })
 
-  test('forwards repo query invalidations and returns the shared subscription disposer', () => {
+  test('forwards repo read invalidations and returns the shared subscription disposer', () => {
     const listener = vi.fn()
-    const dispose = subscribeRepoQueryInvalidation(listener)
+    const dispose = subscribeRepoReadInvalidation(listener)
     const event = {
-      type: 'repo-query-invalidated' as const,
+      type: 'repo-read-invalidated' as const,
       repoId: workspaceIdForTest('goblin+file:///workspace'),
-      query: 'repo-snapshot' as const,
+      domain: 'metadata' as const,
     }
 
     mocks.listener?.(event)
@@ -40,7 +40,7 @@ describe('repo query invalidation ingress', () => {
 
   test('ignores invalidations owned by other projections', () => {
     const listener = vi.fn()
-    subscribeRepoQueryInvalidation(listener)
+    subscribeRepoReadInvalidation(listener)
 
     mocks.listener?.({ type: 'settings-invalidated', scopes: ['theme'] })
 

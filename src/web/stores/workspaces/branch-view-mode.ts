@@ -1,22 +1,23 @@
-import type { BranchViewMode, RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 interface BranchSelectionInput {
-  branches: RepoBranchState[]
+  branches: BranchSnapshotInfo[]
   currentBranch: string
   selectedBranch: string | null
   viewMode: BranchViewMode
 }
 
 interface VisibleBranchesInput {
-  branches: RepoBranchState[]
+  branches: BranchSnapshotInfo[]
   viewMode: BranchViewMode
 }
 
-function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchViewMode): boolean {
+function branchMatchesViewMode(branch: BranchSnapshotInfo, viewMode: BranchViewMode): boolean {
   if (viewMode === 'worktrees') return !!branch.worktree?.path
   return true
 }
 
-export function visibleBranches({ branches, viewMode }: VisibleBranchesInput): RepoBranchState[] {
+export function visibleBranches({ branches, viewMode }: VisibleBranchesInput): BranchSnapshotInfo[] {
   return branches.filter((branch) => branchMatchesViewMode(branch, viewMode))
 }
 

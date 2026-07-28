@@ -18,15 +18,25 @@ import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import {
+  useRepoPullRequestsReadModel,
+  useRepoSnapshotReadModel,
+  useRepoWorktreeStatusReadModel,
+} from '#/web/repo-queries.ts'
 import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
-import type { PullRequestEntry } from '#/shared/api-types.ts'
+import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { RepoRemoteInfo } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import {
+  RepoReadFailureNotice,
+  RepoStatusFailureView,
+  RepoStatusStaleNotice,
+} from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/workspace-pages/dashboard-ui.tsx'
@@ -35,21 +45,28 @@ const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
 interface DashboardBranchItem {
-  branch: RepoBranchState
-  dirty: boolean
+  branch: BranchSnapshotInfo
+  dirty: boolean | undefined
   pullRequest?: PullRequestEntry['pullRequest']
 }
 
 interface DashboardSummary {
   branchCount: number
   worktreeCount: number
-  dirtyWorktreeCount: number
+  dirtyWorktreeCount: number | undefined
   aheadCount: number
   behindCount: number
-  openPullRequestCount: number
+  openPullRequestCount: number | undefined
   attentionBranches: DashboardBranchItem[]
   recentBranches: DashboardBranchItem[]
 }
+
+interface DashboardRepositoryFacts {
+  snapshot: RepoSnapshot
+  status: WorktreeStatus[] | undefined
+}
+
+type DashboardPullRequestState = 'pending' | 'unavailable' | 'error' | 'empty' | 'ready' | 'stale'
 
 interface WorkspaceDashboardPaneProps {
   workspaceId: WorkspaceId
@@ -83,14 +100,18 @@ export function WorkspaceDashboardPane({
   )
   const directoryWorkspace = workspace?.capability.kind === 'filesystem'
   const gitQueriesEnabled = workspace?.capability.kind === 'git'
-  const projectionReadModel = useRepoProjectionReadModel(
+  const snapshotReadModel = useRepoSnapshotReadModel(
     workspaceId,
     workspace?.workspaceRuntimeId ?? '',
-    null,
-    'summary',
     gitQueriesEnabled,
   )
-  const projection = projectionReadModel.data
+  const snapshot = snapshotReadModel.data?.snapshot
+  const pullRequestsReadModel = useRepoPullRequestsReadModel(
+    workspaceId,
+    workspace?.workspaceRuntimeId ?? '',
+    { kind: 'repository-summary' },
+    gitQueriesEnabled,
+  )
   const statusReadModel = useRepoWorktreeStatusReadModel(
     workspaceId,
     workspace?.workspaceRuntimeId ?? '',
@@ -102,13 +123,21 @@ export function WorkspaceDashboardPane({
     !!workspace && directoryWorkspace,
   )
   const branchModel = useMemo(
-    () =>
-      projection?.snapshot && statusReadModel.data
-        ? repoBranchReadModelFromSnapshot(projection.snapshot, statusReadModel.data.status)
-        : null,
-    [projection?.snapshot, statusReadModel.data],
+    () => (snapshot ? { snapshot, status: statusReadModel.data?.status } : null),
+    [snapshot, statusReadModel.data],
   )
-  const pullRequestEntries = projection?.pullRequests ?? null
+  const pullRequestEntries = pullRequestsReadModel.data?.pullRequests
+  const pullRequestState: DashboardPullRequestState = !pullRequestsReadModel.data
+    ? pullRequestsReadModel.isError
+      ? 'error'
+      : 'pending'
+    : pullRequestsReadModel.isError
+      ? 'stale'
+      : pullRequestsReadModel.data.pullRequests === null
+        ? 'unavailable'
+        : pullRequestsReadModel.data.pullRequests.length === 0
+          ? 'empty'
+          : 'ready'
   const summary = useMemo(
     () => (branchModel ? buildDashboardSummary(branchModel, pullRequestEntries) : null),
     [branchModel, pullRequestEntries],
@@ -117,6 +146,11 @@ export function WorkspaceDashboardPane({
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : String(statusError)
   const statusStale = !!statusReadModel.data && statusReadModel.isError
+  const snapshotError = snapshotReadModel.error
+  const snapshotErrorKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
+  const pullRequestError = pullRequestsReadModel.error
+  const pullRequestErrorKey =
+    pullRequestError instanceof Error ? pullRequestError.message : pullRequestError ? String(pullRequestError) : null
   const retryStatus = () => {
     if (!workspace) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, workspace.id, workspace.workspaceRuntimeId)
@@ -138,27 +172,55 @@ export function WorkspaceDashboardPane({
             <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4 text-sm text-destructive')}>
               {t('dashboard.directory.read-failed')}
             </div>
-          ) : workspace && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
+          ) : workspace && workspace.capability.kind === 'git' && !snapshot && snapshotReadModel.isError ? (
             <RepoStatusFailureView
-              messageKey={statusErrorKey}
-              retrying={statusReadModel.isFetching}
-              onRetry={retryStatus}
+              messageKey={snapshotErrorKey || 'error.failed-read-repo'}
+              retrying={snapshotReadModel.isFetching}
+              onRetry={() => void snapshotReadModel.refetch()}
             />
           ) : workspace && workspace.capability.kind === 'git' && branchModel && summary ? (
             <>
-              {statusStale && (
+              {snapshotReadModel.isError && (
                 <RepoStatusStaleNotice
-                  messageKey={statusErrorKey}
-                  retrying={statusReadModel.isFetching}
-                  onRetry={retryStatus}
+                  messageKey={snapshotErrorKey || 'error.failed-read-repo'}
+                  retrying={snapshotReadModel.isFetching}
+                  onRetry={() => void snapshotReadModel.refetch()}
+                />
+              )}
+              {statusReadModel.isError &&
+                (statusStale ? (
+                  <RepoStatusStaleNotice
+                    messageKey={statusErrorKey}
+                    retrying={statusReadModel.isFetching}
+                    onRetry={retryStatus}
+                  />
+                ) : (
+                  <RepoReadFailureNotice
+                    messageKey={statusErrorKey || 'error.failed-read-repo'}
+                    retrying={statusReadModel.isFetching}
+                    onRetry={retryStatus}
+                  />
+                ))}
+              {pullRequestState === 'error' && (
+                <RepoReadFailureNotice
+                  messageKey={pullRequestErrorKey || 'error.failed-read-repo'}
+                  retrying={pullRequestsReadModel.isFetching}
+                  onRetry={() => void pullRequestsReadModel.refetch()}
+                />
+              )}
+              {pullRequestState === 'stale' && pullRequestErrorKey && (
+                <RepoStatusStaleNotice
+                  messageKey={pullRequestErrorKey}
+                  retrying={pullRequestsReadModel.isFetching}
+                  onRetry={() => void pullRequestsReadModel.refetch()}
                 />
               )}
               <DashboardHeader
                 workspace={workspace}
-                git={workspace.capability.git}
-                currentBranch={branchModel.currentBranch}
+                remote={branchModel.snapshot.remote}
+                currentBranch={branchModel.snapshot.current}
               />
-              <DashboardStats compact={compact} summary={summary} />
+              <DashboardStats compact={compact} summary={summary} pullRequestState={pullRequestState} />
               <div
                 className={cn(
                   'grid gap-4',
@@ -214,19 +276,21 @@ function DirectoryDashboard({
 }
 
 function buildDashboardSummary(
-  branchModel: RepoBranchReadModelData,
-  pullRequestEntries: PullRequestEntry[] | null,
+  branchModel: DashboardRepositoryFacts,
+  pullRequestEntries: PullRequestEntry[] | null | undefined,
 ): DashboardSummary {
-  const branches = branchModel.branches
+  const branches = branchModel.snapshot.branches
   const pullRequestsByBranch = new Map(pullRequestEntries?.map((entry) => [entry.branch, entry.pullRequest]) ?? [])
   const branchItems = branches.map((branch) => buildDashboardBranchItem(branchModel, pullRequestsByBranch, branch))
   const worktreeBranches = branchItems.filter(({ branch }) => !!branch.worktree?.path)
-  const dirtyWorktreeCount = worktreeBranches.filter((item) => item.dirty).length
+  const dirtyWorktreeCount = branchModel.status
+    ? worktreeBranches.filter((item) => item.dirty === true).length
+    : undefined
   const aheadCount = branches.filter((branch) => branch.ahead > 0).length
   const behindCount = branches.filter((branch) => branch.behind > 0).length
-  const openPullRequestCount = [...pullRequestsByBranch.values()].filter(
-    (pullRequest) => pullRequest.state === 'open',
-  ).length
+  const openPullRequestCount = pullRequestEntries
+    ? [...pullRequestsByBranch.values()].filter((pullRequest) => pullRequest.state === 'open').length
+    : undefined
   const attentionBranches = branchItems
     .filter(
       ({ branch, dirty, pullRequest }) =>
@@ -249,9 +313,9 @@ function buildDashboardSummary(
 }
 
 function buildDashboardBranchItem(
-  branchModel: RepoBranchReadModelData,
+  branchModel: DashboardRepositoryFacts,
   pullRequestsByBranch: Map<string, PullRequestEntry['pullRequest']>,
-  branch: RepoBranchState,
+  branch: BranchSnapshotInfo,
 ): DashboardBranchItem {
   return {
     branch,
@@ -278,25 +342,24 @@ function branchAttentionScore({ branch, dirty, pullRequest }: DashboardBranchIte
   )
 }
 
-function branchWorktreeDirty(branchModel: RepoBranchReadModelData, branch: RepoBranchState) {
+function branchWorktreeDirty(branchModel: DashboardRepositoryFacts, branch: BranchSnapshotInfo): boolean | undefined {
   const worktreePath = branch.worktree?.path
   if (!worktreePath) return false
-  const status = branchModel.status.find((wt) => wt.path === worktreePath)
-  if (status) return status.entries.length > 0
-  return branchModel.worktreesByPath[worktreePath]?.isDirty ?? false
+  const status = branchModel.status?.find((wt) => wt.path === worktreePath)
+  return status ? status.entries.length > 0 : undefined
 }
 
 function DashboardHeader({
   workspace,
-  git,
+  remote,
   currentBranch,
 }: {
   workspace: Pick<WorkspaceState, 'id' | 'admission'>
-  git: GitWorkspaceProjection
+  remote: RepoRemoteInfo
   currentBranch: string
 }) {
   const t = useT()
-  const remoteState = dashboardRemoteState(git)
+  const remoteState = dashboardRemoteState(remote)
   const displayLocation = formatWorkspaceDisplayLocation(
     workspace.id,
     remoteWorkspaceTarget(workspace.id, workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null),
@@ -329,16 +392,23 @@ function DashboardHeader({
   )
 }
 
-function dashboardRemoteState(git: GitWorkspaceProjection): {
+function dashboardRemoteState(remote: RepoRemoteInfo): {
   labelKey: string
   variant: 'outline' | 'success' | 'attention'
 } {
-  if (git.remote.fetchFailed) return { labelKey: 'dashboard.remote.fetch-failed', variant: 'attention' }
-  if (git.remote.hasRemotes) return { labelKey: 'dashboard.remote.connected', variant: 'success' }
+  if (remote.hasRemotes) return { labelKey: 'dashboard.remote.connected', variant: 'success' }
   return { labelKey: 'dashboard.remote.local-only', variant: 'outline' }
 }
 
-function DashboardStats({ compact, summary }: { compact: boolean; summary: DashboardSummary }) {
+function DashboardStats({
+  compact,
+  summary,
+  pullRequestState,
+}: {
+  compact: boolean
+  summary: DashboardSummary
+  pullRequestState: DashboardPullRequestState
+}) {
   const t = useT()
   return (
     <div
@@ -354,8 +424,12 @@ function DashboardStats({ compact, summary }: { compact: boolean; summary: Dashb
         icon={Workflow}
         label={t('dashboard.metric.worktrees')}
         value={summary.worktreeCount}
-        detail={t('dashboard.metric.worktrees-detail', { count: summary.dirtyWorktreeCount })}
-        tone={summary.dirtyWorktreeCount > 0 ? 'attention' : 'default'}
+        detail={
+          summary.dirtyWorktreeCount === undefined
+            ? '—'
+            : t('dashboard.metric.worktrees-detail', { count: summary.dirtyWorktreeCount })
+        }
+        tone={(summary.dirtyWorktreeCount ?? 0) > 0 ? 'attention' : 'default'}
       />
       <DashboardMetricCard
         icon={GitCompareArrows}
@@ -367,7 +441,15 @@ function DashboardStats({ compact, summary }: { compact: boolean; summary: Dashb
       <DashboardMetricCard
         icon={GitPullRequest}
         label={t('dashboard.metric.prs')}
-        value={summary.openPullRequestCount}
+        value={
+          pullRequestState === 'pending'
+            ? t('branch-status.pr.pending')
+            : pullRequestState === 'unavailable'
+              ? t('branch-status.pr.unavailable')
+              : pullRequestState === 'error'
+                ? t('branch-status.pr.failed')
+                : (summary.openPullRequestCount ?? '—')
+        }
         detail={t('dashboard.metric.prs-detail')}
       />
     </div>
@@ -379,7 +461,7 @@ function DashboardAttention({
   summary,
   onSelectBranch,
 }: {
-  branchModel: RepoBranchReadModelData
+  branchModel: DashboardRepositoryFacts
   summary: DashboardSummary
   onSelectBranch?: (branchName: string) => void
 }) {
@@ -407,7 +489,7 @@ function BranchAttentionRow({
   item,
   onSelectBranch,
 }: {
-  branchModel: RepoBranchReadModelData
+  branchModel: DashboardRepositoryFacts
   item: DashboardBranchItem
   onSelectBranch?: (branchName: string) => void
 }) {
@@ -425,7 +507,7 @@ function BranchAttentionRow({
       disabled={!onSelectBranch}
       onClick={() => onSelectBranch?.(branch.name)}
     >
-      <BranchSummaryInline repo={{ branchModel }} branch={branch} />
+      <BranchSummaryInline repo={{ status: branchModel.status }} branch={branch} />
       <BranchSignals item={item} />
     </button>
   )
@@ -470,7 +552,7 @@ function DashboardRecentBranches({
   branches,
   onSelectBranch,
 }: {
-  branchModel: RepoBranchReadModelData
+  branchModel: DashboardRepositoryFacts
   branches: DashboardBranchItem[]
   onSelectBranch?: (branchName: string) => void
 }) {
@@ -493,7 +575,7 @@ function DashboardRecentBranches({
               disabled={!onSelectBranch}
               onClick={() => onSelectBranch?.(item.branch.name)}
             >
-              <BranchSummaryInline repo={{ branchModel }} branch={item.branch} />
+              <BranchSummaryInline repo={{ status: branchModel.status }} branch={item.branch} />
               <div
                 className="mt-0.5 truncate pl-5 text-[11px] text-muted-foreground"
                 title={item.branch.lastCommitMessage}

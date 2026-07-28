@@ -3,9 +3,9 @@ import {
   disconnectAllInvalidationSockets,
   InvalidationSocketLimitError,
   MAX_INVALIDATION_SOCKETS,
-  publishRepoQueryInvalidation,
+  publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
-  publishUserRepoQueryInvalidation,
+  publishUserRepoReadInvalidation,
   publishUserWorkspaceRuntimeInvalidation,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
@@ -26,7 +26,7 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(second)
 
     disconnectAllInvalidationSockets()
-    publishRepoQueryInvalidation({ repoId: workspaceId, query: 'repo-snapshot' })
+    publishRepoReadInvalidation({ repoId: workspaceId, domain: 'metadata' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
@@ -56,7 +56,7 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(first, 'user_a')
     registerInvalidationSocket(second, 'user_b')
 
-    publishUserRepoQueryInvalidation('user_a', { repoId: workspaceId, query: 'repo-runtime' })
+    publishUserRepoReadInvalidation('user_a', { repoId: workspaceId, domain: 'operations' })
 
     expect(first.send).toHaveBeenCalledOnce()
     expect(second.send).not.toHaveBeenCalled()

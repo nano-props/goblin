@@ -1,6 +1,6 @@
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -16,7 +16,7 @@ import {
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
@@ -101,10 +101,14 @@ describe('workspace pane destination navigation', () => {
       commitWorkspacePaneRoute: routeNavigation.commit,
     })
     await routeNavigation.started
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [
-        createRepoBranch('feature/current', { worktree: { path: CURRENT_WORKTREE } }),
-        createRepoBranch('feature/destination', { worktree: { path: '/tmp/goblin-replaced-worktree' } }),
+        createRepoBranch('feature/current', {
+          worktree: { path: CURRENT_WORKTREE, isPrimary: false, isLocked: false },
+        }),
+        createRepoBranch('feature/destination', {
+          worktree: { path: '/tmp/goblin-replaced-worktree', isPrimary: false, isLocked: false },
+        }),
       ],
       currentBranch: 'feature/current',
     })
@@ -124,7 +128,7 @@ describe('workspace pane destination navigation', () => {
       commitWorkspacePaneRoute: routeNavigation.commit,
     })
     await routeNavigation.started
-    const queryKey = repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'full')
+    const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
     const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('missing repo projection query')
     query.setState({ ...query.state, status: 'error', error: new Error('projection unavailable') })
@@ -315,17 +319,21 @@ function seedNoWorktreeRepo() {
     branches: [branch],
     currentBranchName: branch.name,
   })
-  seedRepoReadModelQueryData(repo, { branches: [branch], currentBranch: branch.name })
+  seedRepoQueryDataForTest(repo, { branches: [branch], currentBranch: branch.name })
 }
 
 function seedDestinationRepo() {
-  const current = createRepoBranch('feature/current', { worktree: { path: CURRENT_WORKTREE } })
-  const destination = createRepoBranch('feature/destination', { worktree: { path: DESTINATION_WORKTREE } })
+  const current = createRepoBranch('feature/current', {
+    worktree: { path: CURRENT_WORKTREE, isPrimary: false, isLocked: false },
+  })
+  const destination = createRepoBranch('feature/destination', {
+    worktree: { path: DESTINATION_WORKTREE, isPrimary: false, isLocked: false },
+  })
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [current, destination],
     currentBranchName: current.name,
   })
-  seedRepoReadModelQueryData(repo, { branches: [current, destination], currentBranch: current.name })
+  seedRepoQueryDataForTest(repo, { branches: [current, destination], currentBranch: current.name })
   return repo
 }

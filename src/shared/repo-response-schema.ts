@@ -59,12 +59,11 @@ const BranchSnapshotSchema = v.strictObject({
   worktree: v.optional(
     v.strictObject({
       path: v.string(),
-      isPrimary: v.optional(v.boolean()),
-      isLocked: v.optional(v.boolean()),
+      isPrimary: v.boolean(),
+      isLocked: v.boolean(),
     }),
   ),
   mergedToDefault: v.optional(v.boolean()),
-  pullRequest: v.optional(PullRequestSchema),
 })
 const RepoRemoteInfoSchema = v.strictObject({
   remotes: v.array(v.strictObject({ name: v.string(), fetchUrl: v.string(), pushUrl: v.string() })),
@@ -78,13 +77,13 @@ const RepoSnapshotSchema = v.strictObject({
   branches: v.array(BranchSnapshotSchema),
   current: v.string(),
   currentHEAD: v.optional(v.string()),
-  remote: v.optional(RepoRemoteInfoSchema),
+  remote: RepoRemoteInfoSchema,
 })
-export const RepoProjectionResponseSchema = v.strictObject({
-  snapshot: v.nullable(RepoSnapshotSchema),
+export const RepoSnapshotResponseSchema = v.strictObject({
+  snapshot: RepoSnapshotSchema,
+})
+export const RepoPullRequestsResponseSchema = v.strictObject({
   pullRequests: v.nullable(v.array(v.strictObject({ branch: v.string(), pullRequest: PullRequestSchema }))),
-  requested: v.strictObject({ branch: v.nullable(v.string()), pullRequestMode: v.picklist(['summary', 'full']) }),
-  loadedAt: v.number(),
 })
 
 const StatusEntrySchema = v.strictObject({ x: v.string(), y: v.string(), path: v.string() })

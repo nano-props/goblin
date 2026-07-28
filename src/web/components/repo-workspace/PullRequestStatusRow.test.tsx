@@ -22,6 +22,11 @@ const TEST_DICT: Record<string, string> = {
   'branch-status.pr.open-externally': 'Open pull request in browser',
   'branch-status.signal.pr': 'PR',
   'branch-status.copied': 'Copied',
+  'branch-status.pr.pending': 'loading',
+  'branch-status.pr.unavailable': 'unavailable',
+  'branch-status.pr.failed': 'could not load',
+  'branch-status.pr.none': 'none',
+  'error.try-again': 'Try again',
 }
 
 vi.mock('#/web/stores/i18n.ts', () => ({
@@ -48,6 +53,42 @@ beforeEach(() => {
 })
 
 describe('PullRequestStatusRow', () => {
+  test.each([
+    ['pending', 'loading'],
+    ['unavailable', 'unavailable'],
+    ['empty', 'none'],
+  ] as const)('renders the local %s state without treating it as a PR result', (state, label) => {
+    renderInJsdom(
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={undefined}
+        read={{ state, error: null, retrying: false, retry: vi.fn() }}
+      />,
+    )
+
+    expect(document.body.textContent).toContain(label)
+    expect(document.querySelector('[data-pull-request-link]')).toBeNull()
+  })
+
+  test('renders a retryable local error state', () => {
+    const retry = vi.fn()
+    renderInJsdom(
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={undefined}
+        read={{ state: 'error', error: 'error.failed-read-repo', retrying: false, retry }}
+      />,
+    )
+
+    fireEvent.click(document.querySelector<HTMLButtonElement>('button')!)
+    expect(document.body.textContent).toContain('could not load')
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
   test('renders the PR summary chip as a clickable button', () => {
     const pullRequest = createPullRequest(178, {
       state: 'open',
@@ -59,6 +100,7 @@ describe('PullRequestStatusRow', () => {
         workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
         branchName={BRANCH_NAME}
         pullRequest={pullRequest}
+        read={{ state: 'ready', error: null, retrying: false, retry: vi.fn() }}
       />,
     )
 
@@ -84,6 +126,7 @@ describe('PullRequestStatusRow', () => {
         workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
         branchName={BRANCH_NAME}
         pullRequest={pullRequest}
+        read={{ state: 'ready', error: null, retrying: false, retry: vi.fn() }}
       />,
     )
 
@@ -106,6 +149,7 @@ describe('PullRequestStatusRow', () => {
         workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
         branchName={BRANCH_NAME}
         pullRequest={pullRequest}
+        read={{ state: 'ready', error: null, retrying: false, retry: vi.fn() }}
       />,
     )
 

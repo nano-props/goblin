@@ -3,8 +3,8 @@ import {
   LINKED_REPO_ID,
   REPO_ID,
   WORKTREE_REPO_ID,
-  expectNoRepoSnapshotInvalidations,
-  expectRepoSnapshotInvalidations,
+  expectNoRepoMetadataInvalidations,
+  expectRepoMetadataInvalidations,
   mocks,
   removeLocalRepoWorktreeForTest,
   removeRepoWorktreeForTest,
@@ -49,14 +49,14 @@ describe('repo worktree removal', () => {
       phase: 'done',
       target: { branch: 'feature/a', worktreePath: '/tmp/repo-worktree' },
     })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: WORKTREE_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -122,14 +122,14 @@ describe('repo worktree removal', () => {
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: WORKTREE_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -200,7 +200,7 @@ describe('repo worktree removal', () => {
     expect(beforeRemove).not.toHaveBeenCalled()
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('removeRepoWorktree publishes affected invalidations after branch deletion fails post-removal', async () => {
@@ -224,14 +224,14 @@ describe('repo worktree removal', () => {
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: WORKTREE_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -262,14 +262,14 @@ describe('repo worktree removal', () => {
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({

@@ -146,7 +146,6 @@ Canonical examples:
 | Bulk read                   | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
 | Operation scheduler         | `RepoOperationScheduler`              | `WorkspaceRuntime`                               |
 | Operation lane              | `RepoOperationLane`                   | `RepoTaskLane`, `RepoLane`                       |
-| Data load state             | `RepoDataLoadState`                   | `RepoResourcesState`                             |
 | Right-pane surface          | `RepoWorkspace`                       | `branch-workspace/`                              |
 | Workspace-pane tab type     | `WorkspacePaneTabType`                | `WorkspacePaneView`                              |
 

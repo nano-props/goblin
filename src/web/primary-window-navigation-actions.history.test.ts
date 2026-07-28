@@ -129,7 +129,9 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
   test('does not block bare branch history restore while tabs projection is pending', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

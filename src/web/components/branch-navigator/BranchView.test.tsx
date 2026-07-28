@@ -3,7 +3,7 @@
 import {
   createRepoBranch,
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
@@ -79,7 +79,7 @@ describe('BranchView', () => {
       branches: [],
       currentBranchName: 'feature/query',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/query')],
       currentBranch: 'feature/query',
     })
@@ -90,13 +90,15 @@ describe('BranchView', () => {
   })
 
   test('opens a non-current branch status through destination navigation', () => {
-    const destination = createRepoBranch('feature/destination', { worktree: { path: WORKTREE_PATH } })
+    const destination = createRepoBranch('feature/destination', {
+      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/current'), destination],
       currentBranchName: 'feature/current',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/current'), destination],
       currentBranch: 'feature/current',
     })
@@ -114,13 +116,15 @@ describe('BranchView', () => {
   })
 
   test('uses the React Query status read model for branch row dirty state when available', () => {
-    const branch = createRepoBranch('feature/dirty', { worktree: { path: WORKTREE_PATH } })
+    const branch = createRepoBranch('feature/dirty', {
+      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+    })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       currentBranchName: 'feature/dirty',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [branch],
       currentBranch: 'feature/dirty',
       status: [
@@ -144,11 +148,11 @@ describe('BranchView', () => {
       branches: [],
       currentBranchName: 'feature/query-dirty',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [
         createBranchSnapshot('feature/query-dirty', {
           isCurrent: true,
-          worktree: { path: WORKTREE_PATH },
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
         }),
       ],
       currentBranch: 'feature/query-dirty',
@@ -167,13 +171,13 @@ describe('BranchView', () => {
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
 
-  test('shows a retryable failure when the initial status read fails', async () => {
+  test('keeps branch rows visible with unknown dirty state when the initial status read fails', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
     })
@@ -187,11 +191,10 @@ describe('BranchView', () => {
 
     renderBranchView()
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    const retry = screen.getByRole('button', { name: 'error.try-again' })
-    expect(retry).toBeTruthy()
-    fireEvent.click(retry)
-    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 
   test('keeps last-good branch status visible with a retryable stale warning', async () => {
@@ -200,7 +203,7 @@ describe('BranchView', () => {
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       status: [{ path: REPO_ID, branch: 'main', isMain: true, entries: [] }],

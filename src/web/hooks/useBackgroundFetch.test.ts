@@ -1,24 +1,25 @@
-import { describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { backgroundSyncTargetsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///remote-workspace')
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///local-workspace')
 const UNAVAILABLE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///unavailable-workspace')
 
+beforeEach(() => primaryWindowQueryClient.clear())
+
 describe('backgroundSyncTargetsFromStore', () => {
-  test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
+  test('keeps the visible remotely backed repo registered from accepted snapshot metadata', () => {
     const repo = createRepo({
       id: REMOTE_WORKSPACE_ID,
       remote: { hasRemotes: true, hasGitHubRemote: true },
     })
-    if (repo.capability.kind !== 'git') throw new Error('expected Git capability')
-    repo.capability.git.dataLoads.repoReadModel.phase = 'refreshing'
-    repo.capability.git.operations.repoReadModel.phase = 'running'
 
     expect(
       backgroundSyncTargetsFromStore({ workspaces: { [REMOTE_WORKSPACE_ID]: repo } }, REMOTE_WORKSPACE_ID),
@@ -91,10 +92,17 @@ function createRepo(input: {
     },
     diagnostics: [],
   })
-  if (readyRepo.capability.kind !== 'git') throw new Error('expected Git capability')
-  readyRepo.capability.git.remote.hasRemotes = input.remote.hasRemotes
-  readyRepo.capability.git.remote.hasBrowserRemote = input.remote.hasGitHubRemote
-  readyRepo.capability.git.remote.browserRemoteProvider = input.remote.hasGitHubRemote ? 'github' : undefined
-  readyRepo.capability.git.remote.hasGitHubRemote = input.remote.hasGitHubRemote
+  setRepoSnapshotQueryData(readyRepo.id, readyRepo.workspaceRuntimeId, {
+    branches: [],
+    current: '',
+    remote: {
+      remotes: [],
+      hasRemotes: input.remote.hasRemotes,
+      hasBrowserRemote: input.remote.hasGitHubRemote,
+      browserRemoteProvider: input.remote.hasGitHubRemote ? 'github' : undefined,
+      remoteProviders: {},
+      hasGitHubRemote: input.remote.hasGitHubRemote,
+    },
+  })
   return readyRepo
 }

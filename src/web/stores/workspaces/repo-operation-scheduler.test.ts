@@ -5,7 +5,6 @@ import {
   markRepoOperationTargets,
   nextRepoOperationId,
   repoLocalBranchActionScheduleGuard,
-  repoLocalProjectionReadBusy,
   repoLocalPrimaryRefreshBusy,
   repoLocalRemoteFetchBlocked,
   repoOperation,
@@ -149,12 +148,10 @@ describe('workspace runtime task scheduling', () => {
 
   test('local guard helpers name the scheduler-only busy sets', () => {
     expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(false)
-    expect(repoLocalProjectionReadBusy(REPO_ID)).toBe(false)
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
       fetchBusy: false,
       branchOperationPhase: 'idle',
-      projectionReadBusy: false,
     })
 
     markRepoOperationTargets(
@@ -169,22 +166,12 @@ describe('workspace runtime task scheduling', () => {
     markRepoOperationTargets(
       REPO_ID,
       nextRepoOperationId(REPO_ID),
-      [{ key: 'repoReadModel', reason: 'repo-read-model' }],
-      'running',
-    )
-    expect(repoLocalProjectionReadBusy(REPO_ID)).toBe(true)
-    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(true)
-
-    markRepoOperationTargets(
-      REPO_ID,
-      nextRepoOperationId(REPO_ID),
       [{ key: 'branchAction', reason: 'branch:pull', target: 'feature/a' }],
       'queued',
     )
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toMatchObject({
       fetchBusy: false,
       branchOperationPhase: 'queued',
-      projectionReadBusy: true,
     })
   })
 })

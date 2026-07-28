@@ -49,13 +49,13 @@ export function parseBranches(
     }
   }
 
-  const worktreeMap = new Map<string, { path: string; isPrimary: boolean; isLocked?: boolean }>()
+  const worktreeMap = new Map<string, { path: string; isPrimary: boolean; isLocked: boolean }>()
   for (const wt of worktrees) {
     if (wt.branch) {
       worktreeMap.set(wt.branch, {
         path: wt.path,
         isPrimary: wt.isPrimary,
-        isLocked: wt.isLocked,
+        isLocked: wt.isLocked ?? false,
       })
     }
   }
@@ -102,7 +102,7 @@ export function parseBranches(
       branchInfo.worktree = {
         path: wtInfo.path,
         isPrimary: wtInfo.isPrimary,
-        ...(wtInfo.isLocked !== undefined ? { isLocked: wtInfo.isLocked } : {}),
+        isLocked: wtInfo.isLocked,
       }
     }
 

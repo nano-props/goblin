@@ -2,7 +2,7 @@
 
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
@@ -32,7 +32,7 @@ describe('RepoToolbarActions', () => {
       branches: [],
       currentBranchName: 'feature/query',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
       currentBranch: 'feature/query',
     })

@@ -80,8 +80,8 @@ type WorkspacePaneLayoutRestoreAdmission =
   { kind: 'ready'; targets: RestorableWorkspacePaneTarget[] } | { kind: 'deferred' }
 
 function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime): WorkspacePaneLayoutRestoreAdmission {
-  if (workspace.gitProjection?.snapshot) {
-    const gitTargets = workspace.gitProjection.snapshot.branches.flatMap((branch) => {
+  if (workspace.repoSnapshot) {
+    const gitTargets = workspace.repoSnapshot.branches.flatMap((branch) => {
       const target: RestorableWorkspacePaneTarget | null = branch.worktree
         ? restorableWorktreeTarget(workspace.workspaceId, branch.worktree.path)
         : { kind: 'git-branch', branch: branch.name }

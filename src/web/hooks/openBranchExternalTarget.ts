@@ -1,14 +1,14 @@
 import { openRepoUrl } from '#/web/repo-client.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export async function openBranchExternalTarget(
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: Pick<RepoBranchState, 'name' | 'pullRequest'>,
+  branch: { name: string; pullRequest?: PullRequestInfo },
 ): Promise<ExecResult> {
   if (branch.pullRequest?.url) return await openExternalUrl(branch.pullRequest.url)
   return await openRepoUrl(repoId, workspaceRuntimeId, { type: 'branch', branch: branch.name })
@@ -19,12 +19,11 @@ export async function openUpstreamBranchExternalTarget(
   workspaceRuntimeId: string,
   tracking: string,
 ): Promise<ExecResult> {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
-  if (repo?.capability.kind !== 'git') return { ok: false, message: 'error.invalid-upstream-ref' }
-  const gitRemote = repo.capability.git.remote
+  const gitRemote = getRepoSnapshotQueryData(repoId, workspaceRuntimeId)?.remote
+  if (!gitRemote) return { ok: false, message: 'error.invalid-upstream-ref' }
   const remoteName = resolveTrackingRemoteName(
     tracking,
-    gitRemote.remotes ?? Object.keys(gitRemote.remoteProviders ?? {}),
+    gitRemote.remotes.map((remote) => remote.name),
   )
   if (!remoteName) {
     return { ok: false, message: 'error.invalid-upstream-ref' }

@@ -48,7 +48,7 @@ interface WorkspacePaneTargetToolbarProps {
   model: WorkspacePaneTabModel
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  statusCount: number
+  statusCount: number | undefined
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
   staticTabAvailable?: Parameters<typeof workspacePaneTabItems>[0]['staticTabAvailable']

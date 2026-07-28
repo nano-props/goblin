@@ -6,21 +6,23 @@
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
+import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import {
+  useRepoOperationsReadModel,
+  useRepoSnapshotReadModel,
+  useRepoWorktreeStatusReadModel,
+} from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
-// data query; the store contributes only identity, UI, operation, and
-// remote shell fields for the list.
+// data queries; the store contributes only identity, UI, and operation
+// shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
-  branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
-  ui: GitWorkspaceProjection['ui']
+  ui: GitWorkspaceClientState['ui']
 }
 
-type BranchListRepoShell = Omit<BranchListRepo, 'branchModel' | 'branchAction'> & {
-  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
+type BranchListRepoShell = Omit<BranchListRepo, 'snapshot' | 'status' | 'branchAction'> & {
+  operations: Pick<GitWorkspaceClientState['operations'], 'branchAction'>
 }
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
@@ -28,7 +30,6 @@ const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'workspaceRuntimeId',
   'ui',
   'operations',
-  'remote',
   'remoteLifecycle',
 ]
 
@@ -38,14 +39,6 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   for (const field of branchListRepoShellEqualFields) {
     if (field === 'ui') {
       if (a.ui.branchViewMode !== b.ui.branchViewMode) return false
-    } else if (field === 'remote') {
-      const ra = a.remote
-      const rb = b.remote
-      if (ra.hasRemotes !== rb.hasRemotes) return false
-      if (ra.hasBrowserRemote !== rb.hasBrowserRemote) return false
-      if (ra.hasGitHubRemote !== rb.hasGitHubRemote) return false
-      if (ra.browserRemoteProvider !== rb.browserRemoteProvider) return false
-      if (ra.remoteProviders !== rb.remoteProviders) return false
     } else if (field === 'operations') {
       // The selector rebuilds `{ branchAction }` on every call, so the
       // wrapper reference always changes; compare the inner field
@@ -73,13 +66,6 @@ export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefin
             operations: {
               branchAction: repo.capability.git.operations.branchAction,
             },
-            remote: {
-              hasRemotes: repo.capability.git.remote.hasRemotes,
-              hasBrowserRemote: repo.capability.git.remote.hasBrowserRemote,
-              hasGitHubRemote: repo.capability.git.remote.hasGitHubRemote,
-              browserRemoteProvider: repo.capability.git.remote.browserRemoteProvider,
-              remoteProviders: repo.capability.git.remote.remoteProviders,
-            },
             remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
           }
         : undefined
@@ -89,14 +75,22 @@ export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefin
   const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
-  const branchReadModel = useRepoBranchReadModel(
+  const snapshotReadModel = useRepoSnapshotReadModel(
     repoShell?.id ?? null,
     repoShell?.workspaceRuntimeId ?? '',
     !!repoShell,
   )
-  if (!repoShell || !branchReadModel) return undefined
+  const statusReadModel = useRepoWorktreeStatusReadModel(
+    repoShell?.id ?? null,
+    repoShell?.workspaceRuntimeId ?? '',
+    !!repoShell,
+  )
+  const snapshot = snapshotReadModel.data?.snapshot
+  if (!repoShell || !snapshot) return undefined
   return {
-    ...projectBranchActionRepo(repoShell, operationsReadModel.data?.operations),
-    branchModel: branchReadModel,
+    ...projectBranchActionRepo(
+      { ...repoShell, snapshot, status: statusReadModel.data?.status },
+      operationsReadModel.data?.operations,
+    ),
   }
 }

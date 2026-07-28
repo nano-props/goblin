@@ -41,9 +41,21 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
         diagnostics: [],
       }
     },
-    'repo.projection': ({ cwd }: { cwd: string }) => {
+    'repo.snapshot': ({ cwd }: { cwd: string }) => {
       calls.projection.push(cwd)
-      return { snapshot: { branches: [], current: '' }, pullRequests: null }
+      return {
+        snapshot: {
+          branches: [],
+          current: '',
+          remote: {
+            remotes: [],
+            hasRemotes: false,
+            hasBrowserRemote: false,
+            remoteProviders: {},
+            hasGitHubRemote: false,
+          },
+        },
+      }
     },
     'repo.worktreeStatus': ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
       workspaceRuntimeId,
@@ -89,7 +101,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'workspaceProbe') {
       handlers['workspace.probe'] = ({ workspaceInput }: { workspaceInput: string }) => handler(workspaceInput)
-    } else if (key === 'projection') handlers['repo.projection'] = handler
+    } else if (key === 'projection') handlers['repo.snapshot'] = handler
     else handlers[key] = handler
   }
   // Exercise the same server-side lifecycle boundary used in production:

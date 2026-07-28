@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   REPO_ID,
-  expectNoRepoSnapshotInvalidations,
+  expectNoRepoMetadataInvalidations,
   mocks,
   pullRequest,
   repoSnapshot,
@@ -32,7 +32,7 @@ describe('getRepoSnapshot', () => {
     const result = await getRepoSnapshot(REPO_ID)
 
     expect(result).toEqual(snapshot)
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
   test('rejects an authoritative snapshot when branch membership cannot be read', async () => {
@@ -74,13 +74,13 @@ describe('getRepoPullRequests', () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(2)]]))
 
     const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoPullRequests(REPO_ID, ['feature/a'], { mode: 'summary' })
+    const result = await getRepoPullRequests(REPO_ID, { kind: 'branch-detail', branch: 'feature/a' })
 
     expect(result).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(2) }])
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 
-  test('returns multi-branch pull requests without publishing invalidation', async () => {
+  test('returns repository pull request summaries without publishing invalidation', async () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(
       new Map([
         ['feature/a', pullRequest(3)],
@@ -89,12 +89,12 @@ describe('getRepoPullRequests', () => {
     )
 
     const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await getRepoPullRequests(REPO_ID, ['feature/a', 'feature/b'], { mode: 'full' })
+    const result = await getRepoPullRequests(REPO_ID, { kind: 'repository-summary' })
 
     expect(result).toEqual([
       { branch: 'feature/a', pullRequest: pullRequest(3) },
       { branch: 'feature/b', pullRequest: pullRequest(4) },
     ])
-    expectNoRepoSnapshotInvalidations()
+    expectNoRepoMetadataInvalidations()
   })
 })

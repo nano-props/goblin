@@ -72,20 +72,24 @@ import {
   type BranchCheckboxState,
   useBranchActionDialogsStore,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
-import type { RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
+import {
+  useRepoOperationsReadModel,
+  useRepoSnapshotReadModel,
+  useRepoWorktreeStatusReadModel,
+} from '#/web/repo-queries.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-type BranchActionDialogRepo = Omit<BranchActionRepo, 'branchModel'> & {
-  branchModel: RepoBranchReadModelData
-}
+type BranchActionDialogRepo = BranchActionRepo
 
 interface BranchActionDialogContext {
   repo: BranchActionDialogRepo
-  branch: RepoBranchState
+  branch: BranchSnapshotInfo
 }
 
 export interface BranchActionDialogDisplay<P> {
@@ -123,12 +127,27 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? workspaces[slot.repoId] : null
-  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? null, slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
+  const snapshotReadModel = useRepoSnapshotReadModel(
+    slot?.repoId ?? null,
+    slotRepo?.workspaceRuntimeId ?? '',
+    !!slotRepo,
+  )
+  const statusReadModel = useRepoWorktreeStatusReadModel(
+    slot?.repoId ?? null,
+    slotRepo?.workspaceRuntimeId ?? '',
+    !!slotRepo,
+  )
   const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? null, slotRepo?.workspaceRuntimeId ?? '', {
     enabled: slotRepo?.capability.kind === 'git',
   })
   const liveContext = slot
-    ? resolveContext(workspaces, slot, branchReadModel, operationsReadModel.data?.operations)
+    ? resolveContext(
+        workspaces,
+        slot,
+        snapshotReadModel.data?.snapshot,
+        statusReadModel.data?.status,
+        operationsReadModel.data?.operations,
+      )
     : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
@@ -155,27 +174,22 @@ export function useBranchActionDialogDisplay<P>(
 function resolveContext<P>(
   workspaces: Record<string, WorkspaceState>,
   entry: BranchActionDialogEntry<P>,
-  branchReadModel: RepoBranchReadModelData | null,
+  snapshot: RepoSnapshot | undefined,
+  status: WorktreeStatus[] | undefined,
   operations: readonly RepoServerOperationState[] | undefined,
 ): BranchActionDialogContext | null {
   const repoFromStore = workspaces[entry.repoId]
-  if (!repoFromStore || repoFromStore.capability.kind !== 'git' || !branchReadModel) return null
+  if (!repoFromStore || repoFromStore.capability.kind !== 'git' || !snapshot) return null
   const git = repoFromStore.capability.git
   const repo: BranchActionDialogRepo = {
     id: repoFromStore.id,
     workspaceRuntimeId: repoFromStore.workspaceRuntimeId,
-    branchModel: branchReadModel,
+    snapshot,
+    status,
     branchAction: projectBranchActionOperation(git.operations.branchAction, operations, entry.branchName),
-    remote: {
-      hasRemotes: git.remote.hasRemotes,
-      hasBrowserRemote: git.remote.hasBrowserRemote,
-      hasGitHubRemote: git.remote.hasGitHubRemote,
-      browserRemoteProvider: git.remote.browserRemoteProvider,
-      remoteProviders: git.remote.remoteProviders,
-    },
     remoteLifecycle: repoFromStore.admission.kind === 'remote' ? repoFromStore.admission.lifecycle : null,
   }
-  const branch = repo.branchModel.branches.find((b) => b.name === entry.branchName)
+  const branch = repo.snapshot.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null
   return { repo, branch }
 }

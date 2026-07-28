@@ -13,8 +13,7 @@ import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
+import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
@@ -47,11 +46,11 @@ function WorktreeFilterToggle({ repoId }: Props) {
       }
     }),
   )
-  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.workspaceRuntimeId, repoView.exists)
+  const snapshotReadModel = useRepoSnapshotReadModel(repoView.id || null, repoView.workspaceRuntimeId, repoView.exists)
   return (
     <BranchViewModeControl
       value={repoView.branchViewMode}
-      disabled={!branchReadModel || branchReadModel.branches.length === 0}
+      disabled={!snapshotReadModel.data || snapshotReadModel.data.snapshot.branches.length === 0}
       onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
     />
   )

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { Check, Circle, GitPullRequest, X } from 'lucide-react'
+import { Check, Circle, GitPullRequest, RefreshCw, X } from 'lucide-react'
 import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
@@ -23,6 +23,8 @@ import {
 } from '#/web/components/workspace-pane/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { Lang } from '#/shared/api-types.ts'
+import type { PullRequestReadPresentation } from '#/web/components/repo-workspace/model.ts'
+import { Button } from '#/web/components/ui/button.tsx'
 type TFn = (key: string, params?: Record<string, string | number>) => string
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
 const PR_STATE_LABEL_KEYS: Record<PullRequestInfo['state'], string> = {
@@ -183,12 +185,14 @@ export function PullRequestStatusRow({
   workspaceRuntimeId,
   branchName,
   pullRequest,
+  read,
   tooltipSide = 'right',
 }: {
   repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   pullRequest: PullRequestInfo | undefined
+  read: PullRequestReadPresentation
   tooltipSide?: TooltipSide
 }) {
   const t = useT()
@@ -210,7 +214,35 @@ export function PullRequestStatusRow({
       ),
     [repoId, workspaceRuntimeId, branchName, pullRequest],
   )
-  if (!pullRequest) return null
+  if (!pullRequest) {
+    const labelKey =
+      read.state === 'pending'
+        ? 'branch-status.pr.pending'
+        : read.state === 'unavailable'
+          ? 'branch-status.pr.unavailable'
+          : read.state === 'error'
+            ? 'branch-status.pr.failed'
+            : 'branch-status.pr.none'
+    return (
+      <StatusRow
+        icon={<GitPullRequest size={14} />}
+        label={t('branch-status.signal.pr')}
+        value={
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{t(labelKey)}</span>
+            {read.state === 'error' && (
+              <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
+                <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
+                {t('error.try-again')}
+              </Button>
+            )}
+          </div>
+        }
+        valueLayout="fill"
+        tone={read.state === 'error' ? 'danger' : 'neutral'}
+      />
+    )
+  }
 
   const signals = prHealthSignals(pullRequest, t)
   const tone = prChipTone(pullRequest, signals)
@@ -223,18 +255,26 @@ export function PullRequestStatusRow({
       icon={<GitPullRequest size={14} />}
       label={t('branch-status.signal.pr')}
       value={
-        <PullRequestValue
-          summary={summary}
-          summaryTone={summaryTone}
-          signals={signals}
-          tooltip={tooltip}
-          url={pullRequest.url}
-          copyLabel={t('branch-status.pr.copy-link')}
-          copiedLabel={t('branch-status.copied')}
-          openExternallyLabel={t('branch-status.pr.open-externally')}
-          tooltipSide={tooltipSide}
-          onOpenExternally={handleOpenExternally}
-        />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <PullRequestValue
+            summary={summary}
+            summaryTone={summaryTone}
+            signals={signals}
+            tooltip={tooltip}
+            url={pullRequest.url}
+            copyLabel={t('branch-status.pr.copy-link')}
+            copiedLabel={t('branch-status.copied')}
+            openExternallyLabel={t('branch-status.pr.open-externally')}
+            tooltipSide={tooltipSide}
+            onOpenExternally={handleOpenExternally}
+          />
+          {read.state === 'stale' && (
+            <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
+              <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
+              {t('error.try-again')}
+            </Button>
+          )}
+        </div>
       }
       valueLayout="fill"
       tone={tone}

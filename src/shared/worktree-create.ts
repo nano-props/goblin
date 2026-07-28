@@ -8,8 +8,8 @@
 // keep a malformed payload from ever reaching `git worktree add`.
 //
 // We deliberately exclude the `detached` mode here — detached worktrees
-// would land in `worktreesByPath` but have no matching `BranchSnapshotInfo`,
-// which leaves them invisible in the BranchNavigator. Reintroducing the mode
+// have no matching `BranchSnapshotInfo`, which leaves them outside the
+// branch-oriented navigator. Reintroducing the mode
 // should be a paired change with a detached-worktree row in the list.
 
 import * as v from 'valibot'

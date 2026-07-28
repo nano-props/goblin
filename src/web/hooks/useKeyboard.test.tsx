@@ -2,7 +2,7 @@
 
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -29,7 +29,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
@@ -231,7 +231,7 @@ describe('useKeyboard', () => {
       branches: [],
       currentBranchName: 'main',
     })
-    seedRepoReadModelQueryData(repo, {
+    seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
       currentBranch: 'main',
     })
@@ -706,7 +706,9 @@ function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
 function seedCurrentWorktreeRepoForTest() {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    branches: [
+      createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+    ],
     currentBranchName: 'feature/worktree',
   })
 }
@@ -714,7 +716,9 @@ function seedCurrentWorktreeRepoForTest() {
 function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'terminal') {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    branches: [
+      createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+    ],
     currentBranchName: 'feature/worktree',
     preferredWorkspacePaneTab,
     workspacePaneTabsByBranch: {
@@ -789,7 +793,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
     : null
   const branch =
     repo && overrides.currentBranchName
-      ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find(
+      ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.find(
           (candidate) => candidate.name === overrides.currentBranchName,
         )
       : null

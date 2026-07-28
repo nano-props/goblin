@@ -60,7 +60,7 @@ vi.mock('#/web/stores/workspaces/store.ts', async (importActual) => {
 function stubRepo(
   id: WorkspaceId,
   workspaceRuntimeId: string,
-  options: { projectionState?: 'projected' | 'stub'; loadedAt?: number | null } = {},
+  options: { projectionState?: 'projected' | 'stub' } = {},
 ) {
   return {
     id,
@@ -68,9 +68,6 @@ function stubRepo(
     session: {
       entry: { id },
       projectionState: options.projectionState ?? 'stub',
-    },
-    dataLoads: {
-      repoReadModel: { phase: 'idle', loadedAt: options.loadedAt ?? null, error: null, stale: false },
     },
   }
 }
@@ -103,7 +100,7 @@ describe('useRestoreWorkspaceTabsOnView', () => {
     }
     mocks.storeState = {
       workspaces: {
-        [WORKSPACE_A_ID]: stubRepo(WORKSPACE_A_ID, 'rta', { projectionState: 'projected', loadedAt: null }),
+        [WORKSPACE_A_ID]: stubRepo(WORKSPACE_A_ID, 'rta', { projectionState: 'projected' }),
       },
       promoteRestoredWorkspace: mocks.promoteRestoredWorkspace,
     }
@@ -111,14 +108,14 @@ describe('useRestoreWorkspaceTabsOnView', () => {
     await waitFor(() => expect(mocks.restoreWorkspaceTabsOnView).not.toHaveBeenCalled())
   })
 
-  test('restores a stub even when warm cache has populated loadedAt', async () => {
+  test('restores a workspace stub', async () => {
     function Host() {
       useRestoreWorkspaceTabsOnView({ workspaceId: WORKSPACE_A_ID })
       return null
     }
     mocks.storeState = {
       workspaces: {
-        [WORKSPACE_A_ID]: stubRepo(WORKSPACE_A_ID, 'rta', { projectionState: 'stub', loadedAt: 1 }),
+        [WORKSPACE_A_ID]: stubRepo(WORKSPACE_A_ID, 'rta', { projectionState: 'stub' }),
       },
       promoteRestoredWorkspace: mocks.promoteRestoredWorkspace,
     }

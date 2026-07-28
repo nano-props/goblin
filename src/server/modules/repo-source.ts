@@ -76,6 +76,7 @@ import {
   parseRemoteWorkspaceId,
   type PullRequestEntry,
   type RemoteWorkspaceTarget,
+  type RepoPullRequestScope,
   type RepoSnapshot,
 } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceRef } from '#/shared/remote-workspace.ts'
@@ -119,10 +120,7 @@ export interface RepoSource {
   getSnapshot(signal?: AbortSignal): Promise<RepoSnapshot | null>
   getWorkspacePaneTargetIdentities(signal?: AbortSignal): Promise<WorkspacePaneTargetIdentity[]>
   getStatus(signal?: AbortSignal): Promise<WorktreeStatus[]>
-  getPullRequests(
-    branches?: string[],
-    options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
-  ): Promise<PullRequestEntry[] | null>
+  getPullRequests(scope: RepoPullRequestScope, options?: { signal?: AbortSignal }): Promise<PullRequestEntry[] | null>
   getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
   getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]>
   fetch(signal: AbortSignal): Promise<RepoMutationResult>
@@ -208,15 +206,21 @@ export async function runWithRepoSource<T>(
   cwd: WorkspaceId,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
   runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
 ): Promise<T> {
-  return await task(await resolveRepoSource(cwd, runtime))
+  return await task(await resolveRepoSource(cwd, runtime, signal))
 }
 
-export async function resolveRepoSource(repoId: WorkspaceId, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
+export async function resolveRepoSource(
+  repoId: WorkspaceId,
+  runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
+): Promise<RepoSource> {
+  signal?.throwIfAborted()
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator) throw new Error('error.workspace-locator-malformed')
   return locator.transport === 'ssh'
-    ? await createRemoteRepoSource(repoId, undefined, null, runtime)
+    ? await createRemoteRepoSource(repoId, undefined, null, runtime, signal)
     : createLocalRepoSource(locator.path)
 }
 
@@ -579,12 +583,14 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       return await getWorkingStatus(repoId, { signal })
     },
-    async getPullRequests(branches, options) {
+    async getPullRequests(scope, options) {
       if (!isValidCwd(repoId)) return null
+      const branches = scope.kind === 'branch-detail' ? [scope.branch] : undefined
       const branchSet = normalizeRequestedBranches(branches)
       if (branchSet?.size === 0) return []
       if (capabilities.pullRequests !== 'cwd-github') return null
-      const prs = await getBranchPullRequests(repoId, branchSet, { mode: options?.mode, signal: options?.signal })
+      const mode: PullRequestFetchMode = scope.kind === 'repository-summary' ? 'summary' : 'full'
+      const prs = await getBranchPullRequests(repoId, branchSet, { mode, signal: options?.signal })
       return pullRequestEntries(prs)
     },
     async getLog(branch, options) {
@@ -754,8 +760,9 @@ async function createRemoteRepoSource(
   capturedTarget?: RemoteWorkspaceTarget,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null = null,
   runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
 ): Promise<RepoSource> {
-  const target = capturedTarget ?? (await resolveRemoteWorkspaceTarget(repoId, runtime))
+  const target = capturedTarget ?? (await resolveRemoteWorkspaceTarget(repoId, runtime, signal))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
   const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
   return {
@@ -772,14 +779,15 @@ async function createRemoteRepoSource(
     async getStatus(signal) {
       return await getRemoteStatus(target, { signal, run })
     },
-    async getPullRequests(branches, options) {
+    async getPullRequests(scope, options) {
+      const branches = scope.kind === 'branch-detail' ? [scope.branch] : undefined
       const branchSet = normalizeRequestedBranches(branches)
       if (branchSet?.size === 0) return []
       if (capabilities.pullRequests !== 'derived-github-repo') return null
       const repo = await remotePullRequestRepoRef(target, { signal: options?.signal, run })
       if (!repo) return null
       const prs = await getBranchPullRequestsForRepoRef(repoId, repo, branchSet, {
-        mode: options?.mode,
+        mode: scope.kind === 'repository-summary' ? 'summary' : 'full',
         signal: options?.signal,
       })
       return pullRequestEntries(prs)

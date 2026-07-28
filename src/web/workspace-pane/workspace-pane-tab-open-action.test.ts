@@ -28,7 +28,7 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import {
@@ -124,7 +124,11 @@ describe('openWorkspacePaneTab', () => {
   test('can explicitly append a newly opened static tab while still recording the opener', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -160,7 +164,9 @@ describe('openWorkspacePaneTab', () => {
     const terminalEntry = workspacePaneRuntimeTabEntry('terminal', terminalSessionId)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -313,7 +319,11 @@ describe('openWorkspacePaneTab', () => {
   test('records the active tab as the opener when opening a new static tab', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -342,7 +352,11 @@ describe('openWorkspacePaneTab', () => {
   test('does not overwrite the recorded opener when refocusing an already-open static tab', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -381,7 +395,7 @@ describe('openWorkspacePaneTab', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } }),
+        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
         createBranchSnapshot('feature/b'),
       ],
       currentBranchName: 'feature/a',
@@ -434,7 +448,9 @@ describe('openWorkspacePaneTab', () => {
   test('does not record an opener when the server rejects a stale workspace runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -477,7 +493,9 @@ describe('openWorkspacePaneTab', () => {
   test('does not select a stale opened tab when the server rejects a stale workspace runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -518,7 +536,11 @@ describe('openWorkspacePaneTab', () => {
     await useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/reopened', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -536,7 +558,9 @@ describe('openWorkspacePaneTab', () => {
   test('does not select a stale opened tab when the old workspace runtime commit succeeds after reopen', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -578,7 +602,11 @@ describe('openWorkspacePaneTab', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-reopened',
-      branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/reopened', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -607,7 +635,11 @@ describe('openWorkspacePaneTab', () => {
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -616,7 +648,9 @@ describe('openWorkspacePaneTab', () => {
     })
     const repoB = seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
-      branchSnapshots: [createBranchSnapshot('main', { worktree: { path: OTHER_WORKTREE_PATH } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', { worktree: { path: OTHER_WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -713,7 +747,11 @@ describe('openWorkspacePaneTab', () => {
 function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType) {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    branchSnapshots: [
+      createBranchSnapshot('feature/worktree', {
+        worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+      }),
+    ],
     currentBranchName: 'feature/worktree',
     preferredWorkspacePaneTab,
     workspacePaneTabsByBranch: {
@@ -726,7 +764,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
         branchName,
       )
     : null
@@ -741,7 +779,7 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
           branchName,
         ),
       )

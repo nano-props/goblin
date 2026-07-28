@@ -144,7 +144,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       status: [{ path: WORKTREE_PATH, branch: 'feature/worktree', isMain: false, entries: [] }],
       currentBranchName: 'feature/worktree',
     })
@@ -343,7 +345,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('selects branches by resolving the branch workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -372,7 +376,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('opens the branch root while workspace pane tabs are still loading', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -394,7 +400,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('opens the branch root when workspace pane tab restoration failed', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -426,7 +434,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
@@ -450,7 +460,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('selects branches with an intentional empty workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: null,
       workspacePaneTabsByBranch: {
@@ -475,7 +487,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('keeps command-owned route commits free of workspace pane supplements', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -514,7 +528,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('does not commit route supplements when operation-owned navigation settles', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -545,7 +561,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('forwards operation abandonment to the route owner', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
     })
     const navigation = routeNavigation()
@@ -568,7 +586,9 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
   test('blocks workspace history restore before mutating history while terminal creation is pending', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      branches: [
+        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

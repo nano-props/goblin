@@ -1,8 +1,9 @@
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch as branch,
+  repoPresentationFromQueryForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -24,9 +25,8 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-selection-test-repo')
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
@@ -42,8 +42,8 @@ function seedRepo(options: {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: options.branches ?? [
-      branch('main', { worktree: { path: '/repo' } }),
-      branch('feature/worktree', { worktree: { path: '/tmp/feature-worktree' } }),
+      branch('main', { worktree: { path: '/repo', isPrimary: false, isLocked: false } }),
+      branch('feature/worktree', { worktree: { path: '/tmp/feature-worktree', isPrimary: false, isLocked: false } }),
       branch('feature/plain'),
     ],
     currentBranch: options.currentBranch ?? 'main',
@@ -57,7 +57,9 @@ function seedRepo(options: {
           }
         : undefined,
     remote: {
-      remotes: ['origin'],
+      remotes: [
+        { name: 'origin', fetchUrl: 'https://example.test/repo.git', pushUrl: 'https://example.test/repo.git' },
+      ],
       hasRemotes: true,
       hasBrowserRemote: true,
       browserRemoteProvider: 'github',
@@ -78,7 +80,7 @@ function seedRepoShellWithoutBranchReadModel(): void {
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const branchModel = repo ? repoPresentationFromQueryForTest(repo).snapshot : null
   const target =
     repo && branchModel
       ? workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branchName)
@@ -90,7 +92,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const branchModel = repo ? repoPresentationFromQueryForTest(repo).snapshot : null
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -127,9 +129,7 @@ describe('setBranchViewMode', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
-    expect(useWorkspacesStore.getState().repoSnapshotCache[REPO_ID]?.ui).toMatchObject({
-      branchViewMode: 'worktrees',
-    })
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test('keeps the selected branch when it remains visible', () => {
@@ -139,7 +139,7 @@ describe('setBranchViewMode', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
-    expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('feature/worktree')
+    expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('feature/worktree')
   })
 
   test('keeps the selected branch when the new view mode has no visible branches', () => {
@@ -149,7 +149,7 @@ describe('setBranchViewMode', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
-    expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('main')
+    expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('main')
   })
 
   test('changes branch view mode without mutating the React Query projection read model', () => {
@@ -158,8 +158,11 @@ describe('setBranchViewMode', () => {
       branchSnapshots: [],
       currentBranchName: 'feature/plain',
     })
-    seedRepoReadModelQueryData(repo, {
-      branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        branch('main', { worktree: { path: '/repo', isPrimary: false, isLocked: false } }),
+        branch('feature/plain'),
+      ],
       currentBranch: 'main',
     })
 
@@ -167,18 +170,20 @@ describe('setBranchViewMode', () => {
 
     const updatedRepo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(updatedRepo).capability.git.ui.branchViewMode).toBe('worktrees')
-    expect(readRepoBranchQueryProjection(updatedRepo!)?.currentBranch).toBe('main')
-    expect(readRepoBranchQueryProjection(updatedRepo!)?.branches.map((repoBranch) => repoBranch.name)).toEqual([
-      'main',
-      'feature/plain',
-    ])
+    expect(repoPresentationFromQueryForTest(updatedRepo!).snapshot.current).toBe('main')
+    expect(
+      repoPresentationFromQueryForTest(updatedRepo!).snapshot.branches.map((repoBranch) => repoBranch.name),
+    ).toEqual(['main', 'feature/plain'])
   })
 
   test('keeps the hidden repo workspace pane selection on that branch', () => {
     seedRepo({
       currentBranchName: 'feature/plain',
       preferredWorkspacePaneTab: 'terminal',
-      branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+      branches: [
+        branch('main', { worktree: { path: '/repo', isPrimary: false, isLocked: false } }),
+        branch('feature/plain'),
+      ],
     })
 
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
@@ -193,7 +198,7 @@ describe('setWorkspacePaneTab', () => {
     seedRepoShellWithoutBranchReadModel()
 
     expect(() => useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'changes')).toThrow(
-      'repo branch snapshot query data unavailable for repo',
+      'repository snapshot query data unavailable for workspace',
     )
   })
 
@@ -219,8 +224,10 @@ describe('setWorkspacePaneTab', () => {
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    seedRepoReadModelQueryData(repo, {
-      branches: [branch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        branch('feature/query', { worktree: { path: '/tmp/query-worktree', isPrimary: false, isLocked: false } }),
+      ],
       currentBranch: 'feature/query',
     })
 

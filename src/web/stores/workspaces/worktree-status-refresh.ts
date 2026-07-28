@@ -22,10 +22,11 @@ export async function refreshRepoWorktreeStatus(
   store: RepoWorktreeStatusRefreshAccess,
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<void> {
   if (!statusRefreshable(store, repoRoot, workspaceRuntimeId)) return
   try {
-    await refreshRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId)
+    await refreshRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, { signal: options.signal })
   } catch (err) {
     if (isExpectedRepoOperationCancellation(err)) return
     const message = err instanceof Error ? err.message : String(err)

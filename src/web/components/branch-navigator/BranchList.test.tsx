@@ -131,7 +131,6 @@ function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], current
       branches,
       currentBranch,
       status: [],
-      worktreesByPath: {},
     },
   )
 }

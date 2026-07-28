@@ -130,67 +130,84 @@ describe('getRepoWorktreeBootstrapPreview', () => {
   })
 })
 
-describe('readRepoProjection', () => {
-  test('reads snapshot and current-branch pull requests through one server projection', async () => {
-    const snapshot: RepoSnapshot = {
-      branches: [],
-      current: 'main',
-    }
+const EMPTY_REMOTE: RepoSnapshot['remote'] = {
+  remotes: [],
+  hasRemotes: false,
+  hasBrowserRemote: false,
+  remoteProviders: {},
+  hasGitHubRemote: false,
+}
+
+describe('independent repository reads', () => {
+  test('reads the repository snapshot without also requesting pull requests', async () => {
+    const snapshot: RepoSnapshot = { branches: [], current: 'main', remote: EMPTY_REMOTE }
+    const getSnapshot = vi.fn(() => Promise.resolve(snapshot))
+    const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>([]))
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getSnapshot, getPullRequests }))),
+    )
+    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    await expect(readRepoSnapshot(WORKSPACE_ID)).resolves.toEqual({ snapshot })
+    expect(getSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getPullRequests).not.toHaveBeenCalled()
+  })
+
+  test('rejects rather than fabricating a snapshot when the source has none', async () => {
+    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    await expect(readRepoSnapshot(WORKSPACE_ID)).rejects.toThrow('repository snapshot unavailable')
+  })
+
+  test('reads only the requested branch pull request', async () => {
     const pullRequests: PullRequestEntry[] = [
       {
         branch: 'feature/a',
         pullRequest: {
           number: 229,
-          title: 'Converge repo data authority',
-          url: 'https://github.com/acme/repo/pull/229',
+          title: 'Converge repository authorities',
+          url: 'https://example.invalid/repository/pull/229',
           state: 'open',
         },
       },
     ]
-    const getSnapshot = vi.fn(() => Promise.resolve(snapshot))
-    const getStatus = vi.fn(() => Promise.resolve<WorktreeStatus[]>([]))
+    const getSnapshot = vi.fn(() => Promise.resolve<RepoSnapshot | null>(null))
     const getPullRequests = vi.fn(() => Promise.resolve(pullRequests))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(asRepoSource(makeSource({ getSnapshot, getStatus, getPullRequests }))),
+      task(asRepoSource(makeSource({ getSnapshot, getPullRequests }))),
     )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const signal = new AbortController().signal
+    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const scope = { kind: 'branch-detail' as const, branch: 'feature/a' }
 
-    const result = await readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', mode: 'full', signal })
-
-    expect(result).toMatchObject({
-      snapshot,
-      pullRequests,
-      requested: { branch: 'feature/a', pullRequestMode: 'full' },
-    })
-    expect(result.loadedAt).toEqual(expect.any(Number))
-    expect(getSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal))
-    expect(getStatus).not.toHaveBeenCalled()
-    expect(getPullRequests).toHaveBeenCalledWith(['feature/a'], {
-      mode: 'full',
-      signal: expect.any(AbortSignal),
-    })
-    expect(mocks.listRepoWriteOperationsForRepo).not.toHaveBeenCalled()
+    await expect(readRepoPullRequests(WORKSPACE_ID, scope)).resolves.toEqual({ pullRequests })
+    expect(getPullRequests).toHaveBeenCalledWith(scope, { signal: expect.any(AbortSignal) })
+    expect(getSnapshot).not.toHaveBeenCalled()
   })
 
-  test('does not read all pull requests when no branch is requested', async () => {
-    const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>([]))
+  test('rejects a branch-detail response for a different branch', async () => {
+    const getPullRequests = vi.fn(() =>
+      Promise.resolve<PullRequestEntry[]>([
+        {
+          branch: 'feature/b',
+          pullRequest: {
+            number: 230,
+            title: 'Wrong branch',
+            url: 'https://example.invalid/repository/pull/230',
+            state: 'open',
+          },
+        },
+      ]),
+    )
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getPullRequests }))),
     )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoProjection(WORKSPACE_ID)
-
-    expect(result).toMatchObject({
-      snapshot: null,
-      pullRequests: null,
-      requested: { branch: null, pullRequestMode: 'full' },
-    })
-    expect(getPullRequests).not.toHaveBeenCalled()
+    await expect(readRepoPullRequests(WORKSPACE_ID, { kind: 'branch-detail', branch: 'feature/a' })).rejects.toThrow(
+      'did not match requested branch',
+    )
   })
 
-  test('reads one complete repo-runtime-scoped worktree status snapshot', async () => {
+  test('reads one complete runtime-scoped worktree status snapshot', async () => {
     const status: WorktreeStatus[] = [{ path: '/workspace', branch: 'main', isMain: true, entries: [] }]
     const getStatus = vi.fn(() => Promise.resolve(status))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
@@ -199,183 +216,81 @@ describe('readRepoProjection', () => {
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
 
     const result = await readRepoWorktreeStatus(WORKSPACE_ID, { workspaceRuntimeId: 'repo-runtime-test' })
-
     expect(result).toMatchObject({ workspaceRuntimeId: 'repo-runtime-test', status })
     expect(result.loadedAt).toEqual(expect.any(Number))
-    expect(getStatus).toHaveBeenCalledWith(undefined)
   })
 
   test('does not turn an aborted status read into an empty clean snapshot', async () => {
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
     const controller = new AbortController()
     controller.abort()
-
     await expect(
-      readRepoWorktreeStatus(WORKSPACE_ID, {
-        workspaceRuntimeId: 'repo-runtime-test',
-        signal: controller.signal,
-      }),
+      readRepoWorktreeStatus(WORKSPACE_ID, { workspaceRuntimeId: 'repo-runtime-test', signal: controller.signal }),
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
   })
-
-  test('reads all pull request summaries when the dashboard projection asks for summary mode', async () => {
-    const pullRequests: PullRequestEntry[] = [
-      {
-        branch: 'feature/a',
-        pullRequest: {
-          number: 230,
-          title: 'Dashboard summary projection',
-          url: 'https://github.com/acme/repo/pull/230',
-          state: 'open',
-        },
-      },
-    ]
-    const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>(pullRequests))
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(asRepoSource(makeSource({ getPullRequests }))),
-    )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-
-    const result = await readRepoProjection(WORKSPACE_ID, { mode: 'summary' })
-
-    expect(result).toMatchObject({
-      pullRequests,
-      requested: { branch: null, pullRequestMode: 'summary' },
-    })
-    expect(getPullRequests).toHaveBeenCalledWith(undefined, {
-      mode: 'summary',
-      signal: expect.any(AbortSignal),
-    })
-  })
 })
 
-describe('repo projection section deadlines', () => {
-  test('returns successful results when sections finish before the deadline', async () => {
-    const snapshot: RepoSnapshot = {
-      branches: [],
-      current: 'main',
-    }
-    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(
-        asRepoSource(
-          makeSource({
-            getSnapshot: () => Promise.resolve(snapshot),
-            getPullRequests: () => Promise.resolve(null),
-          }),
-        ),
-      ),
-    )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', timeoutMs: 5_000 })
-    expect(result).toMatchObject({ snapshot, pullRequests: null })
-  })
-
-  test('rejects when a requested section times out', async () => {
+describe('independent repository read deadlines', () => {
+  test('rejects a snapshot read when its own deadline expires', async () => {
     useFakeTimers()
-    // Snapshot hangs until aborted; PRs returns immediately.
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
           makeSource({
-            getSnapshot: (signal?: AbortSignal) =>
-              new Promise<RepoSnapshot | null>((_resolve, reject) => {
-                signal?.addEventListener('abort', () => reject(new Error('aborted')))
-              }),
-            getPullRequests: () => Promise.resolve<PullRequestEntry[] | null>(null),
+            getSnapshot: () => new Promise<RepoSnapshot | null>(() => {}),
           }),
         ),
       ),
     )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', timeoutMs: 50 })
-    const rejected = expect(promise).rejects.toThrow('aborted')
-    // Advance the fake clock past the section deadline.
+    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const rejected = expect(readRepoSnapshot(WORKSPACE_ID, { timeoutMs: 50 })).rejects.toThrow(
+      'repository read timeout',
+    )
     await vi.advanceTimersByTimeAsync(75)
     await rejected
   })
 
-  test('disables the per-section timeout when timeoutMs is 0', async () => {
+  test('rejects a pull-request read when an uncooperative source exceeds its own deadline', async () => {
     useFakeTimers()
-    let observedSignal: AbortSignal | undefined
-    const snapshotStarted = Promise.withResolvers<void>()
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
           makeSource({
-            getSnapshot: (signal?: AbortSignal) => {
-              observedSignal = signal
-              return new Promise<RepoSnapshot | null>((resolve) => {
-                signal?.addEventListener('abort', () => resolve(null))
-                snapshotStarted.resolve()
-              })
-            },
+            getPullRequests: () => new Promise<PullRequestEntry[] | null>(() => {}),
           }),
         ),
       ),
     )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const projection = readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
-    let settled = false
-    void projection.then(
-      () => {
-        settled = true
-      },
-      () => {
-        settled = true
-      },
-    )
-    await snapshotStarted.promise
-    if (!observedSignal) throw new Error('missing snapshot section signal')
-    // A fresh, never-aborting signal is still wired through to the
-    // source (so the source code path is uniform) — just one
-    // that will never fire on its own.
-    expect(observedSignal.aborted).toBe(false)
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000)
-    await flushMicrotasks()
-    expect(observedSignal.aborted).toBe(false)
-    expect(settled).toBe(false)
+    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const rejected = expect(
+      readRepoPullRequests(WORKSPACE_ID, { kind: 'repository-summary' }, { timeoutMs: 50 }),
+    ).rejects.toThrow('repository read timeout')
+    await vi.advanceTimersByTimeAsync(75)
+    await rejected
   })
 
-  test('cancels every section when the caller signal fires', async () => {
-    let snapshotSignal: AbortSignal | undefined
-    let prsSignal: AbortSignal | undefined
-    const snapshotStarted = Promise.withResolvers<void>()
-    const prsStarted = Promise.withResolvers<void>()
+  test('cancels a pull-request read when the caller aborts', async () => {
+    let observedSignal: AbortSignal | undefined
+    const started = Promise.withResolvers<void>()
+    const getPullRequests: ReadSource['getPullRequests'] = (_scope, options) => {
+      observedSignal = options?.signal
+      return new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        started.resolve()
+      })
+    }
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
-      task(
-        asRepoSource(
-          makeSource({
-            getSnapshot: (signal?: AbortSignal) => {
-              snapshotSignal = signal
-              return new Promise<RepoSnapshot | null>((_resolve, reject) => {
-                signal?.addEventListener('abort', () => reject(new Error('aborted')))
-                snapshotStarted.resolve()
-              })
-            },
-            getPullRequests: (_branches?: string[], options?: { signal?: AbortSignal }) => {
-              prsSignal = options?.signal
-              return new Promise<PullRequestEntry[] | null>((_resolve, reject) => {
-                options?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
-                prsStarted.resolve()
-              })
-            },
-          }),
-        ),
-      ),
+      task(asRepoSource(makeSource({ getPullRequests }))),
     )
-    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
     const controller = new AbortController()
-    const promise = readRepoProjection(WORKSPACE_ID, {
-      branch: 'feature/a',
-      signal: controller.signal,
-    })
-    const rejected = expect(promise).rejects.toThrow('aborted')
-    await Promise.all([snapshotStarted.promise, prsStarted.promise])
-    if (!snapshotSignal || !prsSignal) throw new Error('missing repo projection section signal')
+    const rejected = expect(
+      readRepoPullRequests(WORKSPACE_ID, { kind: 'repository-summary' }, { signal: controller.signal }),
+    ).rejects.toThrow('aborted')
+    await started.promise
     controller.abort()
     await rejected
-    expect(snapshotSignal.aborted).toBe(true)
-    expect(prsSignal.aborted).toBe(true)
+    expect(observedSignal?.aborted).toBe(true)
   })
 })

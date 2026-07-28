@@ -283,33 +283,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         return handler(payload)
       }
-      const readRepoProjection = async (payload: Record<string, unknown>) => {
-        const cwd = typeof payload.cwd === 'string' ? payload.cwd : ''
-        const branch = typeof payload.branch === 'string' && payload.branch.length > 0 ? payload.branch : null
-        const mode = payload.mode === 'summary' ? 'summary' : 'full'
-        const normalizeProjection = (raw: unknown) => {
-          const projection = raw as {
-            snapshot?: unknown
-            status?: unknown
-            pullRequests?: unknown
-            requested?: unknown
-            loadedAt?: unknown
-          }
-          return {
-            snapshot: projection.snapshot ?? null,
-            pullRequests: projection.pullRequests ?? null,
-            requested:
-              projection.requested && typeof projection.requested === 'object'
-                ? projection.requested
-                : {
-                    branch,
-                    pullRequestMode: mode,
-                  },
-            loadedAt: typeof projection.loadedAt === 'number' ? projection.loadedAt : Date.now(),
-          }
-        }
-        return normalizeProjection(await call('repo.projection', payload))
-      }
       const openWorkspaceRuntime = async (payload: unknown) => {
         const workspaceId =
           typeof payload === 'object' && payload && 'workspaceId' in payload ? payload.workspaceId : null
@@ -478,7 +451,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/remote/test-workspace') return call('remote.testWorkspace', body)
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
-        if (url.pathname === '/api/repo/projection') return readRepoProjection(body)
+        if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
+        if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
         if (url.pathname === '/api/repo/worktree-status') {
           return handlers['repo.worktreeStatus']
             ? call('repo.worktreeStatus', body)

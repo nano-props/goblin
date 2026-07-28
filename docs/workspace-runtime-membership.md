@@ -62,7 +62,7 @@ Restore:
 
 1. `ServerWorkspaceState.openWorkspaceEntries` is read as the shared boot restore
    intent.
-2. Restore performs slow workspace probing and optional Git projection I/O outside the settings mutation queue, then
+2. Restore performs slow workspace probing and an optional repository snapshot read outside the settings mutation queue, then
    compares membership through a short server-side CAS.
 3. Concurrent membership changes are converged by retaining unchanged leases,
    releasing removed entries, and opening newly added entries.
@@ -124,9 +124,9 @@ that workspace, but it must not become an independent workspace-membership autho
 
 Good candidates for React Query ownership:
 
-- snapshot reads
-- status reads
-- pull request reads
+- branch-independent repository snapshot reads
+- worktree status reads
+- independently scoped pull request reads
 - file tree reads
 - workspace pane tabs reads
 - the user-scoped runtime snapshot used to project remote lifecycle state
@@ -145,3 +145,7 @@ Keep in window-local state:
 - branch selection
 - workspace layout
 - restored membership
+
+Restore or lazy promotion may return an accepted repository snapshot and seed its
+runtime-scoped query key once. It does not carry status or pull requests, and it
+must not schedule an immediate duplicate snapshot read after seeding.

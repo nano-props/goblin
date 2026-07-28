@@ -66,9 +66,10 @@ import {
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import type { GitRemoteProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { RepoRemoteInfo } from '#/shared/git-types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
@@ -178,20 +179,25 @@ function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessPro
 }
 
 function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
-  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false })
+  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false }, undefined, {
+    state: 'empty',
+    error: null,
+    retrying: false,
+    retry: () => {},
+  })
 }
 
 export function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePaneProjection {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
-  const branchModel = readRepoBranchQueryProjection(repo)
-  if (!branchModel) throw new Error('missing branch read model')
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  if (!snapshot) throw new Error('missing repository snapshot')
   return {
     ...repo,
-    ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
+    ui: { ...repo.ui, currentBranchName: snapshot.branches[0]?.name ?? null },
     branchAction: repo.capability.git.operations.branchAction,
-    branchModel,
+    snapshot,
+    status: getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status,
     probe: repo.capability.probe,
-    remote: repo.capability.git.remote,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
   }
 }
@@ -248,7 +254,7 @@ export function renderToolbar(options: {
   collapsed?: boolean
   createPending?: boolean
   trafficLightOffset?: boolean
-  remote?: Partial<GitRemoteProjection>
+  remote?: Partial<RepoRemoteInfo>
   workspaceRuntimeId?: string
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
@@ -280,7 +286,7 @@ export function renderToolbar(options: {
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createBranchSnapshot(
     branchName,
-    options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } },
+    options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } },
   )
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -451,7 +457,9 @@ export function renderToolbar(options: {
   )
 
   const rerenderWorktreePath = (worktreePath: string) => {
-    const nextBranch = createBranchSnapshot(branchName, { worktree: { path: worktreePath } })
+    const nextBranch = createBranchSnapshot(branchName, {
+      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+    })
     const nextRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -578,7 +586,10 @@ export function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        {
+          workspaceId: repo.id,
+          branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+        },
         branchName,
       )
     : null

@@ -7,10 +7,10 @@ import {
   WORKTREE_BOOTSTRAP_CONFIG_HASH,
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
-  expectRepoSnapshotInvalidations,
+  expectRepoMetadataInvalidations,
   mocks,
   removeRepoWorktreeForTest,
-  repoSnapshotInvalidations,
+  repoMetadataInvalidations,
   successfulRemovalLifecycle,
 } from '#/server/test-utils/repo-module.ts'
 
@@ -24,9 +24,9 @@ describe('repo worktree creation', () => {
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(repoSnapshotInvalidations()).toContainEqual({
+    expect(repoMetadataInvalidations()).toContainEqual({
       repoId: REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
   })
 
@@ -43,18 +43,18 @@ describe('repo worktree creation', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expectRepoSnapshotInvalidations(
+    expectRepoMetadataInvalidations(
       {
         repoId: REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: LINKED_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
       {
         repoId: WORKTREE_REPO_ID,
-        query: 'repo-snapshot',
+        domain: 'metadata',
       },
     )
   })
@@ -458,13 +458,13 @@ describe('repo worktree creation', () => {
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: WORKTREE_REPO_ID,
-      query: 'repo-snapshot',
+      domain: 'metadata',
     })
     expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
@@ -48,8 +48,12 @@ describe('client effect intent handlers', () => {
       branches: [],
       currentBranchName: 'feature/query',
     })
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/bell-worktree' } })],
+    seedRepoQueryDataForTest(repo, {
+      branches: [
+        createRepoBranch('feature/query', {
+          worktree: { path: '/tmp/bell-worktree', isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)

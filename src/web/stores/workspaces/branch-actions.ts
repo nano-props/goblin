@@ -2,28 +2,20 @@ import {
   runExclusiveOperation,
   runLatestOperation,
   type RepoOperationContext,
-  type RepoOperationTarget,
 } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
-import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
+import type {
+  RepoBranchActionReason,
+  RepoOperationReason,
+  RepoOperationTarget,
+} from '#/web/stores/workspaces/operations.ts'
 import {
   updateIfFresh,
   workspaceCanExecute,
   workspaceOperationalFailureReason,
 } from '#/web/stores/workspaces/workspace-guards.ts'
-import {
-  repoOperation,
-  repoLocalBranchActionScheduleGuard,
-  repoLocalProjectionReadBusy,
-  waitForRepoOperationsIdle,
-} from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import {
-  cancelDataLoad,
-  finishDataLoadError,
-  finishDataLoadSuccess,
-  startDataLoad,
-} from '#/web/stores/workspaces/repo-data-load-state.ts'
+import { repoOperation, repoLocalBranchActionScheduleGuard } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import type {
   RepoBranchAction,
   RepoBranchActionKind,
@@ -35,7 +27,7 @@ import {
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -44,7 +36,7 @@ import {
   removeRepoWorktree,
 } from '#/web/repo-client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
-import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -143,32 +135,11 @@ function evaluateRepoBranchActionSchedule(repo: WorkspaceState, action: RepoBran
     actionKind: action.kind,
     fetchBusy: guard.fetchBusy,
     branchOperationPhase: guard.branchOperationPhase,
-    projectionReadBusy: guard.projectionReadBusy,
   })
 }
 
 function throwIfStale(get: WorkspacesGet, id: WorkspaceId, workspaceRuntimeId: string): void {
   if (get().workspaces[id]?.workspaceRuntimeId !== workspaceRuntimeId) throw new RepoOperationCancelledError()
-}
-
-function settleNetworkFetchDataLoadState(
-  set: WorkspacesSet,
-  id: WorkspaceId,
-  workspaceRuntimeId: string,
-  ownsFetchDataLoad: boolean,
-  result: ExecResult | { ok: false; message: string },
-): void {
-  if (!ownsFetchDataLoad) return
-  updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-    if (!isGitWorkspace(r)) return
-    const fetch = gitWorkspaceProjection(r).dataLoads.fetch
-    if (result.message === 'cancelled') {
-      cancelDataLoad(fetch)
-      return
-    }
-    if (result.ok) finishDataLoadSuccess(fetch)
-    else finishDataLoadError(fetch, result.message)
-  })
 }
 
 function branchActionErrorFromResult(result: ExecResult): string | null {
@@ -187,28 +158,6 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
 
 function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
   return result.ok && (action.kind === 'createWorktree' || action.kind === 'removeWorktree')
-}
-
-function waitForBranchActionIdle(
-  id: WorkspaceId,
-  keys: Parameters<typeof waitForRepoOperationsIdle>[1],
-  signal: AbortSignal,
-  timeoutMs = BRANCH_ACTION_WAIT_TIMEOUT_MS,
-) {
-  const ctrl = new AbortController()
-  const timeout = globalThis.setTimeout(() => ctrl.abort(BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE), timeoutMs)
-  const abort = () => ctrl.abort()
-  signal.addEventListener('abort', abort, { once: true })
-  if (signal.aborted) ctrl.abort()
-  return waitForRepoOperationsIdle(id, keys, ctrl.signal)
-    .catch((err) => {
-      if (ctrl.signal.reason === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) throw new Error(BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE)
-      throw err
-    })
-    .finally(() => {
-      globalThis.clearTimeout(timeout)
-      signal.removeEventListener('abort', abort)
-    })
 }
 
 function runBranchActionIpc(
@@ -283,52 +232,22 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         get().setLastResult(id, result, workspaceRuntimeId)
         return result
       }
-      updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-        if (!isGitWorkspace(r)) return
-        const fetch = gitWorkspaceProjection(r).dataLoads.fetch
-        if (network) startDataLoad(fetch, { hasData: fetch.loadedAt !== null })
-      })
-      const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
-        network && ctx.ownsTarget('fetch')
       const refreshMembershipProjection = async (): Promise<void> => {
         const repo = get().workspaces[id]
         if (repo?.workspaceRuntimeId !== workspaceRuntimeId) return
-        await requestRepoProjectionReadModelRefresh({ get, set }, id, { workspaceRuntimeId })
+        await requestRepoSnapshotRefresh({ get, set }, id, { workspaceRuntimeId })
       }
       const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
-        const ownsFetchDataLoad = ownsNetworkFetchDataLoad(ctx)
-        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsFetchDataLoad, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }
-        if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, workspaceRuntimeId)
       }
-      const handleError = (message: string, ctx: RepoOperationContext) => {
-        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), {
-          ok: false,
-          message,
-        })
+      const handleError = (message: string) => {
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
-      const handleStale = (ctx: RepoOperationContext) => {
-        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), {
-          ok: false,
-          message: 'cancelled',
-        })
-      }
+      const handleStale = () => {}
       const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
-        try {
-          if (repoLocalProjectionReadBusy(id)) {
-            ctx.setPhase('queued')
-            signal.throwIfAborted()
-            await waitForBranchActionIdle(id, ['repoReadModel'], signal, options?.waitTimeoutMs)
-          }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return branchActionErrorResult(message)
-          throw err
-        }
         throwIfStale(get, id, workspaceRuntimeId)
         ctx.setPhase('running')
         return runBranchActionIpc(action, id, workspaceRuntimeId, signal)

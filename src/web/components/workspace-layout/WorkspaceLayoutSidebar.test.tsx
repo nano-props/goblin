@@ -33,7 +33,7 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-shell-sidebar-test')
 
-function gitProjection() {
+function repoSnapshot() {
   const capability = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.capability
   if (capability?.kind !== 'git') throw new Error('Expected Git workspace fixture')
   return capability.git
@@ -62,7 +62,7 @@ describe('WorkspaceLayoutSidebar', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
-        git={gitProjection()}
+        git={repoSnapshot()}
         compact={false}
         branchContent={<div data-testid="branch-content" />}
       />,
@@ -195,7 +195,7 @@ describe('WorkspaceLayoutSidebar', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
-        git={gitProjection()}
+        git={repoSnapshot()}
         compact={false}
         branchContent={<div />}
         onCreateWorktree={onCreateWorktree}
@@ -214,7 +214,7 @@ describe('WorkspaceLayoutSidebar', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
-        git={gitProjection()}
+        git={repoSnapshot()}
         compact={false}
         branchContent={<div data-testid="branch-content" />}
       />,
@@ -232,7 +232,7 @@ describe('WorkspaceLayoutSidebar', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
-        git={gitProjection()}
+        git={repoSnapshot()}
         compact={false}
         chromeRegion="none"
         branchContent={<div data-testid="branch-content" />}

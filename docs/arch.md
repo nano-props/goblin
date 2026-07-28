@@ -55,12 +55,13 @@ The ownership split is:
   opening a provider runtime and its canonical tab as one server result.
 - `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
 - `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
-  reverse indexes, active repo projections, and its overlay revision.
+  reverse indexes, and its overlay revision.
 - `WorkspacePaneLayoutAggregate` owns the canonical epoch projection clock,
   derived from durable layout, target projection, overlay revision, and provider revisions.
-- The repo projection owns current target validity and worktree branch metadata.
-  Commands capture it as an explicit read-only projection input; the pane
-  aggregate does not cache or mutate a second target catalog.
+- The server `WorkspacePaneTargetCatalog` owns command-time target validity and
+  worktree branch metadata by sampling the repository source. The client
+  `RepoSnapshot` owns only route and presentation facts; it never authorizes a
+  server command. The pane aggregate does not cache or mutate a second catalog.
 - `src/server/workspace-pane/*` owns aggregate layout commands, pure projection,
   realtime invalidation, and the cross-provider runtime-open operation. Provider
   snapshots are the sole live-membership authority; list and restore never copy
@@ -97,7 +98,7 @@ Runtime creation follows three responsibility layers:
    exact admission lease prevents old cleanup from clearing a newer same-path
    binding, but it does not model filesystem generation or revalidate external
    state at execution time. Cleanup cannot authorize durable retirement;
-   invalid rows stay suppressed by the repo projection and are removed by the
+   invalid rows stay suppressed by the server target catalog and are removed by the
    next membership-aware atomic repair. Branch retirement remains a direct
    aggregate command. A Git failure returns directly; resources already
    quiesced remain closed and the user repairs or retries. Git success followed

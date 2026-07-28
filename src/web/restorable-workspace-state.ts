@@ -19,7 +19,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   defaultWorkspacePaneTabs,
   workspacePaneStaticTabsFromEntries,
@@ -104,7 +104,8 @@ function clientWorkspaceRestorationProjections(
     const workspace = workspaces[id]
     if (!workspace) continue
     if (workspace.session.projectionState === 'stub') continue
-    const branchModel = workspace.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(workspace) : null
+    const branchModel =
+      workspace.capability.kind === 'git' ? getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId) : null
     const readyWithoutGit = workspace.capability.kind === 'filesystem'
     if (!branchModel && !readyWithoutGit) continue
     projections[id] = {

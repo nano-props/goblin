@@ -14,7 +14,7 @@ interface WorkspacePaneTabItemsInput {
   model: WorkspacePaneTabModel
   workspacePaneId: string
   branchName: string | null
-  statusCount: number
+  statusCount: number | undefined
   t: WorkspacePaneStaticTabMetadataInput['t']
   staticTabAvailable?: (type: WorkspacePaneStaticTabType) => boolean
 }

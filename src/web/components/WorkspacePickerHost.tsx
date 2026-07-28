@@ -49,7 +49,7 @@ export function WorkspacePickerHost({
         .map<WorkspacePickerItem | null>((id) => {
           const workspace = s.workspaces[id]
           if (!workspace) return null
-          const git = workspace.capability.kind === 'git' ? workspace.capability.git : null
+          const git = workspace.capability.kind === 'git'
           return {
             id: workspace.id,
             name: workspaceNameFromLocator(workspace.id),
@@ -61,7 +61,7 @@ export function WorkspacePickerHost({
                   : 'unknown',
             git: git
               ? {
-                  remoteDetails: git.remote.remoteDetails,
+                  remoteDetails: undefined,
                 }
               : null,
             lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,

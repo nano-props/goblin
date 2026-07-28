@@ -4,14 +4,12 @@ import {
   queueOperation,
   settleOperation,
   startOperation,
-  type RepoOperationKey,
   type RepoOperationState,
   type RepoOperationTarget,
 } from '#/web/stores/workspaces/operations.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type RepoOperationLane = 'network' | 'read' | 'write'
-export type { RepoOperationKey, RepoOperationTarget }
 
 interface QueuedRepoOperation<T> {
   task: (signal: AbortSignal) => Promise<T>
@@ -246,29 +244,19 @@ export function repoLocalPrimaryRefreshBusy(repoId: WorkspaceId): boolean {
   return repoOperationBusy(repoId, 'manualRefresh') || repoOperationBusy(repoId, 'fetch')
 }
 
-export function repoLocalProjectionReadBusy(repoId: WorkspaceId): boolean {
-  return repoOperationBusy(repoId, 'repoReadModel')
-}
-
 export function repoLocalRemoteFetchBlocked(repoId: WorkspaceId): boolean {
-  return (
-    repoOperationBusy(repoId, 'fetch') ||
-    repoOperationBusy(repoId, 'branchAction') ||
-    repoLocalProjectionReadBusy(repoId)
-  )
+  return repoOperationBusy(repoId, 'fetch') || repoOperationBusy(repoId, 'branchAction')
 }
 
 export function repoLocalBranchActionScheduleGuard(repoId: WorkspaceId): {
   fetchBusy: boolean
   branchOperationPhase: RepoOperationState['phase']
-  projectionReadBusy: boolean
 } {
   const fetchOperation = repoOperation(repoId, 'fetch')
   const branchOperation = repoOperation(repoId, 'branchAction')
   return {
     fetchBusy: fetchOperation.phase !== 'idle',
     branchOperationPhase: branchOperation.phase,
-    projectionReadBusy: repoLocalProjectionReadBusy(repoId),
   }
 }
 

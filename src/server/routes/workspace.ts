@@ -23,7 +23,7 @@ import {
   runWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import {
-  publishUserRepoQueryInvalidation,
+  publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
 } from '#/server/modules/invalidation-broker.ts'
 import { probeLocalWorkspace, probeWorkspace } from '#/server/modules/workspace-probe.ts'
@@ -220,9 +220,9 @@ export function createWorkspaceRoutes(options: {
       publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
     }
     if (executionTarget.kind === 'git-worktree' && (result.ok || result.repositoryStateChanged === true)) {
-      publishUserRepoQueryInvalidation(userId, {
+      publishUserRepoReadInvalidation(userId, {
         repoId: executionTarget.workspaceId,
-        query: 'repo-worktree-snapshot',
+        domain: 'worktree-status',
       })
     }
     return c.json(result)

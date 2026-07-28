@@ -1,14 +1,16 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import { requestWorkspaceCapabilityRefresh } from '#/web/workspace-capability-refresh.ts'
-import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
+import { refreshActiveRepoPullRequestQueries } from '#/web/repo-query-runtime.ts'
+import { goblinLog } from '#/web/logger.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 
 export interface WorkspaceRefreshStoreAccess {
@@ -62,10 +64,17 @@ async function runManualWorkspaceRefreshOnce(
   const resolved = resolveActionWorkspaceRuntimeId(store.get, workspaceId, workspaceRuntimeId)
   if (!resolved || !isGitWorkspace(resolved.repo)) return { ok: true }
   const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
-    refreshProjectionReadModel: async (repoId, nextWorkspaceRuntimeId) => {
+    refreshReadModels: async (repoId, nextWorkspaceRuntimeId, signal) => {
+      void refreshActiveRepoPullRequestQueries(repoId, nextWorkspaceRuntimeId).catch((error) => {
+        goblinLog.warn('active pull-request refresh failed', {
+          repoId,
+          workspaceRuntimeId: nextWorkspaceRuntimeId,
+          error,
+        })
+      })
       await Promise.all([
-        requestRepoProjectionReadModelRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId }),
-        refreshRepoWorktreeStatus(store, repoId, nextWorkspaceRuntimeId),
+        requestRepoSnapshotRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId, signal }),
+        refreshRepoWorktreeStatus(store, repoId, nextWorkspaceRuntimeId, { signal }),
       ])
     },
   })
@@ -77,11 +86,11 @@ async function runManualWorkspaceRefreshOnce(
     lane: 'read',
     priority: 100,
     targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-    task: async () => await runManualSyncPipeline(workspaceId, workspaceRuntimeId),
+    task: async (signal) => await runManualSyncPipeline(workspaceId, workspaceRuntimeId, signal),
     onError: (message) => {
       updateIfFresh(store.set, workspaceId, workspaceRuntimeId, (workspace) => {
         if (!isGitWorkspace(workspace)) return
-        const git = gitWorkspaceProjection(workspace)
+        const git = gitWorkspaceClientState(workspace)
         git.events = appendRepoEvent(git.events, errorEvent(message))
       })
     },

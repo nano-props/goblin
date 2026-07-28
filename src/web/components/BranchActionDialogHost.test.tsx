@@ -11,9 +11,10 @@
 
 import {
   resetWorkspacesStore,
-  seedRepoReadModelQueryData,
+  seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  repoPresentationFromQueryForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { act, cleanup } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -29,7 +30,6 @@ import {
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchPush: vi.fn(),
@@ -114,7 +114,9 @@ const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-host-test')
 
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
-  const branch = createRepoBranch('feature/host', { worktree: { path: worktreePath } })
+  const branch = createRepoBranch('feature/host', {
+    worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+  })
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [branch] })
   return { repo, branch, worktreePath }
 }
@@ -150,19 +152,22 @@ function findButtonByText(text: string): HTMLButtonElement | null {
 function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof createRepoBranch>[]): void {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
-  const readModel = readRepoBranchQueryProjection(repo)
-  seedRepoReadModelQueryData(repo, {
+  const readModel = repoPresentationFromQueryForTest(repo)
+  seedRepoQueryDataForTest(repo, {
     branches,
-    currentBranch: readModel?.currentBranch ?? '',
-    status: readModel?.status ?? [],
+    currentBranch: readModel.snapshot.current,
+    status: readModel.status ?? [],
   })
 }
 
 function removeBranchFromReadModel(repoId: string, branchName: string): void {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
-  const readModel = readRepoBranchQueryProjection(repo)
-  setBranchSnapshotForRepo(repoId, readModel?.branches.filter((branch) => branch.name !== branchName) ?? [])
+  const readModel = repoPresentationFromQueryForTest(repo)
+  setBranchSnapshotForRepo(
+    repoId,
+    readModel.snapshot.branches.filter((branch) => branch.name !== branchName),
+  )
 }
 
 describe('BranchActionDialogHost', () => {
@@ -236,7 +241,7 @@ describe('BranchActionDialogHost', () => {
 
   test('regression: closeStaleDialogs clears a dialog whose branch does not match the new current branch', () => {
     const { repo, branch: branchX } = setupRepo()
-    const branchY = createRepoBranch('feature/y', { worktree: { path: '/tmp/y' } })
+    const branchY = createRepoBranch('feature/y', { worktree: { path: '/tmp/y', isPrimary: false, isLocked: false } })
     setBranchSnapshotForRepo(REPO_ID, [branchX, branchY])
 
     act(() => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { createRepoBranch, seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -20,6 +20,7 @@ import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import type * as SettingsClient from '#/web/settings-client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -28,12 +29,6 @@ const surfaceMocks = vi.hoisted(() => ({
   createRequest: {
     input: { worktreePath: '/repo-feature', mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' } },
   } satisfies CreateWorktreeRequest,
-  branchReadModel: { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} } as {
-    branches: Array<{ name: string }>
-    currentBranch: string
-    status: never[]
-    worktreesByPath: Record<string, never>
-  } | null,
 }))
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
@@ -73,10 +68,6 @@ vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
   WorkspaceToolbarPrimary: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
-vi.mock('#/web/repo-branch-read-model.ts', () => ({
-  useRepoBranchReadModel: () => surfaceMocks.branchReadModel,
-}))
-
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoWorktreeBootstrapPreview: vi.fn(async () => ({ ok: false, message: 'error.failed-read-repo' })),
   getRepoOperations: vi.fn(async () => ({ operations: [], loadedAt: 0 })),
@@ -86,12 +77,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
-  surfaceMocks.branchReadModel = {
-    branches: [{ name: 'main' }],
-    currentBranch: 'main',
-    status: [],
-    worktreesByPath: {},
-  }
   vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementation(async () => ({
     ok: false,
     message: 'error.failed-read-repo',
@@ -99,7 +84,12 @@ beforeEach(() => {
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ workspaceSettings: [] }))
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
-  seedRepoWithReadModelForTest({ id: REPO_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+  seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    branches: [createRepoBranch('main')],
+    currentBranchName: 'main',
+  })
 })
 
 afterEach(() => {
@@ -121,7 +111,7 @@ async function renderPaneInAct(element: ReactElement): Promise<ReturnType<typeof
 
 describe('CreateWorktreePagePane', () => {
   test('keeps stable page chrome while branch data is loading', () => {
-    surfaceMocks.branchReadModel = null
+    primaryWindowQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID) })
 
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
@@ -286,7 +276,7 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('reuses a pending settings query after the first consumer unmounts', async () => {
-    primaryWindowQueryClient.clear()
+    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
     const settings = Promise.withResolvers<ReturnType<typeof defaultSettingsSnapshot>>()
     let querySignal: AbortSignal | undefined
     mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
@@ -321,7 +311,8 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('releases the form when settings fails after a trust-relevant bootstrap preview', async () => {
-    primaryWindowQueryClient.clear()
+    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+    mockedGetSettingsSnapshot.mockRejectedValueOnce(new Error('settings unavailable'))
     vi.mocked(getRepoWorktreeBootstrapPreview).mockResolvedValueOnce({
       ok: true,
       preview: {

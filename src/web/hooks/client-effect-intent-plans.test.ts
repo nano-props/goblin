@@ -10,7 +10,9 @@ import {
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import type { BranchSnapshotInfo, WorktreeStatus } from '#/shared/git-types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -27,6 +29,30 @@ const CURRENT_GIT_REPO = {
     },
     diagnostics: [],
   },
+}
+
+function repositoryFacts(branches: BranchSnapshotInfo[], status: WorktreeStatus[] | undefined) {
+  return {
+    snapshot: {
+      branches,
+      current: 'main',
+      remote: {
+        remotes: [],
+        hasRemotes: false,
+        hasBrowserRemote: false,
+        remoteProviders: {},
+        hasGitHubRemote: false,
+      },
+    },
+    status,
+  }
+}
+
+function repositoryFactsForTest(repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>) {
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  return snapshot
+    ? { snapshot, status: getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status }
+    : null
 }
 const GIT_WORKSPACE_ID = CURRENT_GIT_REPO.id
 const DETACHED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/example-repo')
@@ -56,12 +82,17 @@ describe('client effect intent plans', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [
-        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
-        createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo-main', isPrimary: false, isLocked: false },
+        }),
+        createBranchSnapshot('feature/test', {
+          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
+        }),
       ],
     })
 
-    const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
+    const plan = createTerminalBellIntentPlan(repo, repositoryFactsForTest(repo), {
       type: 'terminal-bell-click',
       terminalSessionId: 'term-222222222222222222222',
       session: {
@@ -108,10 +139,15 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo' } })],
+      branchSnapshots: [
+        createBranchSnapshot('main', {
+          isCurrent: true,
+          worktree: { path: '/tmp/repo', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
 
-    const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
+    const plan = createTerminalBellIntentPlan(repo, repositoryFactsForTest(repo), {
       type: 'terminal-bell-click',
       terminalSessionId: 'term-111111111111111111111',
       session: {
@@ -158,14 +194,7 @@ describe('client effect intent plans', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
-      {
-        branches: [],
-        currentBranch: 'main',
-        status: [{ path: worktreePath, isMain: false, entries: [] }],
-        worktreesByPath: {
-          [worktreePath]: { path: worktreePath, isMain: false, isDirty: false, changeCount: 0 },
-        },
-      },
+      repositoryFacts([], [{ path: worktreePath, isMain: false, entries: [] }]),
       {
         type: 'terminal-bell-click',
         terminalSessionId: 'term-333333333333333333333',
@@ -193,14 +222,14 @@ describe('client effect intent plans', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
-      {
-        branches: [createBranchSnapshot('feature/later', { worktree: { path: worktreePath } })],
-        currentBranch: 'main',
-        status: [{ path: worktreePath, isMain: false, entries: [] }],
-        worktreesByPath: {
-          [worktreePath]: { path: worktreePath, isMain: false, isDirty: false, changeCount: 0 },
-        },
-      },
+      repositoryFacts(
+        [
+          createBranchSnapshot('feature/later', {
+            worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+          }),
+        ],
+        [{ path: worktreePath, isMain: false, entries: [] }],
+      ),
       {
         type: 'terminal-bell-click',
         terminalSessionId: 'term-444444444444444444444',
@@ -243,19 +272,23 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/test', {
+          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
+        }),
+      ],
     })
     const otherPath = '/tmp/repo-other'
     const plan = createTerminalBellIntentPlan(
       repo,
-      {
-        branches: [createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } })],
-        currentBranch: 'main',
-        status: [{ path: otherPath, isMain: false, entries: [] }],
-        worktreesByPath: {
-          [otherPath]: { path: otherPath, isMain: false, isDirty: false, changeCount: 0 },
-        },
-      },
+      repositoryFacts(
+        [
+          createBranchSnapshot('feature/test', {
+            worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
+          }),
+        ],
+        [{ path: otherPath, isMain: false, entries: [] }],
+      ),
       {
         type: 'terminal-bell-click',
         terminalSessionId: 'term-666666666666666666666',

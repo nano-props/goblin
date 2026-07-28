@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RefreshCw } from 'lucide-react'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
@@ -30,9 +30,7 @@ interface Props {
 
 const COMPLETION_VISIBLE_MS = 1500
 
-type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
-  Pick<GitWorkspaceProjection, 'dataLoads' | 'remote'> &
-  RepoActivityProjectionRepo
+type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> & RepoActivityProjectionRepo
 
 function useRepoActivityControlPresentation(
   repo: RepoActivityProjectionRepo,
@@ -52,13 +50,7 @@ function repoActivityControlRepoEqual(
 ): boolean {
   return (
     a === b ||
-    (!!a &&
-      !!b &&
-      a.id === b.id &&
-      a.workspaceRuntimeId === b.workspaceRuntimeId &&
-      a.dataLoads === b.dataLoads &&
-      a.branchAction === b.branchAction &&
-      a.remote === b.remote)
+    (!!a && !!b && a.id === b.id && a.workspaceRuntimeId === b.workspaceRuntimeId && a.branchAction === b.branchAction)
   )
 }
 
@@ -71,9 +63,7 @@ export function RepoActivityControl({ repoId }: Props) {
         ? {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
-            dataLoads: repo.capability.git.dataLoads,
             branchAction: repo.capability.git.operations.branchAction,
-            remote: repo.capability.git.remote,
           }
         : undefined
     },
@@ -101,14 +91,11 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
       return <RepoCompletionIndicator completion={view.completion} />
     case 'refresh-button':
       return (
-        <div className="flex items-center gap-2">
-          <RepoRefreshButton
-            repo={repo}
-            manualSyncBusy={view.manualSyncBusy}
-            lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
-          />
-          <RepoFetchFailureIndicator repo={repo} />
-        </div>
+        <RepoRefreshButton
+          repo={repo}
+          manualSyncBusy={view.manualSyncBusy}
+          lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
+        />
       )
   }
 }
@@ -261,26 +248,4 @@ function RepoCompletionIndicator({ completion }: { completion: RepoCompletion })
       </span>
     </div>
   )
-}
-
-function RepoFetchFailureIndicator({ repo }: { repo: RepoActivityControlRepo }) {
-  const t = useT()
-
-  if (repo.remote.fetchFailed) {
-    return (
-      <span
-        className="flex items-center gap-1 text-xs text-warning"
-        // Hover surfaces the actual git error (e.g. "fatal: could
-        // not read Username") so the user can act on it; without
-        // a real message we fall back to the generic title.
-        title={repo.remote.fetchError ?? t('tab.fetch-failed-title')}
-        aria-label={repo.remote.fetchError ?? t('tab.fetch-failed-title')}
-      >
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
-        {t('tab.fetch-failed')}
-      </span>
-    )
-  }
-
-  return null
 }

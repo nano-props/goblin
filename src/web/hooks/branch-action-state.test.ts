@@ -22,7 +22,6 @@ describe('branch action state projection', () => {
       phase: 'running',
       reason: 'branch:push',
       target: 'feature/a',
-      startedAt: 101,
     })
   })
 
@@ -35,7 +34,6 @@ describe('branch action state projection', () => {
       phase: 'queued',
       reason: 'branch:deleteBranch',
       target: 'feature/a',
-      startedAt: null,
     })
   })
 

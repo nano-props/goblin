@@ -272,14 +272,16 @@ function createRepo(): RepoPresentationForTest {
     branches,
     currentBranch: 'main',
   })
-  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
+  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [] })
 }
 
 function createRepoWithCreatedWorktree(): RepoPresentationForTest {
   const branches = [
     createRepoBranch('main'),
     createRepoBranch('feature/base'),
-    createRepoBranch('feature/new', { worktree: { path: `${WORKTREE_PATH}-feature-new` } }),
+    createRepoBranch('feature/new', {
+      worktree: { path: `${WORKTREE_PATH}-feature-new`, isPrimary: false, isLocked: false },
+    }),
   ]
   const repo = seedRepoWithReadModelForTest({
     id: WORKSPACE_ID,
@@ -287,7 +289,7 @@ function createRepoWithCreatedWorktree(): RepoPresentationForTest {
     branches,
     currentBranch: 'main',
   })
-  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
+  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [] })
 }
 
 function createRemoteRepo(): RepoPresentationForTest {
@@ -307,5 +309,5 @@ function createRemoteRepo(): RepoPresentationForTest {
     currentBranch: 'main',
     remoteLifecycle: { kind: 'ready', target },
   })
-  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
+  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [] })
 }

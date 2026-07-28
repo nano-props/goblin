@@ -30,7 +30,7 @@ import {
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo
@@ -144,15 +144,13 @@ export function dispatchPush({
 }
 
 function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo | null {
-  const readModel = readRepoBranchQueryProjection(repo)
-  if (!readModel) return null
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+  if (!snapshot) return null
+  const status = getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status
   return {
     ...repo,
-    branchModel: {
-      ...repo.branchModel,
-      currentBranch: readModel.currentBranch,
-      worktreesByPath: readModel.worktreesByPath,
-    },
+    snapshot,
+    status,
   }
 }
 

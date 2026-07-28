@@ -1,5 +1,4 @@
 import { replaceWorkspaceState } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { persistRepoSnapshotCacheEntry } from '#/web/stores/workspaces/persistence.ts'
 import {
   DEFAULT_WORKSPACE_PANE_SIZE,
   normalizeWorkspacePaneSize,
@@ -16,14 +15,14 @@ import {
   workspaceNavigationHistoryEntryEqual,
 } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { requireRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { requireRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 type RestorableWorkspaceActions = Pick<
   WorkspacesStore,
@@ -163,27 +162,20 @@ function createWorkspacePanePreferenceActions(set: WorkspacesSet): WorkspacePane
 function createGitWorkspacePreferenceActions(set: WorkspacesSet, get: WorkspacesGet): GitWorkspacePreferenceActions {
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
-      let changed = false
-      let workspaceRuntimeId: string | undefined
       set((s) => {
         const repo = s.workspaces[id]
-        if (!repo || !isGitWorkspace(repo) || gitWorkspaceProjection(repo).ui.branchViewMode === viewMode) return s
-        changed = true
-        workspaceRuntimeId = repo.workspaceRuntimeId
+        if (!repo || !isGitWorkspace(repo) || gitWorkspaceClientState(repo).ui.branchViewMode === viewMode) return s
         return replaceWorkspaceState(s, repo, (r) => {
           if (!isGitWorkspace(r)) return
-          gitWorkspaceProjection(r).ui.branchViewMode = viewMode
+          gitWorkspaceClientState(r).ui.branchViewMode = viewMode
         })
       })
-      if (changed && workspaceRuntimeId !== undefined) {
-        persistRepoSnapshotCacheEntry(set, get().workspaces[id], workspaceRuntimeId)
-      }
     },
 
     setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType | null) {
       const repo = get().workspaces[id]
       if (!repo) return
-      const branchModel = requireRepoBranchSnapshotQueryProjection(repo)
+      const branchModel = requireRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
       const target = workspacePaneTabsTargetForRepoBranch(
         { workspaceId: repo.id, branches: branchModel.branches },
         branch,

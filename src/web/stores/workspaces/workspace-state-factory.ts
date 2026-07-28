@@ -1,12 +1,11 @@
 import { produce, type Draft } from 'immer'
 import { isRemoteWorkspaceId, localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
-import { emptyWorkspaceDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type {
-  GitWorkspaceProjection,
+  GitWorkspaceClientState,
   RepoEvent,
   RepoResultEventOptions,
   WorkspaceState,
@@ -38,22 +37,10 @@ export function emptyWorkspace(id: string, workspaceRuntimeId: string): Workspac
   }
 }
 
-export function emptyGitWorkspaceProjection(): GitWorkspaceProjection {
+export function emptyGitWorkspaceClientState(): GitWorkspaceClientState {
   return {
-    dataLoads: emptyWorkspaceDataLoadBundle(),
     operations: emptyWorkspaceOperations(),
     ui: { branchViewMode: 'all' },
-    remote: {
-      remotes: [],
-      remoteDetails: [],
-      hasRemotes: false,
-      hasBrowserRemote: false,
-      browserRemoteProvider: undefined,
-      remoteProviders: {},
-      hasGitHubRemote: false,
-      fetchFailed: false,
-      fetchError: null,
-    },
     events: [],
   }
 }

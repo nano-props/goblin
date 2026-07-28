@@ -1,437 +1,55 @@
-import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { refreshStatusLog } from '#/web/logger.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  branch,
-  REPO_ID,
-  resetRefreshTest,
-  ipcHandlers,
-  seedRepo,
-  repoProjection,
-  refreshStoreAccess,
-  updateRepoForTest,
-  cachedRepoStatus,
-} from '#/web/stores/workspaces/refresh-test-utils.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
-import {
-  getRepoWorktreeStatusQueryData,
-  setRepoProjectionQueryData,
-  setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
-import { repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
-import { invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { WorktreeStatus } from '#/web/types.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
+
 beforeEach(resetRefreshTest)
 
-describe('workspace refresh status', () => {
-  test('standalone status errors remain query-local', async () => {
-    const workspaceRuntimeId = seedRepo([branch('main')])
-    ipcHandlers['repo.worktreeStatus'] = async () => {
-      throw new Error('error.workspace-git-unavailable')
-    }
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
-    expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
-    ).toEqual(
-      expect.objectContaining({
-        message: 'error.failed-read-repo',
-        cause: expect.objectContaining({ message: 'error.workspace-git-unavailable' }),
-      }),
-    )
-  })
-
-  test('coalesces concurrent visible status refreshes for the same workspace runtime', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    let callCount = 0
-    let resolveFirst!: (value: WorktreeStatus[]) => void
-    ipcHandlers['repo.projection'] = () => repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
-    ipcHandlers['repo.worktreeStatus'] = () => {
-      callCount += 1
-      return new Promise((resolve) => {
-        const complete = (status: WorktreeStatus[]) => resolve({ workspaceRuntimeId, status, loadedAt: Date.now() })
-        resolveFirst = complete
-      })
-    }
-
-    const first = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    const second = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    let secondSettled = false
-    void second.then(() => {
-      secondSettled = true
-    })
-    const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
-
-    await vi.waitFor(() => {
-      expect(callCount).toBe(1)
-    })
-    expect(secondSettled).toBe(false)
-    resolveFirst(fresh)
-    await Promise.all([first, second])
-    expect(secondSettled).toBe(true)
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(fresh)
-  })
-
-  test('status refresh updates normalized worktree dirty metadata in the branch read model', async () => {
+describe('independent worktree status refresh', () => {
+  test('updates status without replacing the accepted repository snapshot', async () => {
     const workspaceRuntimeId = seedRepo([
-      branch('feature/cleaned', undefined, {
-        worktree: {
-          path: '/tmp/worktree-cleaned',
-        },
-      }),
-      branch('feature/dirty', undefined, {
-        worktree: {
-          path: '/tmp/worktree-dirty',
-        },
-      }),
-      branch('feature/missing', undefined, {
-        worktree: {
-          path: '/tmp/worktree-missing',
-        },
+      branch('feature/a', {
+        worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
       }),
     ])
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({
-        branches: [
-          branch('feature/cleaned', undefined, {
-            worktree: {
-              path: '/tmp/worktree-cleaned',
-            },
-          }),
-          branch('feature/dirty', undefined, {
-            worktree: {
-              path: '/tmp/worktree-dirty',
-            },
-          }),
-          branch('feature/missing', undefined, {
-            worktree: {
-              path: '/tmp/worktree-missing',
-            },
-          }),
-        ],
-        current: '',
-      })
+    const snapshotBefore = getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId)
     ipcHandlers['repo.worktreeStatus'] = () => ({
       workspaceRuntimeId,
       status: [
-        { path: '/tmp/worktree-cleaned', branch: 'feature/cleaned', isMain: false, entries: [] },
-        {
-          path: '/tmp/worktree-dirty',
-          branch: 'feature/dirty',
-          isMain: false,
-          entries: [
-            { x: 'M', y: ' ', path: 'one.ts' },
-            { x: '?', y: '?', path: 'two.ts' },
-          ],
-        },
+        { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'file.ts' }] },
       ],
       loadedAt: Date.now(),
     })
 
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
+    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, workspaceRuntimeId)
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
-    expect(worktreesByPath?.['/tmp/worktree-cleaned']).toMatchObject({
-      isDirty: false,
-      changeCount: 0,
-    })
-    expect(worktreesByPath?.['/tmp/worktree-dirty']).toMatchObject({
-      isDirty: true,
-      changeCount: 2,
-    })
-    expect(worktreesByPath?.['/tmp/worktree-missing']).toMatchObject({
-      isDirty: false,
-      changeCount: 0,
-    })
+    expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.status[0]?.entries).toHaveLength(1)
+    expect(getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId)).toBe(snapshotBefore)
   })
 
-  test('status refresh writes the server result into repo data query cache', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    const status: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
-    ]
-    ipcHandlers['repo.projection'] = async () =>
-      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
-    ipcHandlers['repo.worktreeStatus'] = () => ({ workspaceRuntimeId, status, loadedAt: Date.now() })
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(status)
-  })
-
-  test('status refresh replaces the normalized repo-runtime status result', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    const staleStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
-    ]
-    setRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, {
-      workspaceRuntimeId,
-      status: staleStatus,
-      loadedAt: 1,
-    })
-    const freshStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] },
-    ]
-    setRepoProjectionQueryData(
-      REPO_ID,
-      workspaceRuntimeId,
-      'feature/a',
-      'full',
-      repoProjection(
-        { branches: [branch('feature/a')], current: 'feature/a' },
-        {
-          requested: { branch: 'feature/a', pullRequestMode: 'full' },
-        },
-      ),
-    )
-    setRepoProjectionQueryData(
-      REPO_ID,
-      workspaceRuntimeId,
-      null,
-      'full',
-      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }),
-    )
-    ipcHandlers['repo.projection'] = async (input) => {
-      expect(input).toMatchObject({ cwd: REPO_ID, branch: 'feature/a', mode: 'full' })
-      return repoProjection(
-        { branches: [branch('feature/a')], current: 'feature/a' },
-        {
-          requested: { branch: 'feature/a', pullRequestMode: 'full' },
-        },
-      )
-    }
-    ipcHandlers['repo.worktreeStatus'] = () => ({ workspaceRuntimeId, status: freshStatus, loadedAt: Date.now() })
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(freshStatus)
-  })
-
-  test('workspace visible status cache refresh writes branch-scoped results without invalidating active queries', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
-    const staleStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
-    ]
-    setRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, {
-      workspaceRuntimeId,
-      status: staleStatus,
-      loadedAt: 1,
-    })
-    const freshStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] },
-    ]
-    setRepoProjectionQueryData(
-      REPO_ID,
-      workspaceRuntimeId,
-      'feature/a',
-      'full',
-      repoProjection(
-        { branches: [branch('feature/a')], current: 'feature/a' },
-        {
-          requested: { branch: 'feature/a', pullRequestMode: 'full' },
-        },
-      ),
-    )
-    ipcHandlers['repo.worktreeStatus'] = () => ({ workspaceRuntimeId, status: freshStatus, loadedAt: Date.now() })
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      { queryKey: repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId), exact: true, refetchType: 'none' },
-      { cancelRefetch: false },
-    )
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(freshStatus)
-  })
-
-  test('workspace visible status cache refresh rejects stale results without retrying', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    let statusCalls = 0
-    let resolveStatus!: (snapshot: { workspaceRuntimeId: string; status: WorktreeStatus[]; loadedAt: number }) => void
-    const staleStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
-    ]
-    ipcHandlers['repo.worktreeStatus'] = async () => {
-      statusCalls += 1
-      return await new Promise((resolve) => {
-        resolveStatus = resolve
-      })
-    }
-
-    const refresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    await vi.waitFor(() => {
-      expect(statusCalls).toBe(1)
-    })
-    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
-    resolveStatus({ workspaceRuntimeId, status: staleStatus, loadedAt: Date.now() })
-    await refresh
-
-    expect(statusCalls).toBe(1)
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
-  })
-
-  test('workspace visible status cache refresh drops stale errors after worktree invalidation', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    let statusCalls = 0
-    let rejectStatus!: (err: Error) => void
-    ipcHandlers['repo.worktreeStatus'] = async () => {
-      statusCalls += 1
-      if (statusCalls > 1) return { workspaceRuntimeId, status: [], loadedAt: Date.now() }
-      return await new Promise((_resolve, reject) => {
-        rejectStatus = reject
-      })
-    }
-
-    const refresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    await vi.waitFor(() => {
-      expect(statusCalls).toBe(1)
-    })
-    invalidateRepoWorktreeStatusQueries(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
-
-    rejectStatus(new Error('error.path-not-found'))
-    await refresh
-
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    expect(repo.capability.kind).toBe('git')
-    expect(statusCalls).toBe(1)
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
-  })
-
-  test('workspace status refresh requires a current runtime with Git capability', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    let statusCalls = 0
-    ipcHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => {
-      statusCalls += 1
-      return { workspaceRuntimeId, status: [], loadedAt: Date.now() }
-    }
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, 'repo-runtime-stale')
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    updateRepoForTest((repo) => {
-      acceptWorkspaceProbeState(repo, {
-        status: 'unavailable',
-        reason: 'error.workspace-path-not-found',
-      })
-    })
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-    updateRepoForTest((repo) => {
-      acceptWorkspaceProbeState(repo, {
-        status: 'ready',
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'unavailable' },
-        },
-        diagnostics: [],
-      })
-    })
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(statusCalls).toBe(1)
-  })
-
-  test('workspace visible status cache refresh joins an active matching status fetch', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId) })
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
-    let statusCalls = 0
-    let resolveStatus!: (snapshot: { workspaceRuntimeId: string; status: WorktreeStatus[]; loadedAt: number }) => void
-    const activeStatus: WorktreeStatus[] = [
-      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'active.ts' }] },
-    ]
+  test('keeps accepted status when a background status refresh fails', async () => {
+    const workspaceRuntimeId = seedRepo([branch('main')])
+    const acceptedStatus = getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)
     ipcHandlers['repo.worktreeStatus'] = () => {
-      statusCalls += 1
-      return new Promise((resolve) => {
-        resolveStatus = resolve
-      })
+      throw new Error('status unavailable')
     }
+    const warn = vi.spyOn(refreshStatusLog, 'warn').mockImplementation(() => {})
 
-    const activeFetch = primaryWindowQueryClient.fetchQuery(repoWorktreeStatusQueryOptions(REPO_ID, workspaceRuntimeId))
-    await vi.waitFor(() => {
-      expect(statusCalls).toBe(1)
-    })
+    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, workspaceRuntimeId)
 
-    const visibleRefresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(statusCalls).toBe(1)
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      { queryKey: repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId), exact: true, refetchType: 'none' },
-      { cancelRefetch: false },
-    )
-    expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.fetchStatus,
-    ).toBe('fetching')
-
-    resolveStatus({ workspaceRuntimeId, status: activeStatus, loadedAt: Date.now() })
-    await Promise.all([activeFetch, visibleRefresh])
-    expect(cachedRepoStatus(workspaceRuntimeId)).toEqual(activeStatus)
+    expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)).toBe(acceptedStatus)
+    expect(warn).toHaveBeenCalledWith('failed', expect.objectContaining({ err: expect.any(Error) }))
   })
 
-  test('status query records fetching, success, and stale error state', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    let resolveStatus!: (value: WorktreeStatus[]) => void
-    const status: WorktreeStatus[] = [{ path: '/tmp/goblin-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
-    ipcHandlers['repo.projection'] = () => repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
-    ipcHandlers['repo.worktreeStatus'] = () =>
-      new Promise((resolve) => {
-        resolveStatus = (status) => resolve({ workspaceRuntimeId, status, loadedAt: Date.now() })
-      })
+  test('does not request status for a stale workspace runtime', async () => {
+    seedRepo([branch('main')], 'repo-runtime-current')
+    const handler = vi.fn()
+    ipcHandlers['repo.worktreeStatus'] = handler
 
-    const work = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
+    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, 'repo-runtime-stale')
 
-    await vi.waitFor(() => {
-      expect(resolveStatus).toEqual(expect.any(Function))
-    })
-    expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId)),
-    ).toMatchObject({
-      fetchStatus: 'fetching',
-      error: null,
-    })
-    resolveStatus(status)
-    await work
-
-    const loadedAt = getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt
-    expect(loadedAt).toEqual(expect.any(Number))
-    expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId)),
-    ).toMatchObject({
-      fetchStatus: 'idle',
-      error: null,
-    })
-
-    ipcHandlers['repo.worktreeStatus'] = async () => {
-      throw new Error('status failed')
-    }
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(loadedAt)
-    expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
-    ).toEqual(
-      expect.objectContaining({
-        message: 'error.failed-read-repo',
-        cause: expect.objectContaining({ message: 'status failed' }),
-      }),
-    )
-  })
-
-  test('treats query cancellation as a lifecycle outcome rather than a status failure', async () => {
-    const workspaceRuntimeId = seedRepo([branch('feature/a')])
-    const warn = vi.spyOn(refreshStatusLog, 'warn')
-    vi.spyOn(primaryWindowQueryClient, 'fetchQuery').mockRejectedValueOnce(new CancelledError())
-
-    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
-
-    expect(warn).not.toHaveBeenCalled()
+    expect(handler).not.toHaveBeenCalled()
   })
 })

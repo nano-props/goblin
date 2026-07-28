@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   resolveRepoWriteBoundaryKey: vi.fn(
     async (workspaceId: WorkspaceId, _signal?: AbortSignal): Promise<string> => workspaceId,
   ),
-  publishRepoQueryInvalidation: vi.fn(),
+  publishRepoReadInvalidation: vi.fn(),
   workspaceRuntimeClosed: null as
     ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
 }))
@@ -39,7 +39,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
-  publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
+  publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
 }))
 
 vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
@@ -57,7 +57,7 @@ beforeEach(() => {
   resetRepoWriteOperationCoordinatorForTests()
   mocks.resolveRepoWriteBoundaryKey.mockReset()
   mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => workspaceId)
-  mocks.publishRepoQueryInvalidation.mockReset()
+  mocks.publishRepoReadInvalidation.mockReset()
   mocks.workspaceRuntimeClosed = null
   useFakeTimers()
   vi.setSystemTime(0)
@@ -436,7 +436,7 @@ describe('repo write operation coordinator', () => {
     const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const observedFetchTimes: Array<number | null> = []
     const { getRepoBoundaryLastFetchAt } = await import('#/server/modules/repo-write-operation-coordinator.ts')
-    mocks.publishRepoQueryInvalidation.mockImplementation(() => {
+    mocks.publishRepoReadInvalidation.mockImplementation(() => {
       observedFetchTimes.push(getRepoBoundaryLastFetchAt(boundary))
     })
 
@@ -487,7 +487,7 @@ describe('repo write operation coordinator', () => {
       workspaceId === WORKSPACE_ID || workspaceId === LINKED_WORKSPACE_ID ? WORKSPACE_BOUNDARY_KEY : workspaceId,
     )
     await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
-    mocks.publishRepoQueryInvalidation.mockClear()
+    mocks.publishRepoReadInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
@@ -500,13 +500,13 @@ describe('repo write operation coordinator', () => {
       },
     )
 
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: WORKSPACE_ID,
-      query: 'repo-runtime',
+      domain: 'operations',
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: LINKED_WORKSPACE_ID,
-      query: 'repo-runtime',
+      domain: 'operations',
     })
   })
 
@@ -520,7 +520,7 @@ describe('repo write operation coordinator', () => {
     await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
     linkedBoundary = LINKED_WORKSPACE_BOUNDARY_KEY
     await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
-    mocks.publishRepoQueryInvalidation.mockClear()
+    mocks.publishRepoReadInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
@@ -533,13 +533,13 @@ describe('repo write operation coordinator', () => {
       },
     )
 
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId: WORKSPACE_ID,
-      query: 'repo-runtime',
+      domain: 'operations',
     })
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalledWith({
+    expect(mocks.publishRepoReadInvalidation).not.toHaveBeenCalledWith({
       repoId: LINKED_WORKSPACE_ID,
-      query: 'repo-runtime',
+      domain: 'operations',
     })
   })
 

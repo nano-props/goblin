@@ -17,19 +17,23 @@ const mocks = repoRouteMocks()
 beforeEach(resetRepoRouteHarness)
 
 describe('repo routes — POST body validation (read endpoints)', () => {
-  test('returns 400 for invalid picklist values in the body (e.g. projection mode)', async () => {
+  test('returns 400 for an invalid pull-request scope', async () => {
     const app = createTestRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/projection', {
+      new Request('http://localhost/pull-requests', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, mode: 'not-a-mode' }),
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId: 'repo-runtime-invalid',
+          scope: { kind: 'invalid' },
+        }),
       }),
     )
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(mocks.readRepoPullRequests).not.toHaveBeenCalled()
   })
 
   test('rejects Git reads after the server commits Git unavailable', async () => {
@@ -52,7 +56,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
 
     const response = await app.request(
-      new Request('http://localhost/projection', {
+      new Request('http://localhost/snapshot', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ cwd: workspaceId, workspaceRuntimeId: workspaceRuntimeId }),
@@ -61,7 +65,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-git-unavailable' })
-    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
@@ -96,31 +100,36 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
-  test('passes projection body through to the module layer', async () => {
-    mocks.readRepoProjection.mockResolvedValue({
-      snapshot: { branches: [], current: 'main' },
-      pullRequests: [],
-      requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      loadedAt: 123,
+  test('passes snapshot body through to the module layer', async () => {
+    mocks.readRepoSnapshot.mockResolvedValue({
+      snapshot: {
+        branches: [],
+        current: 'main',
+        remote: {
+          remotes: [],
+          hasRemotes: false,
+          hasBrowserRemote: false,
+          remoteProviders: {},
+          hasGitHubRemote: false,
+        },
+      },
     })
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
-      new Request('http://localhost/projection', {
+      new Request('http://localhost/snapshot', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/a' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.readRepoProjection).toHaveBeenCalledWith(WORKSPACE_ID, {
-      branch: 'feature/a',
-      mode: 'full',
+    expect(mocks.readRepoSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal: expect.any(AbortSignal),
       workspaceRuntimeId,
     })
-    expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
+    expect(await response.json()).toMatchObject({ snapshot: { current: 'main', branches: [] } })
   })
 
   test('returns a complete repo-runtime-scoped worktree status snapshot', async () => {

@@ -105,7 +105,11 @@ describe('workspace pane runtime tab command actions', () => {
     seedRepoWithReadModelForTest({
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      branches: [
+        createRepoBranch(branchName, {
+          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: branchName,
     })
 
@@ -122,7 +126,11 @@ describe('workspace pane runtime tab command actions', () => {
     seedRepoWithReadModelForTest({
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      branches: [
+        createRepoBranch(branchName, {
+          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: branchName,
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
@@ -430,7 +438,11 @@ describe('workspace pane runtime tab command actions', () => {
     seedRepoWithReadModelForTest({
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      branches: [
+        createRepoBranch(branchName, {
+          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
+        }),
+      ],
       currentBranchName: branchName,
     })
     const createTerminal = vi.fn(async () => 'created-session')
