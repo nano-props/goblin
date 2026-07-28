@@ -3,11 +3,7 @@ import { focusManager, QueryClient, QueryClientProvider, QueryObserver } from '@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoWorktreeStatusSnapshot } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import {
-  getRepoWorktreeStatusQueryData,
-  getSuccessfulRepoWorktreeStatusQueryData,
-  setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+import { getRepoWorktreeStatusQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
 import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import {
@@ -181,6 +177,28 @@ describe('repo worktree status query data', () => {
     expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
   })
 
+  test('does not accept a status read that started before an explicit refresh', async () => {
+    const queryClient = new QueryClient()
+    const reads: Array<PromiseWithResolvers<RepoWorktreeStatusSnapshot>> = []
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(() => {
+      const read = Promise.withResolvers<RepoWorktreeStatusSnapshot>()
+      reads.push(read)
+      return read.promise
+    })
+    const observer = new QueryObserver(queryClient, repoWorktreeStatusQueryOptions(WORKSPACE_ID, 'repo-runtime-1'))
+    const unsubscribe = observer.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+
+    const refresh = refreshRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient })
+    reads[0]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    reads[1]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+
+    await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+    expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2)
+    unsubscribe()
+  })
+
   test('does not create status data when the first refresh fails', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('transport failed'))
@@ -191,40 +209,41 @@ describe('repo worktree status query data', () => {
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
-  test('shares a failing in-flight status read between concurrent refreshes', async () => {
+  test('shares the current read after a concurrent refresh supersedes the first read', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    let rejectRead!: (error: Error) => void
-    repoClientMocks.getRepoWorktreeStatus.mockImplementation(
-      () =>
-        new Promise((_resolve, reject) => {
-          rejectRead = reject
-        }),
-    )
+    const reads: Array<PromiseWithResolvers<RepoWorktreeStatusSnapshot>> = []
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(() => {
+      const read = Promise.withResolvers<RepoWorktreeStatusSnapshot>()
+      reads.push(read)
+      return read.promise
+    })
 
     const first = refreshRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient })
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
     const second = refreshRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient })
-    rejectRead(new Error('transport failed'))
+    reads[0]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    reads[1]!.reject(new Error('transport failed'))
 
     const results = await Promise.allSettled([first, second])
     expect(results).toEqual([
       expect.objectContaining({ status: 'rejected', reason: expect.objectContaining({ message: 'transport failed' }) }),
       expect.objectContaining({ status: 'rejected', reason: expect.objectContaining({ message: 'transport failed' }) }),
     ])
-    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
   test('caller cancellation does not abort a shared status read', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const controller = new AbortController()
-    let transportSignal!: AbortSignal
-    let resolveRead!: (snapshot: RepoWorktreeStatusSnapshot) => void
+    const transportSignals: AbortSignal[] = []
+    const reads: Array<PromiseWithResolvers<RepoWorktreeStatusSnapshot>> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation((_repoRoot, _repoRuntimeId, signal) => {
-      transportSignal = signal
-      return new Promise((resolve) => {
-        resolveRead = resolve
-      })
+      transportSignals.push(signal)
+      const read = Promise.withResolvers<RepoWorktreeStatusSnapshot>()
+      reads.push(read)
+      return read.promise
     })
 
     const first = refreshRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', {
@@ -236,10 +255,12 @@ describe('repo worktree status query data', () => {
     controller.abort(new Error('caller stopped'))
 
     await expect(first).rejects.toThrow('caller stopped')
-    expect(transportSignal.aborted).toBe(false)
-    resolveRead({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+    expect(transportSignals[0]?.aborted).toBe(false)
+    reads[0]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    reads[1]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
     await expect(second).resolves.toMatchObject({ loadedAt: 2 })
-    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
   })
 
   test('preserves the last accepted status when refresh fails', async () => {
@@ -256,7 +277,6 @@ describe('repo worktree status query data', () => {
       'transport failed',
     )
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toEqual(accepted)
-    expect(getSuccessfulRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
   test('accepts a successful empty collection as clean', async () => {

@@ -38,7 +38,7 @@ import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
-import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
+import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
@@ -225,7 +225,7 @@ describe('useKeyboard', () => {
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'history')
   })
 
-  test('branch navigation shortcuts use the React Query projection read model for branch order', async () => {
+  test('branch navigation shortcuts use accepted snapshot data after a background refresh failure', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -235,6 +235,10 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
       currentBranch: 'main',
     })
+    const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    if (!query) throw new Error('Missing snapshot query')
+    query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
     const selectRepoBranch = vi.fn()
     await renderHookHost({
       currentWorkspaceId: REPO_ID,

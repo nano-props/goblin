@@ -7,7 +7,8 @@ export type CurrentGitWorkspacePane = ReturnType<typeof getCurrentGitWorkspacePa
 export type CurrentGitWorkspacePanePresentation = ReturnType<typeof getCurrentGitWorkspacePanePresentation>
 
 export interface PullRequestReadPresentation {
-  state: 'pending' | 'unavailable' | 'error' | 'empty' | 'ready' | 'stale'
+  state: 'pending' | 'unavailable' | 'error' | 'empty' | 'ready'
+  stale: boolean
   error: string | null
   retrying: boolean
   retry: () => void

@@ -348,6 +348,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, message: 'removed' })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(worktreeRemovalApplication.removeWorktree).toHaveBeenCalledWith(
       'user-test',
       expect.objectContaining({

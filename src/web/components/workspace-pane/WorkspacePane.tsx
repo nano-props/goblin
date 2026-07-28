@@ -251,10 +251,10 @@ function GitWorktreeFilesystemPane({
   const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.workspaceRuntimeId, true)
   const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
   const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
-  if (statusReadModel.isPending) {
+  if (!statusReadModel.data && statusReadModel.isPending) {
     return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  if (statusReadModel.isError) {
+  if (!statusReadModel.data && statusReadModel.isError) {
     const error = statusReadModel.error
     return (
       <RepoStatusFailureView
@@ -273,6 +273,15 @@ function GitWorktreeFilesystemPane({
       workspaceProbe={workspaceProbe}
       head={gitHead(worktree.branch ?? null)}
       status={worktree}
+      statusError={
+        statusReadModel.isError
+          ? statusReadModel.error instanceof Error
+            ? statusReadModel.error.message
+            : String(statusReadModel.error)
+          : null
+      }
+      statusRetrying={statusReadModel.isFetching}
+      onRetryStatus={() => void statusReadModel.refetch()}
       target={target}
       route={route}
       workspacePaneId={workspacePaneId}
@@ -287,6 +296,9 @@ function GitWorktreeFilesystemPaneReady({
   workspaceProbe,
   head,
   status,
+  statusError,
+  statusRetrying,
+  onRetryStatus,
   target,
   route,
   workspacePaneId,
@@ -297,6 +309,9 @@ function GitWorktreeFilesystemPaneReady({
   workspaceProbe: WorkspaceGitReadyProbeState
   head: GitHead
   status: WorktreeStatus
+  statusError: string | null
+  statusRetrying: boolean
+  onRetryStatus: () => void
   target: GitWorktreeWorkspacePaneTabsTarget
   route: ParsedWorkspacePaneRoute | null
   workspacePaneId: string
@@ -321,6 +336,9 @@ function GitWorktreeFilesystemPaneReady({
   })
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background" data-testid="detached-worktree-pane">
+      {statusError && (
+        <RepoStatusStaleNotice messageKey={statusError} retrying={statusRetrying} onRetry={onRetryStatus} />
+      )}
       <WorkspacePaneTargetToolbar
         target={surfaceTarget}
         model={model}
@@ -411,13 +429,12 @@ function GitWorkspacePaneLoaded({
       ? pullRequestsReadModel.isError
         ? 'error'
         : 'pending'
-      : pullRequestsReadModel.isError
-        ? 'stale'
-        : pullRequestsReadModel.data.pullRequests === null
-          ? 'unavailable'
-          : pullRequestsReadModel.data.pullRequests.length === 0
-            ? 'empty'
-            : 'ready',
+      : pullRequestsReadModel.data.pullRequests === null
+        ? 'unavailable'
+        : pullRequestsReadModel.data.pullRequests.length === 0
+          ? 'empty'
+          : 'ready',
+    stale: !!pullRequestsReadModel.data && pullRequestsReadModel.isError,
     error: pullRequestErrorKey,
     retrying: pullRequestsReadModel.isFetching,
     retry: () => void pullRequestsReadModel.refetch(),

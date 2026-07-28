@@ -33,7 +33,7 @@ export interface ServerWebSocketIngressConfig<T> {
 
 export interface ServerWebSocketIngress<T> {
   /** Subscribe to messages. Returns an unsubscribe function. */
-  subscribe: (listener: (message: T) => void) => () => void
+  subscribe: (listener: (message: T) => void, onOpen?: () => void) => () => void
   /** Drop all listeners and close the underlying socket. Test-only. */
   resetForTests: () => void
 }
@@ -41,7 +41,7 @@ export interface ServerWebSocketIngress<T> {
 export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressConfig<T>): ServerWebSocketIngress<T> {
   const { path, parseMessage, reconnectDelayMs = 300 } = config
 
-  const listeners = new Set<(message: T) => void>()
+  const subscriptions = new Set<{ listener: (message: T) => void; onOpen?: () => void }>()
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   const socketLifecycle = createWebSocketLifecycle({
@@ -54,19 +54,22 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
       return new WebSocket(connection.url)
     },
     shouldOpen() {
-      return typeof WebSocket !== 'undefined' && listeners.size > 0 && !isAppQuitting()
+      return typeof WebSocket !== 'undefined' && subscriptions.size > 0 && !isAppQuitting()
     },
     shouldKeepOpen() {
-      return listeners.size > 0
+      return subscriptions.size > 0
+    },
+    onOpen() {
+      for (const subscription of subscriptions) subscription.onOpen?.()
     },
     onMessage(event) {
       const message = parseMessage(event.data)
       if (message === null || message === undefined) return
-      for (const listener of listeners) listener(message)
+      for (const subscription of subscriptions) subscription.listener(message)
     },
     onDisconnect(_entry, context) {
       if (context.idleClose) {
-        if (listeners.size > 0) ensureSocket()
+        if (subscriptions.size > 0) ensureSocket()
         return
       }
       scheduleReconnect()
@@ -91,7 +94,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   }
 
   function scheduleReconnect(): void {
-    if (reconnectTimer !== null || listeners.size === 0 || isAppQuitting()) return
+    if (reconnectTimer !== null || subscriptions.size === 0 || isAppQuitting()) return
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
       ensureSocket()
@@ -104,7 +107,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   }
 
   function maybeCloseSocket(): void {
-    if (listeners.size > 0) return
+    if (subscriptions.size > 0) return
     clearReconnectTimer()
     socketLifecycle.requestIdleClose()
   }
@@ -117,17 +120,19 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   subscribeAppQuitting(closeSocketForQuit)
 
   return {
-    subscribe(listener) {
-      listeners.add(listener)
+    subscribe(listener, onOpen) {
+      const subscription = { listener, onOpen }
+      subscriptions.add(subscription)
       socketLifecycle.cancelIdleClose()
+      if (socketLifecycle.active()?.phase === 'open') onOpen?.()
       ensureSocket()
       return () => {
-        listeners.delete(listener)
+        subscriptions.delete(subscription)
         maybeCloseSocket()
       }
     },
     resetForTests() {
-      listeners.clear()
+      subscriptions.clear()
       clearReconnectTimer()
       socketLifecycle.closeAndForget()
     },

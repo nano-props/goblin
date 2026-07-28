@@ -18,6 +18,10 @@ Use this doc for the server-first client model.
 - React Query is the only runtime cache for server-owned repository reads.
   Repository snapshot, worktree status, and pull requests have independent keys,
   pending states, and failure lifecycles; do not mirror them into Zustand.
+- Accepted query data and the latest refresh outcome are different facts. A
+  background error may mark accepted data stale and expose retry feedback, but
+  it does not revoke that data from route or command planning. Runtime ids,
+  target leases, and server admission remain the actual safety boundaries.
 - A successful `RepoSnapshot` contains complete remote metadata. Every present
   branch worktree contains its path plus required `isPrimary` and `isLocked`
   facts. Missing required facts fail strict decoding instead of producing a
@@ -28,3 +32,7 @@ Use this doc for the server-first client model.
 - Client snapshots provide route and presentation facts. Server commands resolve
   current target authority from the server-owned target catalog; a client query
   result never authorizes a command.
+- Create/remove worktree responses describe their committed effect; they do not
+  carry a full repository snapshot. Repository snapshots have one client cache
+  submission path: the snapshot query converges from server-published
+  invalidation without a mutation read-back or client-side cache replacement.

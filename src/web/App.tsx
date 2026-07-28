@@ -9,6 +9,7 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
@@ -25,7 +26,11 @@ interface AppProps {
   onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
-  onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
+  onReplaceRepoBranch?: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    navigationGeneration: PrimaryWindowNavigationGeneration,
+  ) => void
 }
 
 export type WorkspaceRouteView =

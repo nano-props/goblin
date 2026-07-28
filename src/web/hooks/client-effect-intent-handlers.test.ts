@@ -42,7 +42,7 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
-  test('routes terminal bell clicks through the React Query projection read model', async () => {
+  test('routes terminal bell clicks through the React Query snapshot', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],

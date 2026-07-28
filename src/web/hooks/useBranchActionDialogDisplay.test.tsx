@@ -142,7 +142,7 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current?.displayCheckboxes.removeAlsoDeletes).toBe(true)
   })
 
-  test('resolves branch context from the React Query projection read model when store branches are stale', () => {
+  test('resolves branch context from the React Query snapshot', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],

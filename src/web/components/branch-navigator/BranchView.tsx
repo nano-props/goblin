@@ -15,7 +15,11 @@ import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/w
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
-import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import {
+  RepoReadFailureNotice,
+  RepoStatusFailureView,
+  RepoStatusStaleNotice,
+} from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
 interface Props {
@@ -93,15 +97,6 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     )
   }
 
-  if (!repo && !statusReadModel.data && statusReadModel.isError && workspaceRuntimeId) {
-    return (
-      <RepoStatusFailureView
-        messageKey={statusErrorKey ?? 'error.failed-read-repo'}
-        retrying={statusReadModel.isFetching}
-        onRetry={retryStatus}
-      />
-    )
-  }
   if (!repo) return <BranchNavigatorSkeleton />
 
   return (
@@ -113,13 +108,21 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
           onRetry={() => void snapshotReadModel.refetch()}
         />
       )}
-      {statusReadModel.data && statusReadModel.isError && statusErrorKey && (
-        <RepoStatusStaleNotice
-          messageKey={statusErrorKey}
-          retrying={statusReadModel.isFetching}
-          onRetry={retryStatus}
-        />
-      )}
+      {statusReadModel.isError &&
+        statusErrorKey &&
+        (statusReadModel.data ? (
+          <RepoStatusStaleNotice
+            messageKey={statusErrorKey}
+            retrying={statusReadModel.isFetching}
+            onRetry={retryStatus}
+          />
+        ) : (
+          <RepoReadFailureNotice
+            messageKey={statusErrorKey}
+            retrying={statusReadModel.isFetching}
+            onRetry={retryStatus}
+          />
+        ))}
       <BranchList
         repo={repo}
         branches={branches}

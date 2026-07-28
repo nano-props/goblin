@@ -128,44 +128,11 @@ function createWorktreeAction(): Extract<RepoBranchAction, { kind: 'createWorktr
   }
 }
 
-function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => void }) {
-  const snapshot = {
-    branches: [
-      createBranchSnapshot('feature/a'),
-      createBranchSnapshot('feature/b'),
-      createBranchSnapshot('feature/new', {
-        worktree: { path: '/tmp/goblin-branch-actions-test-worktree', isPrimary: false, isLocked: false },
-      }),
-    ],
-    current: 'feature/a',
-  }
+function installSuccessfulCreateWorktreeBridge(options?: { onResponse?: () => void }) {
   installGoblinTestBridge({
-    'repo.createWorktree': async () => ({ ok: true, message: 'ok' }),
-    'repo.snapshot': async () => {
-      options?.onSnapshot?.()
-      return repoSnapshotResponse(snapshot)
-    },
-  })
-}
-
-function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { onSnapshot?: () => void }) {
-  const snapshot = {
-    branches: [
-      createBranchSnapshot('feature/a', {
-        worktree: { path: '/tmp/goblin-branch-actions-test-repo', isPrimary: false, isLocked: false },
-      }),
-      createBranchSnapshot('feature/b'),
-      createBranchSnapshot('feature/new', {
-        worktree: { path: '/tmp/goblin-branch-actions-test-worktree', isPrimary: false, isLocked: false },
-      }),
-    ],
-    current: 'feature/a',
-  }
-  installGoblinTestBridge({
-    'repo.createWorktree': async () => ({ ok: true, message: 'ok' }),
-    'repo.snapshot': async () => {
-      options?.onSnapshot?.()
-      return repoSnapshotResponse(snapshot)
+    'repo.createWorktree': async () => {
+      options?.onResponse?.()
+      return { ok: true, message: 'ok' }
     },
   })
 }
@@ -745,21 +712,7 @@ describe('runBranchAction', () => {
   })
 
   test.each([
-    [
-      'createWorktree',
-      createWorktreeAction(),
-      'repo.createWorktree',
-      'feature/new',
-      repoSnapshotResponse({
-        branches: [
-          createBranchSnapshot('feature/a'),
-          createBranchSnapshot('feature/new', {
-            worktree: { path: '/tmp/goblin-branch-actions-test-worktree', isPrimary: false, isLocked: false },
-          }),
-        ],
-        current: 'feature/a',
-      }),
-    ],
+    ['createWorktree', createWorktreeAction(), 'repo.createWorktree', 'feature/new'],
     [
       'removeWorktree',
       {
@@ -770,17 +723,16 @@ describe('runBranchAction', () => {
       },
       'repo.removeWorktree',
       'feature/a',
-      repoSnapshotResponse({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     ],
-  ] satisfies Array<[string, RepoBranchAction, string, string, ReturnType<typeof repoSnapshotResponse>]>)(
-    'keeps %s busy until the follow-up projection refresh completes',
-    async (_label, action, ipcPath, target, projection) => {
-      let resolveProjection!: () => void
+  ] satisfies Array<[string, RepoBranchAction, string, string]>)(
+    'keeps %s busy until the mutation response arrives without replacing snapshot query data',
+    async (_label, action, ipcPath, target) => {
+      let resolveResponse!: () => void
+      const snapshotBefore = getRepoSnapshotQueryData(REPO_ID, 'repo-runtime-test')
       installGoblinTestBridge({
-        [ipcPath]: async () => ({ ok: true, message: 'ok' }),
-        'repo.snapshot': () =>
+        [ipcPath]: () =>
           new Promise((resolve) => {
-            resolveProjection = () => resolve(projection)
+            resolveResponse = () => resolve({ ok: true, message: 'ok' })
           }),
       })
 
@@ -799,7 +751,7 @@ describe('runBranchAction', () => {
         target,
       })
 
-      resolveProjection()
+      resolveResponse()
       await work
 
       expect(
@@ -813,6 +765,7 @@ describe('runBranchAction', () => {
         phase: 'idle',
         target: null,
       })
+      expect(getRepoSnapshotQueryData(REPO_ID, 'repo-runtime-test')).toBe(snapshotBefore)
     },
   )
 
@@ -823,8 +776,6 @@ describe('runBranchAction', () => {
         new Promise((resolve) => {
           release = () => resolve({ ok: true, message: 'ok' })
         }),
-      'repo.snapshot': async () =>
-        repoSnapshotResponse({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
     useWorkspacesStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
@@ -878,7 +829,7 @@ describe('runBranchAction', () => {
 
   test('keeps worktrees filtering after creating a worktree', async () => {
     setBranchViewModeForTest('worktrees')
-    installSuccessfulCreateWorktreeBridgeWithExistingWorktree()
+    installSuccessfulCreateWorktreeBridge()
 
     await useWorkspacesStore
       .getState()
@@ -908,7 +859,7 @@ describe('runBranchAction', () => {
   test('does not let stale create worktree refresh results change selection', async () => {
     setBranchViewModeForTest('worktrees')
     installSuccessfulCreateWorktreeBridge({
-      onSnapshot: () => {
+      onResponse: () => {
         seedRepoWithReadModelForTest({
           id: REPO_ID,
           workspaceRuntimeId: 'repo-runtime-test-2',

@@ -122,7 +122,7 @@ describe('WorkspaceView branch and page routes', () => {
 
     buttonByTestId(container, 'create-worktree-created')?.click()
 
-    expect(onReplaceRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/new-worktree')
+    expect(onReplaceRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/new-worktree', 1)
     expect(onCancelRepoNewWorktree).not.toHaveBeenCalled()
   })
 

@@ -80,7 +80,6 @@ export function createRepoRoutes(options: {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
     }
   }
-
   app.post('/log', async (c) => {
     const { cwd, workspaceRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     const userId = userIdFromContext(c)
@@ -384,7 +383,7 @@ export function createRepoRoutes(options: {
               })
               const snapshot = await source.getSnapshot(signal)
               signal.throwIfAborted()
-              if (snapshot?.remote?.hasRemotes !== true) {
+              if (snapshot?.remote.hasRemotes !== true) {
                 throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
               }
             }

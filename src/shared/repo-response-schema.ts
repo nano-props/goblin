@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
-import { ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
+import { ExecResultResponseSchema, WorktreeBootstrapSummaryResponseSchema } from '#/shared/http-response-schema.ts'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 
 const StringArraySchema = v.array(v.string())

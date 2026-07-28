@@ -25,6 +25,7 @@ import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
@@ -56,7 +57,11 @@ interface Props {
   onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
-  onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
+  onReplaceRepoBranch?: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    navigationGeneration: PrimaryWindowNavigationGeneration,
+  ) => void
 }
 
 export function WorkspaceView(props: Props) {
@@ -335,7 +340,9 @@ function WorkspaceViewContent({
                   if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(workspace.id)
                   else onOpenWorkspaceNavigator?.(workspace.id)
                 }}
-                onCreated={(branchName) => onReplaceRepoBranch?.(workspace.id, branchName)}
+                onCreated={(branchName, navigationGeneration) =>
+                  onReplaceRepoBranch?.(workspace.id, branchName, navigationGeneration)
+                }
               />
             ) : routeView?.kind === 'empty' ? (
               <EmptyWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />

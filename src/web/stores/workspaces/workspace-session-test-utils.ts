@@ -25,7 +25,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   const calls = {
     recent: [] as WorkspaceSessionEntry[],
     workspaceEntries: [] as WorkspaceSessionEntry[],
-    projection: [] as string[],
+    snapshot: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
   const handlers: Record<string, (input: any) => unknown> = {
@@ -42,7 +42,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       }
     },
     'repo.snapshot': ({ cwd }: { cwd: string }) => {
-      calls.projection.push(cwd)
+      calls.snapshot.push(cwd)
       return {
         snapshot: {
           branches: [],
@@ -101,8 +101,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'workspaceProbe') {
       handlers['workspace.probe'] = ({ workspaceInput }: { workspaceInput: string }) => handler(workspaceInput)
-    } else if (key === 'projection') handlers['repo.snapshot'] = handler
-    else handlers[key] = handler
+    } else handlers[key] = handler
   }
   // Exercise the same server-side lifecycle boundary used in production:
   // inject test doubles into `resolveServerRemoteWorkspaceConnection` so the

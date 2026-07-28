@@ -39,7 +39,6 @@ import type {
   ResolvedRemoteWorkspaceTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
-import type { RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -53,7 +52,6 @@ import type {
 import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
 import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 
-export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
   EditorApp,
   EditorAppAvailability,
@@ -382,9 +380,6 @@ export interface RepoWorktreeStatusSnapshot {
   loadedAt: number
 }
 
-export type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-export { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-
 /** Request envelope for the native Electron bridge IPC layer. */
 export interface IpcRequest {
   path: string
@@ -407,7 +402,6 @@ export type IpcEvent =
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
-  | RepoReadInvalidationEvent
 
 export interface AppIpcHandlers {
   workspace: {

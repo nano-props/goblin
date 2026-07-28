@@ -28,8 +28,6 @@ import {
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 
-export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
-
 const SILENT_SUCCESS_OPS = new Set<string>(['terminal', 'editor', 'finder'])
 type BranchUiActionOpId = 'copyPatch' | 'terminal' | 'editor' | 'finder'
 

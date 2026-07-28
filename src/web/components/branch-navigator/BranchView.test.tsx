@@ -73,7 +73,7 @@ beforeEach(() => {
 })
 
 describe('BranchView', () => {
-  test('uses the React Query projection read model for branch rows when available', () => {
+  test('uses the React Query snapshot for branch rows when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -193,7 +193,8 @@ describe('BranchView', () => {
 
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect((await screen.findByRole('alert')).textContent).toContain('error.failed-read-repo')
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
     expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 

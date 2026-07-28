@@ -1,8 +1,4 @@
-import {
-  runExclusiveOperation,
-  runLatestOperation,
-  type RepoOperationContext,
-} from '#/web/stores/workspaces/operation-runner.ts'
+import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type {
@@ -27,7 +23,6 @@ import {
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -156,10 +151,6 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
   return false
 }
 
-function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
-  return result.ok && (action.kind === 'createWorktree' || action.kind === 'removeWorktree')
-}
-
 function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: WorkspaceId,
@@ -232,12 +223,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         get().setLastResult(id, result, workspaceRuntimeId)
         return result
       }
-      const refreshMembershipProjection = async (): Promise<void> => {
-        const repo = get().workspaces[id]
-        if (repo?.workspaceRuntimeId !== workspaceRuntimeId) return
-        await requestRepoSnapshotRefresh({ get, set }, id, { workspaceRuntimeId })
-      }
-      const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
+      const handleResult = async (result: ExecResult) => {
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }
@@ -253,10 +239,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         return runBranchActionIpc(action, id, workspaceRuntimeId, signal)
       }
 
-      const completionBarrier = async (result: ExecResult) => {
-        if (requiresProjectionRefreshBeforeCompletion(action, result)) await refreshMembershipProjection()
-      }
-
       if (network) {
         return await runLatestOperation({
           set,
@@ -268,7 +250,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
           priority: 100,
           targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
           task: runActionTask,
-          completionBarrier,
           queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
           queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
           errorFromResult: branchActionErrorFromResult,
@@ -289,7 +270,6 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         targets: [branchActionTarget(action)],
         busyResult: branchActionErrorResult('cancelled'),
         task: runActionTask,
-        completionBarrier,
         errorFromResult: branchActionErrorFromResult,
         errorResult: branchActionErrorResult,
         onResult: handleResult,

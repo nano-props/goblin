@@ -283,7 +283,7 @@ describe('WorkspacePane status presentation', () => {
     expect(screen.getByText(/status failed/)).toBeTruthy()
   })
 
-  test('uses the React Query projection read model for workspace branch presentation when available', () => {
+  test('uses the React Query snapshot for workspace branch presentation when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],

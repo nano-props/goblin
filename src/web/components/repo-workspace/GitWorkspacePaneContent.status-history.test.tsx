@@ -68,7 +68,7 @@ describe('GitWorkspacePaneContent status-history', () => {
         stale: false,
       },
       undefined,
-      { state: 'empty', error: null, retrying: false, retry: vi.fn() },
+      { state: 'empty', stale: false, error: null, retrying: false, retry: vi.fn() },
     )
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
@@ -585,7 +585,7 @@ describe('GitWorkspacePaneContent status-history', () => {
         stale: true,
       },
       undefined,
-      { state: 'empty', error: null, retrying: false, retry: vi.fn() },
+      { state: 'empty', stale: false, error: null, retrying: false, retry: vi.fn() },
     )
     const onRetryStatus = vi.fn()
 

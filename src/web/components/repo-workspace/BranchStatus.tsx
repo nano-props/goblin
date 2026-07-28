@@ -158,7 +158,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
   const navigation = usePrimaryWindowNavigation()
-  const { branch, statusCount, pullRequest } = detail
+  const { branch, pullRequest } = detail
   const branchName = branch?.name
   const worktreePathRaw = branch?.worktree?.path
   // Phase 4: pull the target off the lifecycle union. The
@@ -231,7 +231,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   if (!branch) return <EmptyState title={t('branches.empty')} />
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
-  const worktreeChangeCount = detail.worktreeChanges?.changeCount ?? statusCount
+  const worktreeChangeCount = detail.worktreeChanges?.changeCount
   const hasRole = branch.isDefault || protectedBranch
   // Gate on the same value the chip displays. If `worktreeChangeCount` is 0,
   // the row shows "0 changes" and there's nothing to copy — keep the
@@ -253,7 +253,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const mergeTone: Tone = !mergeKnown ? 'neutral' : branch.mergedToDefault ? 'success' : 'attention'
   const upstreamTone: Tone = branch.trackingGone || !branch.tracking ? 'attention' : 'brand'
   const syncTone: Tone = !branch.tracking ? 'attention' : branch.behind > 0 ? 'attention' : 'success'
-  const worktreeLocked = branch.worktree?.isLocked ?? false
+  const worktreeLocked = branch.worktree?.isLocked
   // The "dirty worktree" signal moved to its own row below; the worktree
   // row only needs to surface lock state on its own.
   const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'

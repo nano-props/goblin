@@ -172,9 +172,9 @@ describe('repo session hydration', () => {
     ).toBeUndefined()
   })
 
-  test('hydrateRestoredWorkspaceRuntime applies the server canonical snapshot as client projection', async () => {
+  test('hydrateRestoredWorkspaceRuntime accepts the server canonical snapshot', async () => {
     installGoblin({
-      projection: () => new Promise(() => {}),
+      'repo.snapshot': () => new Promise(() => {}),
     })
     primaryWindowQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
       runtimes: [

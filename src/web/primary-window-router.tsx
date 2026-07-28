@@ -27,6 +27,7 @@ import {
 } from '#/web/primary-window-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
+import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
 
 const rootRoute = createRootRoute()
 
@@ -303,8 +304,13 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
       openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
-    onReplaceRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
-      openWorkspacePaneRoute(routeActions, workspaceId, branchName, { replace: true }),
+    // The successful create command already owns this target. Its Query
+    // projection converges asynchronously and must not re-admit the route.
+    onReplaceRepoBranch: (
+      workspaceId: WorkspaceId,
+      branchName: string,
+      navigationGeneration: PrimaryWindowNavigationGeneration,
+    ) => routeActions.openRepoBranch(workspaceId, branchName, { replace: true, navigationGeneration }),
   }
 }
 

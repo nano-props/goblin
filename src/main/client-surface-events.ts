@@ -1,6 +1,5 @@
 import type { BrowserWindow } from 'electron'
 import type { IpcEvent } from '#/shared/api-types.ts'
-import type { RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { broadcastToSurfaceCapability, sendToRegisteredWindow } from '#/main/client-surface-registry.ts'
 import { CLIENT_EFFECT_INTENT_CHANNEL, HOST_IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
@@ -21,8 +20,4 @@ export function broadcastClientEffectIntent(intent: ClientEffectIntent): void {
 
 export function sendClientEffectIntent(win: BrowserWindow | null | undefined, intent: ClientEffectIntent): void {
   sendToRegisteredWindow(win, CLIENT_EFFECT_INTENT_CHANNEL, [intent])
-}
-
-export function broadcastRepoReadInvalidation(event: Omit<RepoReadInvalidationEvent, 'type'>): void {
-  broadcastIpcEvent({ type: 'repo-read-invalidated', ...event })
 }

@@ -30,9 +30,10 @@ describe('repo response schemas', () => {
     expect(v.parse(RepoPullRequestsResponseSchema, { pullRequests: null })).toEqual({ pullRequests: null })
   })
 
-  test('rejects malformed and forward-incompatible mutation envelopes', () => {
+  test('rejects malformed, forward-incompatible, and full-read-model mutation envelopes', () => {
     expect(v.safeParse(ExecResultResponseSchema, { ok: true }).success).toBe(false)
     expect(v.safeParse(ExecResultResponseSchema, { ok: true, message: 'ok', legacy: true }).success).toBe(false)
+    expect(v.safeParse(ExecResultResponseSchema, { ok: true, message: 'ok', snapshot: {} }).success).toBe(false)
   })
 
   test('rejects a malformed member instead of turning a list into an empty result', () => {

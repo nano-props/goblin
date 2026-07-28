@@ -181,6 +181,7 @@ function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessPro
 function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
   return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false }, undefined, {
     state: 'empty',
+    stale: false,
     error: null,
     retrying: false,
     retry: () => {},
