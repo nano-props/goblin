@@ -6,15 +6,11 @@
 
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
   TerminalRestartResult,
-  TerminalMutationResult,
-  TerminalResizeInput,
   TerminalResizeResult,
   TerminalWriteResult,
   TerminalSessionsSnapshot,
@@ -38,9 +34,7 @@ interface TerminalClientTestOutputs {
   'terminal.write': TerminalWriteResult
   'terminal.resize': TerminalResizeResult
   'terminal.takeover': TerminalTakeoverResult
-  'terminal.close': TerminalMutationResult
   'terminal.recoverSessions': TerminalSessionsSnapshot
-  'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.list': WorkspacePaneTabsSnapshot
@@ -60,8 +54,6 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'terminal.resize'
     case 'takeover':
       return 'terminal.takeover'
-    case 'close':
-      return 'terminal.close'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
       return 'workspacePaneTabs.replace'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
@@ -79,13 +71,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
   }
 }
 
-import {
-  defaultWorkspacePaneTabsOperationResult,
-  isWorkspacePaneTabsReplaceInput,
-  isWorkspacePaneTabsUpdateInput,
-} from '#/web/test-utils/workspace-pane-bridge.ts'
-
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
+  setClientBridgeForTests(null)
   const workspaceRuntimeState = new Map<
     string,
     {
@@ -142,47 +129,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               : Promise.resolve([]),
         },
         terminal: {
-          attach: () => Promise.resolve({ ok: false, message: 'unhandled terminal attach' }),
-          restart: () => Promise.resolve({ ok: false, message: 'unhandled terminal restart' }),
-          write: () => Promise.resolve({ status: 'accepted' }),
-          resize: (input: TerminalResizeInput) =>
-            Promise.resolve({
-              ok: true as const,
-              terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-              terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-              identityRevision: 1,
-              role: 'controller' as const,
-              controllerStatus: 'connected' as const,
-              controller: { clientId: 'attachment_local', status: 'connected' as const },
-              canonicalSize: { cols: input.cols, rows: input.rows },
-            }),
-          takeover: () =>
-            Promise.resolve({
-              ok: true as const,
-              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-              terminalRuntimeGeneration: 1,
-              identityRevision: 1,
-              role: 'controller' as const,
-              controllerStatus: 'connected' as const,
-              controller: { clientId: 'attachment_local', status: 'connected' as const },
-              canonicalSize: { cols: 80, rows: 24 },
-              phase: 'open' as const,
-            }),
-          close: () => Promise.resolve(true),
-          recoverSessions: () => Promise.resolve({ revision: 0, sessions: [] }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
-          onOutput: () => () => {},
-          onBell: () => () => {},
-          onTitle: () => () => {},
-          onExit: () => () => {},
-          onIdentity: () => () => {},
-          onLifecycle: () => () => {},
-          onSessionsChanged: () => () => {},
-          onSessionClosed: () => () => {},
         },
-        saveClipboardFiles: () => Promise.resolve([]),
         rotateAccessToken: () => Promise.resolve({ accessToken: 'test-access-token' }),
       },
       location: {
@@ -208,7 +158,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'terminal.takeover',
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.takeover']
-  function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalClientTestOutputs['terminal.close']
   function callTerminalHandler(
     name: 'workspacePaneTabs.replace',
     payload: unknown,
@@ -234,10 +183,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.recoverSessions']
   function callTerminalHandler(
-    name: 'terminal.notifyBell',
-    payload: unknown,
-  ): TerminalClientTestOutputs['terminal.notifyBell']
-  function callTerminalHandler(
     name: keyof TerminalClientTestOutputs,
     payload: unknown,
   ): TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -252,77 +197,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.restart':
           return { ok: false, message: `unhandled ${name}` }
         case 'terminal.write':
-          return { status: 'accepted' } satisfies TerminalWriteResult
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'terminal.resize':
           return { ok: false, message: `unhandled ${name}` } satisfies TerminalResizeResult
-        case 'terminal.close':
-        case 'terminal.notifyBell':
-          return true satisfies TerminalMutationResult
         case 'terminal.takeover':
-          return {
-            ok: true as const,
-            terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-            terminalRuntimeGeneration: 1,
-            identityRevision: 1,
-            role: 'controller' as const,
-            controllerStatus: 'connected' as const,
-            controller: { clientId: 'attachment_local', status: 'connected' as const },
-            canonicalSize: { cols: 80, rows: 24 },
-            phase: 'open' as const,
-          }
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'workspacePaneTabs.replace':
-          return {
-            revision: 1,
-            entries: isWorkspacePaneTabsReplaceInput(payload)
-              ? [
-                  {
-                    target: payload.target,
-                    tabs: [...payload.tabs],
-                  },
-                ]
-              : [],
-          }
-        case 'workspacePaneTabs.update': {
-          const input = isWorkspacePaneTabsUpdateInput(payload) ? payload : null
-          const target = input ? workspacePaneTabsTargetFromRuntime(input.target) : null
-          return {
-            revision: 1,
-            entries:
-              input && target
-                ? [
-                    {
-                      target: input.target,
-                      tabs: defaultWorkspacePaneTabsOperationResult(
-                        input,
-                        readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: input.workspaceRuntimeId }),
-                      ),
-                    },
-                  ]
-                : [],
-          }
-        }
+        case 'workspacePaneTabs.update':
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'workspacePaneTabs.list':
           return { revision: 0, entries: [] }
         case 'workspacePaneRuntime.close': {
-          const runtimeType =
-            (payload as { runtimeType?: WorkspacePaneRuntimeCloseResult['runtimeType'] } | null)?.runtimeType ??
-            'terminal'
-          const terminalSessionId =
-            (payload as { sessionId?: string } | null)?.sessionId ?? 'term-testtesttesttesttest1'
-          return {
-            ok: true,
-            runtimeType,
-            paneTabsSnapshot: { revision: 1, entries: [] },
-            runtime: {
-              action: 'closed',
-              terminalSessionId,
-              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-              terminalRuntimeGeneration: 1,
-            },
-          }
+          throw new Error(`Unhandled terminal handler: ${name}`)
         }
         case 'terminal.recoverSessions':
           return { revision: 0, sessions: [] }
+        case 'workspacePaneRuntime.open':
+          throw new Error(`Unhandled terminal handler: ${name}`)
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -375,64 +266,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         },
       )
   }
-  setClientBridgeForTests({
-    kind: () => 'electron',
-    hasCapability: () => false,
-    getBootstrap: () => ({
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    }),
-    invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
-      const handler = handlers[path]
-      if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
-      return handler(input)
-    },
-    abortIpc: async () => false,
-    onIpcEvent: () => () => {},
-    onEffectIntent: () => () => {},
-    pathForFile: () => '',
-    saveClipboardFiles: () => Promise.resolve([]),
-    host: () => window.goblinNative.host ?? null,
-    appRealtime: () => ({
-      kickReconnect: () => {},
-      onRecovered: () => () => {},
-    }),
-    terminal: () => ({
-      attach: async (input) => callTerminalHandler('terminal.attach', input),
-      restart: async (input) => callTerminalHandler('terminal.restart', input),
-      write: async (input) => callTerminalHandler('terminal.write', input),
-      resize: async (input) => callTerminalHandler('terminal.resize', input),
-      takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
-      notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
-      sendTestNotification: async () => true,
-      setBadge: () => {},
-      onOutput: () => () => {},
-      onBell: () => () => {},
-      onTitle: () => () => {},
-      onExit: () => () => {},
-      onIdentity: () => () => {},
-      onLifecycle: () => () => {},
-      onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
-    }),
-    workspacePaneTabs: () => ({
-      replace: async (input) => callTerminalHandler('workspacePaneTabs.replace', input),
-      update: async (input) => callTerminalHandler('workspacePaneTabs.update', input),
-      list: async (input) => callTerminalHandler('workspacePaneTabs.list', input),
-      onChanged: () => () => {},
-    }),
-    workspacePaneRuntime: () => ({
-      open: async (input) => callTerminalHandler('workspacePaneRuntime.open', input),
-      close: async (input) => callTerminalHandler('workspacePaneRuntime.close', input),
-    }),
-  })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -733,5 +566,4 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       }
     }),
   )
-  setClientBridgeForTests(null)
 }
