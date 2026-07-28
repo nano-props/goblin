@@ -71,8 +71,10 @@ import a helper from inside another test file.
   `src/web/test-utils/websocket-mock.ts`. An inline xterm mock is allowed only
   in `src/web/test-utils/terminal-session.ts`; do not duplicate that
   `vi.hoisted` boundary in component or provider tests.
-- Redefining `window.localStorage` or `window.sessionStorage` in any test
-  file.
+- Redefining `window.localStorage` or `window.sessionStorage` in tests or
+  ad-hoc helpers. `withBrowserStorageUnavailable()` in
+  `src/test-utils/storage.ts` owns the narrow failure-path boundary that
+  temporarily hides a setup-provided storage binding and restores it.
 - Direct `vi.stubGlobal('fetch', …)` in tests. Use `installGoblinTestBridge`
   for client routes and `mockFetch()` from `src/test-utils/fetch-mock.ts` for
   a raw fetch boundary that the bridge does not model.
@@ -168,16 +170,16 @@ capabilities needed by the behavior suites.
   mirrors the repo-store test's behavior (open fires on the next
   microtask). `autoOpen: false` is used by `terminal.test.ts` style tests
   that call `emitOpen()` themselves to control timing.
-- `MockNotification` and `installNotificationMock()` — for browser
-  notification clicks in web host mode.
+- The returned handle also exposes the installed `MockNotification`
+  constructor and notification instances for browser-notification tests.
 
 ### `src/web/test-utils/bridge.ts`
 
-- `installGoblinTestBridge(handlers)` — installs `window.goblinNative`,
-  the client bridge via `setClientBridgeForTests`, and a path-keyed
-  `fetch` stub. `handlers` is `Record<string, (input) => unknown>` mapping
-  IPC pathnames (e.g. `'repo.probe'`) and server routes (e.g.
-  `'repo.projection'`) to their test handlers.
+- `installGoblinTestBridge(handlers)` — installs the bootstrap/native host
+  boundary, shared WebSocket router, and a path-keyed `fetch` stub. It clears
+  any explicit client-bridge override so tests exercise the runtime-selected
+  transport. `handlers` is `Record<string, (input) => unknown>` mapping host
+  actions, socket actions, and server routes to their test responses.
 
 ### `src/web/test-utils/repo-store.ts`
 
@@ -257,6 +259,8 @@ path` warning (process startup, before any test code runs).
 5. Install a no-op `ResizeObserver` on `window` in jsdom (Radix UI's
    Tooltip and HoverCard mount one per `TooltipContent`; jsdom does not
    implement it).
+6. Restore jsdom's real `Window` before every test so narrow host facades
+   cannot leak browser lifecycle methods across tests.
 
 Tests do not redefine these. If a test needs to bypass a shim (e.g. spy
 on `canvas.getContext`), install the spy inside the test body so it runs

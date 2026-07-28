@@ -33,6 +33,11 @@
 //   6. Component tests mount below the real entrypoint, which guarantees that
 //      host info is ready before React mounts. Seed that entrypoint invariant
 //      before each jsdom test; host-info tests replace it explicitly.
+//
+//   7. Restore jsdom's real Window before each test. Narrow transport tests
+//      sometimes replace `globalThis.window` with a host facade; letting that
+//      facade escape its test breaks browser lifecycle owners such as React
+//      Query's focus manager.
 
 import { beforeEach } from 'vitest'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
@@ -92,6 +97,8 @@ function makeMemoryStorage(): Storage {
 globalThis.localStorage = makeMemoryStorage()
 globalThis.sessionStorage = makeMemoryStorage()
 
+const jsdomWindow = typeof window === 'undefined' ? null : window
+
 // Only relevant in the jsdom environment; no-op when undefined.
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'focus', {
@@ -119,7 +126,13 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
 }
 
 beforeEach(() => {
-  if (typeof window === 'undefined') return
+  if (!jsdomWindow) return
+  if (globalThis.window !== jsdomWindow) {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: jsdomWindow,
+    })
+  }
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/test', platform: 'darwin' },
     status: 'ready',

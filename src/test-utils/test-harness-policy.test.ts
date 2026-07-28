@@ -9,6 +9,7 @@ const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
 const CANONICAL_TIMERS_FILE = 'src/test-utils/timers.ts'
+const CANONICAL_STORAGE_FILE = 'src/test-utils/storage.ts'
 const CANONICAL_FETCH_MOCK_FILES = new Set(['src/test-utils/fetch-mock.ts', 'src/web/test-utils/bridge.ts'])
 const MAX_TEST_SURFACE_LINES = 1_500
 const TEST_FILE_GLOBS = ['src/**/*.test.ts', 'src/**/*.test.tsx']
@@ -82,8 +83,8 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
-  test('uses the shared fake-timer configuration across repository tests', async () => {
-    const files = await glob(TEST_FILE_GLOBS)
+  test('uses the shared fake-timer configuration across repository tests and utilities', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
     for (const file of files) {
       if (file === POLICY_FILE || file === CANONICAL_TIMERS_FILE) continue
@@ -169,6 +170,7 @@ function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLab
   if (label === 'hand-rolled React root') return !isTestFile(file)
   if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
   if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
+  if (label === 'test-local Storage replacement') return file === CANONICAL_STORAGE_FILE
   return false
 }
 

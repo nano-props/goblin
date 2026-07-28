@@ -87,9 +87,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   const hostOpenDirectoryDialog = handlers['workspace.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
   const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
+  const browserWindow = globalThis.window
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
+      addEventListener: browserWindow.addEventListener.bind(browserWindow),
+      removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
+      dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
       __GOBLIN_BOOTSTRAP__: {
         runtime: {
           kind: 'electron',
