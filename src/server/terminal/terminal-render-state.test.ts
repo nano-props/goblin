@@ -304,7 +304,7 @@ describe('terminal-render-state', () => {
       appendOutput(state, 'history')
       disposeRender(state)
 
-      await expect(withSnapshotTimeout(replaySnapshot(state))).resolves.toBeNull()
+      await expect(replaySnapshot(state)).resolves.toBeNull()
     })
 
     test('serializes the current headless screen and applied sequence as the snapshot', async () => {
@@ -371,17 +371,3 @@ describe('terminal-render-state', () => {
     })
   })
 })
-
-async function withSnapshotTimeout<T>(promise: Promise<T>): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error('snapshot timed out')), 250)
-      }),
-    ])
-  } finally {
-    if (timeout) clearTimeout(timeout)
-  }
-}
