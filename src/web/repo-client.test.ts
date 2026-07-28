@@ -370,7 +370,7 @@ describe('repo-client', () => {
           cwd: workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
           branch: 'feature/work',
-          count: 150,
+          count: 100,
           skip: 0,
         }),
       }),

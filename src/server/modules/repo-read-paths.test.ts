@@ -96,7 +96,7 @@ describe('getRepoLog', () => {
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
     await expect(getRepoLog(WORKSPACE_ID, 'feature/work')).resolves.toEqual([])
-    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 150, skip: 0, signal: undefined })
+    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 100, skip: 0, signal: undefined })
   })
 })
 

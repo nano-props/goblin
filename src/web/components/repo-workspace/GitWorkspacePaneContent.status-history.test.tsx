@@ -688,7 +688,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       REPO_ID,
       repo.workspaceRuntimeId,
       'feature/history',
-      expect.objectContaining({ count: 150 }),
+      expect.objectContaining({ count: 100 }),
     )
     await waitFor(() => {
       expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()
