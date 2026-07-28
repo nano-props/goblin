@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import {
   bellHandler,
   identityHandler,
@@ -25,7 +26,7 @@ import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-file
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 
 beforeEach(resetTerminalSessionProviderHarness)
 

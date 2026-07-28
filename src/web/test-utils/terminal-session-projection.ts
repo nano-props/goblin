@@ -11,7 +11,7 @@ import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/c
 import type { TerminalSessionClosedEvent, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { terminalClient } from '#/web/terminal.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 import {

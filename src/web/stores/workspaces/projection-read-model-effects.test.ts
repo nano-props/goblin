@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, test } from 'vitest'
-import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import {
-  createBranchSnapshot,
   createGitWorkspaceProbeForTest,
-  installGoblinTestBridge,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoShellForTest,
-} from '#/web/test-utils/bridge.ts'
+} from '#/web/test-utils/repo-store.ts'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'

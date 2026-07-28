@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { type AppOverlayKey, useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 
 function Harness() {
   const overlays = useAppOverlays()

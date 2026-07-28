@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
@@ -14,12 +19,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import {
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import {
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,

@@ -1,12 +1,9 @@
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

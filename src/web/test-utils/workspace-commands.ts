@@ -1,3 +1,8 @@
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
@@ -11,13 +16,8 @@ import {
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'

@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -32,12 +33,8 @@ import type {
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'

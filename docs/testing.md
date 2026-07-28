@@ -99,6 +99,8 @@ import a helper from inside another test file.
 
 The shared harnesses live under two roots. Importing them pulls in the
 side-effects (`vi.mock(...)`, `globalThis` shims) needed by web tests.
+Shared test utilities follow the same 1000-line structural ceiling as test
+files so fixture extraction cannot merely move size debt into a harness.
 
 ### `src/test-utils/render.tsx`
 

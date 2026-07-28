@@ -1,3 +1,4 @@
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import {
   normalizeRemoteWorkspaceId,
   type WorkspaceSessionEntry,
@@ -7,7 +8,8 @@ import {
   resolveServerRemoteWorkspaceConnection,
   type RemoteWorkspaceConnectionDeps,
 } from '#/server/modules/remote-workspace.ts'
-import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

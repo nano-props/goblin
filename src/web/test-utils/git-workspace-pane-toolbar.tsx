@@ -1,3 +1,4 @@
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import type { ComponentProps, ReactNode } from 'react'
@@ -63,12 +64,8 @@ import {
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import type { GitRemoteProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'

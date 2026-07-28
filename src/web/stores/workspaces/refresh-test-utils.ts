@@ -3,11 +3,10 @@ import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
 import {
   createBranchSnapshot,
   createPullRequest,
-  installGoblinTestBridge,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
-  type IpcTestHandler,
-} from '#/web/test-utils/bridge.ts'
+} from '#/web/test-utils/repo-store.ts'
+import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'

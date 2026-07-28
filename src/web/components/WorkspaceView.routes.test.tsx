@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
+import { seedRepoShellForTest } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   responsiveMocks,

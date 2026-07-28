@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -7,12 +8,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import {
-  createRepoBranch,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {

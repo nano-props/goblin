@@ -9,6 +9,11 @@
 //     choice
 //   - one-dialog-at-a-time invariant across the `openXxx` actions
 
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { act, cleanup } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -20,12 +25,7 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
-import {
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'

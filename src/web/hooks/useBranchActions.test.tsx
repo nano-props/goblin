@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
 
+import {
+  repoPresentationFromQueryForTest,
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  type RepoPresentationForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -7,13 +13,7 @@ import React from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
-import {
-  createRepoBranch,
-  repoPresentationFromQueryForTest,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-  type RepoPresentationForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'

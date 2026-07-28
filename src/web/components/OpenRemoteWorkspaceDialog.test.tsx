@@ -15,7 +15,7 @@ import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({

@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 
+import {
+  seedRepoShellForTest,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  setWorkspaceProbeForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { act, cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import {
-  resetWorkspacesStore,
-  seedRepoShellForTest,
-  seedRepoWithReadModelForTest,
-  createRepoBranch,
-  setWorkspaceProbeForTest,
-} from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

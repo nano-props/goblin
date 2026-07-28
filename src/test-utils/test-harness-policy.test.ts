@@ -92,6 +92,27 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
+  test('keeps shared test utilities within the structural line budget', async () => {
+    const files = await glob([
+      'src/test-utils/**/*.ts',
+      'src/test-utils/**/*.tsx',
+      'src/server/test-utils/**/*.ts',
+      'src/server/test-utils/**/*.tsx',
+      'src/web/test-utils/**/*.ts',
+      'src/web/test-utils/**/*.tsx',
+    ])
+    const violations: string[] = []
+
+    for (const file of files) {
+      const source = await readFile(file, 'utf8')
+      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
+      if (lineCount > DEFAULT_TEST_FILE_LINE_BUDGET)
+        violations.push(`${file}: ${lineCount} lines exceeds ${DEFAULT_TEST_FILE_LINE_BUDGET}`)
+    }
+
+    expect(violations).toEqual([])
+  })
+
   test('keeps every test file under a named suite', async () => {
     const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
     const violations: string[] = []

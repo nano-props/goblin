@@ -9,7 +9,7 @@ import { cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({ useT: () => (key: string) => key }))

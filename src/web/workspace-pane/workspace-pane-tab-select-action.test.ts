@@ -1,3 +1,4 @@
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -5,12 +6,8 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
   observeWorkspacePaneRouteForTest,
   observedPrimaryWindowNavigationActionsForTest,

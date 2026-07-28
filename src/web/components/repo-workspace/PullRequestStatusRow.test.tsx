@@ -6,7 +6,7 @@ import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { createPullRequest } from '#/web/test-utils/bridge.ts'
+import { createPullRequest } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Pass-through i18n with minimal translations for the keys this component

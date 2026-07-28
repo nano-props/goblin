@@ -16,12 +16,13 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
   }
 })
 
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { createGitWorkspaceProbeForTest, resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { createGitWorkspaceProbeForTest } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const toastMocks = vi.hoisted(() => ({
