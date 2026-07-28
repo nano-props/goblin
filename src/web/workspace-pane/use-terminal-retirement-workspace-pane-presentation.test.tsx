@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -38,7 +38,7 @@ describe('terminal retirement workspace pane presentation', () => {
   })
 
   test('routes an accepted current-workspace exit into the presentation command and unsubscribes', async () => {
-    const navigation = primaryWindowNavigationActionsForTest()
+    const navigation = appNavigationActionsForTest()
     const target = {
       routeTarget: {
         kind: 'git-branch' as const,
@@ -79,7 +79,7 @@ describe('terminal retirement workspace pane presentation', () => {
     renderHook(() =>
       useTerminalRetirementWorkspacePanePresentation({
         currentTarget: null,
-        navigation: primaryWindowNavigationActionsForTest(),
+        navigation: appNavigationActionsForTest(),
       }),
     )
     const listener = mocks.listener

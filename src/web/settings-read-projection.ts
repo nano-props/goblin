@@ -1,11 +1,11 @@
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type { ExternalAppsSnapshot, RuntimeSettingsSnapshot, SettingsSnapshot } from '#/shared/api-types.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 function currentSettingsSnapshot(): SettingsSnapshot | undefined {
-  return primaryWindowQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
+  return appQueryClient.getQueryData<SettingsSnapshot>(settingsSnapshotQueryKey())
 }
 
 function runtimeSettingsSnapshotOrUndefined(

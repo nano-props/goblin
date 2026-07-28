@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ClientWorkspaceState, SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restorable-workspace-state.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
@@ -79,18 +79,16 @@ function startAuthenticatedWorkspaceRestoreRun(
   )
   // QueryClient owns the settings and external-app reads. Mounted consumers
   // join these in-flight queries and observe the same cached snapshot.
-  const settingsSnapshot = primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions())
-  void waitForPromiseWithSignal(primaryWindowQueryClient.fetchQuery(externalAppsQueryOptions()), timeout.signal).catch(
-    (err) => {
-      if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
-    },
-  )
+  const settingsSnapshot = appQueryClient.fetchQuery(settingsSnapshotQueryOptions())
+  void waitForPromiseWithSignal(appQueryClient.fetchQuery(externalAppsQueryOptions()), timeout.signal).catch((err) => {
+    if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
+  })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
   void restoreBootSession(settingsSnapshot, timeout.signal, activeWorkspaceId).then(async (outcome) => {
     if (!cancelled && outcome.status === 'failed' && timeout.signal.aborted) {
       await Promise.all([
-        primaryWindowQueryClient.cancelQueries({ queryKey: settingsSnapshotQueryKey(), exact: true }),
-        primaryWindowQueryClient.cancelQueries({ queryKey: externalAppsQueryKey(), exact: true }),
+        appQueryClient.cancelQueries({ queryKey: settingsSnapshotQueryKey(), exact: true }),
+        appQueryClient.cancelQueries({ queryKey: externalAppsQueryKey(), exact: true }),
       ])
     }
     timeout.dispose()

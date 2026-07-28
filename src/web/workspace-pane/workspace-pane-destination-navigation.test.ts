@@ -15,18 +15,18 @@ import {
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigation,
-  observePrimaryWindowHistoryNavigation,
-  primaryWindowNavigationState,
-  primaryWindowNavigationIsCurrent,
-  registerPrimaryWindowNavigation,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  observeAppHistoryNavigation,
+  appNavigationState,
+  appNavigationIsCurrent,
+  registerAppNavigation,
+} from '#/web/app-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-destination-navigation-repo')
 const CURRENT_WORKTREE = '/tmp/goblin-destination-current-worktree'
@@ -34,7 +34,7 @@ const DESTINATION_WORKTREE = '/tmp/goblin-destination-target-worktree'
 const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacePaneDestinationPresentationForTest()
@@ -129,7 +129,7 @@ describe('workspace pane destination navigation', () => {
     })
     await routeNavigation.started
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('missing repo snapshot query')
     query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
     routeCommit.resolve(true)
@@ -138,7 +138,7 @@ describe('workspace pane destination navigation', () => {
     expect(setWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/destination', 'status')
   })
 
-  test('uses a primary-window presentation generation so the latest destination wins', async () => {
+  test('uses a app presentation generation so the latest destination wins', async () => {
     seedDestinationRepo()
     const first = beginPresentation('feature/current')
     const firstCommit = Promise.withResolvers<boolean>()
@@ -168,7 +168,7 @@ describe('workspace pane destination navigation', () => {
     })
     await routeNavigation.started
 
-    beginPrimaryWindowNavigation()
+    beginAppNavigation()
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
@@ -216,7 +216,7 @@ describe('workspace pane destination navigation', () => {
     })
     await routeNavigation.started
 
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/workspace/current/tab/history',
       state: {},
       action: { type: 'PUSH' },
@@ -234,11 +234,11 @@ describe('workspace pane destination navigation', () => {
         const generation = options?.navigationGeneration
         if (!generation) return false
         const href = '/workspace/destination/tab/status'
-        const registration = registerPrimaryWindowNavigation(generation, href, options.onCommit)
+        const registration = registerAppNavigation(generation, href, options.onCommit)
         if (!registration) return false
-        observePrimaryWindowHistoryNavigation({
+        observeAppHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, generation),
+          state: appNavigationState({}, generation),
           action: { type: 'PUSH' },
         })
         return true
@@ -266,13 +266,13 @@ function primaryNavigationActions() {
   }
   return {
     routeNavigation,
-    actions: createPrimaryWindowNavigationActions({
+    actions: createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,
       commitWorkspaceNavigation: store.commitWorkspaceNavigation,
-      routeNavigation: routeNavigation as unknown as PrimaryWindowRouteNavigation,
+      routeNavigation: routeNavigation as unknown as AppRouteNavigation,
     }),
   }
 }
@@ -286,7 +286,7 @@ function beginPresentation(branchName: string) {
 function acceptedRouteCommit() {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
-      if (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration)) {
+      if (!options?.navigationGeneration || appNavigationIsCurrent(options.navigationGeneration)) {
         options?.onCommit?.()
       }
       return true
@@ -300,10 +300,7 @@ function deferredRouteCommit(completion: Promise<boolean>) {
     async (_repoId, _branchName, _route, options) => {
       started.resolve()
       const accepted = await completion
-      if (
-        accepted &&
-        (!options?.navigationGeneration || primaryWindowNavigationIsCurrent(options.navigationGeneration))
-      ) {
+      if (accepted && (!options?.navigationGeneration || appNavigationIsCurrent(options.navigationGeneration))) {
         options?.onCommit?.()
       }
       return accepted

@@ -29,7 +29,7 @@ import {
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchPush: vi.fn(),
@@ -122,7 +122,7 @@ function setupRepo() {
 }
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   resetBranchActionDialogsStore()
 })
@@ -135,11 +135,11 @@ afterEach(() => {
 })
 
 function render(element: React.ReactNode) {
-  const result = renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+  const result = renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
   return {
     ...result,
     rerender: (next: React.ReactNode) => {
-      result.rerender(<QueryClientProvider client={primaryWindowQueryClient}>{next}</QueryClientProvider>)
+      result.rerender(<QueryClientProvider client={appQueryClient}>{next}</QueryClientProvider>)
     },
   }
 }

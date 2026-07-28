@@ -1,5 +1,5 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { listWorkspaceRuntimes } from '#/web/workspace-client.ts'
 
@@ -35,7 +35,7 @@ export function workspaceRuntimesQueryOptions() {
 }
 
 export async function refreshWorkspaceRuntimes(
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
   return await requestWorkspaceRuntimeRefresh(queryClient, false)
 }
@@ -78,7 +78,7 @@ async function requestWorkspaceRuntimeRefresh(
 
 export async function updateWorkspaceRuntimeCache(
   entry: WorkspaceRuntimeCachePatch,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): Promise<void> {
   await waitForWorkspaceRuntimeRefresh(queryClient)
   queryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), (current) => {
@@ -92,7 +92,7 @@ export async function updateWorkspaceRuntimeCache(
 
 export async function removeWorkspaceRuntimeFromCache(
   entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId'>,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): Promise<void> {
   await waitForWorkspaceRuntimeRefresh(queryClient)
   let foundMatchingEntry = false
@@ -111,7 +111,7 @@ export async function removeWorkspaceRuntimeFromCache(
 }
 
 export async function invalidateWorkspaceRuntimes(
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
   return await requestWorkspaceRuntimeRefresh(queryClient, true)
 }

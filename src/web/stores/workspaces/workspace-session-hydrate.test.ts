@@ -5,7 +5,7 @@ import {
   remoteWorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
@@ -176,7 +176,7 @@ describe('repo session hydration', () => {
     installGoblin({
       'repo.snapshot': () => new Promise(() => {}),
     })
-    primaryWindowQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
+    appQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
       runtimes: [
         { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
       ],
@@ -210,7 +210,7 @@ describe('repo session hydration', () => {
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
     expect(getRepoSnapshotQueryData(repo!.id, repo!.workspaceRuntimeId)?.current).toBe('server-main')
-    expect(primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())).toEqual({
+    expect(appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())).toEqual({
       runtimes: [
         { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
         {
@@ -221,7 +221,7 @@ describe('repo session hydration', () => {
       ],
     })
     expect(
-      primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
+      appQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
         workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'),
       ),
     ).toEqual({ revision: 2, entries: [] })
@@ -275,7 +275,7 @@ describe('repo session hydration', () => {
     expect(
       getRepoSnapshotQueryData(state.workspaces[REPO_A]!.id, state.workspaces[REPO_A]!.workspaceRuntimeId)?.current,
     ).toBe('main')
-    expect(primaryWindowQueryClient.getQueryData(workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'))).toEqual({
+    expect(appQueryClient.getQueryData(workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'))).toEqual({
       revision: 3,
       entries: [],
     })

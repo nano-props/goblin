@@ -34,7 +34,7 @@ focusManager.setEventListener((setFocused) => {
   }
 })
 
-export const primaryWindowQueryClient = new QueryClient({
+export const appQueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: false,

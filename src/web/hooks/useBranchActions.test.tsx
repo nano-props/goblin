@@ -14,7 +14,7 @@ import React from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -381,7 +381,7 @@ function BranchActionsHarness({
   onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
 }) {
   return (
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <BranchActionsHarnessInner repo={repo} onReady={onReady} />
     </QueryClientProvider>
   )
@@ -412,7 +412,7 @@ function BranchActionsSurfaceHarness({
   onReady: (surface: ReturnType<typeof useBranchActions>) => void
 }) {
   return (
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <BranchActionsSurfaceHarnessInner repo={repo} branchIndex={branchIndex} onReady={onReady} />
     </QueryClientProvider>
   )

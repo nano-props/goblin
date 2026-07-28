@@ -42,10 +42,10 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  appNavigationIsCurrent,
+  type AppNavigationGeneration,
+} from '#/web/app-navigation-lifecycle.ts'
 
 export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   workspaceId: WorkspaceId
@@ -76,7 +76,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   if (!provider.canOpen({ hasWorktree: hasFilesystemRoot })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  const navigationGeneration = beginPrimaryWindowNavigation()
+  const navigationGeneration = beginAppNavigation()
   const actionTarget = workspacePaneActionTargetFromCoordinates({
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
@@ -84,7 +84,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
     worktreePath,
   })
   return await runWorkspacePaneAction(actionTarget, async () => {
-    if (!primaryWindowNavigationIsCurrent(navigationGeneration)) return { kind: 'superseded' }
+    if (!appNavigationIsCurrent(navigationGeneration)) return { kind: 'superseded' }
     const target = { ...input.paneTarget, workspaceRuntimeId }
     const currentTabs = readWorkspacePaneTabsForTarget(target)
     const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
@@ -106,7 +106,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
       worktreeHead: input.worktreeHead,
     })
     const tab = model?.tabs.find((candidate) => candidate.type === input.type)
-    if (!model || !tab || !primaryWindowNavigationIsCurrent(navigationGeneration)) {
+    if (!model || !tab || !appNavigationIsCurrent(navigationGeneration)) {
       return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
     }
     if (openerIdentity) {
@@ -222,7 +222,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     placement,
     navigation: input.navigation,
   }
-  const navigationGeneration = beginPrimaryWindowNavigation()
+  const navigationGeneration = beginAppNavigation()
   const outcome = await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: input.workspaceId,
@@ -242,7 +242,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
 type WorkspacePaneStaticTabRouteTransaction =
   | {
       kind: 'current'
-      navigationGeneration: PrimaryWindowNavigationGeneration
+      navigationGeneration: AppNavigationGeneration
     }
   | {
       kind: 'destination'
@@ -260,7 +260,7 @@ async function openWorkspacePaneStaticTabAction(
   if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
     return { kind: 'superseded' }
   }
-  if (transaction.kind === 'current' && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
+  if (transaction.kind === 'current' && !appNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'superseded' }
   }
   if (
@@ -313,7 +313,7 @@ async function openWorkspacePaneStaticTabAction(
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(target, input.workspaceRuntimeId, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  if (transaction.kind === 'current' && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
+  if (transaction.kind === 'current' && !appNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
   if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
@@ -354,7 +354,7 @@ async function commitWorkspacePaneStaticTab(
     undefined,
     transaction.navigationGeneration,
   )
-  if (!committed && !primaryWindowNavigationIsCurrent(transaction.navigationGeneration)) {
+  if (!committed && !appNavigationIsCurrent(transaction.navigationGeneration)) {
     return { kind: 'completed', changed: true, presentation: 'superseded' }
   }
   return committed ? { kind: 'completed', changed: true, presentation: 'observed' } : { kind: 'navigation-rejected' }

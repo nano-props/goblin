@@ -7,7 +7,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -81,7 +81,7 @@ export function WorkspacePickerHost({
     [summaries, terminalBellCounts],
   )
   const currentWorkspacePickerId = currentWorkspaceId
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const { ensureWorkspaceOpen } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
 
   async function handleOpenLocal() {

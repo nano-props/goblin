@@ -9,7 +9,7 @@ import {
   type RemoteWorkspaceConnectionDeps,
 } from '#/server/modules/remote-workspace.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
@@ -149,5 +149,5 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
 
 export function resetLifecycleTest(): void {
   resetWorkspacesStore()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
 }

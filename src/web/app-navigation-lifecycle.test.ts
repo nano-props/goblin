@@ -1,48 +1,48 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import {
-  beginPrimaryWindowNavigation,
-  captureUnownedPrimaryWindowNavigationGeneration,
-  observePrimaryWindowHistoryNavigation,
-  primaryWindowNavigationState,
-  primaryWindowNavigationIsCurrent,
-  registerPrimaryWindowNavigation,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
-import { runOwnedPrimaryWindowNavigation } from '#/web/primary-window-route-navigation.ts'
+  beginAppNavigation,
+  captureUnownedAppNavigationGeneration,
+  observeAppHistoryNavigation,
+  appNavigationState,
+  appNavigationIsCurrent,
+  registerAppNavigation,
+  resetAppNavigationForTest,
+} from '#/web/app-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { runOwnedAppNavigation } from '#/web/app-route-navigation.ts'
 
-beforeEach(() => resetPrimaryWindowNavigationForTest())
+beforeEach(() => resetAppNavigationForTest())
 
-describe('primary window navigation lifecycle', () => {
+describe('app navigation lifecycle', () => {
   test('captures the current generation only while it has no registered history commit owner', () => {
-    const unownedGeneration = captureUnownedPrimaryWindowNavigationGeneration()
+    const unownedGeneration = captureUnownedAppNavigationGeneration()
     expect(unownedGeneration).toBe(0)
 
-    const explicitGeneration = beginPrimaryWindowNavigation()
-    const registration = registerPrimaryWindowNavigation(explicitGeneration, '/pending')
+    const explicitGeneration = beginAppNavigation()
+    const registration = registerAppNavigation(explicitGeneration, '/pending')
     if (!registration) throw new Error('missing navigation registration')
 
-    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBeNull()
-    expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
+    expect(captureUnownedAppNavigationGeneration()).toBeNull()
+    expect(appNavigationIsCurrent(explicitGeneration)).toBe(true)
     registration.release()
-    expect(captureUnownedPrimaryWindowNavigationGeneration()).toBe(explicitGeneration)
+    expect(captureUnownedAppNavigationGeneration()).toBe(explicitGeneration)
   })
 
   test('allows one history commit owner per generation and settles it when superseded', async () => {
-    const generation = beginPrimaryWindowNavigation()
+    const generation = beginAppNavigation()
     const effects: string[] = []
-    const failed = registerPrimaryWindowNavigation(generation, '/failed', undefined, () => {
+    const failed = registerAppNavigation(generation, '/failed', undefined, () => {
       effects.push('failed')
       throw new Error('abandon failed')
     })
     if (!failed) throw new Error('expected owned navigation registration')
 
-    expect(() => registerPrimaryWindowNavigation(generation, '/duplicate')).toThrow(
-      'primary window navigation generation already owns a history commit',
+    expect(() => registerAppNavigation(generation, '/duplicate')).toThrow(
+      'app navigation generation already owns a history commit',
     )
 
-    expect(() => beginPrimaryWindowNavigation()).not.toThrow()
+    expect(() => beginAppNavigation()).not.toThrow()
     expect(effects).toEqual(['failed'])
     await expect(failed.settled).resolves.toMatchObject({
       status: 'failed',
@@ -52,42 +52,42 @@ describe('primary window navigation lifecycle', () => {
   })
 
   test('an unknown same-href PUSH supersedes the current navigation', () => {
-    const generation = beginPrimaryWindowNavigation()
-    observePrimaryWindowHistoryNavigation({ href: '/same', state: {}, action: { type: 'PUSH' } })
-    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    const generation = beginAppNavigation()
+    observeAppHistoryNavigation({ href: '/same', state: {}, action: { type: 'PUSH' } })
+    expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('treats a late PUSH from an abandoned registration as the new external presentation', () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
+    const staleGeneration = beginAppNavigation()
     const commitEffect = vi.fn()
-    const registration = registerPrimaryWindowNavigation(staleGeneration, '/owned', commitEffect)
+    const registration = registerAppNavigation(staleGeneration, '/owned', commitEffect)
     if (!registration) throw new Error('missing navigation registration')
-    const currentGeneration = beginPrimaryWindowNavigation()
+    const currentGeneration = beginAppNavigation()
 
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/owned',
-      state: primaryWindowNavigationState({}, staleGeneration),
+      state: appNavigationState({}, staleGeneration),
       action: { type: 'PUSH' },
     })
 
-    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
+    expect(appNavigationIsCurrent(currentGeneration)).toBe(false)
     expect(commitEffect).not.toHaveBeenCalled()
   })
 
   test('advances navigation generation even when mismatched navigation cleanup fails', async () => {
-    const generation = beginPrimaryWindowNavigation()
-    const registration = registerPrimaryWindowNavigation(generation, '/expected', undefined, () => {
+    const generation = beginAppNavigation()
+    const registration = registerAppNavigation(generation, '/expected', undefined, () => {
       throw new Error('abandon effect failed')
     })
     if (!registration) throw new Error('missing navigation registration')
 
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/actual',
-      state: primaryWindowNavigationState({}, generation),
+      state: appNavigationState({}, generation),
       action: { type: 'PUSH' },
     })
 
-    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    expect(appNavigationIsCurrent(generation)).toBe(false)
     await expect(registration.settled).resolves.toMatchObject({
       status: 'failed',
       intendedStatus: 'abandoned',
@@ -96,15 +96,15 @@ describe('primary window navigation lifecycle', () => {
   })
 
   test('records a committed navigation effect failure without throwing from history observation', async () => {
-    const generation = beginPrimaryWindowNavigation()
-    const registration = registerPrimaryWindowNavigation(generation, '/owned', () => {
+    const generation = beginAppNavigation()
+    const registration = registerAppNavigation(generation, '/owned', () => {
       throw new Error('commit effect failed')
     })
     if (!registration) throw new Error('missing navigation registration')
 
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/owned',
-      state: primaryWindowNavigationState({}, generation),
+      state: appNavigationState({}, generation),
       action: { type: 'PUSH' },
     })
     await expect(registration.settled).resolves.toMatchObject({
@@ -121,7 +121,7 @@ describe('primary window navigation lifecycle', () => {
     const abandonEffect = vi.fn()
 
     expect(
-      runOwnedPrimaryWindowNavigation({
+      runOwnedAppNavigation({
         targetHref: '/owned',
         currentHref: '/start',
         commitEffect,
@@ -134,7 +134,7 @@ describe('primary window navigation lifecycle', () => {
     ).toBe(true)
     await navigationStarted.promise
 
-    beginPrimaryWindowNavigation()
+    beginAppNavigation()
     expect(commitEffect).not.toHaveBeenCalled()
     expect(abandonEffect).toHaveBeenCalledOnce()
 
@@ -151,16 +151,16 @@ describe('primary window navigation lifecycle', () => {
     const committed: string[] = []
     let href = '/start'
 
-    runOwnedPrimaryWindowNavigation({
+    runOwnedAppNavigation({
       targetHref: '/first',
       currentHref: href,
       commitEffect: () => committed.push('first'),
       navigate: async (navigationGeneration) => {
         firstEntered.resolve()
         href = '/first'
-        observePrimaryWindowHistoryNavigation({
+        observeAppHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, navigationGeneration),
+          state: appNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
         await releaseFirst.promise
@@ -168,7 +168,7 @@ describe('primary window navigation lifecycle', () => {
     })
     await firstEntered.promise
 
-    runOwnedPrimaryWindowNavigation({
+    runOwnedAppNavigation({
       targetHref: '/second',
       currentHref: href,
       commitEffect: () => {
@@ -177,9 +177,9 @@ describe('primary window navigation lifecycle', () => {
       },
       navigate: async (navigationGeneration) => {
         href = '/second'
-        observePrimaryWindowHistoryNavigation({
+        observeAppHistoryNavigation({
           href,
-          state: primaryWindowNavigationState({}, navigationGeneration),
+          state: appNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
       },
@@ -197,31 +197,31 @@ describe('primary window navigation lifecycle', () => {
   })
 
   test('a current owned observation commits its effect exactly once', () => {
-    const generation = beginPrimaryWindowNavigation()
+    const generation = beginAppNavigation()
     const commitEffect = vi.fn()
-    const registration = registerPrimaryWindowNavigation(generation, '/owned', commitEffect)
+    const registration = registerAppNavigation(generation, '/owned', commitEffect)
     if (!registration) throw new Error('missing navigation registration')
-    const state = primaryWindowNavigationState({}, generation)
+    const state = appNavigationState({}, generation)
 
-    observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
-    observePrimaryWindowHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
+    observeAppHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
+    observeAppHistoryNavigation({ href: '/owned', state, action: { type: 'REPLACE' } })
 
     expect(commitEffect).toHaveBeenCalledOnce()
   })
 
   test('a settled registration cannot release a later owner in the same generation', async () => {
-    const generation = beginPrimaryWindowNavigation()
-    const first = registerPrimaryWindowNavigation(generation, '/first')
+    const generation = beginAppNavigation()
+    const first = registerAppNavigation(generation, '/first')
     if (!first) throw new Error('missing first navigation registration')
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/first',
-      state: primaryWindowNavigationState({}, generation),
+      state: appNavigationState({}, generation),
       action: { type: 'PUSH' },
     })
     await expect(first.settled).resolves.toEqual({ status: 'committed' })
 
     const secondAbandon = vi.fn()
-    const second = registerPrimaryWindowNavigation(generation, '/second', undefined, secondAbandon)
+    const second = registerAppNavigation(generation, '/second', undefined, secondAbandon)
     if (!second) throw new Error('missing second navigation registration')
 
     first.release()
@@ -232,42 +232,42 @@ describe('primary window navigation lifecycle', () => {
   })
 
   test('releasing a rejected navigation makes its later history event external', () => {
-    const rejectedGeneration = beginPrimaryWindowNavigation()
-    const registration = registerPrimaryWindowNavigation(rejectedGeneration, '/rejected')
+    const rejectedGeneration = beginAppNavigation()
+    const registration = registerAppNavigation(rejectedGeneration, '/rejected')
     if (!registration) throw new Error('missing navigation registration')
     registration.release()
-    const currentGeneration = beginPrimaryWindowNavigation()
+    const currentGeneration = beginAppNavigation()
 
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/rejected',
-      state: primaryWindowNavigationState({}, rejectedGeneration),
+      state: appNavigationState({}, rejectedGeneration),
       action: { type: 'PUSH' },
     })
 
-    expect(primaryWindowNavigationIsCurrent(currentGeneration)).toBe(false)
+    expect(appNavigationIsCurrent(currentGeneration)).toBe(false)
   })
 
   test.each(['BACK', 'FORWARD'] as const)('%s supersedes at the history callback boundary', (type) => {
-    const generation = beginPrimaryWindowNavigation()
-    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type } })
-    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    const generation = beginAppNavigation()
+    observeAppHistoryNavigation({ href: '/history', state: {}, action: { type } })
+    expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('GO supersedes at the history callback boundary', () => {
-    const generation = beginPrimaryWindowNavigation()
-    observePrimaryWindowHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
-    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    const generation = beginAppNavigation()
+    observeAppHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
+    expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 
   test('an async blocker rejection releases ownership without committing its effect', async () => {
     const blocked = Promise.withResolvers<void>()
     const navigationStarted = Promise.withResolvers<void>()
     const navigationReleased = Promise.withResolvers<void>()
-    let navigationGeneration: PrimaryWindowNavigationGeneration | null = null
+    let navigationGeneration: AppNavigationGeneration | null = null
     const commitEffect = vi.fn()
     const abandonEffect = vi.fn(() => navigationReleased.resolve())
     expect(
-      runOwnedPrimaryWindowNavigation({
+      runOwnedAppNavigation({
         targetHref: '/blocked',
         currentHref: '/start',
         commitEffect,
@@ -285,9 +285,9 @@ describe('primary window navigation lifecycle', () => {
     await blocked.promise.catch(() => {})
     await navigationReleased.promise
     if (navigationGeneration === null) throw new Error('missing navigation generation')
-    observePrimaryWindowHistoryNavigation({
+    observeAppHistoryNavigation({
       href: '/blocked',
-      state: primaryWindowNavigationState({}, navigationGeneration),
+      state: appNavigationState({}, navigationGeneration),
       action: { type: 'PUSH' },
     })
 
@@ -300,7 +300,7 @@ describe('primary window navigation lifecycle', () => {
     const navigate = vi.fn(async () => {})
 
     expect(
-      runOwnedPrimaryWindowNavigation({
+      runOwnedAppNavigation({
         targetHref: '/workspace',
         currentHref: '/workspace',
         commitEffect,
@@ -313,12 +313,12 @@ describe('primary window navigation lifecycle', () => {
   })
 
   test('rejects a stale same-target presentation without committing', () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const staleGeneration = beginAppNavigation()
+    beginAppNavigation()
     const commitEffect = vi.fn()
 
     expect(
-      runOwnedPrimaryWindowNavigation({
+      runOwnedAppNavigation({
         generation: staleGeneration,
         targetHref: '/workspace',
         currentHref: '/workspace',
@@ -331,11 +331,11 @@ describe('primary window navigation lifecycle', () => {
 
   test('accepts a same-target commit whose effect starts the next presentation', () => {
     const commitEffect = vi.fn(() => {
-      beginPrimaryWindowNavigation()
+      beginAppNavigation()
     })
 
     expect(
-      runOwnedPrimaryWindowNavigation({
+      runOwnedAppNavigation({
         targetHref: '/workspace',
         currentHref: '/workspace',
         commitEffect,

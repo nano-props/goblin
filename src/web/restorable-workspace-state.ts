@@ -13,7 +13,7 @@ import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-t
 import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import {
   workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,
@@ -128,7 +128,7 @@ function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
     const workspace = workspaces[id]
     if (!workspace) continue
     if (workspace.session.projectionState === 'stub') continue
-    const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
+    const data = appQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
       workspacePaneTabsQueryKey(id, workspace.workspaceRuntimeId),
     )
     if (!data) continue

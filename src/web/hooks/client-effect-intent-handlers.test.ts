@@ -21,11 +21,11 @@ vi.mock('sonner', () => ({
   },
 }))
 import {
-  observedPrimaryWindowNavigationActionsForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
+  type ObservedAppNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
@@ -33,7 +33,7 @@ import type { RepoServerOperationState } from '#/shared/api-types.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-client-intent-handlers-repo')
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
 })
 
@@ -164,7 +164,7 @@ describe('client effect intent handlers', () => {
       loadedAt: 123,
     })
     const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('Missing operations query')
     query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
     const d = deps(REPO_ID)
@@ -207,8 +207,8 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
   }
 }
 
-function navigationWithStoreActions(): ObservedPrimaryWindowNavigationActionsForTest {
-  return observedPrimaryWindowNavigationActionsForTest({
+function navigationWithStoreActions(): ObservedAppNavigationActionsForTest {
+  return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: (workspaceId) => useWorkspacesStore.getState().closeWorkspace(workspaceId),

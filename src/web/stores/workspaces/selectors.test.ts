@@ -7,7 +7,7 @@ import {
   workspaceSessionPersistenceOpenFromStore,
 } from '#/web/stores/workspaces/selector-state.ts'
 import {
-  primaryWindowNavigationStoreActionsFromStore,
+  appNavigationStoreActionsFromStore,
   clientEffectIntentStoreActionsFromStore,
   workspacePickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
@@ -105,7 +105,7 @@ describe('workspace selectors', () => {
       closeWorkspace: fnA,
     })
     expect(
-      primaryWindowNavigationStoreActionsFromStore({
+      appNavigationStoreActionsFromStore({
         closeWorkspace: fnA as never,
         peekWorkspaceNavigation: fnA as never,
         commitWorkspaceNavigation: fnA as never,

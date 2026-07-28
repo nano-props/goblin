@@ -21,13 +21,10 @@ import {
 } from '#/web/workspace-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
-import {
-  usePrimaryWindowRouteActions,
-  type PrimaryWindowRouteNavigation,
-} from '#/web/primary-window-route-navigation.ts'
+import { useAppRouteActions, type AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 const rootRoute = createRootRoute()
 
@@ -288,11 +285,11 @@ export function workspaceRouteViewFromChildRoute(
 }
 
 function useWorkspaceRouteNavigation() {
-  const routeActions = usePrimaryWindowRouteActions()
-  return primaryWindowRouterCallbacks(routeActions)
+  const routeActions = useAppRouteActions()
+  return appRouterCallbacks(routeActions)
 }
 
-export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNavigation) {
+export function appRouterCallbacks(routeActions: AppRouteNavigation) {
   return {
     onRouteSettingsPageChange: (page: SettingsPage | null) => {
       if (page) routeActions.openSettings(page)
@@ -309,13 +306,13 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
     onReplaceRepoBranch: (
       workspaceId: WorkspaceId,
       branchName: string,
-      navigationGeneration: PrimaryWindowNavigationGeneration,
+      navigationGeneration: AppNavigationGeneration,
     ) => routeActions.openRepoBranch(workspaceId, branchName, { replace: true, navigationGeneration }),
   }
 }
 
-export function applyPrimaryWindowSettingsRouteChange(
-  routeActions: Pick<PrimaryWindowRouteNavigation, 'openSettings' | 'closeSettings'>,
+export function applyAppSettingsRouteChange(
+  routeActions: Pick<AppRouteNavigation, 'openSettings' | 'closeSettings'>,
   nextPage: SettingsPage | null,
 ): void {
   if (nextPage) routeActions.openSettings(nextPage)
@@ -324,16 +321,16 @@ export function applyPrimaryWindowSettingsRouteChange(
 
 function SettingsRoute() {
   const { page } = settingsRoute.useParams()
-  const routeActions = usePrimaryWindowRouteActions()
+  const routeActions = useAppRouteActions()
   return (
     <App
       routeSettingsPage={page as SettingsPage}
-      onRouteSettingsPageChange={(nextPage) => applyPrimaryWindowSettingsRouteChange(routeActions, nextPage)}
+      onRouteSettingsPageChange={(nextPage) => applyAppSettingsRouteChange(routeActions, nextPage)}
     />
   )
 }
 
-const primaryWindowRouteTree = rootRoute.addChildren([
+const appRouteTree = rootRoute.addChildren([
   layoutRoute.addChildren([
     indexRoute,
     workspaceRoute.addChildren([
@@ -348,11 +345,11 @@ const primaryWindowRouteTree = rootRoute.addChildren([
   ]),
 ])
 
-const primaryWindowRouter = createRouter({
-  routeTree: primaryWindowRouteTree,
+const appRouter = createRouter({
+  routeTree: appRouteTree,
   history: createBrowserHistory(),
 })
 
-export function PrimaryWindowRouterProvider() {
-  return <RouterProvider router={primaryWindowRouter} />
+export function AppRouterProvider() {
+  return <RouterProvider router={appRouter} />
 }

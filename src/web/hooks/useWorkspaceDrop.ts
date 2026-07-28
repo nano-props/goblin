@@ -5,7 +5,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the
    *  drop overlay stays hidden and drops are ignored — otherwise the
@@ -25,7 +25,7 @@ function isDropBlocked(blocked: boolean): boolean {
 
 export function useWorkspaceDrop({ blocked }: Options) {
   const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const t = useT()
   const tRef = useRef(t)
   tRef.current = t

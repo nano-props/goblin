@@ -11,14 +11,11 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -69,8 +66,8 @@ describe('WorkspacePane route synchronization', () => {
     const readContext = terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const route = routeNavigation()
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
               <WorkspacePane
@@ -83,7 +80,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -111,13 +108,11 @@ describe('WorkspacePane route synchronization', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const actions = navigationWithStore()
-    const commitWorkspacePaneRoute = vi.fn<PrimaryWindowNavigationActions['commitWorkspacePaneRoute']>(
-      async () => false,
-    )
+    const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>(async () => false)
     actions.commitWorkspacePaneRoute = commitWorkspacePaneRoute
     const workspace = (readContext: TerminalSessionReadContextValue) => (
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={actions}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={actions}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
               <WorkspacePane
@@ -130,7 +125,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>
     )
 
@@ -183,8 +178,8 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
               value={terminalReadContextWithSessions(terminalFilesystemTargetKey, [
@@ -202,7 +197,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -236,8 +231,8 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
               value={terminalReadContextWithSessions(terminalFilesystemTargetKey, [
@@ -255,7 +250,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -274,8 +269,8 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/cold-route'
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore()}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore()}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -285,7 +280,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -327,8 +322,8 @@ describe('WorkspacePane route synchronization', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore()}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore()}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -338,7 +333,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -373,8 +368,8 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -384,7 +379,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -425,8 +420,8 @@ describe('WorkspacePane route synchronization', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={actions}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={actions}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -436,7 +431,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
     const filesHistoryEntry = {
@@ -501,8 +496,8 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -512,7 +507,7 @@ describe('WorkspacePane route synchronization', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 

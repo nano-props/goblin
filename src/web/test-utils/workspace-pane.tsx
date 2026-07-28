@@ -13,15 +13,15 @@ import type {
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
-import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
+import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -30,7 +30,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
+import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
 
@@ -77,8 +77,8 @@ export const terminalCommandContext: TerminalSessionContextValue = terminalSessi
   focusTerminal: vi.fn(),
 })
 
-export const navigation: PrimaryWindowNavigationActions = {
-  ...primaryWindowNavigationActionsForTest(),
+export const navigation: AppNavigationActions = {
+  ...appNavigationActionsForTest(),
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
@@ -93,9 +93,9 @@ export const navigation: PrimaryWindowNavigationActions = {
 export let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
   resetWorkspacePaneActionQueueForTest()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({
@@ -178,11 +178,11 @@ export function terminalReadContextWithSessions(
 }
 
 export function navigationWithStore(
-  routeNavigationOverrides: PrimaryWindowRouteNavigation = routeNavigation(),
-): PrimaryWindowNavigationActions {
+  routeNavigationOverrides: AppRouteNavigation = routeNavigation(),
+): AppNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
   const store = useWorkspacesStore.getState()
-  const navigation = createPrimaryWindowNavigationActions({
+  const navigation = createAppNavigationActions({
     currentWorkspaceId: REPO_ID,
     workspaceOrder: [REPO_ID],
     closeWorkspace: store.closeWorkspace,
@@ -195,18 +195,16 @@ export function navigationWithStore(
   return navigation
 }
 
-export function routeNavigation(): PrimaryWindowRouteNavigation {
-  const openRepoBranch: PrimaryWindowRouteNavigation['openRepoBranch'] = vi.fn((_repoId, _branchName, options) => {
+export function routeNavigation(): AppRouteNavigation {
+  const openRepoBranch: AppRouteNavigation['openRepoBranch'] = vi.fn((_repoId, _branchName, options) => {
     options?.onCommit?.()
     return true
   })
-  const openRepoBranchTab: PrimaryWindowRouteNavigation['openRepoBranchTab'] = vi.fn(
-    (_repoId, _branchName, _tab, options) => {
-      options?.onCommit?.()
-      return true
-    },
-  )
-  const openRepoBranchTerminal: PrimaryWindowRouteNavigation['openRepoBranchTerminal'] = vi.fn(
+  const openRepoBranchTab: AppRouteNavigation['openRepoBranchTab'] = vi.fn((_repoId, _branchName, _tab, options) => {
+    options?.onCommit?.()
+    return true
+  })
+  const openRepoBranchTerminal: AppRouteNavigation['openRepoBranchTerminal'] = vi.fn(
     (_repoId, _branchName, _sessionId, options) => {
       options?.onCommit?.()
       return true

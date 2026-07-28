@@ -9,7 +9,7 @@ import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/b
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 
@@ -41,11 +41,11 @@ export function repoCurrentBranch(): string | null {
 }
 
 export function cachedRepoSnapshot(workspaceRuntimeId: string): RepoSnapshot | undefined {
-  return getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)
+  return getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId, appQueryClient)
 }
 
 export function cachedRepoStatus(workspaceRuntimeId: string): WorktreeStatus[] | undefined {
-  return getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, primaryWindowQueryClient)?.status
+  return getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, appQueryClient)?.status
 }
 
 export function createWorktreeAction(): TestCreateWorktreeAction {

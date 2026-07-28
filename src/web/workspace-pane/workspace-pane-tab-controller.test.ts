@@ -29,9 +29,9 @@ import type {
   WorkspacePaneStaticTab,
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
@@ -40,7 +40,7 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
     resetWorkspacesStore()
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
@@ -169,7 +169,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         {
-          navigationGeneration: beginPrimaryWindowNavigation(),
+          navigationGeneration: beginAppNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -189,7 +189,7 @@ describe('workspace pane tab controller transactions', () => {
         terminalTab(),
         controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => false) }),
         {
-          navigationGeneration: beginPrimaryWindowNavigation(),
+          navigationGeneration: beginAppNavigation(),
           focusEffects: { onCommit, onAbandon },
         },
       ),
@@ -200,8 +200,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons provided terminal focus before rejecting a stale presentation', async () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const staleGeneration = beginAppNavigation()
+    beginAppNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const navigation = controllerNavigation({ commitWorkspacePaneRoute: vi.fn(async () => true) })
@@ -219,8 +219,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('does not create a replacement worktree presentation after the queued generation is superseded', async () => {
-    const supersededGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const supersededGeneration = beginAppNavigation()
+    beginAppNavigation()
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const target = {
       ...workspacePaneTarget(),
@@ -353,8 +353,8 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('abandons a stale navigation generation exactly once without invoking navigation', async () => {
-    const staleGeneration = beginPrimaryWindowNavigation()
-    beginPrimaryWindowNavigation()
+    const staleGeneration = beginAppNavigation()
+    beginAppNavigation()
     const onCommit = vi.fn()
     const onAbandon = vi.fn()
     const commitWorkspacePaneRoute = vi.fn(async () => true)

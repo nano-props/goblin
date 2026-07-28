@@ -10,7 +10,7 @@ import {
 } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
@@ -49,7 +49,7 @@ describe('TerminalActionDialogHost', () => {
       <TerminalActionDialogHost
         currentWorkspaceId={WORKSPACE_ID}
         currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }}
-        navigation={primaryWindowNavigationActionsForTest()}
+        navigation={appNavigationActionsForTest()}
       />,
     )
 

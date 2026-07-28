@@ -7,17 +7,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
+import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
   observeWorkspacePaneRouteForTest,
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  type ObservedAppNavigationActionsForTest,
+  type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import {
@@ -44,8 +44,8 @@ const PANE_TARGET = {
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetPrimaryWindowNavigationForTest()
-  primaryWindowQueryClient.clear()
+  resetAppNavigationForTest()
+  appQueryClient.clear()
   resetWorkspacesStore()
   installWorkspacePaneTabsTestBridge()
 })
@@ -94,10 +94,10 @@ describe('workspace pane tab select action', () => {
   })
 
   test.each([
-    ['relative move', (navigation: ObservedPrimaryWindowNavigationActionsForTest) => moveTab(navigation)],
+    ['relative move', (navigation: ObservedAppNavigationActionsForTest) => moveTab(navigation)],
     [
       'absolute selection',
-      (navigation: ObservedPrimaryWindowNavigationActionsForTest) => selectTab('workspace-pane:files', navigation),
+      (navigation: ObservedAppNavigationActionsForTest) => selectTab('workspace-pane:files', navigation),
     ],
   ] as const)('rejects a queued %s after its workspace runtime epoch is replaced', async (_action, dispatch) => {
     const target = seedTarget(['status', 'files'])
@@ -195,7 +195,7 @@ function observeStatusRoute(target: ReturnType<typeof seedTarget>): void {
   observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
 }
 
-function selectTab(identity: string, navigation: ObservedPrimaryWindowNavigationActionsForTest) {
+function selectTab(identity: string, navigation: ObservedAppNavigationActionsForTest) {
   return dispatchSelectWorkspacePaneTabByIdentityAction({
     routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
     paneTarget: PANE_TARGET,
@@ -207,7 +207,7 @@ function selectTab(identity: string, navigation: ObservedPrimaryWindowNavigation
   })
 }
 
-function moveTab(navigation: ObservedPrimaryWindowNavigationActionsForTest) {
+function moveTab(navigation: ObservedAppNavigationActionsForTest) {
   return dispatchMoveWorkspacePaneTabAction({
     routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
     paneTarget: PANE_TARGET,
@@ -227,11 +227,11 @@ function storeBackedShowTab() {
 }
 
 function navigationWith(
-  overrides: PrimaryWindowNavigationOverridesForTest = {},
+  overrides: AppNavigationOverridesForTest = {},
   options: { autoSeedInitialRoute?: boolean } = {},
-): ObservedPrimaryWindowNavigationActionsForTest {
+): ObservedAppNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
-  return observedPrimaryWindowNavigationActionsForTest({
+  return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: (workspaceId) =>
       useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),

@@ -17,7 +17,7 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
-import { beginPrimaryWindowNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import {
   TerminalSessionView,
   completeFilesystemTargetSnapshot,
@@ -103,7 +103,7 @@ describe('TerminalSessionView presentation and focus', () => {
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
-    const navigationGeneration = beginPrimaryWindowNavigation()
+    const navigationGeneration = beginAppNavigation()
     const focusLease = claimTerminalAutoFocus(navigationGeneration)
     if (!focusLease) throw new Error('expected terminal automatic-focus lease')
     focusLease.commit('term-222222222222222222222', focusTerminal)

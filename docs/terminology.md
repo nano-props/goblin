@@ -175,7 +175,8 @@ Selected mappings:
 Canonical rules:
 
 - Use `native host` for the Electron main-process side.
-- Use `primaryWindow`, not `mainWindow`, for the principal BrowserWindow.
+- Use `primaryWindow`, not `mainWindow`, for the principal BrowserWindow and default native activation target. `primary` names that role; it does not require other surfaces to be called `secondary`.
+- Keep `primaryWindow` inside the native-host boundary. Browser-client routing, navigation, and query state run in both Electron renderer pages and plain browser tabs, so name them for the client app rather than an Electron window.
 - Use `*-ipc` for plain IPC handlers.
 - Use `embedded server` for the server process the native host spawns.
 
@@ -201,6 +202,7 @@ Reject or rename changes that:
 - use `session` for controller ownership
 - add `Repository*` names to internal repo code
 - introduce `main*` names that really mean `native host` or `primaryWindow`
+- introduce `primaryWindow*` names for browser-client concepts that do not depend on Electron window identity
 - use `runtime`, `manager`, `service`, or `registry` as a vague bucket instead of a real boundary
 - use `SessionState` for anything other than persisted workspace session state
 

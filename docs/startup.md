@@ -1,6 +1,6 @@
 # Startup Architecture
 
-The primary window boot path has two separate concerns: public shell hydration and authenticated workspace restore. Keep new startup work in the narrowest stage that owns the data it needs.
+The client app boot path has two separate concerns: public shell hydration and authenticated workspace restore. It is shared by Electron renderer pages and plain browser tabs. Keep new startup work in the narrowest stage that owns the data it needs.
 
 ## Stages
 

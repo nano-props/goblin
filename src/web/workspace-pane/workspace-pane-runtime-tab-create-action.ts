@@ -32,20 +32,17 @@ import {
   workspacePaneTabsTargetFromRuntime,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import {
-  beginPrimaryWindowNavigation,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
 export interface CreatedTerminalRouteRequest {
-  navigationGeneration: PrimaryWindowNavigationGeneration
+  navigationGeneration: AppNavigationGeneration
   routeTarget: WorkspacePaneTabsTarget
 }
 
 export type CreatedTerminalNavigation = Pick<
-  PrimaryWindowNavigationActions,
+  AppNavigationActions,
   'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute' | 'commitWorkspaceRootTerminalSession'
 >
 
@@ -135,7 +132,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   const base = options.base
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  const navigationGeneration = beginPrimaryWindowNavigation()
+  const navigationGeneration = beginAppNavigation()
   let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
   try {
     return await runWorkspacePaneAction(

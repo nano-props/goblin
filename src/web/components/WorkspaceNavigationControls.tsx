@@ -3,7 +3,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ComponentProps } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -22,7 +22,7 @@ export function WorkspaceNavigationControls({
   ...props
 }: WorkspaceNavigationControlsProps) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const history = useWorkspacesStore((s) => (workspaceId ? s.navigationHistoryByWorkspace[workspaceId] : undefined))
   const canGoBack = !!history?.backStack.length
   const canGoForward = !!history?.forwardStack.length

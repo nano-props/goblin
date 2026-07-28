@@ -9,7 +9,7 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import {
   type WorkspacePaneTabsQueryData,
   workspacePaneTabsQueryKey,
@@ -27,7 +27,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
         worktreePath: string | null
         tabs: readonly WorkspacePaneTabEntry[]
       },
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   const workspaceId = workspaceIdForTest(input.workspaceId)
   const resolvedTarget: WorkspacePaneTabsTarget & {

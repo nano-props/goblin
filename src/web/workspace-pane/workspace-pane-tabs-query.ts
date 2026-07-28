@@ -8,7 +8,7 @@ import {
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
@@ -62,7 +62,7 @@ export function useWorkspacePaneTabsQuery(
 
 export function readWorkspacePaneTabsForTarget(
   target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): WorkspacePaneTabEntry[] {
   const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
@@ -72,7 +72,7 @@ export function readWorkspacePaneTabsForTarget(
 
 export function readWorkspacePaneTabsProjectionForTarget(
   target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): WorkspacePaneTabsTargetProjection {
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
@@ -105,7 +105,7 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot | null,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): boolean {
   if (!snapshot) return false
   let accepted = false
@@ -124,7 +124,7 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
 export function refreshWorkspacePaneTabs(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, queryClient).catch((err) => {
     goblinLog.warn('workspace pane tabs refresh failed', { workspaceId, workspaceRuntimeId, err })
@@ -134,14 +134,14 @@ export function refreshWorkspacePaneTabs(
 export async function refreshWorkspacePaneTabsQueryData(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): Promise<void> {
   const snapshot = await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
   writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
 }
 
 export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
-  primaryWindowQueryClient.removeQueries({
+  appQueryClient.removeQueries({
     queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     exact: true,
   })
@@ -178,9 +178,8 @@ export function workspacePaneTabsProjectionRevision(
   workspaceRuntimeId: string,
 ): number | null {
   return (
-    primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
-      workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
-    )?.revision ?? null
+    appQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId))
+      ?.revision ?? null
   )
 }
 

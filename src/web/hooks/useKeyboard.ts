@@ -20,7 +20,7 @@ import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
@@ -49,7 +49,7 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
 
 interface Options {
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   currentWorkspaceId: WorkspaceId | null
   currentBranchName?: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
@@ -109,7 +109,7 @@ function moveBranchSelection(
     currentBranchName: string | null
   },
   direction: MoveDirection,
-  navigation: PrimaryWindowNavigationActions,
+  navigation: AppNavigationActions,
 ): boolean {
   const branchModel = getRepoSnapshotQueryData(input.repo.id, input.repo.workspaceRuntimeId)
   if (!branchModel) return false

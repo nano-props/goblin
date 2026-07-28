@@ -21,13 +21,13 @@ vi.mock('sonner', () => ({
   },
 }))
 import {
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
@@ -36,15 +36,12 @@ import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/tes
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import {
-  beginPrimaryWindowNavigation,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -78,19 +75,19 @@ interface HookHostOptions {
   isSettingsOpen: () => boolean
   onExitSettings: () => void
   openCreateWorktree: () => void
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
-  primaryWindowQueryClient.clear()
+  resetAppNavigationForTest()
+  appQueryClient.clear()
   resetWorkspacesStore()
 })
 
 afterEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
   setTerminalSessionCommandBridge(null)
   delete testWindow.goblinNative
   document.body.replaceChildren()
@@ -118,7 +115,7 @@ describe('useKeyboard', () => {
   test('does not suppress a later workspace shortcut while automatic terminal focus is pending', async () => {
     seedCurrentWorktreeRepoForTest()
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const keydown = keyboardEventForTest('keydown', {
       key: 'p',
@@ -236,7 +233,7 @@ describe('useKeyboard', () => {
       currentBranch: 'main',
     })
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('Missing snapshot query')
     query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
     const selectRepoBranch = vi.fn()
@@ -573,7 +570,7 @@ describe('useKeyboard', () => {
       loadedAt: 123,
     })
     const queryKey = repoOperationsQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('Missing operations query')
     query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
     const openCreateWorktree = vi.fn()
@@ -843,8 +840,8 @@ function HookHost(overrides: Partial<HookHostOptions>) {
   return null
 }
 
-function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {
-  return observedPrimaryWindowNavigationActionsForTest({
+function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavigationActions {
+  return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),

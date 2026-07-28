@@ -8,11 +8,11 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -67,8 +67,8 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={{ ...navigation, commitWorkspaceRootTerminalSession }}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={{ ...navigation, commitWorkspaceRootTerminalSession }}>
           <TerminalSessionContext value={deferredTerminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -77,7 +77,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -116,7 +116,7 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), {
+    appQueryClient.setQueryData(externalAppsQueryKey(), {
       terminal: {
         available: true,
         appAvailability: { ghostty: true, terminal: true, windowsTerminal: false },
@@ -131,8 +131,8 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -141,7 +141,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -159,8 +159,8 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -170,7 +170,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -227,8 +227,8 @@ describe('WorkspacePane directory workspaces', () => {
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
               value={terminalReadContextWithSession(terminalFilesystemTargetKey, terminalSessionId)}
@@ -244,7 +244,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -268,7 +268,7 @@ describe('WorkspacePane directory workspaces', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    const statusQuery = primaryWindowQueryClient.getQueryCache().find({
+    const statusQuery = appQueryClient.getQueryCache().find({
       queryKey: repoWorktreeStatusQueryKey(workspaceId, repo.workspaceRuntimeId),
       exact: true,
     })
@@ -276,8 +276,8 @@ describe('WorkspacePane directory workspaces', () => {
     statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status refresh failed') })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -291,7 +291,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -323,8 +323,8 @@ describe('WorkspacePane directory workspaces', () => {
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -334,7 +334,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -357,8 +357,8 @@ describe('WorkspacePane directory workspaces', () => {
     const onBackToNavigator = vi.fn()
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -368,7 +368,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -388,21 +388,21 @@ describe('WorkspacePane directory workspaces', () => {
     useWorkspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'status')
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
+    appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
       totalSizeBytes: 2048,
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -430,21 +430,21 @@ describe('WorkspacePane directory workspaces', () => {
       workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
+    appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 1,
       topLevelDirectoryCount: 2,
       totalSizeBytes: null,
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -464,7 +464,7 @@ describe('WorkspacePane directory workspaces', () => {
       workspaceProbe: directoryWorkspaceProbe(),
     })
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
+    appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 1,
       topLevelDirectoryCount: 2,
       totalSizeBytes: 3,
@@ -475,14 +475,14 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -512,8 +512,8 @@ describe('WorkspacePane directory workspaces', () => {
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -522,7 +522,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -551,8 +551,8 @@ describe('WorkspacePane directory workspaces', () => {
     useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -561,7 +561,7 @@ describe('WorkspacePane directory workspaces', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -586,14 +586,14 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 

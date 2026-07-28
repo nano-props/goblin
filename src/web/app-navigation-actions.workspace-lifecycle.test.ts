@@ -12,20 +12,20 @@ import {
   presentationOptions,
   historyRestoreOptions,
   WORKTREE_PATH,
-  setupPrimaryWindowNavigationActionsTests,
+  setupAppNavigationActionsTests,
   branchHistoryEntry,
   historyTraversal,
-  createPrimaryWindowNavigationActions,
+  createAppNavigationActions,
   routeNavigation,
   createPendingWorktreeSnapshot,
-} from '#/web/primary-window-navigation-actions.test-utils.ts'
+} from '#/web/app-navigation-actions.test-utils.ts'
 
-beforeEach(setupPrimaryWindowNavigationActionsTests)
+beforeEach(setupAppNavigationActionsTests)
 
-describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
+describe('createAppNavigationActions workspace lifecycle', () => {
   test('cycles repos by navigating from the current repo', () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace: vi.fn(),
@@ -46,7 +46,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'history')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
@@ -70,7 +70,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
       route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/branch/main' },
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
@@ -100,7 +100,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
       selectTerminal: vi.fn(),
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_ID],
       closeWorkspace: vi.fn(),
@@ -119,7 +119,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
@@ -140,7 +140,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     })
     const navigation = routeNavigation()
     vi.mocked(navigation.openWorkspaceRootPane).mockReturnValue(false)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId,
       workspaceOrder: [currentWorkspaceId, workspaceId],
       closeWorkspace: vi.fn(),
@@ -161,7 +161,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'status')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
@@ -180,7 +180,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
 
   test('cycles repos backward and wraps around', () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace: vi.fn(),
@@ -195,7 +195,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
   test('closes the repo through the store action without navigation when it is not current', async () => {
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
@@ -211,7 +211,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
   test('closes the current repo and navigates to the next repo dashboard without history', async () => {
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_B_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
@@ -235,7 +235,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
       .recordWorkspaceNavigation(branchHistoryEntry(REPO_C_ID, 'feature/remembered', 'history'))
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_B_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
@@ -271,7 +271,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     })
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_ID],
       closeWorkspace,
@@ -288,7 +288,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
 
   test('closes the final current repo and navigates home', async () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(async () => ({ ok: true as const })),
@@ -302,7 +302,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
 
   test('keeps the current route when the shared workspace close fails', async () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(async () => ({ ok: false as const, message: 'error.failed-read-repo' })),
@@ -319,7 +319,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
 
   test('opens create worktree for the current repo', async () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
@@ -340,7 +340,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     const traversal = historyTraversal(target)
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
@@ -374,7 +374,7 @@ describe('createPrimaryWindowNavigationActions workspace lifecycle', () => {
     const traversal = historyTraversal(target)
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),

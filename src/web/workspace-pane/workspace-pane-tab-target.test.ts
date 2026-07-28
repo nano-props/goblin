@@ -5,7 +5,7 @@ import {
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -30,7 +30,7 @@ const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-rep
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
 })
 
@@ -85,11 +85,11 @@ describe('workspace pane tab target read model', () => {
       workspacePaneTabsByBranch: { 'feature/query': [workspacePaneStaticTabEntry('status')] },
     })
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('missing repo snapshot query')
     query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
 
-    expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
+    expect(appQueryClient.getQueryData(queryKey)).toBeDefined()
     expect(
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
     ).toMatchObject({ kind: 'ready', target: { branchName: 'feature/query', worktreePath: WORKTREE_PATH } })
@@ -109,7 +109,7 @@ describe('workspace pane tab target read model', () => {
       ],
       currentBranch: 'feature/query',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     expect(
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
     ).toEqual({
@@ -135,7 +135,7 @@ describe('workspace pane tab target read model', () => {
       ],
       currentBranch: 'feature/query',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
       workspaceId: REPO_ID,
@@ -168,7 +168,7 @@ describe('workspace pane tab target read model', () => {
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
-      primaryWindowQueryClient.fetchQuery({
+      appQueryClient.fetchQuery({
         queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
           throw new Error('status unavailable')
@@ -177,9 +177,7 @@ describe('workspace pane tab target read model', () => {
       }),
     ).rejects.toThrow('status unavailable')
 
-    expect(
-      primaryWindowQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)),
-    ).toBeDefined()
+    expect(appQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 
@@ -201,7 +199,7 @@ describe('workspace pane tab target read model', () => {
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
-      primaryWindowQueryClient.fetchQuery({
+      appQueryClient.fetchQuery({
         queryKey,
         queryFn: async () => {
           throw new Error('snapshot unavailable')
@@ -210,7 +208,7 @@ describe('workspace pane tab target read model', () => {
       }),
     ).rejects.toThrow('snapshot unavailable')
 
-    expect(primaryWindowQueryClient.getQueryData(queryKey)).toBeDefined()
+    expect(appQueryClient.getQueryData(queryKey)).toBeDefined()
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 

@@ -4,7 +4,7 @@ import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/rem
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
@@ -119,7 +119,7 @@ describe('repo lifecycle', () => {
     const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
 
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
-    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
+    const cached = appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       {
         workspaceId: REPO_A,
@@ -252,7 +252,7 @@ describe('repo lifecycle', () => {
       { kind: 'recent-workspace', message: 'recent write failed' },
     ])
     expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeDefined()
-    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
+    const cached = appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       {
         workspaceId: REPO_A,
@@ -396,7 +396,7 @@ describe('repo lifecycle', () => {
 
     await useWorkspacesStore.getState().closeWorkspace(REPO_A)
     await vi.waitFor(() => {
-      const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
+      const cached = appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
       expect(cached?.runtimes).not.toContainEqual({ workspaceId: REPO_A, workspaceRuntimeId })
     })
   })
@@ -407,7 +407,7 @@ describe('repo lifecycle', () => {
     const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_A]!.workspaceRuntimeId
-    primaryWindowQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
+    appQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
       runtimes: [
         { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-stale-cache', workspaceProbe: { status: 'probing' } },
       ],
@@ -418,7 +418,7 @@ describe('repo lifecycle', () => {
       workspaceRuntimeId: 'repo-runtime-not-in-cache',
     })
 
-    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
+    const cached = appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       { workspaceId: REPO_A, workspaceRuntimeId, workspaceProbe: expect.objectContaining({ status: 'ready' }) },
     ])

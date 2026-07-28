@@ -1,4 +1,4 @@
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseCurrentWorkspacePaneTabAction,
@@ -42,27 +42,27 @@ interface ShowWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   tab: WorkspacePaneTabType
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 interface TerminalPrimaryActionCommandOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface WorkspacePaneTabCommandTargetOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   targetIdentity?: string
 }
 
@@ -77,7 +77,7 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: WorkspacePaneCommandRoute
   routeTarget: WorkspacePaneTabsTarget
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   targetIdentity?: string
   selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
@@ -86,7 +86,7 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
 
 interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
   target: WorkspacePaneCommandTarget
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   terminalSessionId: string
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
@@ -97,14 +97,14 @@ interface SelectWorkspacePaneTabByIndexCommandOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   tabIndex: number
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 interface MoveWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   direction: 1 | -1
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 export async function runShowWorkspacePaneTabCommand({

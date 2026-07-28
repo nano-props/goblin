@@ -2,7 +2,7 @@ import { AlertCircle, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
@@ -16,7 +16,7 @@ export function WorkspaceProjectionFailureView({
   onRetry: () => void
 }) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
 
   async function handleClose() {
     const result = await navigation.closeWorkspace(workspace.id)

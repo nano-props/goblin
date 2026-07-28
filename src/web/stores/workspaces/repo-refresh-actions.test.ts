@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoDataQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
@@ -39,14 +39,14 @@ function repoRefreshStoreAccess(
 
 describe('repo refresh actions', () => {
   beforeEach(() => {
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
   })
 
-  afterEach(() => primaryWindowQueryClient.clear())
+  afterEach(() => appQueryClient.clear())
 
   test('does not issue Git refreshes for a filesystem-only workspace', async () => {
     const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'filesystem')
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
 
     await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
@@ -56,7 +56,7 @@ describe('repo refresh actions', () => {
 
   test('routes metadata invalidation through query invalidation only', async () => {
     const store = repoRefreshStoreAccess()
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
 
     await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
@@ -74,7 +74,7 @@ describe('repo refresh actions', () => {
 
   test('routes worktree-status invalidation through its narrower query domain', async () => {
     const store = repoRefreshStoreAccess()
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
 
     await handleRepoInvalidationRefresh(
       store,

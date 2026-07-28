@@ -10,7 +10,7 @@ import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -35,7 +35,7 @@ interface Props {
 
 export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const workspaceRuntimeId = useWorkspacesStore((state) => state.workspaces[repoId]?.workspaceRuntimeId ?? null)
   const statusReadModel = useRepoWorktreeStatusReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)
   const snapshotReadModel = useRepoSnapshotReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)

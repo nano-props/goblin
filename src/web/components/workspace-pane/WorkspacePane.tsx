@@ -56,7 +56,7 @@ import { StatusList } from '#/web/components/StatusList.tsx'
 import type { WorktreeStatus } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
 
@@ -515,7 +515,7 @@ function WorkspaceRootPane({
   onBackToNavigator?: () => void
 }) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const model = useWorkspaceRootTabModel(workspace, route)
   useFilesystemWorkspacePaneRouteController({ route, model })
   const target = useMemo(() => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }), [workspace.id])

@@ -11,7 +11,7 @@ import {
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
@@ -83,7 +83,7 @@ function WorkspacePaneTargetToolbarContent({
   externalItems,
 }: WorkspacePaneTargetToolbarProps & { externalItems: readonly WorkspaceExternalAppItem[] }) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const { scrollToBottom } = useTerminalSessionContext()
   const branchName = model.branchName
   const filesystemTarget = target.kind === 'git-branch' ? null : target

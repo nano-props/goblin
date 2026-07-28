@@ -58,7 +58,7 @@ vi.mock('#/web/workspace-navigation-history.ts', async () => {
   const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>('#/web/workspace-navigation-history.ts')
   return {
     ...actual,
-    usePrimaryWindowHistoryPresentationObserver: () => undefined,
+    useAppHistoryPresentationObserver: () => undefined,
   }
 })
 

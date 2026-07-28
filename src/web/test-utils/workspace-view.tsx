@@ -6,9 +6,9 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -115,7 +115,7 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
   }: {
     compact?: boolean
     onCancel: () => void
-    onCreated: (branchName: string, navigationGeneration: PrimaryWindowNavigationGeneration) => void
+    onCreated: (branchName: string, navigationGeneration: AppNavigationGeneration) => void
   }) => (
     <div data-testid="create-worktree-page" data-compact={compact ? 'true' : 'false'}>
       <button
@@ -471,7 +471,7 @@ function domRect({ left, top, width, height }: { left: number; top: number; widt
 function setReadModelLoading(repoId: string) {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
-  primaryWindowQueryClient.removeQueries({
+  appQueryClient.removeQueries({
     queryKey: repoSnapshotQueryKey(repo.id, repo.workspaceRuntimeId),
     exact: true,
   })

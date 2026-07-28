@@ -5,7 +5,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
@@ -19,7 +19,7 @@ interface Props {
 
 export function UnavailableWorkspaceView({ workspace }: Props) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const failureReason = workspaceOperationalFailureReason(workspace)
   const isRemote = isRemoteWorkspaceId(workspace.id)
   if (!failureReason) {

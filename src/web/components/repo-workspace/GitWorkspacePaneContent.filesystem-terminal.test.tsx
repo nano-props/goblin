@@ -31,7 +31,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import type {
   TerminalFilesystemTargetSnapshot,
   TerminalSessionContextValue,
@@ -40,7 +40,7 @@ import type {
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 describe('GitWorkspacePaneContent filesystem-terminal', () => {
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
@@ -295,7 +295,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
 
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
@@ -307,7 +307,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
               </BranchActionSurfaceContext>
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -434,8 +434,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     )
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               routeTarget={{ kind: 'workspace-root', workspaceId }}
@@ -450,7 +450,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
               })}
             />
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -503,8 +503,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const createTerminalWithAdmission = vi.fn()
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               routeTarget={{ kind: 'workspace-root', workspaceId }}
@@ -519,7 +519,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
               })}
             />
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 

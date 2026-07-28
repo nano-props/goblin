@@ -29,7 +29,7 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
@@ -39,7 +39,7 @@ const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-tes
 const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-test-other')
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   resetBranchActionDialogsStore()
 })
@@ -64,13 +64,13 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     return null
   }
   const result = renderInJsdom(
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <Harness slot={initial} />
     </QueryClientProvider>,
   )
   handle.setSlot = (next) => {
     result.rerender(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <Harness slot={next} />
       </QueryClientProvider>,
     )

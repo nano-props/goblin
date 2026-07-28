@@ -3,7 +3,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
@@ -22,7 +22,7 @@ const settingsActionsMocks = vi.hoisted(() => ({
 vi.mock('#/web/settings-actions.ts', () => settingsActionsMocks)
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   settingsActionsMocks.refreshExternalAppsDetection.mockClear()
   settingsActionsMocks.refreshExternalAppsDetection.mockResolvedValue(undefined)
   settingsActionsMocks.refreshGitHubCliDetection.mockClear()
@@ -53,7 +53,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
 
     await act(async () => {
       await controller?.setFetchInterval(300)
@@ -78,7 +78,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
 
     await act(async () => {
       await controller?.setLanEnabled(true)
@@ -97,7 +97,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
 
     let globalShortcutResult: Awaited<ReturnType<NonNullable<typeof controller>['setGlobalShortcut']>> | undefined
     await act(async () => {
@@ -127,7 +127,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
 
     await act(async () => {
       await controller?.refreshExternalApps()
@@ -148,7 +148,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
     if (!controller) throw new Error('controller not mounted')
 
     let firstRefresh: Promise<void> | undefined
@@ -177,7 +177,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
 
     await act(async () => {
       await controller?.refreshGitHubCli()
@@ -198,7 +198,7 @@ describe('runtime settings controllers', () => {
       return null
     }
 
-    renderWithPrimaryWindowQueryClient(<HookHost />)
+    renderWithAppQueryClient(<HookHost />)
     if (!controller) throw new Error('controller not mounted')
 
     let firstRefresh: Promise<void> | undefined
@@ -219,8 +219,8 @@ describe('runtime settings controllers', () => {
   })
 })
 
-function renderWithPrimaryWindowQueryClient(element: React.ReactElement) {
-  return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+function renderWithAppQueryClient(element: React.ReactElement) {
+  return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
 }
 
 function createDeferredVoid(): { promise: Promise<void>; resolve: () => void } {

@@ -13,7 +13,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -38,7 +38,7 @@ describe('restorable-workspace-state', () => {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(repo.id, repo.workspaceRuntimeId) })
+    appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(repo.id, repo.workspaceRuntimeId) })
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({

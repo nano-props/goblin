@@ -5,9 +5,9 @@ import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -68,7 +68,7 @@ describe('WorkspaceNavigationControls', () => {
     expect(forwardButton().disabled).toBe(false)
   })
 
-  test('routes back and forward clicks through primary window navigation', async () => {
+  test('routes back and forward clicks through app navigation', async () => {
     const user = userEvent.setup()
     const goBack = vi.fn()
     const goForward = vi.fn()
@@ -104,23 +104,23 @@ function renderControls({
   workspaceId?: WorkspaceId
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
-  navigation?: PrimaryWindowNavigationActions
+  navigation?: AppNavigationActions
 } = {}) {
   return renderInJsdom(
-    <PrimaryWindowNavigationProvider value={navigation}>
+    <AppNavigationProvider value={navigation}>
       <WorkspaceNavigationControls
         workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />
-    </PrimaryWindowNavigationProvider>,
+    </AppNavigationProvider>,
   )
 }
 
 function navigationWith(
-  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'goBack' | 'goForward'>> = {},
-): PrimaryWindowNavigationActions {
-  return primaryWindowNavigationActionsForTest({
+  overrides: Partial<Pick<AppNavigationActions, 'goBack' | 'goForward'>> = {},
+): AppNavigationActions {
+  return appNavigationActionsForTest({
     goBack: () => {},
     goForward: () => {},
     ...overrides,

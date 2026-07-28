@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { ObservedBranchRouteNavigationForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   REPO_ID,
@@ -209,7 +209,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     const showRepoBranchTerminalSession = vi.fn<ObservedBranchRouteNavigationForTest['showRepoBranchTerminalSession']>(
       () => true,
     )
-    const commitWorkspacePaneRoute: PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] = async (
+    const commitWorkspacePaneRoute: AppNavigationActions['commitWorkspacePaneRoute'] = async (
       repoId,
       branchName,
       route,

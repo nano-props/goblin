@@ -10,7 +10,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
@@ -22,10 +22,10 @@ import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import {
-  beginPrimaryWindowNavigation,
-  currentPrimaryWindowNavigationGeneration,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  currentAppNavigationGeneration,
+  resetAppNavigationForTest,
+} from '#/web/app-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -79,9 +79,9 @@ vi.mock('#/web/repo-client.ts', () => ({
 }))
 
 beforeEach(() => {
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
   vi.clearAllMocks()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementation(async () => ({
     ok: false,
@@ -89,7 +89,7 @@ beforeEach(() => {
   }))
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ workspaceSettings: [] }))
-  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
+  appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -103,7 +103,7 @@ afterEach(() => {
 })
 
 function renderPane(element: ReactElement) {
-  return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+  return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
 }
 
 async function renderPaneInAct(element: ReactElement): Promise<ReturnType<typeof renderPane>> {
@@ -117,7 +117,7 @@ async function renderPaneInAct(element: ReactElement): Promise<ReturnType<typeof
 
 describe('CreateWorktreePagePane', () => {
   test('does not start a worktree-status query for the create form', async () => {
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
       exact: true,
     })
@@ -126,7 +126,7 @@ describe('CreateWorktreePagePane', () => {
 
     await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
     expect(
-      primaryWindowQueryClient.getQueryCache().find({
+      appQueryClient.getQueryCache().find({
         queryKey: repoWorktreeStatusQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
         exact: true,
       }),
@@ -134,7 +134,7 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('keeps the accepted snapshot visible when its background refresh fails', async () => {
-    const snapshotQuery = primaryWindowQueryClient.getQueryCache().find({
+    const snapshotQuery = appQueryClient.getQueryCache().find({
       queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
       exact: true,
     })
@@ -149,7 +149,7 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('keeps stable page chrome while branch data is loading', () => {
-    primaryWindowQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID) })
+    appQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID) })
 
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
@@ -314,7 +314,7 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('reuses a pending settings query after the first consumer unmounts', async () => {
-    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+    appQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
     const settings = Promise.withResolvers<ReturnType<typeof defaultSettingsSnapshot>>()
     let querySignal: AbortSignal | undefined
     mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {
@@ -349,7 +349,7 @@ describe('CreateWorktreePagePane', () => {
   })
 
   test('releases the form when settings fails after a trust-relevant bootstrap preview', async () => {
-    primaryWindowQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+    appQueryClient.removeQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
     mockedGetSettingsSnapshot.mockRejectedValueOnce(new Error('settings unavailable'))
     vi.mocked(getRepoWorktreeBootstrapPreview).mockResolvedValueOnce({
       ok: true,
@@ -392,11 +392,11 @@ describe('CreateWorktreePagePane', () => {
       expect(button(container).dataset.loading).toBe('false')
     })
 
-    const generationBeforeSubmit = currentPrimaryWindowNavigationGeneration()
+    const generationBeforeSubmit = currentAppNavigationGeneration()
     await act(async () => {
       button(container).click()
     })
-    const navigationGeneration = currentPrimaryWindowNavigationGeneration()
+    const navigationGeneration = currentAppNavigationGeneration()
     expect(navigationGeneration).toBeGreaterThan(generationBeforeSubmit)
 
     expect(onCreated).not.toHaveBeenCalled()
@@ -430,8 +430,8 @@ describe('CreateWorktreePagePane', () => {
     await act(async () => {
       button(container).click()
     })
-    const submittingGeneration = currentPrimaryWindowNavigationGeneration()
-    beginPrimaryWindowNavigation()
+    const submittingGeneration = currentAppNavigationGeneration()
+    beginAppNavigation()
     await act(async () => {
       resolveAction({ ok: true, message: 'ok' })
     })
@@ -449,7 +449,7 @@ describe('CreateWorktreePagePane', () => {
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     useWorkspacesStore.setState({ workspaces: { [REPO_ID]: { ...repo } } })
     rerender(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />
       </QueryClientProvider>,
     )

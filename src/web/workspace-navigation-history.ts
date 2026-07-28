@@ -2,10 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import type { HistoryState } from '@tanstack/history'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import type {
-  PrimaryWindowRouteNavigation,
-  PrimaryWindowRouteNavigationOptions,
-} from '#/web/primary-window-route-navigation.ts'
+import type { AppRouteNavigation, AppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
@@ -14,7 +11,7 @@ import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/share
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { observePrimaryWindowHistoryNavigation } from '#/web/primary-window-navigation-lifecycle.ts'
+import { observeAppHistoryNavigation } from '#/web/app-navigation-lifecycle.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceNavigationRouteContext =
@@ -106,13 +103,13 @@ export function useWorkspaceNavigationHistory({
   }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
 }
 
-/** One primary-window subscription owns navigation settlement and browser traversal metadata. */
-export function usePrimaryWindowHistoryPresentationObserver(): void {
+/** One app subscription owns navigation settlement and browser traversal metadata. */
+export function useAppHistoryPresentationObserver(): void {
   const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
   useEffect(() => {
     if (!router) return
     return router.history.subscribe(({ location, action }) => {
-      observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
+      observeAppHistoryNavigation({ href: location.href, state: location.state, action })
       browserHistoryAction =
         action.type === 'GO'
           ? { href: location.href, type: 'GO', index: action.index }
@@ -300,8 +297,8 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
-  routeNavigation: PrimaryWindowRouteNavigation,
-  options?: PrimaryWindowRouteNavigationOptions,
+  routeNavigation: AppRouteNavigation,
+  options?: AppRouteNavigationOptions,
 ): WorkspaceNavigationRestoreResult {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {

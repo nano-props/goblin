@@ -19,7 +19,7 @@ import type { WorkspacePaneTabsChangedRealtimeMessage, WorkspacePaneTabsEntry } 
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -95,7 +95,7 @@ describe('AppRuntimeProjectionProvider', () => {
     listWorkspaceTabsMock.mockResolvedValue([])
     resetWorkspacesStore()
     useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
@@ -228,9 +228,9 @@ describe('AppRuntimeProjectionProvider', () => {
           'client_sharedterminal',
         )
       })
-      expect(
-        primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.workspaceRuntimeId]),
-      ).toMatchObject({ revision: 2 })
+      expect(appQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.workspaceRuntimeId])).toMatchObject({
+        revision: 2,
+      })
     } finally {
       result.unmount()
     }

@@ -8,7 +8,7 @@ import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factor
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -18,21 +18,21 @@ import {
   presentationOptions,
   WORKTREE_PATH,
   WORKTREE_KEY,
-  setupPrimaryWindowNavigationActionsTests,
+  setupAppNavigationActionsTests,
   preferredWorkspacePaneTab,
-  createPrimaryWindowNavigationActions,
+  createAppNavigationActions,
   markRepoGitUnavailable,
   routeNavigation,
   createPendingWorktreeSnapshot,
-} from '#/web/primary-window-navigation-actions.test-utils.ts'
+} from '#/web/app-navigation-actions.test-utils.ts'
 
-beforeEach(setupPrimaryWindowNavigationActionsTests)
+beforeEach(setupAppNavigationActionsTests)
 
-describe('createPrimaryWindowNavigationActions presentation', () => {
+describe('createAppNavigationActions presentation', () => {
   test('presents a workspace-root tab through the workspace route and commits its preference', () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -71,7 +71,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
         if (accepted && commit) options?.onCommit?.()
         return accepted
       })
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: REPO_ID,
         workspaceOrder: [REPO_ID],
         closeWorkspace: vi.fn(),
@@ -101,7 +101,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
     navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -153,7 +153,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
     navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -184,7 +184,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const navigation = routeNavigation()
     navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -223,7 +223,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       },
     }))
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: null,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -247,7 +247,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
         route: kind === 'workspace-root' ? { kind, workspacePaneTab: null, terminalSessionId: null } : { kind },
       })
       const navigation = routeNavigation()
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: OTHER_WORKSPACE_ID,
         workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
         closeWorkspace: vi.fn(),
@@ -276,7 +276,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
         route: { kind: 'workspace-root', workspacePaneTab: tab, terminalSessionId },
       })
       const navigation = routeNavigation()
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: OTHER_WORKSPACE_ID,
         workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
         closeWorkspace: vi.fn(),
@@ -324,7 +324,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       const navigation = routeNavigation()
       const openRepoWorktreeTab = vi.fn(() => true)
       navigation.openRepoWorktreeTab = openRepoWorktreeTab
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: OTHER_WORKSPACE_ID,
         workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
         closeWorkspace: vi.fn(),
@@ -355,7 +355,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       },
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -383,7 +383,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       preferredWorkspacePaneTab: 'status',
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -406,8 +406,8 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId) })
-    await primaryWindowQueryClient
+    appQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    await appQueryClient
       .fetchQuery({
         queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
@@ -417,7 +417,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       })
       .catch(() => undefined)
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -444,7 +444,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       },
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -470,7 +470,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       },
     })
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -503,7 +503,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       if (route?.kind !== 'terminal') return false
       return navigation.openRepoBranchTerminal(workspaceId, branchName, route.terminalSessionId, options)
     })
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -540,7 +540,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
     navigation.commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -571,7 +571,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       options?.onAbandon?.()
       return false
     })
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -617,7 +617,7 @@ describe('createPrimaryWindowNavigationActions presentation', () => {
       useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),

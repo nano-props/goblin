@@ -1,8 +1,8 @@
 import {
-  currentPrimaryWindowNavigationGeneration,
-  primaryWindowNavigationIsCurrent,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  currentAppNavigationGeneration,
+  appNavigationIsCurrent,
+  type AppNavigationGeneration,
+} from '#/web/app-navigation-lifecycle.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 type FocusTerminal = (
@@ -21,7 +21,7 @@ export interface TerminalAutoFocusLease {
 }
 
 interface TerminalAutoFocusIntent {
-  generation: PrimaryWindowNavigationGeneration
+  generation: AppNavigationGeneration
   terminalSessionId: string | null
   phase: 'open' | 'submitted' | 'finished'
 }
@@ -29,10 +29,10 @@ interface TerminalAutoFocusIntent {
 const terminalAutoFocusByDocument = new WeakMap<Document, TerminalAutoFocusIntent>()
 const observedDocuments = new WeakSet<Document>()
 
-/** Reserves one automatic-focus intent for a primary-window navigation. */
-export function claimTerminalAutoFocus(generation: PrimaryWindowNavigationGeneration): TerminalAutoFocusLease | null {
+/** Reserves one automatic-focus intent for a app navigation. */
+export function claimTerminalAutoFocus(generation: AppNavigationGeneration): TerminalAutoFocusLease | null {
   const ownerDocument = currentDocument()
-  if (!ownerDocument || !primaryWindowNavigationIsCurrent(generation)) return null
+  if (!ownerDocument || !appNavigationIsCurrent(generation)) return null
   const existing = terminalAutoFocusByDocument.get(ownerDocument)
   if (existing?.generation === generation) return null
 
@@ -56,7 +56,7 @@ export function claimTerminalAutoFocus(generation: PrimaryWindowNavigationGenera
 }
 
 export function claimTerminalPresentationFocus(
-  generation: PrimaryWindowNavigationGeneration,
+  generation: AppNavigationGeneration,
   terminalSessionId: string,
 ): TerminalPresentationFocusEffects | null {
   const lease = claimTerminalAutoFocus(generation)
@@ -83,7 +83,7 @@ export function claimTerminalPresentationFocus(
 export function fulfillTerminalPresentationFocus(terminalSessionId: string, focusTerminal: FocusTerminal): void {
   const ownerDocument = currentDocument()
   if (!ownerDocument) return
-  const generation = currentPrimaryWindowNavigationGeneration()
+  const generation = currentAppNavigationGeneration()
   const existing = terminalAutoFocusByDocument.get(ownerDocument)
   if (existing?.generation === generation) {
     if (existing.terminalSessionId === terminalSessionId && existing.phase === 'open') {
@@ -122,7 +122,7 @@ function submitTerminalAutoFocus(
   const isCurrent = () =>
     intent.phase === 'submitted' &&
     terminalAutoFocusByDocument.get(ownerDocument) === intent &&
-    primaryWindowNavigationIsCurrent(intent.generation)
+    appNavigationIsCurrent(intent.generation)
   const onSettled = () => finishTerminalAutoFocus(intent)
   intent.phase = 'submitted'
   try {
@@ -140,7 +140,7 @@ function terminalAutoFocusIntentIsOpen(ownerDocument: Document, intent: Terminal
   if (
     intent.phase === 'open' &&
     terminalAutoFocusByDocument.get(ownerDocument) === intent &&
-    primaryWindowNavigationIsCurrent(intent.generation)
+    appNavigationIsCurrent(intent.generation)
   ) {
     return true
   }

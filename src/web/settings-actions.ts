@@ -27,7 +27,7 @@ import {
 } from '#/web/settings-client.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,
@@ -41,12 +41,12 @@ import {
 // window-local projection of that server result, never an independent source.
 export async function recordRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<void> {
   const result = await addRecentWorkspace(workspace)
-  updateRuntimeRecentWorkspacesStateCache(primaryWindowQueryClient, { recentWorkspaces: result.recentWorkspaces })
+  updateRuntimeRecentWorkspacesStateCache(appQueryClient, { recentWorkspaces: result.recentWorkspaces })
 }
 
 export async function clearRecentWorkspaceHistory(): Promise<void> {
   await clearRecentWorkspaces()
-  updateRuntimeRecentWorkspacesStateCache(primaryWindowQueryClient, { recentWorkspaces: [] })
+  updateRuntimeRecentWorkspacesStateCache(appQueryClient, { recentWorkspaces: [] })
 }
 
 export async function restoreWorkspaceAtBoot(
@@ -81,13 +81,13 @@ export async function restoreWorkspaceTabsOnView(
 
 export async function setFetchInterval(sec: number): Promise<number> {
   const fetchIntervalSec = await setSettingsFetchInterval(sec)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, fetchIntervalSec }))
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({ ...current, fetchIntervalSec }))
   return fetchIntervalSec
 }
 
 export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
   const terminalNotificationsEnabled = await setSettingsTerminalNotificationsEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     terminalNotificationsEnabled,
   }))
@@ -95,7 +95,7 @@ export async function setTerminalNotificationsEnabled(enabled: boolean): Promise
 
 export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
   const shortcutsDisabled = await setSettingsShortcutsDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     shortcutsDisabled,
   }))
@@ -103,7 +103,7 @@ export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
 
 export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
   const globalShortcutDisabled = await setSettingsGlobalShortcutDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     globalShortcutDisabled,
   }))
@@ -111,7 +111,7 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
   const state = await setSettingsGlobalShortcut(accelerator)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     globalShortcut: state.accelerator,
     globalShortcutRegistered: state.registered,
@@ -121,7 +121,7 @@ export async function setGlobalShortcut(accelerator: string): Promise<GlobalShor
 
 export async function setThemePreference(pref: ThemePref): Promise<ThemeState> {
   const state = await setSettingsThemePref(pref)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     theme: state.pref,
     colorTheme: state.colorTheme,
@@ -131,7 +131,7 @@ export async function setThemePreference(pref: ThemePref): Promise<ThemeState> {
 
 export async function setThemeColorThemePreference(colorTheme: ColorTheme): Promise<ThemeState> {
   const state = await setSettingsThemeColorTheme(colorTheme)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
     ...current,
     theme: state.pref,
     colorTheme: state.colorTheme,
@@ -141,18 +141,18 @@ export async function setThemeColorThemePreference(colorTheme: ColorTheme): Prom
 
 export async function setI18nPreference(pref: LangPref): Promise<I18nSnapshot> {
   const snapshot = await setSettingsI18nPref(pref)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lang: snapshot.pref }))
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({ ...current, lang: snapshot.pref }))
   return snapshot
 }
 
 export async function refreshExternalAppsDetection(): Promise<void> {
   const state = await refreshExternalAppsSnapshot()
-  primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), state)
+  appQueryClient.setQueryData(externalAppsQueryKey(), state)
 }
 
 export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void> {
   const state = await refreshGitHubCliState(hosts)
-  updateGitHubCliCache(primaryWindowQueryClient, hosts, state)
+  updateGitHubCliCache(appQueryClient, hosts, state)
 }
 
 export async function setRecentWorkspaceExternalAppPreference(input: {
@@ -161,13 +161,13 @@ export async function setRecentWorkspaceExternalAppPreference(input: {
   itemId: string
 }): Promise<void> {
   const state = await setRecentWorkspaceExternalApp(input)
-  updateWorkspaceSettingsStateCache(primaryWindowQueryClient, state)
+  updateWorkspaceSettingsStateCache(appQueryClient, state)
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {
   const lanEnabled = await setSettingsLanEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, lanEnabled }))
-  void primaryWindowQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
+  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({ ...current, lanEnabled }))
+  void appQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
 }
 
 export async function runSettingsAction<T>(label: string, task: () => Promise<T>): Promise<T | null> {

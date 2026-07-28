@@ -7,11 +7,8 @@ import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -105,9 +102,9 @@ afterEach(() => {
 describe('OpenRemoteWorkspaceDialog', () => {
   test('keeps the remote status row mounted before running a connection test', async () => {
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -116,9 +113,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
   test('renders a minimal remote status row in the initial state', async () => {
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -130,9 +127,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
   test('updates typed values in the host and path inputs', async () => {
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -177,9 +174,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -222,9 +219,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -273,9 +270,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -324,9 +321,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -336,9 +333,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
   test('keeps the empty remote path in a neutral state until the user types an invalid path', async () => {
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -353,9 +350,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={onOpenChange} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -396,9 +393,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -415,9 +412,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     const onOpenChange = vi.fn()
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
         <OpenRemoteWorkspaceDialog open onOpenChange={onOpenChange} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -440,9 +437,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     useWorkspacesStore.setState({ ensureWorkspaceOpen })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -480,9 +477,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -511,9 +508,9 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
     await flush()
 
@@ -525,10 +522,8 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 })
 
-function navigationWith(
-  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'activateWorkspace'>>,
-): PrimaryWindowNavigationActions {
-  return primaryWindowNavigationActionsForTest({
+function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateWorkspace'>>): AppNavigationActions {
+  return appNavigationActionsForTest({
     activateWorkspace: () => {},
     ...overrides,
   })

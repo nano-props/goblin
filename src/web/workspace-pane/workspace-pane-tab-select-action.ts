@@ -2,7 +2,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import { adjacentWorkspacePaneTab, type WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   selectWorkspacePaneControllerTab,
@@ -20,10 +20,7 @@ import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  beginPrimaryWindowNavigation,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
@@ -32,7 +29,7 @@ export interface SelectWorkspacePaneTabByIndexActionOptions {
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   tabIndex: number
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 export interface MoveWorkspacePaneTabActionOptions {
@@ -42,7 +39,7 @@ export interface MoveWorkspacePaneTabActionOptions {
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   direction: 1 | -1
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
@@ -52,7 +49,7 @@ export interface SelectWorkspacePaneTabByIdentityActionOptions {
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   identity: string
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   onTerminalReselect?: (terminalSessionId: string) => void
   reselect?: boolean
 }
@@ -61,7 +58,7 @@ export interface ShowWorkspacePaneTerminalRouteActionOptions {
   workspaceId: WorkspaceId | null
   branchName: string | null
   terminalSessionId: string
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 export async function dispatchSelectWorkspacePaneTabByIndexAction(
@@ -70,7 +67,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
   if (!options.workspaceId || options.tabIndex < 1) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  const navigationGeneration = beginPrimaryWindowNavigation()
+  const navigationGeneration = beginAppNavigation()
   return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, navigationGeneration),
   )
@@ -79,7 +76,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
 async function selectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
   coordinatorTarget: WorkspacePaneTabModel,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, tabIndex, navigation } = options
   if (!workspaceId || tabIndex < 1) return false
@@ -98,7 +95,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   if (!options.workspaceId) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  const navigationGeneration = beginPrimaryWindowNavigation()
+  const navigationGeneration = beginAppNavigation()
   return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, navigationGeneration),
   )
@@ -107,7 +104,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
 async function selectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
   coordinatorTarget: WorkspacePaneTabModel,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, identity, navigation, onTerminalReselect, reselect } = options
   if (!workspaceId) return false
@@ -164,7 +161,7 @@ async function moveWorkspacePaneTabAction(
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   return await selectWorkspacePaneControllerTab(target, tab, navigation, {
-    navigationGeneration: beginPrimaryWindowNavigation(),
+    navigationGeneration: beginAppNavigation(),
   })
 }
 

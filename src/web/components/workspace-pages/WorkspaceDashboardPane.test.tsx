@@ -11,7 +11,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -35,7 +35,7 @@ vi.mock('#/web/repo-client.ts', async (importOriginal) => {
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   repoClientMocks.getRepoWorktreeStatus.mockReset()
   repoClientMocks.getRepoSnapshot.mockReset()
@@ -55,26 +55,26 @@ describe('WorkspaceDashboardPane', () => {
   test('does not admit Git or directory reads before workspace capability settles', () => {
     const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, { status: 'probing' })
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     })
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     })
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
-    const projectionState = primaryWindowQueryClient.getQueryState(
+    const projectionState = appQueryClient.getQueryState(
       repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
-    const statusState = primaryWindowQueryClient.getQueryState(
+    const statusState = appQueryClient.getQueryState(
       repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
-    const overviewState = primaryWindowQueryClient.getQueryState(
+    const overviewState = appQueryClient.getQueryState(
       workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
     for (const queryState of [projectionState, statusState, overviewState]) {
@@ -94,17 +94,14 @@ describe('WorkspaceDashboardPane', () => {
       },
       diagnostics: [],
     })
-    primaryWindowQueryClient.setQueryData(
-      workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
-      {
-        topLevelFileCount: 4,
-        topLevelDirectoryCount: 2,
-        totalSizeBytes: 2048,
-      },
-    )
+    appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId), {
+      topLevelFileCount: 4,
+      topLevelDirectoryCount: 2,
+      totalSizeBytes: 2048,
+    })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -115,8 +112,7 @@ describe('WorkspaceDashboardPane', () => {
     expect(container.textContent).toContain('/workspace')
     expect(container.textContent).not.toContain('goblin+file://')
     expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))
-        ?.fetchStatus,
+      appQueryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))?.fetchStatus,
     ).not.toBe('fetching')
   })
 
@@ -127,13 +123,13 @@ describe('WorkspaceDashboardPane', () => {
       currentBranchName: 'main',
     })
     const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
-    primaryWindowQueryClient.removeQueries({ queryKey: statusQueryKey })
+    appQueryClient.removeQueries({ queryKey: statusQueryKey })
     repoClientMocks.getRepoWorktreeStatus.mockImplementation(async () => {
       throw new Error('status failed')
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -146,13 +142,13 @@ describe('WorkspaceDashboardPane', () => {
 
   test('shows a retryable failure instead of loading forever when the initial snapshot fails', async () => {
     const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     })
     repoClientMocks.getRepoSnapshot.mockRejectedValue(new Error('snapshot failed'))
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -174,7 +170,7 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -193,7 +189,7 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -210,7 +206,7 @@ describe('WorkspaceDashboardPane', () => {
       branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, { kind: 'repository-summary' }),
       {
         pullRequests: [
@@ -226,7 +222,7 @@ describe('WorkspaceDashboardPane', () => {
     )
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
@@ -246,7 +242,7 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { getByTestId } = renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} onSelectBranch={onSelectBranch} />
       </QueryClientProvider>,
     )

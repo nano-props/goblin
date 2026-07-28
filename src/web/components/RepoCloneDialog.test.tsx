@@ -5,11 +5,8 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -77,9 +74,9 @@ describe('RepoCloneDialog', () => {
     const onOpenChange = vi.fn()
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
         <RepoCloneDialog open onOpenChange={onOpenChange} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
@@ -104,9 +101,9 @@ describe('RepoCloneDialog', () => {
     useWorkspacesStore.setState({ ensureWorkspaceOpen })
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+      <AppNavigationProvider value={navigationWith({})}>
         <RepoCloneDialog open onOpenChange={vi.fn()} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
@@ -121,10 +118,8 @@ describe('RepoCloneDialog', () => {
   })
 })
 
-function navigationWith(
-  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'activateWorkspace'>>,
-): PrimaryWindowNavigationActions {
-  return primaryWindowNavigationActionsForTest({
+function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateWorkspace'>>): AppNavigationActions {
+  return appNavigationActionsForTest({
     activateWorkspace: () => {},
     ...overrides,
   })
