@@ -2,23 +2,16 @@
 
 import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import {
-  bellHandler,
-  identityHandler,
-  lifecycleHandler,
-  outputHandler,
   renderProviderWithHost,
   renderProviderWithProbe,
   renderTerminalProvider,
   REPO_ID,
   repoTerminalBase,
   resetTerminalSessionProviderHarness,
-  sessionClosedHandler,
-  terminalExitEvent,
   terminalGeometryMocks,
+  terminalProviderRealtimeHarness,
   terminalSessionMocks,
-  titleHandler,
   WORKTREE_PATH,
-  exitHandler,
 } from '#/web/test-utils/terminal-session-provider.tsx'
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -83,8 +76,8 @@ describe('TerminalSessionProvider', () => {
         }
 
         await act(async () => {
-          outputHandler?.(outputEvent)
-          bellHandler?.({
+          terminalProviderRealtimeHarness.emitOutput(outputEvent)
+          terminalProviderRealtimeHarness.emitBell({
             terminalRuntimeSessionId: 'term-111111111111111111111',
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
@@ -92,15 +85,15 @@ describe('TerminalSessionProvider', () => {
             processName: 'zsh',
             canonicalTitle: null,
           })
-          titleHandler?.({
+          terminalProviderRealtimeHarness.emitTitle({
             terminalRuntimeSessionId: 'term-111111111111111111111',
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
             workspaceId: REPO_ID,
             canonicalTitle: '~/Developer/goblin — npm run dev',
           })
-          identityHandler?.(identityEvent)
-          lifecycleHandler?.(lifecycleEvent)
+          terminalProviderRealtimeHarness.emitIdentity(identityEvent)
+          terminalProviderRealtimeHarness.emitLifecycle(lifecycleEvent)
         })
 
         expect(session.handleOutput).toHaveBeenCalledWith(outputEvent)
@@ -110,12 +103,12 @@ describe('TerminalSessionProvider', () => {
         expect(getProbe().summaries[0]?.hasBell).toBe(true)
 
         await act(async () => {
-          exitHandler?.(terminalExitEvent('term-222222222222222222222'))
+          terminalProviderRealtimeHarness.emitExit('term-222222222222222222222')
         })
         expect(getProbe().terminalIds).toEqual(['term-111111111111111111111'])
 
         await act(async () => {
-          sessionClosedHandler?.({
+          terminalProviderRealtimeHarness.emitSessionClosed({
             terminalRuntimeSessionId: 'term-111111111111111111111',
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',

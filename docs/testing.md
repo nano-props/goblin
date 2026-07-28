@@ -107,6 +107,10 @@ and `src/web/test-utils`. Importing them pulls in the side-effects
 Shared test utilities use the same 1500-line oversized-surface tripwire as
 test files so fixture extraction cannot merely hide severe size debt in a
 harness. Treat roughly 1000 lines as a review signal, not a mandatory split.
+Extract a harness to share a real boundary or encapsulate noisy, unsafe state,
+not solely to shorten its only consumer. A single-consumer harness should make
+the combined surface smaller or safer; prefer fail-fast actions over exported
+nullable callbacks that can silently skip the behavior under test.
 When a harness installs module mocks, import it before every production-graph
 runtime import. If the test also consumes harness exports, use one leading
 named import rather than a separate side-effect import of the same module.

@@ -304,7 +304,7 @@ export const REPO_ID = workspaceIdFixture('goblin+file:///tmp/goblin-terminal-pr
 const BRANCH_NAME = 'feature/worktree'
 export const WORKTREE_PATH = '/tmp/goblin-terminal-provider-worktree'
 
-export function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
+function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
   return {
     terminalRuntimeSessionId: terminalSessionId,
     terminalRuntimeGeneration: 1,
@@ -315,16 +315,45 @@ export function terminalExitEvent(terminalSessionId: string): TerminalExitEvent 
   }
 }
 
-export let exitHandler: ((event: TerminalExitEvent) => void) | null = null
-export let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
-export let bellHandler: ((event: TerminalBellRealtimeEvent) => void) | null = null
-export let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
-export let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = null
-export let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
+let exitHandler: ((event: TerminalExitEvent) => void) | null = null
+let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
+let bellHandler: ((event: TerminalBellRealtimeEvent) => void) | null = null
+let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
+let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = null
+let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
 let sessionsChangedHandler: ((event: TerminalSessionsChangedEvent) => void) | null = null
 let sessionsChangedRevision = 0
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
-export let sessionClosedHandler: ((event: TerminalSessionClosedEvent) => void) | null = null
+let sessionClosedHandler: ((event: TerminalSessionClosedEvent) => void) | null = null
+
+function requireRealtimeHandler<T>(name: string, handler: T | null): T {
+  if (handler === null) throw new Error(`terminal provider did not subscribe to ${name}`)
+  return handler
+}
+
+export const terminalProviderRealtimeHarness = {
+  emitOutput(event: TerminalOutputEvent): void {
+    requireRealtimeHandler('terminal output', outputHandler)(event)
+  },
+  emitBell(event: TerminalBellRealtimeEvent): void {
+    requireRealtimeHandler('terminal bell', bellHandler)(event)
+  },
+  emitTitle(event: TerminalTitleEvent): void {
+    requireRealtimeHandler('terminal title', titleHandler)(event)
+  },
+  emitIdentity(event: TerminalIdentityRealtimeEvent): void {
+    requireRealtimeHandler('terminal identity', identityHandler)(event)
+  },
+  emitLifecycle(event: TerminalLifecycleRealtimeEvent): void {
+    requireRealtimeHandler('terminal lifecycle', lifecycleHandler)(event)
+  },
+  emitExit(terminalSessionId: string): void {
+    requireRealtimeHandler('terminal exit', exitHandler)(terminalExitEvent(terminalSessionId))
+  },
+  emitSessionClosed(event: TerminalSessionClosedEvent): void {
+    requireRealtimeHandler('terminal session close', sessionClosedHandler)(event)
+  },
+}
 type OptionalIdentityRevision<T> = T extends unknown
   ? Omit<T, 'identityRevision'> & { identityRevision?: number }
   : never
@@ -526,114 +555,6 @@ export function resetTerminalSessionProviderHarness() {
     defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
   )
   document.body.innerHTML = ''
-  Object.defineProperty(window, 'goblinNative', {
-    configurable: true,
-    value: {
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      invokeIpc: vi.fn(async () => []),
-      abortIpc: vi.fn(),
-      onEvent: vi.fn(() => () => {}),
-      pathForFile: vi.fn(() => ''),
-      terminal: {
-        attach: vi.fn(async () => ({
-          ok: true,
-          frame: 'snapshot' as const,
-          terminalProjectionEffect: { kind: 'none' as const },
-          terminalRuntimeSessionId: 'unused',
-          terminalRuntimeGeneration: 1,
-          snapshot: '',
-          snapshotSeq: 0,
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open',
-          message: null,
-          controller: { clientId: 'client_local', status: 'connected' as const },
-          canonicalSize: { cols: 80, rows: 24 },
-        })),
-        restart: vi.fn(async () => restartResult()),
-        write: vi.fn(async () => ({ status: 'accepted' as const })),
-        resize: vi.fn(async () => ({ ok: false as const, message: 'not configured' })),
-        takeover: vi.fn(async () => ({
-          ok: true as const,
-          terminalRuntimeSessionId: 'term-111111111111111111111',
-          terminalRuntimeGeneration: 1,
-          role: 'controller' as const,
-          controllerStatus: 'connected' as const,
-          controller: { clientId: 'client_local', status: 'connected' as const },
-          canonicalSize: { cols: 80, rows: 24 },
-          phase: 'open' as const,
-        })),
-        close: closeMock,
-        notifyBell: vi.fn(async () => true),
-        setBadge: vi.fn(async () => {}),
-        recoverSessions: async (input: { workspaceId: typeof REPO_ID }) => ({
-          revision: Math.max(1, sessionsChangedRevision),
-          sessions: completeServerSessions(await listSessionsMock(input)),
-        }),
-        onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
-          outputHandler = cb
-          return () => {}
-        }),
-        onBell: vi.fn((cb: (event: TerminalBellRealtimeEvent) => void) => {
-          bellHandler = cb
-          return () => {}
-        }),
-        onTitle: vi.fn((cb: (event: TerminalTitleEvent) => void) => {
-          titleHandler = cb
-          return () => {}
-        }),
-        onExit: vi.fn((cb: (event: TerminalExitEvent) => void) => {
-          exitHandler = cb
-          return () => {}
-        }),
-        onIdentity: vi.fn((cb: (event: TerminalIdentityRealtimeEvent) => void) => {
-          identityHandler = cb
-          return () => {}
-        }),
-        onLifecycle: vi.fn((cb: (event: TerminalLifecycleRealtimeEvent) => void) => {
-          lifecycleHandler = cb
-          return () => {}
-        }),
-        onSessionsChanged: vi.fn((cb) => {
-          sessionsChangedHandler = cb
-          return () => {
-            if (sessionsChangedHandler === cb) sessionsChangedHandler = null
-          }
-        }),
-        onSessionClosed: vi.fn(() => () => {}),
-      },
-      workspacePaneTabs: {
-        replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
-        update: vi.fn(async () => []),
-        list: async (input: { workspaceId: string }) => ({
-          revision: 1,
-          entries: await listWorkspaceTabsMock(input),
-        }),
-        onChanged: vi.fn((cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => {
-          workspaceTabsChangedHandler = cb
-          return () => {
-            if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
-          }
-        }),
-      },
-    },
-  })
-  Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
-    configurable: true,
-    value: {
-      runtime: {
-        kind: 'web',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [],
-      },
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    },
-  })
   setClientBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
@@ -684,9 +605,9 @@ export function resetTerminalSessionProviderHarness() {
         revision: Math.max(1, sessionsChangedRevision),
         sessions: completeServerSessions(await listSessionsMock(input)),
       }),
-      notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
+      notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
-      setBadge: window.goblinNative.terminal.setBadge ?? vi.fn(() => {}),
+      setBadge: vi.fn(async () => {}),
       onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
         outputHandler = cb
         return () => {}
