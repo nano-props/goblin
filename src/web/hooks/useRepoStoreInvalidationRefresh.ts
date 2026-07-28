@@ -8,7 +8,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { goblinLog } from '#/web/logger.ts'
 export function useRepoStoreInvalidationRefresh() {
   useEffect(() => {
-    const store = { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }
+    const store = { get: useWorkspacesStore.getState }
     return subscribeRepoReadInvalidation(
       (event) => {
         const repo = store.get().workspaces[event.repoId]
