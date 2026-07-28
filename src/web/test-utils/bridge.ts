@@ -4,45 +4,11 @@
 // actions, workspace runtime events, and workspace-pane tab operations.
 // Repo/store fixtures live in #/web/test-utils/repo-store.ts.
 
-import type {
-  GitRemoteProjection,
-  GitWorkspaceProjection,
-  WorkspaceState,
-  RepoBranchState,
-} from '#/web/stores/workspaces/types.ts'
-import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
-import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
-import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  writeWorkspacePaneTabsSnapshotQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import {
-  workspacePaneTabsWithStaticTab,
-  workspacePaneTabsWithoutStaticTab,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  runtimeWorkspacePaneTarget,
-  requiredGitWorkspacePaneTabsTarget,
-  workspacePaneTabsTargetFromRuntime,
-  workspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
+import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
@@ -54,22 +20,13 @@ import type {
   TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneTabsEntry,
-  WorkspacePaneTabsListInput,
-  WorkspacePaneTabsReplaceInput,
-  WorkspacePaneTabsSnapshot,
-  WorkspacePaneTabsUpdateInput,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
   type WorkspacePaneRuntimeCloseResult,
   type WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'

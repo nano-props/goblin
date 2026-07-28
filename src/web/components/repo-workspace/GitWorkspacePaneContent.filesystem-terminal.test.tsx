@@ -1,6 +1,26 @@
 // @vitest-environment jsdom
 
-import '#/web/test-utils/git-workspace-pane-content.tsx'
+import {
+  GitWorkspacePaneContentHarness,
+  REPO_ID,
+  defaultBranchActionSurface,
+  emptyWorktreeSnapshot,
+  emptyTerminalReadContext,
+  filetreeClientMocks,
+  flushAsyncWork,
+  getTestGitWorkspacePanePresentation,
+  gitWorkspacePaneProjection,
+  gitWorktreeFilesystemTarget,
+  navigationWith,
+  preferenceBackedWorkspacePaneTabModel,
+  repoClientMocks,
+  responsiveMocks,
+  staticEntry,
+  terminalCommandContextWith,
+  terminalEntry,
+  terminalSession,
+  workspacePaneTabsTestBridge,
+} from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -31,28 +51,6 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import {
-  GitWorkspacePaneContentHarness,
-  REPO_ID,
-  defaultBranchActionSurface,
-  emptyWorktreeSnapshot,
-  emptyTerminalReadContext,
-  filetreeClientMocks,
-  flushAsyncWork,
-  getTestGitWorkspacePanePresentation,
-  gitWorkspacePaneProjection,
-  gitWorktreeFilesystemTarget,
-  navigationWith,
-  preferenceBackedWorkspacePaneTabModel,
-  repoClientMocks,
-  responsiveMocks,
-  staticEntry,
-  terminalCommandContextWith,
-  terminalEntry,
-  terminalSession,
-  workspacePaneTabsTestBridge,
-} from '#/web/test-utils/git-workspace-pane-content.tsx'
-
 describe('GitWorkspacePaneContent filesystem-terminal', () => {
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'

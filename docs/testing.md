@@ -72,8 +72,9 @@ import a helper from inside another test file.
   `vi.hoisted` boundary in component or provider tests.
 - Redefining `window.localStorage` or `window.sessionStorage` in any test
   file.
-- `vi.stubGlobal('fetch', …)` for routes already covered by
-  `installGoblinTestBridge`.
+- Direct `vi.stubGlobal('fetch', …)` in tests. Use `installGoblinTestBridge`
+  for client routes and `mockFetch()` from `src/test-utils/fetch-mock.ts` for
+  a raw fetch boundary that the bridge does not model.
 - Direct `new KeyboardEvent(...)` construction in tests. Use
   `userEvent.keyboard(...)` for user input; listener-contract tests that must
   inspect repeat or default prevention use `keyboardEventForTest(...)`.
@@ -97,10 +98,14 @@ import a helper from inside another test file.
 
 ## 5. Harnesses
 
-The shared harnesses live under two roots. Importing them pulls in the
-side-effects (`vi.mock(...)`, `globalThis` shims) needed by web tests.
+The shared harnesses live under `src/test-utils`, `src/server/test-utils`,
+and `src/web/test-utils`. Importing them pulls in the side-effects
+(`vi.mock(...)`, `globalThis` shims) needed by their tests.
 Shared test utilities follow the same 1000-line structural ceiling as test
 files so fixture extraction cannot merely move size debt into a harness.
+When a harness installs module mocks, import it before every production-graph
+runtime import. If the test also consumes harness exports, use one leading
+named import rather than a separate side-effect import of the same module.
 
 ### `src/test-utils/render.tsx`
 
@@ -165,9 +170,13 @@ capabilities needed by the behavior suites.
   `fetch` stub. `handlers` is `Record<string, (input) => unknown>` mapping
   IPC pathnames (e.g. `'repo.probe'`) and server routes (e.g.
   `'repo.projection'`) to their test handlers.
-- `resetWorkspacesStore()`, `seedWorkspaceState({...})`, `createBranchSnapshot(...)`,
-  `createRepoBranch(...)`, `createPullRequest(...)` — co-located here
-  so non-repo tests can use them without dragging in the repo store.
+
+### `src/web/test-utils/repo-store.ts`
+
+- Owns repo/store fixtures such as `resetWorkspacesStore()`,
+  `createBranchSnapshot(...)`, `createRepoBranch(...)`, and
+  `createPullRequest(...)`. Import it only when a test needs workspace store
+  state; transport-only tests stay on `bridge.ts` without loading that graph.
 
 ### `src/web/test-utils/host-bootstrap.ts`
 

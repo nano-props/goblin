@@ -1,6 +1,25 @@
 // @vitest-environment jsdom
 
-import '#/web/test-utils/git-workspace-pane-content.tsx'
+import {
+  GitWorkspacePaneContentHarness,
+  REPO_ID,
+  branchActionSurfaceWithCopyPatch,
+  defaultBranchActionSurface,
+  emptyTerminalReadContext,
+  filetreeClientMocks,
+  flushAsyncWork,
+  getTestGitWorkspacePanePresentation,
+  gitWorkspacePaneProjection,
+  gitWorktreeFilesystemTarget,
+  navigationWith,
+  preferenceBackedWorkspacePaneTabModel,
+  repoClientMocks,
+  responsiveMocks,
+  staticEntry,
+  terminalCommandContextWith,
+  terminalEntry,
+  terminalSession,
+} from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -26,27 +45,6 @@ import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresenta
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import {
-  GitWorkspacePaneContentHarness,
-  REPO_ID,
-  branchActionSurfaceWithCopyPatch,
-  defaultBranchActionSurface,
-  emptyTerminalReadContext,
-  filetreeClientMocks,
-  flushAsyncWork,
-  getTestGitWorkspacePanePresentation,
-  gitWorkspacePaneProjection,
-  gitWorktreeFilesystemTarget,
-  navigationWith,
-  preferenceBackedWorkspacePaneTabModel,
-  repoClientMocks,
-  responsiveMocks,
-  staticEntry,
-  terminalCommandContextWith,
-  terminalEntry,
-  terminalSession,
-} from '#/web/test-utils/git-workspace-pane-content.tsx'
-
 describe('GitWorkspacePaneContent status-history', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
     const onCopyPatch = vi.fn()

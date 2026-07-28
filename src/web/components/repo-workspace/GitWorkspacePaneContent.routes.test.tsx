@@ -1,6 +1,24 @@
 // @vitest-environment jsdom
 
-import '#/web/test-utils/git-workspace-pane-content.tsx'
+import {
+  GitWorkspacePaneContentHarness,
+  REPO_ID,
+  defaultBranchActionSurface,
+  emptyTerminalReadContext,
+  filetreeClientMocks,
+  flushAsyncWork,
+  getTestGitWorkspacePanePresentation,
+  gitWorkspacePaneProjection,
+  gitWorktreeFilesystemTarget,
+  navigationWith,
+  preferenceBackedWorkspacePaneTabModel,
+  repoClientMocks,
+  responsiveMocks,
+  staticEntry,
+  terminalCommandContextWith,
+  terminalEntry,
+  terminalSession,
+} from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -22,26 +40,6 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import {
-  GitWorkspacePaneContentHarness,
-  REPO_ID,
-  defaultBranchActionSurface,
-  emptyTerminalReadContext,
-  filetreeClientMocks,
-  flushAsyncWork,
-  getTestGitWorkspacePanePresentation,
-  gitWorkspacePaneProjection,
-  gitWorktreeFilesystemTarget,
-  navigationWith,
-  preferenceBackedWorkspacePaneTabModel,
-  repoClientMocks,
-  responsiveMocks,
-  staticEntry,
-  terminalCommandContextWith,
-  terminalEntry,
-  terminalSession,
-} from '#/web/test-utils/git-workspace-pane-content.tsx'
-
 describe('GitWorkspacePaneContent routes', () => {
   test('offers a compact return to the branch list when the last routed branch no longer exists', () => {
     const repo = seedRepoWithReadModelForTest({
