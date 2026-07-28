@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
 import type { WorkspacePaneRuntimeTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
+import { terminalGitWorktreePresentation, type TerminalCreateResult } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 function requiredWorkspaceLocator(value: string) {
@@ -46,7 +46,7 @@ export function terminalCreateSuccess(
     terminalSessionId,
     admission: {
       kind: 'existing',
-      commit: () => committedTerminalResult(action),
+      commit: vi.fn(({ presentation }) => committedTerminalResult(action, presentation)),
       publishCommittedEffects: vi.fn(),
       abort: vi.fn(),
     },
@@ -54,10 +54,13 @@ export function terminalCreateSuccess(
   }
 }
 
-export function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
+function committedTerminalResult(
+  action: 'created' | 'restored' | 'reused',
+  presentation = terminalGitWorktreePresentation(request.branch),
+) {
   return {
     action,
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },
+    presentation,
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 0,
@@ -73,13 +76,12 @@ export function committedTerminalResult(action: 'created' | 'restored' | 'reused
 
 export function publishedTerminalResult(
   runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
+  canonicalBranch = request.branch,
 ): Extract<TerminalCreateResult, { ok: true }> {
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,
-    ...runtime.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch' as const, branchName: request.branch } },
-    }),
+    ...committedTerminalResult('created', terminalGitWorktreePresentation(canonicalBranch)),
   }
 }
 

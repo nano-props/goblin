@@ -1,7 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
 import {
-  committedTerminalResult,
   deferred,
   paneTabsSnapshot,
   request,
@@ -233,7 +232,7 @@ describe('removal coordination and failure settlement', () => {
 
   test('does not compensate an invariant failure after admission', async () => {
     const runtime = terminalCreateSuccess()
-    const publish = vi.fn(() => committedTerminalResult('created'))
+    const publish = vi.fn(runtime.admission.commit)
     const retire = vi.fn()
     const publishCommittedEffects = vi.fn()
     runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects, abort: retire }
