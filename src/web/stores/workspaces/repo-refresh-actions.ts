@@ -9,7 +9,7 @@ import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
 
 export async function handleRepoInvalidationRefresh(
-  store: RepoRefreshStoreAccess,
+  store: Pick<RepoRefreshStoreAccess, 'get'>,
   event: Pick<RepoReadInvalidationEvent, 'repoId' | 'domain'>,
   workspaceRuntimeId: string,
 ): Promise<void> {
@@ -28,7 +28,7 @@ export async function handleRepoInvalidationRefresh(
   invalidateRepoMetadataQueries(repoId, workspaceRuntimeId)
 }
 
-export async function resyncActiveRepoReadQueries(store: RepoRefreshStoreAccess): Promise<void> {
+export async function resyncActiveRepoReadQueries(store: Pick<RepoRefreshStoreAccess, 'get'>): Promise<void> {
   const pullRequestRefreshes: Promise<void>[] = []
   for (const repo of Object.values(store.get().workspaces)) {
     if (!gitWorkspaceCanExecute(repo)) continue

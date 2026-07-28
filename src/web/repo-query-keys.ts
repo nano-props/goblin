@@ -1,23 +1,27 @@
 import type { RepoPullRequestScope } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export function repoSnapshotQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
+export function repoSnapshotQueryKey(repoRoot: WorkspaceId | null, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'snapshot'] as const
 }
 
 export function repoPullRequestsQueryKey(
-  repoRoot: WorkspaceId,
+  repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
   scope: RepoPullRequestScope,
 ) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'pull-requests', scope] as const
 }
 
-export function repoOperationsQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string, includeSettled = false) {
+export function repoOperationsQueryKey(
+  repoRoot: WorkspaceId | null,
+  workspaceRuntimeId: string,
+  includeSettled = false,
+) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const
 }
 
-export function repoWorktreeStatusQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
+export function repoWorktreeStatusQueryKey(repoRoot: WorkspaceId | null, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const
 }
 

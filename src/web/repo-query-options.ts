@@ -77,7 +77,7 @@ export function repoSnapshotReadModelQueryOptions(
 ) {
   const active = enabled && repoRoot !== null
   return queryOptions({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'snapshot'] as const,
+    queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
     queryFn:
       repoRoot === null
         ? skipToken
@@ -98,7 +98,7 @@ export function repoPullRequestsReadModelQueryOptions(
 ) {
   const active = enabled && repoRoot !== null
   return queryOptions({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'pull-requests', scope] as const,
+    queryKey: repoPullRequestsQueryKey(repoRoot, workspaceRuntimeId, scope),
     queryFn:
       repoRoot === null
         ? skipToken
@@ -123,7 +123,7 @@ export function repoWorktreeStatusReadModelQueryOptions(
 ) {
   const active = enabled && repoRoot !== null
   return queryOptions({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const,
+    queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
     queryFn:
       repoRoot === null
         ? skipToken
@@ -183,7 +183,7 @@ export function repoOperationsReadModelQueryOptions(
   const includeSettled = options.includeSettled === true
   const enabled = options.enabled !== false && repoRoot !== null
   return queryOptions({
-    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const,
+    queryKey: repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled),
     queryFn:
       repoRoot === null
         ? skipToken
