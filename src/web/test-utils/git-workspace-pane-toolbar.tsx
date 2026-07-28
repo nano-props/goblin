@@ -1,9 +1,12 @@
-import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
-import { act, waitFor } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
+import { act } from '@testing-library/react'
 import type { ComponentProps, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -17,7 +20,6 @@ import {
 import {
   gitWorktreePaneFilesystemTarget,
   type WorkspacePaneFilesystemTarget,
-  workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
@@ -25,7 +27,6 @@ import {
 } from '#/web/components/repo-workspace/model.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionContext,
@@ -64,7 +65,6 @@ import {
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import type { GitRemoteProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'

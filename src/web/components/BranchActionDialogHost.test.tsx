@@ -13,6 +13,7 @@ import {
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
+  createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import { act, cleanup } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -25,7 +26,6 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'

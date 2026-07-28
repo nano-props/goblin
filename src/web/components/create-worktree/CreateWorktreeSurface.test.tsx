@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { repoPresentationForTest, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { repoPresentationForTest, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { cleanup, render as rtlRender, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -10,7 +10,6 @@ import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateW
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

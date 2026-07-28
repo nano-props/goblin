@@ -69,6 +69,7 @@ describe('settings source commits', () => {
 
     await mod.setServerWorkspaceExternalAppRecent(recent)
 
+    expect(writesAfterFirstCommit).toBeGreaterThan(0)
     expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(writesAfterFirstCommit)
   })
 

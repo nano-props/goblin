@@ -1,7 +1,6 @@
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspaceNavigationHistoryEntry,

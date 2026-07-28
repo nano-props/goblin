@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { act, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'

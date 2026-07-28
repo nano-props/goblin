@@ -17,7 +17,6 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
 
 stubI18n()

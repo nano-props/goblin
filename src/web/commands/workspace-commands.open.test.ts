@@ -4,6 +4,7 @@ import {
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
+  createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-commands.ts'
@@ -19,7 +20,6 @@ import {
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -39,7 +39,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection, readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRootPath,
@@ -59,7 +59,6 @@ import {
   formatTerminalFilesystemTargetKeyForPath,
 } from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {

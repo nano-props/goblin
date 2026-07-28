@@ -9,6 +9,14 @@ const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
 const DEFAULT_TEST_FILE_LINE_BUDGET = 1_000
+const SHARED_TEST_UTILITY_GLOBS = [
+  'src/test-utils/**/*.ts',
+  'src/test-utils/**/*.tsx',
+  'src/server/test-utils/**/*.ts',
+  'src/server/test-utils/**/*.tsx',
+  'src/web/test-utils/**/*.ts',
+  'src/web/test-utils/**/*.tsx',
+]
 
 const repositoryPolicyLabels = [
   'hand-rolled React root',
@@ -93,14 +101,7 @@ describe('test harness policy', () => {
   })
 
   test('keeps shared test utilities within the structural line budget', async () => {
-    const files = await glob([
-      'src/test-utils/**/*.ts',
-      'src/test-utils/**/*.tsx',
-      'src/server/test-utils/**/*.ts',
-      'src/server/test-utils/**/*.tsx',
-      'src/web/test-utils/**/*.ts',
-      'src/web/test-utils/**/*.tsx',
-    ])
+    const files = await glob(SHARED_TEST_UTILITY_GLOBS)
     const violations: string[] = []
 
     for (const file of files) {
@@ -113,16 +114,40 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
+  test('keeps shared test utility imports live', async () => {
+    const files = await glob(SHARED_TEST_UTILITY_GLOBS)
+    const violations: string[] = []
+
+    for (const file of files) {
+      const source = await readFile(file, 'utf8')
+      for (const name of unusedImportNames(source, file)) violations.push(`${file}: ${name}`)
+    }
+
+    expect(violations).toEqual([])
+  })
+
   test('keeps every test file under a named suite', async () => {
     const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
     const violations: string[] = []
 
     for (const file of files) {
       const source = await readFile(file, 'utf8')
-      if (!/\bdescribe\s*\(/u.test(source)) violations.push(file)
+      if (!hasNamedTopLevelSuite(source, file)) violations.push(file)
     }
 
     expect(violations).toEqual([])
+  })
+
+  test('recognizes only top-level named Vitest suites', () => {
+    expect(
+      hasNamedTopLevelSuite("import { describe } from 'vitest'; describe('suite', () => {})", 'fixture.test.ts'),
+    ).toBe(true)
+    expect(hasNamedTopLevelSuite("// describe('comment only', () => {})", 'fixture.test.ts')).toBe(false)
+    expect(hasNamedTopLevelSuite('const note = "describe(\'string only\', () => {})"', 'fixture.test.ts')).toBe(false)
+    expect(hasNamedTopLevelSuite("import { describe } from 'vitest'; describe(() => {})", 'fixture.test.ts')).toBe(
+      false,
+    )
+    expect(hasNamedTopLevelSuite("function describe() {}; describe('local', () => {})", 'fixture.test.ts')).toBe(false)
   })
 
   test('keeps raw keyboard event construction behind the listener-contract helper', async () => {
@@ -222,6 +247,42 @@ function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
   const analysis = readFile(file, 'utf8').then((source) => analyzeSource(source, file))
   analysisByFile.set(file, analysis)
   return analysis
+}
+
+function hasNamedTopLevelSuite(source: string, file: string): boolean {
+  const ast = parse(source, {
+    sourceType: 'module',
+    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
+  })
+  let found = false
+  traverse(ast, {
+    CallExpression(path) {
+      if (path.getFunctionParent() || !isImportedIdentifier(path.get('callee'), 'vitest', 'describe')) return
+      const name = argumentPaths(path)[0]
+      if (name?.isStringLiteral() && name.node.value.trim().length > 0) {
+        found = true
+        path.stop()
+      }
+    },
+  })
+  return found
+}
+
+function unusedImportNames(source: string, file: string): string[] {
+  const ast = parse(source, {
+    sourceType: 'module',
+    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
+  })
+  const names: string[] = []
+  traverse(ast, {
+    Program(path) {
+      for (const [name, binding] of Object.entries(path.scope.bindings)) {
+        if (binding.kind === 'module' && !binding.referenced) names.push(name)
+      }
+      path.stop()
+    },
+  })
+  return names
 }
 
 function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {

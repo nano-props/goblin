@@ -1,11 +1,14 @@
-import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'

@@ -1,7 +1,6 @@
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {

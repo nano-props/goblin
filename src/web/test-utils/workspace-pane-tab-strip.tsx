@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'

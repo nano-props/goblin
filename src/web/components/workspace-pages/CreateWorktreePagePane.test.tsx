@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -9,7 +9,6 @@ import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'

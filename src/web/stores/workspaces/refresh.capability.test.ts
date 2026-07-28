@@ -1,4 +1,4 @@
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, seedRepoReadModelQueryData } from '#/web/test-utils/repo-store.ts'
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -22,7 +22,6 @@ import {
   cachedRepoStatus,
   createWorktreeAction,
 } from '#/web/stores/workspaces/refresh-test-utils.ts'
-import { seedRepoReadModelQueryData } from '#/web/test-utils/repo-store.ts'
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import {
   preferredWorkspacePaneTabForTarget,

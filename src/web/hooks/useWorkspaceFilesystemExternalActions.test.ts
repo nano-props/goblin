@@ -1,7 +1,6 @@
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { runWorkspaceFilesystemExternalAction } from '#/web/hooks/useWorkspaceFilesystemExternalActions.ts'
 

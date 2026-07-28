@@ -1,8 +1,14 @@
-import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import {
+  dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab,
+  dispatchShowWorkspacePaneStaticTabAction,
+} from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -17,7 +23,6 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,

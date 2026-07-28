@@ -81,7 +81,6 @@ export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPres
 
 export function seedRepoShellForTest(options: {
   id: string
-  currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
   remote?: Partial<GitRemoteProjection>
@@ -229,7 +228,6 @@ export function seedRepoWithReadModelForTest(options: {
   const repo = seedRepoShellForTest({
     id: options.id,
     workspaceRuntimeId: options.workspaceRuntimeId,
-    currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
     remoteLifecycle: options.remoteLifecycle,

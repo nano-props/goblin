@@ -1,13 +1,15 @@
 // @vitest-environment node
 
 import path from 'node:path'
-import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import {
+  testPhysicalWorktreeExecutionCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
+} from '#/server/test-utils/physical-worktree-identity.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   createTerminalSessionEnsurer,
   type TerminalSessionEnsureContext,
 } from '#/server/terminal/terminal-session-ensurer.ts'
-import { issueTestPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'

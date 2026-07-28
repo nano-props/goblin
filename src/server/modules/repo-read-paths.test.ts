@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { RepoSource } from '#/server/modules/repo-source.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
@@ -314,7 +315,16 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    void readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
+    const projection = readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
+    let settled = false
+    void projection.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
     await snapshotStarted.promise
     if (!observedSignal) throw new Error('missing snapshot section signal')
     // A fresh, never-aborting signal is still wired through to the
@@ -322,7 +332,9 @@ describe('repo projection section deadlines', () => {
     // that will never fire on its own.
     expect(observedSignal.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000)
+    await flushMicrotasks()
     expect(observedSignal.aborted).toBe(false)
+    expect(settled).toBe(false)
   })
 
   test('cancels every section when the caller signal fires', async () => {

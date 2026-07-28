@@ -21,7 +21,6 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,

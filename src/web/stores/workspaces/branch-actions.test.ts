@@ -3,6 +3,7 @@ import {
   repoPresentationFromQueryForTest,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
+  createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -17,7 +18,6 @@ import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-ref
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'

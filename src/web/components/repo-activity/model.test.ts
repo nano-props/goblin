@@ -1,4 +1,8 @@
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  seedRepoWithReadModelForTest,
+  seedRepoShellForTest,
+  resetWorkspacesStore,
+} from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
 import {
   getRepoActivity,
@@ -6,9 +10,7 @@ import {
   type RepoActivityProjectionRepo,
   repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
-import { seedRepoShellForTest } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import {
   markRepoOperationTargets,
   nextRepoOperationId,

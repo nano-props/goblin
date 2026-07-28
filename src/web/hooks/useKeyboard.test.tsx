@@ -4,6 +4,7 @@ import {
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
+  createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -19,7 +20,6 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import {
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,

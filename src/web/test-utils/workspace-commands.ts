@@ -1,14 +1,9 @@
-import {
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/repo-store.ts'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { afterEach, beforeEach, vi } from 'vitest'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   runCloseCurrentWorkspacePaneTabCommand as runCloseCurrentWorkspacePaneTabCommandRaw,
   runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,
-  runConfirmCloseTerminalWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand as runMoveWorkspacePaneTabCommandRaw,
   runNewTerminalTabCommand as runNewTerminalTabCommandRaw,
   runSelectWorkspacePaneTabByIndexCommand as runSelectWorkspacePaneTabByIndexCommandRaw,
@@ -16,21 +11,16 @@ import {
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  resetTerminalActionDialogsStore,
-  useTerminalActionDialogsStore,
-} from '#/web/stores/workspaces/terminal-action-dialogs.ts'
+import { resetTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -57,7 +47,6 @@ import {
 } from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   observedPrimaryWindowNavigationActionsForTest,

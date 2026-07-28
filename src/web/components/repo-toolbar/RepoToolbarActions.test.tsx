@@ -5,6 +5,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
+  createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -13,7 +14,6 @@ import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 

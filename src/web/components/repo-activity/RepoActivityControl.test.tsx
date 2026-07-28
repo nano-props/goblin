@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { act, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'

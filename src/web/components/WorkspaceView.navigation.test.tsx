@@ -4,13 +4,13 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   setWorkspaceProbeForTest,
+  createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import * as repoDataQuery from '#/web/repo-query-runtime.ts'
 import {

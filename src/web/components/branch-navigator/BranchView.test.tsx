@@ -5,6 +5,7 @@ import {
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
+  createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { fireEvent, screen } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -18,7 +19,6 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -21,7 +21,6 @@ import {
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 
 stubI18n()
 

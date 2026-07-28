@@ -3,6 +3,7 @@ import {
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
+  createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -19,7 +20,6 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import {
   observedPrimaryWindowNavigationActionsForTest,
   type ObservedPrimaryWindowNavigationActionsForTest,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { HistoryState } from '@tanstack/history'
@@ -18,7 +18,6 @@ import {
   resetPrimaryWindowNavigationForTest,
 } from '#/web/primary-window-navigation-lifecycle.ts'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneRouteTarget } from '#/web/primary-window-route-navigation.ts'

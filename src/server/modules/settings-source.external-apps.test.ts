@@ -128,7 +128,7 @@ describe('settings source external app recents', () => {
   })
 
   test('rejects invalid target and item inputs without touching disk', async () => {
-    prepareSettingsDataDir()
+    const dataDir = prepareSettingsDataDir()
     const mod = await import('#/server/modules/settings-source.ts')
 
     await expect(
@@ -153,6 +153,7 @@ describe('settings source external app recents', () => {
       }),
     ).rejects.toThrow('invalid workspace external-app item')
 
+    expect(readdirSync(dataDir)).toEqual([])
     expect(await mod.getServerWorkspaceSettings()).toEqual([])
   })
 
