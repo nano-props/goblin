@@ -18,13 +18,10 @@ import {
   terminalSessionCoordinates,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -101,29 +98,29 @@ describe('WorkspacePane terminal routes', () => {
       focusTerminal: workspaceTerminalCommands.focusTerminal,
       closeTerminalByDescriptor,
     })
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async (_target, route, options) => {
-      if (route?.kind === 'terminal') {
-        useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, route.terminalSessionId)
-      }
-      useWorkspacesStore
-        .getState()
-        .setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', workspaceId: workspaceId },
-          route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
-        )
-      options?.onCommit?.()
-      return true
-    })
-    const workspaceNavigation: PrimaryWindowNavigationActions = {
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async (_target, route, options) => {
+        if (route?.kind === 'terminal') {
+          useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, route.terminalSessionId)
+        }
+        useWorkspacesStore
+          .getState()
+          .setWorkspacePaneTabForTarget(
+            { kind: 'workspace-root', workspaceId: workspaceId },
+            route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
+          )
+        options?.onCommit?.()
+        return true
+      },
+    )
+    const workspaceNavigation: AppNavigationActions = {
       ...navigation,
       commitFilesystemWorkspacePaneRoute,
     }
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={workspaceNavigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={workspaceNavigation}>
           <TerminalSessionContext value={workspaceTerminalCommands}>
             <TerminalSessionReadContext value={workspaceTerminalReadContext}>
               <WorkspacePane
@@ -132,7 +129,7 @@ describe('WorkspacePane terminal routes', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -185,13 +182,13 @@ describe('WorkspacePane terminal routes', () => {
         workspacePaneRuntimeTabEntry('terminal', exitedSessionId),
       ],
     })
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async () => false)
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async () => false,
+    )
     const workspaceNavigation = { ...navigation, commitFilesystemWorkspacePaneRoute }
     const workspace = (readContext: TerminalSessionReadContextValue, routeSessionId = exitedSessionId) => (
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={workspaceNavigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={workspaceNavigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
               <WorkspacePane
@@ -203,7 +200,7 @@ describe('WorkspacePane terminal routes', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>
     )
     const { rerender } = render(
@@ -259,13 +256,13 @@ describe('WorkspacePane terminal routes', () => {
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', retainedSessionId)],
     })
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async () => false)
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async () => false,
+    )
     const actions = { ...navigation, commitFilesystemWorkspacePaneRoute }
     const workspace = (readContext: TerminalSessionReadContextValue) => (
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={actions}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={actions}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
               <WorkspacePane
@@ -277,7 +274,7 @@ describe('WorkspacePane terminal routes', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>
     )
 
@@ -319,14 +316,14 @@ describe('WorkspacePane terminal routes', () => {
     })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -346,8 +343,8 @@ describe('WorkspacePane terminal routes', () => {
     const onBackToBranchNavigator = vi.fn()
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -358,7 +355,7 @@ describe('WorkspacePane terminal routes', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -449,8 +446,8 @@ describe('WorkspacePane terminal routes', () => {
       workspacePaneRoute: WorkspacePaneRoute | null,
       nextReadContext: TerminalSessionReadContextValue = readContext,
     ) => (
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={testNavigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={testNavigation}>
           <TerminalSessionContext value={commandContext}>
             <TerminalSessionReadContext value={nextReadContext}>
               <WorkspacePane
@@ -460,7 +457,7 @@ describe('WorkspacePane terminal routes', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>
     )
     const { rerender } = render(workspace({ kind: 'static', tab: 'status' }))

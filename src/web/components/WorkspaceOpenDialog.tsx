@@ -1,5 +1,5 @@
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 interface WorkspaceOpenDialogProps {
   open: boolean
@@ -8,7 +8,7 @@ interface WorkspaceOpenDialogProps {
 
 export function WorkspaceOpenDialog({ open, onOpenChange }: WorkspaceOpenDialogProps) {
   const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
 
   return (
     <OpenWorkspaceDialog

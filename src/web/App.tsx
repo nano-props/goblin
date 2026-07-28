@@ -9,11 +9,11 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
-// route in primary-window-router.tsx so they survive settings ⇄ workspace
+// route in app-router.tsx so they survive settings ⇄ workspace
 // round-trips. This file handles rendering only.
 
 interface AppProps {
@@ -29,7 +29,7 @@ interface AppProps {
   onReplaceRepoBranch?: (
     workspaceId: WorkspaceId,
     branchName: string,
-    navigationGeneration: PrimaryWindowNavigationGeneration,
+    navigationGeneration: AppNavigationGeneration,
   ) => void
 }
 

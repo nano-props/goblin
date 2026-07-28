@@ -23,7 +23,7 @@ import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWork
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -250,7 +250,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchEmptyWorkspacePane })
 
     const { container } = renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigation}>
+      <AppNavigationProvider value={navigation}>
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
             <GitWorkspacePaneContentHarness
@@ -260,7 +260,7 @@ describe('GitWorkspacePaneContent status-history', () => {
             />
           </BranchActionSurfaceContext>
         </TerminalSessionReadContext>
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
 
     const pathButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -345,7 +345,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
+      <AppNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
             <GitWorkspacePaneContentHarness
@@ -355,7 +355,7 @@ describe('GitWorkspacePaneContent status-history', () => {
             />
           </BranchActionSurfaceContext>
         </TerminalSessionReadContext>
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
 
     const changesButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) =>

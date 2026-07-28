@@ -9,7 +9,7 @@ import {
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
@@ -50,7 +50,7 @@ export function useBranchActionItems(
   options: { workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined },
 ): BranchActionSurface {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const { blocked, busyAction, capabilities, actions } = branchActions
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id

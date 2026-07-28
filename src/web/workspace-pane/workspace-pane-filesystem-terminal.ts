@@ -1,4 +1,4 @@
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import {
   showCreatedTerminalWorkspacePaneRuntimeTab,
   type CreatedTerminalRouteRequest,
@@ -11,7 +11,7 @@ export function showCreatedWorkspacePaneFilesystemTerminal(
   target: WorkspacePaneFilesystemTarget,
   terminalSessionId: string,
   presentation: TerminalPresentation,
-  navigation: PrimaryWindowNavigationActions,
+  navigation: AppNavigationActions,
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   const base = workspacePaneFilesystemTerminalBase(target)

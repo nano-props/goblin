@@ -23,7 +23,7 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
@@ -45,17 +45,17 @@ import {
   formatTerminalFilesystemTargetKey,
   formatTerminalFilesystemTargetKeyForPath,
 } from '#/shared/terminal-filesystem-target-key.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  type ObservedAppNavigationActionsForTest,
+  type AppNavigationOverridesForTest,
   type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
+import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 
 // Command tests need one target, navigation, tab-store, and terminal-projection fixture boundary.
@@ -184,8 +184,8 @@ export let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTa
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
   resetWorkspacePaneActionQueueForTest()
-  resetPrimaryWindowNavigationForTest()
-  primaryWindowQueryClient.clear()
+  resetAppNavigationForTest()
+  appQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
@@ -317,11 +317,11 @@ export function terminalEntry(id: string) {
 }
 
 export function navigationWith(
-  overrides: PrimaryWindowNavigationOverridesForTest = {},
+  overrides: AppNavigationOverridesForTest = {},
   options: { autoSeedInitialRoute?: boolean } = {},
-): ObservedPrimaryWindowNavigationActionsForTest {
+): ObservedAppNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
-  return observedPrimaryWindowNavigationActionsForTest({
+  return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: (workspaceId) =>
       useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),

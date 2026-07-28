@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
@@ -120,7 +120,7 @@ vi.mock('#/web/settings-client.ts', () => ({
 
 describe('settings actions', () => {
   beforeEach(() => {
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
     appDataClientMocks.addRecentWorkspace.mockReset()
     appDataClientMocks.addRecentWorkspace.mockResolvedValue({ recentWorkspaces: [], addedWorkspace: null })
     appDataClientMocks.clearRecentWorkspaces.mockReset()
@@ -200,7 +200,7 @@ describe('settings actions', () => {
   })
 
   test('recordRecentWorkspace syncs recent repos into the settings snapshot cache', async () => {
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     appDataClientMocks.addRecentWorkspace.mockResolvedValue({
       recentWorkspaces: [{ id: WORKSPACE_A }],
       addedWorkspace: { id: WORKSPACE_A },
@@ -209,13 +209,13 @@ describe('settings actions', () => {
 
     await recordRecentWorkspace({ id: WORKSPACE_A })
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       recentWorkspaces: [{ id: 'goblin+file:///tmp/repo-a' }],
     })
   })
 
   test('clearRecentWorkspaceHistory clears recent repos from the settings snapshot cache', async () => {
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ recentWorkspaces: [{ id: WORKSPACE_A }] }),
     )
@@ -223,13 +223,13 @@ describe('settings actions', () => {
 
     await clearRecentWorkspaceHistory()
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       recentWorkspaces: [],
     })
   })
 
   test('restoreWorkspaceAtBoot returns the server-owned workspace restore result', async () => {
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ id: WORKSPACE_A }],
@@ -293,26 +293,26 @@ describe('settings actions', () => {
 
     await refreshGitHubCliDetection()
 
-    expect(primaryWindowQueryClient.getQueryData(githubCliQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(githubCliQueryKey())).toMatchObject({
       available: true,
       version: '2.70.0',
     })
   })
 
   test('setLanEnabled updates runtime settings cache and invalidates LAN info', async () => {
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
+    appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const { setLanEnabled } = await import('#/web/settings-actions.ts')
 
     await setLanEnabled(true)
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lanEnabled: true })
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lanEnabled: true })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: lanInfoQueryKey() })
     invalidateSpy.mockRestore()
   })
 
   test('uses server canonical runtime boolean preferences as cache values', async () => {
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         terminalNotificationsEnabled: false,
@@ -333,7 +333,7 @@ describe('settings actions', () => {
     await setGlobalShortcutDisabled(true)
     await setLanEnabled(true)
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
@@ -342,7 +342,7 @@ describe('settings actions', () => {
   })
 
   test('leaves runtime settings cache unchanged when the server write fails', async () => {
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
     )
@@ -351,13 +351,13 @@ describe('settings actions', () => {
 
     await expect(setTerminalNotificationsEnabled(true)).rejects.toThrow('settings unavailable')
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       terminalNotificationsEnabled: false,
     })
   })
 
   test('uses the server shortcut registration result as the cache value', async () => {
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ globalShortcut: 'Alt+Space', globalShortcutRegistered: true }),
     )
@@ -367,17 +367,14 @@ describe('settings actions', () => {
     const state = await setGlobalShortcut('Ctrl+Space')
 
     expect(state).toEqual({ accelerator: 'Ctrl+Space', registered: false })
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       globalShortcut: 'Ctrl+Space',
       globalShortcutRegistered: false,
     })
   })
 
   test('setRecentWorkspaceExternalAppPreference syncs server workspace settings into the settings snapshot cache', async () => {
-    primaryWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ workspaceSettings: [] }),
-    )
+    appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
     appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({
       workspaceSettings: [
         {
@@ -394,7 +391,7 @@ describe('settings actions', () => {
       itemId: 'editor:vscode',
     })
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       workspaceSettings: [
         {
           workspaceId: WORKSPACE_A,

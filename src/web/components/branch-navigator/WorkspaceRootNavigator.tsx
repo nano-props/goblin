@@ -13,7 +13,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -28,7 +28,7 @@ interface WorkspaceRootNavigatorProps {
 /** The non-Git workspace root is a first-class navigation target, not a synthetic branch. */
 export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: WorkspaceRootNavigatorProps) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const compact = useIsCompactUi()
   const [menuOpen, setMenuOpen] = useState(false)
   const actionVisible = compact || menuOpen

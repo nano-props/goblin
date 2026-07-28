@@ -6,23 +6,23 @@ import type {
   WorkspaceNavigationHistoryEntry,
   WorkspaceNavigationHistoryTraversal,
 } from '#/web/stores/workspaces/types.ts'
-import { currentPrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import { currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import {
   REPO_ID,
   REPO_A_ID,
   BRANCH_NAME,
   historyRestoreOptions,
   WORKTREE_PATH,
-  setupPrimaryWindowNavigationActionsTests,
+  setupAppNavigationActionsTests,
   branchHistoryEntry,
   historyTraversal,
-  createPrimaryWindowNavigationActions,
+  createAppNavigationActions,
   routeNavigation,
-} from '#/web/primary-window-navigation-actions.test-utils.ts'
+} from '#/web/app-navigation-actions.test-utils.ts'
 
-beforeEach(setupPrimaryWindowNavigationActionsTests)
+beforeEach(setupAppNavigationActionsTests)
 
-describe('createPrimaryWindowNavigationActions history traversal', () => {
+describe('createAppNavigationActions history traversal', () => {
   test.each(['back', 'forward'] as const)('moves %s history only after the restored route commits', (direction) => {
     const navigation = routeNavigation()
     let commitRoute: (() => void) | undefined
@@ -42,7 +42,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
     }
     const traversal = { ...historyTraversal(target), direction }
     const commitWorkspaceNavigation = vi.fn(() => true)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
@@ -69,7 +69,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
       seedRepoWithReadModelForTest({ id: REPO_A_ID, branches: [], currentBranchName: null })
       const navigation = routeNavigation()
       const peekWorkspaceNavigation = vi.fn(() => null)
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: REPO_A_ID,
         workspaceOrder: [REPO_A_ID],
         closeWorkspace: vi.fn(),
@@ -77,12 +77,12 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
         commitWorkspaceNavigation: vi.fn(),
         routeNavigation: navigation,
       })
-      const generationBefore = currentPrimaryWindowNavigationGeneration()
+      const generationBefore = currentAppNavigationGeneration()
 
       if (direction === 'back') actions.goBack(REPO_A_ID)
       else actions.goForward(REPO_A_ID)
 
-      expect(currentPrimaryWindowNavigationGeneration()).toBe(generationBefore)
+      expect(currentAppNavigationGeneration()).toBe(generationBefore)
       expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, direction)
     },
   )
@@ -108,7 +108,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
       }
       const peekWorkspaceNavigation = vi.fn(() => traversal)
       const commitWorkspaceNavigation = vi.fn(() => true)
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: REPO_ID,
         workspaceOrder: [REPO_ID],
         closeWorkspace: vi.fn(),
@@ -155,7 +155,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
     const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
       useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
@@ -185,7 +185,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
     const traversal = historyTraversal(target)
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
@@ -212,7 +212,7 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
       const commitWorkspaceNavigation = vi.fn(() => true)
       const navigation = routeNavigation()
       vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
-      const actions = createPrimaryWindowNavigationActions({
+      const actions = createAppNavigationActions({
         currentWorkspaceId: REPO_A_ID,
         workspaceOrder: [REPO_A_ID],
         closeWorkspace: vi.fn(),
@@ -220,20 +220,20 @@ describe('createPrimaryWindowNavigationActions history traversal', () => {
         commitWorkspaceNavigation,
         routeNavigation: navigation,
       })
-      const generationBefore = currentPrimaryWindowNavigationGeneration()
+      const generationBefore = currentAppNavigationGeneration()
 
       if (direction === 'back') actions.goBack(REPO_A_ID)
       else actions.goForward(REPO_A_ID)
 
       expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, direction)
       expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
-      expect(currentPrimaryWindowNavigationGeneration()).toBe(generationBefore)
+      expect(currentAppNavigationGeneration()).toBe(generationBefore)
     },
   )
 
   test('does not open create worktree without a current repo', () => {
     const navigation = routeNavigation()
-    const actions = createPrimaryWindowNavigationActions({
+    const actions = createAppNavigationActions({
       currentWorkspaceId: null,
       workspaceOrder: [],
       closeWorkspace: vi.fn(),

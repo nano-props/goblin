@@ -2,9 +2,9 @@
 
 import { focusManager } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import '#/web/primary-window-queries.ts'
+import '#/web/app-query-client.ts'
 
-describe('primary window query focus events', () => {
+describe('app query focus events', () => {
   afterEach(() => {
     focusManager.setFocused(undefined)
     vi.restoreAllMocks()

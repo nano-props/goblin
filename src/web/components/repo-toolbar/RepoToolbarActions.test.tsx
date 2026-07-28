@@ -13,14 +13,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo')
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   vi.clearAllMocks()
 })
@@ -38,7 +38,7 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <BranchFilterAction repoId={REPO_ID} />
       </QueryClientProvider>,
     )
@@ -54,7 +54,7 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <BranchFilterAction repoId={REPO_ID} />
       </QueryClientProvider>,
     )
@@ -71,7 +71,7 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <CreateWorktreeRowAction repoId={REPO_ID} />
       </QueryClientProvider>,
     )

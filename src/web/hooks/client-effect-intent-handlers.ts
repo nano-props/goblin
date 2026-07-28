@@ -26,7 +26,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -41,12 +41,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
 interface TerminalBellIntentDeps {
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   closeAllOverlays: () => void
 }
 
 interface SharedClientIntentDeps {
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   currentWorkspaceId: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   closeAllOverlays: () => void

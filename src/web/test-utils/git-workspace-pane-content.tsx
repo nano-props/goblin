@@ -36,8 +36,8 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
-  observedPrimaryWindowNavigationActionsForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  observedAppNavigationActionsForTest,
+  type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -46,8 +46,8 @@ import {
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 // RTL has no reusable harness for Git content routing, query state, and terminal/filesystem contexts.
@@ -84,7 +84,7 @@ type GitWorkspacePaneContentHarnessProps = Omit<
 
 export function GitWorkspacePaneContentHarness(props: GitWorkspacePaneContentHarnessProps) {
   return (
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <GitWorkspacePaneContentInner {...props} />
     </QueryClientProvider>
   )
@@ -172,7 +172,7 @@ export function preferenceBackedWorkspacePaneTabModel(repoId: WorkspaceId, branc
 
 beforeEach(() => {
   hoistedResponsiveMocks.compact = false
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({
@@ -276,8 +276,8 @@ export function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-export function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest): PrimaryWindowNavigationActions {
-  return observedPrimaryWindowNavigationActionsForTest({
+export function navigationWith(overrides: AppNavigationOverridesForTest): AppNavigationActions {
+  return observedAppNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},

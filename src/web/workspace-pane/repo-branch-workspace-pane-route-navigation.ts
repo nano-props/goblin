@@ -1,11 +1,11 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 interface WorkspacePaneRouteNavigationOptions {
   replace?: boolean
-  navigationGeneration?: PrimaryWindowNavigationGeneration
+  navigationGeneration?: AppNavigationGeneration
   onCommit?: () => void
   onAbandon?: () => void
   routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }

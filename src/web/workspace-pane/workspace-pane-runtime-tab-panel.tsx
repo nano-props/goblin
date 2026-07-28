@@ -7,7 +7,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { useT } from '#/web/stores/i18n.ts'
@@ -71,7 +71,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
   const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({

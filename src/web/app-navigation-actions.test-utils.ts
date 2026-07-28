@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest'
-import { createPrimaryWindowNavigationActions as createPrimaryWindowNavigationActionsCore } from '#/web/primary-window-navigation-actions.ts'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { createAppNavigationActions as createAppNavigationActionsCore } from '#/web/app-navigation-actions.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
@@ -20,7 +20,7 @@ import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-gua
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-// Vitest has no reusable fixture for primary-window route navigation and workspace history state.
+// Vitest has no reusable fixture for app route navigation and workspace history state.
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/navigation-actions-repo')
 export const REPO_A_ID = workspaceIdForTest('goblin+file:///tmp/repo-a')
 export const REPO_B_ID = workspaceIdForTest('goblin+file:///tmp/repo-b')
@@ -34,7 +34,7 @@ export const historyRestoreOptions = (options: { returnTo?: string | null } = {}
 export const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
 export const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 
-export function setupPrimaryWindowNavigationActionsTests() {
+export function setupAppNavigationActionsTests() {
   resetWorkspacesStore()
   setTerminalSessionCommandBridge(null)
 }
@@ -81,14 +81,14 @@ export function historyTraversal(target: WorkspaceNavigationHistoryEntry): Works
   }
 }
 
-type PrimaryWindowNavigationActionOptions = Parameters<typeof createPrimaryWindowNavigationActionsCore>[0]
-type PrimaryWindowNavigationActionTestOptions = Omit<
-  PrimaryWindowNavigationActionOptions,
+type AppNavigationActionOptions = Parameters<typeof createAppNavigationActionsCore>[0]
+type AppNavigationActionTestOptions = Omit<
+  AppNavigationActionOptions,
   'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
 > &
-  Partial<Pick<PrimaryWindowNavigationActionOptions, 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
+  Partial<Pick<AppNavigationActionOptions, 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
 
-export function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationActionTestOptions) {
+export function createAppNavigationActions(options: AppNavigationActionTestOptions) {
   if (options.currentWorkspaceId && !useWorkspacesStore.getState().workspaces[options.currentWorkspaceId]) {
     const workspace = emptyWorkspace(options.currentWorkspaceId, 'navigation-actions-runtime')
     useWorkspacesStore.setState((state) => ({
@@ -96,7 +96,7 @@ export function createPrimaryWindowNavigationActions(options: PrimaryWindowNavig
     }))
   }
   const store = useWorkspacesStore.getState()
-  return createPrimaryWindowNavigationActionsCore({
+  return createAppNavigationActionsCore({
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     ...options,
@@ -126,7 +126,7 @@ export function markRepoGitUnavailable(workspaceId: string): void {
   })
 }
 
-export function routeNavigation(): PrimaryWindowRouteNavigation {
+export function routeNavigation(): AppRouteNavigation {
   return {
     workspaceSlugForId: vi.fn(() => 'repo-slug'),
     currentWorkspacePaneRoute: () => undefined,

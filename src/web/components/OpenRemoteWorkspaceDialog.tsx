@@ -5,7 +5,7 @@ import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -30,7 +30,7 @@ interface Props {
 export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const [hosts, setHosts] = useState<SshConfigHost[]>([])
   const [hasInclude, setHasInclude] = useState(false)
   const [alias, setAlias] = useState('')

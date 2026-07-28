@@ -10,7 +10,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
@@ -47,7 +47,7 @@ describe('useBackgroundFetch request lifecycle', () => {
     const firstSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
 
     view.rerender(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <BackgroundFetchHost workspaceId={null} />
       </QueryClientProvider>,
     )
@@ -91,7 +91,7 @@ function BackgroundFetchHost({ workspaceId }: { workspaceId: WorkspaceId | null 
 
 function renderBackgroundFetchHost(workspaceId: WorkspaceId | null) {
   return renderInJsdom(
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <BackgroundFetchHost workspaceId={workspaceId} />
     </QueryClientProvider>,
   )

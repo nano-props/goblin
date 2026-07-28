@@ -25,7 +25,7 @@ import {
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type {
   ClientWorkspaceState,
@@ -72,7 +72,7 @@ const mockedWriteClientWorkspaceState = vi.mocked(writeClientWorkspaceState)
 beforeEach(() => {
   resetWorkspacesStore()
   resetFiletreeInteractionStore()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   vi.restoreAllMocks()
   mockedGetExternalAppsSnapshot.mockReset()
   mockedGetExternalAppsSnapshot.mockResolvedValue(defaultExternalAppsSnapshot())
@@ -154,8 +154,8 @@ describe('app bootstrap hooks', () => {
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
     expect(mockedGetExternalAppsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toEqual(settings)
-    expect(primaryWindowQueryClient.getQueryData(externalAppsQueryKey())).toEqual(defaultExternalAppsSnapshot())
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toEqual(settings)
+    expect(appQueryClient.getQueryData(externalAppsQueryKey())).toEqual(defaultExternalAppsSnapshot())
     expect(state.sessionPersistenceReady).toBe(true)
   })
 
@@ -299,7 +299,7 @@ describe('app bootstrap hooks', () => {
         restoredClientWorkspace: rebuiltSession.clientWorkspace,
       },
     )
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
     expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
 

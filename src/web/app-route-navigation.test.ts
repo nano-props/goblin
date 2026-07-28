@@ -4,21 +4,17 @@ import {
   returnToFromHref,
   parsedWorkspacePaneRouteFromTargetHref,
   routeReturnSearch,
-  settleOwnedPrimaryWindowRouteCommit,
-  settlePrimaryWindowRouteCommit,
+  settleOwnedAppRouteCommit,
+  settleAppRouteCommit,
   workspacePaneRouteFromBranchHref,
-} from '#/web/primary-window-route-navigation.ts'
-import {
-  beginPrimaryWindowNavigation,
-  observePrimaryWindowHistoryNavigation,
-  primaryWindowNavigationState,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+} from '#/web/app-route-navigation.ts'
+import { beginAppNavigation, observeAppHistoryNavigation, appNavigationState } from '#/web/app-navigation-lifecycle.ts'
 
-describe('primary window route navigation helpers', () => {
+describe('app route navigation helpers', () => {
   test('settles an awaited owned navigation when a newer presentation abandons it', async () => {
     const navigation = Promise.withResolvers<void>()
     const started = Promise.withResolvers<void>()
-    const committed = settleOwnedPrimaryWindowRouteCommit({
+    const committed = settleOwnedAppRouteCommit({
       targetHref: '/workspace/example/branch/main/tab/status',
       currentHref: () => '/workspace/example/branch/main',
       navigate: async () => {
@@ -28,7 +24,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigation()
+    beginAppNavigation()
 
     await expect(committed).resolves.toBe(false)
     navigation.resolve()
@@ -37,7 +33,7 @@ describe('primary window route navigation helpers', () => {
 
   test('propagates a routed commit effect failure through the awaited transaction', async () => {
     let currentHref = '/start'
-    const committed = settleOwnedPrimaryWindowRouteCommit({
+    const committed = settleOwnedAppRouteCommit({
       targetHref: '/target',
       currentHref: () => currentHref,
       commitEffect: () => {
@@ -45,9 +41,9 @@ describe('primary window route navigation helpers', () => {
       },
       navigate: async (navigationGeneration) => {
         currentHref = '/target'
-        observePrimaryWindowHistoryNavigation({
+        observeAppHistoryNavigation({
           href: currentHref,
-          state: primaryWindowNavigationState({}, navigationGeneration),
+          state: appNavigationState({}, navigationGeneration),
           action: { type: 'PUSH' },
         })
       },
@@ -59,7 +55,7 @@ describe('primary window route navigation helpers', () => {
   test('propagates an abandon effect failure after a newer presentation supersedes the route', async () => {
     const navigation = Promise.withResolvers<void>()
     const started = Promise.withResolvers<void>()
-    const committed = settleOwnedPrimaryWindowRouteCommit({
+    const committed = settleOwnedAppRouteCommit({
       targetHref: '/target',
       currentHref: () => '/start',
       abandonEffect: () => {
@@ -72,7 +68,7 @@ describe('primary window route navigation helpers', () => {
     })
     await started.promise
 
-    beginPrimaryWindowNavigation()
+    beginAppNavigation()
 
     await expect(committed).rejects.toThrow('abandon effect failed')
     navigation.resolve()
@@ -83,7 +79,7 @@ describe('primary window route navigation helpers', () => {
     let currentHref = '/workspace/example/branch/main'
 
     await expect(
-      settlePrimaryWindowRouteCommit({
+      settleAppRouteCommit({
         targetHref: '/workspace/example/branch/main/tab/status',
         navigate: async () => {
           currentHref = '/workspace/example/branch/main/tab/status'
@@ -95,7 +91,7 @@ describe('primary window route navigation helpers', () => {
 
   test('rejects an operation route when navigation is superseded', async () => {
     await expect(
-      settlePrimaryWindowRouteCommit({
+      settleAppRouteCommit({
         targetHref: '/workspace/example/branch/main/tab/status',
         navigate: async () => {},
         currentHref: () => '/workspace/example/branch/main/tab/history',
@@ -107,7 +103,7 @@ describe('primary window route navigation helpers', () => {
     const navigate = vi.fn(async () => {})
 
     await expect(
-      settlePrimaryWindowRouteCommit({
+      settleAppRouteCommit({
         targetHref: '/workspace/example/branch/main/tab/history',
         expectedCurrentHref: '/workspace/example/branch/main/tab/files',
         navigate,
@@ -123,7 +119,7 @@ describe('primary window route navigation helpers', () => {
     const abandonEffect = vi.fn()
 
     await expect(
-      settleOwnedPrimaryWindowRouteCommit({
+      settleOwnedAppRouteCommit({
         targetHref: '/workspace/example/branch/main/terminal/term-2',
         expectedCurrentHref: '/workspace/example/branch/main/terminal/term-1',
         navigate,
@@ -159,7 +155,7 @@ describe('primary window route navigation helpers', () => {
 
   test('propagates an operation route navigation failure', async () => {
     await expect(
-      settlePrimaryWindowRouteCommit({
+      settleAppRouteCommit({
         targetHref: '/workspace/example/branch/main/tab/status',
         navigate: async () => {
           throw new Error('navigation failed')

@@ -5,8 +5,8 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { PrimaryWindowRouterProvider } from '#/web/primary-window-router.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { AppRouterProvider } from '#/web/app-router.tsx'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { reactRootOptions } from '#/web/react-root-options.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -62,10 +62,10 @@ function createTimeoutController(ms: number): {
 
 function AppRoot() {
   return (
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <ResponsiveUiProvider>
         <AuthProvider>
-          <PrimaryWindowRouterProvider />
+          <AppRouterProvider />
         </AuthProvider>
       </ResponsiveUiProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}

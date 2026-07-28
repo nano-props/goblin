@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  beginPrimaryWindowNavigation,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import {
   claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
@@ -18,12 +15,12 @@ type RequiredTerminalFocusRequest = Required<TerminalFocusRequest>
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
 })
 
 afterEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
   document.body.replaceChildren()
 })
 
@@ -55,7 +52,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('admits at most one automatic-focus intent for a presentation generation', () => {
-    const generation = beginPrimaryWindowNavigation()
+    const generation = beginAppNavigation()
     const firstLease = claimTerminalAutoFocus(generation)
 
     expect(firstLease).not.toBeNull()
@@ -67,7 +64,7 @@ describe('terminal presentation focus', () => {
     const createButton = document.createElement('button')
     document.body.appendChild(createButton)
     createButton.focus()
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
 
@@ -84,7 +81,7 @@ describe('terminal presentation focus', () => {
     const popoverTrigger = document.createElement('button')
     document.body.append(createItem, popoverTrigger)
     createItem.focus()
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const beforeMount = rejectedFocus()
     const afterMount = acceptedFocus()
@@ -100,7 +97,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('does not intercept or retire a pending focus intent after a later key', async () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
@@ -122,7 +119,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('retires pending automatic focus when Tab transfers keyboard focus ownership', () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
@@ -137,7 +134,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('retires pending automatic focus after a later pointer action without consuming it', async () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     lease.commit('term-created', focusTerminal)
@@ -153,7 +150,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('retries a committed target when its session materializes at the view boundary', () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const beforeMaterialization = rejectedFocus()
     const afterMaterialization = acceptedFocus()
@@ -169,7 +166,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('releases the focus intent when a focus callback throws', () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
 
     expect(() =>
@@ -184,7 +181,7 @@ describe('terminal presentation focus', () => {
   })
 
   test('does not duplicate focus when navigation commit already reached the session', () => {
-    const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
     const mountedFocusTerminal = acceptedFocus()
@@ -198,13 +195,13 @@ describe('terminal presentation focus', () => {
   })
 
   test('prevents a superseded presentation from focusing its old terminal', () => {
-    const firstLease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const firstLease = claimTerminalAutoFocus(beginAppNavigation())
     if (!firstLease) throw new Error('expected first terminal automatic-focus lease')
     const focusFirst = acceptedFocus()
     firstLease.commit('term-a', focusFirst)
     const firstRequest = focusFirst.mock.calls[0]![1]
 
-    const secondLease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
+    const secondLease = claimTerminalAutoFocus(beginAppNavigation())
     if (!secondLease) throw new Error('expected second terminal automatic-focus lease')
     const focusSecond = acceptedFocus()
     secondLease.commit('term-b', focusSecond)

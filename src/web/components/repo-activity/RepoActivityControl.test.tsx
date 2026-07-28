@@ -11,7 +11,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -174,7 +174,7 @@ describe('RepoActivityControl', () => {
       lastFetchAt: loadedAt,
       loadedAt,
     })
-    const query = primaryWindowQueryClient.getQueryCache().find({ queryKey, exact: true })
+    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('Missing operations query')
     query.setState({ ...query.state, status: 'error', error: new Error('error.repository-boundary-unavailable') })
 
@@ -189,7 +189,7 @@ describe('RepoActivityControl', () => {
 
 function renderControl() {
   return renderInJsdom(
-    <QueryClientProvider client={primaryWindowQueryClient}>
+    <QueryClientProvider client={appQueryClient}>
       <RepoActivityControl repoId={REPO_ID} />
     </QueryClientProvider>,
   )

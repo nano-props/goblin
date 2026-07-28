@@ -13,12 +13,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchView } from '#/web/components/branch-navigator/BranchView.tsx'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -35,8 +32,8 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
 const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
-const navigation: PrimaryWindowNavigationActions = {
-  ...primaryWindowNavigationActionsForTest(),
+const navigation: AppNavigationActions = {
+  ...appNavigationActionsForTest(),
   currentWorkspacePaneRoute: () => undefined,
   activateWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
@@ -67,7 +64,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
 }
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   vi.clearAllMocks()
 })
@@ -181,7 +178,7 @@ describe('BranchView', () => {
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
     })
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
     })
     const readStatus = vi.fn(async () => {
@@ -226,12 +223,12 @@ describe('BranchView', () => {
 
 function renderBranchView() {
   return renderInJsdom(
-    <QueryClientProvider client={primaryWindowQueryClient}>
-      <PrimaryWindowNavigationProvider value={navigation}>
+    <QueryClientProvider client={appQueryClient}>
+      <AppNavigationProvider value={navigation}>
         <TerminalSessionReadContext value={terminalReadContext}>
           <BranchView repoId={REPO_ID} />
         </TerminalSessionReadContext>
-      </PrimaryWindowNavigationProvider>
+      </AppNavigationProvider>
     </QueryClientProvider>,
   )
 }

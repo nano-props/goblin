@@ -4,11 +4,8 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
-import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-window-navigation.ts'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -71,9 +68,9 @@ describe('WorkspaceOpenDialog', () => {
     const onOpenChange = vi.fn()
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
         <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
-      </PrimaryWindowNavigationProvider>,
+      </AppNavigationProvider>,
     )
 
     setInputValue('#open-workspace-path', '~/Developer/repo')
@@ -89,10 +86,8 @@ describe('WorkspaceOpenDialog', () => {
   })
 })
 
-function navigationWith(
-  overrides: Partial<Pick<PrimaryWindowNavigationActions, 'activateWorkspace'>>,
-): PrimaryWindowNavigationActions {
-  return primaryWindowNavigationActionsForTest({
+function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateWorkspace'>>): AppNavigationActions {
+  return appNavigationActionsForTest({
     activateWorkspace: () => {},
     ...overrides,
   })

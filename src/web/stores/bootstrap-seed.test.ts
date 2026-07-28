@@ -74,9 +74,9 @@ describe('client bootstrap seeding', () => {
       getI18nSnapshot: vi.fn(async () => nextSnapshot),
       setI18nPref: vi.fn(async () => nextSnapshot),
     }))
-    const { primaryWindowQueryClient } = await import('#/web/primary-window-queries.ts')
+    const { appQueryClient } = await import('#/web/app-query-client.ts')
     const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lang: 'auto' }))
+    appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lang: 'auto' }))
 
     const { useI18nStore } = await import('#/web/stores/i18n.ts')
 
@@ -98,6 +98,6 @@ describe('client bootstrap seeding', () => {
       pref: 'zh',
       dict: { hello: '你好' },
     })
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lang: 'zh' })
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ lang: 'zh' })
   })
 })

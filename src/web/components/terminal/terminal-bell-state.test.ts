@@ -5,7 +5,7 @@ import { createTerminalBellState } from '#/web/components/terminal/terminal-bell
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { terminalSessionBase } from '#/shared/terminal-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
@@ -20,8 +20,8 @@ const descriptor = terminalDescriptorForTest({
 })
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
-  primaryWindowQueryClient.setQueryData(
+  appQueryClient.clear()
+  appQueryClient.setQueryData(
     settingsSnapshotQueryKey(),
     defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
   )
@@ -60,7 +60,7 @@ describe('terminal bell state', () => {
   test('marks background bells unread and requests a system notification when enabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -84,7 +84,7 @@ describe('terminal bell state', () => {
   test('prefers the server terminal title over process name in system notifications', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -112,7 +112,7 @@ describe('terminal bell state', () => {
     ['goblin+file:///C:/', 'C:\\'],
   ])('derives the system notification title from canonical workspace identity', async (repoRoot, title) => {
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -136,7 +136,7 @@ describe('terminal bell state', () => {
   test('marks bells unread without requesting a system notification when disabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
     )
@@ -155,7 +155,7 @@ describe('terminal bell state', () => {
   test('ignores bells from the visible focused terminal', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -175,7 +175,7 @@ describe('terminal bell state', () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )
@@ -217,7 +217,7 @@ describe('terminal bell state', () => {
   test('reset clears unread and notification debounce state', async () => {
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
     )

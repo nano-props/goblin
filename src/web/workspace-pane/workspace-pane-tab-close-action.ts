@@ -1,7 +1,7 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
@@ -54,10 +54,7 @@ import {
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { terminalLog } from '#/web/logger.ts'
-import {
-  captureUnownedPrimaryWindowNavigationGeneration,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
@@ -67,7 +64,7 @@ export interface CloseWorkspacePaneTabActionOptions {
   worktreeHead?: GitHead
   runtimeView?: WorkspacePaneRuntimeTabSummary
   selectedIdentity?: string | null
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
@@ -89,7 +86,7 @@ export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
   routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   terminalSessionId: string
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
 }
@@ -180,7 +177,7 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
     type: 'terminal',
     runtimeSessionId: options.terminalSessionId,
   })
-  const navigationGeneration = captureUnownedPrimaryWindowNavigationGeneration()
+  const navigationGeneration = captureUnownedAppNavigationGeneration()
   if (navigationGeneration === null) {
     completeWorkspacePaneTabClose(target, closingIdentity)
     return Promise.resolve(false)
@@ -340,7 +337,7 @@ function workspacePaneCloseTransition(
   closingIdentity: string,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null | undefined = target.selectedIdentity,
-  navigationGeneration?: PrimaryWindowNavigationGeneration,
+  navigationGeneration?: AppNavigationGeneration,
   tabEntries: readonly WorkspacePaneTabEntry[] = target.tabEntries,
 ): WorkspacePaneCloseTransition {
   const wasActive = selectedIdentity === closingIdentity
@@ -460,7 +457,7 @@ async function reconcilePresentationAfterCommittedWorkspacePaneClose(operation: 
 async function completeCommittedWorkspacePaneClosePresentation(
   target: WorkspacePaneTabModel,
   transition: WorkspacePaneCloseTransition,
-  navigation: PrimaryWindowNavigationActions,
+  navigation: AppNavigationActions,
 ): Promise<void> {
   if (!transition.wasActive) return
   if (!workspacePaneTabControllerTargetIsCurrent(target)) return

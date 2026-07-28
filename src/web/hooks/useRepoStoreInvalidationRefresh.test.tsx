@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -68,7 +68,7 @@ function Harness() {
 
 function ProjectionObserverHarness() {
   useRepoStoreInvalidationRefresh()
-  const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), primaryWindowQueryClient)
+  const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), appQueryClient)
   return <output>{projection.data?.snapshot?.current ?? 'loading'}</output>
 }
 
@@ -78,18 +78,18 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     openListeners.clear()
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
     storeState.workspaces[WORKSPACE_ID] = workspace()
   })
 
   afterEach(() => {
     listeners.clear()
     openListeners.clear()
-    primaryWindowQueryClient.clear()
+    appQueryClient.clear()
   })
 
   test('handles metadata invalidations through query invalidation only', async () => {
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -128,7 +128,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       }
     })
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <ProjectionObserverHarness />
       </QueryClientProvider>,
     )
@@ -174,7 +174,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       }
     })
     renderInJsdom(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <ProjectionObserverHarness />
       </QueryClientProvider>,
     )
@@ -204,7 +204,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
   })
 
   test('limits repo-runtime invalidations to operation queries', async () => {
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -224,7 +224,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
   })
 
   test('refreshes invalidations even when extra transport metadata is present', async () => {
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {

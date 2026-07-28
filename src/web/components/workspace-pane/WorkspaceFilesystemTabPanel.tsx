@@ -7,7 +7,7 @@ import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/workspace-pane/file-read-command.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import {
@@ -41,7 +41,7 @@ export function WorkspaceFilesystemTabPanel({
     [rootPath, target.kind, workspaceId, workspaceRuntimeId],
   )
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((state) => state.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(workspaceId, rootPath), [rootPath, workspaceId])

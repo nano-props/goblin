@@ -30,8 +30,8 @@ beforeEach(() => {
   vi.doMock('#/web/logger.ts', () => ({
     bootstrapLog: { warn: vi.fn() },
   }))
-  vi.doMock('#/web/primary-window-queries.ts', () => ({
-    primaryWindowQueryClient: {},
+  vi.doMock('#/web/app-query-client.ts', () => ({
+    appQueryClient: {},
   }))
   vi.doMock('@tanstack/react-query', async () => {
     const React = await import('react')
@@ -57,10 +57,10 @@ beforeEach(() => {
         React.createElement(React.Fragment, null, children),
     }
   })
-  vi.doMock('#/web/primary-window-router.tsx', async () => {
+  vi.doMock('#/web/app-router.tsx', async () => {
     const React = await import('react')
     return {
-      PrimaryWindowRouterProvider: () => {
+      AppRouterProvider: () => {
         React.useEffect(() => {
           appMount()
           return appUnmount

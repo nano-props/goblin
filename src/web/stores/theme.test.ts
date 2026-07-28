@@ -302,9 +302,9 @@ describe('theme store OS-appearance sync', () => {
 
   test('setPref syncs the settings snapshot query cache from the server response', async () => {
     installWindow({ matchMedia: createMediaQuery(false) })
-    const { primaryWindowQueryClient } = await import('#/web/primary-window-queries.ts')
+    const { appQueryClient } = await import('#/web/app-query-client.ts')
     const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'macos' }),
     )
@@ -319,7 +319,7 @@ describe('theme store OS-appearance sync', () => {
     const { useThemeStore } = await import('#/web/stores/theme.ts')
     await useThemeStore.getState().setPref('dark')
 
-    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       theme: 'dark',
       colorTheme: 'github',
     })

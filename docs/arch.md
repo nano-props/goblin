@@ -2,7 +2,7 @@
 
 Use this doc for app shell and process control rules.
 
-- Keep one primary `BrowserWindow` by default. Add extra windows only when the product really needs a separate surface.
+- Keep one primary `BrowserWindow` by default. It is the native host's principal and default activation target. Add extra windows only when the product really needs a separate surface, and name them by product role rather than as secondary windows.
 - Put app logic in `src/server/` or `src/shared/`.
 - Keep `src/main/` focused on Electron-native host work; the architecture term is `native host`.
 - Keep overlays centralized in `src/web/hooks/useAppOverlays.ts`.

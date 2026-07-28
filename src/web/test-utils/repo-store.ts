@@ -12,7 +12,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import {
   getRepoSnapshotQueryData,
   getRepoWorktreeStatusQueryData,
@@ -172,7 +172,7 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 
 export function resetWorkspacesStore(): void {
   disposeAllRepoOperationSchedulers()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   useWorkspacesStore.setState({
     workspaces: {},
     workspaceOrder: [],

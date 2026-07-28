@@ -31,21 +31,15 @@ import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspace
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
-import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
+import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
+import { appNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
-import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
-import {
-  usePrimaryWindowHistoryPresentationObserver,
-  useWorkspaceNavigationHistory,
-} from '#/web/workspace-navigation-history.ts'
+import { returnToFromHref, useAppRouteActions } from '#/web/app-route-navigation.ts'
+import { useAppHistoryPresentationObserver, useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type {
   AuthenticatedAppBootstrapResult,
@@ -54,7 +48,7 @@ import type {
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
@@ -71,9 +65,7 @@ const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBoots
 
 export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-failed' | 'workspace-ready'
 
-export function primaryWindowLayoutRouteCallbacks(
-  routeActions: Pick<PrimaryWindowRouteNavigation, 'openSettings' | 'openHome'>,
-) {
+export function appLayoutRouteCallbacks(routeActions: Pick<AppRouteNavigation, 'openSettings' | 'openHome'>) {
   return {
     navigateToSettingsShortcuts: () => routeActions.openSettings('shortcuts'),
     navigateToIndex: () => routeActions.openHome(),
@@ -91,7 +83,7 @@ export function authenticatedAppShellMode(
 
 export function Layout() {
   useSettingsWriteErrorToast()
-  usePrimaryWindowHistoryPresentationObserver()
+  useAppHistoryPresentationObserver()
 
   return (
     <ErrorBoundary>
@@ -249,13 +241,13 @@ function AuthenticatedWorkspaceShell() {
           : null
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
-    useShallow(primaryWindowNavigationStoreActionsFromStore),
+    useShallow(appNavigationStoreActionsFromStore),
   )
-  const routeNavigation = usePrimaryWindowRouteActions()
-  const layoutRouteCallbacks = primaryWindowLayoutRouteCallbacks(routeNavigation)
+  const routeNavigation = useAppRouteActions()
+  const layoutRouteCallbacks = appLayoutRouteCallbacks(routeNavigation)
   const navigation = useMemo(
     () =>
-      createPrimaryWindowNavigationActions({
+      createAppNavigationActions({
         currentWorkspaceId: hydratedRouteWorkspaceId,
         workspaceOrder,
         closeWorkspace,
@@ -293,7 +285,7 @@ function AuthenticatedWorkspaceShell() {
         navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
         navigateToIndex={layoutRouteCallbacks.navigateToIndex}
       />
-      <PrimaryWindowNavigationProvider value={navigation}>
+      <AppNavigationProvider value={navigation}>
         <LayoutOverlayActions
           value={{
             openWorkspacePathDialog: overlays.openWorkspacePathDialog,
@@ -311,7 +303,7 @@ function AuthenticatedWorkspaceShell() {
               onDrop={workspaceDrop.onDrop}
             >
               <Outlet />
-              <PrimaryWindowOverlays
+              <AppOverlays
                 overlays={overlays}
                 workspaceDrop={workspaceDrop}
                 navigation={navigation}
@@ -323,7 +315,7 @@ function AuthenticatedWorkspaceShell() {
             </div>
           </AppRuntimeProjectionProvider>
         </LayoutOverlayActions>
-      </PrimaryWindowNavigationProvider>
+      </AppNavigationProvider>
     </>
   )
 }
@@ -437,17 +429,17 @@ function workspacePaneRouteFromMatches(
   return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
 }
 
-interface PrimaryWindowOverlaysProps {
+interface AppOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   workspaceDrop: ReturnType<typeof useWorkspaceDrop>
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   hydratedRouteWorkspaceId: WorkspaceId | null
   currentWorkspaceRuntimeId: string | null
   currentBranchName: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
 
-function PrimaryWindowOverlays({
+function AppOverlays({
   overlays,
   workspaceDrop,
   navigation,
@@ -455,7 +447,7 @@ function PrimaryWindowOverlays({
   currentWorkspaceRuntimeId,
   currentBranchName,
   currentWorkspacePaneRoute,
-}: PrimaryWindowOverlaysProps) {
+}: AppOverlaysProps) {
   return (
     <>
       <WorkspaceOpenDialog open={overlays.state.openWorkspace.open} onOpenChange={overlays.setOpenWorkspaceOpen} />
@@ -519,7 +511,7 @@ function AuthenticatedWorkspaceSideEffects({
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
   closeAllOverlays: () => void
   openWorkspacePathDialog: () => void
   openCloneRepo: () => void

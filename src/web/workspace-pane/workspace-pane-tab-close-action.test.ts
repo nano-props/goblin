@@ -13,7 +13,7 @@ import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import {
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
@@ -21,13 +21,13 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  type AppNavigationOverridesForTest,
   observeWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -44,11 +44,11 @@ import {
   resetTerminalAutoFocusForTest,
 } from '#/web/terminal-focus.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  registerPrimaryWindowNavigation,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  appNavigationIsCurrent,
+  registerAppNavigation,
+  resetAppNavigationForTest,
+} from '#/web/app-navigation-lifecycle.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-close-repo')
 const BRANCH_NAME = 'feature/worktree-close'
@@ -61,9 +61,9 @@ const WORKTREE_PANE_TARGET = {
 
 beforeEach(() => {
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
   resetWorkspacePaneActionQueueForTest()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   setTerminalSessionCommandBridgeForTest(null)
   installWorkspacePaneTabsTestBridge()
@@ -72,7 +72,7 @@ beforeEach(() => {
 afterEach(() => {
   setTerminalSessionCommandBridgeForTest(null)
   resetTerminalAutoFocusForTest()
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
 })
 
 describe('workspace pane tab close action', () => {
@@ -127,12 +127,12 @@ describe('workspace pane tab close action', () => {
       },
     })
     const commitWorkspacePaneRoute = vi.fn(async () => true)
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async (_target, _route, options) => {
-      options?.onCommit?.()
-      return true
-    })
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async (_target, _route, options) => {
+        options?.onCommit?.()
+        return true
+      },
+    )
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
@@ -214,13 +214,13 @@ describe('workspace pane tab close action', () => {
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
     const bridgeFocus = installPendingTerminalFocusBridge()
     const routeCommit = Promise.withResolvers<void>()
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async (_target, _route, options) => {
-      await routeCommit.promise
-      options?.onCommit?.()
-      return true
-    })
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async (_target, _route, options) => {
+        await routeCommit.promise
+        options?.onCommit?.()
+        return true
+      },
+    )
     const close = dispatchCloseWorkspacePaneTabAction({
       routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
@@ -276,9 +276,9 @@ describe('workspace pane tab close action', () => {
     const updateWorkspaceTabs = vi.fn(async () => await lifecycle.promise)
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     installPendingTerminalFocusBridge()
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async () => true,
+    )
     const close = dispatchCloseWorkspacePaneTabAction({
       routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
@@ -294,7 +294,7 @@ describe('workspace pane tab close action', () => {
     await expect(close).resolves.toBe(false)
 
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-    const nextPresentation = beginPrimaryWindowNavigation()
+    const nextPresentation = beginAppNavigation()
     const nextFocusLease = claimTerminalAutoFocus(nextPresentation)
     expect(nextFocusLease).not.toBeNull()
     nextFocusLease?.release()
@@ -442,12 +442,12 @@ describe('workspace pane tab close action', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async (_target, _route, options) => {
-      options?.onCommit?.()
-      return true
-    })
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async (_target, _route, options) => {
+        options?.onCommit?.()
+        return true
+      },
+    )
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
@@ -715,12 +715,12 @@ describe('workspace pane tab close action', () => {
       selectTerminal: vi.fn(),
     })
     const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
-    const commitFilesystemWorkspacePaneRoute = vi.fn<
-      PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']
-    >(async (_target, _route, options) => {
-      options?.onCommit?.()
-      return true
-    })
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async (_target, _route, options) => {
+        options?.onCommit?.()
+        return true
+      },
+    )
 
     await expect(
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
@@ -747,11 +747,11 @@ describe('workspace pane tab close action', () => {
       }),
     )
 
-    resetPrimaryWindowNavigationForTest()
-    const explicitGeneration = beginPrimaryWindowNavigation()
-    const explicitNavigation = registerPrimaryWindowNavigation(explicitGeneration, '/pending-explicit-navigation')
+    resetAppNavigationForTest()
+    const explicitGeneration = beginAppNavigation()
+    const explicitNavigation = registerAppNavigation(explicitGeneration, '/pending-explicit-navigation')
     if (!explicitNavigation) throw new Error('missing explicit navigation registration')
-    const passiveCommit = vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
+    const passiveCommit = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>()
 
     await expect(
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
@@ -770,7 +770,7 @@ describe('workspace pane tab close action', () => {
     ).resolves.toBe(false)
 
     expect(passiveCommit).not.toHaveBeenCalled()
-    expect(primaryWindowNavigationIsCurrent(explicitGeneration)).toBe(true)
+    expect(appNavigationIsCurrent(explicitGeneration)).toBe(true)
     explicitNavigation.release()
   })
 
@@ -788,8 +788,7 @@ describe('workspace pane tab close action', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    const commitFilesystemWorkspacePaneRoute =
-      vi.fn<PrimaryWindowNavigationActions['commitFilesystemWorkspacePaneRoute']>()
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>()
 
     await expect(
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
@@ -810,9 +809,9 @@ describe('workspace pane tab close action', () => {
   })
 })
 
-function navigationWith(overrides: PrimaryWindowNavigationOverridesForTest = {}): PrimaryWindowNavigationActions {
+function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
-  return observedPrimaryWindowNavigationActionsForTest({
+  return observedAppNavigationActionsForTest({
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),
     cycleWorkspace: vi.fn(),

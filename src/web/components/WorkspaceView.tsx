@@ -25,7 +25,7 @@ import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
@@ -60,7 +60,7 @@ interface Props {
   onReplaceRepoBranch?: (
     workspaceId: WorkspaceId,
     branchName: string,
-    navigationGeneration: PrimaryWindowNavigationGeneration,
+    navigationGeneration: AppNavigationGeneration,
   ) => void
 }
 

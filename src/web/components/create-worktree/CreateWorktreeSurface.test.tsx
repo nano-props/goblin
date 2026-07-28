@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -25,7 +25,7 @@ vi.mock('#/web/repo-client.ts', async () => {
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
@@ -48,7 +48,7 @@ afterEach(() => {
 })
 
 function render(ui: ReactElement) {
-  return rtlRender(<QueryClientProvider client={primaryWindowQueryClient}>{ui}</QueryClientProvider>)
+  return rtlRender(<QueryClientProvider client={appQueryClient}>{ui}</QueryClientProvider>)
 }
 
 describe('CreateWorktreePageBody', () => {
@@ -128,7 +128,7 @@ describe('CreateWorktreePageBody', () => {
     ).toBe(true)
 
     view.rerender(
-      <QueryClientProvider client={primaryWindowQueryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <CreateWorktreePageBody repo={createRepoWithCreatedWorktree()} onCancel={onCancel} onCreate={onCreate} />
       </QueryClientProvider>,
     )

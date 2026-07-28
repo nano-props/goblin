@@ -49,10 +49,7 @@ import type {
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -82,11 +79,11 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import {
   observeWorkspacePaneRouteForTest,
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedBranchRouteNavigationForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
-  type PrimaryWindowNavigationOverridesForTest,
+  type ObservedAppNavigationActionsForTest,
+  type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
 // RTL has no reusable harness for Git toolbar routing, tab state, and external-app settings.
@@ -247,7 +244,7 @@ export function WorkspaceOpenExternallyMenu({ target }: { target: WorkspacePaneF
 export function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
-  navigation: ObservedPrimaryWindowNavigationActionsForTest
+  navigation: ObservedAppNavigationActionsForTest
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   workspacePaneTabs?: WorkspacePaneTabEntry[]
@@ -441,7 +438,7 @@ export function renderToolbar(options: {
   })
   const { container, rerender } = renderInJsdom(
     <QueryClientProvider client={queryClient}>
-      <PrimaryWindowNavigationProvider value={navigation}>
+      <AppNavigationProvider value={navigation}>
         <TerminalSessionContext value={commandContext}>
           <TerminalSessionReadContext value={readContext}>
             <GitWorkspacePaneToolbarHarness
@@ -453,7 +450,7 @@ export function renderToolbar(options: {
             />
           </TerminalSessionReadContext>
         </TerminalSessionContext>
-      </PrimaryWindowNavigationProvider>
+      </AppNavigationProvider>
     </QueryClientProvider>,
   )
 
@@ -486,7 +483,7 @@ export function renderToolbar(options: {
     })
     rerender(
       <QueryClientProvider client={queryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={commandContext}>
             <TerminalSessionReadContext value={readContext}>
               <GitWorkspacePaneToolbarHarness
@@ -498,7 +495,7 @@ export function renderToolbar(options: {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
   }
@@ -538,11 +535,9 @@ function workspacePaneRouteForPreferredTab(
   return isWorkspacePaneStaticTabType(preferredTab) ? { kind: 'static', tab: preferredTab } : null
 }
 
-export function navigationWith(
-  overrides: PrimaryWindowNavigationOverridesForTest,
-): ObservedPrimaryWindowNavigationActionsForTest {
+export function navigationWith(overrides: AppNavigationOverridesForTest): ObservedAppNavigationActionsForTest {
   seedInitialObservedWorkspacePaneRouteForTest()
-  return observedPrimaryWindowNavigationActionsForTest({
+  return observedAppNavigationActionsForTest({
     activateWorkspace: () => {},
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},

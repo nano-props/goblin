@@ -14,8 +14,8 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
@@ -43,11 +43,11 @@ describe('WorkspacePane status presentation', () => {
       branchSnapshots: [createBranchSnapshot('main')],
       currentBranchName: 'main',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -57,15 +57,15 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
-    const statusQuery = primaryWindowQueryClient.getQueryCache().find({
+    const statusQuery = appQueryClient.getQueryCache().find({
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })
-    await primaryWindowQueryClient.cancelQueries({
+    await appQueryClient.cancelQueries({
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })
@@ -87,14 +87,14 @@ describe('WorkspacePane status presentation', () => {
 
   test('can render after the repo appears without changing hook order', () => {
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane workspaceId={REPO_ID} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -124,8 +124,8 @@ describe('WorkspacePane status presentation', () => {
       },
     })
     const { container, rerender } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -135,7 +135,7 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
     const viewport = scrollViewport(container)
@@ -146,8 +146,8 @@ describe('WorkspacePane status presentation', () => {
 
     act(() => {
       rerender(
-        <QueryClientProvider client={primaryWindowQueryClient}>
-          <PrimaryWindowNavigationProvider value={navigation}>
+        <QueryClientProvider client={appQueryClient}>
+          <AppNavigationProvider value={navigation}>
             <TerminalSessionContext value={terminalCommandContext}>
               <TerminalSessionReadContext value={terminalReadContext}>
                 <WorkspacePane
@@ -157,7 +157,7 @@ describe('WorkspacePane status presentation', () => {
                 />
               </TerminalSessionReadContext>
             </TerminalSessionContext>
-          </PrimaryWindowNavigationProvider>
+          </AppNavigationProvider>
         </QueryClientProvider>,
       )
     })
@@ -172,8 +172,8 @@ describe('WorkspacePane status presentation', () => {
 
     act(() => {
       rerender(
-        <QueryClientProvider client={primaryWindowQueryClient}>
-          <PrimaryWindowNavigationProvider value={navigation}>
+        <QueryClientProvider client={appQueryClient}>
+          <AppNavigationProvider value={navigation}>
             <TerminalSessionContext value={terminalCommandContext}>
               <TerminalSessionReadContext value={terminalReadContext}>
                 <WorkspacePane
@@ -183,7 +183,7 @@ describe('WorkspacePane status presentation', () => {
                 />
               </TerminalSessionReadContext>
             </TerminalSessionContext>
-          </PrimaryWindowNavigationProvider>
+          </AppNavigationProvider>
         </QueryClientProvider>,
       )
     })
@@ -216,8 +216,8 @@ describe('WorkspacePane status presentation', () => {
     })
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -227,7 +227,7 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -256,15 +256,15 @@ describe('WorkspacePane status presentation', () => {
         },
       ],
     })
-    const statusQuery = primaryWindowQueryClient.getQueryCache().find({
+    const statusQuery = appQueryClient.getQueryCache().find({
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })!
     statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
 
     render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -274,7 +274,7 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -299,8 +299,8 @@ describe('WorkspacePane status presentation', () => {
     })
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -310,7 +310,7 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 
@@ -330,7 +330,7 @@ describe('WorkspacePane status presentation', () => {
       },
     })
     const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
-    primaryWindowQueryClient.setQueryData(
+    appQueryClient.setQueryData(
       repoPullRequestsQueryKey(REPO_ID, repo.workspaceRuntimeId, { kind: 'branch-detail', branch: 'feature/pr' }),
       {
         pullRequests: [{ branch: 'feature/pr', pullRequest }],
@@ -338,8 +338,8 @@ describe('WorkspacePane status presentation', () => {
     )
 
     const { container } = render(
-      <QueryClientProvider client={primaryWindowQueryClient}>
-        <PrimaryWindowNavigationProvider value={navigation}>
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <WorkspacePane
@@ -349,7 +349,7 @@ describe('WorkspacePane status presentation', () => {
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
-        </PrimaryWindowNavigationProvider>
+        </AppNavigationProvider>
       </QueryClientProvider>,
     )
 

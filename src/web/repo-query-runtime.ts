@@ -8,7 +8,7 @@ import type {
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { getRepoOperations, getRepoPullRequests, getRepoSnapshot, getRepoWorktreeStatus } from '#/web/repo-client.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import {
   repoDataQueryKey,
@@ -73,7 +73,7 @@ function bump(
 export function disposeRepoRuntimeReadState(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  client: QueryClient = primaryWindowQueryClient,
+  client: QueryClient = appQueryClient,
 ): void {
   const key = scopeKey(repoRoot, workspaceRuntimeId)
   metadataVersions.get(client)?.delete(key)
@@ -183,7 +183,7 @@ export async function refreshRepoSnapshotReadModel(
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoSnapshotResponse> {
   options.signal?.throwIfAborted()
-  const client = options.queryClient ?? primaryWindowQueryClient
+  const client = options.queryClient ?? appQueryClient
   const queryKey = repoSnapshotQueryKey(repoRoot, workspaceRuntimeId)
   bump(metadataVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
@@ -203,7 +203,7 @@ export function refreshActiveRepoPullRequestQueries(
   workspaceRuntimeId: string,
   options: { queryClient?: QueryClient } = {},
 ): Promise<void> {
-  const client = options.queryClient ?? primaryWindowQueryClient
+  const client = options.queryClient ?? appQueryClient
   return client.refetchQueries({
     queryKey: repoPullRequestsQueryPrefix(repoRoot, workspaceRuntimeId),
     type: 'active',
@@ -216,7 +216,7 @@ export async function refreshRepoWorktreeStatusReadModel(
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoWorktreeStatusSnapshot> {
   options.signal?.throwIfAborted()
-  const client = options.queryClient ?? primaryWindowQueryClient
+  const client = options.queryClient ?? appQueryClient
   const queryKey = repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId)
   bump(statusVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
@@ -234,7 +234,7 @@ export async function refreshRepoWorktreeStatusReadModel(
 export function invalidateRepoMetadataQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  client: QueryClient = primaryWindowQueryClient,
+  client: QueryClient = appQueryClient,
 ): void {
   bump(metadataVersions, client, repoRoot, workspaceRuntimeId)
   void client.invalidateQueries(
@@ -250,7 +250,7 @@ export function invalidateRepoMetadataQueries(
 export function invalidateRepoWorktreeStatusQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  client: QueryClient = primaryWindowQueryClient,
+  client: QueryClient = appQueryClient,
 ): void {
   bump(statusVersions, client, repoRoot, workspaceRuntimeId)
   void client.invalidateQueries(
@@ -262,7 +262,7 @@ export function invalidateRepoWorktreeStatusQueries(
 export function invalidateRepoOperationsQueries(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  client: QueryClient = primaryWindowQueryClient,
+  client: QueryClient = appQueryClient,
 ): void {
   bump(operationVersions, client, repoRoot, workspaceRuntimeId)
   void client.invalidateQueries(

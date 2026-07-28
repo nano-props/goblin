@@ -1,10 +1,8 @@
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 
 // Provider tests need a complete context value, but an unconfigured action must
 // fail instead of silently pretending that navigation was rejected or committed.
-export function primaryWindowNavigationActionsForTest(
-  overrides: Partial<PrimaryWindowNavigationActions> = {},
-): PrimaryWindowNavigationActions {
+export function appNavigationActionsForTest(overrides: Partial<AppNavigationActions> = {}): AppNavigationActions {
   return {
     activateWorkspace: unexpectedNavigationAction('activateWorkspace'),
     closeWorkspace: unexpectedNavigationAction('closeWorkspace'),
@@ -24,8 +22,8 @@ export function primaryWindowNavigationActionsForTest(
   }
 }
 
-function unexpectedNavigationAction(name: keyof PrimaryWindowNavigationActions): () => never {
+function unexpectedNavigationAction(name: keyof AppNavigationActions): () => never {
   return () => {
-    throw new Error(`Unexpected primary window navigation action in test: ${name}`)
+    throw new Error(`Unexpected app navigation action in test: ${name}`)
   }
 }

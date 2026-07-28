@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -43,7 +43,7 @@ beforeEach(() => {
   responsiveMocks.compact = false
   workspaceCommandMocks.showTab.mockClear()
   workspaceCommandMocks.terminal.mockClear()
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
     id: WORKSPACE_ID,
@@ -52,7 +52,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
   vi.restoreAllMocks()
 })
@@ -247,5 +247,5 @@ describe('WorkspaceLayoutSidebar', () => {
 })
 
 function renderSidebar(element: ReactElement) {
-  return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+  return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
 }

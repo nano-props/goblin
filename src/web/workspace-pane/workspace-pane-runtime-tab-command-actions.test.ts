@@ -29,10 +29,10 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  appNavigationIsCurrent,
+  resetAppNavigationForTest,
+} from '#/web/app-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 
 const terminalBase: TerminalSessionBase = {
@@ -58,7 +58,7 @@ describe('workspace pane runtime tab command actions', () => {
     resetTerminalAutoFocusForTest()
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
-    resetPrimaryWindowNavigationForTest()
+    resetAppNavigationForTest()
   })
 
   afterEach(() => {
@@ -300,7 +300,7 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
     const showTerminalSession = vi.fn((_sessionId, routeRequest) =>
-      primaryWindowNavigationIsCurrent(routeRequest.navigationGeneration),
+      appNavigationIsCurrent(routeRequest.navigationGeneration),
     )
     const terminalFilesystemTargetSnapshot = vi.fn(() => ({
       terminalFilesystemTargetKey: '/repo\0/repo-worktree',
@@ -334,7 +334,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).not.toHaveBeenCalled()
 
     sessions = [terminalSession('term-222222222222222222222', true)]
-    beginPrimaryWindowNavigation()
+    beginAppNavigation()
     releaseCoordinator.resolve()
     await coordinatorBlocker
 
@@ -372,7 +372,7 @@ describe('workspace pane runtime tab command actions', () => {
       focusTerminal: vi.fn(),
     }
 
-    const pendingCreatePresentation = beginPrimaryWindowNavigation()
+    const pendingCreatePresentation = beginAppNavigation()
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
@@ -388,7 +388,7 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(primaryWindowNavigationIsCurrent(pendingCreatePresentation)).toBe(true)
+    expect(appNavigationIsCurrent(pendingCreatePresentation)).toBe(true)
   })
 
   test('primary terminal action presents an existing session while another create is pending', async () => {
@@ -553,5 +553,5 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginPrimaryWindowNavigation(), routeTarget: terminalRouteTarget }
+  return { navigationGeneration: beginAppNavigation(), routeTarget: terminalRouteTarget }
 }

@@ -5,7 +5,7 @@ import {
   workspacePaneTabEntryIdentity,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import {
   isWorkspacePaneRuntimeTab,
   type WorkspacePaneModelTarget,
@@ -23,10 +23,10 @@ import {
   workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  appNavigationIsCurrent,
+  type AppNavigationGeneration,
+} from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal-focus.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
@@ -40,10 +40,10 @@ export interface WorkspacePaneControllerTarget {
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerCommitNavigation = Pick<
-  PrimaryWindowNavigationActions,
+  AppNavigationActions,
   'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute'
 >
-export type WorkspacePaneRouteCommitNavigation = Pick<PrimaryWindowNavigationActions, 'commitWorkspacePaneRoute'>
+export type WorkspacePaneRouteCommitNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
 
 export function workspacePaneControllerRouteForTab(tab: WorkspacePaneTab): WorkspacePaneTabControllerRoute | undefined {
   if (isWorkspacePaneRuntimeTab(tab)) {
@@ -64,7 +64,7 @@ export function workspacePaneControllerRouteForEntry(
 }
 
 export interface WorkspacePaneControllerPresentationLease {
-  navigationGeneration: PrimaryWindowNavigationGeneration
+  navigationGeneration: AppNavigationGeneration
   target: WorkspacePaneControllerTarget
   fromRoute: WorkspacePaneTabControllerRoute
   toRoute: WorkspacePaneTabControllerRoute
@@ -76,7 +76,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   closingEntry: WorkspacePaneTabEntry
   nextEntry: WorkspacePaneTabEntry | null
   workspacePaneRoute: ParsedWorkspacePaneRouteTarget | undefined
-  navigationGeneration?: PrimaryWindowNavigationGeneration
+  navigationGeneration?: AppNavigationGeneration
 }): WorkspacePaneControllerPresentationLease | null {
   const fromRoute =
     workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
@@ -85,7 +85,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   const toRoute = input.nextEntry ? workspacePaneControllerRouteForEntry(input.nextEntry) : null
   if (toRoute === undefined) return null
   if (input.target.routeTarget.kind === 'inactive') return null
-  const navigationGeneration = input.navigationGeneration ?? beginPrimaryWindowNavigation()
+  const navigationGeneration = input.navigationGeneration ?? beginAppNavigation()
   const target: WorkspacePaneControllerTarget = {
     workspaceId: input.target.workspaceId,
     workspaceRuntimeId: input.target.workspaceRuntimeId,
@@ -107,7 +107,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
 }
 
 export interface SelectWorkspacePaneControllerTabOptions {
-  navigationGeneration?: PrimaryWindowNavigationGeneration
+  navigationGeneration?: AppNavigationGeneration
   focusEffects?: TerminalPresentationFocusEffects
 }
 
@@ -117,9 +117,9 @@ export async function selectWorkspacePaneControllerTab(
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options: SelectWorkspacePaneControllerTabOptions = {},
 ): Promise<boolean> {
-  const navigationGeneration = options.navigationGeneration ?? beginPrimaryWindowNavigation()
+  const navigationGeneration = options.navigationGeneration ?? beginAppNavigation()
   const providedFocusEffects = options.focusEffects
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!appNavigationIsCurrent(navigationGeneration)) {
     providedFocusEffects?.onAbandon()
     return false
   }
@@ -150,9 +150,9 @@ export async function selectWorkspacePaneControllerTabEntry(
   target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) return false
+  if (!appNavigationIsCurrent(navigationGeneration)) return false
   const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
   if (materialized) {
     return await selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationGeneration })
@@ -205,7 +205,7 @@ async function commitWorkspacePaneControllerTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationGeneration: AppNavigationGeneration,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
 ): Promise<boolean> {
   if (target.routeTarget.kind === 'inactive') {
@@ -217,7 +217,7 @@ async function commitWorkspacePaneControllerTargetRoute(
       ? await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, options, navigationGeneration)
       : await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, navigationGeneration)
   }
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!appNavigationIsCurrent(navigationGeneration)) {
     options?.onAbandon?.()
     return false
   }
@@ -242,7 +242,7 @@ export async function commitWorkspacePaneControllerRoute(
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: {
     replace?: boolean
-    navigationGeneration?: PrimaryWindowNavigationGeneration
+    navigationGeneration?: AppNavigationGeneration
     routePrecondition?:
       { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
   },
@@ -259,7 +259,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
   return await commitWorkspacePaneValidatedTargetRoute(
     target,
@@ -278,7 +278,7 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
   return await commitWorkspacePaneValidatedTargetRoute(
     target,
@@ -307,9 +307,9 @@ async function commitWorkspacePaneValidatedTargetRoute(
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
   useCurrentTargetPrecondition: boolean,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!appNavigationIsCurrent(navigationGeneration)) {
     options?.onAbandon?.()
     return false
   }
@@ -337,10 +337,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
         route,
       )
     completed =
-      committed &&
-      supplementCommitted &&
-      primaryWindowNavigationIsCurrent(navigationGeneration) &&
-      targetIsCurrent(target)
+      committed && supplementCommitted && appNavigationIsCurrent(navigationGeneration) && targetIsCurrent(target)
   } catch (error) {
     options?.onAbandon?.()
     throw error
@@ -359,9 +356,9 @@ export async function commitWorkspacePaneExactTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneRouteCommitNavigation,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: PrimaryWindowNavigationGeneration = beginPrimaryWindowNavigation(),
+  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
-  if (!primaryWindowNavigationIsCurrent(navigationGeneration)) {
+  if (!appNavigationIsCurrent(navigationGeneration)) {
     options?.onAbandon?.()
     return false
   }
@@ -391,7 +388,7 @@ export async function commitWorkspacePaneExactTargetRoute(
     completed =
       committed &&
       supplementCommitted &&
-      primaryWindowNavigationIsCurrent(navigationGeneration) &&
+      appNavigationIsCurrent(navigationGeneration) &&
       workspacePaneTabControllerTargetIsCurrent(target)
   } catch (error) {
     options?.onAbandon?.()

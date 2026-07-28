@@ -20,10 +20,10 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
+  type ObservedAppNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -79,7 +79,7 @@ let currentWorkspaceId: WorkspaceId | null = null
 let currentBranchName: string | null = null
 let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
 let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null
-let navigation!: ObservedPrimaryWindowNavigationActionsForTest
+let navigation!: ObservedAppNavigationActionsForTest
 const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
@@ -110,7 +110,7 @@ beforeEach(() => {
   currentFilesystemTarget = null
   nativeIntentSubscriptionStarts = 0
   setTerminalSessionCommandBridge(null)
-  navigation = observedPrimaryWindowNavigationActionsForTest({
+  navigation = observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: (repoId) => {
       activateWorkspaceSpy(repoId)

@@ -10,18 +10,18 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/goblin-branch-action-dispatch-worktree'
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
 })
 
 afterEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   resetWorkspacesStore()
 })
 

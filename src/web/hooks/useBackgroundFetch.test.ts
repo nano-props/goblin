@@ -5,14 +5,14 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///remote-workspace')
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///local-workspace')
 const UNAVAILABLE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///unavailable-workspace')
 
-beforeEach(() => primaryWindowQueryClient.clear())
+beforeEach(() => appQueryClient.clear())
 
 describe('backgroundSyncTargetsFromStore', () => {
   test('keeps the visible remotely backed repo registered from accepted snapshot metadata', () => {

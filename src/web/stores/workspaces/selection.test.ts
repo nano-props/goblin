@@ -24,7 +24,7 @@ import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -115,7 +115,7 @@ function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEnt
 }
 
 beforeEach(() => {
-  primaryWindowQueryClient.clear()
+  appQueryClient.clear()
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetWorkspacesStore()
   installGoblinTestBridge(ipcHandlers)

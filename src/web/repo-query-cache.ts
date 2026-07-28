@@ -6,13 +6,13 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 
 export function getRepoOperationsQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): RepoOperationsSnapshot | undefined {
   const queryKey = repoOperationsQueryKey(repoRoot, workspaceRuntimeId, false)
   return projectRepoOperationsQueryData(queryClient.getQueryState<RepoOperationsSnapshot>(queryKey))
@@ -29,7 +29,7 @@ export function setRepoOperationsQueryData(
   workspaceRuntimeId: string,
   includeSettled: boolean,
   operations: RepoOperationsSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   queryClient.setQueryData(repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled), operations)
 }
@@ -37,7 +37,7 @@ export function setRepoOperationsQueryData(
 export function getRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): RepoSnapshot | undefined {
   return queryClient.getQueryData<RepoSnapshotResponse>(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId))?.snapshot
 }
@@ -45,7 +45,7 @@ export function getRepoSnapshotQueryData(
 export function requireRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): RepoSnapshot {
   const snapshot = getRepoSnapshotQueryData(repoRoot, workspaceRuntimeId, queryClient)
   if (!snapshot) throw new Error(`repository snapshot query data unavailable for workspace: ${repoRoot}`)
@@ -55,7 +55,7 @@ export function requireRepoSnapshotQueryData(
 export function getRepoWorktreeStatusQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): RepoWorktreeStatusSnapshot | undefined {
   return queryClient.getQueryData<RepoWorktreeStatusSnapshot>(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId))
 }
@@ -64,7 +64,7 @@ export function setRepoWorktreeStatusQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: RepoWorktreeStatusSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   if (snapshot.workspaceRuntimeId !== workspaceRuntimeId) return
   queryClient.setQueryData(repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId), snapshot)
@@ -74,7 +74,7 @@ export function setRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: RepoSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId), { snapshot })
 }
@@ -83,7 +83,7 @@ export function seedRepoSnapshotQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: RepoSnapshot | null,
-  queryClient: QueryClient = primaryWindowQueryClient,
+  queryClient: QueryClient = appQueryClient,
 ): void {
   if (!snapshot) return
   queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, workspaceRuntimeId), { snapshot })

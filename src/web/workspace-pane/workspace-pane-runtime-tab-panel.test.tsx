@@ -10,13 +10,10 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
-import {
-  PrimaryWindowNavigationProvider,
-  type PrimaryWindowNavigationActions,
-} from '#/web/primary-window-navigation.tsx'
+import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
 import {
   observeWorkspacePaneRouteForTest,
-  observedPrimaryWindowNavigationActionsForTest,
+  observedAppNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
@@ -175,7 +172,7 @@ describe('workspace pane runtime tab panel', () => {
 function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = {}) {
   const navigation = navigationWith()
   const result = renderInJsdom(
-    <PrimaryWindowNavigationProvider value={navigation}>
+    <AppNavigationProvider value={navigation}>
       <TerminalSessionContext value={input.terminalContext ?? terminalCommandContextWith()}>
         {renderWorkspacePaneRuntimeTabPanel({
           type: 'terminal',
@@ -202,13 +199,13 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           },
         })}
       </TerminalSessionContext>
-    </PrimaryWindowNavigationProvider>,
+    </AppNavigationProvider>,
   )
   return { ...result, navigation }
 }
 
-function navigationWith(): PrimaryWindowNavigationActions {
-  return observedPrimaryWindowNavigationActionsForTest({
+function navigationWith(): AppNavigationActions {
+  return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(),

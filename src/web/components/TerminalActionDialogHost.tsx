@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
 import { runConfirmCloseTerminalWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
@@ -10,7 +10,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 interface Props {
   currentWorkspaceId: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
-  navigation: PrimaryWindowNavigationActions
+  navigation: AppNavigationActions
 }
 
 export function TerminalActionDialogHost({ currentWorkspaceId, currentWorkspacePaneRoute, navigation }: Props) {

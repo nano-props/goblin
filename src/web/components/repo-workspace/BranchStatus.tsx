@@ -41,7 +41,7 @@ import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import type { CurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 interface Props {
   detail: CurrentGitWorkspacePanePresentation
@@ -157,7 +157,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
-  const navigation = usePrimaryWindowNavigation()
+  const navigation = useAppNavigation()
   const { branch, pullRequest } = detail
   const branchName = branch?.name
   const worktreePathRaw = branch?.worktree?.path

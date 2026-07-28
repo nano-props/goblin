@@ -16,7 +16,7 @@ interface RuntimeCoherentWorkspaceProjectionStoreActions extends Pick<
   'ensureWorkspaceOpen' | 'closeWorkspace'
 > {}
 
-interface PrimaryWindowNavigationStoreActions extends Pick<
+interface AppNavigationStoreActions extends Pick<
   WorkspacesStore,
   'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
 > {}
@@ -75,9 +75,9 @@ export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
   }
 }
 
-export function primaryWindowNavigationStoreActionsFromStore(
+export function appNavigationStoreActionsFromStore(
   state: Pick<WorkspacesStore, 'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>,
-): PrimaryWindowNavigationStoreActions {
+): AppNavigationStoreActions {
   return {
     closeWorkspace: state.closeWorkspace,
     peekWorkspaceNavigation: state.peekWorkspaceNavigation,

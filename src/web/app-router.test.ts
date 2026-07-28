@@ -44,26 +44,26 @@ import {
   initialWorkspaceRouteSlugFromStore,
   workspaceRouteViewFromChildRoute,
   workspaceRouteViewFromSlugChildRoute,
-  primaryWindowRouterCallbacks,
-  applyPrimaryWindowSettingsRouteChange,
-  PrimaryWindowRouterProvider,
-} from '#/web/primary-window-router.tsx'
+  appRouterCallbacks,
+  applyAppSettingsRouteChange,
+  AppRouterProvider,
+} from '#/web/app-router.tsx'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   authenticatedAppShellMode,
   currentWorkspacePaneRouteFromContext,
-  primaryWindowLayoutRouteCallbacks,
+  appLayoutRouteCallbacks,
   workspaceRouteContextFromMatches,
 } from '#/web/Layout.tsx'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import {
-  beginPrimaryWindowNavigation,
-  observePrimaryWindowHistoryNavigation,
-  primaryWindowNavigationIsCurrent,
-  resetPrimaryWindowNavigationForTest,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  observeAppHistoryNavigation,
+  appNavigationIsCurrent,
+  resetAppNavigationForTest,
+} from '#/web/app-navigation-lifecycle.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -88,7 +88,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('primary window initial route', () => {
+describe('app initial route', () => {
   test('prefers the restored workspace over the first workspace in order', () => {
     const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-runtime-a')
     const workspaceB = emptyWorkspace(WORKSPACE_B_ID, 'workspace-runtime-b')
@@ -290,7 +290,7 @@ describe('workspace route capability admission', () => {
   ])('redirects a non-Git %s to Dashboard without mounting the rejected surface', async (_label, pathForSlug) => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-router-workspace')
     seedWorkspaceCapability(workspaceId, 'unavailable')
-    render(createElement(PrimaryWindowRouterProvider))
+    render(createElement(AppRouterProvider))
     appMocks.render.mockClear()
 
     navigateBrowser(pathForSlug(workspaceSlugFromId(workspaceId)))
@@ -309,7 +309,7 @@ describe('workspace route capability admission', () => {
     seedWorkspaceCapability(workspaceId, 'unavailable')
     navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
 
-    render(createElement(PrimaryWindowRouterProvider))
+    render(createElement(AppRouterProvider))
 
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
   })
@@ -320,7 +320,7 @@ describe('workspace route capability admission', () => {
     const worktreeSlug = worktreeSlugFromPath('/tmp/cold-git-worktree')
     navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/worktree/${worktreeSlug}/terminal/terminal-test`)
 
-    render(createElement(PrimaryWindowRouterProvider))
+    render(createElement(AppRouterProvider))
 
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('worktree'))
   })
@@ -331,7 +331,7 @@ describe('workspace route capability admission', () => {
     const workspaceSlug = workspaceSlugFromId(workspaceId)
     const returnTo = `/workspace/${workspaceSlug}/branch/bWFpbg/tab/status`
     navigateBrowser(`/workspace/${workspaceSlug}/worktree/new?returnTo=${encodeURIComponent(returnTo)}`)
-    const view = render(createElement(PrimaryWindowRouterProvider))
+    const view = render(createElement(AppRouterProvider))
 
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('newWorktree'))
     fireEvent.click(view.getByRole('button', { name: 'cancel new worktree' }))
@@ -343,7 +343,7 @@ describe('workspace route capability admission', () => {
   test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/git-router-workspace')
     seedWorkspaceCapability(workspaceId, 'available')
-    render(createElement(PrimaryWindowRouterProvider))
+    render(createElement(AppRouterProvider))
     appMocks.render.mockClear()
 
     navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
@@ -407,7 +407,7 @@ describe('workspace route context derivation', () => {
   })
 })
 
-describe('primary window route callback facades', () => {
+describe('app route callback facades', () => {
   test('router and Layout callbacks delegate every primary write to arbiter-aware route actions', () => {
     const routeActions = {
       openHome: vi.fn(),
@@ -422,9 +422,9 @@ describe('primary window route callback facades', () => {
       openRepoNewWorktree: vi.fn(),
       cancelRepoNewWorktree: vi.fn(),
       workspaceSlugForId: vi.fn(),
-    } as unknown as PrimaryWindowRouteNavigation
-    const routerCallbacks = primaryWindowRouterCallbacks(routeActions)
-    const layoutCallbacks = primaryWindowLayoutRouteCallbacks(routeActions)
+    } as unknown as AppRouteNavigation
+    const routerCallbacks = appRouterCallbacks(routeActions)
+    const layoutCallbacks = appLayoutRouteCallbacks(routeActions)
 
     routerCallbacks.onRouteSettingsPageChange('general')
     routerCallbacks.onOpenWorkspaceNavigator(ROUTE_WORKSPACE_ID)
@@ -433,7 +433,7 @@ describe('primary window route callback facades', () => {
     routerCallbacks.onOpenRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onCancelRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'main', 1)
-    applyPrimaryWindowSettingsRouteChange(routeActions, null)
+    applyAppSettingsRouteChange(routeActions, null)
     layoutCallbacks.navigateToSettingsShortcuts()
     layoutCallbacks.navigateToIndex()
 
@@ -450,9 +450,9 @@ describe('primary window route callback facades', () => {
   test('created worktree replacement commits its accepted branch route without snapshot admission', () => {
     const routeActions = {
       openRepoBranch: vi.fn(() => true),
-    } as unknown as PrimaryWindowRouteNavigation
+    } as unknown as AppRouteNavigation
 
-    primaryWindowRouterCallbacks(routeActions).onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'feature/new', 7)
+    appRouterCallbacks(routeActions).onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'feature/new', 7)
 
     expect(routeActions.openRepoBranch).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID, 'feature/new', {
       replace: true,
@@ -464,12 +464,12 @@ describe('primary window route callback facades', () => {
     ['/settings/general', { status: 'ready' as const }],
     ['/', { status: 'restoring-workspace' as const }],
   ])('browser traversal supersedes independently of conditional shell mode at %s', (pathname, bootstrapState) => {
-    resetPrimaryWindowNavigationForTest()
+    resetAppNavigationForTest()
     authenticatedAppShellMode(pathname, bootstrapState as AuthenticatedAppBootstrapState)
-    const generation = beginPrimaryWindowNavigation()
+    const generation = beginAppNavigation()
 
-    observePrimaryWindowHistoryNavigation({ href: '/', state: {}, action: { type: 'BACK' } })
+    observeAppHistoryNavigation({ href: '/', state: {}, action: { type: 'BACK' } })
 
-    expect(primaryWindowNavigationIsCurrent(generation)).toBe(false)
+    expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 })

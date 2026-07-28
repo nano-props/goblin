@@ -1,15 +1,15 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
-  beginPrimaryWindowNavigation,
-  primaryWindowNavigationIsCurrent,
-  resetPrimaryWindowNavigationForTest,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+  beginAppNavigation,
+  appNavigationIsCurrent,
+  resetAppNavigationForTest,
+  type AppNavigationGeneration,
+} from '#/web/app-navigation-lifecycle.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
   workspacePaneTargetLeaseIsCurrent,
@@ -20,29 +20,27 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
-export type WorkspacePaneDestinationNavigation = Pick<PrimaryWindowNavigationActions, 'commitWorkspacePaneRoute'>
+export type WorkspacePaneDestinationNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
 
 export interface WorkspacePaneDestinationPresentation {
-  generation: PrimaryWindowNavigationGeneration
+  generation: AppNavigationGeneration
   lease: WorkspacePaneDestinationTargetLease
 }
 
 export function beginWorkspacePaneDestinationPresentation(
   lease: WorkspacePaneDestinationTargetLease,
 ): WorkspacePaneDestinationPresentation {
-  return { generation: beginPrimaryWindowNavigation(), lease }
+  return { generation: beginAppNavigation(), lease }
 }
 
 export function workspacePaneDestinationPresentationIsCurrent(
   presentation: WorkspacePaneDestinationPresentation,
 ): boolean {
-  return (
-    primaryWindowNavigationIsCurrent(presentation.generation) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
-  )
+  return appNavigationIsCurrent(presentation.generation) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
 }
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {
-  resetPrimaryWindowNavigationForTest()
+  resetAppNavigationForTest()
 }
 
 export async function dispatchWorkspacePaneDestinationRoute(input: {

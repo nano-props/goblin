@@ -22,7 +22,7 @@ import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/work
 import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
 import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
@@ -164,7 +164,7 @@ async function closeWorkspaceRuntimeWithCacheNow(workspaceId: WorkspaceId, works
   } finally {
     clearWorkspacePaneTabsProjectionState(workspaceId, workspaceRuntimeId)
     disposeRepoRuntimeReadState(workspaceId, workspaceRuntimeId)
-    primaryWindowQueryClient.removeQueries({ queryKey: repoDataQueryKey(workspaceId, workspaceRuntimeId) })
+    appQueryClient.removeQueries({ queryKey: repoDataQueryKey(workspaceId, workspaceRuntimeId) })
   }
 }
 
@@ -269,7 +269,7 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     cancelWorkspaceCapabilityRefreshes(changed.workspaceId, changed.previousWorkspaceRuntimeId)
     disposeRepoOperationScheduler(changed.workspaceId)
     clearWorkspacePaneTabsProjectionState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
-    primaryWindowQueryClient.removeQueries({
+    appQueryClient.removeQueries({
       queryKey: repoDataQueryKey(changed.workspaceId, changed.previousWorkspaceRuntimeId),
     })
     disposeRepoRuntimeReadState(changed.workspaceId, changed.previousWorkspaceRuntimeId)

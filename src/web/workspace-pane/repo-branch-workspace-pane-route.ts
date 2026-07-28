@@ -1,7 +1,7 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import type { PrimaryWindowNavigationGeneration } from '#/web/primary-window-navigation-lifecycle.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createWorkspacePaneTabModel,
@@ -79,13 +79,10 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
 }
 
 export function openWorkspacePaneRoute(
-  routeNavigation: Pick<
-    PrimaryWindowRouteNavigation,
-    'openRepoBranch' | 'openRepoBranchTab' | 'openRepoBranchTerminal'
-  >,
+  routeNavigation: Pick<AppRouteNavigation, 'openRepoBranch' | 'openRepoBranchTab' | 'openRepoBranchTerminal'>,
   repoId: WorkspaceId,
   branchName: string,
-  options?: { replace?: boolean; navigationGeneration?: PrimaryWindowNavigationGeneration; onCommit?: () => void },
+  options?: { replace?: boolean; navigationGeneration?: AppNavigationGeneration; onCommit?: () => void },
 ): boolean {
   const resolution = resolveWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing') return false

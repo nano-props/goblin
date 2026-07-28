@@ -3,7 +3,7 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryPrefix } from '#/web/repo-query-keys.ts'
 import {
   REPO_ID,
@@ -36,7 +36,7 @@ describe('manual workspace refresh', () => {
     ipcHandlers['repo.fetch'] = fetch
     ipcHandlers['repo.snapshot'] = snapshot
     ipcHandlers['repo.worktreeStatus'] = status
-    const refetchPullRequests = vi.spyOn(primaryWindowQueryClient, 'refetchQueries')
+    const refetchPullRequests = vi.spyOn(appQueryClient, 'refetchQueries')
 
     await expect(
       runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: repo.workspaceRuntimeId }),
@@ -60,7 +60,7 @@ describe('manual workspace refresh', () => {
       remote: { hasRemotes: false },
     })
     const pending = new Promise<void>(() => {})
-    vi.spyOn(primaryWindowQueryClient, 'refetchQueries').mockReturnValue(pending)
+    vi.spyOn(appQueryClient, 'refetchQueries').mockReturnValue(pending)
     ipcHandlers['repo.snapshot'] = vi.fn(async () =>
       repoSnapshotResponse({ branches: [branch('main')], current: 'main' }),
     )

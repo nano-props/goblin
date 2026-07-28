@@ -38,10 +38,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  beginPrimaryWindowNavigation,
-  type PrimaryWindowNavigationGeneration,
-} from '#/web/primary-window-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import {
   claimTerminalAutoFocus,
   type TerminalAutoFocusLease,
@@ -49,7 +46,7 @@ import {
 } from '#/web/terminal-focus.ts'
 
 export interface ExistingTerminalPresentationRouteRequest extends TerminalPresentationFocusEffects {
-  navigationGeneration: PrimaryWindowNavigationGeneration
+  navigationGeneration: AppNavigationGeneration
 }
 
 export interface WorkspacePaneRuntimeTabCommandContext {
@@ -339,7 +336,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (worktree.count > 0) {
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
-    const navigationGeneration = beginPrimaryWindowNavigation()
+    const navigationGeneration = beginAppNavigation()
     let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
     try {
       return await runWorkspacePaneAction(target, async () => {
@@ -404,7 +401,7 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
 }
 
 function existingTerminalPresentationRouteRequest(
-  navigationGeneration: PrimaryWindowNavigationGeneration,
+  navigationGeneration: AppNavigationGeneration,
   terminalSessionId: string,
   focusLease: TerminalAutoFocusLease | null,
   focusTerminal: TerminalSessionCommandBridge['focusTerminal'],
