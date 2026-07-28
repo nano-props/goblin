@@ -82,21 +82,6 @@ const RepoSnapshotSchema = v.strictObject({
 export const RepoSnapshotResponseSchema = v.strictObject({
   snapshot: RepoSnapshotSchema,
 })
-export const RepoWorktreeMutationResponseSchema = v.union([
-  v.strictObject({
-    ok: v.literal(true),
-    message: v.string(),
-    repositoryStateChanged: v.optional(v.boolean()),
-    worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
-    snapshot: RepoSnapshotSchema,
-  }),
-  v.strictObject({
-    ok: v.literal(false),
-    message: v.string(),
-    repositoryStateChanged: v.optional(v.boolean()),
-    worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
-  }),
-])
 export const RepoPullRequestsResponseSchema = v.strictObject({
   pullRequests: v.nullable(v.array(v.strictObject({ branch: v.string(), pullRequest: PullRequestSchema }))),
 })

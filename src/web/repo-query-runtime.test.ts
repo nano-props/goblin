@@ -14,7 +14,6 @@ import {
 } from '#/web/repo-query-keys.ts'
 import { repoSnapshotReadModelQueryOptions } from '#/web/repo-query-options.ts'
 import {
-  acceptWorktreeMutationSnapshot,
   invalidateRepoOperationsQueries,
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
@@ -58,32 +57,6 @@ describe('repository query authorities', () => {
 
     expect(getRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', client)?.current).toBe('main')
     expect(client.getQueryData(repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1'))).toEqual(snapshot('main'))
-  })
-
-  test('does not resurrect a disposed runtime while accepting a mutation snapshot', async () => {
-    const client = new QueryClient()
-    setRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', snapshot('before').snapshot, client)
-    const cancellation = Promise.withResolvers<void>()
-    vi.spyOn(client, 'cancelQueries').mockReturnValueOnce(cancellation.promise)
-    let current = true
-
-    const acceptance = acceptWorktreeMutationSnapshot(
-      WORKSPACE_ID,
-      'repo-runtime-1',
-      snapshot('after').snapshot,
-      new AbortController().signal,
-      () => {
-        if (!current) throw new Error('stale runtime')
-      },
-      client,
-    )
-    await vi.waitFor(() => expect(client.cancelQueries).toHaveBeenCalledOnce())
-    client.removeQueries({ queryKey: repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1'), exact: true })
-    current = false
-    cancellation.resolve()
-
-    await expect(acceptance).rejects.toThrow('stale runtime')
-    expect(getRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', client)).toBeUndefined()
   })
 
   test('uses exact, non-overlapping pull-request scope keys', () => {

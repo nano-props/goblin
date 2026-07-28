@@ -562,24 +562,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 })
 
-describe('repo routes — worktree mutation snapshots', () => {
-  const snapshot = {
-    branches: [],
-    current: 'main',
-    remote: {
-      remotes: [],
-      hasRemotes: false,
-      hasBrowserRemote: false,
-      remoteProviders: {},
-      hasGitHubRemote: false,
-    },
-  }
-
-  test('returns the authoritative snapshot with a successful create', async () => {
+describe('repo routes — worktree mutation responses', () => {
+  test('returns the committed create result without a snapshot read-back', async () => {
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
     mocks.createRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'created' })
-    mocks.readRepoSnapshot.mockResolvedValueOnce({ snapshot })
 
     const response = await app.request(
       new Request('http://localhost/create-worktree', {
@@ -596,11 +583,8 @@ describe('repo routes — worktree mutation snapshots', () => {
     )
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: true, message: 'created', snapshot })
-    expect(mocks.readRepoSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, {
-      workspaceRuntimeId,
-      signal: expect.any(AbortSignal),
-    })
+    await expect(response.json()).resolves.toEqual({ ok: true, message: 'created' })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
   })
 
   test('does not read a snapshot after a failed create', async () => {
@@ -626,38 +610,10 @@ describe('repo routes — worktree mutation snapshots', () => {
     expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
   })
 
-  test('reports a changed repository when the post-create snapshot cannot be produced', async () => {
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    mocks.createRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'created' })
-    mocks.readRepoSnapshot.mockRejectedValueOnce(new Error('snapshot failed'))
-
-    const response = await app.request(
-      new Request('http://localhost/create-worktree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          cwd: WORKSPACE_ID,
-          workspaceRuntimeId,
-          worktreePath: '/tmp/repo-feature',
-          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-          worktreeBootstrap: { kind: 'skip' },
-        }),
-      }),
-    )
-
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      message: 'error.failed-read-repo',
-      repositoryStateChanged: true,
-    })
-  })
-
-  test('returns the authoritative snapshot with a successful remove', async () => {
+  test('returns the committed remove result without a snapshot read-back', async () => {
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
     mocks.removeCapturedRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'removed' })
-    mocks.readRepoSnapshot.mockResolvedValueOnce({ snapshot })
 
     const response = await app.request(
       new Request('http://localhost/remove-worktree', {
@@ -674,7 +630,7 @@ describe('repo routes — worktree mutation snapshots', () => {
     )
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: true, message: 'removed', snapshot })
-    expect(mocks.readRepoSnapshot).toHaveBeenCalledOnce()
+    await expect(response.json()).resolves.toEqual({ ok: true, message: 'removed' })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
   })
 })

@@ -40,7 +40,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { IpcError, type RepoLogResponse, type RepoWorktreeMutationResponse } from '#/shared/api-types.ts'
+import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import {
   requireCurrentWorkspaceRuntime,
   runGitWorkspaceRuntimeRequest,
@@ -49,7 +49,7 @@ import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktr
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT, type ExecResult } from '#/shared/git-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
@@ -80,22 +80,6 @@ export function createRepoRoutes(options: {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
     }
   }
-  async function worktreeMutationResponse(
-    result: ExecResult,
-    repoRoot: WorkspaceId,
-    workspaceRuntimeId: string,
-    signal: AbortSignal,
-  ): Promise<RepoWorktreeMutationResponse> {
-    if (!result.ok) return { ...result, ok: false }
-    try {
-      const { snapshot } = await readRepoSnapshot(repoRoot, { workspaceRuntimeId, signal })
-      return { ...result, ok: true, snapshot }
-    } catch {
-      signal.throwIfAborted()
-      return { ...result, ok: false, message: 'error.failed-read-repo', repositoryStateChanged: true }
-    }
-  }
-
   app.post('/log', async (c) => {
     const { cwd, workspaceRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     const userId = userIdFromContext(c)
@@ -283,16 +267,11 @@ export function createRepoRoutes(options: {
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        async () =>
-          await worktreeMutationResponse(
-            await createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
-              workspaceRuntimeId,
-              worktreeBootstrap,
-            }),
-            cwd,
+        () =>
+          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
             workspaceRuntimeId,
-            c.req.raw.signal,
-          ),
+            worktreeBootstrap,
+          }),
         'create-worktree',
         c.req.raw.signal,
       ),
@@ -332,33 +311,28 @@ export function createRepoRoutes(options: {
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        async () =>
-          await worktreeMutationResponse(
-            await options.worktreeRemovalApplication.removeWorktree(userId, {
-              repoRoot: cwd,
-              workspaceRuntimeId,
-              worktreePath,
-              branchName: branch,
-              deleteBranch,
-              signal: c.req.raw.signal,
-              remove: async (
-                physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-                lifecycle: RepoWorktreeRemovalLifecycle,
-                signal: AbortSignal,
-              ) =>
-                await removeCapturedRepoWorktree(
-                  cwd,
-                  { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
-                  lifecycle,
-                  physicalWorktreeCapability,
-                  signal,
-                  { workspaceRuntimeId },
-                ),
-            }),
-            cwd,
+        () =>
+          options.worktreeRemovalApplication.removeWorktree(userId, {
+            repoRoot: cwd,
             workspaceRuntimeId,
-            c.req.raw.signal,
-          ),
+            worktreePath,
+            branchName: branch,
+            deleteBranch,
+            signal: c.req.raw.signal,
+            remove: async (
+              physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+              lifecycle: RepoWorktreeRemovalLifecycle,
+              signal: AbortSignal,
+            ) =>
+              await removeCapturedRepoWorktree(
+                cwd,
+                { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
+                lifecycle,
+                physicalWorktreeCapability,
+                signal,
+                { workspaceRuntimeId },
+              ),
+          }),
         'remove-worktree',
         c.req.raw.signal,
       ),

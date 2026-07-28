@@ -32,6 +32,7 @@ Use this doc for the server-first client model.
 - Client snapshots provide route and presentation facts. Server commands resolve
   current target authority from the server-owned target catalog; a client query
   result never authorizes a command.
-- Create/remove worktree responses carry their canonical post-write snapshot on
-  success. The initiating client cancels any obsolete in-flight snapshot read
-  and accepts that response directly; it does not issue a compensating read.
+- Create/remove worktree responses describe their committed effect; they do not
+  carry a full repository snapshot. Repository snapshots have one client cache
+  submission path: the snapshot query converges from server-published
+  invalidation without a mutation read-back or client-side cache replacement.

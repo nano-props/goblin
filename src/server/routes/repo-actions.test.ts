@@ -330,18 +330,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       const prepared = await lifecycle.beforeRemove()
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
-    const snapshot = {
-      branches: [],
-      current: 'main',
-      remote: {
-        remotes: [],
-        hasRemotes: false,
-        hasBrowserRemote: false,
-        remoteProviders: {},
-        hasGitHubRemote: false,
-      },
-    }
-    mocks.readRepoSnapshot.mockResolvedValueOnce({ snapshot })
     const app = createTestRepoRoutes(worktreeRemovalApplication)
     const workspaceRuntimeId = await openTestWorkspaceRuntime(WORKSPACE_ID)
     const response = await app.request(
@@ -359,7 +347,8 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, message: 'removed', snapshot })
+    expect(await response.json()).toEqual({ ok: true, message: 'removed' })
+    expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(worktreeRemovalApplication.removeWorktree).toHaveBeenCalledWith(
       'user-test',
       expect.objectContaining({

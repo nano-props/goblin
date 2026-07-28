@@ -319,9 +319,6 @@ export interface RepoSnapshotResponse {
   snapshot: RepoSnapshot
 }
 
-export type RepoWorktreeMutationResponse =
-  (ExecResult & { ok: false }) | (ExecResult & { ok: true; snapshot: RepoSnapshot })
-
 export interface RepoPullRequestsResponse {
   pullRequests: PullRequestEntry[] | null
 }
@@ -462,8 +459,8 @@ export interface AppIpcHandlers {
       deleteBranch: boolean
       forceDeleteBranch?: boolean
       deleteUpstream?: boolean
-    }) => Promise<RepoWorktreeMutationResponse>
-    createWorktree: (input: CreateWorktreeIpcInput) => Promise<RepoWorktreeMutationResponse>
+    }) => Promise<ExecResult>
+    createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     worktreeBootstrapPreview: (input: {
       cwd: WorkspaceId
       workspaceRuntimeId: string

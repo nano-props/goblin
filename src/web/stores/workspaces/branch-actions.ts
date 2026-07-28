@@ -23,8 +23,6 @@ import {
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import type { RepoSnapshot } from '#/shared/api-types.ts'
-import { acceptWorktreeMutationSnapshot } from '#/web/repo-query-runtime.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -153,11 +151,10 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
   return false
 }
 
-async function runBranchActionIpc(
+function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
-  acceptSnapshot: (snapshot: RepoSnapshot) => Promise<void>,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   switch (action.kind) {
@@ -166,10 +163,7 @@ async function runBranchActionIpc(
     case 'push':
       return pushRepoBranch(repoId, workspaceRuntimeId, action.branch, signal)
     case 'createWorktree':
-      return await acceptWorktreeMutationResponse(
-        await createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal),
-        acceptSnapshot,
-      )
+      return createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal)
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
@@ -179,34 +173,21 @@ async function runBranchActionIpc(
         signal,
       )
     case 'removeWorktree':
-      return await acceptWorktreeMutationResponse(
-        await removeRepoWorktree(
-          repoId,
-          workspaceRuntimeId,
-          {
-            branch: action.branch,
-            worktreePath: action.worktreePath,
-            deleteBranch: action.deleteBranch,
-            forceDeleteBranch: action.forceDeleteBranch,
-            deleteUpstream: action.deleteUpstream,
-          },
-          signal,
-        ),
-        acceptSnapshot,
+      return removeRepoWorktree(
+        repoId,
+        workspaceRuntimeId,
+        {
+          branch: action.branch,
+          worktreePath: action.worktreePath,
+          deleteBranch: action.deleteBranch,
+          forceDeleteBranch: action.forceDeleteBranch,
+          deleteUpstream: action.deleteUpstream,
+        },
+        signal,
       )
   }
   const exhaustive: never = action
   return exhaustive
-}
-
-async function acceptWorktreeMutationResponse(
-  response: Awaited<ReturnType<typeof createRepoWorktree>>,
-  acceptSnapshot: (snapshot: RepoSnapshot) => Promise<void>,
-): Promise<ExecResult> {
-  if (!response.ok) return response
-  const { snapshot, ...result } = response
-  await acceptSnapshot(snapshot)
-  return result
 }
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
@@ -255,17 +236,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
         throwIfStale(get, id, workspaceRuntimeId)
         ctx.setPhase('running')
-        return runBranchActionIpc(
-          action,
-          id,
-          workspaceRuntimeId,
-          async (snapshot) => {
-            await acceptWorktreeMutationSnapshot(id, workspaceRuntimeId, snapshot, signal, () =>
-              throwIfStale(get, id, workspaceRuntimeId),
-            )
-          },
-          signal,
-        )
+        return runBranchActionIpc(action, id, workspaceRuntimeId, signal)
       }
 
       if (network) {
