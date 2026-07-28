@@ -232,7 +232,10 @@ describe('close reconciliation', () => {
         createAdmitted: async () => terminalCreateSuccess(),
         close: async () => ({ kind: 'already-closed' as const }),
       },
-      workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
+      workspaceTabsCoordinator: runtimeTabsCoordinator({
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
+      }),
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })

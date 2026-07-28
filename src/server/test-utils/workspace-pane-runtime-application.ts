@@ -30,8 +30,12 @@ export function runtimeTabsCoordinator(
   overrides: Partial<WorkspacePaneRuntimeTabsCoordinator> = {},
 ): WorkspacePaneRuntimeTabsCoordinator {
   return {
-    ensureRuntimeTabForSession: vi.fn(),
-    reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
+    ensureRuntimeTabForSession: vi.fn(async () => {
+      throw new Error('ensureRuntimeTabForSession must be explicitly overridden by the test')
+    }),
+    reconcileWorktreeAdmitted: vi.fn(async () => {
+      throw new Error('reconcileWorktreeAdmitted must be explicitly overridden by the test')
+    }),
     ...overrides,
   }
 }

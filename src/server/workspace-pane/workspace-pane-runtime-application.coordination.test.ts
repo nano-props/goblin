@@ -59,6 +59,7 @@ describe('removal coordination and failure settlement', () => {
           input.commitAdmission(request.branch)
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
+        reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
       }),
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: () => {},

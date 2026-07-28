@@ -318,7 +318,10 @@ describe('open admission', () => {
         ],
       },
       terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
-      workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
+      workspaceTabsCoordinator: runtimeTabsCoordinator({
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
+      }),
       isCurrentWorkspaceRuntimeMembership: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
