@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, test } from 'vitest'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
-  createRepoBranch,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+  createRepoBranch,
+} from '#/web/test-utils/repo-store.ts'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'

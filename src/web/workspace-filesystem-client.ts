@@ -47,12 +47,16 @@ export async function trashWorkspaceFile(
   path: string,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<ExecResult> {
-  return await postServerJson('/api/workspace/trash-file', { target, path }, decodeWith(ExecResultResponseSchema), { signal: options.signal })
+  return await postServerJson('/api/workspace/trash-file', { target, path }, decodeWith(ExecResultResponseSchema), {
+    signal: options.signal,
+  })
 }
 
 export async function getWorkspaceFileViewer(
   target: WorkspacePaneFilesystemExecutionTarget,
   options: { readonly signal?: AbortSignal },
 ): Promise<WorkspaceFileViewerResult> {
-  return await postServerJson('/api/workspace/file-viewer', { target }, decodeWith(WorkspaceFileViewerResponseSchema), { signal: options.signal })
+  return await postServerJson('/api/workspace/file-viewer', { target }, decodeWith(WorkspaceFileViewerResponseSchema), {
+    signal: options.signal,
+  })
 }

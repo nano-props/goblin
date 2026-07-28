@@ -1,105 +1,42 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import '#/web/test-utils/workspace-commands.ts'
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
-  runCloseCurrentWorkspacePaneTabCommand as runCloseCurrentWorkspacePaneTabCommandRaw,
-  runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,
-  runConfirmCloseTerminalWorkspacePaneTabCommand,
-  runMoveWorkspacePaneTabCommand as runMoveWorkspacePaneTabCommandRaw,
-  runNewTerminalTabCommand as runNewTerminalTabCommandRaw,
-  runSelectWorkspacePaneTabByIndexCommand as runSelectWorkspacePaneTabByIndexCommandRaw,
-  runShowWorkspacePaneTabCommand as runShowWorkspacePaneTabCommandRaw,
-  runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
-} from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import {
-  createBranchSnapshot,
-  installWorkspacePaneTabsTestBridge,
-  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
+import { describe, expect, test, vi } from 'vitest'
+import '#/web/test-utils/workspace-commands.ts'
+import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  resetTerminalActionDialogsStore,
-  useTerminalActionDialogsStore,
-} from '#/web/stores/workspaces/terminal-action-dialogs.ts'
-import {
-  preferredWorkspacePaneTabForTarget,
-  workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import {
-  gitWorktreePaneFilesystemTarget,
-  workspacePaneFilesystemRootPath,
-  workspaceRootPaneFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  terminalPresentationBranch,
-  terminalExecutionPath,
-  terminalSessionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  formatTerminalFilesystemTargetKey,
-  formatTerminalFilesystemTargetKeyForPath,
-} from '#/shared/terminal-filesystem-target-key.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  observedPrimaryWindowNavigationActionsForTest,
-  observedWorkspacePaneRouteForTarget,
-  seedInitialObservedWorkspacePaneRouteForTest,
-  type ObservedPrimaryWindowNavigationActionsForTest,
-  type PrimaryWindowNavigationOverridesForTest,
-  type WorkspacePaneNavigationObservation,
-} from '#/web/test-utils/workspace-pane-navigation.ts'
-import { resetPrimaryWindowNavigationForTest } from '#/web/primary-window-navigation-lifecycle.ts'
-import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
   REPO_ID,
   WORKTREE_KEY,
   WORKTREE_PANE_TARGET,
   WORKTREE_PATH,
-  baseForWorktree,
   createTerminalWithProjection,
   emptyWorktreeSnapshot,
   expectedTerminalBase,
   filesystemTargetForTest,
   navigationWith,
-  openTabsFor,
   preferredWorkspacePaneTab,
   recordCreatedTerminalSelection,
   removeTerminalFromWorkspacePaneTabsServer,
-  runCloseCurrentWorkspacePaneTabCommand,
   runCloseWorkspacePaneTabCommand,
   runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
   runShowWorkspacePaneTabCommand,
   runTerminalPrimaryActionCommand,
-  staticEntry,
   tabsFor,
   terminalEntry,
   toastMocks,
   worktreeSnapshotForSessions,
-  worktreeSnapshotWithSecondTerminalSelected,
   worktreeSnapshotWithTerminal,
   workspaceRuntimeIdForTest,
   workspacePaneTabsTestBridge,
@@ -243,7 +180,7 @@ describe('workspace commands open', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
-      removeTerminalFromWorkspacePaneTabsServer(baseForWorktree(), terminalSessionId)
+      removeTerminalFromWorkspacePaneTabsServer(expectedTerminalBase(), terminalSessionId)
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({

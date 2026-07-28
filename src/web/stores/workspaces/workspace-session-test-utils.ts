@@ -1,3 +1,4 @@
+import { resetWorkspacesStore, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import {
   normalizeRemoteWorkspaceId,
   type WorkspaceSessionEntry,
@@ -7,9 +8,9 @@ import {
   resolveServerRemoteWorkspaceConnection,
   type RemoteWorkspaceConnectionDeps,
 } from '#/server/modules/remote-workspace.ts'
-import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { flushMicrotasks } from '#/test-utils/index.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 export const REPO_A = workspaceIdForTest('goblin+file:///tmp/goblin-lifecycle-a')

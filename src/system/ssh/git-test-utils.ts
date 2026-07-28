@@ -1,29 +1,6 @@
-import { describe, expect, test, vi } from 'vitest'
-import {
-  bootstrapRemoteWorktreeAfterCreate,
-  createRemoteWorktree,
-  deleteRemoteBranch,
-  getRemoteBrowserUrl,
-  getRemoteLog,
-  getRemoteSnapshot,
-  getRemoteRepoWorktreePaths,
-  getRemoteWorkspacePaneTargetIdentities,
-  getRemoteTrackingBranches,
-  getRemoteTreeWalk,
-  getRemoteWorktreeBootstrapPreview,
-  pullRemoteBranch,
-  fetchRemoteRepo,
-  remoteCommandExists,
-  remoteCommandExistsAtWorkspaceRoot,
-  pushRemoteBranch,
-  remoteExecResult,
-  removeRemoteWorktree,
-  type RemoteGitRunner,
-  resolveRemoteWorktree,
-} from '#/system/ssh/git.ts'
+import type { RemoteGitRunner } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
-import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 
 // Remote Git tests share canonical targets and byte-exact command output fixtures.

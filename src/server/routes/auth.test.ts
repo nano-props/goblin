@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { createAuthRoutes } from '#/server/routes/auth.ts'
 import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 
 /**
  * The auth routes are the only way to obtain (login) or clear
@@ -35,6 +36,18 @@ function readSetCookie(res: Response): string | null {
   return headers.get('set-cookie')
 }
 
+async function settleTimeFlooredLogin(request: Response | Promise<Response>): Promise<Response> {
+  const response = Promise.resolve(request)
+  let settled = false
+  void response.then(() => {
+    settled = true
+  })
+  await vi.advanceTimersByTimeAsync(49)
+  expect(settled).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
+  return await response
+}
+
 describe('POST /api/login', () => {
   test('sets the cookie on a valid token', async () => {
     const app = buildApp()
@@ -59,70 +72,39 @@ describe('POST /api/login', () => {
   })
 
   test('rejects a wrong token with 401 + constant-time floor', async () => {
+    useFakeTimers()
     const app = buildApp()
-    const start = Date.now()
-    const res = await app.request(
-      new Request('http://localhost/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: 'x'.repeat(25) }),
-      }),
+    const res = await settleTimeFlooredLogin(
+      app.request(
+        new Request('http://localhost/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: 'x'.repeat(25) }),
+        }),
+      ),
     )
-    const elapsed = Date.now() - start
     expect(res.status).toBe(401)
     const body = (await res.json()) as { ok: false; code: string; message: string }
     expect(body.code).toBe('FORBIDDEN')
-    // The 50ms floor removes the timing signal between "wrong token"
-    // and "server is unreachable at all". A test using fake timers
-    // would be more deterministic; the wall-clock check below is a
-    // coarse smoke test that catches a regression where the delay
-    // is dropped entirely (elapsed would drop near 0).
-    expect(elapsed).toBeGreaterThanOrEqual(30)
   })
 
-  test('rejects malformed JSON with 400 (and the same time floor)', async () => {
+  test.each([
+    ['malformed JSON', 'not json'],
+    ['a missing token field', JSON.stringify({})],
+    ['a non-string token field', JSON.stringify({ token: 12345 })],
+  ])('rejects %s with 400 and the same time floor', async (_name, body) => {
+    useFakeTimers()
     const app = buildApp()
-    const start = Date.now()
-    const res = await app.request(
-      new Request('http://localhost/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: 'not json',
-      }),
+    const res = await settleTimeFlooredLogin(
+      app.request(
+        new Request('http://localhost/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body,
+        }),
+      ),
     )
-    const elapsed = Date.now() - start
     expect(res.status).toBe(400)
-    expect(elapsed).toBeGreaterThanOrEqual(30)
-  })
-
-  test('rejects a missing token field with 400 (and the same time floor)', async () => {
-    const app = buildApp()
-    const start = Date.now()
-    const res = await app.request(
-      new Request('http://localhost/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-    )
-    const elapsed = Date.now() - start
-    expect(res.status).toBe(400)
-    expect(elapsed).toBeGreaterThanOrEqual(30)
-  })
-
-  test('rejects a non-string token field with 400 (and the same time floor)', async () => {
-    const app = buildApp()
-    const start = Date.now()
-    const res = await app.request(
-      new Request('http://localhost/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token: 12345 }),
-      }),
-    )
-    const elapsed = Date.now() - start
-    expect(res.status).toBe(400)
-    expect(elapsed).toBeGreaterThanOrEqual(30)
   })
 
   test('returns 500 when the server has no access token configured', async () => {

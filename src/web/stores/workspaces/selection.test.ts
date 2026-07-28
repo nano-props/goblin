@@ -1,3 +1,9 @@
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+  createRepoBranch as branch,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -7,13 +13,7 @@ import type {
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import { WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  createRepoBranch as branch,
-  installGoblinTestBridge,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,

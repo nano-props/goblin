@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
 
+import {
+  createRepoBranch,
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  setWorkspaceProbeForTest,
+  createPullRequest,
+} from '#/web/test-utils/repo-store.ts'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -10,14 +17,6 @@ import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import {
-  createPullRequest,
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-  setWorkspaceProbeForTest,
-} from '#/web/test-utils/bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type * as RepoClient from '#/web/repo-client.ts'
 
 const repoClientMocks = vi.hoisted(() => ({

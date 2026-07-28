@@ -5,8 +5,8 @@ import {
   deriveWorkspaceConnectivity,
   workspaceCanExecute,
   workspaceOperationalFailureReason,
+  acceptWorkspaceProbeState,
 } from '#/web/stores/workspaces/workspace-guards.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 
 const REMOTE_ID = 'goblin+ssh://example/srv/repo'

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
+import { seedRepoShellForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   responsiveMocks,
@@ -40,7 +40,7 @@ describe('WorkspaceView branch and page routes', () => {
 
   test('route branch view does not write current branch into the store before read model is ready', () => {
     resetWorkspacesStore()
-    seedRepoShellForTest({ id: REPO_ID, currentBranchName: null })
+    seedRepoShellForTest({ id: REPO_ID })
 
     expect(() =>
       render(

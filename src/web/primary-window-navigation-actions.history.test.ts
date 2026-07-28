@@ -1,6 +1,6 @@
+import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspaceNavigationHistoryEntry,
@@ -14,7 +14,6 @@ import {
   historyRestoreOptions,
   WORKTREE_PATH,
   setupPrimaryWindowNavigationActionsTests,
-  preferredWorkspacePaneTab,
   branchHistoryEntry,
   historyTraversal,
   createPrimaryWindowNavigationActions,

@@ -1,8 +1,11 @@
-import type { TerminalProjectionEffect, TerminalSessionSummary, WorkspaceRuntimeScope } from '#/shared/terminal-types.ts'
+import type {
+  TerminalProjectionEffect,
+  TerminalSessionSummary,
+  WorkspaceRuntimeScope,
+} from '#/shared/terminal-types.ts'
 import type { TerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import type { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import type { TerminalSessionProjection } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import type { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import type { TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProjectionTestAccess {
@@ -35,9 +38,4 @@ export function requiredTerminalSession(
   const session = terminalSessionProjectionAccess(projection).sessions.get(terminalSessionId)
   if (!session) throw new Error(`Missing terminal session fixture: ${terminalSessionId}`)
   return session
-}
-
-/** Typed access to runtime failure injection used by projection recovery tests. */
-export function terminalSessionRuntimeAccess(session: TerminalSession): { runtime: TerminalSessionRuntime } {
-  return session as unknown as { runtime: TerminalSessionRuntime }
 }

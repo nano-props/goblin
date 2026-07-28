@@ -13,17 +13,14 @@ const CLIENT_ID = 'client_background_sync_test'
 const RUNTIME_ID = 'workspace-runtime-background-sync-test'
 let nextRegistrationRevision = 1
 
-function requiredAdmission(
-  admission: BackgroundSyncRegistrationAdmission | null,
-): BackgroundSyncRegistrationAdmission {
+function requiredAdmission(admission: BackgroundSyncRegistrationAdmission | null): BackgroundSyncRegistrationAdmission {
   if (!admission) throw new Error('expected background sync admission')
   return admission
 }
 
 async function registerRepos(workspaceIds: WorkspaceId[]): Promise<void> {
-  const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } = await import(
-    '#/server/modules/background-sync.ts'
-  )
+  const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
+    await import('#/server/modules/background-sync.ts')
   await prepareBackgroundSync()
   const targets = workspaceIds.map((workspaceId) => ({ workspaceId, workspaceRuntimeId: RUNTIME_ID }))
   const admission = requiredAdmission(
@@ -340,9 +337,7 @@ describe('server background sync scheduler', () => {
     const secondRuntimeId = 'workspace-runtime-background-sync-b'
 
     await registerRepos([REPO_A])
-    const targets = [
-      { workspaceId: REPO_B, workspaceRuntimeId: secondRuntimeId },
-    ]
+    const targets = [{ workspaceId: REPO_B, workspaceRuntimeId: secondRuntimeId }]
     const admission = requiredAdmission(
       beginBackgroundSyncRegistration(secondUserId, 'client_background_sync_second', 1, targets),
     )
@@ -368,9 +363,7 @@ describe('server background sync scheduler', () => {
 
     const firstClient = 'client_background_sync_first'
     const secondClient = 'client_background_sync_second'
-    const firstTargets = [
-      { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
-    ]
+    const firstTargets = [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]
     const firstAdmission = requiredAdmission(beginBackgroundSyncRegistration(USER_ID, firstClient, 1, firstTargets))
     commitBackgroundSyncRegistration(firstAdmission)
     const secondTargets = [
@@ -398,14 +391,10 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const olderAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [
-        { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
     )
     const newerAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [
-        { workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
     )
     expect(olderAdmission.signal.aborted).toBe(true)
     expect(commitBackgroundSyncRegistration(newerAdmission)).toBe(true)
@@ -424,14 +413,10 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const latestAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [
-        { workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
     )
     expect(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [
-        { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
     ).toBeNull()
     expect(latestAdmission.signal.aborted).toBe(false)
     expect(commitBackgroundSyncRegistration(latestAdmission)).toBe(true)
@@ -448,9 +433,7 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const firstPage = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [
-        { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
     )
     const newPage = requiredAdmission(
       beginBackgroundSyncRegistration(USER_ID, 'background-sync-new-page', 1, [
@@ -471,9 +454,7 @@ describe('server background sync scheduler', () => {
       getBackgroundSyncRepos,
       prepareBackgroundSync,
     } = await import('#/server/modules/background-sync.ts')
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import(
-      '#/server/modules/workspace-runtimes.ts'
-    )
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import('#/server/modules/workspace-runtimes.ts')
     const clientId = 'background-sync-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()
@@ -494,9 +475,8 @@ describe('server background sync scheduler', () => {
       getBackgroundSyncRepos,
       prepareBackgroundSync,
     } = await import('#/server/modules/background-sync.ts')
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime, retainWorkspaceRuntimeResource } = await import(
-      '#/server/modules/workspace-runtimes.ts'
-    )
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime, retainWorkspaceRuntimeResource } =
+      await import('#/server/modules/workspace-runtimes.ts')
     const ownerClientId = 'background-sync-owner-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, ownerClientId)
     const retention = retainWorkspaceRuntimeResource(USER_ID, REPO, workspaceRuntimeId, 'terminal-session')
@@ -516,12 +496,9 @@ describe('server background sync scheduler', () => {
   })
 
   test('aborts pending admission when its Workspace membership is released', async () => {
-    const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } = await import(
-      '#/server/modules/background-sync.ts'
-    )
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import(
-      '#/server/modules/workspace-runtimes.ts'
-    )
+    const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
+      await import('#/server/modules/background-sync.ts')
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import('#/server/modules/workspace-runtimes.ts')
     const clientId = 'background-sync-pending-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()

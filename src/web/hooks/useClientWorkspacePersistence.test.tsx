@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
@@ -12,7 +17,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const writePresentationMock = vi.fn()
 

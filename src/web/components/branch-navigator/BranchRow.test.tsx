@@ -39,6 +39,7 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
   }
 })
 
+import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import { createRef } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
@@ -46,7 +47,6 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,

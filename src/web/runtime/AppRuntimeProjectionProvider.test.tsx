@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -21,7 +22,6 @@ import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjection
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   readWorkspacePaneTabsForTarget,
@@ -593,7 +593,6 @@ describe('AppRuntimeProjectionProvider', () => {
     expect(recoverSessionsMock).not.toHaveBeenCalled()
     expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
   })
-
 })
 
 function renderRuntimeProvider(currentWorkspaceId: WorkspaceId | null) {

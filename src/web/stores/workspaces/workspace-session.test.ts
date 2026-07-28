@@ -1,9 +1,9 @@
+import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
-import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
@@ -594,6 +594,7 @@ describe('repo lifecycle', () => {
   })
 
   test('closeWorkspace clears recorded tab openers scoped to that repo, but leaves other repos untouched', async () => {
+    installGoblin()
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
@@ -626,7 +627,7 @@ describe('repo lifecycle', () => {
         'workspace-pane:status',
       )
 
-    await useWorkspacesStore.getState().closeWorkspace(REPO_A)
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({ ok: true })
 
     const openers = useWorkspacesStore.getState().tabOpenerIdentityByScope
     expect(
@@ -640,6 +641,7 @@ describe('repo lifecycle', () => {
   })
 
   test('closeWorkspace clears only terminal selections canonically owned by that Workspace', async () => {
+    installGoblin()
     const workspaceA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [] })
     const workspaceB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [] })
     const keyA = formatTerminalFilesystemTargetKey(REPO_A, REPO_A)
@@ -656,7 +658,7 @@ describe('repo lifecycle', () => {
       },
     })
 
-    await useWorkspacesStore.getState().closeWorkspace(REPO_A)
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({ ok: true })
 
     expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({
       [keyB]: 'terminal-session-b',
@@ -665,6 +667,7 @@ describe('repo lifecycle', () => {
   })
 
   test('closeWorkspace clears workspace navigation history scoped to that repo', async () => {
+    installGoblin()
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_A,
       branches: [createRepoBranch('feature/a')],
@@ -686,7 +689,7 @@ describe('repo lifecycle', () => {
       route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/dashboard' },
     })
 
-    await useWorkspacesStore.getState().closeWorkspace(REPO_A)
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({ ok: true })
 
     const history = useWorkspacesStore.getState().navigationHistoryByWorkspace
     expect(history[REPO_A]).toBeUndefined()

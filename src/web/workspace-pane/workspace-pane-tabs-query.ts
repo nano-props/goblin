@@ -173,7 +173,10 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
   return workspacePaneTabsPersistenceVersion
 }
 
-export function workspacePaneTabsProjectionRevision(workspaceId: WorkspaceId, workspaceRuntimeId: string): number | null {
+export function workspacePaneTabsProjectionRevision(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): number | null {
   return (
     primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
       workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),

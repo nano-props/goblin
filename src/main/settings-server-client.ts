@@ -45,11 +45,8 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
 
 export async function updateUserSettings(settings: UserSettingsPatch): Promise<UserSettings> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson(
-    runtime,
-    '/api/settings/prefs',
-    { prefs: settings },
-    (value) => v.parse(UserSettingsUpdateResponseSchema, value),
+  const json = await postEmbeddedServerJson(runtime, '/api/settings/prefs', { prefs: settings }, (value) =>
+    v.parse(UserSettingsUpdateResponseSchema, value),
   ).catch((error) => {
     throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
   })
@@ -67,11 +64,8 @@ export async function getUserSettings(): Promise<UserSettings> {
 
 export async function setGlobalShortcutState(registered: boolean): Promise<boolean> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson(
-    runtime,
-    '/api/settings/global-shortcut-state',
-    { registered },
-    (value) => v.parse(GlobalShortcutStateResponseSchema, value),
+  const json = await postEmbeddedServerJson(runtime, '/api/settings/global-shortcut-state', { registered }, (value) =>
+    v.parse(GlobalShortcutStateResponseSchema, value),
   ).catch((error) => {
     throw new Error(
       `Embedded server rejected global shortcut state update${error instanceof Error ? `: ${error.message}` : ''}`,

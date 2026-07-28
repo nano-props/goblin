@@ -6,13 +6,7 @@
 // from each git command.
 
 import { describe, expect, test } from 'vitest'
-import {
-  FIELD_SEP,
-  parseBranches,
-  parseLog,
-  parseStatus,
-  parseWorktrees,
-} from '#/system/git/parsers.ts'
+import { FIELD_SEP, parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 
 const SEP = FIELD_SEP
 const NUL = String.fromCharCode(0)
@@ -24,11 +18,18 @@ describe('parseBranches', () => {
 
   test('strict parsing rejects incomplete and invalid authoritative rows', () => {
     expect(() => parseBranches(`main${SEP}abc1234`, 'main')).toThrow('Invalid branch snapshot row')
-    expect(
-      () => parseBranches(
-        ['invalid branch name', 'abc1234000000000000000000000000000000000', 'abc1234', '', '2026-05-20', '', '', ''].join(
-          SEP,
-        ),
+    expect(() =>
+      parseBranches(
+        [
+          'invalid branch name',
+          'abc1234000000000000000000000000000000000',
+          'abc1234',
+          '',
+          '2026-05-20',
+          '',
+          '',
+          '',
+        ].join(SEP),
         'main',
       ),
     ).toThrow('Invalid branch snapshot identity')
@@ -109,17 +110,19 @@ describe('parseBranches', () => {
   })
 
   test('attaches worktree info when branch matches', () => {
-    const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(SEP)
-    const result = parseBranches(line, 'main', [
-      { path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false },
-    ])
+    const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
+      SEP,
+    )
+    const result = parseBranches(line, 'main', [{ path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false }])
     expect(result[0]?.worktree?.path).toBe('/wt/feat')
     expect(result[0]?.worktree?.isPrimary).toBe(false)
     expect(result[0]?.worktree).not.toHaveProperty('summary')
   })
 
   test('attaches primary worktree marker when branch matches the main worktree', () => {
-    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(SEP)
+    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
+      SEP,
+    )
     const [branch] = parseBranches(line, 'feature', [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
     expect(branch?.worktree?.path).toBe('/repo')
     expect(branch?.worktree?.isPrimary).toBe(true)
@@ -128,7 +131,16 @@ describe('parseBranches', () => {
 
   test('preserves SEP-free subjects with spaces and unicode', () => {
     const subject = 'feat: 添加 i18n 🎉'
-    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', subject, '2026-05-20', 'Z', '', ''].join(SEP)
+    const line = [
+      'main',
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'aaaaaaa',
+      subject,
+      '2026-05-20',
+      'Z',
+      '',
+      '',
+    ].join(SEP)
     const [b] = parseBranches(line, 'main')
     expect(b?.lastCommitMessage).toBe(subject)
   })
@@ -258,7 +270,8 @@ describe('parseWorktrees', () => {
   test('flags locked worktrees (with or without reason)', () => {
     // `git worktree list --porcelain` emits either a bare `locked` line
     // or `locked <reason>` when the user passed `--reason` to lock.
-    const out = ['worktree /repo/wt', 'HEAD aaaaaaa', 'branch refs/heads/feat', 'locked needed for release'].join(NUL) + NUL + NUL
+    const out =
+      ['worktree /repo/wt', 'HEAD aaaaaaa', 'branch refs/heads/feat', 'locked needed for release'].join(NUL) + NUL + NUL
     const [w] = parseWorktrees(out)
     expect(w?.isLocked).toBe(true)
 
@@ -267,20 +280,23 @@ describe('parseWorktrees', () => {
   })
 
   test('models prunable metadata while excluding it from the usable projection', () => {
-    const out = [
-      'worktree /repo',
-      'HEAD aaaaaaa',
-      'branch refs/heads/main',
-      '',
-      'worktree /repo/missing',
-      'HEAD bbbbbbb',
-      'branch refs/heads/stale',
-      'prunable gitdir file points to non-existent location',
-      '',
-      'worktree /repo/live',
-      'HEAD ccccccc',
-      'branch refs/heads/live',
-    ].join(NUL) + NUL + NUL
+    const out =
+      [
+        'worktree /repo',
+        'HEAD aaaaaaa',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/missing',
+        'HEAD bbbbbbb',
+        'branch refs/heads/stale',
+        'prunable gitdir file points to non-existent location',
+        '',
+        'worktree /repo/live',
+        'HEAD ccccccc',
+        'branch refs/heads/live',
+      ].join(NUL) +
+      NUL +
+      NUL
 
     expect(parseWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
   })
@@ -292,10 +308,13 @@ describe('parseWorktrees', () => {
     ])
   })
 
-  test.each(['/repo/line\nbreak', '/repo/tab\tpath'])('preserves special characters in worktree path %j', (worktreePath) => {
-    const out = [`worktree ${worktreePath}`, 'HEAD aaaaaaa', 'branch refs/heads/main'].join(NUL) + NUL + NUL
-    expect(parseWorktrees(out)[0]?.path).toBe(worktreePath)
-  })
+  test.each(['/repo/line\nbreak', '/repo/tab\tpath'])(
+    'preserves special characters in worktree path %j',
+    (worktreePath) => {
+      const out = [`worktree ${worktreePath}`, 'HEAD aaaaaaa', 'branch refs/heads/main'].join(NUL) + NUL + NUL
+      expect(parseWorktrees(out)[0]?.path).toBe(worktreePath)
+    },
+  )
 
   test('detached HEAD has no branch line — branch left undefined', () => {
     const out = ['worktree /repo/wt-detached', 'HEAD abc1234', 'detached'].join(NUL) + NUL + NUL
@@ -315,15 +334,18 @@ describe('parseWorktrees', () => {
   })
 
   test('parses multiple blocks separated by blank lines', () => {
-    const out = [
-      'worktree /repo',
-      'HEAD aaaaaaa',
-      'branch refs/heads/main',
-      '',
-      'worktree /repo/wt',
-      'HEAD bbbbbbb',
-      'branch refs/heads/feat',
-    ].join(NUL) + NUL + NUL
+    const out =
+      [
+        'worktree /repo',
+        'HEAD aaaaaaa',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/wt',
+        'HEAD bbbbbbb',
+        'branch refs/heads/feat',
+      ].join(NUL) +
+      NUL +
+      NUL
     const result = parseWorktrees(out)
     expect(result).toHaveLength(2)
     expect(result.map((w) => w.branch)).toEqual(['main', 'feat'])

@@ -159,7 +159,10 @@ export class WorkspacePaneEpochOverlay {
     )
   }
 
-  clearPhysicalIdentity(workspaceId: WorkspaceId, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
+  clearPhysicalIdentity(
+    workspaceId: WorkspaceId,
+    removedLease: PhysicalWorktreeAdmissionLease,
+  ): WorkspacePaneEpochScope[] {
     const physicalKey = physicalWorktreeAdmissionLeaseKey(removedLease)
     const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
     const affected: WorkspacePaneEpochScope[] = []

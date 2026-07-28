@@ -55,11 +55,7 @@ import type {
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import { closeWorkspaceRuntimesForDurableRemoval } from '#/server/modules/workspace-runtimes.ts'
-import {
-  MAX_RECENT_WORKSPACES,
-  defaultUserSettings,
-  defaultServerWorkspaceState,
-} from '#/shared/settings-defaults.ts'
+import { MAX_RECENT_WORKSPACES, defaultUserSettings, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 
 type FetchIntervalListener = (sec: number) => void
 interface UserSettingsData {
@@ -78,9 +74,7 @@ interface UserSettingsData {
 }
 
 type UserSettingsReadOutcome =
-  | { kind: 'missing' }
-  | { kind: 'current'; data: UserSettingsData; needsRewrite: boolean }
-  | { kind: 'invalid' }
+  { kind: 'missing' } | { kind: 'current'; data: UserSettingsData; needsRewrite: boolean } | { kind: 'invalid' }
 
 export type UserSettingsPatch = Partial<UserSettings>
 

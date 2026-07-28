@@ -1,3 +1,4 @@
+import { createRepoBranch, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
 import {
   applyStatusToWorktreeStates,
@@ -7,7 +8,6 @@ import {
   worktreeStatesFromBranchReadModel,
   type BranchWorktreeRepo,
 } from '#/web/stores/workspaces/worktree-state.ts'
-import { createBranchSnapshot, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import type { RepoWorktreeState } from '#/web/stores/workspaces/types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 

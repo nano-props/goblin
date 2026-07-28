@@ -6,7 +6,6 @@ import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/work
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   workspacePaneTabsBranchIdentity,
@@ -17,20 +16,6 @@ import {
 // Vitest has no reusable fixture for coordinator repositories and runtime target projections.
 export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 export const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
-
-export function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] }): WorkspacePaneLayoutRepository {
-  let layout: WorkspacePaneDurableLayout = initial
-  return {
-    async load() {
-      return { layout: structuredClone(layout) }
-    },
-    async compareAndSwap(input) {
-      const changed = JSON.stringify(layout) !== JSON.stringify(input.replacement)
-      layout = structuredClone(input.replacement)
-      return { kind: 'accepted', changed, snapshot: { layout: structuredClone(layout) } }
-    },
-  }
-}
 
 export function aggregateFor(
   repository: WorkspacePaneLayoutRepository,

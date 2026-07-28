@@ -1,24 +1,15 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useFakeTimers } from '#/test-utils/timers.ts'
+import { afterEach, beforeEach, vi } from 'vitest'
 import {
   TerminalSessionProjection,
-  getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionClosedEvent, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { terminalClient } from '#/web/terminal.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
-import {
-  requiredTerminalSession,
-  terminalSessionProjectionAccess,
-  terminalSessionRuntimeAccess,
-} from '#/web/test-utils/terminal-session-projection-access.ts'
 
 // Projection tests share one singleton lifecycle and canonical runtime binding fixture.
 const hoistedWorkspacePaneRuntimeMocks = vi.hoisted(() => ({
@@ -38,7 +29,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsSnapshot: hoistedWorkspacePaneTabsCommitMocks.writeCanonicalSnapshot,
 }))
 
-export function workspaceIdFixture(input: string) {
+function workspaceIdFixture(input: string) {
   const workspaceId = canonicalWorkspaceLocator(input)
   if (!workspaceId) throw new Error('invalid workspace locator fixture')
   return workspaceId
@@ -46,10 +37,10 @@ export function workspaceIdFixture(input: string) {
 
 export const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 export const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
-export const WORKTREE_PATH = '/repo'
+const WORKTREE_PATH = '/repo'
 export const BRANCH = 'main'
 export const WORKTREE_KEY = formatTerminalFilesystemTargetKey(REPO_ROOT, REPO_ROOT)
-export const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
 export const RUNTIME_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: WORKSPACE_ID,
@@ -80,7 +71,7 @@ export function tabsBeforeRetirement(terminalSessionId: string) {
   ]
 }
 
-export function requiredWorkspaceLocator(input: string) {
+function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)
   if (!locator) throw new Error('invalid workspace locator fixture')
   return locator

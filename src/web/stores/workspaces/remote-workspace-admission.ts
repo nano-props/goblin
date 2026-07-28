@@ -27,7 +27,6 @@ export function markRemoteLifecycleFailed(
 function remoteWorkspaceAdmission(
   workspace: RemoteWorkspaceAdmissionTarget,
 ): Extract<WorkspaceState['admission'], { kind: 'remote' }> {
-  if (workspace.admission.kind !== 'remote')
-    throw new Error('Remote lifecycle requires remote workspace admission')
+  if (workspace.admission.kind !== 'remote') throw new Error('Remote lifecycle requires remote workspace admission')
   return workspace.admission
 }

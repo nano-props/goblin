@@ -70,8 +70,7 @@ function makeActions(
   } = {},
 ) {
   const broadcasts = vi.fn()
-  const closeSessionForUserOutcome =
-    options.closeSessionForUserOutcome ?? (() => ({ kind: 'already-closed' as const }))
+  const closeSessionForUserOutcome = options.closeSessionForUserOutcome ?? (() => ({ kind: 'already-closed' as const }))
   const physicalWorktreeCapability =
     options.physicalWorktreeCapability ?? testPhysicalWorktreeExecutionCapability(REPO_ROOT)
   const worktreeOperations = options.worktreeOperations ?? createPhysicalWorktreeOperationCoordinator()

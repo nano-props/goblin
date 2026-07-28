@@ -1,3 +1,9 @@
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
@@ -12,12 +18,6 @@ import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/works
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoProjectionQueryKey } from '#/web/repo-query-keys.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import {

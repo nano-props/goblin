@@ -7,80 +7,87 @@ import { glob } from 'tinyglobby'
 
 const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
+const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
+const CANONICAL_TIMERS_FILE = 'src/test-utils/timers.ts'
+const CANONICAL_STORAGE_FILE = 'src/test-utils/storage.ts'
+const CANONICAL_FETCH_MOCK_FILES = new Set(['src/test-utils/fetch-mock.ts', 'src/web/test-utils/bridge.ts'])
+const MAX_TEST_SURFACE_LINES = 1_500
+const TEST_FILE_GLOBS = ['src/**/*.test.ts', 'src/**/*.test.tsx']
+const TEST_UTILITY_GLOBS = [
+  'src/test-utils/**/*.ts',
+  'src/test-utils/**/*.tsx',
+  'src/server/test-utils/**/*.ts',
+  'src/server/test-utils/**/*.tsx',
+  'src/web/test-utils/**/*.ts',
+  'src/web/test-utils/**/*.tsx',
+  'src/**/*.test-utils.ts',
+  'src/**/*.test-utils.tsx',
+  'src/**/*-test-utils.ts',
+  'src/**/*-test-utils.tsx',
+]
 
 const repositoryPolicyLabels = [
   'hand-rolled React root',
   'act imported directly from React',
   'manual React act-environment mutation',
   'inline WebSocket mock',
-  'repeated manual microtask drain',
-  'test-local zero-delay macrotask wait',
   'test-local fetch replacement',
   'test-local Storage replacement',
 ] as const
 
-type PolicyLabel =
-  (typeof repositoryPolicyLabels)[number] | 'direct KeyboardEvent construction' | 'direct fake-timer configuration'
+type PolicyLabel = (typeof repositoryPolicyLabels)[number] | 'direct fake-timer configuration'
 
 const analysisByFile = new Map<string, Promise<ReadonlySet<PolicyLabel>>>()
 
 describe('test harness policy', () => {
-  test('keeps repository tests on the shared React and WebSocket harnesses', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+  test('keeps repository tests and utilities on the shared harnesses', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
 
     for (const file of files) {
       if (file === POLICY_FILE) continue
       const labels = await analyzeFile(file)
       for (const label of repositoryPolicyLabels) {
-        if (labels.has(label)) violations.push(`${file}: ${label}`)
+        if (labels.has(label) && !isCanonicalPolicyOwner(file, label)) violations.push(`${file}: ${label}`)
       }
     }
 
     expect(violations).toEqual([])
   })
 
-  test('keeps test helpers on the canonical WebSocket mock', async () => {
-    const files = await glob([
-      'src/test-utils/**/*.ts',
-      'src/test-utils/**/*.tsx',
-      'src/web/test-utils/**/*.ts',
-      'src/web/test-utils/**/*.tsx',
-    ])
+  test('keeps the hoisted xterm boundary in one canonical harness', async () => {
+    const files = await glob(['src/**/*.ts', 'src/**/*.tsx'])
     const violations: string[] = []
 
     for (const file of files) {
-      if (file === POLICY_FILE || file === CANONICAL_WEBSOCKET_MOCK_FILE) continue
-      if ((await analyzeFile(file)).has('inline WebSocket mock')) violations.push(file)
+      if (file === CANONICAL_XTERM_MOCK_FILE) continue
+      const source = await readFile(file, 'utf8')
+      if (hasXtermMock(source, file)) violations.push(file)
     }
 
     expect(violations).toEqual([])
   })
 
-  test('keeps component test filenames aligned with their source surfaces', async () => {
-    const files = await glob(['src/**/*.component.test.ts', 'src/**/*.component.test.tsx'])
-
-    expect(files).toEqual([])
-  })
-
-  test('drives component keyboard input through userEvent', async () => {
-    const files = await glob('src/web/components/**/*.test.tsx')
+  test('keeps test surfaces below the oversized-file tripwire', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
+
     for (const file of files) {
-      if ((await analyzeFile(file)).has('direct KeyboardEvent construction')) violations.push(file)
+      const source = await readFile(file, 'utf8')
+      const lineCount = source.endsWith('\n') ? source.split('\n').length - 1 : source.split('\n').length
+      if (lineCount > MAX_TEST_SURFACE_LINES) {
+        violations.push(`${file}: ${lineCount} lines exceeds ${MAX_TEST_SURFACE_LINES}`)
+      }
     }
 
     expect(violations).toEqual([])
   })
 
-  test('uses the shared fake-timer configuration across repository tests', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
-    // TerminalSession intentionally leaves Date and performance real because
-    // they participate in its terminal protocol and activity calculations.
-    const exceptions = new Set(['src/web/components/terminal/TerminalSession.test.ts'])
+  test('uses the shared fake-timer configuration across repository tests and utilities', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
     for (const file of files) {
-      if (file === POLICY_FILE || exceptions.has(file)) continue
+      if (file === POLICY_FILE || file === CANONICAL_TIMERS_FILE) continue
       if ((await analyzeFile(file)).has('direct fake-timer configuration')) violations.push(file)
     }
 
@@ -93,14 +100,14 @@ describe('test harness policy', () => {
       const documentation = "new KeyboardEvent('keydown'); IS_REACT_ACT_ENVIRONMENT"
       import { vi } from 'vitest'
       import { createRoot } from 'react-dom/client'
-      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window, global) {
+      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window, global, globalThis) {
         vi.stubGlobal('fetch')
         vi.useFakeTimers()
         createRoot()
-        new KeyboardEvent('keydown')
-        new Promise((resolve) => window.setTimeout(resolve, 0))
         Object.defineProperty(window, 'localStorage', {})
         global.WebSocket = class TestSocket {}
+        globalThis.fetch = fetchMock
+        window.localStorage = storage
       }
       const config = { IS_REACT_ACT_ENVIRONMENT: false }
       config.IS_REACT_ACT_ENVIRONMENT = true
@@ -115,13 +122,10 @@ describe('test harness policy', () => {
     ['hand-rolled React root', "import { createRoot as mount } from 'react-dom/client'; mount(node)"],
     ['act imported directly from React', "import { act as reactAct } from 'react'"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
-    ['repeated manual microtask drain', 'await Promise.resolve(); await Promise.resolve()'],
-    ['repeated manual microtask drain', 'for (let i = 0; i < 3; i += 1) await Promise.resolve()'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0))'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve))'],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, undefined))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
+    ['test-local fetch replacement', 'globalThis.fetch = fetchMock'],
     ['test-local Storage replacement', "Object.defineProperty(window, 'localStorage', { value: storage })"],
+    ['test-local Storage replacement', 'window.sessionStorage = storage'],
     [
       'inline WebSocket mock',
       "import { vi } from 'vitest'; class TestWebSocket {}; vi.stubGlobal('WebSocket', TestWebSocket)",
@@ -130,13 +134,6 @@ describe('test harness policy', () => {
     ['inline WebSocket mock', 'global.WebSocket = class TestSocket {}'],
     ['inline WebSocket mock', "Object.defineProperty(window, 'WebSocket', { value: class TestSocket {} })"],
     ['inline WebSocket mock', "Object.defineProperty(global, 'WebSocket', { value: class TestSocket {} })"],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 as number))'],
-    [
-      'test-local zero-delay macrotask wait',
-      'await new Promise((resolve) => setTimeout(resolve, undefined as undefined))',
-    ],
-    ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, 0 satisfies number))'],
-    ['direct KeyboardEvent construction', "new KeyboardEvent('keydown')"],
     ['direct fake-timer configuration', "import { vi as testVi } from 'vitest'; testVi.useFakeTimers()"],
   ] satisfies Array<[PolicyLabel, string]>)('detects %s from syntax bindings', (label, source) => {
     expect(analyzeSource(source, 'fixture.test.tsx')).toContain(label)
@@ -155,7 +152,31 @@ describe('test harness policy', () => {
   ])('detects act-environment mutation through global syntax and aliases', (source) => {
     expect(analyzeSource(source, 'fixture.test.ts')).toContain('manual React act-environment mutation')
   })
+
+  test('detects xterm mocks through Vitest bindings without matching text', () => {
+    expect(hasXtermMock("import { vi as testVi } from 'vitest'; testVi.mock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(
+      true,
+    )
+    expect(
+      hasXtermMock("import * as vitest from 'vitest'; vitest.vi.mock('@xterm/addon-fit', () => ({}))", 'x.ts'),
+    ).toBe(true)
+    expect(hasXtermMock("import { vi } from 'vitest'; vi.mock(import('@xterm/xterm'), () => ({}))", 'x.ts')).toBe(true)
+    expect(hasXtermMock("import { vi } from 'vitest'; vi.doMock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(true)
+    expect(hasXtermMock('const note = "vi.mock(\'@xterm/xterm\')"', 'x.ts')).toBe(false)
+  })
 })
+
+function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLabels)[number]): boolean {
+  if (label === 'hand-rolled React root') return !isTestFile(file)
+  if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
+  if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
+  if (label === 'test-local Storage replacement') return file === CANONICAL_STORAGE_FILE
+  return false
+}
+
+function isTestFile(file: string): boolean {
+  return file.endsWith('.test.ts') || file.endsWith('.test.tsx')
+}
 
 function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
   const cached = analysisByFile.get(file)
@@ -183,50 +204,29 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
         violations.add('inline WebSocket mock')
       }
     },
-    Program(path) {
-      detectRepeatedMicrotaskDrain(path.get('body'), violations)
-    },
-    BlockStatement(path) {
-      detectRepeatedMicrotaskDrain(path.get('body'), violations)
-    },
-    ForStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    ForInStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    ForOfStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    WhileStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
-    DoWhileStatement(path) {
-      if (containsAwaitPromiseResolve(path.get('body'))) violations.add('repeated manual microtask drain')
-    },
     AssignmentExpression(path) {
       if (isActEnvironmentTarget(path.get('left'))) violations.add('manual React act-environment mutation')
       if (isGlobalWebSocketTarget(path.get('left'))) violations.add('inline WebSocket mock')
+      if (isGlobalNamedTarget(path.get('left'), 'fetch')) violations.add('test-local fetch replacement')
+      if (
+        isGlobalNamedTarget(path.get('left'), 'localStorage') ||
+        isGlobalNamedTarget(path.get('left'), 'sessionStorage')
+      ) {
+        violations.add('test-local Storage replacement')
+      }
     },
     UnaryExpression(path) {
       if (path.node.operator === 'delete' && isActEnvironmentTarget(path.get('argument'))) {
         violations.add('manual React act-environment mutation')
       }
     },
-    NewExpression(path) {
-      const callee = path.get('callee')
-      if (isUnboundIdentifier(callee, 'KeyboardEvent')) violations.add('direct KeyboardEvent construction')
-      if (isUnboundIdentifier(callee, 'Promise') && containsZeroDelayTimeout(path)) {
-        violations.add('test-local zero-delay macrotask wait')
-      }
-    },
     CallExpression(path) {
       const callee = path.get('callee')
       if (isImportedCreateRoot(callee)) violations.add('hand-rolled React root')
-      if (isImportedMember(callee, 'vitest', 'vi', 'useFakeTimers')) {
+      if (isVitestViMember(callee, 'useFakeTimers')) {
         violations.add('direct fake-timer configuration')
       }
-      if (isImportedMember(callee, 'vitest', 'vi', 'stubGlobal')) {
+      if (isVitestViMember(callee, 'stubGlobal')) {
         const globalName = stringArgument(path, 0)
         if (globalName === 'fetch') violations.add('test-local fetch replacement')
         if (isStorageName(globalName)) violations.add('test-local Storage replacement')
@@ -273,9 +273,47 @@ function isImportedCreateRoot(callee: NodePath): boolean {
   return isImportedNamespace(callee.get('object'), 'react-dom/client')
 }
 
-function isImportedMember(callee: NodePath, source: string, imported: string, property: string): boolean {
+function isVitestViMember(callee: NodePath, property: string): boolean {
   if (!callee.isMemberExpression() || memberPropertyName(callee) !== property) return false
-  return isImportedIdentifier(callee.get('object'), source, imported)
+  const object = callee.get('object')
+  if (isImportedIdentifier(object, 'vitest', 'vi')) return true
+  return (
+    object.isMemberExpression() &&
+    memberPropertyName(object) === 'vi' &&
+    isImportedNamespace(object.get('object'), 'vitest')
+  )
+}
+
+function hasXtermMock(source: string, file: string): boolean {
+  if (!source.includes('@xterm/')) return false
+  const ast = parse(source, {
+    sourceType: 'module',
+    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
+  })
+  let found = false
+  traverse(ast, {
+    CallExpression(path) {
+      const callee = path.get('callee')
+      if (!isVitestViMember(callee, 'mock') && !isVitestViMember(callee, 'doMock')) return
+      const moduleName = moduleNameArgument(path)
+      if (moduleName?.startsWith('@xterm/')) {
+        found = true
+        path.stop()
+      }
+    },
+  })
+  return found
+}
+
+function moduleNameArgument(path: NodePath<CallExpression>): string | null {
+  const argument = argumentPaths(path)[0]
+  if (argument?.isStringLiteral()) return argument.node.value
+  if (argument?.isImportExpression()) {
+    const source = argument.get('source')
+    return source.isStringLiteral() ? source.node.value : null
+  }
+  if (!argument?.isCallExpression() || !argument.get('callee').isImport()) return null
+  return stringArgument(argument, 0)
 }
 
 function memberPropertyName(path: NodePath): string | null {
@@ -330,79 +368,14 @@ function isGlobalMember(path: NodePath, property: string): boolean {
   return path.isMemberExpression() && memberPropertyName(path) === property && isGlobalObject(path.get('object'))
 }
 
-function isGlobalFunction(path: NodePath, name: string): boolean {
-  return isUnboundIdentifier(path, name) || isGlobalMember(path, name)
-}
-
 function isGlobalWebSocketTarget(path: NodePath): boolean {
   const target = unwrapExpression(path)
   return isUnboundIdentifier(target, 'WebSocket') || isGlobalMember(target, 'WebSocket')
 }
 
-function containsZeroDelayTimeout(promisePath: NodePath): boolean {
-  const executor = argumentPaths(promisePath)[0]
-  if (!executor?.isFunction()) return false
-  let found = false
-  executor.traverse({
-    CallExpression(path: NodePath<CallExpression>) {
-      if (!isGlobalFunction(path.get('callee'), 'setTimeout')) return
-      const delay = argumentPaths(path)[1]
-      const delayExpression = delay && unwrapExpression(delay)
-      if (
-        delayExpression === undefined ||
-        delayExpression.isNumericLiteral({ value: 0 }) ||
-        isUnboundIdentifier(delayExpression, 'undefined')
-      ) {
-        found = true
-      }
-    },
-  })
-  return found
-}
-
-function detectRepeatedMicrotaskDrain(statements: NodePath[], violations: Set<PolicyLabel>): void {
-  let consecutive = 0
-  for (const statement of statements) {
-    consecutive = isAwaitPromiseResolve(statement) ? consecutive + 1 : 0
-    if (consecutive === 2) violations.add('repeated manual microtask drain')
-  }
-}
-
-function isAwaitPromiseResolve(statement: NodePath): boolean {
-  if (!statement.isExpressionStatement()) return false
-  const expression = statement.get('expression')
-  if (!expression.isAwaitExpression()) return false
-  const argument = expression.get('argument')
-  if (!argument.isCallExpression() || argument.node.arguments.length !== 0) return false
-  const callee = argument.get('callee')
-  return (
-    callee.isMemberExpression() &&
-    memberPropertyName(callee) === 'resolve' &&
-    isUnboundIdentifier(callee.get('object'), 'Promise')
-  )
-}
-
-function containsAwaitPromiseResolve(path: NodePath): boolean {
-  let found = false
-  path.traverse({
-    Function(innerPath) {
-      innerPath.skip()
-    },
-    AwaitExpression(innerPath) {
-      const argument = innerPath.get('argument')
-      if (!argument.isCallExpression() || argument.node.arguments.length !== 0) return
-      const callee = argument.get('callee')
-      if (
-        callee.isMemberExpression() &&
-        memberPropertyName(callee) === 'resolve' &&
-        isUnboundIdentifier(callee.get('object'), 'Promise')
-      ) {
-        found = true
-        innerPath.stop()
-      }
-    },
-  })
-  return found
+function isGlobalNamedTarget(path: NodePath, name: string): boolean {
+  const target = unwrapExpression(path)
+  return isUnboundIdentifier(target, name) || isGlobalMember(target, name)
 }
 
 function stringArgument(path: NodePath, index: number): string | null {

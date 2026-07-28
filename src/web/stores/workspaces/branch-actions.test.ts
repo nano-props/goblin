@@ -1,3 +1,10 @@
+import {
+  createRepoBranch,
+  repoPresentationFromQueryForTest,
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -11,14 +18,7 @@ import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-ref
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
-import {
-  createBranchSnapshot,
-  createRepoBranch,
-  installGoblinTestBridge,
-  repoPresentationFromQueryForTest,
-  resetWorkspacesStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
@@ -564,9 +564,7 @@ describe('runBranchAction', () => {
         repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
-    const result = await useWorkspacesStore
-      .getState()
-      .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+    const result = await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
     expect(result).toEqual({ ok: false, message: 'boom' })
     expect(

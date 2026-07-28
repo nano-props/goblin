@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from 'vitest'
-import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom, waitForNextMacrotask } from '#/test-utils/index.ts'
-import { useFakeTimers } from '#/test-utils/timers.ts'
+import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 
 describe('renderInJsdom', () => {
   test('renders React elements and returns the standard RTL query API', () => {

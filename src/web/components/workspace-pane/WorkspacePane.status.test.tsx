@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
 
+import {
+  createBranchSnapshot,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+  createPullRequest,
+} from '#/web/test-utils/repo-store.ts'
 import { act, screen } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -9,12 +15,6 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
-import {
-  createPullRequest,
-  createBranchSnapshot,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'

@@ -66,12 +66,9 @@ describe('TokenGate', () => {
     await waitFor(() => {
       expect(screen.getByText('bad token')).toBeTruthy()
     })
-    expect(postServerJson).toHaveBeenCalledWith(
-      '/api/login',
-      { token: 'bad-token' },
-      expect.any(Function),
-      { signal: expect.any(AbortSignal) },
-    )
+    expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'bad-token' }, expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
   })
 
   test('hides the previous error while a retry is pending', async () => {
@@ -109,12 +106,9 @@ describe('TokenGate', () => {
     await user.click(screen.getByRole('button', { name: 'auth.gate.sign-in' }))
 
     await waitFor(() => {
-      expect(postServerJson).toHaveBeenCalledWith(
-        '/api/login',
-        { token: 'good-token' },
-        expect.any(Function),
-        { signal: expect.any(AbortSignal) },
-      )
+      expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'good-token' }, expect.any(Function), {
+        signal: expect.any(AbortSignal),
+      })
       expect(authMock.status.refresh).toHaveBeenCalledTimes(1)
     })
   })

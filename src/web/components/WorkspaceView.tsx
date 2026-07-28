@@ -29,10 +29,7 @@ import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
-import {
-  invalidateRepoSnapshotQueries,
-  invalidateRepoWorktreeStatusQueries,
-} from '#/web/repo-query-runtime.ts'
+import { invalidateRepoSnapshotQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
 interface WorkspaceProjectionRestoreController {

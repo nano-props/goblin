@@ -22,23 +22,24 @@ describe('persistedOpenWorkspaceEntries', () => {
           id: remoteId,
         },
       }),
-    ).toEqual([
-      { id: 'goblin+file:///tmp/repo-a' },
-      { id: remoteId },
-    ])
+    ).toEqual([{ id: 'goblin+file:///tmp/repo-a' }, { id: remoteId }])
   })
 })
 
 describe('nextRestoredWorkspaceIdAfterWorkspaceClose', () => {
   test('keeps the active selection when closing an inactive workspace', () => {
-    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_A, REPO_B)).toBe('goblin+file:///tmp/repo-a')
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_A, REPO_B)).toBe(
+      'goblin+file:///tmp/repo-a',
+    )
   })
 
   test('slides to the right neighbor, then the left, then null', () => {
     expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B, REPO_C], REPO_B, REPO_B)).toBe(
       'goblin+file:///tmp/repo-c',
     )
-    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_B, REPO_B)).toBe('goblin+file:///tmp/repo-a')
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_B, REPO_B)).toBe(
+      'goblin+file:///tmp/repo-a',
+    )
     expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A], REPO_A, REPO_A)).toBeNull()
   })
 })

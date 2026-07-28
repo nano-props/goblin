@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { REPO_ID, deferred, expectNoRepoSnapshotInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
+import { REPO_ID, expectNoRepoSnapshotInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo coordination', () => {
   test('serializes different SSH aliases for the same resolved repository', async () => {
@@ -21,7 +21,7 @@ describe('fetchRepo coordination', () => {
         },
       },
     }))
-    const firstFetch = deferred<{ ok: true; message: string }>()
+    const firstFetch = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await firstFetch.promise)
     mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched second alias' })
 
@@ -56,8 +56,8 @@ describe('fetchRepo coordination', () => {
         },
       },
     }))
-    const firstFetch = deferred<{ ok: true; message: string }>()
-    const secondFetch = deferred<{ ok: true; message: string }>()
+    const firstFetch = Promise.withResolvers<{ ok: true; message: string }>()
+    const secondFetch = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementation(async (target: { alias: string }) =>
       target.alias === 'proxy-a' ? await firstFetch.promise : await secondFetch.promise,
     )
@@ -88,8 +88,8 @@ describe('fetchRepo coordination', () => {
       },
     }))
     mocks.resolveRemoteRepoCommonDir.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
-    const first = deferred<{ ok: true; message: string }>()
-    const second = deferred<{ ok: true; message: string }>()
+    const first = Promise.withResolvers<{ ok: true; message: string }>()
+    const second = Promise.withResolvers<{ ok: true; message: string }>()
     const fetchPaths: string[] = []
     mocks.fetchRemoteRepo.mockImplementation(async (target: { remotePath: string }) => {
       fetchPaths.push(target.remotePath)
@@ -117,7 +117,7 @@ describe('fetchRepo coordination', () => {
   })
 
   test('caller abort records wait cancellation for a queued user sync', async () => {
-    const deleteBranch = deferred<{ ok: true; message: string }>()
+    const deleteBranch = Promise.withResolvers<{ ok: true; message: string }>()
     mocks.deleteBranch.mockImplementationOnce(async () => await deleteBranch.promise)
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 

@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, test } from 'vitest'
-import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import {
-  createBranchSnapshot,
   createGitWorkspaceProbeForTest,
-  installGoblinTestBridge,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoShellForTest,
-} from '#/web/test-utils/bridge.ts'
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -44,7 +44,6 @@ describe('repo projection read-model effects', () => {
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     seedRepoReadModelQueryData(repo, {
@@ -76,7 +75,6 @@ describe('repo projection read-model effects', () => {
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     seedRepoReadModelQueryData(repo, {
@@ -103,7 +101,6 @@ describe('repo projection read-model effects', () => {
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     const loadedAt = 123
@@ -160,7 +157,6 @@ describe('repo projection read-model effects', () => {
     const repo = seedRepoShellForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     useWorkspacesStore.setState((state) => {

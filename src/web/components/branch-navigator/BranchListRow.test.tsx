@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
+import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import { createRef } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'

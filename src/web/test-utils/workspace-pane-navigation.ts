@@ -41,7 +41,7 @@ export type PrimaryWindowNavigationOverridesForTest = Partial<PrimaryWindowNavig
 export type ObservedPrimaryWindowNavigationActionsForTest = PrimaryWindowNavigationActions &
   ObservedBranchRouteNavigationForTest
 
-export interface ObservedWorkspacePaneRouteCommitOptions {
+interface ObservedWorkspacePaneRouteCommitOptions {
   observeAcceptedRoute?: (observation: WorkspacePaneNavigationObservation) => void
   commitRoute?: PrimaryWindowNavigationActions['commitWorkspacePaneRoute']
 }

@@ -17,7 +17,11 @@ const bellInput = {
   body: 'feature/test\nzsh',
   terminalSessionId: 'term-111111111111111111111',
   session: {
-    target: { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
+    target: {
+      kind: 'workspace-root' as const,
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'workspace-runtime-test',
+    },
     presentation: { kind: 'workspace-root' as const },
   },
 }

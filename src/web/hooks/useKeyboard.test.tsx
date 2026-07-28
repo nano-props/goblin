@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
 
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+} from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
@@ -15,12 +21,6 @@ vi.mock('sonner', () => ({
   },
 }))
 import {
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
-import {
   observedPrimaryWindowNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
   seedInitialObservedWorkspacePaneRouteForTest,
@@ -30,11 +30,11 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
@@ -108,7 +108,7 @@ describe('useKeyboard', () => {
     textarea.focus()
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'p', code: 'KeyP' }))
       await Promise.resolve()
     })
 
@@ -120,7 +120,7 @@ describe('useKeyboard', () => {
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentBranchName: 'feature/worktree' })
     const lease = claimTerminalAutoFocus(beginPrimaryWindowNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
-    const keydown = new KeyboardEvent('keydown', {
+    const keydown = keyboardEventForTest('keydown', {
       key: 'p',
       code: 'KeyP',
       bubbles: true,
@@ -145,7 +145,7 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'Escape' }))
       await Promise.resolve()
     })
 
@@ -177,7 +177,7 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight' }))
       await Promise.resolve()
     })
 
@@ -218,7 +218,7 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight' }))
       await Promise.resolve()
     })
 
@@ -243,7 +243,7 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', code: 'KeyJ', bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'j', code: 'KeyJ' }))
       await Promise.resolve()
     })
 
@@ -259,12 +259,8 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', altKey: true, bubbles: true }),
-      )
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', altKey: true, bubbles: true }),
-      )
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', altKey: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight', code: 'ArrowRight', altKey: true }))
       await Promise.resolve()
     })
 
@@ -329,14 +325,14 @@ describe('useKeyboard', () => {
       currentWorkspacePaneCommandTarget: currentTerminalPaneCommandTargetForTest(),
     })
 
-    const initialShortcut = new KeyboardEvent('keydown', {
+    const initialShortcut = keyboardEventForTest('keydown', {
       key: 't',
       code: 'KeyT',
       ctrlKey: true,
       bubbles: true,
       cancelable: true,
     })
-    const repeatedShortcut = new KeyboardEvent('keydown', {
+    const repeatedShortcut = keyboardEventForTest('keydown', {
       key: 't',
       code: 'KeyT',
       ctrlKey: true,
@@ -378,7 +374,7 @@ describe('useKeyboard', () => {
       worktreePath: WORKTREE_PATH,
       route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
-    const shortcut = new KeyboardEvent('keydown', {
+    const shortcut = keyboardEventForTest('keydown', {
       key: 't',
       code: 'KeyT',
       ctrlKey: true,
@@ -387,7 +383,7 @@ describe('useKeyboard', () => {
     })
     await act(async () => {
       document.body.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true, bubbles: true }),
+        keyboardEventForTest('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true }),
       )
       document.body.dispatchEvent(shortcut)
       await Promise.resolve()
@@ -501,7 +497,7 @@ describe('useKeyboard', () => {
   test('does not consume unowned primary-modifier combinations', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     await renderHookHost()
-    const copy = new KeyboardEvent('keydown', {
+    const copy = keyboardEventForTest('keydown', {
       key: 'c',
       code: 'KeyC',
       ctrlKey: true,
@@ -601,9 +597,9 @@ describe('useKeyboard', () => {
     await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'n', code: 'KeyN', ctrlKey: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
       await Promise.resolve()
     })
 
@@ -628,9 +624,9 @@ describe('useKeyboard', () => {
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentWorkspacePaneCommandTarget: null })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', code: 'Digit1', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: '1', code: 'Digit1', ctrlKey: true }))
       await Promise.resolve()
     })
 
@@ -655,7 +651,7 @@ describe('useKeyboard', () => {
     })
 
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
       await Promise.resolve()
     })
 
@@ -669,7 +665,7 @@ describe('useKeyboard', () => {
       }),
     )
 
-    const repeatedClose = new KeyboardEvent('keydown', {
+    const repeatedClose = keyboardEventForTest('keydown', {
       key: 'w',
       code: 'KeyW',
       ctrlKey: true,
@@ -685,7 +681,7 @@ describe('useKeyboard', () => {
     expect(repeatedClose.defaultPrevented).toBe(true)
     await vi.waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledTimes(2))
 
-    const secondClose = new KeyboardEvent('keydown', {
+    const secondClose = keyboardEventForTest('keydown', {
       key: 'w',
       code: 'KeyW',
       ctrlKey: true,
@@ -693,7 +689,7 @@ describe('useKeyboard', () => {
       cancelable: true,
     })
     await act(async () => {
-      document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      document.body.dispatchEvent(keyboardEventForTest('keyup', { key: 'w', code: 'KeyW', ctrlKey: true }))
       document.body.dispatchEvent(secondClose)
       await Promise.resolve()
     })
@@ -750,7 +746,7 @@ async function dispatchPrimaryShortcut(
   init: KeyboardEventInit = {},
 ): Promise<KeyboardEvent> {
   Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-  const shortcut = new KeyboardEvent('keydown', { ...init, key, code, ctrlKey: true, bubbles: true })
+  const shortcut = keyboardEventForTest('keydown', { ...init, key, code, ctrlKey: true })
   await act(async () => {
     window.dispatchEvent(shortcut)
     await Promise.resolve()

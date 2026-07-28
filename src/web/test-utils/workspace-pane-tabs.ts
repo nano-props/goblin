@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   runtimeWorkspacePaneTarget,
   requiredGitWorkspacePaneTabsTarget,
@@ -64,22 +64,6 @@ export function setWorkspacePaneTabsForTargetQueryData(
   )
 }
 
-export function replaceWorkspacePaneTabsQueryData(
-  workspaceId: string,
-  workspaceRuntimeId: string,
-  entries: readonly WorkspacePaneTabsEntry[],
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
-  const current = currentSnapshot(canonicalWorkspaceId, workspaceRuntimeId, queryClient)
-  writeWorkspacePaneTabsSnapshotQueryData(
-    canonicalWorkspaceId,
-    workspaceRuntimeId,
-    { revision: current.revision, entries: [...entries] },
-    queryClient,
-  )
-}
-
 function currentSnapshot(
   workspaceId: string,
   workspaceRuntimeId: string,
@@ -119,11 +103,7 @@ export function runtimeWorkspacePaneTargetForTest(
   const paneTarget =
     'kind' in input
       ? input
-      : requiredGitWorkspacePaneTabsTarget(
-          workspaceIdForTest(input.workspaceId),
-          input.branchName,
-          input.worktreePath,
-        )
+      : requiredGitWorkspacePaneTabsTarget(workspaceIdForTest(input.workspaceId), input.branchName, input.worktreePath)
   const target = runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')
   return target

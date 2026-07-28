@@ -111,7 +111,9 @@ export function parseRemoteTrackingRefs(
       .filter((spec) => !spec.startsWith('^') && !spec.startsWith('+^'))
       .map(parsePositiveFetchRefspec)
       .filter((spec): spec is PositiveFetchRefspec => spec !== null),
-    negative: remote.fetchSpecs.filter((spec) => spec.startsWith('^') || spec.startsWith('+^')).map(parseNegativeFetchRefspec),
+    negative: remote.fetchSpecs
+      .filter((spec) => spec.startsWith('^') || spec.startsWith('+^'))
+      .map(parseNegativeFetchRefspec),
   }))
   const parsed: RemoteTrackingBranchIdentity[] = []
   for (const fullRef of refs) {

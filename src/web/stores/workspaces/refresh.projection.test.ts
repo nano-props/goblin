@@ -1,11 +1,8 @@
+import { seedRepoReadModelQueryData } from '#/web/test-utils/repo-store.ts'
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { refreshStatusLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import {
   branch,
   REPO_ID,
@@ -18,11 +15,7 @@ import {
   repoBranchNames,
   repoCurrentBranch,
   cachedRepoProjection,
-  cachedRepoStatus,
-  createWorktreeAction,
 } from '#/web/stores/workspaces/refresh-test-utils.ts'
-import { seedRepoReadModelQueryData, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
@@ -30,20 +23,9 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey, repoProjectionQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
-import {
-  getRepoWorktreeStatusQueryData,
-  setRepoProjectionQueryData,
-  setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
-import { repoProjectionQueryOptions, repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
-import { invalidateRepoSnapshotQueries } from '#/web/repo-query-runtime.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
-import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
-import type { WorktreeStatus } from '#/web/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 beforeEach(resetRefreshTest)
 
 describe('workspace refresh projection', () => {
@@ -344,5 +326,4 @@ describe('workspace refresh projection', () => {
         : null,
     ).toBe('terminal')
   })
-
 })

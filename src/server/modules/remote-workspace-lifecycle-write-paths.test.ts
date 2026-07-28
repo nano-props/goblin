@@ -108,9 +108,7 @@ describe('remote lifecycle write path', () => {
 
   test('serializes a conclusive Git downgrade through capability cleanup before committing it', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    mocks.resolveConnection
-      .mockResolvedValueOnce(readyConnection(true))
-      .mockResolvedValueOnce(readyConnection(false))
+    mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const cleanup = vi.fn(async ({ before, after }) => {
       expect(before).toMatchObject({ capabilities: { git: { status: 'available' } } })
@@ -130,9 +128,7 @@ describe('remote lifecycle write path', () => {
 
   test('exposes no terminal lifecycle until its capability transition commits', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    mocks.resolveConnection
-      .mockResolvedValueOnce(readyConnection(true))
-      .mockResolvedValueOnce(readyConnection(false))
+    mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const capabilityCommit = createCapabilityCommitGate()
 
@@ -160,9 +156,7 @@ describe('remote lifecycle write path', () => {
 
   test('queues restart and runtime failure behind an in-flight capability commit', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    mocks.resolveConnection
-      .mockResolvedValueOnce(readyConnection(true))
-      .mockResolvedValue(readyConnection(false))
+    mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValue(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const capabilityCommit = createCapabilityCommitGate()
     const downgrade = runRemoteWorkspaceLifecycleWrite(
@@ -233,9 +227,7 @@ describe('remote lifecycle write path', () => {
 
   test('rejects a later Git downgrade when no transactional cleanup dependency was injected', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    mocks.resolveConnection
-      .mockResolvedValueOnce(readyConnection(true))
-      .mockResolvedValueOnce(readyConnection(false))
+    mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
 
     await expect(
@@ -299,9 +291,7 @@ describe('remote lifecycle write path', () => {
 
   test('keeps reopen in the same epoch while a remote capability transition is committing', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
-    mocks.resolveConnection
-      .mockResolvedValueOnce(readyConnection(true))
-      .mockResolvedValue(readyConnection(false))
+    mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValue(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
     const capabilityCommit = createCapabilityCommitGate()
     const transition = runRemoteWorkspaceLifecycleWrite(

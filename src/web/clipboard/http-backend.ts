@@ -45,12 +45,12 @@ export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): 
       const headers: Record<string, string> = {}
       if (config.accessToken) headers[ACCESS_TOKEN_HEADER] = config.accessToken
       const res = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: form,
-          // `credentials: 'include'` carries the cookie on cross-origin
-          // LAN requests; for same-origin it's a no-op.
-          credentials: 'include',
+        method: 'POST',
+        headers,
+        body: form,
+        // `credentials: 'include'` carries the cookie on cross-origin
+        // LAN requests; for same-origin it's a no-op.
+        credentials: 'include',
       })
       if (!res.ok) throw new Error(`Clipboard file request failed with status ${res.status}`)
       const json = v.safeParse(ClipboardFilesResponseSchema, await res.json())

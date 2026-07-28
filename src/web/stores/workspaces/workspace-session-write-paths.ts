@@ -85,9 +85,7 @@ function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): Wor
   if (typeof input !== 'string') return { kind: 'workspace-entry', entry: input }
   const parsed = parseRemoteWorkspaceId(input)
   const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
-  return ref
-    ? { kind: 'workspace-entry', entry: { id: ref.id } }
-    : { kind: 'command-input', input }
+  return ref ? { kind: 'workspace-entry', entry: { id: ref.id } } : { kind: 'command-input', input }
 }
 
 export async function openLocalWorkspaceRuntimeForInput(
@@ -661,13 +659,7 @@ export function addResolvedWorkspace(
         existing.admission.kind === 'remote' ? remoteWorkspaceConnectionTarget(existing.admission.lifecycle) : null,
         resolvedWorkspace.target,
       )
-      if (
-        !runtimeChanged &&
-        !sessionChanged &&
-        !workspaceProbeChanged &&
-        lifecycleReady &&
-        !targetChanged
-      ) {
+      if (!runtimeChanged && !sessionChanged && !workspaceProbeChanged && lifecycleReady && !targetChanged) {
         return null
       }
       // Promote the existing remote workspace from 'connecting' or
@@ -786,9 +778,7 @@ async function openLocalWorkspace(
     if (!opened.workspace || !opened.workspaceRuntimeId) return opened
     const workspace = opened.workspace
     const workspaceRuntimeId = opened.workspaceRuntimeId
-    const workspaceEntry = workspace.target
-      ? remoteWorkspaceSessionEntry(workspace.target)
-      : { id: workspace.id }
+    const workspaceEntry = workspace.target ? remoteWorkspaceSessionEntry(workspace.target) : { id: workspace.id }
     const membership = await addWorkspaceMembershipResult(workspaceEntry)
     if (!membership.ok) {
       workspacesLog.warn('failed to add local workspace to server workspace', {

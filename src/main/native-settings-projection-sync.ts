@@ -112,5 +112,7 @@ export function nativeProjectionFromSnapshots(
     JSON.stringify(previous.recentWorkspaces) === JSON.stringify(current.recentWorkspaces)
       ? undefined
       : { recentWorkspaces: current.recentWorkspaces }
-  return prefs || recentWorkspaces ? { ...(prefs ? { prefs } : {}), ...(recentWorkspaces ? { recentWorkspaces } : {}) } : null
+  return prefs || recentWorkspaces
+    ? { ...(prefs ? { prefs } : {}), ...(recentWorkspaces ? { recentWorkspaces } : {}) }
+    : null
 }

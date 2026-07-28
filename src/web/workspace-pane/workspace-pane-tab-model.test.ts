@@ -1,35 +1,23 @@
 import { describe, expect, test } from 'vitest'
 import {
-  adjacentWorkspacePaneTab,
   createWorkspacePaneTabModel,
-  nextWorkspacePaneTabEntryAfterClose,
   materializedWorkspacePaneRuntimeTabSessionId,
+  nextWorkspacePaneTabEntryAfterClose,
   workspacePaneTerminalBaseForTabModel,
-  type WorkspacePaneTabModel,
-  type WorkspacePaneTabModelInput,
-  type WorkspacePaneRuntimeTabStateInputByType,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
-  workspacePaneRuntimeTabEntry,
-  workspacePaneStaticTabEntry,
-  workspacePaneTabEntryIdentity,
-} from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+  createModel,
+  staticEntry,
+  terminalEntry,
+  terminalView,
+  WORKSPACE_ID,
+  WORKSPACE_RUNTIME_ID,
+  WORKTREE_KEY,
+  WORKTREE_PATH,
+} from '#/web/test-utils/workspace-pane-tab-model.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
-const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-repo')
-const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
-const WORKTREE_PATH = '/tmp/goblin-workspace-pane-tab-model-worktree'
-const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(WORKSPACE_ID, WORKTREE_PATH)
-
-function requiredEntryIdentity(entry: WorkspacePaneTabEntry | null): string {
-  if (!entry) throw new Error('expected workspace pane tab entry')
-  return workspacePaneTabEntryIdentity(entry)
-}
 
 describe('repo workspace pane tab model', () => {
   test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
@@ -779,230 +767,4 @@ describe('repo workspace pane tab model', () => {
       materializedTab: { identity: 'workspace-pane:status', kind: 'static', type: 'status', view: null },
     })
   })
-
-  test('resolves the adjacent tab after close from the shared tab list', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
-
-    expect(requiredEntryIdentity(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status'))).toBe(
-      'terminal:term-111111111111111111111',
-    )
-    expect(requiredEntryIdentity(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:changes'))).toBe(
-      'terminal:term-111111111111111111111',
-    )
-    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'missing:missing')).toBeNull()
-  })
-
-  test('prefers the opener tab over the adjacent tab when resolving the next tab after close', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
-
-    expect(
-      requiredEntryIdentity(
-        nextWorkspacePaneTabEntryAfterClose(
-          model.tabEntries,
-          'terminal:term-111111111111111111111',
-          'workspace-pane:changes',
-        ),
-      ),
-    ).toBe('workspace-pane:changes')
-  })
-
-  test('falls back to the adjacent tab when the opener tab no longer exists', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'status',
-      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
-      runtimeTabViews: [terminalView('term-111111111111111111111', 1, true)],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-111111111111111111111',
-    })
-
-    expect(
-      requiredEntryIdentity(
-        nextWorkspacePaneTabEntryAfterClose(
-          model.tabEntries,
-          'terminal:term-111111111111111111111',
-          'terminal:missing-opener',
-        ),
-      ),
-    ).toBe('workspace-pane:changes')
-  })
-
-  test('skips pending terminal tabs when resolving the next tab after close', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabEntries: [staticEntry('status')],
-      runtimeTabViews: [],
-      terminalCreatePending: true,
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: null,
-    })
-
-    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status')).toBeNull()
-  })
-
-  test('moves through the shared tab list from the active tab identity', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabEntries: [
-        staticEntry('status'),
-        terminalEntry('term-111111111111111111111'),
-        terminalEntry('term-222222222222222222222'),
-        staticEntry('changes'),
-      ],
-      runtimeTabViews: [
-        terminalView('term-111111111111111111111', 1, false),
-        terminalView('term-222222222222222222222', 2, false),
-      ],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-222222222222222222222',
-    })
-
-    expect(adjacentWorkspacePaneTab(model.tabs, model.activeTab?.identity, 1)?.identity).toBe('workspace-pane:changes')
-    expect(adjacentWorkspacePaneTab(model.tabs, model.activeTab?.identity, -1)?.identity).toBe(
-      'terminal:term-111111111111111111111',
-    )
-    expect(adjacentWorkspacePaneTab(model.tabs, null, -1)).toBeNull()
-    expect(adjacentWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
-  })
-
-  test('keeps the current terminal selection when another terminal remains selected', () => {
-    const model = createModel({
-      workspaceId: WORKSPACE_ID,
-
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
-      preferredTab: 'terminal',
-      tabEntries: [
-        terminalEntry('term-111111111111111111111'),
-        staticEntry('status'),
-        terminalEntry('term-222222222222222222222'),
-      ],
-      runtimeTabViews: [
-        terminalView('term-111111111111111111111', 1, false),
-        terminalView('term-222222222222222222222', 2, false),
-      ],
-      terminalProjectionPhase: 'ready',
-      selectedTerminalSessionId: 'term-222222222222222222222',
-    })
-
-    expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'terminal' })
-    expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
-  })
 })
-
-type WorkspacePaneTabModelTestInput = Omit<
-  WorkspacePaneTabModelInput,
-  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'routeTarget' | 'paneTarget' | 'worktreeHead'
-> & {
-  branchName: string | null
-  worktreePath: string | null
-  workspaceRuntimeId?: string
-  runtimeTabStateByType?: WorkspacePaneRuntimeTabStateInputByType
-  terminalCreatePending?: boolean
-  terminalProjectionPhase?: WorkspacePaneRuntimeProjectionPhase
-  terminalProjectionErrorMessage?: string
-  selectedTerminalSessionId?: string | null
-}
-
-function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePaneTabModel {
-  const {
-    branchName,
-    worktreePath,
-    workspaceRuntimeId,
-    runtimeTabStateByType,
-    terminalCreatePending,
-    terminalProjectionPhase,
-    terminalProjectionErrorMessage,
-    selectedTerminalSessionId,
-    ...modelInput
-  } = input
-  const terminalState = runtimeTabStateByType?.terminal
-  const hasSelectedTerminalSession = terminalState
-    ? Object.prototype.hasOwnProperty.call(terminalState, 'selectedSessionId')
-    : false
-  return createWorkspacePaneTabModel({
-    workspaceRuntimeId: workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
-    ...modelInput,
-    routeTarget: branchName
-      ? { kind: 'git-branch', workspaceId: modelInput.workspaceId, branchName }
-      : worktreePath === modelInput.workspaceId
-        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
-        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
-    paneTarget: branchName
-      ? requiredGitWorkspacePaneTabsTarget(modelInput.workspaceId, branchName, worktreePath)
-      : worktreePath === modelInput.workspaceId
-        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
-        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
-    worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
-    runtimeTabStateByType: {
-      ...runtimeTabStateByType,
-      terminal: {
-        createPending: terminalState?.createPending ?? terminalCreatePending ?? false,
-        projectionPhase: terminalState?.projectionPhase ?? terminalProjectionPhase ?? 'pending',
-        projectionErrorMessage: terminalState?.projectionErrorMessage ?? terminalProjectionErrorMessage,
-        selectedSessionId: hasSelectedTerminalSession
-          ? (terminalState?.selectedSessionId ?? null)
-          : (selectedTerminalSessionId ?? null),
-      },
-    },
-  })
-}
-
-function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
-  return workspacePaneStaticTabEntry(type)
-}
-
-function terminalEntry(id: string): WorkspacePaneTabEntry {
-  return workspacePaneRuntimeTabEntry('terminal', id)
-}
-
-function terminalView(terminalSessionId: string, index: number, selected: boolean): WorkspacePaneTabSummary {
-  return {
-    type: 'terminal',
-    terminalSessionId,
-    terminalFilesystemTargetKey: WORKTREE_KEY,
-    index,
-    title: terminalSessionId,
-    phase: 'open',
-    selected,
-    hasBell: false,
-    hasRecentOutput: false,
-  }
-}

@@ -10,6 +10,12 @@
 // title, message, checkbox state, protected-branch hint — stays
 // rendered for the duration of the close animation.
 
+import {
+  resetWorkspacesStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+} from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -23,12 +29,6 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import {
-  createRepoBranch,
-  resetWorkspacesStore,
-  seedRepoReadModelQueryData,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'

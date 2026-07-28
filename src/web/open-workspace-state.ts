@@ -40,7 +40,11 @@ export function restoredWorkspaceIdAfterWorkspaceHydration(
   preferredActiveWorkspaceId: WorkspaceId | null,
   managedRestoredWorkspaceId: WorkspaceId | null,
 ): WorkspaceId | null {
-  if (currentRestoredWorkspaceId && currentRestoredWorkspaceId !== managedRestoredWorkspaceId && workspaces[currentRestoredWorkspaceId]) {
+  if (
+    currentRestoredWorkspaceId &&
+    currentRestoredWorkspaceId !== managedRestoredWorkspaceId &&
+    workspaces[currentRestoredWorkspaceId]
+  ) {
     return currentRestoredWorkspaceId
   }
   if (preferredActiveWorkspaceId && workspaces[preferredActiveWorkspaceId]) return preferredActiveWorkspaceId

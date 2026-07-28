@@ -3,7 +3,6 @@ import { createWorktreeRemovalApplication } from '#/server/worktree-removal/work
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
-  testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
   issueTestPhysicalWorktreeExecutionCapability,

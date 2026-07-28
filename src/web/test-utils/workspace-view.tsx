@@ -1,21 +1,11 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useFakeTimers } from '#/test-utils/timers.ts'
-import { act, cleanup } from '@testing-library/react'
+import { seedRepoWithReadModelForTest, createRepoBranch, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import {
-  resetWorkspacesStore,
-  seedRepoShellForTest,
-  seedRepoWithReadModelForTest,
-  createRepoBranch,
-  setWorkspaceProbeForTest,
-} from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import * as repoDataQuery from '#/web/repo-query-runtime.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',

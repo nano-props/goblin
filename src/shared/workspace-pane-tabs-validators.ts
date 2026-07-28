@@ -132,7 +132,9 @@ type RuntimeWorkspacePaneTargetInput =
   | { kind: 'git-branch'; workspaceId: string; workspaceRuntimeId: string; branch: string }
   | { kind: 'git-worktree'; workspaceId: string; workspaceRuntimeId: string; root: string }
 
-export function canonicalRuntimeWorkspacePaneTarget(target: RuntimeWorkspacePaneTargetInput): RuntimeWorkspacePaneTarget | null {
+export function canonicalRuntimeWorkspacePaneTarget(
+  target: RuntimeWorkspacePaneTargetInput,
+): RuntimeWorkspacePaneTarget | null {
   const workspaceId = canonicalLocator(target.workspaceId)
   if (!workspaceId) return null
   if (target.kind === 'workspace-root') return { ...target, workspaceId }

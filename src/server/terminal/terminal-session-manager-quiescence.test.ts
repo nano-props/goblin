@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { PtyHandle } from '#/server/terminal/pty-supervisor.ts'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'

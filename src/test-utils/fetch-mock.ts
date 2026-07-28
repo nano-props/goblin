@@ -27,7 +27,7 @@
 
 import { vi } from 'vitest'
 
-export type FetchMock = ReturnType<typeof vi.fn>
+type FetchMock = ReturnType<typeof vi.fn>
 
 /**
  * Install a `vi.fn()` as the global `fetch` and return it. Tests configure

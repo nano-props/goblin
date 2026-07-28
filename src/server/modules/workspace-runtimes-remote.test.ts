@@ -227,12 +227,7 @@ describe('workspace runtime remote lifecycle', () => {
   test('returns stale-runtime when close replaces the running generation', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     const attempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
-    const work = runRemoteWorkspaceLifecycle(
-      userId,
-      workspaceId,
-      runtimeId,
-      () => attempt.promise,
-    )
+    const work = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, () => attempt.promise)
     await vi.waitFor(() =>
       expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
     )

@@ -35,13 +35,13 @@ beforeEach(() => {
   vi.mocked(workspacePaneTabsClient.list).mockReset()
 })
 
-test('test workspace identity construction rejects legacy raw workspace ids', () => {
-  expect(() => workspaceIdForTest('/tmp/legacy-workspace-id')).toThrow(
-    'invalid test workspace id: /tmp/legacy-workspace-id',
-  )
-})
+describe('workspace pane tabs query', () => {
+  test('test workspace identity construction rejects legacy raw workspace ids', () => {
+    expect(() => workspaceIdForTest('/tmp/legacy-workspace-id')).toThrow(
+      'invalid test workspace id: /tmp/legacy-workspace-id',
+    )
+  })
 
-describe('workspace pane tabs revisioned query cache', () => {
   test('reads workspace-root runtime tabs by their explicit target identity', () => {
     const queryClient = new QueryClient()
     const tabs = [

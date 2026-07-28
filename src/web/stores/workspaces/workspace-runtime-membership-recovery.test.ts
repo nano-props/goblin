@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   closeWorkspaceRuntimeWithCache,
@@ -7,7 +8,7 @@ import {
   reconcileOpenWorkspaceRuntimeMemberships,
 } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { installGoblinTestBridge, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 

@@ -195,7 +195,11 @@ export async function addWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<v
 }
 
 export async function removeWorkspaceEntry(workspaceId: WorkspaceId): Promise<void> {
-  await postServerJson('/api/settings/workspace/entries/remove', { workspaceId }, decodeWith(ServerWorkspaceStateSchema))
+  await postServerJson(
+    '/api/settings/workspace/entries/remove',
+    { workspaceId },
+    decodeWith(ServerWorkspaceStateSchema),
+  )
 }
 
 export async function restoreWorkspaceTabs(

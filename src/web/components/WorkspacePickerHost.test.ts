@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 
 import { createElement } from 'react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({ useT: () => (key: string) => key }))
@@ -25,24 +24,25 @@ vi.mock('#/web/primary-window-navigation.tsx', () => ({
 }))
 
 beforeEach(resetWorkspacesStore)
-afterEach(cleanup)
 
-test('binds a remote workspace directory name into the picker from its canonical id', () => {
-  const workspaceId = workspaceIdForTest('goblin+ssh://example/home/developer/Documents')
-  const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-picker')
-  useWorkspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
+describe('WorkspacePickerHost', () => {
+  test('binds a remote workspace directory name into the picker from its canonical id', () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/home/developer/Documents')
+    const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-picker')
+    useWorkspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
 
-  const { container } = renderInJsdom(
-    createElement(WorkspacePickerHost, {
-      currentWorkspaceId: workspaceId,
-      onOpenWorkspacePathDialog: vi.fn(),
-      onOpenRemote: vi.fn(),
-      onClone: vi.fn(),
-    }),
-  )
+    const { container } = renderInJsdom(
+      createElement(WorkspacePickerHost, {
+        currentWorkspaceId: workspaceId,
+        onOpenWorkspacePathDialog: vi.fn(),
+        onOpenRemote: vi.fn(),
+        onClone: vi.fn(),
+      }),
+    )
 
-  expect(container.textContent).toContain('Documents')
-  expect(container.textContent).not.toContain('example:Documents')
+    expect(container.textContent).toContain('Documents')
+    expect(container.textContent).not.toContain('example:Documents')
+  })
 })
 
 describe('workspacePickerItemsEqual', () => {

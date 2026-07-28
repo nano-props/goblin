@@ -7,11 +7,8 @@ import {
   type WorkspacePaneLayoutUpdateInput,
   type WorkspacePaneLayoutValidationInput,
 } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
-import type {
-  WorkspacePaneLayoutRepository,
-  WorkspacePaneLayoutRepositoryCasInput,
-  WorkspacePaneLayoutRepositoryCasOutcome,
-} from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import { createMemoryWorkspacePaneLayoutRepository } from '#/server/test-utils/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -23,6 +20,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other-repo')
 const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
 import {
   issueTestPhysicalWorktreeExecutionCapability,
@@ -34,6 +32,10 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const scope = { userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
+
+function memoryRepository(initial?: WorkspacePaneDurableLayout) {
+  return createMemoryWorkspacePaneLayoutRepository(WORKSPACE_ID, initial)
+}
 const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
@@ -90,6 +92,29 @@ function replacementCapability() {
 }
 
 describe('workspace pane layout aggregate', () => {
+  test('memory repository preserves raw fixtures within its bound workspace', async () => {
+    const status = workspacePaneStaticTabEntry('status')
+    const raw = { entries: [{ target: { kind: 'git-branch' as const, branch: 'main' }, tabs: [status, status] }] }
+    const repository = memoryRepository(raw)
+
+    await expect(repository.load(WORKSPACE_ID)).resolves.toEqual({ layout: raw })
+    await expect(repository.load(OTHER_WORKSPACE_ID)).rejects.toThrow(
+      'memory workspace pane layout repository scope mismatch',
+    )
+  })
+
+  test('memory repository rejects a stale expected layout without replacing authority', async () => {
+    const current = {
+      entries: [{ target: { kind: 'git-branch' as const, branch: 'main' }, tabs: [] }],
+    }
+    const repository = memoryRepository(current)
+
+    await expect(
+      repository.compareAndSwap({ workspaceId: WORKSPACE_ID, expected: { entries: [] }, replacement: { entries: [] } }),
+    ).resolves.toEqual({ kind: 'conflict', snapshot: { layout: current } })
+    expect(repository.layout).toEqual(current)
+  })
+
   test('splits a mixed command into durable static layout and epoch placement', async () => {
     const repository = memoryRepository()
     const aggregate = aggregateFor(repository)
@@ -487,7 +512,9 @@ describe('workspace pane layout aggregate', () => {
 
   test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {
     const branchTarget = branchProjection('main')
-    const repository = memoryRepository({ entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }] })
+    const repository = memoryRepository({
+      entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
+    })
     const aggregate = aggregateFor(repository)
     const validated = await validate(aggregate, {
       ...scope,
@@ -903,35 +930,6 @@ describe('workspace pane layout aggregate', () => {
     expect(result).toEqual({ affectedUserIds: ['user-a'] })
   })
 })
-
-interface MemoryRepository extends WorkspacePaneLayoutRepository {
-  layout: WorkspacePaneDurableLayout
-  compareAndSwap(input: WorkspacePaneLayoutRepositoryCasInput): Promise<WorkspacePaneLayoutRepositoryCasOutcome>
-}
-
-function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] }): MemoryRepository {
-  let layout = initial
-  const repository: MemoryRepository = {
-    get layout() {
-      return layout
-    },
-    set layout(value) {
-      layout = value
-    },
-    async load() {
-      return { layout: structuredClone(layout) }
-    },
-    async compareAndSwap(input) {
-      if (JSON.stringify(layout) !== JSON.stringify(input.expected)) {
-        return { kind: 'conflict', snapshot: { layout: structuredClone(layout) } }
-      }
-      const changed = JSON.stringify(layout) !== JSON.stringify(input.replacement)
-      layout = structuredClone(input.replacement)
-      return { kind: 'accepted', changed, snapshot: { layout: structuredClone(layout) } }
-    },
-  }
-  return repository
-}
 
 function aggregateFor(
   repository: WorkspacePaneLayoutRepository,

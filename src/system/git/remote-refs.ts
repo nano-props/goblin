@@ -11,7 +11,10 @@ import { getRemotes } from '#/system/git/remote.ts'
  *  `refs/remotes/` includes the symbolic `origin/HEAD` plus every branch
  *  the remote has; we run the list through `parseRemoteTrackingRefs` so
  *  the local and remote (`system/ssh/git.ts`) sides agree on the shape. */
-export async function getRemoteTrackingBranches(cwd: string, signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]> {
+export async function getRemoteTrackingBranches(
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<RemoteTrackingBranchIdentity[]> {
   const authority = await readRemoteTrackingAuthority(cwd, signal)
   return parseRemoteTrackingRefs(authority.refs, authority.remotes)
 }

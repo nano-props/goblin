@@ -1,15 +1,12 @@
-import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  normalizeRepoSnapshotCache,
-  persistRepoSnapshotCacheEntry,
-} from '#/web/stores/workspaces/persistence.ts'
-import {
-  createBranchSnapshot,
   createRepoBranch,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { normalizeRepoSnapshotCache, persistRepoSnapshotCacheEntry } from '#/web/stores/workspaces/persistence.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/workspaces/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'

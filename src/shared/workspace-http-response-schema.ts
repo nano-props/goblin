@@ -98,7 +98,10 @@ const WorkspaceSettledProbeStateResponseSchema = v.variant('status', [
 export const RemoteWorkspaceTargetResponseSchema = v.strictObject({
   id: WorkspaceIdSchema,
   alias: NonEmptyStringSchema,
-  remotePath: v.pipe(v.string(), v.check((value) => value.startsWith('/') && !value.includes('\0'))),
+  remotePath: v.pipe(
+    v.string(),
+    v.check((value) => value.startsWith('/') && !value.includes('\0')),
+  ),
   displayName: NonEmptyStringSchema,
   host: NonEmptyStringSchema,
   user: v.string(),
@@ -111,7 +114,11 @@ export const RemoteWorkspaceTargetResponseSchema = v.strictObject({
 export const RemoteRuntimeLifecycleResponseSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('idle'), attemptId: NonNegativeIntegerSchema }),
   v.strictObject({ kind: v.literal('connecting'), attemptId: NonNegativeIntegerSchema }),
-  v.strictObject({ kind: v.literal('ready'), attemptId: NonNegativeIntegerSchema, target: RemoteWorkspaceTargetResponseSchema }),
+  v.strictObject({
+    kind: v.literal('ready'),
+    attemptId: NonNegativeIntegerSchema,
+    target: RemoteWorkspaceTargetResponseSchema,
+  }),
   v.strictObject({
     kind: v.literal('failed'),
     attemptId: NonNegativeIntegerSchema,
@@ -127,7 +134,9 @@ const WorkspaceRuntimeEntryResponseSchema = v.strictObject({
   workspaceProbe: WorkspaceProbeStateResponseSchema,
 })
 
-export const WorkspaceRuntimesResponseSchema = v.strictObject({ runtimes: v.array(WorkspaceRuntimeEntryResponseSchema) })
+export const WorkspaceRuntimesResponseSchema = v.strictObject({
+  runtimes: v.array(WorkspaceRuntimeEntryResponseSchema),
+})
 export const WorkspaceRuntimeOpenIdResponseSchema = v.strictObject({
   ok: v.literal(true),
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
@@ -198,7 +207,11 @@ export const RemoteLifecycleResponseSchema = v.variant('kind', [
     kind: v.literal('settled'),
     workspaceId: WorkspaceIdSchema,
     lifecycle: v.variant('kind', [
-      v.strictObject({ kind: v.literal('ready'), attemptId: NonNegativeIntegerSchema, target: RemoteWorkspaceTargetResponseSchema }),
+      v.strictObject({
+        kind: v.literal('ready'),
+        attemptId: NonNegativeIntegerSchema,
+        target: RemoteWorkspaceTargetResponseSchema,
+      }),
       v.strictObject({
         kind: v.literal('failed'),
         attemptId: NonNegativeIntegerSchema,

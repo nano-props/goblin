@@ -7,10 +7,6 @@ import {
   GITHUB_API_INTERVAL_MS,
 } from '#/system/github/queue.ts'
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 describe('GitHub API request queue', () => {
   test('uses conservative default limits', () => {
     expect(GITHUB_API_CONCURRENCY).toBe(3)
@@ -20,19 +16,23 @@ describe('GitHub API request queue', () => {
 
   test('limits concurrent tasks', async () => {
     const queue = createGitHubApiQueue({ concurrency: 2, intervalCap: 100, interval: 1 })
+    const gate = Promise.withResolvers<void>()
     let active = 0
     let maxActive = 0
 
-    await Promise.all(
+    const tasks = Promise.all(
       Array.from({ length: 5 }, () =>
         queue.add(async () => {
           active += 1
           maxActive = Math.max(maxActive, active)
-          await sleep(10)
+          await gate.promise
           active -= 1
         }),
       ),
     )
+    await vi.waitFor(() => expect(active).toBe(2))
+    gate.resolve()
+    await tasks
 
     expect(maxActive).toBe(2)
   })

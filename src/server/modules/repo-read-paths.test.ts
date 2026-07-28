@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { RepoSource } from '#/server/modules/repo-source.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
@@ -295,6 +296,7 @@ describe('repo projection section deadlines', () => {
   })
 
   test('disables the per-section timeout when timeoutMs is 0', async () => {
+    useFakeTimers()
     let observedSignal: AbortSignal | undefined
     const snapshotStarted = Promise.withResolvers<void>()
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
@@ -313,20 +315,26 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
+    const projection = readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
+    let settled = false
+    void projection.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
     await snapshotStarted.promise
     if (!observedSignal) throw new Error('missing snapshot section signal')
     // A fresh, never-aborting signal is still wired through to the
     // source (so the source code path is uniform) — just one
     // that will never fire on its own.
     expect(observedSignal.aborted).toBe(false)
-    // No assertion can wait "forever" — race against a 100ms timeout
-    // to make sure the promise never resolves on its own.
-    const result = await Promise.race([
-      promise,
-      new Promise<'still-pending'>((resolve) => setTimeout(() => resolve('still-pending'), 100)),
-    ])
-    expect(result).toBe('still-pending')
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000)
+    await flushMicrotasks()
+    expect(observedSignal.aborted).toBe(false)
+    expect(settled).toBe(false)
   })
 
   test('cancels every section when the caller signal fires', async () => {

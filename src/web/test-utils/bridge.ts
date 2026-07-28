@@ -1,203 +1,40 @@
-// Web IPC bridge helpers used by tests that need to simulate the
-// Goblin client's interaction with the embedded server. They live
-// here so non-repo tests (e.g. workspace, settings, branch actions)
-// can depend on the same IPC + bridge plumbing without pulling in
-// the repo store.
+// Web client bridge helpers for tests that simulate the embedded server.
 //
-// Design choices:
-//   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
-//     pathname (`'workspace.probe'`, `'repo.projection'`, etc.) and server
-//     route. `installGoblinTestBridge`
-//     wires each pathname to the matching fetch URL.
-//   - The bridge mock composes the same `goblinNative` shape the real
-//     client bridge exposes, including `host`, `terminal`, `invokeIpc`,
-//     and `onEvent`.
-//   - `seedRepoShellForTest`, `seedRepoWithReadModelForTest`, and
-//     `resetWorkspacesStore` interact with the live `useWorkspacesStore`
-//     (Zustand) — they do not mock the store; they drive it. Tests
-//     that need a fresh store call `resetWorkspacesStore` in `beforeEach`.
+// This module owns transport wiring only: IPC/HTTP dispatch, terminal
+// actions, workspace runtime events, and workspace-pane tab operations.
+// Repo/store fixtures live in #/web/test-utils/repo-store.ts.
 
-import type {
-  GitRemoteProjection,
-  GitWorkspaceProjection,
-  WorkspaceState,
-  RepoBranchState,
-} from '#/web/stores/workspaces/types.ts'
-import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
-import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
-import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  writeWorkspacePaneTabsSnapshotQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import {
-  workspacePaneTabsWithStaticTab,
-  workspacePaneTabsWithoutStaticTab,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  runtimeWorkspacePaneTarget,
-  requiredGitWorkspacePaneTabsTarget,
-  workspacePaneTabsTargetFromRuntime,
-  workspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
+import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
   TerminalRestartResult,
-  TerminalMutationResult,
-  TerminalResizeInput,
   TerminalResizeResult,
   TerminalWriteResult,
   TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneTabsEntry,
-  WorkspacePaneTabsListInput,
-  WorkspacePaneTabsReplaceInput,
-  WorkspacePaneTabsSnapshot,
-  WorkspacePaneTabsUpdateInput,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
   type WorkspacePaneRuntimeCloseResult,
   type WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoPresentationForTest = WorkspaceState & {
-  operations: GitWorkspaceProjection['operations']
-  remote: GitRemoteProjection
-  remoteLifecycle: Extract<WorkspaceState['admission'], { kind: 'remote' }>['lifecycle']
-  ui: WorkspaceState['ui'] & GitWorkspaceProjection['ui']
-  branchAction: GitWorkspaceProjection['operations']['branchAction']
-  branchModel: RepoBranchReadModelData
-}
-
-export function repoPresentationForTest(
-  repo: WorkspaceState,
-  branchReadModel: RepoBranchReadModelData,
-): RepoPresentationForTest {
-  if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
-  const git = repo.capability.git
-  return {
-    ...repo,
-    operations: git.operations,
-    remote: git.remote,
-    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
-    ui: { ...repo.ui, ...git.ui },
-    branchAction: git.operations.branchAction,
-    branchModel: branchReadModel,
-  }
-}
-
-export function createGitRepoPresentationForTest(
-  repo: WorkspaceState,
-  branchReadModel: RepoBranchReadModelData,
-): RepoPresentationForTest {
-  acceptWorkspaceProbeState(repo, createGitWorkspaceProbeForTest())
-  return repoPresentationForTest(repo, branchReadModel)
-}
-
-export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPresentationForTest {
-  if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
-  const git = repo.capability.git
-  const readModel = readRepoBranchQueryProjection(repo)
-  if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
-  return {
-    ...repo,
-    operations: git.operations,
-    remote: git.remote,
-    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
-    ui: { ...repo.ui, ...git.ui },
-    branchAction: git.operations.branchAction,
-    branchModel: readModel,
-  }
-}
-
-export function seedRepoShellForTest(options: {
-  id: string
-  currentBranchName?: string | null
-  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
-  workspaceRuntimeId?: string
-  remote?: Partial<GitRemoteProjection>
-  remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
-  workspaceProbe?: WorkspaceProbeState
-}): WorkspaceState {
-  const workspaceId = workspaceIdForTest(options.id)
-  const base = emptyWorkspace(workspaceId, options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'))
-  const repo: WorkspaceState = {
-    ...base,
-    ui: {
-      ...base.ui,
-      preferredWorkspacePaneTabByTarget:
-        options.preferredWorkspacePaneTabByTarget ?? base.ui.preferredWorkspacePaneTabByTarget,
-    },
-  }
-  acceptWorkspaceProbeState(repo, options.workspaceProbe ?? base.capability.probe)
-  if (repo.capability.kind === 'git' && options.remote) {
-    repo.capability.git.remote = { ...repo.capability.git.remote, ...options.remote }
-  }
-  if (options.remoteLifecycle !== undefined && repo.admission.kind === 'remote') {
-    repo.admission.lifecycle = options.remoteLifecycle
-  }
-  useWorkspacesStore.setState({
-    workspaces: { [workspaceId]: repo },
-    repoSnapshotCache: {},
-    workspaceOrder: [workspaceId],
-    restoredWorkspaceId: workspaceId,
-    workspaceMembershipReady: true,
-    sessionPersistenceReady: true,
-    sessionRestoreError: null,
-    restoredClientWorkspaceBaseline: null,
-    zenMode: DEFAULT_ZEN_MODE,
-    workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-  })
-  return repo
-}
-
-export function setWorkspaceProbeForTest(workspaceId: string, workspaceProbe: WorkspaceProbeState): void {
-  useWorkspacesStore.setState((state) => {
-    const workspace = state.workspaces[workspaceId]
-    if (!workspace) throw new Error(`Missing workspace fixture: ${workspaceId}`)
-    const next = { ...workspace }
-    acceptWorkspaceProbeState(next, workspaceProbe)
-    return { workspaces: { ...state.workspaces, [workspaceId]: next } }
-  })
-}
-
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalRestartResult
   'terminal.write': TerminalWriteResult
   'terminal.resize': TerminalResizeResult
   'terminal.takeover': TerminalTakeoverResult
-  'terminal.close': TerminalMutationResult
   'terminal.recoverSessions': TerminalSessionsSnapshot
-  'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.list': WorkspacePaneTabsSnapshot
@@ -217,8 +54,6 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'terminal.resize'
     case 'takeover':
       return 'terminal.takeover'
-    case 'close':
-      return 'terminal.close'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
       return 'workspacePaneTabs.replace'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
@@ -236,418 +71,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
   }
 }
 
-export function createBranchSnapshot(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
-  return {
-    name,
-    isCurrent: false,
-    ahead: 0,
-    behind: 0,
-    lastCommitHash: '',
-    lastCommitShortHash: '',
-    lastCommitMessage: '',
-    lastCommitDate: '',
-    lastCommitAuthor: '',
-    ...options,
-  }
-}
-
-export function createRepoBranch(name: string, options: Partial<RepoBranchState> = {}): RepoBranchState {
-  return stripBranchWorktreeMetadata([createBranchSnapshot(name, options)])[0]!
-}
-
-export function createGitWorkspaceProbeForTest(): WorkspaceProbeState {
-  return {
-    status: 'ready',
-    capabilities: {
-      files: { read: true, write: true },
-      terminal: { available: true },
-      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-    },
-    diagnostics: [],
-  }
-}
-
-export function createPullRequest(number: number, options: Partial<PullRequestInfo> = {}): PullRequestInfo {
-  return {
-    number,
-    title: `PR ${number}`,
-    url: `https://github.com/acme/repo/pull/${number}`,
-    state: 'open',
-    ...options,
-  }
-}
-
-type TestWorkspacePaneRuntimeTabInput =
-  | (WorkspacePaneTabsTarget & { workspaceRuntimeId: string; terminalSessionId: string })
-  | {
-      workspaceId: string
-      workspaceRuntimeId: string
-      branchName: string
-      worktreePath: string
-      terminalSessionId: string
-    }
-
-function testWorkspacePaneRuntimeTabTarget(
-  input: TestWorkspacePaneRuntimeTabInput,
-): WorkspacePaneTabsTarget & { workspaceRuntimeId: string } {
-  return 'kind' in input
-    ? input
-    : {
-        ...requiredGitWorkspacePaneTabsTarget(
-          workspaceIdForTest(input.workspaceId),
-          input.branchName,
-          input.worktreePath,
-        ),
-        workspaceRuntimeId: input.workspaceRuntimeId,
-      }
-}
-
-export function installWorkspacePaneTabsTestBridge(
-  options: {
-    replaceWorkspaceTabs?: (
-      input: WorkspacePaneTabsReplaceInput,
-    ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-    updateWorkspaceTabs?: (
-      input: WorkspacePaneTabsUpdateInput,
-    ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
-    listWorkspaceTabs?: (
-      input: WorkspacePaneTabsListInput,
-    ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
-    onEffectIntent?: ClientBridge['onEffectIntent']
-  } = {},
-): {
-  addRuntimeTab: (
-    input: TestWorkspacePaneRuntimeTabInput & {
-      insertAfterIdentity?: string | null
-    },
-  ) => void
-  removeRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput) => void
-} {
-  let serverEntries: WorkspacePaneTabsEntry[] = []
-  let serverRevision = 0
-  const targetKey = (input: WorkspacePaneTabsTarget) => workspacePaneTabsTargetIdentityKey(input)
-  const entryTarget = (entry: WorkspacePaneTabsEntry) => workspacePaneTabsTargetFromRuntime(entry.target)
-  const serverTabsForTarget = (
-    input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string },
-  ): WorkspacePaneTabEntry[] => {
-    const entry = serverEntries.find((candidate) => {
-      const target = entryTarget(candidate)
-      return target && targetKey(target) === targetKey(input)
-    })
-    if (entry) return [...entry.tabs]
-    const tabs = readWorkspacePaneTabsForTarget(input)
-    const key = targetKey(input)
-    serverEntries = [
-      ...serverEntries.filter((candidate) => {
-        const target = entryTarget(candidate)
-        return !target || targetKey(target) !== key
-      }),
-      { target: runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)!, tabs },
-    ]
-    return tabs
-  }
-  const replaceServerTarget = (
-    input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string },
-    tabs: readonly WorkspacePaneTabEntry[],
-  ): WorkspacePaneTabEntry[] => {
-    const nextTabs = [...tabs]
-    const key = targetKey(input)
-    serverEntries = [
-      ...serverEntries.filter((entry) => {
-        const target = entryTarget(entry)
-        return !target || targetKey(target) !== key
-      }),
-      { target: runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)!, tabs: nextTabs },
-    ]
-    return nextTabs
-  }
-  const serverSnapshot = (): WorkspacePaneTabsSnapshot => ({
-    revision: serverRevision,
-    entries: serverEntries.map((entry) => ({ ...entry, tabs: [...entry.tabs] })),
-  })
-  const commitServerSnapshot = (): WorkspacePaneTabsSnapshot => {
-    serverRevision += 1
-    return serverSnapshot()
-  }
-  setClientBridgeForTests({
-    kind: () => 'web',
-    hasCapability: () => false,
-    getBootstrap: () => ({
-      runtime: {
-        kind: 'web',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [],
-      },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    }),
-    invokeIpc: async ({ path }) => {
-      throw new Error(`Unhandled IPC path: ${path}`)
-    },
-    abortIpc: async () => false,
-    onIpcEvent: () => () => {},
-    onEffectIntent: options.onEffectIntent ?? (() => () => {}),
-    pathForFile: () => '',
-    saveClipboardFiles: async () => [],
-    host: () => null,
-    appRealtime: () => ({
-      kickReconnect: () => {},
-      onRecovered: () => () => {},
-    }),
-    terminal: () => ({
-      attach: async () => ({ ok: false, message: 'unhandled terminal attach' }),
-      restart: async () => ({ ok: false, message: 'unhandled terminal restart' }),
-      write: async () => ({ status: 'accepted' }),
-      resize: async (input) => ({
-        ok: true,
-        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-        identityRevision: 1,
-        role: 'controller',
-        controllerStatus: 'connected',
-        controller: { clientId: 'attachment_local', status: 'connected' },
-        canonicalSize: { cols: input.cols, rows: input.rows },
-      }),
-      takeover: async () => ({
-        ok: true as const,
-        terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        identityRevision: 1,
-        role: 'controller' as const,
-        controllerStatus: 'connected' as const,
-        controller: { clientId: 'attachment_local', status: 'connected' as const },
-        canonicalSize: { cols: 80, rows: 24 },
-        phase: 'open' as const,
-      }),
-      close: async () => true,
-      recoverSessions: async () => ({ revision: 0, sessions: [] }),
-      notifyBell: async () => true,
-      sendTestNotification: async () => true,
-      setBadge: () => {},
-      onOutput: () => () => {},
-      onBell: () => () => {},
-      onTitle: () => () => {},
-      onExit: () => () => {},
-      onIdentity: () => () => {},
-      onLifecycle: () => () => {},
-      onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
-    }),
-    workspacePaneTabs: () => ({
-      replace: async (input) => {
-        const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
-        const target = workspacePaneTabsTargetFromRuntime(input.target)
-        if (!target) return serverSnapshot()
-        replaceServerTarget({ ...target, workspaceRuntimeId: input.workspaceRuntimeId }, tabs)
-        return commitServerSnapshot()
-      },
-      update: async (input) => {
-        const target = workspacePaneTabsTargetFromRuntime(input.target)
-        if (!target) return serverSnapshot()
-        const legacyInput = { ...target, workspaceRuntimeId: input.workspaceRuntimeId }
-        if (options.updateWorkspaceTabs) serverTabsForTarget(legacyInput)
-        const tabs = options.updateWorkspaceTabs
-          ? await options.updateWorkspaceTabs(input)
-          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(legacyInput))
-        replaceServerTarget(legacyInput, tabs)
-        return commitServerSnapshot()
-      },
-      list: async (input) => {
-        if (options.listWorkspaceTabs) {
-          serverEntries = (await options.listWorkspaceTabs(input)).map((entry) => ({
-            ...entry,
-            tabs: [...entry.tabs],
-          }))
-        }
-        return {
-          revision: serverRevision,
-          entries: serverEntries.filter((entry) => entry.target.workspaceId === input.workspaceId),
-        }
-      },
-      onChanged: () => () => {},
-    }),
-    workspacePaneRuntime: () => ({
-      open: async (input) => {
-        const terminalSessionId = 'term-testtesttesttesttest1'
-        const terminalRuntimeSessionId = 'pty_test_aaaaaaaaa'
-        const projectedTarget = workspacePaneTabsTargetFromRuntime(input.request.target)
-        if (!projectedTarget) throw new Error('invalid terminal runtime target')
-        const target = { ...projectedTarget, workspaceRuntimeId: input.request.target.workspaceRuntimeId }
-        replaceServerTarget(
-          target,
-          workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', terminalSessionId, {
-            insertAfterIdentity: input.insertAfterIdentity,
-          }),
-        )
-        const paneTabsSnapshot = commitServerSnapshot()
-        return {
-          ok: true,
-          runtimeType: 'terminal',
-          paneTabsSnapshot,
-          runtime: {
-            ok: true,
-            action: 'created',
-            presentation:
-              input.request.target.kind === 'workspace-root'
-                ? { kind: 'workspace-root' as const }
-                : terminalGitWorktreePresentation('main'),
-            terminalSessionId,
-            terminalProjectionEffect: { kind: 'delta', revision: 1 },
-            terminalRuntimeSessionId,
-            terminalRuntimeGeneration: 0,
-            identityRevision: 0,
-            processName: '',
-            canonicalTitle: null,
-            phase: 'opening',
-            message: null,
-            controller: null,
-            canonicalSize: null,
-          },
-        } as const
-      },
-      close: async (input) => {
-        const projectedTarget = workspacePaneTabsTargetFromRuntime(input.target.target)
-        if (!projectedTarget) throw new Error('invalid terminal runtime target')
-        const target = { ...projectedTarget, workspaceRuntimeId: input.target.target.workspaceRuntimeId }
-        const currentTabs = serverTabsForTarget(target)
-        const wasOpen = currentTabs.some(
-          (tab) => tab.type === input.runtimeType && tab.runtimeSessionId === input.sessionId,
-        )
-        replaceServerTarget(
-          target,
-          currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
-        )
-        const paneTabsSnapshot = commitServerSnapshot()
-        return {
-          ok: true,
-          runtimeType: input.runtimeType,
-          paneTabsSnapshot,
-          runtime: wasOpen
-            ? {
-                action: 'closed' as const,
-                terminalSessionId: input.sessionId,
-                terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-                terminalRuntimeGeneration: 1,
-              }
-            : { action: 'already-closed' as const, terminalSessionId: input.sessionId },
-        }
-      },
-    }),
-  } satisfies ClientBridge)
-  return {
-    addRuntimeTab: (input) => {
-      const target = testWorkspacePaneRuntimeTabTarget(input)
-      replaceServerTarget(
-        target,
-        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', input.terminalSessionId, {
-          insertAfterIdentity: input.insertAfterIdentity,
-        }),
-      )
-      const snapshot = commitServerSnapshot()
-      writeWorkspacePaneTabsSnapshotQueryData(target.workspaceId, input.workspaceRuntimeId, snapshot)
-    },
-    removeRuntimeTab: (input) => {
-      const target = testWorkspacePaneRuntimeTabTarget(input)
-      replaceServerTarget(
-        target,
-        serverTabsForTarget(target).filter(
-          (tab) => tab.type !== 'terminal' || tab.runtimeSessionId !== input.terminalSessionId,
-        ),
-      )
-      commitServerSnapshot()
-    },
-  }
-}
-
-function defaultWorkspacePaneTabsOperationResult(
-  input: Pick<WorkspacePaneTabsUpdateInput, 'operation'>,
-  currentTabs: readonly WorkspacePaneTabEntry[],
-): WorkspacePaneTabEntry[] {
-  switch (input.operation.type) {
-    case 'open-static':
-      return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
-        insertAfterIdentity: input.operation.insertAfterIdentity,
-      })
-    case 'close-static':
-      return workspacePaneTabsWithoutStaticTab(currentTabs, input.operation.tabType)
-    case 'reorder':
-      return workspacePaneTabsWithIdentityOrder(currentTabs, input.operation.tabIdentities)
-  }
-}
-
-function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneTabsUpdateInput {
-  if (!value || typeof value !== 'object') return false
-  const input = value as { workspaceId?: unknown; workspaceRuntimeId?: unknown; target?: unknown; operation?: unknown }
-  return (
-    typeof input.workspaceId === 'string' &&
-    typeof input.workspaceRuntimeId === 'string' &&
-    Boolean(input.target) &&
-    !!input.operation &&
-    typeof input.operation === 'object'
-  )
-}
-
-function isWorkspacePaneTabsReplaceInput(value: unknown): value is WorkspacePaneTabsReplaceInput {
-  if (!value || typeof value !== 'object') return false
-  const input = value as {
-    workspaceId?: unknown
-    workspaceRuntimeId?: unknown
-    target?: unknown
-    tabs?: unknown
-  }
-  return (
-    typeof input.workspaceId === 'string' &&
-    typeof input.workspaceRuntimeId === 'string' &&
-    Boolean(input.target) &&
-    Array.isArray(input.tabs)
-  )
-}
-
-function workspacePaneTabsWithIdentityOrder(
-  currentTabs: readonly WorkspacePaneTabEntry[],
-  tabIdentities: readonly string[],
-): WorkspacePaneTabEntry[] {
-  const tabByIdentity = new Map(currentTabs.map((tab) => [workspacePaneTabEntryIdentity(tab), tab]))
-  const used = new Set<string>()
-  const ordered: WorkspacePaneTabEntry[] = []
-  for (const identity of tabIdentities) {
-    const tab = tabByIdentity.get(identity)
-    if (!tab || used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  for (const tab of currentTabs) {
-    const identity = workspacePaneTabEntryIdentity(tab)
-    if (used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  return ordered
-}
-
-export function resetWorkspacesStore(): void {
-  disposeAllRepoOperationSchedulers()
-  resetAcceptedRepoProjectionReadModelState()
-  primaryWindowQueryClient.clear()
-  useWorkspacesStore.setState({
-    workspaces: {},
-    repoSnapshotCache: {},
-    workspaceOrder: [],
-    restoredWorkspaceId: null,
-    workspaceMembershipReady: false,
-    sessionPersistenceReady: false,
-    sessionRestoreError: null,
-    restoredClientWorkspaceBaseline: null,
-    zenMode: DEFAULT_ZEN_MODE,
-    workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalSessionIdByTerminalFilesystemTarget: {},
-    tabOpenerIdentityByScope: {},
-    navigationHistoryByWorkspace: {},
-  })
-}
-
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
+  setClientBridgeForTests(null)
   const workspaceRuntimeState = new Map<
     string,
     {
@@ -662,9 +87,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   const hostOpenDirectoryDialog = handlers['workspace.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
   const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
+  const browserWindow = globalThis.window
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
+      addEventListener: browserWindow.addEventListener.bind(browserWindow),
+      removeEventListener: browserWindow.removeEventListener.bind(browserWindow),
+      dispatchEvent: browserWindow.dispatchEvent.bind(browserWindow),
       __GOBLIN_BOOTSTRAP__: {
         runtime: {
           kind: 'electron',
@@ -704,47 +133,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               : Promise.resolve([]),
         },
         terminal: {
-          attach: () => Promise.resolve({ ok: false, message: 'unhandled terminal attach' }),
-          restart: () => Promise.resolve({ ok: false, message: 'unhandled terminal restart' }),
-          write: () => Promise.resolve({ status: 'accepted' }),
-          resize: (input: TerminalResizeInput) =>
-            Promise.resolve({
-              ok: true as const,
-              terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-              terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-              identityRevision: 1,
-              role: 'controller' as const,
-              controllerStatus: 'connected' as const,
-              controller: { clientId: 'attachment_local', status: 'connected' as const },
-              canonicalSize: { cols: input.cols, rows: input.rows },
-            }),
-          takeover: () =>
-            Promise.resolve({
-              ok: true as const,
-              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-              terminalRuntimeGeneration: 1,
-              identityRevision: 1,
-              role: 'controller' as const,
-              controllerStatus: 'connected' as const,
-              controller: { clientId: 'attachment_local', status: 'connected' as const },
-              canonicalSize: { cols: 80, rows: 24 },
-              phase: 'open' as const,
-            }),
-          close: () => Promise.resolve(true),
-          recoverSessions: () => Promise.resolve({ revision: 0, sessions: [] }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
-          onOutput: () => () => {},
-          onBell: () => () => {},
-          onTitle: () => () => {},
-          onExit: () => () => {},
-          onIdentity: () => () => {},
-          onLifecycle: () => () => {},
-          onSessionsChanged: () => () => {},
-          onSessionClosed: () => () => {},
         },
-        saveClipboardFiles: () => Promise.resolve([]),
         rotateAccessToken: () => Promise.resolve({ accessToken: 'test-access-token' }),
       },
       location: {
@@ -770,7 +162,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'terminal.takeover',
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.takeover']
-  function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalClientTestOutputs['terminal.close']
   function callTerminalHandler(
     name: 'workspacePaneTabs.replace',
     payload: unknown,
@@ -796,10 +187,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.recoverSessions']
   function callTerminalHandler(
-    name: 'terminal.notifyBell',
-    payload: unknown,
-  ): TerminalClientTestOutputs['terminal.notifyBell']
-  function callTerminalHandler(
     name: keyof TerminalClientTestOutputs,
     payload: unknown,
   ): TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -814,77 +201,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.restart':
           return { ok: false, message: `unhandled ${name}` }
         case 'terminal.write':
-          return { status: 'accepted' } satisfies TerminalWriteResult
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'terminal.resize':
           return { ok: false, message: `unhandled ${name}` } satisfies TerminalResizeResult
-        case 'terminal.close':
-        case 'terminal.notifyBell':
-          return true satisfies TerminalMutationResult
         case 'terminal.takeover':
-          return {
-            ok: true as const,
-            terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-            terminalRuntimeGeneration: 1,
-            identityRevision: 1,
-            role: 'controller' as const,
-            controllerStatus: 'connected' as const,
-            controller: { clientId: 'attachment_local', status: 'connected' as const },
-            canonicalSize: { cols: 80, rows: 24 },
-            phase: 'open' as const,
-          }
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'workspacePaneTabs.replace':
-          return {
-            revision: 1,
-            entries: isWorkspacePaneTabsReplaceInput(payload)
-              ? [
-                  {
-                    target: payload.target,
-                    tabs: [...payload.tabs],
-                  },
-                ]
-              : [],
-          }
-        case 'workspacePaneTabs.update': {
-          const input = isWorkspacePaneTabsUpdateInput(payload) ? payload : null
-          const target = input ? workspacePaneTabsTargetFromRuntime(input.target) : null
-          return {
-            revision: 1,
-            entries:
-              input && target
-                ? [
-                    {
-                      target: input.target,
-                      tabs: defaultWorkspacePaneTabsOperationResult(
-                        input,
-                        readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: input.workspaceRuntimeId }),
-                      ),
-                    },
-                  ]
-                : [],
-          }
-        }
+        case 'workspacePaneTabs.update':
+          throw new Error(`Unhandled terminal handler: ${name}`)
         case 'workspacePaneTabs.list':
           return { revision: 0, entries: [] }
         case 'workspacePaneRuntime.close': {
-          const runtimeType =
-            (payload as { runtimeType?: WorkspacePaneRuntimeCloseResult['runtimeType'] } | null)?.runtimeType ??
-            'terminal'
-          const terminalSessionId =
-            (payload as { sessionId?: string } | null)?.sessionId ?? 'term-testtesttesttesttest1'
-          return {
-            ok: true,
-            runtimeType,
-            paneTabsSnapshot: { revision: 1, entries: [] },
-            runtime: {
-              action: 'closed',
-              terminalSessionId,
-              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-              terminalRuntimeGeneration: 1,
-            },
-          }
+          throw new Error(`Unhandled terminal handler: ${name}`)
         }
         case 'terminal.recoverSessions':
           return { revision: 0, sessions: [] }
+        case 'workspacePaneRuntime.open':
+          throw new Error(`Unhandled terminal handler: ${name}`)
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -937,64 +270,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         },
       )
   }
-  setClientBridgeForTests({
-    kind: () => 'electron',
-    hasCapability: () => false,
-    getBootstrap: () => ({
-      runtime: {
-        kind: 'electron',
-        bridgeVersion: CLIENT_BRIDGE_VERSION,
-        capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-      },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-    }),
-    invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
-      const handler = handlers[path]
-      if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
-      return handler(input)
-    },
-    abortIpc: async () => false,
-    onIpcEvent: () => () => {},
-    onEffectIntent: () => () => {},
-    pathForFile: () => '',
-    saveClipboardFiles: () => Promise.resolve([]),
-    host: () => window.goblinNative.host ?? null,
-    appRealtime: () => ({
-      kickReconnect: () => {},
-      onRecovered: () => () => {},
-    }),
-    terminal: () => ({
-      attach: async (input) => callTerminalHandler('terminal.attach', input),
-      restart: async (input) => callTerminalHandler('terminal.restart', input),
-      write: async (input) => callTerminalHandler('terminal.write', input),
-      resize: async (input) => callTerminalHandler('terminal.resize', input),
-      takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
-      notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
-      sendTestNotification: async () => true,
-      setBadge: () => {},
-      onOutput: () => () => {},
-      onBell: () => () => {},
-      onTitle: () => () => {},
-      onExit: () => () => {},
-      onIdentity: () => () => {},
-      onLifecycle: () => () => {},
-      onSessionsChanged: () => () => {},
-      onSessionClosed: () => () => {},
-    }),
-    workspacePaneTabs: () => ({
-      replace: async (input) => callTerminalHandler('workspacePaneTabs.replace', input),
-      update: async (input) => callTerminalHandler('workspacePaneTabs.update', input),
-      list: async (input) => callTerminalHandler('workspacePaneTabs.list', input),
-      onChanged: () => () => {},
-    }),
-    workspacePaneRuntime: () => ({
-      open: async (input) => callTerminalHandler('workspacePaneRuntime.open', input),
-      close: async (input) => callTerminalHandler('workspacePaneRuntime.close', input),
-    }),
-  })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -1295,111 +570,4 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       }
     }),
   )
-  setClientBridgeForTests(null)
-}
-
-export function seedRepoWithReadModelForTest(options: {
-  id: string
-  branches?: RepoBranchState[]
-  branchSnapshots?: BranchSnapshotInfo[]
-  currentBranch?: string
-  currentBranchName?: string | null
-  preferredWorkspacePaneTab?: WorkspacePaneTabType | null
-  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
-  workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
-  workspaceRuntimeId?: string
-  status?: WorktreeStatus[]
-  remote?: Partial<GitRemoteProjection>
-  remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
-  workspaceProbe?: WorkspaceProbeState
-}): WorkspaceState {
-  const workspaceId = workspaceIdForTest(options.id)
-  const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
-  const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
-  const status = options.status ?? []
-  const currentBranchName = options.currentBranchName ?? null
-  const preferredWorkspacePaneTabByTarget =
-    options.preferredWorkspacePaneTabByTarget ??
-    (currentBranchName && options.preferredWorkspacePaneTab !== undefined
-      ? {
-          [workspacePaneTabsTargetIdentityKey(
-            requiredGitWorkspacePaneTabsTarget(
-              workspaceId,
-              currentBranchName,
-              branchesWithSnapshotWorktreeMetadata.find((branch) => branch.name === currentBranchName)?.worktree
-                ?.path ?? null,
-            ),
-          )]: options.preferredWorkspacePaneTab,
-        }
-      : undefined)
-  const repo = seedRepoShellForTest({
-    id: options.id,
-    workspaceRuntimeId: options.workspaceRuntimeId,
-    currentBranchName,
-    ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
-    remote: options.remote,
-    remoteLifecycle: options.remoteLifecycle,
-    workspaceProbe: options.workspaceProbe ?? {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-      },
-      diagnostics: [],
-    },
-  })
-  seedRepoReadModelQueryData(repo, {
-    branches: branchesWithSnapshotWorktreeMetadata,
-    currentBranch: options.currentBranch ?? currentBranchName ?? '',
-    status,
-  })
-  for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
-    const branch = branchesWithSnapshotWorktreeMetadata.find((candidate) => candidate.name === branchName)
-    if (!branch) continue
-    setWorkspacePaneTabsForTargetQueryData({
-      ...requiredGitWorkspacePaneTabsTarget(repo.id, branchName, branch.worktree?.path ?? null),
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs,
-    })
-  }
-  return repo
-}
-
-export function seedRepoReadModelQueryData(
-  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
-  readModel: {
-    branches: BranchSnapshotInfo[]
-    currentBranch: string
-    status?: WorktreeStatus[]
-  },
-): void {
-  const loadedAt = Date.now()
-  const projection: GitWorkspaceRuntimeProjection = {
-    snapshot: {
-      branches: readModel.branches,
-      current: readModel.currentBranch,
-    },
-    pullRequests: null,
-    requested: {
-      branch: null,
-      pullRequestMode: 'full',
-    },
-    loadedAt,
-  }
-  setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', projection)
-  setRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId, {
-    workspaceRuntimeId: repo.workspaceRuntimeId,
-    status: readModel.status ?? [],
-    loadedAt,
-  })
-  if (readModel.currentBranch) {
-    setRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, readModel.currentBranch, 'full', {
-      ...projection,
-      requested: {
-        branch: readModel.currentBranch,
-        pullRequestMode: 'full',
-      },
-    })
-  }
 }

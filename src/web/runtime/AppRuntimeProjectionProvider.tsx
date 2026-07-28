@@ -129,13 +129,7 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [
-    workspaceMembershipReady,
-    currentWorkspaceId,
-    currentWorkspaceRuntimeId,
-    terminalRecovery,
-    scopeRegistry,
-  ])
+  }, [workspaceMembershipReady, currentWorkspaceId, currentWorkspaceRuntimeId, terminalRecovery, scopeRegistry])
 
   useEffect(() => {
     if (!workspaceMembershipReady) {

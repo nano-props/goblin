@@ -489,5 +489,4 @@ describe('server terminal runtime sessions', () => {
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
-
 })

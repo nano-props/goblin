@@ -1,4 +1,6 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { restorableWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
@@ -9,9 +11,7 @@ const persistence = vi.hoisted(() => ({
   stored: null as unknown,
   failNextWrite: false,
   readUserSettingsJson: vi.fn(async () =>
-    persistence.stored === null
-      ? { kind: 'missing' as const }
-      : { kind: 'loaded' as const, value: persistence.stored },
+    persistence.stored === null ? { kind: 'missing' as const } : { kind: 'loaded' as const, value: persistence.stored },
   ),
   writeUserSettingsJson: vi.fn(async (data: unknown) => {
     if (persistence.failNextWrite) {
@@ -25,59 +25,77 @@ const persistence = vi.hoisted(() => ({
 
 vi.mock('#/server/modules/settings-persistence.ts', () => persistence)
 
-afterEach(async () => {
-  const mod = await import('#/server/modules/settings-source.ts')
-  mod.resetServerSettingsSourceForTests()
-  persistence.stored = null
-  persistence.failNextWrite = false
-  vi.clearAllMocks()
-  vi.resetModules()
-})
+describe('settings source commits', () => {
+  afterEach(async () => {
+    const mod = await import('#/server/modules/settings-source.ts')
+    mod.resetServerSettingsSourceForTests()
+    persistence.stored = null
+    persistence.failNextWrite = false
+    vi.clearAllMocks()
+    vi.resetModules()
+  })
 
-test('commits a layout CAS with one durable write', async () => {
-  const mod = await import('#/server/modules/settings-source.ts')
-  const repository = mod.serverWorkspacePaneLayoutRepository
-  const current = await repository.load(REPO_A)
-  const writesBefore = persistence.writeUserSettingsJson.mock.calls.length
+  test('commits a layout CAS with one durable write', async () => {
+    const mod = await import('#/server/modules/settings-source.ts')
+    const repository = mod.serverWorkspacePaneLayoutRepository
+    const current = await repository.load(REPO_A)
+    const writesBefore = persistence.writeUserSettingsJson.mock.calls.length
 
-  await expect(
-    repository.compareAndSwap({
+    await expect(
+      repository.compareAndSwap({
+        workspaceId: REPO_A,
+        expected: current.layout,
+        replacement: {
+          entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
+        },
+      }),
+    ).resolves.toMatchObject({ kind: 'accepted' })
+
+    expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(writesBefore + 1)
+  })
+
+  test('does not write when the workspace external app recent is already current', async () => {
+    const mod = await import('#/server/modules/settings-source.ts')
+    const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo-a/worktree-x' }, 'posix')
+    if (!root) throw new Error('invalid workspace locator fixture')
+    const recent = {
       workspaceId: REPO_A,
-      expected: current.layout,
-      replacement: {
-        entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
-      },
-    }),
-  ).resolves.toMatchObject({ kind: 'accepted' })
+      targetKey: restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root }),
+      itemId: 'editor:vscode',
+    }
 
-  expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(writesBefore + 1)
-})
+    await mod.setServerWorkspaceExternalAppRecent(recent)
+    const writesAfterFirstCommit = persistence.writeUserSettingsJson.mock.calls.length
 
-test('does not expose failed settings writes through the in-memory cache', async () => {
-  const mod = await import('#/server/modules/settings-source.ts')
-  await mod.addServerRecentWorkspace({ id: REPO_A })
-  persistence.failNextWrite = true
-  await expect(mod.addServerRecentWorkspace({ id: REPO_B })).rejects.toThrow('disk full')
-  expect(await mod.getServerRecentWorkspaces()).toEqual([{ id: REPO_A }])
-  await expect(mod.addServerRecentWorkspace({ id: REPO_C })).resolves.toEqual([
-    { id: REPO_C },
-    { id: REPO_A },
-  ])
-})
+    await mod.setServerWorkspaceExternalAppRecent(recent)
 
-test('retries default settings initialization after a transient write failure', async () => {
-  const mod = await import('#/server/modules/settings-source.ts')
-  persistence.failNextWrite = true
-  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('disk full')
-  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
-})
+    expect(writesAfterFirstCommit).toBeGreaterThan(0)
+    expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(writesAfterFirstCommit)
+  })
 
-test('replaces invalid persisted settings with defaults', async () => {
-  persistence.stored = { theme: 'bogus' }
-  const mod = await import('#/server/modules/settings-source.ts')
+  test('does not expose failed settings writes through the in-memory cache', async () => {
+    const mod = await import('#/server/modules/settings-source.ts')
+    await mod.addServerRecentWorkspace({ id: REPO_A })
+    persistence.failNextWrite = true
+    await expect(mod.addServerRecentWorkspace({ id: REPO_B })).rejects.toThrow('disk full')
+    expect(await mod.getServerRecentWorkspaces()).toEqual([{ id: REPO_A }])
+    await expect(mod.addServerRecentWorkspace({ id: REPO_C })).resolves.toEqual([{ id: REPO_C }, { id: REPO_A }])
+  })
 
-  await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
-  expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(1)
-  expect(persistence.stored).toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
-  expect(persistence.stored).not.toHaveProperty('version')
+  test('retries default settings initialization after a transient write failure', async () => {
+    const mod = await import('#/server/modules/settings-source.ts')
+    persistence.failNextWrite = true
+    await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('disk full')
+    await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+  })
+
+  test('replaces invalid persisted settings with defaults', async () => {
+    persistence.stored = { theme: 'bogus' }
+    const mod = await import('#/server/modules/settings-source.ts')
+
+    await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
+    expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(1)
+    expect(persistence.stored).toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
+    expect(persistence.stored).not.toHaveProperty('version')
+  })
 })

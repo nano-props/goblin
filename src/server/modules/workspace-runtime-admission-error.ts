@@ -5,8 +5,6 @@ export class WorkspaceRuntimeAdmissionClosedError extends Error {
   }
 }
 
-export function isWorkspaceRuntimeAdmissionClosedError(
-  error: unknown,
-): error is WorkspaceRuntimeAdmissionClosedError {
+export function isWorkspaceRuntimeAdmissionClosedError(error: unknown): error is WorkspaceRuntimeAdmissionClosedError {
   return error instanceof WorkspaceRuntimeAdmissionClosedError
 }

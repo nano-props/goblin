@@ -1,10 +1,14 @@
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -58,10 +62,7 @@ describe('restorable-workspace-state', () => {
   })
 
   test('persists a plain Workspace root without synthetic Git targets', () => {
-    const workspace = emptyWorkspace(
-      'goblin+file:///tmp/repo-without-query-model',
-      'repo-runtime-without-query',
-    )
+    const workspace = emptyWorkspace('goblin+file:///tmp/repo-without-query-model', 'repo-runtime-without-query')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
       capabilities: {

@@ -2,12 +2,10 @@ import type { GitWorkspaceRuntimeProjection, RepoSnapshot } from '#/shared/api-t
 import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
 import {
   createBranchSnapshot,
-  createPullRequest,
-  installGoblinTestBridge,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
-  type IpcTestHandler,
-} from '#/web/test-utils/bridge.ts'
+} from '#/web/test-utils/repo-store.ts'
+import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -19,7 +17,6 @@ import type { WorktreeStatus } from '#/web/types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
-export const pullRequest = createPullRequest
 export const refreshStoreAccess = { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }
 
 type TestRepo = NonNullable<ReturnType<typeof useWorkspacesStore.getState>['workspaces'][string]>
@@ -73,14 +70,6 @@ export function branch(
   options: Partial<BranchSnapshotInfo> = {},
 ): BranchSnapshotInfo {
   return createBranchSnapshot(name, { ...options, ...(pullRequest ? { pullRequest } : {}) })
-}
-
-export function pullRequestWithHealth(number: number): PullRequestInfo {
-  return createPullRequest(number, {
-    checks: { total: 1, passing: 1, failing: 0, pending: 0 },
-    reviewDecision: 'APPROVED',
-    mergeable: 'MERGEABLE',
-  })
 }
 
 export function repoProjection(

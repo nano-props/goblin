@@ -26,7 +26,12 @@ export async function resolveRemoteWorkspaceTarget(
   ref: { alias: string; remotePath: string },
   signal?: AbortSignal,
 ): Promise<RemoteWorkspaceTarget> {
-  const result = await postServerJson('/api/remote/resolve-target', ref, decodeWith(ResolveRemoteTargetResponseSchema), { signal })
+  const result = await postServerJson(
+    '/api/remote/resolve-target',
+    ref,
+    decodeWith(ResolveRemoteTargetResponseSchema),
+    { signal },
+  )
   if ('error' in result) throw new Error(result.error)
   return result.target
 }
@@ -59,5 +64,7 @@ export async function testRemoteWorkspaceConnection(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
 ): Promise<RemoteDiagnosticsResult> {
-  return await postServerJson('/api/remote/test-workspace', { target }, decodeWith(RemoteDiagnosticsResponseSchema), { signal })
+  return await postServerJson('/api/remote/test-workspace', { target }, decodeWith(RemoteDiagnosticsResponseSchema), {
+    signal,
+  })
 }

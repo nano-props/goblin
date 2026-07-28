@@ -13,7 +13,7 @@ import { primaryWindowNavigationActionsForTest } from '#/web/test-utils/primary-
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
@@ -92,9 +92,7 @@ describe('RepoCloneDialog', () => {
     expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
       activateWorkspace.mock.invocationCallOrder[0]!,
     )
-    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(
-      onOpenChange.mock.invocationCallOrder[0]!,
-    )
+    expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {

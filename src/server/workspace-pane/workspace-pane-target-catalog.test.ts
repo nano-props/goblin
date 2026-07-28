@@ -16,9 +16,7 @@ describe('WorkspacePaneTargetCatalog', () => {
       readIdentities,
     })
 
-    await expect(
-      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
-    ).resolves.toEqual([
+    await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
         target: {
           kind: 'workspace-root',
@@ -71,9 +69,7 @@ describe('WorkspacePaneTargetCatalog', () => {
       hasGitCapability: () => true,
       readIdentities: async () => [{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }],
     })
-    await expect(
-      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
-    ).resolves.toEqual([
+    await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
         target: {
           kind: 'workspace-root',

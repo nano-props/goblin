@@ -22,11 +22,7 @@ export function runWorkspaceProjectionPromotion(
   const existing = inFlightPromotions.get(key)
   if (existing) return existing
 
-  const command = restoreWorkspaceTabsOnView(
-    readClientPageId(),
-    target.workspaceId,
-    target.workspaceRuntimeId,
-  ).then(
+  const command = restoreWorkspaceTabsOnView(readClientPageId(), target.workspaceId, target.workspaceRuntimeId).then(
     (response) => ({ ok: true as const, workspace: response.workspace, snapshot: response.snapshot }),
     (err: unknown) => ({ ok: false as const, message: err instanceof Error ? err.message : String(err) }),
   )

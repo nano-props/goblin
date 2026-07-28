@@ -1,5 +1,9 @@
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
-import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,

@@ -5,11 +5,11 @@
 // bubble events up". We stub BranchActionsMenu and the terminal bell/output
 // hook so the suite stays focused on the list.
 
+import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`

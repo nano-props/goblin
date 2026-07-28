@@ -395,20 +395,6 @@ export function pullRequest(number: number): PullRequestInfo {
   }
 }
 
-export function deferred<T>(): {
-  promise: Promise<T>
-  resolve: (value: T | PromiseLike<T>) => void
-  reject: (reason?: unknown) => void
-} {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((innerResolve, innerReject) => {
-    resolve = innerResolve
-    reject = innerReject
-  })
-  return { promise, resolve, reject }
-}
-
 type TestRepoQueryInvalidation = {
   repoId: string
   query: 'repo-snapshot' | 'repo-worktree-snapshot' | 'repo-runtime'
@@ -416,7 +402,7 @@ type TestRepoQueryInvalidation = {
 type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
 type TestRepoWorktreeSnapshotInvalidation = { repoId: string; query: 'repo-worktree-snapshot' }
 
-export function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
+function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
   return hoistedMocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
 }
 

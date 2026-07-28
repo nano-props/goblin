@@ -21,7 +21,7 @@ import {
   restorableWorkspacePaneTargetFromRuntime,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
+import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
   projectRuntimePlacements,
   providerRevisionMap,

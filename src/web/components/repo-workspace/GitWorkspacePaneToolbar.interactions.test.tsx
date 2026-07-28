@@ -1,14 +1,8 @@
 // @vitest-environment jsdom
 
-import { act, waitFor } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, test, vi } from 'vitest'
-import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { createBranchSnapshot, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -16,26 +10,14 @@ import type { ObservedBranchRouteNavigationForTest } from '#/web/test-utils/work
 import {
   REPO_ID,
   WORKTREE_PATH,
-  WorkspaceOpenExternallyMenu,
-  appShellMocks,
-  externalAppTargetKey,
-  externalMenuTarget,
   flush,
-  gitWorkspacePaneProjection,
-  installRecentAppFetch,
   navigationWith,
-  openPopover,
-  openTabsFor,
-  renderInJsdom,
   renderToolbar,
-  runtimeExternalAppSettings,
-  seededQueryClientWithWorkspaceSettings,
   staticEntry,
   tabsFor,
   terminalEntry,
   toastMocks,
   toolbarResponsiveMocks,
-  workspaceExternalAppMocks,
   workspaceRuntimeIdForTest,
 } from '#/web/test-utils/git-workspace-pane-toolbar.tsx'
 

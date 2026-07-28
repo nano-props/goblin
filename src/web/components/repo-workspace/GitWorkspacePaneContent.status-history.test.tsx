@@ -1,37 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, screen, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { describe, expect, test, vi } from 'vitest'
-import '#/web/test-utils/git-workspace-pane-content.tsx'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import { createBranchSnapshot, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
-import { useFakeTimers } from '#/test-utils/timers.ts'
-import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
-import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   GitWorkspacePaneContentHarness,
   REPO_ID,
   branchActionSurfaceWithCopyPatch,
   defaultBranchActionSurface,
   emptyTerminalReadContext,
-  filetreeClientMocks,
   flushAsyncWork,
   getTestGitWorkspacePanePresentation,
   gitWorkspacePaneProjection,
@@ -39,13 +13,22 @@ import {
   navigationWith,
   preferenceBackedWorkspacePaneTabModel,
   repoClientMocks,
-  responsiveMocks,
   staticEntry,
-  terminalCommandContextWith,
-  terminalEntry,
-  terminalSession,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
-
+import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import { act, screen, waitFor } from '@testing-library/react'
+import { describe, expect, test, vi } from 'vitest'
+import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
+import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
+import { useFakeTimers } from '#/test-utils/timers.ts'
+import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
+import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 describe('GitWorkspacePaneContent status-history', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
     const onCopyPatch = vi.fn()

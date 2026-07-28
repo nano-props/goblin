@@ -42,11 +42,10 @@ describe('g command HTTP transport', () => {
   })
 
   test('uses only a strict error envelope for server detail', async () => {
-    const fetchImpl = vi.fn<typeof fetch>()
+    const fetchImpl = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json({ message: 'unavailable' }, { status: 503 }))
-      .mockResolvedValueOnce(
-        Response.json({ ok: false, code: 'NO_CLIENT', message: 'no client' }, { status: 503 }),
-      )
+      .mockResolvedValueOnce(Response.json({ ok: false, code: 'NO_CLIENT', message: 'no client' }, { status: 503 }))
       .mockResolvedValueOnce(Response.json({ message: 'unavailable', legacy: true }, { status: 503 }))
     const transport = createHttpTransport(env(), fetchImpl)
 
