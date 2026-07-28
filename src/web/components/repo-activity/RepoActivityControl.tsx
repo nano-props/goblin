@@ -184,7 +184,7 @@ function RepoRefreshButton({
         size="icon-lg"
         disabled={manualSyncBusy}
         loading={manualSyncBusy}
-        onClick={() => void handleSync()}
+        onClick={handleSync}
         aria-label={label}
       >
         {({ busy }) => (

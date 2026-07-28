@@ -112,6 +112,30 @@ describe('RepoActivityControl', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
+  test('shows pending feedback immediately while a clicked refresh is running', async () => {
+    const refresh = Promise.withResolvers<{ ok: true }>()
+    refreshMocks.run.mockReturnValueOnce(refresh.promise)
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    const { container } = renderControl()
+
+    fireEvent.click(button(container))
+
+    expect(button(container).disabled).toBe(true)
+    expect(button(container).getAttribute('aria-busy')).toBe('true')
+    expect(button(container).querySelector('svg')?.classList.contains('animate-spin')).toBe(true)
+
+    fireEvent.click(button(container))
+    expect(refreshMocks.run).toHaveBeenCalledOnce()
+
+    refresh.resolve({ ok: true })
+
+    await waitFor(() => {
+      expect(button(container).disabled).toBe(false)
+      expect(button(container).getAttribute('aria-busy')).toBeNull()
+      expect(button(container).querySelector('svg')?.classList.contains('animate-spin')).toBe(false)
+    })
+  })
+
   test('renders the primary refresh button for local-only repositories without the local-only label', () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
 
