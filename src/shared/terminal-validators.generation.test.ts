@@ -1,32 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  constrainTerminalSize,
-  isValidTerminalClientId,
-  isValidTerminalNotifyBellInput,
-  isValidTerminalTestNotificationInput,
-  isTerminalWsMessageWithinLimit,
-  isValidTerminalSize,
-  isValidTerminalRuntimeSessionId,
-  isValidTerminalWriteData,
-  MAX_TERMINAL_WRITE_CHARS,
-  normalizeTerminalClientMessage,
-  normalizeTerminalCreateResult,
-  normalizeTerminalRealtimeMessage,
-  normalizeTerminalSessionsSnapshot,
-  normalizeTerminalSize,
-  normalizeTerminalSocketServerMessage,
-  terminalUtf8ByteLength,
-  TERMINAL_WS_MESSAGE_LIMIT_BYTES,
-} from '#/shared/terminal-validators.ts'
-import {
-  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
-} from '#/shared/workspace-pane-tabs.ts'
-import {
-  normalizeAppRealtimeClientMessage,
-  normalizeAppRealtimeSocketServerMessage,
-} from '#/shared/app-realtime-validators.ts'
-import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
+import { normalizeTerminalRealtimeMessage } from '#/shared/terminal-validators.ts'
 
 describe('shared terminal validators generation', () => {
   test('requires a non-negative safe-integer identity revision on identity events', () => {

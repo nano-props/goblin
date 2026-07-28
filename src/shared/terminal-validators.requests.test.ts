@@ -10,22 +10,14 @@ import {
   isValidTerminalWriteData,
   MAX_TERMINAL_WRITE_CHARS,
   normalizeTerminalClientMessage,
-  normalizeTerminalCreateResult,
   normalizeTerminalRealtimeMessage,
-  normalizeTerminalSessionsSnapshot,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
   terminalUtf8ByteLength,
   TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-validators.ts'
-import {
-  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
-} from '#/shared/workspace-pane-tabs.ts'
-import {
-  normalizeAppRealtimeClientMessage,
-  normalizeAppRealtimeSocketServerMessage,
-} from '#/shared/app-realtime-validators.ts'
+import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import { normalizeAppRealtimeClientMessage } from '#/shared/app-realtime-validators.ts'
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 describe('shared terminal validators requests', () => {

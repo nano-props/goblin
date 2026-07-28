@@ -1,5 +1,4 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { app } from 'electron'
 import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-channels.ts'
 import { isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'

@@ -8,14 +8,23 @@ import { glob } from 'tinyglobby'
 const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
+const CANONICAL_KEYBOARD_EVENT_FILE = 'src/web/test-utils/keyboard-event.ts'
+const CANONICAL_TIMERS_FILE = 'src/test-utils/timers.ts'
+const CANONICAL_MICROTASKS_FILE = 'src/test-utils/microtasks.ts'
+const CANONICAL_FETCH_MOCK_FILES = new Set(['src/test-utils/fetch-mock.ts', 'src/web/test-utils/bridge.ts'])
 const DEFAULT_TEST_FILE_LINE_BUDGET = 1_000
-const SHARED_TEST_UTILITY_GLOBS = [
+const TEST_FILE_GLOBS = ['src/**/*.test.ts', 'src/**/*.test.tsx']
+const TEST_UTILITY_GLOBS = [
   'src/test-utils/**/*.ts',
   'src/test-utils/**/*.tsx',
   'src/server/test-utils/**/*.ts',
   'src/server/test-utils/**/*.tsx',
   'src/web/test-utils/**/*.ts',
   'src/web/test-utils/**/*.tsx',
+  'src/**/*.test-utils.ts',
+  'src/**/*.test-utils.tsx',
+  'src/**/*-test-utils.ts',
+  'src/**/*-test-utils.tsx',
 ]
 
 const repositoryPolicyLabels = [
@@ -35,15 +44,15 @@ type PolicyLabel =
 const analysisByFile = new Map<string, Promise<ReadonlySet<PolicyLabel>>>()
 
 describe('test harness policy', () => {
-  test('keeps repository tests on the shared React and WebSocket harnesses', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+  test('keeps repository tests and utilities on the shared harnesses', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
 
     for (const file of files) {
       if (file === POLICY_FILE) continue
       const labels = await analyzeFile(file)
       for (const label of repositoryPolicyLabels) {
-        if (labels.has(label)) violations.push(`${file}: ${label}`)
+        if (labels.has(label) && !isCanonicalPolicyOwner(file, label)) violations.push(`${file}: ${label}`)
       }
     }
 
@@ -51,12 +60,7 @@ describe('test harness policy', () => {
   })
 
   test('keeps test helpers on the canonical WebSocket mock', async () => {
-    const files = await glob([
-      'src/test-utils/**/*.ts',
-      'src/test-utils/**/*.tsx',
-      'src/web/test-utils/**/*.ts',
-      'src/web/test-utils/**/*.tsx',
-    ])
+    const files = await glob(TEST_UTILITY_GLOBS)
     const violations: string[] = []
 
     for (const file of files) {
@@ -74,7 +78,7 @@ describe('test harness policy', () => {
     for (const file of files) {
       if (file === CANONICAL_XTERM_MOCK_FILE) continue
       const source = await readFile(file, 'utf8')
-      if (/vi\.mock\(\s*['"]@xterm\//u.test(source)) violations.push(file)
+      if (hasXtermMock(source, file)) violations.push(file)
     }
 
     expect(violations).toEqual([])
@@ -87,7 +91,7 @@ describe('test harness policy', () => {
   })
 
   test('keeps every test file within the structural line budget', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+    const files = await glob(TEST_FILE_GLOBS)
     const violations: string[] = []
 
     for (const file of files) {
@@ -101,7 +105,7 @@ describe('test harness policy', () => {
   })
 
   test('keeps shared test utilities within the structural line budget', async () => {
-    const files = await glob(SHARED_TEST_UTILITY_GLOBS)
+    const files = await glob(TEST_UTILITY_GLOBS)
     const violations: string[] = []
 
     for (const file of files) {
@@ -114,46 +118,92 @@ describe('test harness policy', () => {
     expect(violations).toEqual([])
   })
 
-  test('keeps shared test utility imports live', async () => {
-    const files = await glob(SHARED_TEST_UTILITY_GLOBS)
+  test('keeps test and test-utility runtime imports live', async () => {
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
 
     for (const file of files) {
       const source = await readFile(file, 'utf8')
-      for (const name of unusedImportNames(source, file)) violations.push(`${file}: ${name}`)
+      for (const name of unusedRuntimeImportNames(source, file)) violations.push(`${file}: ${name}`)
     }
 
     expect(violations).toEqual([])
   })
 
-  test('keeps every test file under a named suite', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+  test('keeps every test under a named suite', async () => {
+    const files = await glob(TEST_FILE_GLOBS)
     const violations: string[] = []
 
     for (const file of files) {
       const source = await readFile(file, 'utf8')
-      if (!hasNamedTopLevelSuite(source, file)) violations.push(file)
+      if (!hasOnlyTestsInNamedSuites(source, file)) violations.push(file)
     }
 
     expect(violations).toEqual([])
   })
 
-  test('recognizes only top-level named Vitest suites', () => {
+  test('recognizes only tests wrapped by named Vitest suites', () => {
     expect(
-      hasNamedTopLevelSuite("import { describe } from 'vitest'; describe('suite', () => {})", 'fixture.test.ts'),
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; describe('suite', () => { test('case', () => {}) })",
+        'fixture.test.ts',
+      ),
     ).toBe(true)
-    expect(hasNamedTopLevelSuite("// describe('comment only', () => {})", 'fixture.test.ts')).toBe(false)
-    expect(hasNamedTopLevelSuite('const note = "describe(\'string only\', () => {})"', 'fixture.test.ts')).toBe(false)
-    expect(hasNamedTopLevelSuite("import { describe } from 'vitest'; describe(() => {})", 'fixture.test.ts')).toBe(
-      false,
-    )
-    expect(hasNamedTopLevelSuite("function describe() {}; describe('local', () => {})", 'fixture.test.ts')).toBe(false)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; describe('suite', () => {}); test('outside', () => {})",
+        'fixture.test.ts',
+      ),
+    ).toBe(false)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; describe(() => { test('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(false)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; describe('suite'); test('outside', () => {})",
+        'fixture.test.ts',
+      ),
+    ).toBe(false)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; describe.each([1])('suite', () => { test.each([1])('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(true)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe as suite, it as spec } from 'vitest'; suite.only('named', () => { spec.skip('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(true)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import * as v from 'vitest'; v.describe('named', () => { v.test('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(true)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "import { describe, test } from 'vitest'; const extended = test.extend({}); describe('named', () => { test('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(true)
+    expect(
+      hasOnlyTestsInNamedSuites(
+        "function describe() {}; function test() {}; describe('local', () => { test('case', () => {}) })",
+        'fixture.test.ts',
+      ),
+    ).toBe(false)
   })
 
   test('keeps raw keyboard event construction behind the listener-contract helper', async () => {
-    const files = await glob(['src/web/**/*.test.ts', 'src/web/**/*.test.tsx'])
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
     for (const file of files) {
+      if (file === CANONICAL_KEYBOARD_EVENT_FILE) continue
       if ((await analyzeFile(file)).has('direct KeyboardEvent construction')) violations.push(file)
     }
 
@@ -161,10 +211,10 @@ describe('test harness policy', () => {
   })
 
   test('uses the shared fake-timer configuration across repository tests', async () => {
-    const files = await glob(['src/**/*.test.ts', 'src/**/*.test.tsx'])
+    const files = await glob([...TEST_FILE_GLOBS, ...TEST_UTILITY_GLOBS])
     const violations: string[] = []
     for (const file of files) {
-      if (file === POLICY_FILE) continue
+      if (file === POLICY_FILE || file === CANONICAL_TIMERS_FILE) continue
       if ((await analyzeFile(file)).has('direct fake-timer configuration')) violations.push(file)
     }
 
@@ -177,7 +227,7 @@ describe('test harness policy', () => {
       const documentation = "new KeyboardEvent('keydown'); IS_REACT_ACT_ENVIRONMENT"
       import { vi } from 'vitest'
       import { createRoot } from 'react-dom/client'
-      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window, global) {
+      function probe(vi, createRoot, KeyboardEvent, Promise, Object, window, global, globalThis) {
         vi.stubGlobal('fetch')
         vi.useFakeTimers()
         createRoot()
@@ -185,6 +235,8 @@ describe('test harness policy', () => {
         new Promise((resolve) => window.setTimeout(resolve, 0))
         Object.defineProperty(window, 'localStorage', {})
         global.WebSocket = class TestSocket {}
+        globalThis.fetch = fetchMock
+        window.localStorage = storage
       }
       const config = { IS_REACT_ACT_ENVIRONMENT: false }
       config.IS_REACT_ACT_ENVIRONMENT = true
@@ -205,7 +257,9 @@ describe('test harness policy', () => {
     ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve))'],
     ['test-local zero-delay macrotask wait', 'await new Promise((resolve) => setTimeout(resolve, undefined))'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
+    ['test-local fetch replacement', 'globalThis.fetch = fetchMock'],
     ['test-local Storage replacement', "Object.defineProperty(window, 'localStorage', { value: storage })"],
+    ['test-local Storage replacement', 'window.sessionStorage = storage'],
     [
       'inline WebSocket mock',
       "import { vi } from 'vitest'; class TestWebSocket {}; vi.stubGlobal('WebSocket', TestWebSocket)",
@@ -239,7 +293,52 @@ describe('test harness policy', () => {
   ])('detects act-environment mutation through global syntax and aliases', (source) => {
     expect(analyzeSource(source, 'fixture.test.ts')).toContain('manual React act-environment mutation')
   })
+
+  test('detects xterm mocks through Vitest bindings without matching text', () => {
+    expect(hasXtermMock("import { vi as testVi } from 'vitest'; testVi.mock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(
+      true,
+    )
+    expect(
+      hasXtermMock("import * as vitest from 'vitest'; vitest.vi.mock('@xterm/addon-fit', () => ({}))", 'x.ts'),
+    ).toBe(true)
+    expect(hasXtermMock("import { vi } from 'vitest'; vi.mock(import('@xterm/xterm'), () => ({}))", 'x.ts')).toBe(true)
+    expect(hasXtermMock("import { vi } from 'vitest'; vi.doMock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(true)
+    expect(hasXtermMock('const note = "vi.mock(\'@xterm/xterm\')"', 'x.ts')).toBe(false)
+  })
+
+  test('recognizes direct zero-delay Promise settlement without inferring callback aliases', () => {
+    expect(analyzeSource('new Promise((resolve) => { setTimeout(sideEffect, 0); resolve() })', 'x.ts')).not.toContain(
+      'test-local zero-delay macrotask wait',
+    )
+    expect(
+      analyzeSource(
+        'new Promise((resolve) => { const schedule = () => setTimeout(sideEffect, 0); resolve() })',
+        'x.ts',
+      ),
+    ).not.toContain('test-local zero-delay macrotask wait')
+    expect(analyzeSource('new Promise((resolve) => setTimeout(() => resolve(), 0))', 'x.ts')).toContain(
+      'test-local zero-delay macrotask wait',
+    )
+    expect(analyzeSource('new Promise((_resolve, reject) => setTimeout(reject, 0))', 'x.ts')).toContain(
+      'test-local zero-delay macrotask wait',
+    )
+    expect(
+      analyzeSource('new Promise((resolve) => { setTimeout(() => console.log(resolve), 0); resolve() })', 'x.ts'),
+    ).not.toContain('test-local zero-delay macrotask wait')
+    expect(
+      analyzeSource('new Promise((resolve) => { const finish = () => resolve(); setTimeout(finish, 0) })', 'x.ts'),
+    ).not.toContain('test-local zero-delay macrotask wait')
+  })
 })
+
+function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLabels)[number]): boolean {
+  if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
+  if (label === 'repeated manual microtask drain' || label === 'test-local zero-delay macrotask wait') {
+    return file === CANONICAL_MICROTASKS_FILE
+  }
+  if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
+  return false
+}
 
 function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
   const cached = analysisByFile.get(file)
@@ -249,26 +348,26 @@ function analyzeFile(file: string): Promise<ReadonlySet<PolicyLabel>> {
   return analysis
 }
 
-function hasNamedTopLevelSuite(source: string, file: string): boolean {
+function hasOnlyTestsInNamedSuites(source: string, file: string): boolean {
   const ast = parse(source, {
     sourceType: 'module',
     plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
   })
-  let found = false
+  let foundTest = false
+  let valid = true
   traverse(ast, {
     CallExpression(path) {
-      if (path.getFunctionParent() || !isImportedIdentifier(path.get('callee'), 'vitest', 'describe')) return
-      const name = argumentPaths(path)[0]
-      if (name?.isStringLiteral() && name.node.value.trim().length > 0) {
-        found = true
-        path.stop()
-      }
+      if (!isOutermostVitestCall(path, ['test', 'it'])) return
+      foundTest = true
+      if (hasNamedSuiteAncestor(path)) return
+      valid = false
+      path.stop()
     },
   })
-  return found
+  return foundTest && valid
 }
 
-function unusedImportNames(source: string, file: string): string[] {
+function unusedRuntimeImportNames(source: string, file: string): string[] {
   const ast = parse(source, {
     sourceType: 'module',
     plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
@@ -277,12 +376,64 @@ function unusedImportNames(source: string, file: string): string[] {
   traverse(ast, {
     Program(path) {
       for (const [name, binding] of Object.entries(path.scope.bindings)) {
-        if (binding.kind === 'module' && !binding.referenced) names.push(name)
+        const declaration = binding.path.parentPath
+        const typeOnly =
+          (binding.path.isImportSpecifier() && binding.path.node.importKind === 'type') ||
+          (declaration?.isImportDeclaration() && declaration.node.importKind === 'type')
+        if (binding.kind === 'module' && !binding.referenced && !typeOnly) names.push(name)
       }
       path.stop()
     },
   })
   return names
+}
+
+function hasNamedSuiteAncestor(path: NodePath<CallExpression>): boolean {
+  let ancestor: NodePath | null = path.parentPath
+  while (ancestor) {
+    if (ancestor.isCallExpression() && isOutermostVitestCall(ancestor, ['describe'])) {
+      const [name, ...remainingArguments] = argumentPaths(ancestor)
+      const callback = remainingArguments.at(-1)
+      if (
+        name?.isStringLiteral() &&
+        name.node.value.trim().length > 0 &&
+        (callback?.isFunctionExpression() || callback?.isArrowFunctionExpression())
+      ) {
+        return true
+      }
+    }
+    ancestor = ancestor.parentPath
+  }
+  return false
+}
+
+function isOutermostVitestCall(path: NodePath<CallExpression>, imports: readonly string[]): boolean {
+  const parent = path.parentPath
+  if (parent?.isCallExpression() && parent.get('callee').node === path.node) return false
+
+  const directCallee = path.get('callee')
+  if (
+    directCallee.isMemberExpression() &&
+    ['each', 'extend', 'for', 'runIf', 'skipIf'].includes(memberPropertyName(directCallee) ?? '')
+  ) {
+    return false
+  }
+
+  let callee: NodePath = directCallee
+  const memberNames: string[] = []
+  while (callee.isCallExpression() || callee.isMemberExpression()) {
+    if (callee.isCallExpression()) {
+      callee = callee.get('callee')
+    } else {
+      const memberName = memberPropertyName(callee)
+      if (memberName) memberNames.unshift(memberName)
+      callee = callee.get('object')
+    }
+  }
+  return (
+    imports.some((imported) => isImportedIdentifier(callee, 'vitest', imported)) ||
+    (isImportedNamespace(callee, 'vitest') && memberNames[0] !== undefined && imports.includes(memberNames[0]))
+  )
 }
 
 function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
@@ -327,6 +478,13 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     AssignmentExpression(path) {
       if (isActEnvironmentTarget(path.get('left'))) violations.add('manual React act-environment mutation')
       if (isGlobalWebSocketTarget(path.get('left'))) violations.add('inline WebSocket mock')
+      if (isGlobalNamedTarget(path.get('left'), 'fetch')) violations.add('test-local fetch replacement')
+      if (
+        isGlobalNamedTarget(path.get('left'), 'localStorage') ||
+        isGlobalNamedTarget(path.get('left'), 'sessionStorage')
+      ) {
+        violations.add('test-local Storage replacement')
+      }
     },
     UnaryExpression(path) {
       if (path.node.operator === 'delete' && isActEnvironmentTarget(path.get('argument'))) {
@@ -343,10 +501,10 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     CallExpression(path) {
       const callee = path.get('callee')
       if (isImportedCreateRoot(callee)) violations.add('hand-rolled React root')
-      if (isImportedMember(callee, 'vitest', 'vi', 'useFakeTimers')) {
+      if (isVitestViMember(callee, 'useFakeTimers')) {
         violations.add('direct fake-timer configuration')
       }
-      if (isImportedMember(callee, 'vitest', 'vi', 'stubGlobal')) {
+      if (isVitestViMember(callee, 'stubGlobal')) {
         const globalName = stringArgument(path, 0)
         if (globalName === 'fetch') violations.add('test-local fetch replacement')
         if (isStorageName(globalName)) violations.add('test-local Storage replacement')
@@ -393,9 +551,47 @@ function isImportedCreateRoot(callee: NodePath): boolean {
   return isImportedNamespace(callee.get('object'), 'react-dom/client')
 }
 
-function isImportedMember(callee: NodePath, source: string, imported: string, property: string): boolean {
+function isVitestViMember(callee: NodePath, property: string): boolean {
   if (!callee.isMemberExpression() || memberPropertyName(callee) !== property) return false
-  return isImportedIdentifier(callee.get('object'), source, imported)
+  const object = callee.get('object')
+  if (isImportedIdentifier(object, 'vitest', 'vi')) return true
+  return (
+    object.isMemberExpression() &&
+    memberPropertyName(object) === 'vi' &&
+    isImportedNamespace(object.get('object'), 'vitest')
+  )
+}
+
+function hasXtermMock(source: string, file: string): boolean {
+  if (!source.includes('@xterm/')) return false
+  const ast = parse(source, {
+    sourceType: 'module',
+    plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
+  })
+  let found = false
+  traverse(ast, {
+    CallExpression(path) {
+      const callee = path.get('callee')
+      if (!isVitestViMember(callee, 'mock') && !isVitestViMember(callee, 'doMock')) return
+      const moduleName = moduleNameArgument(path)
+      if (moduleName?.startsWith('@xterm/')) {
+        found = true
+        path.stop()
+      }
+    },
+  })
+  return found
+}
+
+function moduleNameArgument(path: NodePath<CallExpression>): string | null {
+  const argument = argumentPaths(path)[0]
+  if (argument?.isStringLiteral()) return argument.node.value
+  if (argument?.isImportExpression()) {
+    const source = argument.get('source')
+    return source.isStringLiteral() ? source.node.value : null
+  }
+  if (!argument?.isCallExpression() || !argument.get('callee').isImport()) return null
+  return stringArgument(argument, 0)
 }
 
 function memberPropertyName(path: NodePath): string | null {
@@ -459,13 +655,29 @@ function isGlobalWebSocketTarget(path: NodePath): boolean {
   return isUnboundIdentifier(target, 'WebSocket') || isGlobalMember(target, 'WebSocket')
 }
 
+function isGlobalNamedTarget(path: NodePath, name: string): boolean {
+  const target = unwrapExpression(path)
+  return isUnboundIdentifier(target, name) || isGlobalMember(target, name)
+}
+
 function containsZeroDelayTimeout(promisePath: NodePath): boolean {
   const executor = argumentPaths(promisePath)[0]
   if (!executor?.isFunction()) return false
+  const settlementBindings = executor
+    .get('params')
+    .slice(0, 2)
+    .flatMap((parameter) => {
+      if (!parameter.isIdentifier()) return []
+      const binding = executor.scope.getBinding(parameter.node.name)
+      return binding ? [binding] : []
+    })
+  if (settlementBindings.length === 0) return false
   let found = false
   executor.traverse({
     CallExpression(path: NodePath<CallExpression>) {
       if (!isGlobalFunction(path.get('callee'), 'setTimeout')) return
+      const callback = argumentPaths(path)[0]
+      if (!callback || !directlySettlesPromise(callback, settlementBindings)) return
       const delay = argumentPaths(path)[1]
       const delayExpression = delay && unwrapExpression(delay)
       if (
@@ -474,6 +686,26 @@ function containsZeroDelayTimeout(promisePath: NodePath): boolean {
         isUnboundIdentifier(delayExpression, 'undefined')
       ) {
         found = true
+      }
+    },
+  })
+  return found
+}
+
+function directlySettlesPromise(path: NodePath, bindings: readonly Binding[]): boolean {
+  const expression = unwrapExpression(path)
+  if (expression.isIdentifier()) return bindings.includes(expression.scope.getBinding(expression.node.name) as Binding)
+  if (!expression.isFunction()) return false
+  let found = false
+  expression.traverse({
+    Function(innerPath) {
+      innerPath.skip()
+    },
+    CallExpression(callPath) {
+      const callee = unwrapExpression(callPath.get('callee'))
+      if (callee.isIdentifier() && bindings.includes(callee.scope.getBinding(callee.node.name) as Binding)) {
+        found = true
+        callPath.stop()
       }
     },
   })

@@ -13,7 +13,6 @@ import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-p
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,

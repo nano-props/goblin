@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
 import {

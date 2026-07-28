@@ -1,14 +1,12 @@
 import {
   CLIENT_ID,
   createTestRepoRoutes,
-  expectRemoteRuntimeFailed,
   openTestWorkspaceRuntime,
   repoRouteMocks,
   resetRepoRouteHarness,
   WORKSPACE_ID,
 } from '#/server/test-utils/repo-routes.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import type { createRepoRoutes } from '#/server/routes/repo.ts'
 import {

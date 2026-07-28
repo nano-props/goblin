@@ -1,5 +1,4 @@
 import {
-  CLIENT_ID,
   createTestRepoRoutes,
   expectRemoteRuntimeFailed,
   openTestWorkspaceRuntime,
@@ -7,7 +6,7 @@ import {
   resetRepoRouteHarness,
   WORKSPACE_ID,
 } from '#/server/test-utils/repo-routes.ts'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import { runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
@@ -340,7 +339,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
-    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
+    expectRemoteRuntimeFailed(repoId, workspaceRuntimeId)
     expect(mocks.publishUserWorkspaceRuntimeInvalidation).toHaveBeenCalledWith('user-test', {
       workspaceId: repoId,
     })
@@ -386,7 +385,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
-    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
+    expectRemoteRuntimeFailed(repoId, workspaceRuntimeId)
     expect(mocks.publishUserWorkspaceRuntimeInvalidation).toHaveBeenCalledWith('user-test', {
       workspaceId: repoId,
     })
@@ -418,7 +417,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.pullRepoBranch).toHaveBeenCalledWith(repoId, 'feature/work', undefined, expect.any(AbortSignal), {
       workspaceRuntimeId,
     })
-    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
+    expectRemoteRuntimeFailed(repoId, workspaceRuntimeId)
   })
 
   test('publishes exact filesystem invalidations for worktrees changed by pull', async () => {

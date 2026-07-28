@@ -1,37 +1,18 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
-  bootstrapRemoteWorktreeAfterCreate,
-  createRemoteWorktree,
   deleteRemoteBranch,
-  getRemoteBrowserUrl,
-  getRemoteLog,
-  getRemoteSnapshot,
-  getRemoteRepoWorktreePaths,
-  getRemoteWorkspacePaneTargetIdentities,
   getRemoteTrackingBranches,
-  getRemoteTreeWalk,
-  getRemoteWorktreeBootstrapPreview,
   pullRemoteBranch,
   fetchRemoteRepo,
-  remoteCommandExists,
-  remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
-  remoteExecResult,
-  removeRemoteWorktree,
   type RemoteGitRunner,
-  resolveRemoteWorktree,
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
-import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import {
-  LINKED_TARGET,
-  MAIN_AND_LINKED_WORKTREES_OUTPUT,
   MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT,
   NUL,
   PRIMARY_WORKTREE_OUTPUT,
-  SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
   TARGET,
   failRemoteResult,
   okRemoteResult,

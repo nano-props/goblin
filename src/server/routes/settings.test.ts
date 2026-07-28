@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { restoreWorkspaceTabs as restoreWorkspaceTabsWrite } from '#/server/modules/workspace-tabs-restore.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

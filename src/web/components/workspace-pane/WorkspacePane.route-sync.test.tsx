@@ -27,7 +27,6 @@ import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-comman
 import {
   REPO_ID,
   gitWorktreeFilesystemTarget,
-  navigation,
   navigationWithStore,
   presentationOptions,
   render,

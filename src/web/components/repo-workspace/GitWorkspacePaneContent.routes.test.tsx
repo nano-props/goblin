@@ -5,39 +5,21 @@ import {
   REPO_ID,
   defaultBranchActionSurface,
   emptyTerminalReadContext,
-  filetreeClientMocks,
   flushAsyncWork,
   getTestGitWorkspacePanePresentation,
   gitWorkspacePaneProjection,
-  gitWorktreeFilesystemTarget,
-  navigationWith,
   preferenceBackedWorkspacePaneTabModel,
   repoClientMocks,
   responsiveMocks,
   staticEntry,
-  terminalCommandContextWith,
-  terminalEntry,
-  terminalSession,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { act, screen, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { screen } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 describe('GitWorkspacePaneContent routes', () => {
   test('offers a compact return to the branch list when the last routed branch no longer exists', () => {

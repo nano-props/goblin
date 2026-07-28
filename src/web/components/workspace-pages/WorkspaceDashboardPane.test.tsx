@@ -17,7 +17,6 @@ import { setRepoProjectionQueryData } from '#/web/repo-query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type * as RepoClient from '#/web/repo-client.ts'
 
 const repoClientMocks = vi.hoisted(() => ({

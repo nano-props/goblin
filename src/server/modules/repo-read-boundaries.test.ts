@@ -1,12 +1,10 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   REPO_ID,
-  deferred,
   expectNoRepoSnapshotInvalidations,
   mocks,
   pullRequest,
-  repoQueryInvalidationEvents,
   repoSnapshot,
 } from '#/server/test-utils/repo-module.ts'
 

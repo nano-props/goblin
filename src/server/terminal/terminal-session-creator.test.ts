@@ -1,6 +1,5 @@
 // @vitest-environment node
 
-import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
 import type { ServerTerminalCreateInput } from '#/server/terminal/terminal-session-creator.ts'

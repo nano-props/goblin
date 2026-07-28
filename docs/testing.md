@@ -135,7 +135,7 @@ boundary under test; do not replace a condition with an arbitrary sleep.
 Exports:
 
 - `useFakeTimers()` — calls
-  `vi.useFakeTimers({ toFake: ['setTimeout','setInterval','requestAnimationFrame','cancelAnimationFrame','Date','performance'] })`
+  `vi.useFakeTimers({ toFake: ['setTimeout','clearTimeout','setInterval','clearInterval','requestAnimationFrame','cancelAnimationFrame','Date','performance'] })`
   inside an `afterEach(() => vi.useRealTimers())` scope. Returns the `vi`
   namespace for chaining.
 - `advanceTimersAndFlush(ms)` — `await vi.advanceTimersByTimeAsync(ms)`

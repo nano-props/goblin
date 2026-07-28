@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, waitFor } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import { act } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import {

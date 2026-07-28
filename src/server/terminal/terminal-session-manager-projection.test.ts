@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from 'vitest'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import {
   CLIENT_ID,

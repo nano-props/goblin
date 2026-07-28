@@ -14,7 +14,6 @@ import {
   historyRestoreOptions,
   WORKTREE_PATH,
   setupPrimaryWindowNavigationActionsTests,
-  preferredWorkspacePaneTab,
   branchHistoryEntry,
   historyTraversal,
   createPrimaryWindowNavigationActions,

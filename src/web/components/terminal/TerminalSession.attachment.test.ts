@@ -13,30 +13,22 @@ import {
   hydrateManagedSession,
   mockFonts,
   optionArrow,
-  recoveryAttachResult,
-  requiredWorkspaceLocator,
   resetTerminalSessionHarness,
-  restartResult,
   startHiddenFreshStreamPresentation,
   startOpenControllerSession,
   startPendingFocusRequest,
-  startPresentedControllerGeneration,
-  startSessionWithProgress,
   streamAttachResult,
-  takeoverResult,
   terminalCalls,
   terminalGeometryMocks,
   terminalRect,
   terminalXtermMocks,
 } from '#/web/test-utils/terminal-session.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalAttachResult, TerminalRestartResult, TerminalTakeoverResult } from '#/shared/terminal-types.ts'
+import type { TerminalAttachResult } from '#/shared/terminal-types.ts'
 import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
-import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 const xtermMocks = terminalXtermMocks()
 const geometryMocks = terminalGeometryMocks()

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, waitFor } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'

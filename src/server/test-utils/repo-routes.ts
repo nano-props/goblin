@@ -154,11 +154,7 @@ export async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise
   return workspaceRuntimeId
 }
 
-export async function expectRemoteRuntimeFailed(
-  _app: ReturnType<typeof createTestRepoRoutes>,
-  repoId: string,
-  workspaceRuntimeId: string,
-): Promise<void> {
+export function expectRemoteRuntimeFailed(repoId: string, workspaceRuntimeId: string): void {
   expect(listWorkspaceRuntimes('user-test')).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
