@@ -10,7 +10,7 @@ import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 const LABELS: TerminalComposerLabels = {
   composer: 'Terminal input composer',
   open: 'Open terminal composer',
-  close: 'Collapse terminal composer',
+  close: 'Collapse',
   inputPlaceholder: 'Enter a terminal command',
   more: 'More actions',
   uploadFiles: 'Upload files',

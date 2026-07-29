@@ -391,7 +391,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '粘贴的路径过长，无法发送到终端。',
   'terminal.composer-label': '终端输入器',
   'terminal.composer-open': '打开终端输入器',
-  'terminal.composer-close': '收起终端输入器',
+  'terminal.composer-close': '收起',
   'terminal.composer-input-placeholder': '输入终端命令',
   'terminal.composer-more': '更多操作',
   'terminal.composer-upload-files': '上传文件',

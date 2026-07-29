@@ -399,7 +399,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '붙여넣은 경로가 너무 길어 터미널로 보낼 수 없습니다.',
   'terminal.composer-label': '터미널 입력기',
   'terminal.composer-open': '터미널 입력기 열기',
-  'terminal.composer-close': '터미널 입력기 접기',
+  'terminal.composer-close': '접기',
   'terminal.composer-input-placeholder': '터미널 명령 입력',
   'terminal.composer-more': '추가 작업',
   'terminal.composer-upload-files': '파일 업로드',

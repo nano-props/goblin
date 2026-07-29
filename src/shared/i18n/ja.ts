@@ -407,7 +407,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
   'terminal.composer-label': 'ターミナル入力',
   'terminal.composer-open': 'ターミナル入力を開く',
-  'terminal.composer-close': 'ターミナル入力を閉じる',
+  'terminal.composer-close': '折りたたむ',
   'terminal.composer-input-placeholder': 'ターミナルコマンドを入力',
   'terminal.composer-more': 'その他の操作',
   'terminal.composer-upload-files': 'ファイルをアップロード',

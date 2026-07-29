@@ -408,7 +408,7 @@ export const en = {
   'terminal.paste-file-overflow': 'Pasted paths are too long for the terminal.',
   'terminal.composer-label': 'Terminal input composer',
   'terminal.composer-open': 'Open terminal composer',
-  'terminal.composer-close': 'Collapse terminal composer',
+  'terminal.composer-close': 'Collapse',
   'terminal.composer-input-placeholder': 'Enter a terminal command',
   'terminal.composer-more': 'More actions',
   'terminal.composer-upload-files': 'Upload files',
