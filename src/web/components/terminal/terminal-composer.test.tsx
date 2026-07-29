@@ -65,17 +65,17 @@ describe('TerminalComposer', () => {
   test('starts as one floating action and expands into the composer', () => {
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
-    const composer = container.querySelector('.goblin-terminal-composer__composer')
+    const surface = container.querySelector('.goblin-terminal-composer__surface')
     expect(openButton.getAttribute('aria-expanded')).toBe('false')
-    expect(composer?.getAttribute('aria-hidden')).toBe('true')
-    expect(composer?.hasAttribute('inert')).toBe(true)
+    expect(surface?.getAttribute('aria-hidden')).toBe('true')
+    expect(surface?.hasAttribute('inert')).toBe(true)
     expect(container.querySelector('textarea')).not.toBeNull()
 
     expand(container)
 
     expect(openButton.getAttribute('aria-expanded')).toBe('true')
-    expect(composer?.getAttribute('aria-hidden')).toBe('false')
-    expect(composer?.hasAttribute('inert')).toBe(false)
+    expect(surface?.getAttribute('aria-hidden')).toBe('false')
+    expect(surface?.hasAttribute('inert')).toBe(false)
     const input = container.querySelector('textarea')
     const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
     const showKeys = buttonByAccessibleName(container, LABELS.showKeys)
@@ -90,8 +90,8 @@ describe('TerminalComposer', () => {
     expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
 
     act(() => close.click())
-    expect(composer?.getAttribute('aria-hidden')).toBe('true')
-    expect(composer?.hasAttribute('inert')).toBe(true)
+    expect(surface?.getAttribute('aria-hidden')).toBe('true')
+    expect(surface?.hasAttribute('inert')).toBe(true)
     expect(container.querySelector('textarea')).not.toBeNull()
   })
 

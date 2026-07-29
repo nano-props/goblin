@@ -51,13 +51,13 @@ type AccessibleName = Exclude<
   keyof TerminalComposerLabels,
   'composer' | 'open' | 'close' | 'inputPlaceholder' | 'selectFiles' | 'showKeys' | 'showInput'
 >
-type ToolbarKey = { accessibleName: AccessibleName } & (
+type ComposerKeyAction = { accessibleName: AccessibleName } & (
   | { type: 'virtual-key'; label: string; key: TerminalVirtualKey }
   | { type: 'virtual-key'; icon: ReactNode; key: TerminalVirtualKey }
   | { type: 'scroll'; icon: ReactNode; amount: number }
 )
 
-const KEYS: ToolbarKey[] = [
+const KEY_ACTIONS: ComposerKeyAction[] = [
   { type: 'virtual-key', label: '⇥', key: 'tab', accessibleName: 'tab' },
   { type: 'virtual-key', icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
   {
@@ -119,10 +119,10 @@ export function TerminalComposer({
   useEffect(() => {
     const input = inputRef.current
     if (!input || !expanded || mode !== 'input' || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => resizeComposerInput(input, draft.length > 0))
+    const observer = new ResizeObserver(() => resizeComposerInput(input, input.value.length > 0))
     observer.observe(input)
     return () => observer.disconnect()
-  }, [draft, expanded, mode])
+  }, [expanded, mode])
 
   const submitDraft = () => {
     if (!draft || !onSendText(draft)) return
@@ -141,7 +141,7 @@ export function TerminalComposer({
       role="group"
       aria-label={labels.composer}
     >
-      <ToolbarButton
+      <ComposerButton
         className="goblin-terminal-composer__toggle"
         accessibleName={labels.open}
         disabled={disabled}
@@ -152,21 +152,21 @@ export function TerminalComposer({
         onClick={() => setExpanded(true)}
       >
         <Keyboard className="size-5" />
-      </ToolbarButton>
+      </ComposerButton>
       <div
         id={composerId}
-        className="goblin-terminal-composer__composer"
+        className="goblin-terminal-composer__surface"
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
       >
         <div className="goblin-terminal-composer__mode-row">
-          <ToolbarButton
+          <ComposerButton
             accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
             disabled={disabled}
             onClick={() => setMode((current) => (current === 'input' ? 'keys' : 'input'))}
           >
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
-          </ToolbarButton>
+          </ComposerButton>
           {mode === 'input' ? (
             <textarea
               ref={inputRef}
@@ -190,8 +190,8 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
-                {KEYS.map((key) => (
-                  <ToolbarButton
+                {KEY_ACTIONS.map((key) => (
+                  <ComposerButton
                     key={key.accessibleName}
                     accessibleName={labels[key.accessibleName]}
                     disabled={disabled}
@@ -206,18 +206,18 @@ export function TerminalComposer({
                     }}
                   >
                     {'label' in key ? key.label : key.icon}
-                  </ToolbarButton>
+                  </ComposerButton>
                 ))}
               </div>
             </ScrollArea>
           )}
-          <ToolbarButton
+          <ComposerButton
             accessibleName={labels.selectFiles}
             disabled={disabled}
             onClick={() => fileInputRef.current?.click()}
           >
             <Plus className="size-4" />
-          </ToolbarButton>
+          </ComposerButton>
           <input
             ref={fileInputRef}
             hidden
@@ -227,7 +227,7 @@ export function TerminalComposer({
             multiple
             onChange={selectFiles}
           />
-          <ToolbarButton
+          <ComposerButton
             accessibleName={labels.close}
             disabled={disabled}
             onClick={() => {
@@ -236,14 +236,14 @@ export function TerminalComposer({
             }}
           >
             <X className="size-4" />
-          </ToolbarButton>
+          </ComposerButton>
         </div>
       </div>
     </div>
   )
 }
 
-interface ToolbarButtonProps {
+interface ComposerButtonProps {
   accessibleName: string
   children: ReactNode
   className?: string
@@ -256,7 +256,7 @@ interface ToolbarButtonProps {
   onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
 }
 
-function ToolbarButton({
+function ComposerButton({
   accessibleName,
   children,
   className,
@@ -267,7 +267,7 @@ function ToolbarButton({
   tabIndex,
   onClick,
   onPointerDown,
-}: ToolbarButtonProps) {
+}: ComposerButtonProps) {
   return (
     <Button
       type="button"

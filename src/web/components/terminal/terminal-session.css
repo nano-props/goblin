@@ -320,11 +320,7 @@
   max-width: calc(100% - 2 * var(--goblin-terminal-float-offset));
   justify-content: flex-end;
   pointer-events: none;
-  transform: translateX(0);
-  transition:
-    width 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    right 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: width 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .goblin-terminal-composer--floating {
@@ -338,12 +334,10 @@
   width: min(560px, calc(100% - 2 * var(--goblin-terminal-float-offset)));
 }
 
-.goblin-terminal-composer__composer {
+.goblin-terminal-composer__surface {
   display: flex;
   min-width: 0;
   width: 100%;
-  flex-direction: column;
-  gap: 6px;
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   overflow: hidden;
   border-radius: var(--goblin-terminal-float-radius);
@@ -361,7 +355,7 @@
     visibility 0s linear 200ms;
 }
 
-.goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__composer {
+.goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__surface {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0) scale(1);
@@ -372,6 +366,8 @@
 .goblin-terminal-composer__mode-row {
   display: flex;
   min-width: 0;
+  min-height: var(--goblin-terminal-composer-key-size);
+  width: 100%;
   align-items: flex-end;
   gap: var(--goblin-terminal-composer-key-gap);
 }
@@ -402,15 +398,24 @@
 }
 
 .goblin-terminal-composer__key-scroll {
+  height: var(--goblin-terminal-composer-key-size);
   min-width: 0;
   flex: 1;
 }
 
+.goblin-terminal-composer__key-scroll > [data-orientation='horizontal'] {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
 .goblin-terminal-composer__key-row {
   display: flex;
+  height: var(--goblin-terminal-composer-key-size);
   width: max-content;
+  align-items: center;
   gap: var(--goblin-terminal-composer-key-gap);
-  padding-bottom: 2px;
 }
 
 .goblin-terminal-composer__btn {
@@ -460,14 +465,33 @@
 }
 
 @container goblin-terminal-session (min-width: 720px) {
+  .goblin-terminal-composer,
   .goblin-terminal-composer--expanded {
-    right: 50%;
-    transform: translateX(50%);
+    width: calc(100% - 2 * var(--goblin-terminal-float-offset));
+  }
+
+  .goblin-terminal-composer__surface {
+    width: min(560px, 100%);
+    margin-inline: auto;
+    transform: translateY(8px) scale(0.98);
+    transform-origin: center bottom;
+  }
+
+  .goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__surface {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goblin-terminal-composer,
+  .goblin-terminal-composer__surface,
+  .goblin-terminal-composer__toggle {
+    transition-duration: 0.01ms;
   }
 }
 
 @container goblin-terminal-session (max-width: 360px) {
-  .goblin-terminal-composer__composer {
+  .goblin-terminal-composer__surface {
     padding: 5px;
   }
 
