@@ -16,7 +16,7 @@
   --goblin-terminal-control-radius: 6px;
   --goblin-terminal-composer-key-size: 40px;
   --goblin-terminal-composer-key-gap: 4px;
-  --goblin-terminal-composer-max-width: 640px;
+  --goblin-terminal-composer-max-width: 800px;
 }
 
 .goblin-terminal-session__host {
@@ -379,12 +379,12 @@
 
 .goblin-terminal-composer__input {
   height: var(--goblin-terminal-composer-key-size);
-  max-height: 120px;
+  max-height: 160px;
   min-width: 0;
   flex: 1;
   resize: none;
   /* Native scrolling is intentional inside the editable textarea: once the
-     five-line composer cap is reached, the caret and text selection need the
+     seven-line composer cap is reached, the caret and text selection need the
      browser's editing-aware scroll behavior. */
   overflow-y: auto;
   border: 0;
@@ -527,10 +527,10 @@
   }
 }
 
-/* The fully grown surface needs 144px: 120px input, 12px vertical
+/* The fully grown surface needs 184px: 160px input, 12px vertical
    surface padding, 2px border, and the 10px floating offset. Keep the
    unopened entry point out of layouts that cannot present it intact. */
-@container goblin-terminal-session (max-height: 143px) {
+@container goblin-terminal-session (max-height: 183px) {
   .goblin-terminal-composer:not([data-expanded='true']) {
     display: none;
   }

@@ -103,7 +103,7 @@ const OPTIONAL_KEY_ACTIONS: ComposerKeyAction[] = [
 ]
 
 const COMPOSER_INPUT_MIN_HEIGHT_PX = 40
-const COMPOSER_INPUT_MAX_HEIGHT_PX = 120
+const COMPOSER_INPUT_MAX_HEIGHT_PX = 160
 
 function resizeComposerInput(input: HTMLTextAreaElement, hasContent: boolean) {
   input.style.height = `${COMPOSER_INPUT_MIN_HEIGHT_PX}px`

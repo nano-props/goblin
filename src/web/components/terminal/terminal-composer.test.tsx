@@ -237,17 +237,17 @@ describe('TerminalComposer', () => {
     expect(input.selectionStart).toBe('previous edited'.length)
   })
 
-  test('grows with multiline text until the five-line cap, then leaves overflow to the textarea', () => {
+  test('grows with multiline text until the seven-line cap, then leaves overflow to the textarea', () => {
     const { container } = render()
     expand(container)
     showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
-    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 156 })
+    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 196 })
 
     fireEvent.change(input, { target: { value: 'one\ntwo\nthree\nfour\nfive\nsix' } })
 
-    expect(input.style.height).toBe('120px')
+    expect(input.style.height).toBe('160px')
   })
 
   test('keeps an empty input at 40px even when the placeholder wraps during expansion', () => {
