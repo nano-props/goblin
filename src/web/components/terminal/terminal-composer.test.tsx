@@ -137,6 +137,17 @@ describe('TerminalComposer', () => {
     expect(input.style.height).toBe('120px')
   })
 
+  test('keeps an empty input at 40px even when the placeholder wraps during expansion', () => {
+    const { container } = render()
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 156 })
+
+    expand(container)
+
+    expect(input.style.height).toBe('40px')
+  })
+
   test('passes selected files to the terminal file boundary and permits selecting the same file again', () => {
     const onSelectFiles = vi.fn()
     const { container } = render({ onSelectFiles })

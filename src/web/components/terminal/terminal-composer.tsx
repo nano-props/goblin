@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -87,6 +87,12 @@ const KEYS: ToolbarKey[] = [
 const COMPOSER_INPUT_MIN_HEIGHT_PX = 40
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 120
 
+function resizeComposerInput(input: HTMLTextAreaElement, hasContent: boolean) {
+  input.style.height = `${COMPOSER_INPUT_MIN_HEIGHT_PX}px`
+  if (!hasContent) return
+  input.style.height = `${Math.min(COMPOSER_INPUT_MAX_HEIGHT_PX, Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight))}px`
+}
+
 export function TerminalComposer({
   labels,
   onVirtualKey,
@@ -107,8 +113,15 @@ export function TerminalComposer({
   useLayoutEffect(() => {
     const input = inputRef.current
     if (!input || !expanded || mode !== 'input') return
-    input.style.height = `${COMPOSER_INPUT_MIN_HEIGHT_PX}px`
-    input.style.height = `${Math.min(COMPOSER_INPUT_MAX_HEIGHT_PX, Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight))}px`
+    resizeComposerInput(input, draft.length > 0)
+  }, [draft, expanded, mode])
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || !expanded || mode !== 'input' || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => resizeComposerInput(input, draft.length > 0))
+    observer.observe(input)
+    return () => observer.disconnect()
   }, [draft, expanded, mode])
 
   const submitDraft = () => {
