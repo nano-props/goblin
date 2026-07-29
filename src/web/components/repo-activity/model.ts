@@ -1,5 +1,3 @@
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { repoLocalPrimaryRefreshBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/workspaces/action-labels.ts'
 import {
   branchActionKindFromReason,
@@ -24,10 +22,9 @@ export interface RepoCompletion extends RepoActionLabel {
 export type RepoActivityControlView =
   | { kind: 'activity'; activity: RepoActivity }
   | { kind: 'completion'; completion: RepoCompletion }
-  | { kind: 'refresh-button'; manualSyncBusy: boolean }
+  | { kind: 'refresh-button'; primaryRefreshBusy: boolean }
 
 export interface RepoActivityProjectionRepo {
-  id: WorkspaceState['id']
   branchAction: RepoOperationState
 }
 
@@ -60,20 +57,13 @@ function repoServerOperationIsPrimaryRefresh(operation: RepoServerOperationState
   return operation.kind === 'fetch' && operation.source === 'user' && repoServerOperationActive(operation)
 }
 
-export function isRepoPrimaryRefreshBusy(
-  repo: Pick<RepoActivityProjectionRepo, 'id'>,
-  serverOperations?: RepoOperationsSnapshot,
-): boolean {
-  return repoOperationsSnapshotHasPrimaryRefresh(serverOperations) || repoLocalPrimaryRefreshBusy(repo.id)
-}
-
 export function getRepoActivityControlView(input: {
   visibleActivity: RepoActivity | null
   completion: RepoCompletion | null
-  manualSyncBusy: boolean
+  primaryRefreshBusy: boolean
 }): RepoActivityControlView {
   if (input.visibleActivity?.kind === 'branch-action') return { kind: 'activity', activity: input.visibleActivity }
   if (input.completion) return { kind: 'completion', completion: input.completion }
   if (input.visibleActivity) return { kind: 'activity', activity: input.visibleActivity }
-  return { kind: 'refresh-button', manualSyncBusy: input.manualSyncBusy }
+  return { kind: 'refresh-button', primaryRefreshBusy: input.primaryRefreshBusy }
 }
