@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent } from '@testing-library/react'
+import { act, fireEvent, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { renderTerminalSession } from '#/web/test-utils/terminal-session-view.tsx'
+import {
+  clipboardDataWithFiles,
+  dropDataWithFiles,
+  renderTerminalSession,
+} from '#/web/test-utils/terminal-session-view.tsx'
 
 function buttonByLabel(container: HTMLElement, label: string) {
-  const button = Array.from(container.querySelectorAll('button')).find(
-    (element) => element.querySelector('.sr-only')?.textContent === label,
-  )
-  if (!button) throw new Error(`expected composer button named ${label}`)
-  return button
+  return within(container).getByRole('button', { name: label })
 }
 
 function openComposerInput(container: HTMLElement) {
@@ -86,6 +86,57 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
+  test.each(['paste', 'drop'] as const)('routes Composer file %s into the draft instead of the PTY', async (kind) => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValueOnce('/abs/notes file.txt')
+    const rendered = await renderTerminalSession()
+
+    try {
+      const textarea = openComposerInput(rendered.container)
+      const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+      fireEvent.change(textarea, { target: { value: 'cat ' } })
+      textarea.setSelectionRange(4, 4)
+      if (kind === 'paste') {
+        const event = new Event('paste', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'clipboardData', { value: clipboardDataWithFiles([file]) })
+        textarea.dispatchEvent(event)
+      } else {
+        const event = new Event('drop', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
+        textarea.dispatchEvent(event)
+      }
+
+      await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('keeps tabular clipboard text on the native Composer paste path when a file is incidental', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    const rendered = await renderTerminalSession()
+
+    try {
+      const textarea = openComposerInput(rendered.container)
+      const thumbnail = new File(['thumbnail'], 'thumbnail.png', { type: 'image/png' })
+      const clipboardData = clipboardDataWithFiles([thumbnail]) as DataTransfer & {
+        getData: (format: string) => string
+      }
+      clipboardData.getData = (format) => (format === 'text/plain' ? 'Name\tValue' : '')
+      const event = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'clipboardData', { value: clipboardData })
+
+      textarea.dispatchEvent(event)
+
+      expect(event.defaultPrevented).toBe(false)
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
   test('hides the terminal composer without losing its draft while terminal search is open', async () => {
     const user = userEvent.setup()
     const rendered = await renderTerminalSession()
@@ -99,10 +150,7 @@ describe('TerminalSessionView composer', () => {
       expect(rendered.container.querySelector('.goblin-terminal-composer')?.hasAttribute('hidden')).toBe(true)
       expect(textarea.value).toBe('preserved draft')
 
-      const closeSearch = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.textContent === 'terminal.search-close',
-      )
-      if (!closeSearch) throw new Error('expected terminal search close button')
+      const closeSearch = within(rendered.container).getByRole('button', { name: 'terminal.search-close' })
       act(() => closeSearch.click())
 
       expect(rendered.container.querySelector('.goblin-terminal-composer')?.hasAttribute('hidden')).toBe(false)

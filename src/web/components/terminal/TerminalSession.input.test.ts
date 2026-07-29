@@ -507,15 +507,60 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
-  test('does not send Enter when the composed text write is rejected', async () => {
+  test.each(['rejected', 'indeterminate'] as const)(
+    'does not retry or send Enter when the composed text write is %s',
+    async (status) => {
+      const { session, term } = await startPresentedControllerGeneration()
+      terminalCalls.write.mockResolvedValueOnce({ status })
+
+      await expect(session.submitText('keep this text')).resolves.toBe(false)
+
+      expect(term.paste).toHaveBeenCalledWith('keep this text')
+      expect(term.input).not.toHaveBeenCalled()
+      expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  test('honors an accepted composed text write after its presentation binding becomes stale', async () => {
     const { session, term } = await startPresentedControllerGeneration()
-    terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
 
-    await expect(session.submitText('keep this text')).resolves.toBe(false)
+    const submission = session.submitText('accepted before takeover')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    pasteWrite.resolve({ status: 'accepted' })
 
-    expect(term.paste).toHaveBeenCalledWith('keep this text')
+    await expect(submission).resolves.toBe(true)
     expect(term.input).not.toHaveBeenCalled()
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+  })
+
+  test('settles an accepted submission without waiting for the following Enter acknowledgement', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    const enterWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockReturnValueOnce(enterWrite.promise)
+
+    const submission = session.submitText('deliver without waiting')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 2)
+
+    await expect(submission).resolves.toBe(true)
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\r',
+    })
+
+    enterWrite.resolve({ status: 'accepted' })
+    await flushTerminalStart()
   })
 
   test('treats accepted composed text as delivered when the following Enter is rejected', async () => {

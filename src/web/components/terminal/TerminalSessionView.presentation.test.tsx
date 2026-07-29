@@ -636,8 +636,7 @@ describe('TerminalSessionView presentation and focus', () => {
       await user.keyboard('{Escape}')
 
       expect(container.querySelector('.goblin-terminal-session__search')).toBeNull()
-      expect(focusTerminal).toHaveBeenCalledTimes(1)
-      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(focusTerminal).not.toHaveBeenCalled()
     } finally {
       unmount()
     }

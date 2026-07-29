@@ -24,7 +24,6 @@ interface TerminalComposerMenuLabels {
 interface TerminalComposerMenuProps {
   labels: TerminalComposerMenuLabels
   mode: 'input' | 'keys'
-  disabled?: boolean
   resolvingFiles: boolean
   onUpload: () => void
   onVirtualKey: (key: 'enter' | 'backspace' | 'tab' | 'escape' | 'interrupt' | 'eof') => void
@@ -36,7 +35,6 @@ interface TerminalComposerMenuProps {
 export function TerminalComposerMenu({
   labels,
   mode,
-  disabled,
   resolvingFiles,
   onUpload,
   onVirtualKey,
@@ -57,7 +55,6 @@ export function TerminalComposerMenu({
           type="button"
           size="icon"
           variant="secondary"
-          disabled={disabled}
           className="goblin-terminal-composer__btn"
         >
           <span aria-hidden="true">
@@ -83,7 +80,7 @@ export function TerminalComposerMenu({
         }}
       >
         {mode === 'input' ? (
-          <DropdownMenuItem disabled={disabled || resolvingFiles} onSelect={onUpload}>
+          <DropdownMenuItem disabled={resolvingFiles} onSelect={onUpload}>
             <Upload className="size-4" />
             {labels.uploadFiles}
           </DropdownMenuItem>

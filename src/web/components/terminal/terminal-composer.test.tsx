@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -38,7 +38,6 @@ function render(
     onResolveFiles?: (files: File[]) => Promise<string | null>
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
-    disabled?: boolean
   } = {},
 ) {
   return renderInJsdom(
@@ -49,17 +48,12 @@ function render(
       onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
       onRequestFocus={props.onRequestFocus ?? vi.fn()}
       onScrollLines={props.onScrollLines ?? vi.fn()}
-      disabled={props.disabled}
     />,
   )
 }
 
 function buttonByAccessibleName(container: HTMLElement, name: string) {
-  const button = Array.from(container.querySelectorAll('button')).find(
-    (element) => element.querySelector('.sr-only')?.textContent === name,
-  )
-  if (!button) throw new Error(`expected button named ${name}`)
-  return button
+  return within(container).getByRole('button', { name })
 }
 
 function expand(container: HTMLElement) {
@@ -77,11 +71,7 @@ function openMoreMenu(container: HTMLElement) {
 }
 
 function menuItemByText(text: string) {
-  const item = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-item"]')).find((element) =>
-    element.textContent?.includes(text),
-  )
-  if (!item) throw new Error(`expected menu item named ${text}`)
-  return item
+  return screen.getByRole('menuitem', { name: text })
 }
 
 describe('TerminalComposer', () => {
@@ -115,6 +105,17 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
+  test('moves keyboard focus into the default keys mode when expanded', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    const openButton = buttonByAccessibleName(container, LABELS.open)
+    openButton.focus()
+
+    await user.keyboard('{Enter}')
+
+    expect(document.activeElement).toBe(buttonByAccessibleName(container, LABELS.showInput))
+  })
+
   test('submits with Enter and clears only accepted text', async () => {
     const onSendText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
     const { container } = render({ onSendText })
@@ -146,6 +147,19 @@ describe('TerminalComposer', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenCalledWith('pwd')
     await vi.waitFor(() => expect(input.value).toBe(''))
+  })
+
+  test('does not submit the Enter event owned by a Safari IME composition', () => {
+    const onSendText = vi.fn(async () => true)
+    const { container } = render({ onSendText })
+    expand(container)
+    showInput(container)
+    const input = within(container).getByRole('textbox', { name: LABELS.inputPlaceholder })
+    fireEvent.change(input, { target: { value: '输入内容' } })
+
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+
+    expect(onSendText).not.toHaveBeenCalled()
   })
 
   test('keeps mobile text services from rewriting terminal input', () => {
@@ -207,6 +221,22 @@ describe('TerminalComposer', () => {
     expect(input.value).toBe('previous edited')
   })
 
+  test('does not carry a stale recalled-entry caret into the next draft edit', async () => {
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    fireEvent.change(input, { target: { value: 'previous' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+
+    fireEvent.change(input, { target: { value: 'previous edited' } })
+
+    expect(input.selectionStart).toBe('previous edited'.length)
+  })
+
   test('grows with multiline text until the five-line cap, then leaves overflow to the textarea', () => {
     const { container } = render()
     expand(container)
@@ -255,6 +285,36 @@ describe('TerminalComposer', () => {
     expect(textarea.selectionStart).toBe(4 + resolvedPath.length)
     expect(fileInput.value).toBe('')
     expect(document.activeElement).toBe(textarea)
+  })
+
+  test('keeps one draft edit admitted while selected files resolve', async () => {
+    const resolution = Promise.withResolvers<string | null>()
+    const onResolveFiles = vi.fn(() => resolution.promise)
+    const onSendText = vi.fn(async () => true)
+    const { container } = render({ onResolveFiles, onSendText })
+    expand(container)
+    showInput(container)
+    const textarea = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!fileInput) throw new Error('expected file input')
+    const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+    fireEvent.change(textarea, { target: { value: 'cat ' } })
+    textarea.setSelectionRange(4, 4)
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.uploadFiles).click())
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    expect(textarea.readOnly).toBe(true)
+    expect(textarea.getAttribute('aria-busy')).toBe('true')
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(onSendText).not.toHaveBeenCalled()
+
+    await act(async () => resolution.resolve("'/tmp/notes.txt'"))
+
+    expect(textarea.value).toBe("cat '/tmp/notes.txt'")
+    expect(textarea.readOnly).toBe(false)
+    expect(textarea.hasAttribute('aria-busy')).toBe(false)
   })
 
   test('sends terminal-mode-aware key intents and scroll actions', () => {
@@ -380,12 +440,11 @@ describe('TerminalComposer', () => {
     expect(document.activeElement).toBe(more)
   })
 
-  test('buttons honour disabled and avoid iOS long-press callout attributes', () => {
-    const { container } = render({ disabled: true })
+  test('buttons avoid iOS long-press callout attributes', () => {
+    const { container } = render()
     const buttons = container.querySelectorAll('button')
     expect(buttons.length).toBeGreaterThan(1)
     for (const button of buttons) {
-      expect(button.disabled).toBe(true)
       expect(button.hasAttribute('title')).toBe(false)
       expect(button.hasAttribute('aria-label')).toBe(false)
       expect(button.querySelector('.sr-only')?.textContent?.trim().length ?? 0).toBeGreaterThan(0)

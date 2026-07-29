@@ -523,7 +523,16 @@
   .goblin-terminal-composer,
   .goblin-terminal-composer__surface,
   .goblin-terminal-composer__toggle {
-    transition-duration: 0.01ms;
+    transition: none;
+  }
+}
+
+/* The fully grown surface needs 144px: 120px input, 12px vertical
+   surface padding, 2px border, and the 10px floating offset. Keep the
+   unopened entry point out of layouts that cannot present it intact. */
+@container goblin-terminal-session (max-height: 143px) {
+  .goblin-terminal-composer:not([data-expanded='true']) {
+    display: none;
   }
 }
 

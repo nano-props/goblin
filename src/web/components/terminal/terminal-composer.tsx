@@ -1,4 +1,16 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode, type Ref } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -16,6 +28,8 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistory } from '#/web/components/terminal/terminal-composer-history.ts'
+import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
+import { previewPaste } from '#/web/clipboard/process.ts'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -48,7 +62,6 @@ interface TerminalComposerProps {
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
-  disabled?: boolean
   hidden?: boolean
   className?: string
 }
@@ -114,6 +127,13 @@ function insertComposerText(value: string, insertion: string, start: number, end
   }
 }
 
+function isImeCompositionEvent(event: KeyboardEvent<HTMLTextAreaElement>) {
+  // WebKit dispatches the Enter key that confirms an IME composition after
+  // `compositionend`, with `isComposing === false`. keyCode 229 remains its
+  // compatibility signal for an input-method-owned key event.
+  return event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229
+}
+
 export function TerminalComposer({
   labels,
   onVirtualKey,
@@ -121,7 +141,6 @@ export function TerminalComposer({
   onResolveFiles,
   onRequestFocus,
   onScrollLines,
-  disabled,
   hidden,
   className,
 }: TerminalComposerProps) {
@@ -130,6 +149,7 @@ export function TerminalComposer({
   const [draft, setDraft] = useState('')
   const [resolvingFiles, setResolvingFiles] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInsertionRef = useRef({ start: 0, end: 0 })
@@ -151,7 +171,9 @@ export function TerminalComposer({
   }, [draft, expanded, mode])
 
   useLayoutEffect(() => {
-    if (expanded && mode === 'input') inputRef.current?.focus()
+    if (!expanded) return
+    if (mode === 'input') inputRef.current?.focus()
+    else modeToggleRef.current?.focus()
   }, [expanded, mode])
 
   useEffect(() => {
@@ -163,7 +185,7 @@ export function TerminalComposer({
   }, [expanded, mode])
 
   const submitDraft = async () => {
-    if (!draft || submittingRef.current) return
+    if (!draft || resolvingFiles || submittingRef.current) return
     const submittedDraft = draft
     submittingRef.current = true
     try {
@@ -177,26 +199,27 @@ export function TerminalComposer({
   const closeComposer = () => {
     setExpanded(false)
   }
-  const openFilePicker = () => {
+  const currentFileInsertion = () => {
     const input = inputRef.current
-    fileInsertionRef.current = {
+    return {
       start: input?.selectionStart ?? draft.length,
       end: input?.selectionEnd ?? draft.length,
     }
+  }
+  const openFilePicker = () => {
+    fileInsertionRef.current = currentFileInsertion()
     fileInputRef.current?.click()
   }
-  const handleFileSelection = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    if (files.length === 0) return
+  const resolveFilesIntoDraft = async (files: File[], insertionRange: { start: number; end: number }) => {
+    if (files.length === 0 || resolvingFiles) return
     setResolvingFiles(true)
     try {
       const insertion = await onResolveFiles(files)
       if (!insertion) return
       history.leaveBrowsing()
       setDraft((current) => {
-        const start = Math.min(fileInsertionRef.current.start, current.length)
-        const end = Math.min(Math.max(fileInsertionRef.current.end, start), current.length)
+        const start = Math.min(insertionRange.start, current.length)
+        const end = Math.min(Math.max(insertionRange.end, start), current.length)
         const next = insertComposerText(current, insertion, start, end)
         pendingCaretRef.current = next.caret
         return next.value
@@ -204,6 +227,31 @@ export function TerminalComposer({
     } finally {
       setResolvingFiles(false)
     }
+  }
+  const handleFileSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    await resolveFilesIntoDraft(files, fileInsertionRef.current)
+  }
+  const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const files = collectClipboardFiles(event.clipboardData)
+    const preview = previewPaste({ text: event.clipboardData.getData('text/plain'), files })
+    if (preview.kind === 'no-op' || preview.kind === 'text') return
+    event.preventDefault()
+    event.stopPropagation()
+    void resolveFilesIntoDraft(files, currentFileInsertion())
+  }
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    void resolveFilesIntoDraft(collectClipboardFiles(event.dataTransfer), currentFileInsertion())
   }
 
   return (
@@ -213,12 +261,14 @@ export function TerminalComposer({
       hidden={hidden}
       role="group"
       aria-label={labels.composer}
+      onPaste={handlePaste}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <ComposerButton
         buttonRef={triggerRef}
         className="goblin-terminal-composer__toggle"
         accessibleName={labels.open}
-        disabled={disabled}
         ariaExpanded={expanded}
         ariaControls={composerId}
         ariaHidden={expanded}
@@ -235,8 +285,8 @@ export function TerminalComposer({
       >
         <div className="goblin-terminal-composer__mode-row">
           <ComposerButton
+            buttonRef={modeToggleRef}
             accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
-            disabled={disabled}
             onClick={() => setMode((current) => (current === 'input' ? 'keys' : 'input'))}
           >
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
@@ -246,7 +296,8 @@ export function TerminalComposer({
               ref={inputRef}
               rows={1}
               value={draft}
-              disabled={disabled}
+              readOnly={resolvingFiles}
+              aria-busy={resolvingFiles || undefined}
               aria-label={labels.inputPlaceholder}
               placeholder={labels.inputPlaceholder}
               autoCapitalize="off"
@@ -260,14 +311,16 @@ export function TerminalComposer({
               }}
               onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing) return
+                if (resolvingFiles || isImeCompositionEvent(event)) return
                 const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
                 if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
                   const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
                   if (historicalDraft !== undefined) {
                     event.preventDefault()
-                    pendingCaretRef.current = historicalDraft.length
-                    setDraft(historicalDraft)
+                    if (historicalDraft !== draft) {
+                      pendingCaretRef.current = historicalDraft.length
+                      setDraft(historicalDraft)
+                    }
                     return
                   }
                 } else if (history.isBrowsing()) {
@@ -290,7 +343,6 @@ export function TerminalComposer({
                     key={key.accessibleName}
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
                     accessibleName={labels[key.accessibleName]}
-                    disabled={disabled}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => {
                       if (key.type !== 'virtual-key') return
@@ -305,7 +357,6 @@ export function TerminalComposer({
                   <ComposerButton
                     key={key.accessibleName}
                     accessibleName={labels[key.accessibleName]}
-                    disabled={disabled}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => {
                       if (key.type === 'scroll') {
@@ -334,7 +385,6 @@ export function TerminalComposer({
           <TerminalComposerMenu
             labels={labels}
             mode={mode}
-            disabled={disabled}
             resolvingFiles={resolvingFiles}
             onUpload={openFilePicker}
             onVirtualKey={onVirtualKey}
@@ -353,7 +403,6 @@ interface ComposerButtonProps {
   children: ReactNode
   buttonRef?: Ref<HTMLButtonElement>
   className?: string
-  disabled?: boolean
   ariaExpanded?: boolean
   ariaControls?: string
   ariaHidden?: boolean
@@ -367,7 +416,6 @@ function ComposerButton({
   children,
   buttonRef,
   className,
-  disabled,
   ariaExpanded,
   ariaControls,
   ariaHidden,
@@ -381,7 +429,6 @@ function ComposerButton({
       type="button"
       size="icon"
       variant="secondary"
-      disabled={disabled}
       aria-expanded={ariaExpanded}
       aria-controls={ariaControls}
       aria-hidden={ariaHidden}

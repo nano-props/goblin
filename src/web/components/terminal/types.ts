@@ -215,6 +215,11 @@ export interface TerminalSessionContextValue {
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
+  /**
+   * Returns true once the composed text write is accepted and the caller must
+   * clear its draft. The following Enter write is reported independently and
+   * cannot make an already-delivered draft safe to submit again.
+   */
   submitText: (terminalSessionId: string, text: string) => Promise<boolean>
   takeover: (terminalSessionId: string) => Promise<boolean>
   /** Retries only the local attach/presentation path after a stable recovery failure. */
