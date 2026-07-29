@@ -11,7 +11,7 @@ export function findTypeAssertionViolations(
     plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
   })
   for (const comment of ast.comments ?? []) {
-    if (comment.type === 'CommentLine' && /@ts-ignore\b/.test(comment.value)) {
+    if (comment.type === 'CommentLine' && /^\s*@ts-ignore\b/.test(comment.value)) {
       violations.push(`${file}:${comment.loc?.start.line ?? 1}: @ts-ignore is forbidden`)
     }
   }

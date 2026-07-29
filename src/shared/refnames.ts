@@ -1,4 +1,4 @@
-export const MAX_BRANCH_LENGTH = 1024
+export const MAX_BRANCH_INPUT_LENGTH = 1024
 
 export function validateBranchName(branch: string): { ok: true } | { ok: false } {
   if (branch === 'HEAD' || branch.startsWith('-') || !isSafeRefName(branch)) {
@@ -11,12 +11,10 @@ export function isSafeBranchName(branch: string): boolean {
   return validateBranchName(branch).ok
 }
 
-export function isValidBranch(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_BRANCH_LENGTH && isSafeBranchName(value)
-}
-
-export function isValidOptionalBranch(value: unknown): value is string | undefined {
-  return value === undefined || isValidBranch(value)
+export function isValidBranchInput(value: unknown): value is string {
+  return (
+    typeof value === 'string' && value.length > 0 && value.length <= MAX_BRANCH_INPUT_LENGTH && isSafeBranchName(value)
+  )
 }
 
 export function isSafeRefName(ref: string): boolean {

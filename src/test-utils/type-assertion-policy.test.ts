@@ -37,4 +37,8 @@ describe('type assertion policy', () => {
   test('ignores ts-ignore text inside strings', () => {
     expect(findTypeAssertionViolations("const message = '// @ts-ignore'", file, noAllowlist)).toEqual([])
   })
+
+  test('ignores ts-ignore mentions in explanatory comments', () => {
+    expect(findTypeAssertionViolations('// Do not use @ts-ignore here\ncall()', file, noAllowlist)).toEqual([])
+  })
 })

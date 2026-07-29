@@ -13,7 +13,7 @@ const srcRoot = path.join(repoRoot, 'src')
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs'])
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|cjs|mjs)$/
 const WEB_RUNTIME_ENTRIES = ['/src/web/main.tsx', '/src/web/public/boot.js']
-const NODE_BUILTIN_IMPORTS = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]))
+const NODE_BUILTIN_SPECIFIERS = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]))
 
 export interface Rule {
   fromPrefix: string
@@ -36,7 +36,7 @@ export interface SourcePatternRule {
 export interface ImportReference {
   importPath: string
   importedNames: readonly string[] | null
-  runtime: boolean
+  isRuntime: boolean
 }
 
 const RULES: Rule[] = [
@@ -288,10 +288,10 @@ function addImport(
   results: ImportReference[],
   importPath: string | null,
   importedNames: readonly string[] | null,
-  runtime = true,
+  isRuntime = true,
 ): void {
   if (importPath === null) return
-  results.push({ importPath, importedNames, runtime })
+  results.push({ importPath, importedNames, isRuntime })
 }
 
 function isRuntimeDeclaration(node: BabelNode): boolean {
@@ -396,10 +396,10 @@ export function checkArchitectureSources(
       }
     }
   }
-  return [...violations, ...checkBrowserRuntimeImports(importsByFile)]
+  return [...violations, ...findBrowserNodeBuiltinViolations(importsByFile)]
 }
 
-function checkBrowserRuntimeImports(importsByFile: ReadonlyMap<string, ImportReference[]>): string[] {
+function findBrowserNodeBuiltinViolations(importsByFile: ReadonlyMap<string, ImportReference[]>): string[] {
   const queue = WEB_RUNTIME_ENTRIES.filter((entry) => importsByFile.has(entry)).map((entry) => [entry])
   const visited = new Set<string>()
   const violations: string[] = []
@@ -411,8 +411,8 @@ function checkBrowserRuntimeImports(importsByFile: ReadonlyMap<string, ImportRef
     visited.add(file)
 
     for (const imported of importsByFile.get(file) ?? []) {
-      if (!imported.runtime) continue
-      if (NODE_BUILTIN_IMPORTS.has(imported.importPath)) {
+      if (!imported.isRuntime) continue
+      if (NODE_BUILTIN_SPECIFIERS.has(imported.importPath)) {
         violations.push(
           `${file}: browser runtime reaches Node import "${imported.importPath}" via ${[...chain, imported.importPath].join(' -> ')}`,
         )
