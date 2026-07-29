@@ -11,9 +11,8 @@ export function findTypeAssertionViolations(
     plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
   })
   for (const comment of ast.comments ?? []) {
-    if (comment.type === 'CommentLine' && /^\s*@ts-ignore\b/.test(comment.value)) {
-      violations.push(`${file}:${comment.loc?.start.line ?? 1}: @ts-ignore is forbidden`)
-    }
+    const lineNumber = tsIgnoreDirectiveLine(comment)
+    if (lineNumber !== null) violations.push(`${file}:${lineNumber}: @ts-ignore is forbidden`)
   }
   visitAst(ast, (node) => {
     if (!isTypeAssertion(node)) return
@@ -28,6 +27,17 @@ export function findTypeAssertionViolations(
     if (!allowed) violations.push(`${file}:${lineNumber}: unreviewed double assertion`)
   })
   return violations
+}
+
+function tsIgnoreDirectiveLine(comment: {
+  type: string
+  value: string
+  loc?: { start: { line: number } } | null
+}): number | null {
+  const directiveLine = comment.value
+    .split('\n')
+    .findIndex((line) => (comment.type === 'CommentLine' ? /^\/?\s*@ts-ignore\b/ : /^\s*\*?\s*@ts-ignore\b/).test(line))
+  return directiveLine < 0 ? null : (comment.loc?.start.line ?? 1) + directiveLine
 }
 
 interface AstNode {
