@@ -242,7 +242,11 @@ export class TerminalSession {
     // cannot collapse them back into one delivery step.
     if (!(await this.flushInput())) return false
     this.view.sendVirtualKey('enter')
-    return await this.flushInput()
+    // Once the paste is accepted, the Composer draft has been delivered and
+    // must not be offered for automatic resubmission. Enter still uses the
+    // ordinary write failure reporter, but its failure cannot undo the paste.
+    await this.flushInput()
+    return true
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {

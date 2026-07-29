@@ -518,6 +518,17 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
   })
 
+  test('treats accepted composed text as delivered when the following Enter is rejected', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockResolvedValueOnce({ status: 'rejected' })
+
+    await expect(session.submitText('delivered once')).resolves.toBe(true)
+
+    expect(term.paste).toHaveBeenCalledWith('delivered once')
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenCalledTimes(2)
+  })
+
   test('commits asynchronous input only to the generation captured by its writer', async () => {
     const { session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()

@@ -249,7 +249,11 @@ export function TerminalComposer({
               disabled={disabled}
               aria-label={labels.inputPlaceholder}
               placeholder={labels.inputPlaceholder}
-              className="goblin-terminal-composer__input"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="send"
+              className="goblin-terminal-composer__input font-mono"
               onChange={(event) => {
                 history.leaveBrowsing()
                 setDraft(event.target.value)
@@ -259,8 +263,7 @@ export function TerminalComposer({
                 if (event.nativeEvent.isComposing) return
                 const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
                 if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-                  const historicalDraft =
-                    event.key === 'ArrowUp' ? history.previous(draft) : history.next()
+                  const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
                   if (historicalDraft !== undefined) {
                     event.preventDefault()
                     pendingCaretRef.current = historicalDraft.length

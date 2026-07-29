@@ -148,6 +148,20 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
+  test('keeps mobile text services from rewriting terminal input', () => {
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+
+    expect(input.getAttribute('autocapitalize')).toBe('off')
+    expect(input.getAttribute('autocorrect')).toBe('off')
+    expect(input.getAttribute('spellcheck')).toBe('false')
+    expect(input.getAttribute('enterkeyhint')).toBe('send')
+    expect(input.classList.contains('font-mono')).toBe(true)
+  })
+
   test('browses successful submissions with plain vertical arrows only from an empty draft', async () => {
     const { container } = render()
     expand(container)
