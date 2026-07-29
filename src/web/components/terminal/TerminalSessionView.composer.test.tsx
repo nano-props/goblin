@@ -101,13 +101,21 @@ describe('TerminalSessionView composer', () => {
         Object.defineProperty(event, 'clipboardData', { value: clipboardDataWithFiles([file]) })
         textarea.dispatchEvent(event)
       } else {
+        const terminal = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
+        if (!terminal) throw new Error('expected terminal session')
+        const dataTransfer = dropDataWithFiles([file])
+        fireEvent.dragEnter(terminal, { dataTransfer })
+        expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).not.toBeNull()
         const event = new Event('drop', { bubbles: true, cancelable: true })
-        Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
+        Object.defineProperty(event, 'dataTransfer', { value: dataTransfer })
         textarea.dispatchEvent(event)
       }
 
       await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
       expect(rendered.writeInput).not.toHaveBeenCalled()
+      if (kind === 'drop') {
+        expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+      }
     } finally {
       await rendered.cleanup()
     }

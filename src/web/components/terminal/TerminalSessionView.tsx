@@ -403,6 +403,9 @@ export function TerminalSessionView({
     },
     [handleDroppedFiles],
   )
+  const handleDropCapture = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (event.dataTransfer.types.includes('Files')) setDragOver(false)
+  }, [])
   const resolveComposerFiles = useCallback(
     async (selectedFiles: File[]) => {
       if (!terminalSessionId || !isController) return null
@@ -501,6 +504,7 @@ export function TerminalSessionView({
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
+      onDropCapture={handleDropCapture}
       onDrop={handleDrop}
     >
       {progress && (
