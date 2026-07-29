@@ -170,7 +170,14 @@ describe('TerminalComposer', () => {
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
     expect(container.querySelector('textarea')).toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.showInput)).toBeTruthy()
+    expect(
+      buttonByAccessibleName(container, LABELS.showInput).querySelector('.lucide-text-cursor-input'),
+    ).not.toBeNull()
+    expect(
+      Array.from(container.querySelectorAll('button')).some(
+        (button) => button.querySelector('.sr-only')?.textContent === LABELS.selectFiles,
+      ),
+    ).toBe(false)
 
     for (const name of [
       LABELS.escape,
@@ -216,6 +223,8 @@ describe('TerminalComposer', () => {
 
     act(() => buttonByAccessibleName(container, LABELS.showInput).click())
     expect(container.querySelector('textarea')?.value).toBe('draft command')
+    expect(buttonByAccessibleName(container, LABELS.selectFiles)).toBeTruthy()
+    expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
 
   test('buttons honour disabled and avoid iOS long-press callout attributes', () => {

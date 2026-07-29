@@ -168,21 +168,30 @@ export function TerminalComposer({
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
           </ComposerButton>
           {mode === 'input' ? (
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={draft}
-              disabled={disabled}
-              aria-label={labels.inputPlaceholder}
-              placeholder={labels.inputPlaceholder}
-              className="goblin-terminal-composer__input"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
-                event.preventDefault()
-                submitDraft()
-              }}
-            />
+            <>
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={draft}
+                disabled={disabled}
+                aria-label={labels.inputPlaceholder}
+                placeholder={labels.inputPlaceholder}
+                className="goblin-terminal-composer__input"
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+                  event.preventDefault()
+                  submitDraft()
+                }}
+              />
+              <ComposerButton
+                accessibleName={labels.selectFiles}
+                disabled={disabled}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus className="size-4" />
+              </ComposerButton>
+            </>
           ) : (
             <ScrollArea
               orientation="horizontal"
@@ -211,13 +220,6 @@ export function TerminalComposer({
               </div>
             </ScrollArea>
           )}
-          <ComposerButton
-            accessibleName={labels.selectFiles}
-            disabled={disabled}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Plus className="size-4" />
-          </ComposerButton>
           <input
             ref={fileInputRef}
             hidden
