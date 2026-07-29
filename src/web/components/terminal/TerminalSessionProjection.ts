@@ -948,10 +948,6 @@ export class TerminalSessionProjection {
     return this.sessions.get(terminalSessionId)?.captureInputWriter() ?? null
   }
 
-  capturePasteWriter = (terminalSessionId: string) => {
-    return this.sessions.get(terminalSessionId)?.capturePasteWriter() ?? null
-  }
-
   sendVirtualKey = (terminalSessionId: string, key: TerminalVirtualKey): void => {
     this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }

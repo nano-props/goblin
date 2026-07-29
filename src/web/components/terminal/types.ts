@@ -108,12 +108,6 @@ export interface TerminalFocusRequest {
  */
 export type TerminalInputWriter = (data: string) => boolean
 
-/**
- * Paste capability bound to the xterm presentation and runtime generation that were current when captured.
- * Returns false after either identity stops being current.
- */
-export type TerminalPasteWriter = (data: string) => boolean
-
 export type TerminalVirtualKey =
   'tab' | 'arrow-up' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'escape' | 'interrupt'
 
@@ -211,7 +205,6 @@ export interface TerminalSessionContextValue {
   findPrevious: (terminalSessionId: string, term: string) => TerminalSearchResult
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
-  capturePasteWriter: (terminalSessionId: string) => TerminalPasteWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
   takeover: (terminalSessionId: string) => Promise<boolean>
   /** Retries only the local attach/presentation path after a stable recovery failure. */

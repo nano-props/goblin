@@ -10,8 +10,6 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
-import { DialogFooter } from '#/web/components/ui/dialog.tsx'
-import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
 import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
@@ -29,21 +27,15 @@ import {
   useTerminalFilesystemTargetCreatePending,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
+import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
-import type { TerminalInputWriter, TerminalPasteWriter } from '#/web/components/terminal/types.ts'
+import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
-
-interface ManualPasteDraft {
-  terminalSessionId: string
-  pasteWriter: TerminalPasteWriter
-  text: string
-}
 
 interface TerminalSessionViewProps {
   base: TerminalSessionBase
@@ -65,7 +57,6 @@ export function TerminalSessionView({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [manualPasteDraft, setManualPasteDraft] = useState<ManualPasteDraft | null>(null)
   const context = useTerminalSessionContext()
   const {
     clearBell,
@@ -76,7 +67,6 @@ export function TerminalSessionView({
     findPrevious,
     clearSearch,
     captureInputWriter,
-    capturePasteWriter,
     sendVirtualKey,
     takeover,
     retryPresentation,
@@ -106,18 +96,22 @@ export function TerminalSessionView({
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey) > 0
   const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
-  const mobileToolbarLabels = {
-    toolbar: t('terminal.mobile-toolbar'),
-    tab: t('terminal.mobile-key-tab'),
-    arrowUp: t('terminal.mobile-key-arrow-up'),
-    arrowDown: t('terminal.mobile-key-arrow-down'),
-    arrowLeft: t('terminal.mobile-key-arrow-left'),
-    arrowRight: t('terminal.mobile-key-arrow-right'),
-    escape: t('terminal.mobile-key-escape'),
-    ctrlC: t('terminal.mobile-key-ctrl-c'),
-    paste: t('menu.edit.paste'),
-    pageUp: t('terminal.mobile-key-page-up'),
-    pageDown: t('terminal.mobile-key-page-down'),
+  const terminalComposerLabels = {
+    composer: t('terminal.composer-label'),
+    open: t('terminal.composer-open'),
+    close: t('terminal.composer-close'),
+    inputPlaceholder: t('terminal.composer-input-placeholder'),
+    send: t('terminal.composer-send'),
+    selectFiles: t('terminal.composer-select-files'),
+    tab: t('terminal.composer-key-tab'),
+    arrowUp: t('terminal.composer-key-arrow-up'),
+    arrowDown: t('terminal.composer-key-arrow-down'),
+    arrowLeft: t('terminal.composer-key-arrow-left'),
+    arrowRight: t('terminal.composer-key-arrow-right'),
+    escape: t('terminal.composer-key-escape'),
+    ctrlC: t('terminal.composer-key-ctrl-c'),
+    pageUp: t('terminal.composer-key-page-up'),
+    pageDown: t('terminal.composer-key-page-down'),
   }
 
   useLayoutEffect(() => {
@@ -253,7 +247,7 @@ export function TerminalSessionView({
     return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
   })()
   // `isController` is the *interactive* affordance flag — it gates the
-  // mobile toolbar, the paste/drop file handlers, and the xterm's
+  // terminal composer, the paste/drop file handlers, and the xterm's
   // `aria-readonly`. The PTY is dead in `error-controller`, so we
   // deliberately exclude that state even though the controller status
   // is still ours. The error chip is shown via `showErrorChip`
@@ -261,12 +255,6 @@ export function TerminalSessionView({
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
-
-  useEffect(() => {
-    setManualPasteDraft((current) =>
-      current && (!isController || current.terminalSessionId !== terminalSessionId) ? null : current,
-    )
-  }, [isController, terminalSessionId])
 
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const presentationRecovery = snapshot.presentationRecovery
@@ -346,17 +334,14 @@ export function TerminalSessionView({
     },
     [t],
   )
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes('Files')) return
-      event.preventDefault()
-      setDragOver(false)
+  const handleSelectedFiles = useCallback(
+    (selectedFiles: File[]) => {
       // `isController` gate matches paste: a viewer dropping files into
       // a session it doesn't own would otherwise silently route input
       // to the controller's PTY. The `!terminalSessionId` half preserves the
       // pre-existing guard against sessions with no session.
       if (!terminalSessionId || !isController) return
-      const files = Array.from(event.dataTransfer.files).filter(isNonPlaceholderClipboardFile)
+      const files = selectedFiles.filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return
       // Capture the terminal session the user actually dropped into. Async
       // file resolution may finish after the user changes panes, but the
@@ -386,6 +371,15 @@ export function TerminalSessionView({
       )
     },
     [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
+  )
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes('Files')) return
+      event.preventDefault()
+      setDragOver(false)
+      handleSelectedFiles(Array.from(event.dataTransfer.files))
+    },
+    [handleSelectedFiles],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
@@ -443,23 +437,16 @@ export function TerminalSessionView({
     },
     [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
-  const handleToolbarPaste = useCallback(() => {
-    if (!terminalSessionId || !isController) return
-    const pasteWriter = capturePasteWriter(terminalSessionId)
-    if (!pasteWriter) return
-    const clipboard = navigator.clipboard
-    const openManualPaste = () => setManualPasteDraft({ terminalSessionId, pasteWriter, text: '' })
-    if (globalThis.isSecureContext === false || !clipboard?.readText) {
-      openManualPaste()
-      return
-    }
-    void clipboard.readText().then(
-      (text) => {
-        if (text && !pasteWriter(text)) toast.error(t('terminal.paste-text-failed'))
-      },
-      () => toast.error(t('terminal.paste-text-failed')),
-    )
-  }, [capturePasteWriter, isController, t, terminalSessionId])
+  const handleComposerSend = useCallback(
+    (text: string) => {
+      if (!terminalSessionId || !isController || !text) return false
+      const inputWriter = captureInputWriter(terminalSessionId)
+      if (inputWriter?.(`${text}\r`)) return true
+      toast.error(t('terminal.write-not-sent'))
+      return false
+    },
+    [captureInputWriter, isController, t, terminalSessionId],
+  )
 
   return (
     <div
@@ -518,58 +505,17 @@ export function TerminalSessionView({
         </div>
       )}
       {isMobileDevice() && isController && terminalSessionId && !searchOpen && (
-        <MobileTerminalToolbar
-          className="goblin-terminal-mobile-toolbar--floating"
-          labels={mobileToolbarLabels}
+        <TerminalComposer
+          key={terminalSessionId}
+          className="goblin-terminal-composer--floating"
+          labels={terminalComposerLabels}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
-          onPaste={handleToolbarPaste}
+          onSendText={handleComposerSend}
+          onSelectFiles={handleSelectedFiles}
           onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />
       )}
-      <FormDialog
-        open={manualPasteDraft !== null}
-        onOpenChange={(open) => {
-          if (!open) setManualPasteDraft(null)
-        }}
-        title={t('menu.edit.paste')}
-        description={t('terminal.mobile-paste-description')}
-      >
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const draft = manualPasteDraft
-            if (!draft || !draft.text) return
-            if (!draft.pasteWriter(draft.text)) {
-              toast.error(t('terminal.paste-text-failed'))
-              return
-            }
-            setManualPasteDraft(null)
-          }}
-        >
-          <textarea
-            autoFocus
-            rows={5}
-            value={manualPasteDraft?.text ?? ''}
-            aria-label={t('terminal.mobile-paste-placeholder')}
-            placeholder={t('terminal.mobile-paste-placeholder')}
-            className="min-h-24 w-full resize-y rounded-md border border-input bg-control px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            onChange={(event) => {
-              const text = event.target.value
-              setManualPasteDraft((current) => (current ? { ...current, text } : null))
-            }}
-          />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setManualPasteDraft(null)}>
-              {t('dialog.cancel')}
-            </Button>
-            <Button type="submit" disabled={!manualPasteDraft?.text}>
-              {t('menu.edit.paste')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </FormDialog>
       {showViewerOverlay && (
         <AttachmentOverlay
           badge={readonlyBadge}

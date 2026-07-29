@@ -14,8 +14,8 @@
   --goblin-terminal-float-padding: 6px 8px;
   --goblin-terminal-float-radius: 8px;
   --goblin-terminal-control-radius: 6px;
-  --goblin-terminal-mobile-key-size: 40px;
-  --goblin-terminal-mobile-key-gap: 4px;
+  --goblin-terminal-composer-key-size: 40px;
+  --goblin-terminal-composer-key-gap: 4px;
 }
 
 .goblin-terminal-session__host {
@@ -314,39 +314,101 @@
   color: var(--color-muted-foreground);
 }
 
-.goblin-terminal-mobile-toolbar {
+.goblin-terminal-composer {
   display: flex;
-  flex-direction: column;
-  /* No background / border / shadow on the container — the toolbar
-     should feel like a control surface hovering on the terminal canvas,
-     not a popover. Tap-target spacing comes from the row gap. */
+  width: var(--goblin-terminal-composer-key-size);
+  max-width: calc(100% - 2 * var(--goblin-terminal-float-offset));
+  justify-content: flex-end;
+  pointer-events: none;
+  transition: width 180ms ease;
 }
 
-.goblin-terminal-mobile-toolbar--floating {
+.goblin-terminal-composer--floating {
   position: absolute;
   right: var(--goblin-terminal-float-offset);
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: var(--goblin-terminal-float-offset);
   z-index: 2;
 }
 
-.goblin-terminal-mobile-toolbar__row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--goblin-terminal-mobile-key-gap);
+.goblin-terminal-composer--expanded {
+  width: min(560px, calc(100% - 2 * var(--goblin-terminal-float-offset)));
 }
 
-.goblin-terminal-mobile-toolbar__group {
+.goblin-terminal-composer__composer {
   display: flex;
+  min-width: 0;
+  width: 100%;
   flex-direction: column;
-  gap: var(--goblin-terminal-mobile-key-gap);
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  overflow: hidden;
+  border-radius: var(--goblin-terminal-float-radius);
+  background: var(--color-popover);
+  padding: 6px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(10px) scale(0.98);
+  transform-origin: right bottom;
+  visibility: hidden;
+  transition:
+    opacity 130ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
 }
 
-.goblin-terminal-mobile-toolbar__btn {
-  width: var(--goblin-terminal-mobile-key-size);
-  height: var(--goblin-terminal-mobile-key-size);
-  min-width: var(--goblin-terminal-mobile-key-size);
-  min-height: var(--goblin-terminal-mobile-key-size);
+.goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__composer {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scale(1);
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.goblin-terminal-composer__input-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: var(--goblin-terminal-composer-key-gap);
+}
+
+.goblin-terminal-composer__input {
+  height: var(--goblin-terminal-composer-key-size);
+  max-height: 120px;
+  min-width: 0;
+  flex: 1;
+  resize: none;
+  /* Native scrolling is intentional inside the editable textarea: once the
+     five-line composer cap is reached, the caret and text selection need the
+     browser's editing-aware scroll behavior. */
+  overflow-y: auto;
+  border: 1px solid var(--color-input);
+  border-radius: var(--goblin-terminal-control-radius);
+  background: var(--color-control);
+  padding: 9px 11px;
+  color: var(--color-foreground);
+  font-size: 14px;
+  line-height: 20px;
+  outline: none;
+}
+
+.goblin-terminal-composer__key-scroll {
+  min-width: 0;
+  width: 100%;
+}
+
+.goblin-terminal-composer__key-row {
+  display: flex;
+  width: max-content;
+  gap: var(--goblin-terminal-composer-key-gap);
+  padding-bottom: 2px;
+}
+
+.goblin-terminal-composer__btn {
+  width: var(--goblin-terminal-composer-key-size);
+  height: var(--goblin-terminal-composer-key-size);
+  min-width: var(--goblin-terminal-composer-key-size);
+  min-height: var(--goblin-terminal-composer-key-size);
   padding: 0;
   font-size: 14px;
   font-weight: 500;
@@ -359,36 +421,45 @@
   border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
 }
 
-.goblin-terminal-mobile-toolbar__btn:hover {
+.goblin-terminal-composer__toggle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  border-radius: 9999px;
+  background: var(--color-popover);
+  box-shadow: var(--shadow-md);
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  visibility: visible;
+  transition:
+    opacity 100ms ease 80ms,
+    transform 180ms ease,
+    visibility 0s linear 0s;
+}
+
+.goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__toggle {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  visibility: hidden;
+  transition-delay: 0s, 0s, 180ms;
+}
+
+.goblin-terminal-composer__btn:hover {
   background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
 }
 
-/* Prefer one complete column when the terminal surface has room.
-   Landscape and shorter terminal surfaces use the two key groups as columns. */
-@container goblin-terminal-session (orientation: landscape) or (max-height: 480px) {
-  .goblin-terminal-mobile-toolbar__row {
-    flex-direction: row;
+@container goblin-terminal-session (max-width: 360px) {
+  .goblin-terminal-composer__composer {
+    padding: 5px;
   }
-}
 
-/* When the complete two-column toolbar no longer fits, keep command navigation
-   and cancellation controls. Terminal scrolling and system paste remain
-   available without dedicated buttons. */
-@container goblin-terminal-session (max-height: 220px) {
-  .goblin-terminal-mobile-toolbar__btn--low-priority {
-    display: none;
+  .goblin-terminal-composer__input-row {
+    gap: 3px;
   }
-}
 
-/* The final compact form is two rows: history navigation plus Esc/Ctrl+C. */
-@container goblin-terminal-session (max-height: 175px) {
-  .goblin-terminal-mobile-toolbar__btn--horizontal-arrow {
-    display: none;
-  }
-}
-
-@container goblin-terminal-session (max-height: 83px) {
-  .goblin-terminal-mobile-toolbar {
-    display: none;
+  .goblin-terminal-composer__input {
+    padding-inline: 8px;
   }
 }

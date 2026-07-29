@@ -40,7 +40,6 @@ import type {
   TerminalInputWriter,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
-  TerminalPasteWriter,
   TerminalPresentationRecovery,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
@@ -229,16 +228,6 @@ export class TerminalSession {
     const binding = this.currentWritableInputBinding()
     if (!binding) return null
     return (data) => this.enqueueInput(binding, data)
-  }
-
-  capturePasteWriter(): TerminalPasteWriter | null {
-    const binding = this.currentWritableInputBinding()
-    const term = this.view.currentTerminal()
-    if (!binding || !term) return null
-    return (data) => {
-      if (!data || !this.view.isPresented() || !this.isCurrentInputBinding(binding)) return false
-      return this.view.pasteText(term, data)
-    }
   }
 
   sendVirtualKey(key: TerminalVirtualKey): void {

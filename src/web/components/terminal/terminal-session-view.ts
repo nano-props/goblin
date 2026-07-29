@@ -228,12 +228,6 @@ export class TerminalSessionView {
     term.input(data, true)
   }
 
-  pasteText(term: XTermTerminal, data: string): boolean {
-    if (!data || this.term !== term) return false
-    term.paste(data)
-    return true
-  }
-
   find(term: string, direction: 'next' | 'previous', incremental: boolean): boolean {
     if (!term || !this.searchAddon) {
       this.clearSearch()

@@ -463,24 +463,6 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
-  test('captures xterm paste for the active presented controller and rejects it after restart', async () => {
-    const { host, session, term } = await startPresentedControllerGeneration()
-
-    const pasteWriter = session.capturePasteWriter()
-    if (!pasteWriter) throw new Error('expected presented paste writer')
-    expect(pasteWriter('first line\nsecond line')).toBe(true)
-    expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
-
-    session.restart()
-    await flushUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 2)
-    emitSessionOutput(session, 2)
-    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
-
-    expect(pasteWriter('from old generation')).toBe(false)
-    expect(term.paste).toHaveBeenCalledTimes(1)
-    expect(xtermMocks.terminals.at(-1)!.paste).not.toHaveBeenCalled()
-  })
-
   test('commits asynchronous input only to the generation captured by its writer', async () => {
     const { session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()
