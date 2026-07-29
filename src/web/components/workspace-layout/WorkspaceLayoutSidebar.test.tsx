@@ -190,6 +190,29 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
   })
 
+  test('uses the workspace background throughout the sidebar in compact UI', () => {
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={repoSnapshot()} branchContent={<div />} />,
+    )
+
+    const sidebar = container.querySelector('aside')
+    expect(sidebar?.className).toContain('bg-background')
+    expect(sidebar?.querySelectorAll('.bg-navigation')).toHaveLength(0)
+  })
+
+  test('keeps the navigation background in split UI', () => {
+    const { container } = renderSidebar(
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
+        compact={false}
+        git={repoSnapshot()}
+        branchContent={<div />}
+      />,
+    )
+
+    expect(container.querySelector('aside')?.className).toContain('bg-navigation')
+  })
+
   test('opens create-worktree from the row action', () => {
     const onCreateWorktree = vi.fn()
     const { container } = renderSidebar(
