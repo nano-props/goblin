@@ -17,7 +17,7 @@ import {
   terminalXtermMocks,
 } from '#/web/test-utils/terminal-session.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalResizeResult } from '#/shared/terminal-types.ts'
+import type { TerminalResizeResult, TerminalWriteResult } from '#/shared/terminal-types.ts'
 import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 
@@ -482,17 +482,40 @@ describe('TerminalSession input, resize, and controller authority', () => {
   test('submits composed text through xterm paste semantics followed by Enter', async () => {
     const { session, term } = await startPresentedControllerGeneration()
     term.modes.bracketedPasteMode = true
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockImplementationOnce(() => pasteWrite.promise)
 
-    expect(session.submitText('first line\nsecond line')).toBe(true)
-    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+    const submission = session.submitText('first line\nsecond line')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
     expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
-    expect(term.input).toHaveBeenCalledWith('\r', true)
-    expect(terminalCalls.write).toHaveBeenLastCalledWith({
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(1, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
-      data: '\x1b[200~first line\rsecond line\x1b[201~\r',
+      data: '\x1b[200~first line\rsecond line\x1b[201~',
     })
+
+    pasteWrite.resolve({ status: 'accepted' })
+    await expect(submission).resolves.toBe(true)
+
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\r',
+    })
+  })
+
+  test('does not send Enter when the composed text write is rejected', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
+
+    await expect(session.submitText('keep this text')).resolves.toBe(false)
+
+    expect(term.paste).toHaveBeenCalledWith('keep this text')
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {

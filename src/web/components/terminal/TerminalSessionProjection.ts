@@ -952,8 +952,8 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }
 
-  submitText = (terminalSessionId: string, text: string): boolean => {
-    return this.sessions.get(terminalSessionId)?.submitText(text) ?? false
+  submitText = (terminalSessionId: string, text: string): Promise<boolean> => {
+    return this.sessions.get(terminalSessionId)?.submitText(text) ?? Promise.resolve(false)
   }
 
   takeover = (terminalSessionId: string): Promise<boolean> => {

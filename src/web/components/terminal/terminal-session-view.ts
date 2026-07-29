@@ -228,13 +228,10 @@ export class TerminalSessionView {
     term.input(data, true)
   }
 
-  submitText(text: string): boolean {
+  pasteText(text: string): boolean {
     const term = this.term
     if (!term || !text) return false
-    // Let xterm encode the body using the terminal's active bracketed-paste
-    // mode, then submit it as a distinct Enter key for shells and TUI editors.
     term.paste(text)
-    term.input('\r', true)
     return true
   }
 

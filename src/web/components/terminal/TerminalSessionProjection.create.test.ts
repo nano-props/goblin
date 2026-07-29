@@ -82,7 +82,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       return null
     }
 
-    submitText(): false {
+    async submitText(): Promise<boolean> {
       return false
     }
     takeover(): Promise<boolean> {

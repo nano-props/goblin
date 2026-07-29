@@ -34,7 +34,7 @@ const LABELS: TerminalComposerLabels = {
 function render(
   props: {
     onVirtualKey?: (key: TerminalVirtualKey) => void
-    onSendText?: (text: string) => boolean
+    onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
@@ -45,7 +45,7 @@ function render(
     <TerminalComposer
       labels={LABELS}
       onVirtualKey={props.onVirtualKey ?? vi.fn()}
-      onSendText={props.onSendText ?? vi.fn(() => true)}
+      onSendText={props.onSendText ?? vi.fn(async () => true)}
       onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
       onRequestFocus={props.onRequestFocus ?? vi.fn()}
       onScrollLines={props.onScrollLines ?? vi.fn()}
@@ -115,8 +115,8 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
-  test('submits with Enter and clears only accepted text', () => {
-    const onSendText = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true)
+  test('submits with Enter and clears only accepted text', async () => {
+    const onSendText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
     const { container } = render({ onSendText })
     expand(container)
     showInput(container)
@@ -126,15 +126,15 @@ describe('TerminalComposer', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenNthCalledWith(1, 'git status')
-    expect(input.value).toBe('git status')
+    await vi.waitFor(() => expect(input.value).toBe('git status'))
 
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenNthCalledWith(2, 'git status')
-    expect(input.value).toBe('')
+    await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
-  test('Enter submits while Shift+Enter remains available for text entry', () => {
-    const onSendText = vi.fn(() => true)
+  test('Enter submits while Shift+Enter remains available for text entry', async () => {
+    const onSendText = vi.fn(async () => true)
     const { container } = render({ onSendText })
     expand(container)
     showInput(container)
@@ -145,6 +145,7 @@ describe('TerminalComposer', () => {
     expect(onSendText).not.toHaveBeenCalled()
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenCalledWith('pwd')
+    await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
   test('grows with multiline text until the five-line cap, then leaves overflow to the textarea', () => {

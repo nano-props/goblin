@@ -189,7 +189,7 @@ export async function renderTerminalSession(
       writeInput(terminalSessionId, data)
       return true
     },
-    submitText: (terminalSessionId, text) => {
+    submitText: async (terminalSessionId, text) => {
       writeInput(terminalSessionId, text)
       return true
     },

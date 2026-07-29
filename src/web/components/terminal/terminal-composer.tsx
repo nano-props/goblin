@@ -43,7 +43,7 @@ export interface TerminalComposerLabels {
 interface TerminalComposerProps {
   labels: TerminalComposerLabels
   onVirtualKey: (key: TerminalVirtualKey) => void
-  onSendText: (text: string) => boolean
+  onSendText: (text: string) => Promise<boolean>
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
@@ -133,6 +133,7 @@ export function TerminalComposer({
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
+  const submittingRef = useRef(false)
   const composerId = useId()
 
   useLayoutEffect(() => {
@@ -159,9 +160,16 @@ export function TerminalComposer({
     return () => observer.disconnect()
   }, [expanded, mode])
 
-  const submitDraft = () => {
-    if (!draft || !onSendText(draft)) return
-    setDraft('')
+  const submitDraft = async () => {
+    if (!draft || submittingRef.current) return
+    const submittedDraft = draft
+    submittingRef.current = true
+    try {
+      if (!(await onSendText(submittedDraft))) return
+      setDraft((current) => (current === submittedDraft ? '' : current))
+    } finally {
+      submittingRef.current = false
+    }
   }
   const closeComposer = () => {
     setExpanded(false)
@@ -242,7 +250,7 @@ export function TerminalComposer({
               onKeyDown={(event) => {
                 if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
                 event.preventDefault()
-                submitDraft()
+                void submitDraft()
               }}
             />
           ) : (

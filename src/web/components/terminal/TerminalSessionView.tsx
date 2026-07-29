@@ -481,13 +481,11 @@ export function TerminalSessionView({
     [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
   )
   const handleComposerSend = useCallback(
-    (text: string) => {
+    async (text: string) => {
       if (!terminalSessionId || !isController || !text) return false
-      if (submitText(terminalSessionId, text)) return true
-      toast.error(t('terminal.write-not-sent'))
-      return false
+      return await submitText(terminalSessionId, text)
     },
-    [isController, submitText, t, terminalSessionId],
+    [isController, submitText, terminalSessionId],
   )
 
   return (

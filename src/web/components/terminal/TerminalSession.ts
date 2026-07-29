@@ -235,9 +235,14 @@ export class TerminalSession {
     this.view.sendVirtualKey(key)
   }
 
-  submitText(text: string): boolean {
-    if (!text || !this.currentWritableInputBinding()) return false
-    return this.view.submitText(text)
+  async submitText(text: string): Promise<boolean> {
+    if (!text || !this.currentWritableInputBinding() || !this.view.pasteText(text)) return false
+    // A composed submission represents two ordered user actions. Wait until
+    // the paste has reached the PTY before sending Enter so input batching
+    // cannot collapse them back into one delivery step.
+    if (!(await this.flushInput())) return false
+    this.view.sendVirtualKey('enter')
+    return await this.flushInput()
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
@@ -261,30 +266,34 @@ export class TerminalSession {
     this.inputFlushScheduled = true
     queueMicrotask(() => {
       this.inputFlushScheduled = false
-      this.flushInput()
+      void this.flushInput()
     })
   }
 
-  private flushInput(): void {
-    if (this.disposed) return
+  private async flushInput(): Promise<boolean> {
+    if (this.disposed) return false
     const pending = this.pendingInputWrite
     this.pendingInputWrite = null
-    if (!pending || !this.isCurrentInputBinding(pending.binding)) return
+    if (!pending || !this.isCurrentInputBinding(pending.binding)) return false
     const { terminalRuntimeSessionId, terminalRuntimeGeneration } = pending.binding
-    void terminalClient
-      .write({ terminalRuntimeSessionId, terminalRuntimeGeneration, data: pending.data })
-      .then((result) => {
-        if (!this.isCurrentInputBinding(pending.binding)) return
-        if (result.status !== 'accepted')
-          this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
+    try {
+      const result = await terminalClient.write({
+        terminalRuntimeSessionId,
+        terminalRuntimeGeneration,
+        data: pending.data,
       })
-      .catch((err) => {
-        if (!this.isCurrentInputBinding(pending.binding)) return
-        this.writeFailureReporter.report({
-          terminalRuntimeSessionId,
-          failure: { kind: 'error', error: err },
-        })
+      if (!this.isCurrentInputBinding(pending.binding)) return false
+      if (result.status === 'accepted') return true
+      this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
+      return false
+    } catch (err) {
+      if (!this.isCurrentInputBinding(pending.binding)) return false
+      this.writeFailureReporter.report({
+        terminalRuntimeSessionId,
+        failure: { kind: 'error', error: err },
       })
+      return false
+    }
   }
 
   private isCurrentInputBinding(binding: TerminalRuntimeBinding): boolean {

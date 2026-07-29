@@ -215,7 +215,7 @@ export interface TerminalSessionContextValue {
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
-  submitText: (terminalSessionId: string, text: string) => boolean
+  submitText: (terminalSessionId: string, text: string) => Promise<boolean>
   takeover: (terminalSessionId: string) => Promise<boolean>
   /** Retries only the local attach/presentation path after a stable recovery failure. */
   retryPresentation: (terminalSessionId: string) => boolean

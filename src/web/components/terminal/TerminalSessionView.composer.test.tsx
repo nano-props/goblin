@@ -25,7 +25,7 @@ function openComposerInput(container: HTMLElement) {
 
 describe('TerminalSessionView composer', () => {
   test('submits composer text through the selected terminal paste boundary followed by Enter', async () => {
-    const submitText = vi.fn(() => true)
+    const submitText = vi.fn(async () => true)
     const rendered = await renderTerminalSession({ submitText })
 
     try {
@@ -34,14 +34,14 @@ describe('TerminalSessionView composer', () => {
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
-      expect(textarea.value).toBe('')
+      await vi.waitFor(() => expect(textarea.value).toBe(''))
     } finally {
       await rendered.cleanup()
     }
   })
 
   test('keeps composer text when the captured session no longer accepts input', async () => {
-    const submitText = vi.fn(() => false)
+    const submitText = vi.fn(async () => false)
     const rendered = await renderTerminalSession({ submitText })
 
     try {
@@ -50,7 +50,7 @@ describe('TerminalSessionView composer', () => {
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'keep this command')
-      expect(textarea.value).toBe('keep this command')
+      await vi.waitFor(() => expect(textarea.value).toBe('keep this command'))
     } finally {
       await rendered.cleanup()
     }
