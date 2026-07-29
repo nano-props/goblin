@@ -420,6 +420,30 @@
   gap: var(--goblin-terminal-composer-key-gap);
 }
 
+.goblin-terminal-composer__key-action--optional-1,
+.goblin-terminal-composer__key-action--optional-2,
+.goblin-terminal-composer__key-action--optional-3 {
+  display: none;
+}
+
+@container goblin-terminal-session (min-width: 432px) {
+  .goblin-terminal-composer__key-action--optional-1 {
+    display: inline-flex;
+  }
+}
+
+@container goblin-terminal-session (min-width: 476px) {
+  .goblin-terminal-composer__key-action--optional-2 {
+    display: inline-flex;
+  }
+}
+
+@container goblin-terminal-session (min-width: 520px) {
+  .goblin-terminal-composer__key-action--optional-3 {
+    display: inline-flex;
+  }
+}
+
 .goblin-terminal-composer__btn {
   width: var(--goblin-terminal-composer-key-size);
   height: var(--goblin-terminal-composer-key-size);

@@ -6,6 +6,8 @@ import {
   ArrowUp,
   ChevronsDown,
   ChevronsUp,
+  CornerDownLeft,
+  Delete,
   Keyboard,
   TextCursorInput,
 } from 'lucide-react'
@@ -55,6 +57,7 @@ type AccessibleName = Exclude<
 >
 type ComposerKeyAction = { accessibleName: AccessibleName } & (
   | { type: 'virtual-key'; icon: ReactNode; key: TerminalVirtualKey }
+  | { type: 'virtual-key'; label: string; key: TerminalVirtualKey }
   | { type: 'scroll'; icon: ReactNode; amount: number }
 )
 
@@ -80,6 +83,12 @@ const PRIMARY_KEY_ACTIONS: ComposerKeyAction[] = [
   },
   { type: 'scroll', icon: <ChevronsUp className="size-4" />, amount: -12, accessibleName: 'pageUp' },
   { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'pageDown' },
+]
+
+const OPTIONAL_KEY_ACTIONS: ComposerKeyAction[] = [
+  { type: 'virtual-key', icon: <CornerDownLeft className="size-4" />, key: 'enter', accessibleName: 'enter' },
+  { type: 'virtual-key', icon: <Delete className="size-4" />, key: 'backspace', accessibleName: 'backspace' },
+  { type: 'virtual-key', label: '⇥', key: 'tab', accessibleName: 'tab' },
 ]
 
 const COMPOSER_INPUT_MIN_HEIGHT_PX = 40
@@ -255,7 +264,23 @@ export function TerminalComposer({
                       if (event.detail > 0) onRequestFocus()
                     }}
                   >
-                    {key.icon}
+                    {'label' in key ? key.label : key.icon}
+                  </ComposerButton>
+                ))}
+                {OPTIONAL_KEY_ACTIONS.map((key, index) => (
+                  <ComposerButton
+                    key={key.accessibleName}
+                    className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
+                    accessibleName={labels[key.accessibleName]}
+                    disabled={disabled}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      if (key.type !== 'virtual-key') return
+                      onVirtualKey(key.key)
+                      if (event.detail > 0) onRequestFocus()
+                    }}
+                  >
+                    {'label' in key ? key.label : key.icon}
                   </ComposerButton>
                 ))}
               </div>

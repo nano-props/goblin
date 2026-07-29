@@ -217,6 +217,17 @@ describe('TerminalComposer', () => {
     expect(onScrollLines).toHaveBeenNthCalledWith(1, -12)
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
 
+    const optionalActions = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
+    )
+    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual([
+      LABELS.enter,
+      LABELS.backspace,
+      LABELS.tab,
+    ])
+    for (const button of optionalActions) act(() => button.click())
+    expect(onVirtualKey.mock.calls.slice(-3).map(([key]) => key)).toEqual(['enter', 'backspace', 'tab'])
+
     for (const [label, key] of [
       [LABELS.enter, 'enter'],
       [LABELS.backspace, 'backspace'],
