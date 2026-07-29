@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode, type Ref } from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -40,7 +40,7 @@ interface TerminalComposerProps {
   labels: TerminalComposerLabels
   onVirtualKey: (key: TerminalVirtualKey) => void
   onSendText: (text: string) => boolean
-  onSelectFiles: (files: File[]) => void
+  onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
   disabled?: boolean
@@ -93,11 +93,23 @@ function resizeComposerInput(input: HTMLTextAreaElement, hasContent: boolean) {
   input.style.height = `${Math.min(COMPOSER_INPUT_MAX_HEIGHT_PX, Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight))}px`
 }
 
+function insertComposerText(value: string, insertion: string, start: number, end: number) {
+  const before = value.slice(0, start)
+  const after = value.slice(end)
+  const leadingSpace = before.length > 0 && !/\s$/.test(before) ? ' ' : ''
+  const trailingSpace = after.length > 0 && !/^\s/.test(after) ? ' ' : ''
+  const insertedText = `${leadingSpace}${insertion}${trailingSpace}`
+  return {
+    value: `${before}${insertedText}${after}`,
+    caret: before.length + leadingSpace.length + insertion.length,
+  }
+}
+
 export function TerminalComposer({
   labels,
   onVirtualKey,
   onSendText,
-  onSelectFiles,
+  onResolveFiles,
   onRequestFocus,
   onScrollLines,
   disabled,
@@ -106,15 +118,37 @@ export function TerminalComposer({
   const [expanded, setExpanded] = useState(false)
   const [mode, setMode] = useState<'input' | 'keys'>('input')
   const [draft, setDraft] = useState('')
+  const [resolvingFiles, setResolvingFiles] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInsertionRef = useRef({ start: 0, end: 0 })
+  const pendingCaretRef = useRef<number | null>(null)
+  const restoreTriggerFocusRef = useRef(false)
   const composerId = useId()
 
   useLayoutEffect(() => {
     const input = inputRef.current
     if (!input || !expanded || mode !== 'input') return
     resizeComposerInput(input, draft.length > 0)
+    const pendingCaret = pendingCaretRef.current
+    if (pendingCaret !== null) {
+      pendingCaretRef.current = null
+      input.focus()
+      input.setSelectionRange(pendingCaret, pendingCaret)
+    }
   }, [draft, expanded, mode])
+
+  useLayoutEffect(() => {
+    if (expanded && mode === 'input') {
+      inputRef.current?.focus()
+      return
+    }
+    if (!expanded && restoreTriggerFocusRef.current) {
+      restoreTriggerFocusRef.current = false
+      triggerRef.current?.focus()
+    }
+  }, [expanded, mode])
 
   useEffect(() => {
     const input = inputRef.current
@@ -128,10 +162,24 @@ export function TerminalComposer({
     if (!draft || !onSendText(draft)) return
     setDraft('')
   }
-  const selectFiles = (event: ChangeEvent<HTMLInputElement>) => {
+  const selectFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (files.length > 0) onSelectFiles(files)
+    if (files.length === 0) return
+    setResolvingFiles(true)
+    try {
+      const insertion = await onResolveFiles(files)
+      if (!insertion) return
+      setDraft((current) => {
+        const start = Math.min(fileInsertionRef.current.start, current.length)
+        const end = Math.min(Math.max(fileInsertionRef.current.end, start), current.length)
+        const next = insertComposerText(current, insertion, start, end)
+        pendingCaretRef.current = next.caret
+        return next.value
+      })
+    } finally {
+      setResolvingFiles(false)
+    }
   }
 
   return (
@@ -142,6 +190,7 @@ export function TerminalComposer({
       aria-label={labels.composer}
     >
       <ComposerButton
+        buttonRef={triggerRef}
         className="goblin-terminal-composer__toggle"
         accessibleName={labels.open}
         disabled={disabled}
@@ -186,8 +235,16 @@ export function TerminalComposer({
               />
               <ComposerButton
                 accessibleName={labels.selectFiles}
-                disabled={disabled}
-                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || resolvingFiles}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  const input = inputRef.current
+                  fileInsertionRef.current = {
+                    start: input?.selectionStart ?? draft.length,
+                    end: input?.selectionEnd ?? draft.length,
+                  }
+                  fileInputRef.current?.click()
+                }}
               >
                 <Plus className="size-4" />
               </ComposerButton>
@@ -233,6 +290,7 @@ export function TerminalComposer({
             accessibleName={labels.close}
             disabled={disabled}
             onClick={() => {
+              restoreTriggerFocusRef.current = true
               setMode('input')
               setExpanded(false)
             }}
@@ -248,6 +306,7 @@ export function TerminalComposer({
 interface ComposerButtonProps {
   accessibleName: string
   children: ReactNode
+  buttonRef?: Ref<HTMLButtonElement>
   className?: string
   disabled?: boolean
   ariaExpanded?: boolean
@@ -261,6 +320,7 @@ interface ComposerButtonProps {
 function ComposerButton({
   accessibleName,
   children,
+  buttonRef,
   className,
   disabled,
   ariaExpanded,
@@ -272,6 +332,7 @@ function ComposerButton({
 }: ComposerButtonProps) {
   return (
     <Button
+      ref={buttonRef}
       type="button"
       size="icon"
       variant="secondary"

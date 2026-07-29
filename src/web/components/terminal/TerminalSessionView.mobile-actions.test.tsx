@@ -56,6 +56,40 @@ describe('TerminalSessionView mobile actions', () => {
     }
   })
 
+  test('inserts selected file paths into the composer draft without writing directly to the terminal', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValueOnce('/abs/notes file.txt')
+    const rendered = await renderTerminalSession()
+
+    try {
+      const openButton = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-open',
+      )
+      if (!openButton) throw new Error('expected mobile terminal composer button')
+      act(() => openButton.click())
+      const textarea = rendered.container.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="terminal.composer-input-placeholder"]',
+      )
+      const fileInput = rendered.container.querySelector<HTMLInputElement>('input[type="file"]')
+      const selectFilesButton = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-select-files',
+      )
+      if (!textarea || !fileInput || !selectFilesButton) throw new Error('expected composer file controls')
+      fireEvent.change(textarea, { target: { value: 'cat ' } })
+      textarea.setSelectionRange(4, 4)
+      act(() => selectFilesButton.click())
+
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['content'], 'notes.txt', { type: 'text/plain' })] },
+      })
+
+      await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
   test('hides the terminal composer while terminal search is open on mobile', async () => {
     const user = userEvent.setup()
     const rendered = await renderTerminalSession()

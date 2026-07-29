@@ -311,8 +311,8 @@ export function TerminalSessionView({
     const relatedTarget = event.relatedTarget
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
-  const writeResolutionToPty = useCallback(
-    (resolution: PasteResolution, inputWriter: TerminalInputWriter) => {
+  const planResolvedPaths = useCallback(
+    (resolution: PasteResolution) => {
       const plan = planTerminalPathWrite(resolution.paths, {
         failedUnsafe: resolution.failedUnsafe,
         failedBackend: resolution.failedBackend,
@@ -320,22 +320,36 @@ export function TerminalSessionView({
       if (plan.kind === 'none') {
         if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
         if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-failed'))
-        return
+        return null
       }
       if (plan.kind === 'too-long') {
         toast.error(t('terminal.paste-file-overflow'))
-        return
+        return null
       }
+      return plan
+    },
+    [t],
+  )
+  const reportResolvedPathFailures = useCallback(
+    (failures: { failedUnsafe: number; failedBackend: number }) => {
+      if (failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
+      if (failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
+    },
+    [t],
+  )
+  const writeResolutionToPty = useCallback(
+    (resolution: PasteResolution, inputWriter: TerminalInputWriter) => {
+      const plan = planResolvedPaths(resolution)
+      if (!plan) return
       if (!inputWriter(plan.data)) {
         toast.error(t('terminal.paste-file-failed'))
         return
       }
-      if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
-      if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
+      reportResolvedPathFailures(plan.failures)
     },
-    [t],
+    [planResolvedPaths, reportResolvedPathFailures, t],
   )
-  const handleSelectedFiles = useCallback(
+  const handleDroppedFiles = useCallback(
     (selectedFiles: File[]) => {
       // `isController` gate matches paste: a viewer dropping files into
       // a session it doesn't own would otherwise silently route input
@@ -378,9 +392,33 @@ export function TerminalSessionView({
       if (!event.dataTransfer.types.includes('Files')) return
       event.preventDefault()
       setDragOver(false)
-      handleSelectedFiles(Array.from(event.dataTransfer.files))
+      handleDroppedFiles(Array.from(event.dataTransfer.files))
     },
-    [handleSelectedFiles],
+    [handleDroppedFiles],
+  )
+  const resolveComposerFiles = useCallback(
+    async (selectedFiles: File[]) => {
+      if (!terminalSessionId || !isController) return null
+      const files = selectedFiles.filter(isNonPlaceholderClipboardFile)
+      if (files.length === 0) return null
+      try {
+        const outcome = await processDrop({ files })
+        if (outcome.kind === 'too-large') {
+          toast.error(t('terminal.paste-file-too-large'))
+          return null
+        }
+        if (outcome.kind === 'no-op') return null
+        const plan = planResolvedPaths(outcome.resolution)
+        if (!plan) return null
+        reportResolvedPathFailures(plan.failures)
+        return plan.data
+      } catch (err) {
+        terminalLog.warn('composer file resolver failed', { err })
+        toast.error(t('terminal.paste-file-failed'))
+        return null
+      }
+    },
+    [isController, planResolvedPaths, reportResolvedPathFailures, t, terminalSessionId],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
@@ -512,7 +550,7 @@ export function TerminalSessionView({
           labels={terminalComposerLabels}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
           onSendText={handleComposerSend}
-          onSelectFiles={handleSelectedFiles}
+          onResolveFiles={resolveComposerFiles}
           onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />

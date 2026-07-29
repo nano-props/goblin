@@ -30,7 +30,7 @@ function render(
   props: {
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => boolean
-    onSelectFiles?: (files: File[]) => void
+    onResolveFiles?: (files: File[]) => Promise<string | null>
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
     disabled?: boolean
@@ -41,7 +41,7 @@ function render(
       labels={LABELS}
       onVirtualKey={props.onVirtualKey ?? vi.fn()}
       onSendText={props.onSendText ?? vi.fn(() => true)}
-      onSelectFiles={props.onSelectFiles ?? vi.fn()}
+      onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
       onRequestFocus={props.onRequestFocus ?? vi.fn()}
       onScrollLines={props.onScrollLines ?? vi.fn()}
       disabled={props.disabled}
@@ -82,6 +82,7 @@ describe('TerminalComposer', () => {
     const selectFiles = buttonByAccessibleName(container, LABELS.selectFiles)
     const close = buttonByAccessibleName(container, LABELS.close)
     expect(input?.getAttribute('placeholder')).toBe(LABELS.inputPlaceholder)
+    expect(document.activeElement).toBe(input)
     expect(showKeys.parentElement).toBe(modeRow)
     expect(input?.parentElement).toBe(modeRow)
     expect(selectFiles.parentElement).toBe(modeRow)
@@ -93,6 +94,7 @@ describe('TerminalComposer', () => {
     expect(surface?.getAttribute('aria-hidden')).toBe('true')
     expect(surface?.hasAttribute('inert')).toBe(true)
     expect(container.querySelector('textarea')).not.toBeNull()
+    expect(document.activeElement).toBe(openButton)
   })
 
   test('submits with Enter and clears only accepted text', () => {
@@ -148,18 +150,28 @@ describe('TerminalComposer', () => {
     expect(input.style.height).toBe('40px')
   })
 
-  test('passes selected files to the terminal file boundary and permits selecting the same file again', () => {
-    const onSelectFiles = vi.fn()
-    const { container } = render({ onSelectFiles })
+  test('inserts resolved file paths at the input selection and permits selecting the same file again', async () => {
+    const resolvedPath = "'/tmp/notes file.txt'"
+    const onResolveFiles = vi.fn(async () => resolvedPath)
+    const { container } = render({ onResolveFiles })
     expand(container)
-    const input = container.querySelector<HTMLInputElement>('input[type="file"]')
-    if (!input) throw new Error('expected file input')
+    const textarea = container.querySelector('textarea')
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!textarea || !fileInput) throw new Error('expected composer inputs')
     const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+    fireEvent.change(textarea, { target: { value: 'cat done' } })
+    textarea.setSelectionRange(4, 4)
+    act(() => buttonByAccessibleName(container, LABELS.selectFiles).click())
 
-    fireEvent.change(input, { target: { files: [file] } })
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } })
+    })
 
-    expect(onSelectFiles).toHaveBeenCalledWith([file])
-    expect(input.value).toBe('')
+    expect(onResolveFiles).toHaveBeenCalledWith([file])
+    expect(textarea.value).toBe("cat '/tmp/notes file.txt' done")
+    expect(textarea.selectionStart).toBe(4 + resolvedPath.length)
+    expect(fileInput.value).toBe('')
+    expect(document.activeElement).toBe(textarea)
   })
 
   test('sends terminal-mode-aware key intents and scroll actions', () => {
@@ -223,6 +235,7 @@ describe('TerminalComposer', () => {
 
     act(() => buttonByAccessibleName(container, LABELS.showInput).click())
     expect(container.querySelector('textarea')?.value).toBe('draft command')
+    expect(document.activeElement).toBe(container.querySelector('textarea'))
     expect(buttonByAccessibleName(container, LABELS.selectFiles)).toBeTruthy()
     expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
