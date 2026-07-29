@@ -189,6 +189,10 @@ export async function renderTerminalSession(
       writeInput(terminalSessionId, data)
       return true
     },
+    submitText: (terminalSessionId, text) => {
+      writeInput(terminalSessionId, text)
+      return true
+    },
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
     ...contextOverrides,

@@ -479,6 +479,22 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
+  test('submits composed text through xterm paste semantics followed by Enter', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    term.modes.bracketedPasteMode = true
+
+    expect(session.submitText('first line\nsecond line')).toBe(true)
+    await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+
+    expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenLastCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1b[200~first line\rsecond line\x1b[201~\r',
+    })
+  })
+
   test('commits asynchronous input only to the generation captured by its writer', async () => {
     const { session } = await startPresentedControllerGeneration()
     const inputWriter = session.captureInputWriter()

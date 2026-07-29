@@ -67,6 +67,7 @@ export function TerminalSessionView({
     clearSearch,
     captureInputWriter,
     sendVirtualKey,
+    submitText,
     takeover,
     retryPresentation,
     restart,
@@ -482,12 +483,11 @@ export function TerminalSessionView({
   const handleComposerSend = useCallback(
     (text: string) => {
       if (!terminalSessionId || !isController || !text) return false
-      const inputWriter = captureInputWriter(terminalSessionId)
-      if (inputWriter?.(`${text}\r`)) return true
+      if (submitText(terminalSessionId, text)) return true
       toast.error(t('terminal.write-not-sent'))
       return false
     },
-    [captureInputWriter, isController, t, terminalSessionId],
+    [isController, submitText, t, terminalSessionId],
   )
 
   return (

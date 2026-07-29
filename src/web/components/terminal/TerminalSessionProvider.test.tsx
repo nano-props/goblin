@@ -60,6 +60,7 @@ const projection = vi.hoisted(() => ({
   clearSearch: vi.fn(),
   captureInputWriter: vi.fn(),
   sendVirtualKey: vi.fn(),
+  submitText: vi.fn(),
   takeover: vi.fn(),
   retryPresentation: vi.fn(),
 }))
@@ -260,6 +261,7 @@ describe('TerminalSessionProvider', () => {
       clearSearch: projection.clearSearch,
       captureInputWriter: projection.captureInputWriter,
       sendVirtualKey: projection.sendVirtualKey,
+      submitText: projection.submitText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
     })

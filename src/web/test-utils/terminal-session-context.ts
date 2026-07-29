@@ -3,12 +3,12 @@ import type { TerminalSessionContextValue } from '#/web/components/terminal/type
 
 type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,
-  'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'retryPresentation'
+  'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'submitText' | 'retryPresentation'
 > &
   Partial<
     Pick<
       TerminalSessionContextValue,
-      'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'retryPresentation'
+      'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'submitText' | 'retryPresentation'
     >
   >
 type CreatedAdmissionTestTerminalSessionContextValue = Omit<
@@ -36,12 +36,14 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     context.createTerminalWithAdmission ?? unexpectedContextCapability('createTerminalWithAdmission')
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
+  const submitText = context.submitText ?? unexpectedContextCapability('submitText')
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
   return {
     ...context,
     createTerminalWithAdmission,
     captureInputWriter,
     sendVirtualKey,
+    submitText,
     retryPresentation,
   }
 }

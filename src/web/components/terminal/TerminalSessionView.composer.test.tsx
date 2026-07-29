@@ -24,18 +24,16 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
-  test('submits composer text and Enter through a writer captured for the selected session', async () => {
-    const inputWriter = vi.fn(() => true)
-    const captureInputWriter = vi.fn(() => inputWriter)
-    const rendered = await renderTerminalSession({ captureInputWriter })
+  test('submits composer text through the selected terminal paste boundary followed by Enter', async () => {
+    const submitText = vi.fn(() => true)
+    const rendered = await renderTerminalSession({ submitText })
 
     try {
       const textarea = openComposerInput(rendered.container)
       fireEvent.change(textarea, { target: { value: 'git status' } })
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
-      expect(captureInputWriter).toHaveBeenCalledWith('term-111111111111111111111')
-      expect(inputWriter).toHaveBeenCalledWith('git status\r')
+      expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
       expect(textarea.value).toBe('')
     } finally {
       await rendered.cleanup()
@@ -43,15 +41,15 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('keeps composer text when the captured session no longer accepts input', async () => {
-    const inputWriter = vi.fn(() => false)
-    const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => inputWriter) })
+    const submitText = vi.fn(() => false)
+    const rendered = await renderTerminalSession({ submitText })
 
     try {
       const textarea = openComposerInput(rendered.container)
       fireEvent.change(textarea, { target: { value: 'keep this command' } })
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
-      expect(inputWriter).toHaveBeenCalledWith('keep this command\r')
+      expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'keep this command')
       expect(textarea.value).toBe('keep this command')
     } finally {
       await rendered.cleanup()

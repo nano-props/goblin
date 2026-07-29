@@ -81,6 +81,10 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     captureInputWriter(): null {
       return null
     }
+
+    submitText(): false {
+      return false
+    }
     takeover(): Promise<boolean> {
       return Promise.resolve(true)
     }

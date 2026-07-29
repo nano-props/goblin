@@ -235,6 +235,11 @@ export class TerminalSession {
     this.view.sendVirtualKey(key)
   }
 
+  submitText(text: string): boolean {
+    if (!text || !this.currentWritableInputBinding()) return false
+    return this.view.submitText(text)
+  }
+
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
     if (!this.view.isPresented() || !this.view.currentTerminal() || !this.runtime.canSendInput()) return null
     return this.runtime.currentRuntimeBinding()

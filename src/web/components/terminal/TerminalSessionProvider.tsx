@@ -111,6 +111,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       clearSearch: projection.clearSearch,
       captureInputWriter: projection.captureInputWriter,
       sendVirtualKey: projection.sendVirtualKey,
+      submitText: projection.submitText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
     }),
