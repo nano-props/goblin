@@ -17,6 +17,7 @@ import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import type { GitWorkspaceClientState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { cn } from '#/web/lib/cn.ts'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-navigation text-sm'
@@ -57,8 +58,9 @@ export function WorkspaceLayoutSidebar({
 }: WorkspaceShellSidebarProps) {
   const t = useT()
   const navigatorTitleKey = git ? 'tab.branches' : 'workspace.navigation-title'
+  const backgroundClassName = compact ? 'bg-background' : 'bg-navigation'
   return (
-    <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-navigation">
+    <aside className={cn('flex min-h-0 min-w-0 flex-1 flex-col', backgroundClassName)}>
       {!compact &&
         (chromeRegion === 'drag' ? (
           <TitleBarDragRegion
@@ -88,7 +90,7 @@ export function WorkspaceLayoutSidebar({
             title={t(navigatorTitleKey)}
             gitAvailable={git !== null}
           />
-          <div className="flex min-h-0 flex-1 bg-navigation">
+          <div className={cn('flex min-h-0 flex-1', backgroundClassName)}>
             {branchContent ??
               (git ? (
                 <BranchNavigator
@@ -106,9 +108,9 @@ export function WorkspaceLayoutSidebar({
           </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 bg-navigation" />
+        <div className={cn('flex min-h-0 flex-1', backgroundClassName)} />
       )}
-      <SidebarSettingsButton onOpenSettings={onOpenSettings} />
+      <SidebarSettingsButton backgroundClassName={backgroundClassName} onOpenSettings={onOpenSettings} />
     </aside>
   )
 }
@@ -184,7 +186,13 @@ function WorkspaceShellNavigatorHeader({
   )
 }
 
-function SidebarSettingsButton({ onOpenSettings }: { onOpenSettings?: () => void }) {
+function SidebarSettingsButton({
+  backgroundClassName,
+  onOpenSettings,
+}: {
+  backgroundClassName: string
+  onOpenSettings?: () => void
+}) {
   const t = useT()
   const button = (
     <SidebarRowButton
@@ -195,5 +203,5 @@ function SidebarSettingsButton({ onOpenSettings }: { onOpenSettings?: () => void
       {t('app-chrome.settings-tooltip')}
     </SidebarRowButton>
   )
-  return <div className="relative z-10 shrink-0 bg-navigation p-2">{button}</div>
+  return <div className={cn('relative z-10 shrink-0 p-2', backgroundClassName)}>{button}</div>
 }
