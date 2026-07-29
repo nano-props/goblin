@@ -139,7 +139,7 @@ describe('runtime settings controllers', () => {
 
   test('coalesces concurrent external app refreshes', async () => {
     const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
-    const refresh = createDeferredVoid()
+    const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshExternalAppsDetection.mockImplementation(async () => await refresh.promise)
     let controller: ReturnType<typeof useExternalAppSettingsController> | undefined
 
@@ -189,7 +189,7 @@ describe('runtime settings controllers', () => {
 
   test('coalesces concurrent GitHub CLI refreshes', async () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
-    const refresh = createDeferredVoid()
+    const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
     let controller: ReturnType<typeof useGitHubSettingsController> | undefined
 
@@ -221,12 +221,4 @@ describe('runtime settings controllers', () => {
 
 function renderWithAppQueryClient(element: React.ReactElement) {
   return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
-}
-
-function createDeferredVoid(): { promise: Promise<void>; resolve: () => void } {
-  let resolve = () => {}
-  const promise = new Promise<void>((nextResolve) => {
-    resolve = nextResolve
-  })
-  return { promise, resolve }
 }

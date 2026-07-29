@@ -28,8 +28,8 @@ describe('useAsyncPending', () => {
   })
 
   test('resetKey clears pending without letting older promises clear newer pending', async () => {
-    const first = deferred<void>()
-    const second = deferred<void>()
+    const first = Promise.withResolvers<void>()
+    const second = Promise.withResolvers<void>()
     const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
 
     const view = renderInJsdom(
@@ -83,7 +83,7 @@ describe('useAsyncPending', () => {
   })
 
   test('clears pending after async work settles under StrictMode', async () => {
-    const work = deferred<void>()
+    const work = Promise.withResolvers<void>()
     const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
 
     renderInJsdom(
@@ -122,14 +122,4 @@ function UseAsyncPendingHarness({
   const api = useAsyncPending<string>({ resetKey })
   onReady(api)
   return null
-}
-
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve
-    reject = promiseReject
-  })
-  return { promise, resolve, reject }
 }

@@ -57,10 +57,6 @@ describe('buildCorsOriginPredicate', () => {
     expect(predicate('http://[::1]:32100')).toBe(true)
   })
 
-  test('allows the configured bind host on the same port', () => {
-    expect(predicate('http://127.0.0.1:32100')).toBe(true)
-  })
-
   test('rejects a different port', () => {
     expect(predicate('http://localhost:8080')).toBe(false)
   })

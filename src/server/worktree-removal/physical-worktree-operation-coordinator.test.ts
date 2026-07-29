@@ -40,8 +40,8 @@ describe('physical worktree operation coordinator', () => {
     const held = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/a') })
     const second = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
-    const gate = deferred<void>()
-    const activeStarted = deferred<void>()
+    const gate = Promise.withResolvers<void>()
+    const activeStarted = Promise.withResolvers<void>()
     const active = coordinator.runOperation(held, async () => {
       activeStarted.resolve()
       await gate.promise
@@ -121,8 +121,8 @@ describe('physical worktree operation coordinator', () => {
     })
     const b = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
-    const gate = deferred<void>()
-    const heldStarted = deferred<void>()
+    const gate = Promise.withResolvers<void>()
+    const heldStarted = Promise.withResolvers<void>()
     const held = coordinator.runOperation(b, async () => {
       heldStarted.resolve()
       await gate.promise
@@ -154,7 +154,7 @@ describe('physical worktree operation coordinator', () => {
     const runtime = new AbortController()
     const queued = issueTestPhysicalWorktreeExecutionCapability({ identity, runtimeSignal: runtime.signal })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
-    const gate = deferred<void>()
+    const gate = Promise.withResolvers<void>()
     const active = coordinator.runOperation(held, async () => await gate.promise)
     await Promise.resolve()
     let ran = false
@@ -178,7 +178,7 @@ describe('physical worktree operation coordinator', () => {
       runtimeSignal: runtime.signal,
     })
     const coordinator = createPhysicalWorktreeOperationCoordinator()
-    const gate = deferred<void>()
+    const gate = Promise.withResolvers<void>()
     const active = coordinator.runOperation(held, async () => await gate.promise)
     await Promise.resolve()
     let ran = false
@@ -193,7 +193,3 @@ describe('physical worktree operation coordinator', () => {
     await active
   })
 })
-
-function deferred<T>() {
-  return Promise.withResolvers<T>()
-}

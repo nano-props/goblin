@@ -96,18 +96,24 @@ describe('repository query authorities', () => {
     const snapshotKey = repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1')
     const statusKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, 'repo-runtime-1')
     const prKey = repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', { kind: 'repository-summary' })
-    const operationsKey = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1')
+    const activeOperationsKey = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1')
+    const settledOperationsKey = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1', true)
     client.setQueryData(snapshotKey, snapshot('main'))
     client.setQueryData(statusKey, { workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
     client.setQueryData(prKey, { pullRequests: [] })
-    client.setQueryData(operationsKey, repoOperationsForTest(1))
+    client.setQueryData(activeOperationsKey, repoOperationsForTest(1))
+    client.setQueryData(settledOperationsKey, repoOperationsForTest(2))
+
+    expect(client.getQueryData(activeOperationsKey)).toEqual(repoOperationsForTest(1))
+    expect(client.getQueryData(settledOperationsKey)).toEqual(repoOperationsForTest(2))
 
     invalidateRepoMetadataQueries(WORKSPACE_ID, 'repo-runtime-1', client)
     await Promise.resolve()
     expect(client.getQueryState(snapshotKey)?.isInvalidated).toBe(true)
     expect(client.getQueryState(statusKey)?.isInvalidated).toBe(false)
     expect(client.getQueryState(prKey)?.isInvalidated).toBe(false)
-    expect(client.getQueryState(operationsKey)?.isInvalidated).toBe(false)
+    expect(client.getQueryState(activeOperationsKey)?.isInvalidated).toBe(false)
+    expect(client.getQueryState(settledOperationsKey)?.isInvalidated).toBe(false)
 
     invalidateRepoWorktreeStatusQueries(WORKSPACE_ID, 'repo-runtime-1', client)
     await Promise.resolve()
@@ -115,7 +121,8 @@ describe('repository query authorities', () => {
 
     invalidateRepoOperationsQueries(WORKSPACE_ID, 'repo-runtime-1', client)
     await Promise.resolve()
-    expect(client.getQueryState(operationsKey)?.isInvalidated).toBe(true)
+    expect(client.getQueryState(activeOperationsKey)?.isInvalidated).toBe(true)
+    expect(client.getQueryState(settledOperationsKey)?.isInvalidated).toBe(true)
   })
 
   test('reruns an active snapshot query invalidated during an in-flight read', async () => {

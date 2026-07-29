@@ -73,7 +73,7 @@ describe('TokenGate', () => {
 
   test('hides the previous error while a retry is pending', async () => {
     const user = userEvent.setup()
-    const retry = createDeferred<{ ok: true }>()
+    const retry = Promise.withResolvers<{ ok: true }>()
     vi.mocked(postServerJson).mockRejectedValueOnce(new Error('bad token')).mockReturnValueOnce(retry.promise)
     renderLoginForm()
 
@@ -120,14 +120,4 @@ function renderLoginForm() {
       <div>private app</div>
     </TokenGate>,
   )
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
 }

@@ -120,22 +120,6 @@ function renderElement(element: ReactNode): Promise<void> {
   })
 }
 
-interface Deferred<T> {
-  promise: Promise<T>
-  resolve: (value: T) => void
-  reject: (reason?: unknown) => void
-}
-
-function makeDeferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
-}
-
 async function flush() {
   await act(async () => {
     await Promise.resolve()
@@ -253,7 +237,7 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('kicks an initial fetch on mount and exposes loading=true', async () => {
-    const deferred = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const deferred = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
@@ -352,8 +336,8 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('starts the new target read without letting the previous cache read clobber it', async () => {
-    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
-    const second = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const first = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    const second = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(second.promise)
 
@@ -398,7 +382,7 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('lets the query-owned root read settle after the consumer unmounts', async () => {
-    const deferred = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const deferred = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
@@ -534,7 +518,7 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('keeps child loading state when expanded keys hydrate cached prefixes', async () => {
-    const child = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const child = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
@@ -746,7 +730,7 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('manual refresh() while a request is in flight reuses the in-flight query', async () => {
-    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const first = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
 
     await render({
@@ -784,7 +768,7 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('coalesces invalidation during an in-flight read and discards the pre-invalidation result', async () => {
-    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const first = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     const current = {
       nodes: [
         {
