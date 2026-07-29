@@ -148,6 +148,51 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
+  test('browses successful submissions with plain vertical arrows only from an empty draft', async () => {
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+
+    fireEvent.change(input, { target: { value: 'first' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+    fireEvent.change(input, { target: { value: 'second' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+
+    expect(fireEvent.keyDown(input, { key: 'ArrowUp' })).toBe(false)
+    expect(input.value).toBe('second')
+    expect(fireEvent.keyDown(input, { key: 'ArrowUp' })).toBe(false)
+    expect(input.value).toBe('first')
+    expect(fireEvent.keyDown(input, { key: 'ArrowDown' })).toBe(false)
+    expect(input.value).toBe('second')
+    expect(fireEvent.keyDown(input, { key: 'ArrowDown' })).toBe(false)
+    expect(input.value).toBe('')
+
+    fireEvent.change(input, { target: { value: 'one\ntwo' } })
+    expect(fireEvent.keyDown(input, { key: 'ArrowUp' })).toBe(true)
+    expect(input.value).toBe('one\ntwo')
+  })
+
+  test('returns vertical arrows to native editing after a recalled entry is changed', async () => {
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+
+    fireEvent.change(input, { target: { value: 'previous' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    fireEvent.change(input, { target: { value: 'previous edited' } })
+
+    expect(fireEvent.keyDown(input, { key: 'ArrowUp' })).toBe(true)
+    expect(input.value).toBe('previous edited')
+  })
+
   test('grows with multiline text until the five-line cap, then leaves overflow to the textarea', () => {
     const { container } = render()
     expand(container)

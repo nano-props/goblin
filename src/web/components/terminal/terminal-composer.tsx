@@ -15,6 +15,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
+import { TerminalComposerHistory } from '#/web/components/terminal/terminal-composer-history.ts'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -134,6 +135,7 @@ export function TerminalComposer({
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
   const submittingRef = useRef(false)
+  const [history] = useState(() => new TerminalComposerHistory())
   const composerId = useId()
 
   useLayoutEffect(() => {
@@ -166,6 +168,7 @@ export function TerminalComposer({
     submittingRef.current = true
     try {
       if (!(await onSendText(submittedDraft))) return
+      history.record(submittedDraft)
       setDraft((current) => (current === submittedDraft ? '' : current))
     } finally {
       submittingRef.current = false
@@ -190,6 +193,7 @@ export function TerminalComposer({
     try {
       const insertion = await onResolveFiles(files)
       if (!insertion) return
+      history.leaveBrowsing()
       setDraft((current) => {
         const start = Math.min(fileInsertionRef.current.start, current.length)
         const end = Math.min(Math.max(fileInsertionRef.current.end, start), current.length)
@@ -246,9 +250,27 @@ export function TerminalComposer({
               aria-label={labels.inputPlaceholder}
               placeholder={labels.inputPlaceholder}
               className="goblin-terminal-composer__input"
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                history.leaveBrowsing()
+                setDraft(event.target.value)
+              }}
+              onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={(event) => {
-                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+                if (event.nativeEvent.isComposing) return
+                const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
+                if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                  const historicalDraft =
+                    event.key === 'ArrowUp' ? history.previous(draft) : history.next()
+                  if (historicalDraft !== undefined) {
+                    event.preventDefault()
+                    pendingCaretRef.current = historicalDraft.length
+                    setDraft(historicalDraft)
+                    return
+                  }
+                } else if (history.isBrowsing()) {
+                  history.leaveBrowsing()
+                }
+                if (event.key !== 'Enter' || event.shiftKey) return
                 event.preventDefault()
                 void submitDraft()
               }}
