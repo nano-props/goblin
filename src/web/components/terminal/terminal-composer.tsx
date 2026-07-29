@@ -48,6 +48,7 @@ interface TerminalComposerProps {
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
   disabled?: boolean
+  hidden?: boolean
   className?: string
 }
 
@@ -120,6 +121,7 @@ export function TerminalComposer({
   onRequestFocus,
   onScrollLines,
   disabled,
+  hidden,
   className,
 }: TerminalComposerProps) {
   const [expanded, setExpanded] = useState(false)
@@ -196,6 +198,7 @@ export function TerminalComposer({
     <div
       className={cn('goblin-terminal-composer', expanded && 'goblin-terminal-composer--expanded', className)}
       data-expanded={expanded}
+      hidden={hidden}
       role="group"
       aria-label={labels.composer}
     >

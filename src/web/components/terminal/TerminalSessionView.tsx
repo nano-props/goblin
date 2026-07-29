@@ -546,10 +546,11 @@ export function TerminalSessionView({
           </Button>
         </div>
       )}
-      {isController && terminalSessionId && !searchOpen && (
+      {isController && terminalSessionId && (
         <TerminalComposer
           key={terminalSessionId}
           className="goblin-terminal-composer--floating"
+          hidden={searchOpen}
           labels={terminalComposerLabels}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
           onSendText={handleComposerSend}

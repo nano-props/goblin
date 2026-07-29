@@ -86,17 +86,27 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('hides the terminal composer while terminal search is open', async () => {
+  test('hides the terminal composer without losing its draft while terminal search is open', async () => {
     const user = userEvent.setup()
     const rendered = await renderTerminalSession()
 
     try {
-      expect(rendered.container.querySelector('.goblin-terminal-composer')).not.toBeNull()
-      rendered.sessionRoot.focus()
+      const textarea = openComposerInput(rendered.container)
+      fireEvent.change(textarea, { target: { value: 'preserved draft' } })
       await user.keyboard('{Meta>}f{/Meta}')
 
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
-      expect(rendered.container.querySelector('.goblin-terminal-composer')).toBeNull()
+      expect(rendered.container.querySelector('.goblin-terminal-composer')?.hasAttribute('hidden')).toBe(true)
+      expect(textarea.value).toBe('preserved draft')
+
+      const closeSearch = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.textContent === 'terminal.search-close',
+      )
+      if (!closeSearch) throw new Error('expected terminal search close button')
+      act(() => closeSearch.click())
+
+      expect(rendered.container.querySelector('.goblin-terminal-composer')?.hasAttribute('hidden')).toBe(false)
+      expect(textarea.value).toBe('preserved draft')
     } finally {
       await rendered.cleanup()
     }
