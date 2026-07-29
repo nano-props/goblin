@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
 import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
-import { REALTIME_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS } from '#/server/realtime/realtime-broker.ts'
+import { REALTIME_LIVENESS_PROBE_INTERVAL_MS } from '#/server/realtime/realtime-broker.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {
   CLIENT_STATE_GRACE_MS,
   DETACHED_TTL_MS,
-  HEARTBEAT_SILENCE_MS,
+  LIVENESS_SILENCE_MS,
   REPO_ROOT,
   TEST_NOW,
   USER_1,
@@ -41,7 +41,7 @@ describe('server terminal runtime expiry', () => {
         }),
       ])
 
-      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
       expect(handle.isClientOnline('client_idle')).toBe(false)
       expect(
         await host.listSessions('client_idle', USER_1, {
@@ -75,7 +75,7 @@ describe('server terminal runtime expiry', () => {
     }
   })
 
-  test('runtime: recovered heartbeat cancels detached cleanup after a heartbeat timeout', async () => {
+  test('runtime: recovered health probes cancel detached cleanup after a liveness timeout', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
@@ -88,16 +88,21 @@ describe('server terminal runtime expiry', () => {
       host.registerSocket('client_recovered', USER_1, socket)
       await createTerminalSession(host, 'client_recovered')
 
-      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
       expect(handle.isClientOnline('client_recovered')).toBe(false)
 
       const reconnectedSocket = appRealtimeSocket()
       host.registerSocket('client_recovered', USER_1, reconnectedSocket)
       expect(handle.isClientOnline('client_recovered')).toBe(true)
 
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
-        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
-        host.handleRealtimeMessage('client_recovered', USER_1, reconnectedSocket, JSON.stringify({ type: 'heartbeat' }))
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
+        await advanceTimersAndFlush(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
+        host.handleRealtimeMessage(
+          'client_recovered',
+          USER_1,
+          reconnectedSocket,
+          JSON.stringify({ type: 'ping', requestId: `health_recovered_${elapsed}` }),
+        )
       }
       await vi.runOnlyPendingTimersAsync()
       await expect(
@@ -112,7 +117,7 @@ describe('server terminal runtime expiry', () => {
     }
   })
 
-  test('runtime: detached TTL cleans up when heartbeat timeout leaves only half-open sockets', async () => {
+  test('runtime: detached TTL cleans up when liveness timeout leaves only half-open sockets', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
@@ -125,7 +130,7 @@ describe('server terminal runtime expiry', () => {
       host.registerSocket('client_half_open', USER_1, socket)
       await createTerminalSession(host, 'client_half_open')
 
-      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
       expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
       expect(handle.isClientOnline('client_half_open')).toBe(false)
 
@@ -146,7 +151,7 @@ describe('server terminal runtime expiry', () => {
     }
   })
 
-  test('runtime: late socket drain does not extend detached TTL after heartbeat timeout', async () => {
+  test('runtime: late socket drain does not extend detached TTL after liveness timeout', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
@@ -159,7 +164,7 @@ describe('server terminal runtime expiry', () => {
       host.registerSocket('client_late_drain', USER_1, socket)
       await createTerminalSession(host, 'client_late_drain')
 
-      vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
       expect(handle.isClientOnline('client_late_drain')).toBe(false)
 
       await advanceTimersAndFlush(DETACHED_TTL_MS - 1_000)
@@ -285,14 +290,14 @@ describe('server terminal runtime expiry', () => {
       const socket = appRealtimeSocket()
       handle.host.registerSocket('client_claimed_before_expiry', USER_1, socket)
 
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
         handle.host.handleRealtimeMessage(
           'client_claimed_before_expiry',
           USER_1,
           socket,
-          JSON.stringify({ type: 'heartbeat' }),
+          JSON.stringify({ type: 'ping', requestId: `health_claimed_${elapsed}` }),
         )
-        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
+        await advanceTimersAndFlush(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
       }
 
       expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, runtimeId, 'client_claimed_before_expiry')).toEqual({
@@ -315,14 +320,14 @@ describe('server terminal runtime expiry', () => {
       handle.host.registerSocket('client_online_before_acquire', USER_1, socket)
       const runtimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_online_before_acquire')
 
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
         handle.host.handleRealtimeMessage(
           'client_online_before_acquire',
           USER_1,
           socket,
-          JSON.stringify({ type: 'heartbeat' }),
+          JSON.stringify({ type: 'ping', requestId: `health_online_${elapsed}` }),
         )
-        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
+        await advanceTimersAndFlush(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
       }
 
       expect(releaseWorkspaceRuntime(USER_1, REPO_ROOT, runtimeId, 'client_online_before_acquire')).toEqual({

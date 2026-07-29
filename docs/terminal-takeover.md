@@ -147,9 +147,9 @@ the effective controller would stay pinned to the dead client,
 and every sibling viewer would be stranded in viewer mode with
 no path to auto-claim.
 
-Each realtime socket owns its own heartbeat clock. The client emits a small
-heartbeat while that socket is open; if its receipt time goes stale, the broker
-closes that exact transport. A healthy replacement socket with the same
+Each realtime socket owns its own liveness clock. The client sends a health
+ping while that socket is open and requires the matching pong; if the ping
+receipt time goes stale, the broker closes that exact transport. A healthy replacement socket with the same
 `clientId` cannot keep an obsolete socket alive. Client presence turns offline
 only after its last socket is gone. Stored controller intent is not erased, but
 it no longer projects to an effective controller, so the next attach can

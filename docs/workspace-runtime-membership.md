@@ -81,7 +81,7 @@ Live commands:
 
 Realtime recovery:
 
-1. WebSocket heartbeat and socket counts are the only online-presence
+1. WebSocket health probes and socket counts are the only online-presence
    authority; workspace runtime code does not poll or infer browser lifecycle.
 2. When the last socket for a `clientId` disappears, the server captures the
    client's current membership generations and starts a grace timer.

@@ -72,7 +72,7 @@ interface ClientServerRealtimeClients {
 }
 
 // The app realtime client is *expensive*: it owns the shared WebSocket,
-// subscriber sets, heartbeat, and recovery hooks. Feature clients are sibling
+// subscriber sets, liveness probes, and recovery hooks. Feature clients are sibling
 // capability adapters over that transport.
 let memoizedRealtimeClients: ClientServerRealtimeClients | null = null
 function getOrCreateRealtimeClients(): ClientServerRealtimeClients {

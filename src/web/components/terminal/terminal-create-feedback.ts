@@ -51,8 +51,6 @@ function isTerminalConnectionFailure(message: string): boolean {
     message === 'Terminal socket closed' ||
     message === 'App realtime socket closed' ||
     message === 'Terminal socket error' ||
-    message === 'App realtime socket error' ||
-    message === 'Terminal heartbeat send failed' ||
-    message === 'App realtime heartbeat send failed'
+    message === 'App realtime socket error'
   )
 }

@@ -40,16 +40,6 @@ export type AppRealtimeHealthPongMessage = { type: 'pong'; requestId: string }
 export type AppRealtimeSocketServerMessage =
   AppRealtimeMessage | AppRealtimeResponseMessage | AppRealtimeHealthPongMessage
 
-/**
- * Heartbeat envelope. Sent client→server while the realtime socket is open.
- * The server already knows `(clientId, userId)` from the upgrade; this only
- * feeds broker liveness.
- */
-export interface AppRealtimeHeartbeatMessage {
-  type: 'heartbeat'
-}
-
 export type AppRealtimeHealthPingMessage = { type: 'ping'; requestId: string }
 
-export type AppRealtimeClientMessage =
-  TerminalClientMessage | AppRealtimeRequestMessage | AppRealtimeHeartbeatMessage | AppRealtimeHealthPingMessage
+export type AppRealtimeClientMessage = TerminalClientMessage | AppRealtimeRequestMessage | AppRealtimeHealthPingMessage

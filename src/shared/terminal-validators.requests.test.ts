@@ -173,6 +173,7 @@ describe('shared terminal validators requests', () => {
       requestId: 'health_1',
     })
     expect(normalizeAppRealtimeClientMessage({ type: 'ping', requestId: 'health_1', clientId: 'forged' })).toBeNull()
+    expect(normalizeAppRealtimeClientMessage({ type: 'heartbeat' })).toBeNull()
 
     expect(
       normalizeAppRealtimeClientMessage({
