@@ -389,7 +389,7 @@
   border: 0;
   border-radius: var(--goblin-terminal-control-radius);
   background: var(--color-control);
-  padding: 9px 10px;
+  padding: 10px;
   color: var(--color-foreground);
   font-size: 16px;
   line-height: 20px;
