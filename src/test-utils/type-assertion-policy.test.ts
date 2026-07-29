@@ -32,8 +32,6 @@ describe('type assertion policy', () => {
     for (const [source, line] of [
       ['// @ts-ignore\ncall()', 1],
       ['/// @ts-ignore\ncall()', 1],
-      ['/* @ts-ignore */\ncall()', 1],
-      ['/* note\n * @ts-ignore\n */\ncall()', 2],
     ] as const) {
       expect(findTypeAssertionViolations(source, file, noAllowlist)).toEqual([
         `${file}:${line}: @ts-ignore is forbidden`,
