@@ -6,14 +6,13 @@ import {
   ArrowUp,
   ChevronsDown,
   ChevronsUp,
-  FileUp,
   Keyboard,
-  SendHorizontal,
+  Plus,
   Square,
+  TextCursorInput,
   X,
 } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
-import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
@@ -23,8 +22,9 @@ export interface TerminalComposerLabels {
   open: string
   close: string
   inputPlaceholder: string
-  send: string
   selectFiles: string
+  showKeys: string
+  showInput: string
   tab: string
   arrowUp: string
   arrowDown: string
@@ -49,7 +49,7 @@ interface TerminalComposerProps {
 
 type AccessibleName = Exclude<
   keyof TerminalComposerLabels,
-  'composer' | 'open' | 'close' | 'inputPlaceholder' | 'send' | 'selectFiles'
+  'composer' | 'open' | 'close' | 'inputPlaceholder' | 'selectFiles' | 'showKeys' | 'showInput'
 >
 type ToolbarKey = { accessibleName: AccessibleName } & (
   | { type: 'virtual-key'; label: string; key: TerminalVirtualKey }
@@ -98,6 +98,7 @@ export function TerminalComposer({
   className,
 }: TerminalComposerProps) {
   const [expanded, setExpanded] = useState(false)
+  const [mode, setMode] = useState<'input' | 'keys'>('input')
   const [draft, setDraft] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -105,10 +106,10 @@ export function TerminalComposer({
 
   useLayoutEffect(() => {
     const input = inputRef.current
-    if (!input || !expanded) return
+    if (!input || !expanded || mode !== 'input') return
     input.style.height = `${COMPOSER_INPUT_MIN_HEIGHT_PX}px`
     input.style.height = `${Math.min(COMPOSER_INPUT_MAX_HEIGHT_PX, Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight))}px`
-  }, [draft, expanded])
+  }, [draft, expanded, mode])
 
   const submitDraft = () => {
     if (!draft || !onSendText(draft)) return
@@ -145,13 +146,64 @@ export function TerminalComposer({
         aria-hidden={!expanded}
         inert={!expanded ? true : undefined}
       >
-        <div className="goblin-terminal-composer__input-row">
+        <div className="goblin-terminal-composer__mode-row">
+          <ToolbarButton
+            accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
+            disabled={disabled}
+            onClick={() => setMode((current) => (current === 'input' ? 'keys' : 'input'))}
+          >
+            {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
+          </ToolbarButton>
+          {mode === 'input' ? (
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={draft}
+              disabled={disabled}
+              aria-label={labels.inputPlaceholder}
+              placeholder={labels.inputPlaceholder}
+              className="goblin-terminal-composer__input"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+                event.preventDefault()
+                submitDraft()
+              }}
+            />
+          ) : (
+            <ScrollArea
+              orientation="horizontal"
+              scrollbarMode="compact"
+              className="goblin-terminal-composer__key-scroll"
+            >
+              <div className="goblin-terminal-composer__key-row">
+                {KEYS.map((key) => (
+                  <ToolbarButton
+                    key={key.accessibleName}
+                    accessibleName={labels[key.accessibleName]}
+                    disabled={disabled}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      if (key.type === 'scroll') {
+                        onScrollLines(key.amount)
+                        return
+                      }
+                      onVirtualKey(key.key)
+                      if (event.detail > 0) onRequestFocus()
+                    }}
+                  >
+                    {'label' in key ? key.label : key.icon}
+                  </ToolbarButton>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
           <ToolbarButton
             accessibleName={labels.selectFiles}
             disabled={disabled}
             onClick={() => fileInputRef.current?.click()}
           >
-            <FileUp className="size-4" />
+            <Plus className="size-4" />
           </ToolbarButton>
           <input
             ref={fileInputRef}
@@ -162,50 +214,17 @@ export function TerminalComposer({
             multiple
             onChange={selectFiles}
           />
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={draft}
+          <ToolbarButton
+            accessibleName={labels.close}
             disabled={disabled}
-            aria-label={labels.inputPlaceholder}
-            placeholder={labels.inputPlaceholder}
-            className={cn('goblin-terminal-composer__input', focusRingInset)}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
-              event.preventDefault()
-              submitDraft()
+            onClick={() => {
+              setMode('input')
+              setExpanded(false)
             }}
-          />
-          <ToolbarButton accessibleName={labels.send} disabled={disabled || !draft} onClick={submitDraft}>
-            <SendHorizontal className="size-4" />
-          </ToolbarButton>
-          <ToolbarButton accessibleName={labels.close} disabled={disabled} onClick={() => setExpanded(false)}>
+          >
             <X className="size-4" />
           </ToolbarButton>
         </div>
-        <ScrollArea orientation="horizontal" scrollbarMode="compact" className="goblin-terminal-composer__key-scroll">
-          <div className="goblin-terminal-composer__key-row">
-            {KEYS.map((key) => (
-              <ToolbarButton
-                key={key.accessibleName}
-                accessibleName={labels[key.accessibleName]}
-                disabled={disabled}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  if (key.type === 'scroll') {
-                    onScrollLines(key.amount)
-                    return
-                  }
-                  onVirtualKey(key.key)
-                  if (event.detail > 0) onRequestFocus()
-                }}
-              >
-                {'label' in key ? key.label : key.icon}
-              </ToolbarButton>
-            ))}
-          </div>
-        </ScrollArea>
       </div>
     </div>
   )

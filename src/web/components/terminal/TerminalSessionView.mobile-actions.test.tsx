@@ -22,11 +22,7 @@ describe('TerminalSessionView mobile actions', () => {
       )
       if (!textarea) throw new Error('expected mobile terminal composer input')
       fireEvent.change(textarea, { target: { value: 'git status' } })
-      const sendButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-send',
-      )
-      if (!sendButton) throw new Error('expected composer send button')
-      act(() => sendButton.click())
+      fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(captureInputWriter).toHaveBeenCalledWith('term-111111111111111111111')
       expect(inputWriter).toHaveBeenCalledWith('git status\r')
@@ -51,11 +47,7 @@ describe('TerminalSessionView mobile actions', () => {
       )
       if (!textarea) throw new Error('expected mobile terminal composer input')
       fireEvent.change(textarea, { target: { value: 'keep this command' } })
-      const sendButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-send',
-      )
-      if (!sendButton) throw new Error('expected composer send button')
-      act(() => sendButton.click())
+      fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(inputWriter).toHaveBeenCalledWith('keep this command\r')
       expect(textarea.value).toBe('keep this command')

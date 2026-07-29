@@ -12,8 +12,9 @@ const LABELS: TerminalComposerLabels = {
   open: 'Open terminal composer',
   close: 'Collapse terminal composer',
   inputPlaceholder: 'Enter a terminal command',
-  send: 'Send to terminal',
   selectFiles: 'Select files',
+  showKeys: 'Show terminal keys',
+  showInput: 'Show text input',
   tab: 'Tab',
   arrowUp: 'Arrow Up',
   arrowDown: 'Arrow Down',
@@ -75,17 +76,26 @@ describe('TerminalComposer', () => {
     expect(openButton.getAttribute('aria-expanded')).toBe('true')
     expect(composer?.getAttribute('aria-hidden')).toBe('false')
     expect(composer?.hasAttribute('inert')).toBe(false)
-    expect(container.querySelector('textarea')?.getAttribute('placeholder')).toBe(LABELS.inputPlaceholder)
-    expect(buttonByAccessibleName(container, LABELS.selectFiles)).toBeTruthy()
+    const input = container.querySelector('textarea')
+    const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
+    const showKeys = buttonByAccessibleName(container, LABELS.showKeys)
+    const selectFiles = buttonByAccessibleName(container, LABELS.selectFiles)
+    const close = buttonByAccessibleName(container, LABELS.close)
+    expect(input?.getAttribute('placeholder')).toBe(LABELS.inputPlaceholder)
+    expect(showKeys.parentElement).toBe(modeRow)
+    expect(input?.parentElement).toBe(modeRow)
+    expect(selectFiles.parentElement).toBe(modeRow)
+    expect(selectFiles.querySelector('.lucide-plus')).not.toBeNull()
+    expect(close.parentElement).toBe(modeRow)
     expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
 
-    act(() => buttonByAccessibleName(container, LABELS.close).click())
+    act(() => close.click())
     expect(composer?.getAttribute('aria-hidden')).toBe('true')
     expect(composer?.hasAttribute('inert')).toBe(true)
     expect(container.querySelector('textarea')).not.toBeNull()
   })
 
-  test('submits a command with the send button and clears only accepted text', () => {
+  test('submits with Enter and clears only accepted text', () => {
     const onSendText = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true)
     const { container } = render({ onSendText })
     expand(container)
@@ -93,11 +103,11 @@ describe('TerminalComposer', () => {
     if (!input) throw new Error('expected command input')
     fireEvent.change(input, { target: { value: 'git status' } })
 
-    act(() => buttonByAccessibleName(container, LABELS.send).click())
+    fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenNthCalledWith(1, 'git status')
     expect(input.value).toBe('git status')
 
-    act(() => buttonByAccessibleName(container, LABELS.send).click())
+    fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenNthCalledWith(2, 'git status')
     expect(input.value).toBe('')
   })
@@ -146,6 +156,10 @@ describe('TerminalComposer', () => {
     const onScrollLines = vi.fn()
     const { container } = render({ onVirtualKey, onScrollLines })
     expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.showInput)).toBeTruthy()
 
     for (const name of [
       LABELS.escape,
@@ -173,21 +187,24 @@ describe('TerminalComposer', () => {
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
   })
 
-  test('virtual keys preserve input focus and restore terminal focus only for pointer input', () => {
+  test('mode toggle preserves the draft and virtual keys restore terminal focus only for pointer input', () => {
     const onRequestFocus = vi.fn()
     const { container } = render({ onRequestFocus })
     expand(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
-    input.focus()
+    fireEvent.change(input, { target: { value: 'draft command' } })
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const arrowUp = buttonByAccessibleName(container, LABELS.arrowUp)
 
     expect(fireEvent.pointerDown(arrowUp)).toBe(false)
-    expect(document.activeElement).toBe(input)
     act(() => arrowUp.click())
     expect(onRequestFocus).not.toHaveBeenCalled()
     fireEvent.click(arrowUp, { detail: 1 })
     expect(onRequestFocus).toHaveBeenCalledOnce()
+
+    act(() => buttonByAccessibleName(container, LABELS.showInput).click())
+    expect(container.querySelector('textarea')?.value).toBe('draft command')
   })
 
   test('buttons honour disabled and avoid iOS long-press callout attributes', () => {
