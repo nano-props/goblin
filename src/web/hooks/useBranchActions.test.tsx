@@ -311,7 +311,7 @@ describe('useBranchActions', () => {
   })
 
   test('clears local pending state when the branch action target changes', async () => {
-    const firstOpen = deferred<ExecResult>()
+    const firstOpen = Promise.withResolvers<ExecResult>()
     const branchA = createRepoBranch('feature/a', {
       worktree: { path: '/tmp/local-feature-a', isPrimary: false, isLocked: false },
     })
@@ -433,14 +433,4 @@ function BranchActionsSurfaceHarnessInner({
     onReady(surface)
   }, [surface, onReady])
   return null
-}
-
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve
-    reject = promiseReject
-  })
-  return { promise, resolve, reject }
 }

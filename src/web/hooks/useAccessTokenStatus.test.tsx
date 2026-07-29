@@ -20,7 +20,7 @@ beforeEach(() => {
 
 describe('useAccessTokenStatus', () => {
   test('moves back to checking while a manual refresh probe is pending', async () => {
-    const refreshProbe = createDeferred<{ ok: true }>()
+    const refreshProbe = Promise.withResolvers<{ ok: true }>()
     vi.mocked(fetchServerJson)
       .mockRejectedValueOnce(new Error('unauthorized'))
       .mockReturnValueOnce(refreshProbe.promise)
@@ -80,7 +80,7 @@ describe('useAccessTokenStatus', () => {
   })
 
   test('strips a URL token before the login request settles', async () => {
-    const login = createDeferred<{ ok: true }>()
+    const login = Promise.withResolvers<{ ok: true }>()
     vi.mocked(postServerJson).mockReturnValue(login.promise)
     window.history.replaceState({}, '', '/?accessToken=url-token&x=1')
 
@@ -121,14 +121,4 @@ function Harness() {
       {auth.state}
     </button>
   )
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
 }

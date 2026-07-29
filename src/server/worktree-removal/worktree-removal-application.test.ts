@@ -37,7 +37,7 @@ describe('WorktreeRemovalApplication', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const physicalIdentity = testPhysicalWorktreeIdentity(target.worktreePath)
     const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
-    const finish = deferred<void>()
+    const finish = Promise.withResolvers<void>()
     const application = createApplication({
       operations,
       physicalWorktrees: { capture: async () => physicalCapability },
@@ -63,7 +63,7 @@ describe('WorktreeRemovalApplication', () => {
 
   test('gates one remote endpoint across repository entries without blocking another host or worktree', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
-    const finish = deferred<void>()
+    const finish = Promise.withResolvers<void>()
     const physicalIdentity = remoteIdentity('0123456789abcdef0123456789abcdef', '/srv/repo-linked')
     const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
     const application = createApplication({
@@ -380,12 +380,4 @@ function createApplication(
 
 function remoteIdentity(executionNamespaceId: string, endpoint: string): PhysicalWorktreeIdentity {
   return { kind: 'remote', executionNamespaceId, endpoint }
-}
-
-function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-  return { promise, resolve }
 }
