@@ -59,8 +59,8 @@ const projection = vi.hoisted(() => ({
   findPrevious: vi.fn(),
   clearSearch: vi.fn(),
   captureInputWriter: vi.fn(),
-  capturePasteWriter: vi.fn(),
   sendVirtualKey: vi.fn(),
+  submitText: vi.fn(),
   takeover: vi.fn(),
   retryPresentation: vi.fn(),
 }))
@@ -260,8 +260,8 @@ describe('TerminalSessionProvider', () => {
       findPrevious: projection.findPrevious,
       clearSearch: projection.clearSearch,
       captureInputWriter: projection.captureInputWriter,
-      capturePasteWriter: projection.capturePasteWriter,
       sendVirtualKey: projection.sendVirtualKey,
+      submitText: projection.submitText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
     })

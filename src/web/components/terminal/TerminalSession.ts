@@ -40,7 +40,6 @@ import type {
   TerminalInputWriter,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
-  TerminalPasteWriter,
   TerminalPresentationRecovery,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
@@ -231,19 +230,25 @@ export class TerminalSession {
     return (data) => this.enqueueInput(binding, data)
   }
 
-  capturePasteWriter(): TerminalPasteWriter | null {
-    const binding = this.currentWritableInputBinding()
-    const term = this.view.currentTerminal()
-    if (!binding || !term) return null
-    return (data) => {
-      if (!data || !this.view.isPresented() || !this.isCurrentInputBinding(binding)) return false
-      return this.view.pasteText(term, data)
-    }
-  }
-
   sendVirtualKey(key: TerminalVirtualKey): void {
     if (!this.currentWritableInputBinding()) return
     this.view.sendVirtualKey(key)
+  }
+
+  async submitText(text: string): Promise<boolean> {
+    const submittedBinding = this.currentWritableInputBinding()
+    if (!text || !submittedBinding || !this.view.pasteText(text)) return false
+    // A composed submission represents two ordered user actions. Wait until
+    // the paste has reached the PTY before sending Enter so input batching
+    // cannot collapse them back into one delivery step.
+    if (!(await this.flushInput())) return false
+    // Once the paste is accepted, the Composer draft has been delivered and
+    // must not be offered for automatic resubmission. Enter may follow only
+    // while the same runtime generation remains writable: a replacement PTY
+    // must never receive the second half of an older composed submission.
+    const currentBinding = this.currentWritableInputBinding()
+    if (currentBinding && sameRuntimeBinding(currentBinding, submittedBinding)) this.view.sendVirtualKey('enter')
+    return true
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
@@ -267,30 +272,34 @@ export class TerminalSession {
     this.inputFlushScheduled = true
     queueMicrotask(() => {
       this.inputFlushScheduled = false
-      this.flushInput()
+      void this.flushInput()
     })
   }
 
-  private flushInput(): void {
-    if (this.disposed) return
+  private async flushInput(): Promise<boolean> {
+    if (this.disposed) return false
     const pending = this.pendingInputWrite
     this.pendingInputWrite = null
-    if (!pending || !this.isCurrentInputBinding(pending.binding)) return
+    if (!pending || !this.isCurrentInputBinding(pending.binding)) return false
     const { terminalRuntimeSessionId, terminalRuntimeGeneration } = pending.binding
-    void terminalClient
-      .write({ terminalRuntimeSessionId, terminalRuntimeGeneration, data: pending.data })
-      .then((result) => {
-        if (!this.isCurrentInputBinding(pending.binding)) return
-        if (result.status !== 'accepted')
-          this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
+    try {
+      const result = await terminalClient.write({
+        terminalRuntimeSessionId,
+        terminalRuntimeGeneration,
+        data: pending.data,
       })
-      .catch((err) => {
-        if (!this.isCurrentInputBinding(pending.binding)) return
-        this.writeFailureReporter.report({
-          terminalRuntimeSessionId,
-          failure: { kind: 'error', error: err },
-        })
+      if (result.status === 'accepted') return true
+      if (!this.isCurrentInputBinding(pending.binding)) return false
+      this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
+      return false
+    } catch (err) {
+      if (!this.isCurrentInputBinding(pending.binding)) return false
+      this.writeFailureReporter.report({
+        terminalRuntimeSessionId,
+        failure: { kind: 'error', error: err },
       })
+      return false
+    }
   }
 
   private isCurrentInputBinding(binding: TerminalRuntimeBinding): boolean {

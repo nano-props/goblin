@@ -31,10 +31,6 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn(), message: vi.fn() },
 }))
 
-vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
-  isMobileDevice: () => true,
-}))
-
 // No testing-library fixture models this context/read-model plus clipboard and drop boundary.
 // Keep the DOM harness shared while each suite owns one observable TerminalSessionView behavior.
 type TestTerminalSessionViewProps = Omit<
@@ -191,6 +187,10 @@ export async function renderTerminalSession(
     clearSearch: vi.fn(),
     captureInputWriter: (terminalSessionId) => (data) => {
       writeInput(terminalSessionId, data)
+      return true
+    },
+    submitText: async (terminalSessionId, text) => {
+      writeInput(terminalSessionId, text)
       return true
     },
     takeover: vi.fn(),

@@ -113,12 +113,8 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
       const binding = socketBindingByRawSocket.get(socket)
       if (!binding) return
       const { transport, buffered } = binding
-      if (message.type === 'heartbeat') {
-        broker.recordHeartbeat(buffered)
-        return
-      }
       if (message.type === 'ping') {
-        broker.recordHeartbeat(buffered)
+        broker.recordLiveness(buffered)
         try {
           transport.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
         } catch {

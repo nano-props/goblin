@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   AppRealtimeSocketLimitError,
   MAX_APP_REALTIME_SOCKETS,
-  REALTIME_HEARTBEAT_DEADLINE_MS,
-  REALTIME_HEARTBEAT_INTERVAL_MS,
+  REALTIME_LIVENESS_DEADLINE_MS,
+  REALTIME_LIVENESS_PROBE_INTERVAL_MS,
   RealtimeBroker,
 } from '#/server/realtime/realtime-broker.ts'
 import {
@@ -18,7 +18,7 @@ import { useFakeTimers } from '#/test-utils/timers.ts'
 const USER_ID = 'user_realtime'
 const OTHER_USER_ID = 'user_other'
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
-const HEARTBEAT_SILENCE_MS = REALTIME_HEARTBEAT_DEADLINE_MS + REALTIME_HEARTBEAT_INTERVAL_MS
+const LIVENESS_SILENCE_MS = REALTIME_LIVENESS_DEADLINE_MS + REALTIME_LIVENESS_PROBE_INTERVAL_MS
 
 describe('realtime broker', () => {
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('uses transport heartbeat defaults independently from terminal naming', () => {
+  test('uses transport liveness defaults independently from terminal naming', () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),
@@ -50,9 +50,9 @@ describe('realtime broker', () => {
     bufferedSocket.enqueueTransition(() => new Promise(() => {}))
     broker.registerSocket('client_a', USER_ID, bufferedSocket)
 
-    vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
+    vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
 
-    expect(rawSocket.close).toHaveBeenCalledWith(1001, 'realtime heartbeat timeout')
+    expect(rawSocket.close).toHaveBeenCalledWith(1001, 'realtime liveness timeout')
     expect(broker.hasUserSockets(USER_ID)).toBe(false)
     broker.disconnectAll()
   })
@@ -270,7 +270,7 @@ describe('realtime broker', () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged,
       onUserSocketsDrained: vi.fn(),
-      heartbeatTimeoutReason: 'test heartbeat timeout',
+      livenessTimeoutReason: 'test liveness timeout',
     })
     const staleSocket = { send: vi.fn(), close: vi.fn() }
     const healthySocket = { send: vi.fn(), close: vi.fn() }
@@ -278,11 +278,11 @@ describe('realtime broker', () => {
     broker.registerSocket('client_a', USER_ID, healthySocket)
     onClientPresenceChanged.mockClear()
 
-    vi.advanceTimersByTime(REALTIME_HEARTBEAT_INTERVAL_MS * 2)
-    broker.recordHeartbeat(healthySocket)
-    vi.advanceTimersByTime(REALTIME_HEARTBEAT_INTERVAL_MS * 2)
+    vi.advanceTimersByTime(REALTIME_LIVENESS_PROBE_INTERVAL_MS * 2)
+    broker.recordLiveness(healthySocket)
+    vi.advanceTimersByTime(REALTIME_LIVENESS_PROBE_INTERVAL_MS * 2)
 
-    expect(staleSocket.close).toHaveBeenCalledWith(1001, 'test heartbeat timeout')
+    expect(staleSocket.close).toHaveBeenCalledWith(1001, 'test liveness timeout')
     expect(healthySocket.close).not.toHaveBeenCalled()
     expect(broker.socketCount()).toBe(1)
     expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(true)

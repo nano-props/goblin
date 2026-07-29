@@ -7,7 +7,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
-import { REALTIME_HEARTBEAT_DEADLINE_MS as HEARTBEAT_DEADLINE_MS } from '#/server/realtime/realtime-broker.ts'
+import { REALTIME_LIVENESS_DEADLINE_MS } from '#/server/realtime/realtime-broker.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
@@ -40,7 +40,7 @@ export let USER_2_WORKSPACE_RUNTIME_ID = ''
 export const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 export const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 export const CLIENT_STATE_GRACE_MS = 30_000
-export const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS
+export const LIVENESS_SILENCE_MS = REALTIME_LIVENESS_DEADLINE_MS
 
 export function requiredWorkspaceLocator(input: string) {
   const locator = canonicalWorkspaceLocator(input)

@@ -296,7 +296,7 @@ describe('terminal web host client', () => {
     expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
-  test('sends terminal heartbeat messages while the realtime socket is open', async () => {
+  test('sends periodic liveness probes while the realtime socket is open', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
@@ -306,11 +306,13 @@ describe('terminal web host client', () => {
 
     await vi.advanceTimersByTimeAsync(30_000)
 
-    expect(socket.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
+    const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+    expect(ping).toMatchObject({ type: 'ping' })
+    socket.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
     dispose()
   })
 
-  test('heartbeat send failure closes and reconnects an unhealthy realtime socket', async () => {
+  test('periodic liveness probe send failure closes and reconnects an unhealthy realtime socket', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
@@ -334,7 +336,7 @@ describe('terminal web host client', () => {
     socket.send = vi.fn(() => {
       throw new Error('send failed')
     })
-    const expectation = expect(recoverPromise).rejects.toThrow('App realtime heartbeat send failed')
+    const expectation = expect(recoverPromise).rejects.toThrow('App realtime health probe send failed')
 
     await vi.advanceTimersByTimeAsync(29_000)
 

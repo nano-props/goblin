@@ -543,7 +543,7 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
+  test('does not force terminal focus after search closes if ready happened while search was open', async () => {
     const user = userEvent.setup()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
@@ -636,8 +636,7 @@ describe('TerminalSessionView presentation and focus', () => {
       await user.keyboard('{Escape}')
 
       expect(container.querySelector('.goblin-terminal-session__search')).toBeNull()
-      expect(focusTerminal).toHaveBeenCalledTimes(1)
-      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(focusTerminal).not.toHaveBeenCalled()
     } finally {
       unmount()
     }

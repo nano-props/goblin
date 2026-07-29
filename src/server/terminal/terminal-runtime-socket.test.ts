@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
-  REALTIME_HEARTBEAT_DEADLINE_MS as HEARTBEAT_DEADLINE_MS,
-  REALTIME_HEARTBEAT_INTERVAL_MS as HEARTBEAT_INTERVAL_MS,
+  REALTIME_LIVENESS_DEADLINE_MS,
+  REALTIME_LIVENESS_PROBE_INTERVAL_MS,
   AppRealtimeSocketLimitError,
   MAX_APP_REALTIME_SOCKETS,
 } from '#/server/realtime/realtime-broker.ts'
@@ -60,13 +60,13 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('runtime routes a heartbeat envelope to the registered socket', () => {
+  test('runtime routes a health ping to the registered socket liveness clock', () => {
     // The broker owns a distinct clock for every registered buffered socket.
     // This covers the raw-to-buffered transport lookup in
     // `handleRealtimeMessage`; recording the raw socket would silently miss
     // the registered transport and evict a healthy controller.
     //
-    // The assertion is end-to-end: after a real heartbeat has been
+    // The assertion is end-to-end: after a real health ping has been
     // routed through the runtime, advancing the fake clock past
     // the original deadline must NOT flip broker presence offline.
     // The raw socket would remain registered either way; this assertion
@@ -77,17 +77,27 @@ describe('server terminal runtime sockets and diagnostics', () => {
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     try {
-      // First heartbeat at t=0.
-      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
+      // First health probe at t=0.
+      host.handleRealtimeMessage(
+        'client_a',
+        USER_1,
+        socket,
+        JSON.stringify({ type: 'ping', requestId: 'health_initial' }),
+      )
       // Advance just shy of the original deadline.
-      vi.advanceTimersByTime(HEARTBEAT_DEADLINE_MS - 1_000)
-      // Heartbeat again. If it is not attributed to this exact registered
+      vi.advanceTimersByTime(REALTIME_LIVENESS_DEADLINE_MS - 1_000)
+      // Probe again. If it is not attributed to this exact registered
       // transport, the next scan will flip presence offline.
-      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
+      host.handleRealtimeMessage(
+        'client_a',
+        USER_1,
+        socket,
+        JSON.stringify({ type: 'ping', requestId: 'health_refresh' }),
+      )
       // Advance past the original 90 s deadline. A correctly routed
-      // heartbeat (a real client sending every 30 s) means the
+      // health probe (a real client sending every 30 s) means the
       // broker clock is fresh, so presence must remain online.
-      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+      vi.advanceTimersByTime(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
       expect(isClientOnline('client_a')).toBe(true)
       expect(socket.close).not.toHaveBeenCalled()
     } finally {
@@ -134,7 +144,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     shutdown()
   })
 
-  test('runtime health ping refreshes broker presence before the next heartbeat scan', () => {
+  test('runtime health ping refreshes broker presence before the next liveness scan', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
@@ -146,15 +156,20 @@ describe('server terminal runtime sockets and diagnostics', () => {
       host.registerSocket('client_a', USER_1, socket)
 
       vi.advanceTimersByTime(1)
-      host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'heartbeat' }))
+      host.handleRealtimeMessage(
+        'client_a',
+        USER_1,
+        socket,
+        JSON.stringify({ type: 'ping', requestId: 'health_initial' }),
+      )
       vi.advanceTimersByTime(99_999)
       expect(handle.isClientOnline('client_a')).toBe(true)
 
       host.handleRealtimeMessage('client_a', USER_1, socket, JSON.stringify({ type: 'ping', requestId: 'health_1' }))
-      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+      vi.advanceTimersByTime(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
 
       expect(handle.isClientOnline('client_a')).toBe(true)
-      expect(socket.close).not.toHaveBeenCalledWith(1001, 'terminal heartbeat timeout')
+      expect(socket.close).not.toHaveBeenCalledWith(1001, 'terminal liveness timeout')
       expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'pong', requestId: 'health_1' }))
     } finally {
       vi.useRealTimers()

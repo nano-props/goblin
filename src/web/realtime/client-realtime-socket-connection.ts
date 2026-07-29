@@ -2,7 +2,7 @@ import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
 import type { RealtimeRpcAction, RealtimeRpcOutputs } from '#/shared/realtime-rpc.ts'
 
-const CLIENT_REALTIME_HEARTBEAT_INTERVAL_MS = 30_000
+const CLIENT_REALTIME_LIVENESS_PROBE_INTERVAL_MS = 30_000
 const REALTIME_SOCKET_OPEN_TIMEOUT_MS = 10_000
 const REALTIME_REQUEST_TIMEOUT_MS = 30_000
 const REALTIME_HEALTH_PROBE_TIMEOUT_MS = 5_000
@@ -101,12 +101,11 @@ export function createClientRealtimeSocketConnection<
 
   const socketLabel = `${options.errorPrefix} socket`
   const requestLabel = `${options.errorPrefix} request`
-  const heartbeatLabel = `${options.errorPrefix} heartbeat`
   const healthProbeLabel = `${options.errorPrefix} health probe`
 
   let reconnectTimer: number | null = null
   let realtimeOpenTimeout: ReturnType<typeof setTimeout> | null = null
-  let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
+  let livenessProbeTimer: ReturnType<typeof globalThis.setInterval> | null = null
   let quitting = isAppQuitting()
   let nextOutageId = 0
   let activeOutageId: number | null = null
@@ -130,7 +129,7 @@ export function createClientRealtimeSocketConnection<
     errorReason: `${socketLabel} error`,
     onOpen(entry) {
       clearRealtimeOpenTimeout()
-      startHeartbeat(entry.socket, entry.generation)
+      startLivenessProbes(entry.socket, entry.generation)
       activeOutageId = null
       options.onOpen?.(entry.connection.clientId)
     },
@@ -140,7 +139,7 @@ export function createClientRealtimeSocketConnection<
     },
     onDisconnect(_entry, context) {
       clearRealtimeOpenTimeout()
-      stopHeartbeat()
+      stopLivenessProbes()
       clearPendingHealthProbes()
       const outageId = context.idleClose ? null : beginOutage()
       rejectPendingSocketRequests(
@@ -158,7 +157,7 @@ export function createClientRealtimeSocketConnection<
     },
     onUnavailableSocketDropped() {
       clearRealtimeOpenTimeout()
-      stopHeartbeat()
+      stopLivenessProbes()
       clearPendingHealthProbes()
     },
   })
@@ -310,26 +309,25 @@ export function createClientRealtimeSocketConnection<
     options.onRealtimeMessage(message, currentClientId)
   }
 
-  function startHeartbeat(currentSocket: WebSocket, generation: number): void {
-    stopHeartbeat()
-    heartbeatTimer = globalThis.setInterval(() => {
+  function startLivenessProbes(currentSocket: WebSocket, generation: number): void {
+    stopLivenessProbes()
+    livenessProbeTimer = globalThis.setInterval(() => {
       if (!isActiveSocket(currentSocket, generation)) {
-        stopHeartbeat()
+        stopLivenessProbes()
         return
       }
       if (currentSocket.readyState !== WebSocket.OPEN) return
-      try {
-        currentSocket.send(options.encodeClientMessage({ type: 'heartbeat' }))
-      } catch {
-        forceSocketReconnect(`${heartbeatLabel} send failed`, currentSocket)
-      }
-    }, CLIENT_REALTIME_HEARTBEAT_INTERVAL_MS)
+      // A successful WebSocket.send() only proves that the browser accepted
+      // the bytes. Requiring a pong also detects half-open connections whose
+      // TCP/proxy state still reports OPEN after the server became unreachable.
+      startHealthProbe(currentSocket, generation)
+    }, CLIENT_REALTIME_LIVENESS_PROBE_INTERVAL_MS)
   }
 
-  function stopHeartbeat(): void {
-    if (heartbeatTimer === null) return
-    globalThis.clearInterval(heartbeatTimer)
-    heartbeatTimer = null
+  function stopLivenessProbes(): void {
+    if (livenessProbeTimer === null) return
+    globalThis.clearInterval(livenessProbeTimer)
+    livenessProbeTimer = null
   }
 
   function startHealthProbe(currentSocket: WebSocket, generation: number): void {

@@ -59,7 +59,7 @@ describe('client realtime socket connection', () => {
     expect(onRealtimeMessage).not.toHaveBeenCalled()
   })
 
-  test('forwards feature realtime messages and sends heartbeat envelopes', async () => {
+  test('forwards feature realtime messages and verifies periodic socket liveness', async () => {
     useFakeTimers()
     const onRealtimeMessage = vi.fn()
     const connection = createTestConnection({ onRealtimeMessage, hasRealtimeSubscribers: () => true })
@@ -68,10 +68,30 @@ describe('client realtime socket connection', () => {
     socket?.emitOpen()
 
     socket?.emitMessage(JSON.stringify({ type: 'feature.changed', value: 'fresh' }))
-    vi.advanceTimersByTime(30_000)
+    await vi.advanceTimersByTimeAsync(30_000)
 
     expect(onRealtimeMessage).toHaveBeenCalledWith({ type: 'feature.changed', value: 'fresh' }, 'client_realtime')
-    expect(socket?.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
+    const ping = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
+    expect(ping).toMatchObject({ type: 'ping' })
+    socket?.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(socket?.readyState).toBe(wsMock.OPEN)
+  })
+
+  test('reconnects a half-open socket when its periodic liveness probe receives no pong', async () => {
+    useFakeTimers()
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(socket?.sent.map((payload) => JSON.parse(payload))).toContainEqual(expect.objectContaining({ type: 'ping' }))
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(socket?.readyState).toBe(wsMock.CLOSED)
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
   })
 
   test('notifies callers when the socket opens with the current client id', () => {

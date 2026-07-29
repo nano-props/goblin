@@ -36,7 +36,7 @@ export function createTerminalRuntimeCoordinator(
   const clientStateExpiry = new DelayedPresenceExpiry<string>(clientStateTtlMs)
 
   const broker = new RealtimeBroker<AppRealtimeMessage>({
-    heartbeatTimeoutReason: 'terminal heartbeat timeout',
+    livenessTimeoutReason: 'terminal liveness timeout',
     onClientPresenceChanged(event) {
       const clientKey = workspaceRuntimeClientLeaseKey(event.userId, event.clientId)
       if (event.online) {

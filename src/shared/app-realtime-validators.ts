@@ -76,9 +76,6 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
     input: WorkspacePaneRuntimeCloseInputSchema,
   }),
   v.strictObject({
-    type: v.literal('heartbeat'),
-  }),
-  v.strictObject({
     type: v.literal('ping'),
     requestId: AppRealtimeRequestIdSchema,
   }),

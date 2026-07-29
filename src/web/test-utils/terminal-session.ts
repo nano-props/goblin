@@ -86,7 +86,10 @@ const xtermMocks = vi.hoisted(() => {
       this.emitData(data)
     })
     reset = vi.fn()
-    paste = vi.fn()
+    paste = vi.fn((data: string) => {
+      const normalized = data.replace(/\r?\n/g, '\r')
+      this.emitData(this.modes.bracketedPasteMode ? `\x1b[200~${normalized}\x1b[201~` : normalized)
+    })
     scrollToBottom = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())

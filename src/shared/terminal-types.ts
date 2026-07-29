@@ -8,7 +8,7 @@ import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
- * controller client online. Disconnects and missed heartbeats make the
+ * controller client online. Disconnects and missed liveness probes make the
  * effective controller `none`; server-side controller intent is tracked
  * separately from this wire-facing status.
  */

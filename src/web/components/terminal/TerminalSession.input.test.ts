@@ -17,7 +17,7 @@ import {
   terminalXtermMocks,
 } from '#/web/test-utils/terminal-session.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalResizeResult } from '#/shared/terminal-types.ts'
+import type { TerminalResizeResult, TerminalWriteResult } from '#/shared/terminal-types.ts'
 import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 
@@ -427,6 +427,22 @@ describe('TerminalSession input, resize, and controller authority', () => {
   test('encodes virtual keys at the current xterm input boundary', async () => {
     const { session, term } = await startPresentedControllerGeneration()
 
+    for (const [key, data] of [
+      ['enter', '\r'],
+      ['backspace', '\x7f'],
+      ['eof', '\x04'],
+    ] as const) {
+      terminalCalls.write.mockClear()
+      session.sendVirtualKey(key)
+      await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+      expect(term.input).toHaveBeenLastCalledWith(data, true)
+      expect(terminalCalls.write).toHaveBeenLastCalledWith({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        data,
+      })
+    }
+
     term.scrollToBottom.mockClear()
     session.sendVirtualKey('arrow-up')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
@@ -463,22 +479,134 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
-  test('captures xterm paste for the active presented controller and rejects it after restart', async () => {
-    const { host, session, term } = await startPresentedControllerGeneration()
+  test('submits composed text through xterm paste semantics followed by Enter', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    term.modes.bracketedPasteMode = true
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockImplementationOnce(() => pasteWrite.promise)
 
-    const pasteWriter = session.capturePasteWriter()
-    if (!pasteWriter) throw new Error('expected presented paste writer')
-    expect(pasteWriter('first line\nsecond line')).toBe(true)
+    const submission = session.submitText('first line\nsecond line')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
     expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(1, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1b[200~first line\rsecond line\x1b[201~',
+    })
 
-    session.restart()
-    await flushUntil(() => session.currentRuntimeBinding()?.terminalRuntimeGeneration === 2)
-    emitSessionOutput(session, 2)
-    await flushUntil(() => host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility === '')
+    pasteWrite.resolve({ status: 'accepted' })
+    await expect(submission).resolves.toBe(true)
 
-    expect(pasteWriter('from old generation')).toBe(false)
-    expect(term.paste).toHaveBeenCalledTimes(1)
-    expect(xtermMocks.terminals.at(-1)!.paste).not.toHaveBeenCalled()
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\r',
+    })
+  })
+
+  test.each(['rejected', 'indeterminate'] as const)(
+    'does not retry or send Enter when the composed text write is %s',
+    async (status) => {
+      const { session, term } = await startPresentedControllerGeneration()
+      terminalCalls.write.mockResolvedValueOnce({ status })
+
+      await expect(session.submitText('keep this text')).resolves.toBe(false)
+
+      expect(term.paste).toHaveBeenCalledWith('keep this text')
+      expect(term.input).not.toHaveBeenCalled()
+      expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  test('honors an accepted composed text write after its presentation binding becomes stale', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+
+    const submission = session.submitText('accepted before takeover')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    session.handleIdentity({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      identityRevision: 2,
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    pasteWrite.resolve({ status: 'accepted' })
+
+    await expect(submission).resolves.toBe(true)
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not send the following Enter to a replacement generation after old text is accepted', async () => {
+    const { session } = await startPresentedControllerGeneration()
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+
+    const submission = session.submitText('accepted by the old generation')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        terminalRuntimeGeneration: 2,
+        identityRevision: 3,
+      }),
+    )
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      identityRevision: 2,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await flushTerminalStart()
+    const replacementTerm = xtermMocks.terminals.at(-1)!
+
+    pasteWrite.resolve({ status: 'accepted' })
+
+    await expect(submission).resolves.toBe(true)
+    expect(replacementTerm.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+  })
+
+  test('settles an accepted submission without waiting for the following Enter acknowledgement', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    const enterWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockReturnValueOnce(enterWrite.promise)
+
+    const submission = session.submitText('deliver without waiting')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 2)
+
+    await expect(submission).resolves.toBe(true)
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\r',
+    })
+
+    enterWrite.resolve({ status: 'accepted' })
+    await flushTerminalStart()
+  })
+
+  test('treats accepted composed text as delivered when the following Enter is rejected', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockResolvedValueOnce({ status: 'rejected' })
+
+    await expect(session.submitText('delivered once')).resolves.toBe(true)
+
+    expect(term.paste).toHaveBeenCalledWith('delivered once')
+    expect(term.input).toHaveBeenCalledWith('\r', true)
+    expect(terminalCalls.write).toHaveBeenCalledTimes(2)
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {
