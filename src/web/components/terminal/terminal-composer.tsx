@@ -24,6 +24,8 @@ export interface TerminalComposerLabels {
   uploadFiles: string
   showKeys: string
   showInput: string
+  enter: string
+  backspace: string
   tab: string
   arrowUp: string
   arrowDown: string
@@ -31,6 +33,7 @@ export interface TerminalComposerLabels {
   arrowRight: string
   escape: string
   ctrlC: string
+  ctrlD: string
   pageUp: string
   pageDown: string
 }
@@ -111,7 +114,7 @@ export function TerminalComposer({
   className,
 }: TerminalComposerProps) {
   const [expanded, setExpanded] = useState(false)
-  const [mode, setMode] = useState<'input' | 'keys'>('input')
+  const [mode, setMode] = useState<'input' | 'keys'>('keys')
   const [draft, setDraft] = useState('')
   const [resolvingFiles, setResolvingFiles] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)

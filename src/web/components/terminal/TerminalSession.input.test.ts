@@ -427,6 +427,22 @@ describe('TerminalSession input, resize, and controller authority', () => {
   test('encodes virtual keys at the current xterm input boundary', async () => {
     const { session, term } = await startPresentedControllerGeneration()
 
+    for (const [key, data] of [
+      ['enter', '\r'],
+      ['backspace', '\x7f'],
+      ['eof', '\x04'],
+    ] as const) {
+      terminalCalls.write.mockClear()
+      session.sendVirtualKey(key)
+      await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
+      expect(term.input).toHaveBeenLastCalledWith(data, true)
+      expect(terminalCalls.write).toHaveBeenLastCalledWith({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        data,
+      })
+    }
+
     term.scrollToBottom.mockClear()
     session.sendVirtualKey('arrow-up')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)

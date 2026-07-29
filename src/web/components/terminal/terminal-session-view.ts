@@ -413,12 +413,18 @@ export class TerminalSessionView {
 
 function inputForVirtualKey(key: TerminalVirtualKey, applicationCursorKeysMode: boolean): string {
   switch (key) {
+    case 'enter':
+      return '\r'
+    case 'backspace':
+      return '\x7f'
     case 'tab':
       return '\t'
     case 'escape':
       return '\x1b'
     case 'interrupt':
       return '\x03'
+    case 'eof':
+      return '\x04'
     case 'arrow-up':
     case 'arrow-down':
     case 'arrow-left':

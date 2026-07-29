@@ -5,6 +5,24 @@ import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { renderTerminalSession } from '#/web/test-utils/terminal-session-view.tsx'
 
+function buttonByLabel(container: HTMLElement, label: string) {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (element) => element.querySelector('.sr-only')?.textContent === label,
+  )
+  if (!button) throw new Error(`expected composer button named ${label}`)
+  return button
+}
+
+function openComposerInput(container: HTMLElement) {
+  act(() => buttonByLabel(container, 'terminal.composer-open').click())
+  act(() => buttonByLabel(container, 'terminal.composer-show-input').click())
+  const textarea = container.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="terminal.composer-input-placeholder"]',
+  )
+  if (!textarea) throw new Error('expected terminal composer input')
+  return textarea
+}
+
 describe('TerminalSessionView composer', () => {
   test('submits composer text and Enter through a writer captured for the selected session', async () => {
     const inputWriter = vi.fn(() => true)
@@ -12,15 +30,7 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession({ captureInputWriter })
 
     try {
-      const openButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-open',
-      )
-      if (!openButton) throw new Error('expected mobile terminal composer button')
-      act(() => openButton.click())
-      const textarea = rendered.container.querySelector<HTMLTextAreaElement>(
-        'textarea[aria-label="terminal.composer-input-placeholder"]',
-      )
-      if (!textarea) throw new Error('expected mobile terminal composer input')
+      const textarea = openComposerInput(rendered.container)
       fireEvent.change(textarea, { target: { value: 'git status' } })
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
@@ -37,15 +47,7 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => inputWriter) })
 
     try {
-      const openButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-open',
-      )
-      if (!openButton) throw new Error('expected mobile terminal composer button')
-      act(() => openButton.click())
-      const textarea = rendered.container.querySelector<HTMLTextAreaElement>(
-        'textarea[aria-label="terminal.composer-input-placeholder"]',
-      )
-      if (!textarea) throw new Error('expected mobile terminal composer input')
+      const textarea = openComposerInput(rendered.container)
       fireEvent.change(textarea, { target: { value: 'keep this command' } })
       fireEvent.keyDown(textarea, { key: 'Enter' })
 
@@ -62,19 +64,10 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const openButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-open',
-      )
-      if (!openButton) throw new Error('expected mobile terminal composer button')
-      act(() => openButton.click())
-      const textarea = rendered.container.querySelector<HTMLTextAreaElement>(
-        'textarea[aria-label="terminal.composer-input-placeholder"]',
-      )
+      const textarea = openComposerInput(rendered.container)
       const fileInput = rendered.container.querySelector<HTMLInputElement>('input[type="file"]')
-      const moreButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-more',
-      )
-      if (!textarea || !fileInput || !moreButton) throw new Error('expected composer file controls')
+      const moreButton = buttonByLabel(rendered.container, 'terminal.composer-more')
+      if (!fileInput) throw new Error('expected composer file controls')
       fireEvent.change(textarea, { target: { value: 'cat ' } })
       textarea.setSelectionRange(4, 4)
       act(() => fireEvent.pointerDown(moreButton, { button: 0, ctrlKey: false }))

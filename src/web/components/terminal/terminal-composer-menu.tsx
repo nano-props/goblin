@@ -1,4 +1,4 @@
-import { Ellipsis, Square, Upload, X } from 'lucide-react'
+import { CornerDownLeft, Delete, Ellipsis, Square, Upload, X } from 'lucide-react'
 import { useRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import {
@@ -13,9 +13,12 @@ interface TerminalComposerMenuLabels {
   more: string
   uploadFiles: string
   close: string
+  enter: string
+  backspace: string
   tab: string
   escape: string
   ctrlC: string
+  ctrlD: string
 }
 
 interface TerminalComposerMenuProps {
@@ -24,7 +27,7 @@ interface TerminalComposerMenuProps {
   disabled?: boolean
   resolvingFiles: boolean
   onUpload: () => void
-  onVirtualKey: (key: 'tab' | 'escape' | 'interrupt') => void
+  onVirtualKey: (key: 'enter' | 'backspace' | 'tab' | 'escape' | 'interrupt' | 'eof') => void
   onRequestTerminalFocus: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
@@ -42,7 +45,7 @@ export function TerminalComposerMenu({
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
   const focusTargetRef = useRef<'composer-trigger' | 'terminal' | null>(null)
-  const sendVirtualKey = (key: 'tab' | 'escape' | 'interrupt') => {
+  const sendVirtualKey = (key: 'enter' | 'backspace' | 'tab' | 'escape' | 'interrupt' | 'eof') => {
     focusTargetRef.current = 'terminal'
     onVirtualKey(key)
   }
@@ -85,10 +88,19 @@ export function TerminalComposerMenu({
           </DropdownMenuItem>
         ) : (
           <>
+            <DropdownMenuItem onSelect={() => sendVirtualKey('enter')}>
+              <CornerDownLeft className="size-4" />
+              {labels.enter}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => sendVirtualKey('backspace')}>
+              <Delete className="size-4" />
+              {labels.backspace}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => sendVirtualKey('tab')}>
               <span aria-hidden="true">⇥</span>
               {labels.tab}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => sendVirtualKey('escape')}>
               <span aria-hidden="true">⎋</span>
               {labels.escape}
@@ -96,6 +108,10 @@ export function TerminalComposerMenu({
             <DropdownMenuItem onSelect={() => sendVirtualKey('interrupt')}>
               <CtrlCIcon />
               {labels.ctrlC}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => sendVirtualKey('eof')}>
+              <ControlKeyIcon letter="D" />
+              {labels.ctrlD}
             </DropdownMenuItem>
           </>
         )}
@@ -115,10 +131,14 @@ export function TerminalComposerMenu({
 }
 
 function CtrlCIcon() {
+  return <ControlKeyIcon letter="C" />
+}
+
+function ControlKeyIcon({ letter }: { letter: string }) {
   return (
     <span className="relative inline-flex size-4 items-center justify-center" aria-hidden="true">
       <Square className="size-4" />
-      <span className="absolute text-[8px] font-semibold leading-none">C</span>
+      <span className="absolute text-[8px] font-semibold leading-none">{letter}</span>
     </span>
   )
 }

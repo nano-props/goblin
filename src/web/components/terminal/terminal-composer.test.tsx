@@ -13,9 +13,11 @@ const LABELS: TerminalComposerLabels = {
   close: 'Collapse',
   inputPlaceholder: 'Enter a terminal command',
   more: 'More actions',
-  uploadFiles: 'Upload files',
+  uploadFiles: 'Upload',
   showKeys: 'Show terminal keys',
   showInput: 'Show text input',
+  enter: 'Enter',
+  backspace: 'Backspace',
   tab: 'Tab',
   arrowUp: 'Arrow Up',
   arrowDown: 'Arrow Down',
@@ -23,6 +25,7 @@ const LABELS: TerminalComposerLabels = {
   arrowRight: 'Arrow Right',
   escape: 'Escape',
   ctrlC: 'Ctrl+C',
+  ctrlD: 'Ctrl+D',
   pageUp: 'Page Up (scroll up)',
   pageDown: 'Page Down (scroll down)',
 }
@@ -62,6 +65,10 @@ function expand(container: HTMLElement) {
   act(() => buttonByAccessibleName(container, LABELS.open).click())
 }
 
+function showInput(container: HTMLElement) {
+  act(() => buttonByAccessibleName(container, LABELS.showInput).click())
+}
+
 function openMoreMenu(container: HTMLElement) {
   act(() => {
     fireEvent.pointerDown(buttonByAccessibleName(container, LABELS.more), { button: 0, ctrlKey: false })
@@ -84,21 +91,17 @@ describe('TerminalComposer', () => {
     expect(openButton.getAttribute('aria-expanded')).toBe('false')
     expect(surface?.getAttribute('aria-hidden')).toBe('true')
     expect(surface?.hasAttribute('inert')).toBe(true)
-    expect(container.querySelector('textarea')).not.toBeNull()
+    expect(container.querySelector('textarea')).toBeNull()
 
     expand(container)
 
     expect(openButton.getAttribute('aria-expanded')).toBe('true')
     expect(surface?.getAttribute('aria-hidden')).toBe('false')
     expect(surface?.hasAttribute('inert')).toBe(false)
-    const input = container.querySelector('textarea')
     const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
-    const showKeys = buttonByAccessibleName(container, LABELS.showKeys)
+    const showInputButton = buttonByAccessibleName(container, LABELS.showInput)
     const more = buttonByAccessibleName(container, LABELS.more)
-    expect(input?.getAttribute('placeholder')).toBe(LABELS.inputPlaceholder)
-    expect(document.activeElement).toBe(input)
-    expect(showKeys.parentElement).toBe(modeRow)
-    expect(input?.parentElement).toBe(modeRow)
+    expect(showInputButton.parentElement).toBe(modeRow)
     expect(more.parentElement).toBe(modeRow)
     expect(more.querySelector('.lucide-ellipsis')).not.toBeNull()
     expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
@@ -107,7 +110,7 @@ describe('TerminalComposer', () => {
     act(() => menuItemByText(LABELS.close).click())
     expect(surface?.getAttribute('aria-hidden')).toBe('true')
     expect(surface?.hasAttribute('inert')).toBe(true)
-    expect(container.querySelector('textarea')).not.toBeNull()
+    expect(container.querySelector('textarea')).toBeNull()
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
@@ -115,6 +118,7 @@ describe('TerminalComposer', () => {
     const onSendText = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true)
     const { container } = render({ onSendText })
     expand(container)
+    showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     fireEvent.change(input, { target: { value: 'git status' } })
@@ -132,6 +136,7 @@ describe('TerminalComposer', () => {
     const onSendText = vi.fn(() => true)
     const { container } = render({ onSendText })
     expand(container)
+    showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     fireEvent.change(input, { target: { value: 'pwd' } })
@@ -144,6 +149,7 @@ describe('TerminalComposer', () => {
   test('grows with multiline text until the five-line cap, then leaves overflow to the textarea', () => {
     const { container } = render()
     expand(container)
+    showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 156 })
@@ -155,11 +161,11 @@ describe('TerminalComposer', () => {
 
   test('keeps an empty input at 40px even when the placeholder wraps during expansion', () => {
     const { container } = render()
+    expand(container)
+    showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 156 })
-
-    expand(container)
 
     expect(input.style.height).toBe('40px')
   })
@@ -169,6 +175,7 @@ describe('TerminalComposer', () => {
     const onResolveFiles = vi.fn(async () => resolvedPath)
     const { container } = render({ onResolveFiles })
     expand(container)
+    showInput(container)
     const textarea = container.querySelector('textarea')
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
     if (!textarea || !fileInput) throw new Error('expected composer inputs')
@@ -194,7 +201,6 @@ describe('TerminalComposer', () => {
     const onScrollLines = vi.fn()
     const { container } = render({ onVirtualKey, onScrollLines })
     expand(container)
-    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
     expect(container.querySelector('textarea')).toBeNull()
     expect(
@@ -212,9 +218,12 @@ describe('TerminalComposer', () => {
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
 
     for (const [label, key] of [
+      [LABELS.enter, 'enter'],
+      [LABELS.backspace, 'backspace'],
       [LABELS.tab, 'tab'],
       [LABELS.escape, 'escape'],
       [LABELS.ctrlC, 'interrupt'],
+      [LABELS.ctrlD, 'eof'],
     ] as const) {
       openMoreMenu(container)
       act(() => menuItemByText(label).click())
@@ -226,6 +235,7 @@ describe('TerminalComposer', () => {
     const onRequestFocus = vi.fn()
     const { container } = render({ onRequestFocus })
     expand(container)
+    showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     fireEvent.change(input, { target: { value: 'draft command' } })
@@ -248,7 +258,7 @@ describe('TerminalComposer', () => {
   test('restores the last mode after collapsing and reopening', async () => {
     const { container } = render()
     expand(container)
-    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+    showInput(container)
     openMoreMenu(container)
     act(() => menuItemByText(LABELS.close).click())
     await vi.waitFor(() =>
@@ -257,8 +267,8 @@ describe('TerminalComposer', () => {
 
     expand(container)
 
-    expect(container.querySelector('textarea')).toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.showInput)).toBeTruthy()
+    expect(container.querySelector('textarea')).not.toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.showKeys)).toBeTruthy()
   })
 
   test('buttons honour disabled and avoid iOS long-press callout attributes', () => {

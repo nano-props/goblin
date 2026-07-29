@@ -109,7 +109,16 @@ export interface TerminalFocusRequest {
 export type TerminalInputWriter = (data: string) => boolean
 
 export type TerminalVirtualKey =
-  'tab' | 'arrow-up' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'escape' | 'interrupt'
+  | 'enter'
+  | 'backspace'
+  | 'tab'
+  | 'arrow-up'
+  | 'arrow-down'
+  | 'arrow-left'
+  | 'arrow-right'
+  | 'escape'
+  | 'interrupt'
+  | 'eof'
 
 export type TerminalPresentationRecovery = 'pending' | 'failed'
 

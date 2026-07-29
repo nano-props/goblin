@@ -104,6 +104,8 @@ export function TerminalSessionView({
     uploadFiles: t('terminal.composer-upload-files'),
     showKeys: t('terminal.composer-show-keys'),
     showInput: t('terminal.composer-show-input'),
+    enter: t('terminal.composer-key-enter'),
+    backspace: t('terminal.composer-key-backspace'),
     tab: t('terminal.composer-key-tab'),
     arrowUp: t('terminal.composer-key-arrow-up'),
     arrowDown: t('terminal.composer-key-arrow-down'),
@@ -111,6 +113,7 @@ export function TerminalSessionView({
     arrowRight: t('terminal.composer-key-arrow-right'),
     escape: t('terminal.composer-key-escape'),
     ctrlC: t('terminal.composer-key-ctrl-c'),
+    ctrlD: t('terminal.composer-key-ctrl-d'),
     pageUp: t('terminal.composer-key-page-up'),
     pageDown: t('terminal.composer-key-page-down'),
   }
