@@ -245,6 +245,22 @@ describe('TerminalComposer', () => {
     expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
 
+  test('restores the last mode after collapsing and reopening', async () => {
+    const { container } = render()
+    expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.close).click())
+    await vi.waitFor(() =>
+      expect(buttonByAccessibleName(container, LABELS.open).getAttribute('aria-expanded')).toBe('false'),
+    )
+
+    expand(container)
+
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.showInput)).toBeTruthy()
+  })
+
   test('buttons honour disabled and avoid iOS long-press callout attributes', () => {
     const { container } = render({ disabled: true })
     const buttons = container.querySelectorAll('button')

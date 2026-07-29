@@ -150,7 +150,6 @@ export function TerminalComposer({
     setDraft('')
   }
   const closeComposer = () => {
-    setMode('input')
     setExpanded(false)
   }
   const openFilePicker = () => {
