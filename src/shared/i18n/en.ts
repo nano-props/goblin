@@ -409,7 +409,7 @@ export const en = {
   'terminal.composer-label': 'Terminal input composer',
   'terminal.composer-open': 'Open terminal composer',
   'terminal.composer-close': 'Collapse',
-  'terminal.composer-input-placeholder': 'Enter a terminal command',
+  'terminal.composer-input-placeholder': 'Send a message to the terminal',
   'terminal.composer-more': 'More actions',
   'terminal.composer-upload-files': 'Upload',
   'terminal.composer-show-keys': 'Show terminal keys',

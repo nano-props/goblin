@@ -400,7 +400,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.composer-label': '터미널 입력기',
   'terminal.composer-open': '터미널 입력기 열기',
   'terminal.composer-close': '접기',
-  'terminal.composer-input-placeholder': '터미널 명령 입력',
+  'terminal.composer-input-placeholder': '터미널에 메시지 보내기',
   'terminal.composer-more': '추가 작업',
   'terminal.composer-upload-files': '업로드',
   'terminal.composer-show-keys': '터미널 키 표시',

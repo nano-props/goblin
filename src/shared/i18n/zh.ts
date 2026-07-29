@@ -392,7 +392,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.composer-label': '终端输入器',
   'terminal.composer-open': '打开终端输入器',
   'terminal.composer-close': '收起',
-  'terminal.composer-input-placeholder': '输入终端命令',
+  'terminal.composer-input-placeholder': '发消息给终端',
   'terminal.composer-more': '更多操作',
   'terminal.composer-upload-files': '上传',
   'terminal.composer-show-keys': '显示终端按键',
