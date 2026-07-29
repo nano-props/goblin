@@ -345,13 +345,30 @@ describe('TerminalComposer', () => {
       LABELS.enter,
       LABELS.backspace,
       LABELS.tab,
+      LABELS.escape,
+      LABELS.ctrlC,
+      LABELS.ctrlD,
     ])
     const keyRowLabels = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
     ).map((button) => button.querySelector('.sr-only')?.textContent)
-    expect(keyRowLabels.slice(0, 3)).toEqual([LABELS.enter, LABELS.backspace, LABELS.tab])
+    expect(keyRowLabels.slice(0, 6)).toEqual([
+      LABELS.enter,
+      LABELS.backspace,
+      LABELS.tab,
+      LABELS.escape,
+      LABELS.ctrlC,
+      LABELS.ctrlD,
+    ])
     for (const button of optionalActions) act(() => button.click())
-    expect(onVirtualKey.mock.calls.slice(-3).map(([key]) => key)).toEqual(['enter', 'backspace', 'tab'])
+    expect(onVirtualKey.mock.calls.slice(-6).map(([key]) => key)).toEqual([
+      'enter',
+      'backspace',
+      'tab',
+      'escape',
+      'interrupt',
+      'eof',
+    ])
 
     for (const [label, key] of [
       [LABELS.enter, 'enter'],

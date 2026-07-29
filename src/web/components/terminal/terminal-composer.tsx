@@ -26,6 +26,10 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistory } from '#/web/components/terminal/terminal-composer-history.ts'
+import {
+  TERMINAL_COMPOSER_COMMAND_KEYS,
+  type TerminalComposerCommandLabelKey,
+} from '#/web/components/terminal/terminal-composer-command-keys.ts'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -66,13 +70,12 @@ type AccessibleName = Exclude<
   keyof TerminalComposerLabels,
   'composer' | 'open' | 'close' | 'inputPlaceholder' | 'more' | 'uploadFiles' | 'showKeys' | 'showInput'
 >
-type ComposerKeyAction = { accessibleName: AccessibleName } & (
+type PrimaryKeyAction = { accessibleName: AccessibleName } & (
   | { type: 'virtual-key'; icon: ReactNode; key: TerminalVirtualKey }
-  | { type: 'virtual-key'; label: string; key: TerminalVirtualKey }
   | { type: 'scroll'; icon: ReactNode; amount: number }
 )
 
-const PRIMARY_KEY_ACTIONS: ComposerKeyAction[] = [
+const PRIMARY_KEY_ACTIONS: PrimaryKeyAction[] = [
   { type: 'virtual-key', icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
   {
     type: 'virtual-key',
@@ -96,11 +99,10 @@ const PRIMARY_KEY_ACTIONS: ComposerKeyAction[] = [
   { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'pageDown' },
 ]
 
-const OPTIONAL_KEY_ACTIONS: ComposerKeyAction[] = [
-  { type: 'virtual-key', icon: <CornerDownLeft className="size-4" />, key: 'enter', accessibleName: 'enter' },
-  { type: 'virtual-key', icon: <Delete className="size-4" />, key: 'backspace', accessibleName: 'backspace' },
-  { type: 'virtual-key', label: '⇥', key: 'tab', accessibleName: 'tab' },
-]
+const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerCommandLabelKey, ReactNode>> = {
+  enter: <CornerDownLeft className="size-4" />,
+  backspace: <Delete className="size-4" />,
+}
 
 const COMPOSER_INPUT_MIN_HEIGHT_PX = 40
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160
@@ -311,19 +313,18 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
-                {OPTIONAL_KEY_ACTIONS.map((key, index) => (
+                {TERMINAL_COMPOSER_COMMAND_KEYS.map((key, index) => (
                   <ComposerButton
-                    key={key.accessibleName}
+                    key={key.key}
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
-                    accessibleName={labels[key.accessibleName]}
+                    accessibleName={labels[key.labelKey]}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => {
-                      if (key.type !== 'virtual-key') return
                       onVirtualKey(key.key)
                       if (event.detail > 0) onRequestFocus()
                     }}
                   >
-                    {'label' in key ? key.label : key.icon}
+                    {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
                   </ComposerButton>
                 ))}
                 {PRIMARY_KEY_ACTIONS.map((key) => (
@@ -340,7 +341,7 @@ export function TerminalComposer({
                       if (event.detail > 0) onRequestFocus()
                     }}
                   >
-                    {'label' in key ? key.label : key.icon}
+                    {key.icon}
                   </ComposerButton>
                 ))}
               </div>

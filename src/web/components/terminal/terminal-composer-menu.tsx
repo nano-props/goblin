@@ -1,6 +1,11 @@
 import { Ellipsis, Upload, X } from 'lucide-react'
-import { useRef } from 'react'
+import { Fragment, useRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
+import {
+  TERMINAL_COMPOSER_COMMAND_KEY_GROUPS,
+  type TerminalComposerCommandKeyName,
+  type TerminalComposerCommandLabelKey,
+} from '#/web/components/terminal/terminal-composer-command-keys.ts'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,16 +14,10 @@ import {
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
 
-interface TerminalComposerMenuLabels {
+type TerminalComposerMenuLabels = Record<TerminalComposerCommandLabelKey, string> & {
   more: string
   uploadFiles: string
   close: string
-  enter: string
-  backspace: string
-  tab: string
-  escape: string
-  ctrlC: string
-  ctrlD: string
 }
 
 interface TerminalComposerMenuProps {
@@ -26,7 +25,7 @@ interface TerminalComposerMenuProps {
   mode: 'input' | 'keys'
   resolvingFiles: boolean
   onUpload: () => void
-  onVirtualKey: (key: 'enter' | 'backspace' | 'tab' | 'escape' | 'interrupt' | 'eof') => void
+  onVirtualKey: (key: TerminalComposerCommandKeyName) => void
   onRequestTerminalFocus: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
@@ -43,7 +42,7 @@ export function TerminalComposerMenu({
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
   const focusTargetRef = useRef<'composer-trigger' | 'terminal' | null>(null)
-  const sendVirtualKey = (key: 'enter' | 'backspace' | 'tab' | 'escape' | 'interrupt' | 'eof') => {
+  const sendVirtualKey = (key: TerminalComposerCommandKeyName) => {
     focusTargetRef.current = 'terminal'
     onVirtualKey(key)
   }
@@ -81,31 +80,17 @@ export function TerminalComposerMenu({
           </DropdownMenuItem>
         ) : (
           <>
-            <DropdownMenuItem onSelect={() => sendVirtualKey('enter')}>
-              <Keycap>↵</Keycap>
-              {labels.enter}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => sendVirtualKey('backspace')}>
-              <Keycap>⌫</Keycap>
-              {labels.backspace}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => sendVirtualKey('tab')}>
-              <Keycap>⇥</Keycap>
-              {labels.tab}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => sendVirtualKey('escape')}>
-              <Keycap>Esc</Keycap>
-              {labels.escape}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => sendVirtualKey('interrupt')}>
-              <Keycap>^C</Keycap>
-              {labels.ctrlC}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => sendVirtualKey('eof')}>
-              <Keycap>^D</Keycap>
-              {labels.ctrlD}
-            </DropdownMenuItem>
+            {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
+              <Fragment key={group.id}>
+                {groupIndex > 0 && <DropdownMenuSeparator />}
+                {group.keys.map((action) => (
+                  <DropdownMenuItem key={action.key} onSelect={() => sendVirtualKey(action.key)}>
+                    <Keycap>{action.keycap}</Keycap>
+                    {labels[action.labelKey]}
+                  </DropdownMenuItem>
+                ))}
+              </Fragment>
+            ))}
           </>
         )}
         <DropdownMenuSeparator />
