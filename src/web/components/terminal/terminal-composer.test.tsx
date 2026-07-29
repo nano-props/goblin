@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
@@ -289,6 +290,34 @@ describe('TerminalComposer', () => {
 
     expect(container.querySelector('textarea')).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.showKeys)).toBeTruthy()
+  })
+
+  test('does not restore the More trigger over an input explicitly focused while the menu closes', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+    openMoreMenu(container)
+
+    await user.click(input)
+
+    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.activeElement).toBe(input)
+  })
+
+  test('restores the More trigger when the menu is dismissed from the keyboard', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    expand(container)
+    const more = buttonByAccessibleName(container, LABELS.more)
+    openMoreMenu(container)
+
+    await user.keyboard('{Escape}')
+
+    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.activeElement).toBe(more)
   })
 
   test('buttons honour disabled and avoid iOS long-press callout attributes', () => {
