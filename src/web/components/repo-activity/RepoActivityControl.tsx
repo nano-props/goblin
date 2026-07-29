@@ -12,7 +12,7 @@ import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#
 import {
   getRepoActivity,
   getRepoActivityControlView,
-  isRepoPrimaryRefreshBusy,
+  repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -81,7 +81,7 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
   const view = getRepoActivityControlView({
     visibleActivity,
     completion,
-    manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operationsSnapshot),
+    primaryRefreshBusy: repoOperationsSnapshotHasPrimaryRefresh(operationsSnapshot),
   })
 
   switch (view.kind) {
@@ -93,7 +93,7 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
       return (
         <RepoRefreshButton
           repo={repo}
-          manualSyncBusy={view.manualSyncBusy}
+          primaryRefreshBusy={view.primaryRefreshBusy}
           lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
         />
       )
@@ -142,11 +142,11 @@ function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
 
 function RepoRefreshButton({
   repo,
-  manualSyncBusy,
+  primaryRefreshBusy,
   lastFetchAt,
 }: {
   repo: RepoActivityControlRepo
-  manualSyncBusy: boolean
+  primaryRefreshBusy: boolean
   lastFetchAt: number | null
 }) {
   const t = useT()
@@ -182,8 +182,8 @@ function RepoRefreshButton({
       <AsyncButton
         variant="ghost"
         size="icon-lg"
-        disabled={manualSyncBusy}
-        loading={manualSyncBusy}
+        disabled={primaryRefreshBusy}
+        loading={primaryRefreshBusy}
         onClick={handleSync}
         aria-label={label}
       >

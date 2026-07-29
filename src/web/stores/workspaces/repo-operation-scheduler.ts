@@ -240,10 +240,6 @@ export function repoOperationBusy(repoId: WorkspaceId, key: string): boolean {
   return operationBusy(repoOperation(repoId, key))
 }
 
-export function repoLocalPrimaryRefreshBusy(repoId: WorkspaceId): boolean {
-  return repoOperationBusy(repoId, 'manualRefresh') || repoOperationBusy(repoId, 'fetch')
-}
-
 export function repoLocalRemoteFetchBlocked(repoId: WorkspaceId): boolean {
   return repoOperationBusy(repoId, 'fetch') || repoOperationBusy(repoId, 'branchAction')
 }

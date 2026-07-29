@@ -8,7 +8,11 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
+import {
+  markRepoOperationTargets,
+  nextRepoOperationId,
+  settleRepoOperationTargets,
+} from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -97,21 +101,6 @@ describe('RepoActivityControl', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
-  test('disables the primary refresh button during manual refreshes', () => {
-    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    markRepoOperationTargets(
-      REPO_ID,
-      nextRepoOperationId(REPO_ID),
-      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-      'running',
-    )
-
-    const { container } = renderControl()
-
-    expect(button(container).disabled).toBe(true)
-    expect(button(container).getAttribute('aria-busy')).toBe('true')
-  })
-
   test('shows pending feedback immediately while a clicked refresh is running', async () => {
     const refresh = Promise.withResolvers<{ ok: true }>()
     refreshMocks.run.mockReturnValueOnce(refresh.promise)
@@ -133,6 +122,31 @@ describe('RepoActivityControl', () => {
       expect(button(container).disabled).toBe(false)
       expect(button(container).getAttribute('aria-busy')).toBeNull()
       expect(button(container).querySelector('svg')?.classList.contains('animate-spin')).toBe(false)
+    })
+  })
+
+  test('stops clicked refresh feedback when the command settles after an intervening parent render', async () => {
+    const refresh = Promise.withResolvers<{ ok: true }>()
+    refreshMocks.run.mockReturnValueOnce(refresh.promise)
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    const rendered = renderControl()
+
+    fireEvent.click(button(rendered.container))
+
+    const operationId = nextRepoOperationId(REPO_ID)
+    markRepoOperationTargets(REPO_ID, operationId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], 'running')
+    rendered.rerender(control())
+    settleRepoOperationTargets(REPO_ID, operationId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], null)
+
+    await act(async () => {
+      refresh.resolve({ ok: true })
+      await refresh.promise
+    })
+
+    await waitFor(() => {
+      expect(button(rendered.container).disabled).toBe(false)
+      expect(button(rendered.container).getAttribute('aria-busy')).toBeNull()
+      expect(button(rendered.container).querySelector('svg')?.classList.contains('animate-spin')).toBe(false)
     })
   })
 
@@ -212,10 +226,14 @@ describe('RepoActivityControl', () => {
 })
 
 function renderControl() {
-  return renderInJsdom(
+  return renderInJsdom(control())
+}
+
+function control() {
+  return (
     <QueryClientProvider client={appQueryClient}>
       <RepoActivityControl repoId={REPO_ID} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
 }
 

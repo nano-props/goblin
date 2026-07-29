@@ -5,7 +5,6 @@ import {
   markRepoOperationTargets,
   nextRepoOperationId,
   repoLocalBranchActionScheduleGuard,
-  repoLocalPrimaryRefreshBusy,
   repoLocalRemoteFetchBlocked,
   repoOperation,
   repoOperationBusy,
@@ -146,22 +145,12 @@ describe('workspace runtime task scheduling', () => {
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
   })
 
-  test('local guard helpers name the scheduler-only busy sets', () => {
-    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(false)
+  test('local guard helpers name the scheduler-only admission sets', () => {
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
       fetchBusy: false,
       branchOperationPhase: 'idle',
     })
-
-    markRepoOperationTargets(
-      REPO_ID,
-      nextRepoOperationId(REPO_ID),
-      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-      'running',
-    )
-    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(true)
-    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
 
     markRepoOperationTargets(
       REPO_ID,
