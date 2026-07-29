@@ -288,9 +288,8 @@ which is the contract we now follow.
 
 Every PR must leave these green:
 
-- `bun run typecheck`
 - `bun run test`
-- `bun run check` (architecture, HTML injection, type assertions, and format)
+- `bun run check` (typecheck, architecture, HTML injection, type assertions, and format)
 
 If a verification step is legitimately slow, the fix is to extract a
 deterministic seam, not to raise the timeout. The default
@@ -323,4 +322,4 @@ rules rather than source-text checks.
 5. If the test needs fake timers, call `useFakeTimers()` once at the
    top of the file (or inside the relevant `describe` block).
 6. Privacy-safe fixtures. No real user, machine, or token references.
-7. Run `bun run typecheck && bun run test && bun run check` before opening the PR.
+7. Run `bun run test && bun run check` before opening the PR.

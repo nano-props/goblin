@@ -6,14 +6,14 @@ export function findTypeAssertionViolations(
   doubleAssertionAllowlist: ReadonlyMap<string, readonly string[]>,
 ): string[] {
   const violations: string[] = []
-  for (const match of source.matchAll(/\/\/\s*@ts-ignore\b/g)) {
-    violations.push(`${file}:${sourceLineAt(source, match.index)}: @ts-ignore is forbidden`)
-  }
-
   const ast = parse(source, {
     sourceType: 'module',
     plugins: file.endsWith('.tsx') ? ['typescript', 'jsx'] : ['typescript'],
   })
+  for (const comment of ast.comments ?? []) {
+    if (comment.type !== 'CommentLine' || !/^\/?\s*@ts-ignore\b/.test(comment.value)) continue
+    violations.push(`${file}:${comment.loc?.start.line ?? 1}: @ts-ignore is forbidden`)
+  }
   visitAst(ast, (node) => {
     if (!isTypeAssertion(node)) return
     const lineNumber = node.loc?.start.line ?? 1
@@ -55,8 +55,4 @@ function visitAst(value: unknown, visit: (node: AstNode) => void): void {
     if (key === 'loc') continue
     visitAst(child, visit)
   }
-}
-
-function sourceLineAt(source: string, index: number): number {
-  return source.slice(0, index).split('\n').length
 }

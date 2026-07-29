@@ -17,8 +17,7 @@
  * leaked long-lived credentials into the response body of every
  * page render. This guard makes sure none of it sneaks back in.
  *
- * What it checks (each pattern in either the `match` set or the
- * `commentAware` set — see the per-rule `comment` flag):
+ * What it checks:
  *
  *  - `replace(...<script|...<head|...<html lang` — string-replace
  *    on HTML tags from inside server/handlers.
@@ -36,10 +35,8 @@
  *    `goblin:get-platform` IPC. Allowed in the Electron main
  *    spawn-env (deprecated; harmless) but flagged in src/server.
  *
- * `commentAware: true` rules match against the raw file content
- * so a defensive `// GOBLIN_EMBEDDED_RUNTIME=1` comment in a
- * refactor note doesn't trip the guard. Everything else is a
- * plain code-level match.
+ * Rules match against raw file content. Legacy names are intentionally
+ * comment-aware so reintroducing them in refactor notes still prompts review.
  *
  * The script walks src/server, src/main, and src/shared. It
  * ignores `*.test.*` / `*.spec.*` files and the `dist/` build
@@ -64,14 +61,6 @@ interface Rule {
   label: string
   /** Substring or RegExp to match against file content. */
   match: string | RegExp
-  /**
-   * If true, the rule flags files whose raw content includes the
-   * match. If false, the rule flags files that call / use the
-   * match as code (string literal, identifier, import). The two
-   * are the same in practice — comments count as content — but
-   * the labels differ so the violation message is precise.
-   */
-  commentAware: boolean
 }
 
 const RULES: Rule[] = [
@@ -82,17 +71,14 @@ const RULES: Rule[] = [
   {
     label: 'HTML tag string-replace from a server handler',
     match: /\.replace\([^)]*['"]<script/,
-    commentAware: false,
   },
   {
     label: 'HTML <head> string-replace from a server handler',
     match: /\.replace\(['"]<head>/,
-    commentAware: false,
   },
   {
     label: 'HTML <html lang> string-replace from a server handler',
     match: /\.replace\(['"]<html lang=/,
-    commentAware: false,
   },
   // Reading the built client HTML to rewrite it. The new
   // architecture serves `dist/web/index.html` untouched via
@@ -101,7 +87,6 @@ const RULES: Rule[] = [
   {
     label: 'server reads dist/web/index.html (SPA fallback is fine, but check it returns it untouched)',
     match: /readFile\([^)]*index\.html/,
-    commentAware: false,
   },
   // Legacy function names. If any of these re-appear, the
   // anti-pattern is back. They are intentionally one-word grep
@@ -111,22 +96,18 @@ const RULES: Rule[] = [
   {
     label: 'legacy injectBootstrapIntoHtml helper',
     match: 'injectBootstrapIntoHtml',
-    commentAware: true,
   },
   {
     label: 'legacy buildWebBootstrap helper',
     match: 'buildWebBootstrap',
-    commentAware: true,
   },
   {
     label: 'legacy renderClientIndexHtml helper',
     match: 'renderClientIndexHtml',
-    commentAware: true,
   },
   {
     label: 'legacy shouldInlineAccessTokenInBootstrap predicate',
     match: 'shouldInlineAccessTokenInBootstrap',
-    commentAware: true,
   },
   // Env vars whose only purpose was to gate the HTML inlining.
   // `GOBLIN_HOME_DIR` / `GOBLIN_PLATFORM` are still set in the
@@ -136,22 +117,18 @@ const RULES: Rule[] = [
   {
     label: 'legacy GOBLIN_EMBEDDED_RUNTIME env var (gated HTML inlining)',
     match: 'GOBLIN_EMBEDDED_RUNTIME',
-    commentAware: true,
   },
   {
     label: 'legacy GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN env var (gated HTML inlining)',
     match: 'GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN',
-    commentAware: true,
   },
   {
     label: 'legacy GOBLIN_HOME_DIR env var (server-side bootstrap inlining)',
     match: 'GOBLIN_HOME_DIR',
-    commentAware: true,
   },
   {
     label: 'legacy GOBLIN_PLATFORM env var (server-side bootstrap inlining)',
     match: 'GOBLIN_PLATFORM',
-    commentAware: true,
   },
 ]
 

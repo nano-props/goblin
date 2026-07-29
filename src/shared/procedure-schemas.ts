@@ -9,7 +9,7 @@
 
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranchInput } from '#/shared/refnames.ts'
 import {
   CwdInput,
   RemoteConnectionInputSchema,
@@ -203,7 +203,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
         kind: v.literal('branch-detail'),
         branch: v.pipe(
           v.string(),
-          v.check((branch) => isValidBranch(branch), 'invalid branch'),
+          v.check((branch) => isValidBranchInput(branch), 'invalid branch'),
         ),
       }),
       v.strictObject({ kind: v.literal('repository-summary') }),

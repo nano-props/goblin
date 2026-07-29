@@ -29,8 +29,22 @@ describe('type assertion policy', () => {
   })
 
   test('rejects ts-ignore directives', () => {
-    expect(findTypeAssertionViolations('// @ts-ignore\ncall()', file, noAllowlist)).toEqual([
-      `${file}:1: @ts-ignore is forbidden`,
-    ])
+    for (const [source, line] of [
+      ['// @ts-ignore\ncall()', 1],
+      ['/// @ts-ignore\ncall()', 1],
+    ] as const) {
+      expect(findTypeAssertionViolations(source, file, noAllowlist)).toEqual([
+        `${file}:${line}: @ts-ignore is forbidden`,
+      ])
+    }
+  })
+
+  test('ignores ts-ignore text inside strings', () => {
+    expect(findTypeAssertionViolations("const message = '// @ts-ignore'", file, noAllowlist)).toEqual([])
+  })
+
+  test('ignores ts-ignore mentions in explanatory comments', () => {
+    expect(findTypeAssertionViolations('// Do not use @ts-ignore here\ncall()', file, noAllowlist)).toEqual([])
+    expect(findTypeAssertionViolations('/* Do not use @ts-ignore here */\ncall()', file, noAllowlist)).toEqual([])
   })
 })

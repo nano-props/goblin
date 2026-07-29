@@ -1,5 +1,5 @@
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranchInput } from '#/shared/refnames.ts'
 import {
   canonicalWorkspaceLocator,
   parseCanonicalWorkspaceLocator,
@@ -50,7 +50,7 @@ export function gitWorkspacePaneTabsTarget(
   branchName: string,
   worktreePath: string | null,
 ): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget | null {
-  if (!isValidBranch(branchName)) return null
+  if (!isValidBranchInput(branchName)) return null
   return worktreePath === null
     ? { kind: 'git-branch', workspaceId, branchName }
     : gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
@@ -117,7 +117,7 @@ export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: Workspace
     }
     return `${workspaceId}\0worktree\0${target.worktreeId}`
   }
-  if (!isValidBranch(target.branchName)) throw new Error('workspace pane branch target requires a valid branch')
+  if (!isValidBranchInput(target.branchName)) throw new Error('workspace pane branch target requires a valid branch')
   return `${target.workspaceId}\0branch\0${target.branchName}`
 }
 
@@ -132,7 +132,7 @@ export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspaceP
   const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
   if (canonicalWorkspaceId !== workspaceId || !value) return null
   if (kind === 'branch') {
-    return isValidBranch(value) ? { kind, workspaceId: canonicalWorkspaceId, branchName: value } : null
+    return isValidBranchInput(value) ? { kind, workspaceId: canonicalWorkspaceId, branchName: value } : null
   }
   if (kind === 'worktree') {
     const worktreeId = canonicalWorkspaceLocator(value)

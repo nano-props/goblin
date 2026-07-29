@@ -248,4 +248,71 @@ describe('architecture boundary rules', () => {
       ]),
     ).toEqual([])
   })
+
+  test('rejects transitive Node imports from the browser runtime', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/main.tsx',
+          source: "import { validate } from '#/shared/validator.ts'\nvalidate()\n",
+        },
+        {
+          relativeFilePath: '/src/shared/validator.ts',
+          source: "import path from 'node:path'\nexport const validate = path.isAbsolute\n",
+        },
+      ]),
+    ).toEqual([expect.stringContaining('/src/web/main.tsx -> /src/shared/validator.ts -> node:path')])
+  })
+
+  test('rejects bare Node builtin imports from the browser runtime', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/main.tsx',
+          source: "import path from 'path'\npath.resolve('.')\n",
+        },
+      ]),
+    ).toEqual([expect.stringContaining('/src/web/main.tsx -> path')])
+  })
+
+  test('allows type-only and browser-unreachable Node imports', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/main.tsx',
+          source: "import type { NativeValue } from '#/shared/native.ts'\nexport type Value = NativeValue\n",
+        },
+        {
+          relativeFilePath: '/src/shared/native.ts',
+          source:
+            "import path from 'node:path'\nexport type NativeValue = string\nexport const resolve = path.resolve\n",
+        },
+      ]),
+    ).toEqual([])
+  })
+
+  test('allows inline type-only imports and re-exports', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/main.tsx',
+          source:
+            "import { type NativeValue } from '#/shared/native.ts'\nexport { type OtherValue } from '#/shared/other.ts'\nexport type * from '#/shared/types.ts'\nexport type Value = NativeValue\n",
+        },
+        {
+          relativeFilePath: '/src/shared/native.ts',
+          source:
+            "import path from 'node:path'\nexport type NativeValue = string\nexport const resolve = path.resolve\n",
+        },
+        {
+          relativeFilePath: '/src/shared/other.ts',
+          source: "import os from 'node:os'\nexport type OtherValue = string\nexport const platform = os.platform\n",
+        },
+        {
+          relativeFilePath: '/src/shared/types.ts',
+          source: "import fs from 'node:fs'\nexport type FileValue = string\nexport const read = fs.readFile\n",
+        },
+      ]),
+    ).toEqual([])
+  })
 })

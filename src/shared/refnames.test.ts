@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { isSafeBranchName } from '#/shared/refnames.ts'
+import { isSafeBranchName, isValidBranchInput, MAX_BRANCH_INPUT_LENGTH } from '#/shared/refnames.ts'
 
 describe('isSafeBranchName', () => {
   test('accepts ordinary branch names', () => {
@@ -36,5 +36,12 @@ describe('isSafeBranchName', () => {
     ]) {
       expect(isSafeBranchName(branch)).toBe(false)
     }
+  })
+})
+
+describe('isValidBranchInput', () => {
+  test('enforces the branch input length limit', () => {
+    expect(isValidBranchInput('feature/add-tests')).toBe(true)
+    expect(isValidBranchInput('a'.repeat(MAX_BRANCH_INPUT_LENGTH + 1))).toBe(false)
   })
 })

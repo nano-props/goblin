@@ -18,7 +18,7 @@ import {
   type TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranchInput } from '#/shared/refnames.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
   WorkspacePaneFilesystemExecutionTargetSchema,
@@ -132,7 +132,7 @@ const TerminalPresentationSchema = v.variant('kind', [
         kind: v.literal('branch'),
         branchName: v.pipe(
           v.string(),
-          v.check((value: string) => isValidBranch(value)),
+          v.check((value: string) => isValidBranchInput(value)),
         ),
       }),
       v.strictObject({ kind: v.literal('detached') }),

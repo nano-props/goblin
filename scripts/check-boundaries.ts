@@ -3,6 +3,7 @@
 // parser, then applies project-specific layering rules and a few legacy source
 // pattern bans that are intentionally text-based.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { builtinModules } from 'node:module'
 import path from 'node:path'
 import { parse, type ParserPlugin } from '@babel/parser'
 
@@ -11,6 +12,8 @@ const srcRoot = path.join(repoRoot, 'src')
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs'])
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|cjs|mjs)$/
+const WEB_RUNTIME_ENTRIES = ['/src/web/main.tsx', '/src/web/public/boot.js']
+const NODE_BUILTIN_SPECIFIERS = new Set(builtinModules.flatMap((name) => [name, `node:${name}`]))
 
 export interface Rule {
   fromPrefix: string
@@ -33,6 +36,7 @@ export interface SourcePatternRule {
 export interface ImportReference {
   importPath: string
   importedNames: readonly string[] | null
+  isRuntime: boolean
 }
 
 const RULES: Rule[] = [
@@ -284,9 +288,19 @@ function addImport(
   results: ImportReference[],
   importPath: string | null,
   importedNames: readonly string[] | null,
+  isRuntime = true,
 ): void {
   if (importPath === null) return
-  results.push({ importPath, importedNames })
+  results.push({ importPath, importedNames, isRuntime })
+}
+
+function isRuntimeDeclaration(node: BabelNode): boolean {
+  if (node.importKind === 'type' || node.exportKind === 'type') return false
+  const specifiers = asNodeArray(node.specifiers)
+  return (
+    specifiers.length === 0 ||
+    specifiers.some((specifier) => specifier.importKind !== 'type' && specifier.exportKind !== 'type')
+  )
 }
 
 export function extractImports(source: string, filePath: string): ImportReference[] {
@@ -295,15 +309,15 @@ export function extractImports(source: string, filePath: string): ImportReferenc
 
   traverse(ast, (node) => {
     if (node.type === 'ImportDeclaration') {
-      addImport(results, stringLiteralValue(node.source), importDeclarationNames(node))
+      addImport(results, stringLiteralValue(node.source), importDeclarationNames(node), isRuntimeDeclaration(node))
       return
     }
     if (node.type === 'ExportNamedDeclaration') {
-      addImport(results, stringLiteralValue(node.source), exportDeclarationNames(node))
+      addImport(results, stringLiteralValue(node.source), exportDeclarationNames(node), isRuntimeDeclaration(node))
       return
     }
     if (node.type === 'ExportAllDeclaration') {
-      addImport(results, stringLiteralValue(node.source), null)
+      addImport(results, stringLiteralValue(node.source), null, isRuntimeDeclaration(node))
       return
     }
     if (node.type === 'ImportExpression') {
@@ -363,8 +377,11 @@ export function checkArchitectureSources(
   sourcePatternRules: readonly SourcePatternRule[] = SOURCE_PATTERN_RULES,
 ): string[] {
   const violations: string[] = []
+  const importsByFile = new Map(
+    sources.map(({ relativeFilePath, source }) => [relativeFilePath, extractImports(source, relativeFilePath)]),
+  )
   for (const { relativeFilePath, source } of sources) {
-    const imports = extractImports(source, relativeFilePath)
+    const imports = importsByFile.get(relativeFilePath)!
     for (const importRef of imports) {
       for (const rule of rules) {
         if (!violatesRule(relativeFilePath, importRef, rule)) continue
@@ -377,6 +394,32 @@ export function checkArchitectureSources(
         if (!pattern.pattern.test(source)) continue
         violations.push(`${relativeFilePath}: disallowed source pattern "${pattern.label}" — ${rule.reason}`)
       }
+    }
+  }
+  return [...violations, ...findBrowserNodeBuiltinViolations(importsByFile)]
+}
+
+function findBrowserNodeBuiltinViolations(importsByFile: ReadonlyMap<string, ImportReference[]>): string[] {
+  const queue = WEB_RUNTIME_ENTRIES.filter((entry) => importsByFile.has(entry)).map((entry) => [entry])
+  const visited = new Set<string>()
+  const violations: string[] = []
+
+  while (queue.length > 0) {
+    const chain = queue.shift()!
+    const file = chain.at(-1)!
+    if (visited.has(file)) continue
+    visited.add(file)
+
+    for (const imported of importsByFile.get(file) ?? []) {
+      if (!imported.isRuntime) continue
+      if (NODE_BUILTIN_SPECIFIERS.has(imported.importPath)) {
+        violations.push(
+          `${file}: browser runtime reaches Node import "${imported.importPath}" via ${[...chain, imported.importPath].join(' -> ')}`,
+        )
+        continue
+      }
+      const dependency = canonicalImportPath(imported.importPath, file)
+      if (importsByFile.has(dependency)) queue.push([...chain, dependency])
     }
   }
   return violations
