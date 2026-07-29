@@ -225,6 +225,10 @@ describe('TerminalComposer', () => {
       LABELS.backspace,
       LABELS.tab,
     ])
+    const keyRowLabels = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
+    ).map((button) => button.querySelector('.sr-only')?.textContent)
+    expect(keyRowLabels.slice(0, 3)).toEqual([LABELS.enter, LABELS.backspace, LABELS.tab])
     for (const button of optionalActions) act(() => button.click())
     expect(onVirtualKey.mock.calls.slice(-3).map(([key]) => key)).toEqual(['enter', 'backspace', 'tab'])
 
@@ -237,6 +241,11 @@ describe('TerminalComposer', () => {
       [LABELS.ctrlD, 'eof'],
     ] as const) {
       openMoreMenu(container)
+      if (key === 'enter') {
+        expect(
+          Array.from(document.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
+        ).toEqual(['↵', '⌫', '⇥', 'Esc', '^C', '^D'])
+      }
       act(() => menuItemByText(label).click())
       expect(onVirtualKey).toHaveBeenLastCalledWith(key)
     }

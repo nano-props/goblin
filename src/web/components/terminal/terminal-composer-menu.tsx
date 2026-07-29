@@ -1,4 +1,4 @@
-import { CornerDownLeft, Delete, Ellipsis, Square, Upload, X } from 'lucide-react'
+import { Ellipsis, Upload, X } from 'lucide-react'
 import { useRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import {
@@ -69,6 +69,7 @@ export function TerminalComposerMenu({
       <DropdownMenuContent
         side="top"
         align="end"
+        className="w-max min-w-32"
         onCloseAutoFocus={(event) => {
           const focusTarget = focusTargetRef.current
           if (!focusTarget) return
@@ -89,28 +90,28 @@ export function TerminalComposerMenu({
         ) : (
           <>
             <DropdownMenuItem onSelect={() => sendVirtualKey('enter')}>
-              <CornerDownLeft className="size-4" />
+              <Keycap>↵</Keycap>
               {labels.enter}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => sendVirtualKey('backspace')}>
-              <Delete className="size-4" />
+              <Keycap>⌫</Keycap>
               {labels.backspace}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => sendVirtualKey('tab')}>
-              <span aria-hidden="true">⇥</span>
+              <Keycap>⇥</Keycap>
               {labels.tab}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => sendVirtualKey('escape')}>
-              <span aria-hidden="true">⎋</span>
+              <Keycap>Esc</Keycap>
               {labels.escape}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => sendVirtualKey('interrupt')}>
-              <CtrlCIcon />
+              <Keycap>^C</Keycap>
               {labels.ctrlC}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => sendVirtualKey('eof')}>
-              <ControlKeyIcon letter="D" />
+              <Keycap>^D</Keycap>
               {labels.ctrlD}
             </DropdownMenuItem>
           </>
@@ -130,15 +131,14 @@ export function TerminalComposerMenu({
   )
 }
 
-function CtrlCIcon() {
-  return <ControlKeyIcon letter="C" />
-}
-
-function ControlKeyIcon({ letter }: { letter: string }) {
+function Keycap({ children }: { children: string }) {
   return (
-    <span className="relative inline-flex size-4 items-center justify-center" aria-hidden="true">
-      <Square className="size-4" />
-      <span className="absolute text-[8px] font-semibold leading-none">{letter}</span>
-    </span>
+    <kbd
+      data-terminal-composer-keycap=""
+      aria-hidden="true"
+      className="inline-flex h-[18px] w-6 shrink-0 items-center justify-center rounded-[4px] border border-border bg-muted/40 font-mono text-[10px] font-medium leading-none text-muted-foreground shadow-xs"
+    >
+      {children}
+    </kbd>
   )
 }

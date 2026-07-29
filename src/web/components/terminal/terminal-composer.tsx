@@ -249,6 +249,22 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
+                {OPTIONAL_KEY_ACTIONS.map((key, index) => (
+                  <ComposerButton
+                    key={key.accessibleName}
+                    className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
+                    accessibleName={labels[key.accessibleName]}
+                    disabled={disabled}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      if (key.type !== 'virtual-key') return
+                      onVirtualKey(key.key)
+                      if (event.detail > 0) onRequestFocus()
+                    }}
+                  >
+                    {'label' in key ? key.label : key.icon}
+                  </ComposerButton>
+                ))}
                 {PRIMARY_KEY_ACTIONS.map((key) => (
                   <ComposerButton
                     key={key.accessibleName}
@@ -260,22 +276,6 @@ export function TerminalComposer({
                         onScrollLines(key.amount)
                         return
                       }
-                      onVirtualKey(key.key)
-                      if (event.detail > 0) onRequestFocus()
-                    }}
-                  >
-                    {'label' in key ? key.label : key.icon}
-                  </ComposerButton>
-                ))}
-                {OPTIONAL_KEY_ACTIONS.map((key, index) => (
-                  <ComposerButton
-                    key={key.accessibleName}
-                    className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
-                    accessibleName={labels[key.accessibleName]}
-                    disabled={disabled}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => {
-                      if (key.type !== 'virtual-key') return
                       onVirtualKey(key.key)
                       if (event.detail > 0) onRequestFocus()
                     }}
