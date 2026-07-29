@@ -51,12 +51,7 @@ export function TerminalComposerMenu({
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          size="icon"
-          variant="secondary"
-          className="goblin-terminal-composer__btn"
-        >
+        <Button type="button" size="icon" variant="secondary" className="goblin-terminal-composer__btn">
           <span aria-hidden="true">
             <Ellipsis className="size-4" />
           </span>

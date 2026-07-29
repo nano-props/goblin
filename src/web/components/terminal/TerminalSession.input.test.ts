@@ -543,6 +543,41 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
   })
 
+  test('does not send the following Enter to a replacement generation after old text is accepted', async () => {
+    const { session } = await startPresentedControllerGeneration()
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+
+    const submission = session.submitText('accepted by the old generation')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', {
+        terminalRuntimeGeneration: 2,
+        identityRevision: 3,
+      }),
+    )
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      identityRevision: 2,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await flushTerminalStart()
+    const replacementTerm = xtermMocks.terminals.at(-1)!
+
+    pasteWrite.resolve({ status: 'accepted' })
+
+    await expect(submission).resolves.toBe(true)
+    expect(replacementTerm.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+  })
+
   test('settles an accepted submission without waiting for the following Enter acknowledgement', async () => {
     const { session, term } = await startPresentedControllerGeneration()
     const enterWrite = Promise.withResolvers<TerminalWriteResult>()

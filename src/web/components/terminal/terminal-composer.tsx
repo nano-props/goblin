@@ -5,8 +5,6 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ClipboardEvent,
-  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -28,8 +26,6 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistory } from '#/web/components/terminal/terminal-composer-history.ts'
-import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
-import { previewPaste } from '#/web/clipboard/process.ts'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -233,26 +229,6 @@ export function TerminalComposer({
     event.target.value = ''
     await resolveFilesIntoDraft(files, fileInsertionRef.current)
   }
-  const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
-    const files = collectClipboardFiles(event.clipboardData)
-    const preview = previewPaste({ text: event.clipboardData.getData('text/plain'), files })
-    if (preview.kind === 'no-op' || preview.kind === 'text') return
-    event.preventDefault()
-    event.stopPropagation()
-    void resolveFilesIntoDraft(files, currentFileInsertion())
-  }
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!event.dataTransfer.types.includes('Files')) return
-    event.preventDefault()
-    event.stopPropagation()
-    event.dataTransfer.dropEffect = 'copy'
-  }
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (!event.dataTransfer.types.includes('Files')) return
-    event.preventDefault()
-    event.stopPropagation()
-    void resolveFilesIntoDraft(collectClipboardFiles(event.dataTransfer), currentFileInsertion())
-  }
 
   return (
     <div
@@ -261,9 +237,6 @@ export function TerminalComposer({
       hidden={hidden}
       role="group"
       aria-label={labels.composer}
-      onPaste={handlePaste}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
     >
       <ComposerButton
         buttonRef={triggerRef}

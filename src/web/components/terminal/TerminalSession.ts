@@ -236,16 +236,18 @@ export class TerminalSession {
   }
 
   async submitText(text: string): Promise<boolean> {
-    if (!text || !this.currentWritableInputBinding() || !this.view.pasteText(text)) return false
+    const submittedBinding = this.currentWritableInputBinding()
+    if (!text || !submittedBinding || !this.view.pasteText(text)) return false
     // A composed submission represents two ordered user actions. Wait until
     // the paste has reached the PTY before sending Enter so input batching
     // cannot collapse them back into one delivery step.
     if (!(await this.flushInput())) return false
     // Once the paste is accepted, the Composer draft has been delivered and
-    // must not be offered for automatic resubmission. Enter still uses the
-    // ordinary queued input path and failure reporter, but its failure cannot
-    // undo the paste or keep the delivered draft pending.
-    this.sendVirtualKey('enter')
+    // must not be offered for automatic resubmission. Enter may follow only
+    // while the same runtime generation remains writable: a replacement PTY
+    // must never receive the second half of an older composed submission.
+    const currentBinding = this.currentWritableInputBinding()
+    if (currentBinding && sameRuntimeBinding(currentBinding, submittedBinding)) this.view.sendVirtualKey('enter')
     return true
   }
 

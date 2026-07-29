@@ -300,19 +300,16 @@ export function TerminalSessionView({
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (isTerminalComposerEvent(event)) return
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
     setDragOver(true)
   }, [])
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (isTerminalComposerEvent(event)) return
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
   }, [])
   const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (isTerminalComposerEvent(event)) return
     if (!event.dataTransfer.types.includes('Files')) return
     const relatedTarget = event.relatedTarget
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
@@ -395,7 +392,6 @@ export function TerminalSessionView({
   )
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
-      if (isTerminalComposerEvent(event)) return
       if (!event.dataTransfer.types.includes('Files')) return
       event.preventDefault()
       setDragOver(false)
@@ -403,9 +399,6 @@ export function TerminalSessionView({
     },
     [handleDroppedFiles],
   )
-  const handleDropCapture = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes('Files')) setDragOver(false)
-  }, [])
   const resolveComposerFiles = useCallback(
     async (selectedFiles: File[]) => {
       if (!terminalSessionId || !isController) return null
@@ -432,7 +425,6 @@ export function TerminalSessionView({
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
-      if (isTerminalComposerEvent(event)) return
       if (!terminalSessionId || !isController) return
       const clipboardData = event.clipboardData
       if (!clipboardData) return
@@ -504,7 +496,6 @@ export function TerminalSessionView({
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      onDropCapture={handleDropCapture}
       onDrop={handleDrop}
     >
       {progress && (
@@ -636,10 +627,6 @@ export function TerminalSessionView({
       )}
     </div>
   )
-}
-
-function isTerminalComposerEvent(event: { target: EventTarget | null }): boolean {
-  return event.target instanceof Element && event.target.closest('.goblin-terminal-composer') !== null
 }
 
 interface AttachmentOverlayProps {

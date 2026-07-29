@@ -86,7 +86,7 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test.each(['paste', 'drop'] as const)('routes Composer file %s into the draft instead of the PTY', async (kind) => {
+  test.each(['paste', 'drop'] as const)('keeps terminal file %s routed to the PTY over the Composer', async (kind) => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValueOnce('/abs/notes file.txt')
     const rendered = await renderTerminalSession()
@@ -111,8 +111,10 @@ describe('TerminalSessionView composer', () => {
         textarea.dispatchEvent(event)
       }
 
-      await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
-      expect(rendered.writeInput).not.toHaveBeenCalled()
+      await vi.waitFor(() =>
+        expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/notes file.txt'"),
+      )
+      expect(textarea.value).toBe('cat ')
       if (kind === 'drop') {
         expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
       }
