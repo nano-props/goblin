@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { renderTerminalSession } from '#/web/test-utils/terminal-session-view.tsx'
 
-describe('TerminalSessionView mobile actions', () => {
+describe('TerminalSessionView composer', () => {
   test('submits composer text and Enter through a writer captured for the selected session', async () => {
     const inputWriter = vi.fn(() => true)
     const captureInputWriter = vi.fn(() => inputWriter)
@@ -71,13 +71,18 @@ describe('TerminalSessionView mobile actions', () => {
         'textarea[aria-label="terminal.composer-input-placeholder"]',
       )
       const fileInput = rendered.container.querySelector<HTMLInputElement>('input[type="file"]')
-      const selectFilesButton = Array.from(rendered.container.querySelectorAll('button')).find(
-        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-select-files',
+      const moreButton = Array.from(rendered.container.querySelectorAll('button')).find(
+        (button) => button.querySelector('.sr-only')?.textContent === 'terminal.composer-more',
       )
-      if (!textarea || !fileInput || !selectFilesButton) throw new Error('expected composer file controls')
+      if (!textarea || !fileInput || !moreButton) throw new Error('expected composer file controls')
       fireEvent.change(textarea, { target: { value: 'cat ' } })
       textarea.setSelectionRange(4, 4)
-      act(() => selectFilesButton.click())
+      act(() => fireEvent.pointerDown(moreButton, { button: 0, ctrlKey: false }))
+      const uploadItem = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-item"]')).find(
+        (item) => item.textContent?.includes('terminal.composer-upload-files'),
+      )
+      if (!uploadItem) throw new Error('expected composer upload action')
+      act(() => uploadItem.click())
 
       fireEvent.change(fileInput, {
         target: { files: [new File(['content'], 'notes.txt', { type: 'text/plain' })] },
@@ -90,7 +95,7 @@ describe('TerminalSessionView mobile actions', () => {
     }
   })
 
-  test('hides the terminal composer while terminal search is open on mobile', async () => {
+  test('hides the terminal composer while terminal search is open', async () => {
     const user = userEvent.setup()
     const rendered = await renderTerminalSession()
 

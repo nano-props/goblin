@@ -7,14 +7,12 @@ import {
   ChevronsDown,
   ChevronsUp,
   Keyboard,
-  Plus,
-  Square,
   TextCursorInput,
-  X,
 } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
+import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -22,7 +20,8 @@ export interface TerminalComposerLabels {
   open: string
   close: string
   inputPlaceholder: string
-  selectFiles: string
+  more: string
+  uploadFiles: string
   showKeys: string
   showInput: string
   tab: string
@@ -49,16 +48,14 @@ interface TerminalComposerProps {
 
 type AccessibleName = Exclude<
   keyof TerminalComposerLabels,
-  'composer' | 'open' | 'close' | 'inputPlaceholder' | 'selectFiles' | 'showKeys' | 'showInput'
+  'composer' | 'open' | 'close' | 'inputPlaceholder' | 'more' | 'uploadFiles' | 'showKeys' | 'showInput'
 >
 type ComposerKeyAction = { accessibleName: AccessibleName } & (
-  | { type: 'virtual-key'; label: string; key: TerminalVirtualKey }
   | { type: 'virtual-key'; icon: ReactNode; key: TerminalVirtualKey }
   | { type: 'scroll'; icon: ReactNode; amount: number }
 )
 
-const KEY_ACTIONS: ComposerKeyAction[] = [
-  { type: 'virtual-key', label: '⇥', key: 'tab', accessibleName: 'tab' },
+const PRIMARY_KEY_ACTIONS: ComposerKeyAction[] = [
   { type: 'virtual-key', icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
   {
     type: 'virtual-key',
@@ -78,8 +75,6 @@ const KEY_ACTIONS: ComposerKeyAction[] = [
     key: 'arrow-right',
     accessibleName: 'arrowRight',
   },
-  { type: 'virtual-key', label: '⎋', key: 'escape', accessibleName: 'escape' },
-  { type: 'virtual-key', icon: <CtrlCIcon />, key: 'interrupt', accessibleName: 'ctrlC' },
   { type: 'scroll', icon: <ChevronsUp className="size-4" />, amount: -12, accessibleName: 'pageUp' },
   { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'pageDown' },
 ]
@@ -124,7 +119,6 @@ export function TerminalComposer({
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
-  const restoreTriggerFocusRef = useRef(false)
   const composerId = useId()
 
   useLayoutEffect(() => {
@@ -140,14 +134,7 @@ export function TerminalComposer({
   }, [draft, expanded, mode])
 
   useLayoutEffect(() => {
-    if (expanded && mode === 'input') {
-      inputRef.current?.focus()
-      return
-    }
-    if (!expanded && restoreTriggerFocusRef.current) {
-      restoreTriggerFocusRef.current = false
-      triggerRef.current?.focus()
-    }
+    if (expanded && mode === 'input') inputRef.current?.focus()
   }, [expanded, mode])
 
   useEffect(() => {
@@ -162,7 +149,19 @@ export function TerminalComposer({
     if (!draft || !onSendText(draft)) return
     setDraft('')
   }
-  const selectFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+  const closeComposer = () => {
+    setMode('input')
+    setExpanded(false)
+  }
+  const openFilePicker = () => {
+    const input = inputRef.current
+    fileInsertionRef.current = {
+      start: input?.selectionStart ?? draft.length,
+      end: input?.selectionEnd ?? draft.length,
+    }
+    fileInputRef.current?.click()
+  }
+  const handleFileSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
     if (files.length === 0) return
@@ -217,38 +216,21 @@ export function TerminalComposer({
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
           </ComposerButton>
           {mode === 'input' ? (
-            <>
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={draft}
-                disabled={disabled}
-                aria-label={labels.inputPlaceholder}
-                placeholder={labels.inputPlaceholder}
-                className="goblin-terminal-composer__input"
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
-                  event.preventDefault()
-                  submitDraft()
-                }}
-              />
-              <ComposerButton
-                accessibleName={labels.selectFiles}
-                disabled={disabled || resolvingFiles}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  const input = inputRef.current
-                  fileInsertionRef.current = {
-                    start: input?.selectionStart ?? draft.length,
-                    end: input?.selectionEnd ?? draft.length,
-                  }
-                  fileInputRef.current?.click()
-                }}
-              >
-                <Plus className="size-4" />
-              </ComposerButton>
-            </>
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={draft}
+              disabled={disabled}
+              aria-label={labels.inputPlaceholder}
+              placeholder={labels.inputPlaceholder}
+              className="goblin-terminal-composer__input"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+                event.preventDefault()
+                submitDraft()
+              }}
+            />
           ) : (
             <ScrollArea
               orientation="horizontal"
@@ -256,7 +238,7 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
-                {KEY_ACTIONS.map((key) => (
+                {PRIMARY_KEY_ACTIONS.map((key) => (
                   <ComposerButton
                     key={key.accessibleName}
                     accessibleName={labels[key.accessibleName]}
@@ -271,7 +253,7 @@ export function TerminalComposer({
                       if (event.detail > 0) onRequestFocus()
                     }}
                   >
-                    {'label' in key ? key.label : key.icon}
+                    {key.icon}
                   </ComposerButton>
                 ))}
               </div>
@@ -284,19 +266,19 @@ export function TerminalComposer({
             aria-hidden="true"
             type="file"
             multiple
-            onChange={selectFiles}
+            onChange={handleFileSelection}
           />
-          <ComposerButton
-            accessibleName={labels.close}
+          <TerminalComposerMenu
+            labels={labels}
+            mode={mode}
             disabled={disabled}
-            onClick={() => {
-              restoreTriggerFocusRef.current = true
-              setMode('input')
-              setExpanded(false)
-            }}
-          >
-            <X className="size-4" />
-          </ComposerButton>
+            resolvingFiles={resolvingFiles}
+            onUpload={openFilePicker}
+            onVirtualKey={onVirtualKey}
+            onRequestTerminalFocus={onRequestFocus}
+            onClose={closeComposer}
+            onRestoreComposerTriggerFocus={() => triggerRef.current?.focus()}
+          />
         </div>
       </div>
     </div>
@@ -348,14 +330,5 @@ function ComposerButton({
       <span aria-hidden="true">{children}</span>
       <span className="sr-only">{accessibleName}</span>
     </Button>
-  )
-}
-
-function CtrlCIcon() {
-  return (
-    <span className="relative inline-flex size-4 items-center justify-center" aria-hidden="true">
-      <Square className="size-4" />
-      <span className="absolute text-[8px] font-semibold leading-none">C</span>
-    </span>
   )
 }

@@ -414,7 +414,9 @@
   display: flex;
   height: var(--goblin-terminal-composer-key-size);
   width: max-content;
+  min-width: 100%;
   align-items: center;
+  justify-content: center;
   gap: var(--goblin-terminal-composer-key-gap);
 }
 

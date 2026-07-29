@@ -28,7 +28,6 @@ import {
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
-import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
@@ -101,7 +100,8 @@ export function TerminalSessionView({
     open: t('terminal.composer-open'),
     close: t('terminal.composer-close'),
     inputPlaceholder: t('terminal.composer-input-placeholder'),
-    selectFiles: t('terminal.composer-select-files'),
+    more: t('terminal.composer-more'),
+    uploadFiles: t('terminal.composer-upload-files'),
     showKeys: t('terminal.composer-show-keys'),
     showInput: t('terminal.composer-show-input'),
     tab: t('terminal.composer-key-tab'),
@@ -311,7 +311,7 @@ export function TerminalSessionView({
     const relatedTarget = event.relatedTarget
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
-  const planResolvedPaths = useCallback(
+  const prepareResolvedPaths = useCallback(
     (resolution: PasteResolution) => {
       const plan = planTerminalPathWrite(resolution.paths, {
         failedUnsafe: resolution.failedUnsafe,
@@ -339,7 +339,7 @@ export function TerminalSessionView({
   )
   const writeResolutionToPty = useCallback(
     (resolution: PasteResolution, inputWriter: TerminalInputWriter) => {
-      const plan = planResolvedPaths(resolution)
+      const plan = prepareResolvedPaths(resolution)
       if (!plan) return
       if (!inputWriter(plan.data)) {
         toast.error(t('terminal.paste-file-failed'))
@@ -347,7 +347,7 @@ export function TerminalSessionView({
       }
       reportResolvedPathFailures(plan.failures)
     },
-    [planResolvedPaths, reportResolvedPathFailures, t],
+    [prepareResolvedPaths, reportResolvedPathFailures, t],
   )
   const handleDroppedFiles = useCallback(
     (selectedFiles: File[]) => {
@@ -408,7 +408,7 @@ export function TerminalSessionView({
           return null
         }
         if (outcome.kind === 'no-op') return null
-        const plan = planResolvedPaths(outcome.resolution)
+        const plan = prepareResolvedPaths(outcome.resolution)
         if (!plan) return null
         reportResolvedPathFailures(plan.failures)
         return plan.data
@@ -418,7 +418,7 @@ export function TerminalSessionView({
         return null
       }
     },
-    [isController, planResolvedPaths, reportResolvedPathFailures, t, terminalSessionId],
+    [isController, prepareResolvedPaths, reportResolvedPathFailures, t, terminalSessionId],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
@@ -543,7 +543,7 @@ export function TerminalSessionView({
           </Button>
         </div>
       )}
-      {isMobileDevice() && isController && terminalSessionId && !searchOpen && (
+      {isController && terminalSessionId && !searchOpen && (
         <TerminalComposer
           key={terminalSessionId}
           className="goblin-terminal-composer--floating"

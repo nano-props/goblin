@@ -12,7 +12,8 @@ const LABELS: TerminalComposerLabels = {
   open: 'Open terminal composer',
   close: 'Collapse terminal composer',
   inputPlaceholder: 'Enter a terminal command',
-  selectFiles: 'Select files',
+  more: 'More actions',
+  uploadFiles: 'Upload files',
   showKeys: 'Show terminal keys',
   showInput: 'Show text input',
   tab: 'Tab',
@@ -61,8 +62,22 @@ function expand(container: HTMLElement) {
   act(() => buttonByAccessibleName(container, LABELS.open).click())
 }
 
+function openMoreMenu(container: HTMLElement) {
+  act(() => {
+    fireEvent.pointerDown(buttonByAccessibleName(container, LABELS.more), { button: 0, ctrlKey: false })
+  })
+}
+
+function menuItemByText(text: string) {
+  const item = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-item"]')).find((element) =>
+    element.textContent?.includes(text),
+  )
+  if (!item) throw new Error(`expected menu item named ${text}`)
+  return item
+}
+
 describe('TerminalComposer', () => {
-  test('starts as one floating action and expands into the composer', () => {
+  test('starts as one floating action and expands into the composer', async () => {
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
     const surface = container.querySelector('.goblin-terminal-composer__surface')
@@ -79,22 +94,21 @@ describe('TerminalComposer', () => {
     const input = container.querySelector('textarea')
     const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
     const showKeys = buttonByAccessibleName(container, LABELS.showKeys)
-    const selectFiles = buttonByAccessibleName(container, LABELS.selectFiles)
-    const close = buttonByAccessibleName(container, LABELS.close)
+    const more = buttonByAccessibleName(container, LABELS.more)
     expect(input?.getAttribute('placeholder')).toBe(LABELS.inputPlaceholder)
     expect(document.activeElement).toBe(input)
     expect(showKeys.parentElement).toBe(modeRow)
     expect(input?.parentElement).toBe(modeRow)
-    expect(selectFiles.parentElement).toBe(modeRow)
-    expect(selectFiles.querySelector('.lucide-plus')).not.toBeNull()
-    expect(close.parentElement).toBe(modeRow)
+    expect(more.parentElement).toBe(modeRow)
+    expect(more.querySelector('.lucide-ellipsis')).not.toBeNull()
     expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
 
-    act(() => close.click())
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.close).click())
     expect(surface?.getAttribute('aria-hidden')).toBe('true')
     expect(surface?.hasAttribute('inert')).toBe(true)
     expect(container.querySelector('textarea')).not.toBeNull()
-    expect(document.activeElement).toBe(openButton)
+    await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
   test('submits with Enter and clears only accepted text', () => {
@@ -161,7 +175,8 @@ describe('TerminalComposer', () => {
     const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
     fireEvent.change(textarea, { target: { value: 'cat done' } })
     textarea.setSelectionRange(4, 4)
-    act(() => buttonByAccessibleName(container, LABELS.selectFiles).click())
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.uploadFiles).click())
 
     await act(async () => {
       fireEvent.change(fileInput, { target: { files: [file] } })
@@ -185,36 +200,26 @@ describe('TerminalComposer', () => {
     expect(
       buttonByAccessibleName(container, LABELS.showInput).querySelector('.lucide-text-cursor-input'),
     ).not.toBeNull()
-    expect(
-      Array.from(container.querySelectorAll('button')).some(
-        (button) => button.querySelector('.sr-only')?.textContent === LABELS.selectFiles,
-      ),
-    ).toBe(false)
+    expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    for (const name of [
-      LABELS.escape,
-      LABELS.tab,
-      LABELS.arrowUp,
-      LABELS.arrowDown,
-      LABELS.arrowLeft,
-      LABELS.arrowRight,
-    ]) {
+    for (const name of [LABELS.arrowUp, LABELS.arrowDown, LABELS.arrowLeft, LABELS.arrowRight]) {
       act(() => buttonByAccessibleName(container, name).click())
     }
-    expect(onVirtualKey.mock.calls.map(([key]) => key)).toEqual([
-      'escape',
-      'tab',
-      'arrow-up',
-      'arrow-down',
-      'arrow-left',
-      'arrow-right',
-    ])
-    act(() => buttonByAccessibleName(container, LABELS.ctrlC).click())
-    expect(onVirtualKey).toHaveBeenLastCalledWith('interrupt')
+    expect(onVirtualKey.mock.calls.map(([key]) => key)).toEqual(['arrow-up', 'arrow-down', 'arrow-left', 'arrow-right'])
     act(() => buttonByAccessibleName(container, LABELS.pageUp).click())
     act(() => buttonByAccessibleName(container, LABELS.pageDown).click())
     expect(onScrollLines).toHaveBeenNthCalledWith(1, -12)
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
+
+    for (const [label, key] of [
+      [LABELS.tab, 'tab'],
+      [LABELS.escape, 'escape'],
+      [LABELS.ctrlC, 'interrupt'],
+    ] as const) {
+      openMoreMenu(container)
+      act(() => menuItemByText(label).click())
+      expect(onVirtualKey).toHaveBeenLastCalledWith(key)
+    }
   })
 
   test('mode toggle preserves the draft and virtual keys restore terminal focus only for pointer input', () => {
@@ -236,7 +241,7 @@ describe('TerminalComposer', () => {
     act(() => buttonByAccessibleName(container, LABELS.showInput).click())
     expect(container.querySelector('textarea')?.value).toBe('draft command')
     expect(document.activeElement).toBe(container.querySelector('textarea'))
-    expect(buttonByAccessibleName(container, LABELS.selectFiles)).toBeTruthy()
+    expect(buttonByAccessibleName(container, LABELS.more)).toBeTruthy()
     expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
 
