@@ -18,7 +18,7 @@ import {
   type TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranch } from '#/shared/refnames.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
   WorkspacePaneFilesystemExecutionTargetSchema,

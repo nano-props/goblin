@@ -1,5 +1,5 @@
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranch } from '#/shared/refnames.ts'
 import {
   canonicalWorkspaceLocator,
   parseCanonicalWorkspaceLocator,

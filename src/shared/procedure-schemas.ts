@@ -9,7 +9,7 @@
 
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
-import { isValidBranch } from '#/shared/input-validation.ts'
+import { isValidBranch } from '#/shared/refnames.ts'
 import {
   CwdInput,
   RemoteConnectionInputSchema,
