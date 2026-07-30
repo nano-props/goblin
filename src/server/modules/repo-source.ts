@@ -14,6 +14,13 @@ import {
   resolveRemoteRepoWriteBoundaryForTarget,
   resolveRepoWriteBoundaryForLocator,
 } from '#/server/modules/repo-write-boundary.ts'
+import {
+  localWorktreeRepoIds,
+  remoteWorktreeRepoIds,
+  withAffectedRepoIds,
+  workspaceIdForLocalWorktreePath,
+  type RepoMutationResult,
+} from '#/server/modules/repo-mutation-impact.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
@@ -80,26 +87,16 @@ import type { GitUpstream } from '#/system/git/upstream.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import type { PullRequestEntry, RepoPullRequestScope, RepoSnapshot } from '#/shared/api-types.ts'
-import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { formatWorkspaceLocator, parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import { parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   physicalWorktreeExecutionBinding,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
-
-export interface RepoMutationResult extends ExecResult {
-  /**
-   * Repo session ids whose repo snapshot changed even when the final
-   * command result is a partial failure after an earlier write succeeded.
-   */
-  affectedRepoIds?: readonly WorkspaceId[]
-  /** Filesystem roots whose checked-out contents changed during the mutation. */
-  affectedWorktreePaths?: readonly string[]
-}
 
 export type WorkspacePaneTargetIdentity =
   { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
@@ -268,35 +265,6 @@ function repoWriteExecutionState(capability: RepoWriteExecutionCapability): Repo
   const state = repoWriteExecutions.get(capability)
   if (!state) throw new Error('error.invalid-repository-write-capability')
   return state
-}
-
-function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
-  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
-  return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
-}
-
-function localWorktreeRepoIds(worktrees: WorktreeInfo[]): WorkspaceId[] {
-  return worktrees.flatMap((worktree) => {
-    if (worktree.isBare) return []
-    const id = localWorkspaceId(worktree.path)
-    return id ? [id] : []
-  })
-}
-
-function localWorkspaceId(worktreePath: string): WorkspaceId | null {
-  const platform = process.platform === 'win32' ? 'win32' : 'posix'
-  return formatWorkspaceLocator({ transport: 'file', platform, path: worktreePath }, platform)
-}
-
-function remoteWorktreeRepoIds(
-  target: RemoteWorkspaceTarget,
-  worktreePaths: readonly string[] | undefined,
-): WorkspaceId[] {
-  if (!worktreePaths) return []
-  return worktreePaths.flatMap((remotePath) => {
-    const ref = normalizeRemoteWorkspaceRef({ alias: target.alias, remotePath })
-    return ref ? [ref.id] : []
-  })
 }
 
 async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
@@ -476,7 +444,7 @@ function createLocalRepoSource(
           return { ok: false, message: 'error.invalid-arguments' }
         }
       }
-      const createdWorkspaceId = localWorkspaceId(input.worktreePath)
+      const createdWorkspaceId = workspaceIdForLocalWorktreePath(input.worktreePath)
       const affectedRepoIds = [
         ...(await readLocalAffectedRepoIds(repoId, signal)),
         ...(createdWorkspaceId ? [createdWorkspaceId] : []),
@@ -556,16 +524,11 @@ function createLocalRepoSource(
       }
       const prepared = await lifecycle.beforeRemove()
       if (!prepared.ok) return prepared
-      let removed: Awaited<ReturnType<typeof removeWorktree>>
-      try {
-        removed = await removeWorktree(
-          mutationCwd,
-          exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : removable.target.path,
-          signal,
-        )
-      } catch (error) {
-        throw error
-      }
+      const removed = await removeWorktree(
+        mutationCwd,
+        exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : removable.target.path,
+        signal,
+      )
       if (!removed.ok) return removed
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repositoryStateChanged: true }, affectedRepoIds)

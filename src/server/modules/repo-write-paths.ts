@@ -12,10 +12,10 @@ import {
 import {
   captureRepoWriteExecutionFromPhysicalWorktree,
   runWithRepoSource,
-  type RepoMutationResult,
   type RepoSource,
   type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
+import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
