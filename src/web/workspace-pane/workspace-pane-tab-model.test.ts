@@ -2,9 +2,9 @@ import { describe, expect, test } from 'vitest'
 import {
   createWorkspacePaneTabModel,
   materializedWorkspacePaneRuntimeTabSessionId,
-  nextWorkspacePaneTabEntryAfterClose,
   workspacePaneTerminalBaseForTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   createModel,
   staticEntry,

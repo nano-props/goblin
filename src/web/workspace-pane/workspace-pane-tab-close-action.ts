@@ -9,10 +9,10 @@ import {
 } from '#/shared/terminal-types.ts'
 import {
   isWorkspacePaneRuntimeTab,
-  nextWorkspacePaneTabEntryAfterClose,
   workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
