@@ -8,7 +8,7 @@ import type {
   TerminalTakeoverResult,
   TerminalResizeCommit,
 } from '#/shared/terminal-types.ts'
-import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
+import { sameTerminalCanonicalSize, TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
 import type {
   TerminalControllerViewModel,
@@ -194,7 +194,7 @@ export class TerminalSessionRuntime {
     if (this.bindingState.kind === 'transitioning') return null
     const addressable = this.addressableRuntimeBinding()
     if (!addressable) return null
-    if (addressable?.terminalRuntimeGeneration === 0) {
+    if (addressable.terminalRuntimeGeneration === 0) {
       const attempt = { attemptId: ++this.nextAttemptId, operation: 'attach' as const }
       this.bindingState = {
         kind: 'transitioning',
@@ -245,7 +245,6 @@ export class TerminalSessionRuntime {
     if (!this.isCurrentAttempt(attempt) || !this.isValidAttemptResultBinding(attempt, result)) {
       return { accepted: false, changed: false, resolution: 'superseded' }
     }
-    const binding = bindingFrom(result)
     const staged = this.stagedAuthoritativeHydration
     if (staged) {
       return {
@@ -254,9 +253,10 @@ export class TerminalSessionRuntime {
         resolution: 'staged',
       }
     }
-    this.stagedAuthoritativeHydration = null
+    const binding = bindingFrom(result)
     const previous = this.activeBinding()
-    const metadata = this.applyRuntimeMetadata(result, !previous || !sameTerminalRuntimeBinding(previous, binding))
+    const bindingChanged = !sameTerminalRuntimeBinding(previous, binding)
+    const metadata = this.applyRuntimeMetadata(result, bindingChanged)
     if (!metadata.accepted) {
       if (!previous) throw new Error('stale terminal identity cannot supersede an unbound attach')
       this.bindingState = { kind: 'active', binding: previous }
@@ -265,7 +265,7 @@ export class TerminalSessionRuntime {
     this.bindingState = { kind: 'active', binding }
     return {
       accepted: true,
-      changed: !previous || !sameTerminalRuntimeBinding(previous, binding) || metadata.changed,
+      changed: bindingChanged || metadata.changed,
       resolution: 'response',
     }
   }
@@ -312,8 +312,9 @@ export class TerminalSessionRuntime {
     const binding = bindingFrom(input)
     const previous = this.activeBinding()
     this.bindingState = { kind: 'active', binding }
-    const metadata = this.applyRuntimeMetadata(input, !previous || !sameTerminalRuntimeBinding(previous, binding))
-    return !previous || !sameTerminalRuntimeBinding(previous, binding) || metadata.changed
+    const bindingChanged = !sameTerminalRuntimeBinding(previous, binding)
+    const metadata = this.applyRuntimeMetadata(input, bindingChanged)
+    return bindingChanged || metadata.changed
   }
 
   private stageAuthoritativeHydration(input: TerminalRepoSessionHydration): boolean {
@@ -469,12 +470,7 @@ export class TerminalSessionRuntime {
 
   commitResizeResult(result: TerminalResizeCommit): { accepted: boolean; changed: boolean } {
     const active = this.activeBinding()
-    if (
-      !active ||
-      active.terminalRuntimeSessionId !== result.terminalRuntimeSessionId ||
-      active.terminalRuntimeGeneration !== result.terminalRuntimeGeneration ||
-      !this.state.isController()
-    ) {
+    if (!active || !sameTerminalRuntimeBinding(active, result) || !this.state.isController()) {
       return { accepted: false, changed: false }
     }
     return this.state.applyIdentity(result)
@@ -552,10 +548,6 @@ function sameHydrationIdentity(a: TerminalRepoSessionHydration, b: TerminalRepoS
   return (
     a.role === b.role &&
     a.controllerStatus === b.controllerStatus &&
-    ((a.canonicalSize === null && b.canonicalSize === null) ||
-      (a.canonicalSize !== null &&
-        b.canonicalSize !== null &&
-        a.canonicalSize.cols === b.canonicalSize.cols &&
-        a.canonicalSize.rows === b.canonicalSize.rows))
+    sameTerminalCanonicalSize(a.canonicalSize, b.canonicalSize)
   )
 }

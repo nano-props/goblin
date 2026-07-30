@@ -257,7 +257,7 @@ export class TerminalSessionState {
     return (
       currentController.role === input.role &&
       currentController.controllerStatus === input.controllerStatus &&
-      sameCanonicalSize(this.runtimeState.canonicalSize, input.canonicalSize)
+      sameTerminalCanonicalSize(this.runtimeState.canonicalSize, input.canonicalSize)
     )
   }
 
@@ -347,7 +347,7 @@ function assertValidIdentityRevision(revision: number): void {
   if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('invalid terminal identity revision')
 }
 
-function sameCanonicalSize(
+export function sameTerminalCanonicalSize(
   a: { cols: number; rows: number } | null,
   b: { cols: number; rows: number } | null,
 ): boolean {
