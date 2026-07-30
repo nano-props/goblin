@@ -1,4 +1,4 @@
-import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
+import { buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   type TerminalCreateAction,

@@ -3,11 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import {
-  buildCanonicalSshConnectionSnapshot,
-  buildRemoteCommandInvocation,
-  buildRemoteTerminalInvocation,
-} from '#/system/ssh/commands.ts'
+import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
+import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
