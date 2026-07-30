@@ -3,11 +3,12 @@
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
 import type { TerminalComposerLabels } from '#/web/components/terminal/terminal-composer.tsx'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 
 const LABELS: TerminalComposerLabels = {
   composer: 'Terminal input composer',
@@ -154,6 +155,44 @@ describe('TerminalComposer', () => {
     expect(secondInput.value).toBe('')
     fireEvent.keyDown(secondInput, { key: 'ArrowUp' })
     expect(secondInput.value).toBe('other command')
+  })
+
+  test('applies supplied history entries during commit before later layout observers', () => {
+    const commitOrder: string[] = []
+    const originalUpdateEntries = TerminalComposerHistoryCursor.prototype.updateEntries
+    const updateEntries = vi
+      .spyOn(TerminalComposerHistoryCursor.prototype, 'updateEntries')
+      .mockImplementation(function (this: TerminalComposerHistoryCursor, entries) {
+        commitOrder.push('cursor')
+        originalUpdateEntries.call(this, entries)
+      })
+
+    function LayoutObserver({ historyEntries }: { historyEntries: readonly string[] }) {
+      useLayoutEffect(() => {
+        commitOrder.push('observer')
+      }, [historyEntries])
+      return null
+    }
+
+    function Harness({ historyEntries }: { historyEntries: readonly string[] }) {
+      return (
+        <>
+          {expandedComposerForTest('session-one', historyEntries)}
+          <LayoutObserver historyEntries={historyEntries} />
+        </>
+      )
+    }
+
+    try {
+      const { rerender } = renderInJsdom(<Harness historyEntries={['old command']} />)
+      commitOrder.length = 0
+
+      rerender(<Harness historyEntries={['new command']} />)
+
+      expect(commitOrder).toEqual(['cursor', 'observer'])
+    } finally {
+      updateEntries.mockRestore()
+    }
   })
 
   test('starts as one floating action and expands into the composer', async () => {
