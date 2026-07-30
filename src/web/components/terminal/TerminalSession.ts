@@ -41,7 +41,7 @@ import {
   type TerminalWriteFailureReporter,
 } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { toast } from 'sonner'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import type {
   TerminalDescriptor,
   TerminalComposerMode,

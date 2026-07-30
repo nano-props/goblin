@@ -23,7 +23,7 @@ import type { TerminalRestartResult } from '#/shared/terminal-types.ts'
 import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 const xtermMocks = terminalXtermMocks()

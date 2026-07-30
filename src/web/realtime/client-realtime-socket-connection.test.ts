@@ -2,10 +2,8 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import {
-  ClientRealtimeRequestError,
-  createClientRealtimeSocketConnection,
-} from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { createClientRealtimeSocketConnection } from '#/web/realtime/client-realtime-socket-connection.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
 interface TestInputs {

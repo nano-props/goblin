@@ -32,7 +32,7 @@ import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/t
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
 import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { isImeOwnedKeyboardEvent, isMacNavigatorPlatform } from '#/web/components/terminal/terminal-keyboard.ts'
 import {
   AttachmentOverlay,

@@ -1,5 +1,9 @@
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
+import {
+  ClientRealtimeRequestError,
+  type ClientRealtimeRequestFailureKind,
+} from '#/web/realtime/client-realtime-request-error.ts'
 import type { RealtimeRpcAction, RealtimeRpcOutputs } from '#/shared/realtime-rpc.ts'
 
 const CLIENT_REALTIME_LIVENESS_PROBE_INTERVAL_MS = 30_000
@@ -37,30 +41,6 @@ type RealtimeResponseMessage<TAction extends string> =
 
 type RealtimePongMessage = { type: 'pong'; requestId: string }
 type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
-
-export type ClientRealtimeRequestFailureKind =
-  'unavailable' | 'open-timeout' | 'open-failed' | 'send-failed' | 'disconnected' | 'timeout' | 'app-quitting'
-
-export class ClientRealtimeRequestError extends Error {
-  readonly kind: ClientRealtimeRequestFailureKind
-  readonly delivery: 'not-sent' | 'indeterminate'
-  readonly outageId: number | null
-
-  constructor(
-    message: string,
-    options: {
-      kind: ClientRealtimeRequestFailureKind
-      delivery: 'not-sent' | 'indeterminate'
-      outageId: number | null
-    },
-  ) {
-    super(message)
-    this.name = 'ClientRealtimeRequestError'
-    this.kind = options.kind
-    this.delivery = options.delivery
-    this.outageId = options.outageId
-  }
-}
 
 export interface ClientRealtimeSocketConnectionOptions<
   TInputs extends object,
