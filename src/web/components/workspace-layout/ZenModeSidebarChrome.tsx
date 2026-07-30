@@ -21,11 +21,11 @@ import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import {
-  ZenModeSidebarDragPlate,
   ZenModeSidebarResizeRail,
-  ZenModeSidebarRevealTriggerLayer,
   type ResizeRailState,
-} from '#/web/components/workspace-layout/ZenModeSidebarChromeParts.tsx'
+} from '#/web/components/workspace-layout/ZenModeSidebarResizeRail.tsx'
+import { ZenModeSidebarRevealTriggerLayer } from '#/web/components/workspace-layout/ZenModeSidebarRevealTriggerLayer.tsx'
+import { NativeDragPlate } from '#/web/components/title-bar-chrome-region.tsx'
 import {
   isPointerInsideElement,
   isPointerInsideRevealBounds,
@@ -444,6 +444,28 @@ function ZenModeSidebarReveal({
       </div>
       <ZenModeSidebarDragPlate mounted={panelInteractive} style={dragPlateStyle} onSurfaceEnter={onSurfaceEnter} />
     </div>
+  )
+}
+
+function ZenModeSidebarDragPlate({
+  mounted,
+  style,
+  onSurfaceEnter,
+}: {
+  mounted: boolean
+  style: CSSProperties
+  onSurfaceEnter: () => void
+}) {
+  if (!mounted) return null
+
+  return (
+    <NativeDragPlate
+      data-testid="zen-mode-sidebar-drag-plate"
+      data-zen-reveal-surface=""
+      className="z-30"
+      style={style}
+      onMouseEnter={onSurfaceEnter}
+    />
   )
 }
 
