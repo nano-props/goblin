@@ -6,6 +6,7 @@ import { StrictMode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -25,6 +26,13 @@ import {
   renderTerminalSession,
   terminalDescriptorTargetForTest,
 } from '#/web/test-utils/terminal-session-view.tsx'
+
+const EMPTY_OPENING_SNAPSHOT = {
+  phase: 'opening',
+  message: null,
+  processName: 'terminal',
+  composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+} as const
 
 describe('TerminalSessionView presentation and focus', () => {
   test('retries precommitted focus after the StrictMode view reaches its stable mount', async () => {
@@ -65,6 +73,7 @@ describe('TerminalSessionView presentation and focus', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'controller' as const,
       },
@@ -183,6 +192,7 @@ describe('TerminalSessionView presentation and focus', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'controller' as const,
       },
@@ -293,6 +303,7 @@ describe('TerminalSessionView presentation and focus', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'viewer' as const,
       },
@@ -363,7 +374,12 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 0,
       createPending: false,
     }
-    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+    const emptySnapshot = {
+      phase: 'opening' as const,
+      message: null,
+      processName: 'terminal',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+    }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
@@ -437,7 +453,12 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 1,
       createPending: false,
     }
-    const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
+    const snapshot = {
+      phase: 'opening' as const,
+      message: null,
+      processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+    }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       selectTerminal: vi.fn(),
@@ -516,7 +537,7 @@ describe('TerminalSessionView presentation and focus', () => {
       subscribeTerminalFilesystemTarget: () => () => {},
       workspaceBellCount: () => 0,
       subscribeWorkspaceBellCount: () => () => {},
-      snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+      snapshot: () => EMPTY_OPENING_SNAPSHOT,
       subscribeSnapshot: () => () => {},
     }
 
@@ -569,11 +590,17 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 1,
       createPending: false,
     }
-    const openingSnapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
+    const openingSnapshot: TerminalSnapshot = {
+      phase: 'opening',
+      message: null,
+      processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+    }
     const openSnapshot = {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'controller' as const,
       },
@@ -656,7 +683,12 @@ describe('TerminalSessionView presentation and focus', () => {
       count: 0,
       createPending: false,
     }
-    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+    const emptySnapshot = {
+      phase: 'opening' as const,
+      message: null,
+      processName: 'terminal',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+    }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal,
       selectTerminal: vi.fn(),
@@ -731,6 +763,7 @@ describe('TerminalSessionView presentation and focus', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'controller' },
           presentationRecovery: 'pending',
         },
@@ -756,6 +789,7 @@ describe('TerminalSessionView presentation and focus', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'controller' },
           presentationRecovery: 'failed',
         },
@@ -778,6 +812,7 @@ describe('TerminalSessionView presentation and focus', () => {
         phase: 'open',
         message: null,
         processName: 'zsh',
+        composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
         attachment: { role: 'controller' },
         presentationRecovery: 'pending',
       })
@@ -797,6 +832,7 @@ describe('TerminalSessionView presentation and focus', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'controller' },
           presentationRecovery: 'pending',
         },
@@ -823,6 +859,7 @@ describe('TerminalSessionView presentation and focus', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'unowned' },
         },
       },
@@ -843,6 +880,7 @@ describe('TerminalSessionView presentation and focus', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'viewer' },
           takeoverPending: true,
         },
@@ -875,7 +913,15 @@ describe('TerminalSessionView presentation and focus', () => {
     )
     const view = await renderTerminalSession(
       { takeover },
-      { snapshot: { phase: 'open', message: null, processName: 'zsh', attachment: { role: 'viewer' } } },
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+          attachment: { role: 'viewer' },
+        },
+      },
     )
 
     try {

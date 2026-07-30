@@ -680,7 +680,10 @@ describe('TerminalSession attachment and presentation', () => {
   })
 
   test('activates Unicode 11 and exposes terminal search', async () => {
-    const { session, term } = await startOpenControllerSession()
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    const { term } = await startOpenControllerSession(session)
+    notify.mockClear()
 
     expect(term.unicode.activeVersion).toBe('11')
     expect(session.findNext('needle', true)).toEqual({ resultIndex: 0, resultCount: 2, found: true })
@@ -693,6 +696,8 @@ describe('TerminalSession attachment and presentation', () => {
     session.clearSearch()
     expect(xtermMocks.searchAddons[0]!.clearDecorations).toHaveBeenCalled()
     expect(session.snapshot().search).toBeUndefined()
+    expect(notify.mock.calls.every(([reason]) => reason === 'snapshot')).toBe(true)
+    expect(notify).toHaveBeenCalled()
   })
 
   test('handles mac option arrows with VS Code-like terminal input', async () => {

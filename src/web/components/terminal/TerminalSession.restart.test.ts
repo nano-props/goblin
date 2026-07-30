@@ -372,7 +372,7 @@ describe('TerminalSession restart and resynchronization', () => {
 
     expect(firstTerm.dispose).toHaveBeenCalledOnce()
     expect(session.snapshot().progress).toBeUndefined()
-    expect(notify).toHaveBeenCalledWith('metadata')
+    expect(notify).toHaveBeenCalledWith('snapshot')
     await flushTerminalStart()
 
     const rebuiltTerm = xtermMocks.terminals.at(-1)!
@@ -399,7 +399,7 @@ describe('TerminalSession restart and resynchronization', () => {
     session.resynchronizeConnectedView()
 
     expect(session.snapshot().progress).toBeUndefined()
-    expect(notify).toHaveBeenCalledWith('metadata')
+    expect(notify).toHaveBeenCalledWith('snapshot')
     expect(terminalCalls.attach).toHaveBeenCalledOnce()
   })
 

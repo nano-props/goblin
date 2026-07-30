@@ -27,12 +27,13 @@ import {
   useTerminalFilesystemTargetCreatePending,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
+import { TerminalComposer, type TerminalComposerHandle } from '#/web/components/terminal/terminal-composer.tsx'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
 import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { isImeOwnedKeyboardEvent, isMacNavigatorPlatform } from '#/web/components/terminal/terminal-keyboard.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -54,6 +55,7 @@ export function TerminalSessionView({
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const composerRef = useRef<TerminalComposerHandle | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
@@ -67,6 +69,8 @@ export function TerminalSessionView({
     clearSearch,
     captureInputWriter,
     sendVirtualKey,
+    setComposerExpanded,
+    setComposerMode,
     submitText,
     takeover,
     retryPresentation,
@@ -96,6 +100,9 @@ export function TerminalSessionView({
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey) > 0
   const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
+  const terminalComposerShortcut = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
+    ? 'Meta+Shift+Enter'
+    : 'Control+Shift+Enter'
   const terminalComposerLabels = {
     composer: t('terminal.composer-label'),
     open: t('terminal.composer-open'),
@@ -151,19 +158,16 @@ export function TerminalSessionView({
   }, [searchOpen])
 
   useEffect(() => {
-    if (!searchOpen && terminalSessionId) clearSearch(terminalSessionId)
-  }, [clearSearch, terminalSessionId, searchOpen])
-
-  useEffect(() => {
     return () => {
       if (terminalSessionId) clearSearch(terminalSessionId)
     }
   }, [clearSearch, terminalSessionId])
 
   const closeSearch = useCallback(() => {
+    if (terminalSessionId) clearSearch(terminalSessionId)
     setSearchOpen(false)
     setSearchTerm('')
-  }, [])
+  }, [clearSearch, terminalSessionId])
   const searchNext = useCallback(
     (term = searchTerm, incremental = false) => {
       if (!terminalSessionId) return
@@ -175,7 +179,7 @@ export function TerminalSessionView({
     if (!terminalSessionId) return
     findPrevious(terminalSessionId, searchTerm)
   }, [findPrevious, terminalSessionId, searchTerm])
-  const handleKeyDownCapture = useCallback(
+  const handleSearchKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (isTerminalSearchShortcut(event)) {
         event.preventDefault()
@@ -277,6 +281,38 @@ export function TerminalSessionView({
   // which is the standard polite-live-region contract.
   const projectionPending = projectionPhase === 'pending'
   const projectionFailed = projectionPhase === 'failed'
+
+  const handleKeyDownCapture = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (isTerminalComposerShortcut(event)) {
+        if (
+          !terminalSessionId ||
+          !isController ||
+          presentationRecovery ||
+          isImeOwnedKeyboardEvent(event.nativeEvent) ||
+          !setComposerExpanded(terminalSessionId, true)
+        ) {
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        cancelTerminalAutoFocus()
+        if (searchOpen) closeSearch()
+        composerRef.current?.focus()
+        return
+      }
+      handleSearchKeyDownCapture(event)
+    },
+    [
+      closeSearch,
+      handleSearchKeyDownCapture,
+      isController,
+      presentationRecovery,
+      searchOpen,
+      setComposerExpanded,
+      terminalSessionId,
+    ],
+  )
   const showPresentationFailure = !showErrorChip && !isAttaching && presentationRecovery === 'failed'
   const showProjectionRecoveryFailure =
     !showErrorChip &&
@@ -545,12 +581,19 @@ export function TerminalSessionView({
       )}
       {isController && terminalSessionId && (
         <TerminalComposer
+          ref={composerRef}
           key={terminalSessionId}
           className="goblin-terminal-composer--floating"
           hidden={searchOpen}
           labels={terminalComposerLabels}
+          expanded={snapshot.composer.expanded}
+          mode={snapshot.composer.mode}
+          historyEntries={snapshot.composer.historyEntries}
+          shortcut={terminalComposerShortcut}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
           onSendText={handleComposerSend}
+          onExpandedChange={(expanded) => setComposerExpanded(terminalSessionId, expanded)}
+          onModeChange={(mode) => setComposerMode(terminalSessionId, mode)}
           onResolveFiles={resolveComposerFiles}
           onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
@@ -770,4 +813,10 @@ function showTerminalTakeoverFailure(error: unknown, t: (key: string) => string)
 function isTerminalSearchShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {
   if (event.altKey || event.key.toLowerCase() !== 'f') return false
   return event.metaKey || (event.ctrlKey && event.shiftKey)
+}
+
+function isTerminalComposerShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {
+  if (event.key !== 'Enter' || !event.shiftKey || event.altKey) return false
+  const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
+  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
 }

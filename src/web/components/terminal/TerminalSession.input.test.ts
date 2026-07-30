@@ -27,6 +27,48 @@ const geometryMocks = terminalGeometryMocks()
 beforeEach(resetTerminalSessionHarness)
 
 describe('TerminalSession input, resize, and controller authority', () => {
+  test('publishes changed Composer session state without notifying for accepted no-ops', () => {
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+
+    expect(session.setComposerExpanded(false)).toBe(true)
+    expect(session.setComposerMode('keys')).toBe(true)
+    expect(notify).not.toHaveBeenCalled()
+
+    expect(session.setComposerExpanded(true)).toBe(true)
+    expect(session.setComposerMode('input')).toBe(true)
+    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
+
+    session.dispose()
+    expect(session.setComposerExpanded(false)).toBe(false)
+    expect(session.setComposerMode('keys')).toBe(false)
+    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
+  })
+
+  test('retains Composer session facts through presentation detach and runtime restart', async () => {
+    const session = new TerminalSession(descriptor, vi.fn())
+    const { host } = await startOpenControllerSession(session)
+    session.setComposerExpanded(true)
+    session.setComposerMode('input')
+    await expect(session.submitText('retained command')).resolves.toBe(true)
+
+    session.detach(host)
+    expect(session.snapshot().composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: ['retained command'],
+    })
+
+    session.attach(host)
+    await flushTerminalStart()
+    session.restart()
+    expect(session.snapshot().composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: ['retained command'],
+    })
+  })
+
   test('batches rapid user input into a single ordered write', async () => {
     const { term } = await startOpenControllerSession()
     term.emitData('c')
@@ -507,6 +549,28 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
+  test('fast-fails a concurrent composed submission and records only accepted text in session history', async () => {
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    const { term } = await startOpenControllerSession(session)
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+    notify.mockClear()
+
+    const firstSubmission = session.submitText('first command')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
+    await expect(session.submitText('second command')).resolves.toBe(false)
+    expect(term.paste).toHaveBeenCalledTimes(1)
+    expect(session.snapshot().composer.historyEntries).toEqual([])
+
+    pasteWrite.resolve({ status: 'accepted' })
+    await expect(firstSubmission).resolves.toBe(true)
+
+    expect(session.snapshot().composer.historyEntries).toEqual(['first command'])
+    expect(notify).toHaveBeenCalledWith('snapshot')
+  })
+
   test.each(['rejected', 'indeterminate'] as const)(
     'does not retry or send Enter when the composed text write is %s',
     async (status) => {
@@ -518,8 +582,39 @@ describe('TerminalSession input, resize, and controller authority', () => {
       expect(term.paste).toHaveBeenCalledWith('keep this text')
       expect(term.input).not.toHaveBeenCalled()
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+      expect(session.snapshot().composer.historyEntries).toEqual([])
     },
   )
+
+  test('releases the submission guard after a failed settlement so the user can retry', async () => {
+    const { session } = await startPresentedControllerGeneration()
+    terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
+
+    await expect(session.submitText('retry this command')).resolves.toBe(false)
+    terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' })
+
+    await expect(session.submitText('retry this command')).resolves.toBe(true)
+    expect(session.snapshot().composer.historyEntries).toEqual(['retry this command'])
+  })
+
+  test('preserves an accepted result but skips history when the session is disposed before settlement', async () => {
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    const { term } = await startOpenControllerSession(session)
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+    notify.mockClear()
+
+    const submission = session.submitText('accepted after close')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+    session.dispose()
+    pasteWrite.resolve({ status: 'accepted' })
+
+    await expect(submission).resolves.toBe(true)
+    expect(session.snapshot().composer.historyEntries).toEqual([])
+    expect(notify).not.toHaveBeenCalled()
+    expect(term.input).not.toHaveBeenCalled()
+  })
 
   test('honors an accepted composed text write after its presentation binding becomes stale', async () => {
     const { session, term } = await startPresentedControllerGeneration()
@@ -541,6 +636,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     await expect(submission).resolves.toBe(true)
     expect(term.input).not.toHaveBeenCalled()
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(session.snapshot().composer.historyEntries).toEqual(['accepted before takeover'])
   })
 
   test('does not send the following Enter to a replacement generation after old text is accepted', async () => {
@@ -576,6 +672,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     await expect(submission).resolves.toBe(true)
     expect(replacementTerm.input).not.toHaveBeenCalled()
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(session.snapshot().composer.historyEntries).toEqual(['accepted by the old generation'])
   })
 
   test('settles an accepted submission without waiting for the following Enter acknowledgement', async () => {
@@ -587,6 +684,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     await flushUntil(() => terminalCalls.write.mock.calls.length === 2)
 
     await expect(submission).resolves.toBe(true)
+    expect(session.snapshot().composer.historyEntries).toEqual(['deliver without waiting'])
     expect(term.input).toHaveBeenCalledWith('\r', true)
     expect(terminalCalls.write).toHaveBeenNthCalledWith(2, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -607,6 +705,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(term.paste).toHaveBeenCalledWith('delivered once')
     expect(term.input).toHaveBeenCalledWith('\r', true)
     expect(terminalCalls.write).toHaveBeenCalledTimes(2)
+    expect(session.snapshot().composer.historyEntries).toEqual(['delivered once'])
   })
 
   test('commits asynchronous input only to the generation captured by its writer', async () => {

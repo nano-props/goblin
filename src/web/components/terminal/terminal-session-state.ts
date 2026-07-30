@@ -1,12 +1,17 @@
 import type { TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
 import type {
   TerminalProgressState,
+  TerminalComposerMode,
+  TerminalComposerSessionState,
   TerminalSearchResult,
   TerminalSnapshot,
   TerminalControllerViewModel,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
 } from '#/web/components/terminal/types.ts'
+
+const TERMINAL_COMPOSER_HISTORY_LIMIT = 50
+
 export class TerminalSessionState {
   /** Terminal runtime metadata mirrored from attach/session/identity events.
    *  This is authoritative runtime shape for the client, but it is not
@@ -53,6 +58,14 @@ export class TerminalSessionState {
   } = {
     searchResult: null,
     progressState: null,
+  }
+  /** Client-only facts that follow the logical terminal session rather than
+   *  the mounted xterm/Composer view. Never clear this from view teardown or
+   *  hydrate it from server runtime payloads. */
+  private composerState: TerminalComposerSessionState = {
+    expanded: false,
+    mode: 'keys',
+    historyEntries: [],
   }
 
   getPhase(): TerminalSessionPhase {
@@ -108,6 +121,11 @@ export class TerminalSessionState {
       message: this.runtimeState.message,
       processName: this.runtimeState.processName,
       canonicalTitle: this.runtimeState.canonicalTitle,
+      composer: {
+        expanded: this.composerState.expanded,
+        mode: this.composerState.mode,
+        historyEntries: this.composerState.historyEntries,
+      },
     }
     // Control identity is orthogonal to lifecycle. In particular, a failed
     // restart keeps its retained generation addressable so its controller can
@@ -123,6 +141,26 @@ export class TerminalSessionState {
 
   setError(message: string | null): boolean {
     return this.setPhaseAndMessage('error', message)
+  }
+
+  setComposerExpanded(expanded: boolean): boolean {
+    if (this.composerState.expanded === expanded) return false
+    this.composerState.expanded = expanded
+    return true
+  }
+
+  setComposerMode(mode: TerminalComposerMode): boolean {
+    if (this.composerState.mode === mode) return false
+    this.composerState.mode = mode
+    return true
+  }
+
+  recordComposerHistory(text: string): boolean {
+    if (!text || this.composerState.historyEntries.at(-1) === text) return false
+    this.composerState.historyEntries = [...this.composerState.historyEntries, text].slice(
+      -TERMINAL_COMPOSER_HISTORY_LIMIT,
+    )
+    return true
   }
 
   setProcessName(processName: string): boolean {

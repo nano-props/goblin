@@ -120,12 +120,21 @@ export type TerminalVirtualKey =
   | 'interrupt'
   | 'eof'
 
+export type TerminalComposerMode = 'keys' | 'input'
+
+export interface TerminalComposerSessionState {
+  expanded: boolean
+  mode: TerminalComposerMode
+  historyEntries: readonly string[]
+}
+
 export type TerminalPresentationRecovery = 'pending' | 'failed'
 
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase
   message: string | null
   processName: string
+  composer: TerminalComposerSessionState
   /** Server-canonical terminal title from attach hydration or realtime title events. */
   canonicalTitle?: string | null
   attachment?: TerminalAttachmentSnapshot | null
@@ -215,6 +224,8 @@ export interface TerminalSessionContextValue {
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
+  setComposerExpanded: (terminalSessionId: string, expanded: boolean) => boolean
+  setComposerMode: (terminalSessionId: string, mode: TerminalComposerMode) => boolean
   /**
    * Returns true once the composed text write is accepted and the caller must
    * clear its draft. The following Enter write is reported independently and

@@ -3,6 +3,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   SafariShiftKeyResolver,
+  isImeOwnedKeyboardEvent,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
@@ -207,5 +208,13 @@ describe('isMacNavigatorPlatform', () => {
     expect(isMacNavigatorPlatform('iPad')).toBe(true)
     expect(isMacNavigatorPlatform('Win32')).toBe(false)
     expect(isMacNavigatorPlatform('Linux x86_64')).toBe(false)
+  })
+})
+
+describe('isImeOwnedKeyboardEvent', () => {
+  test('recognizes active composition and the WebKit compatibility event', () => {
+    expect(isImeOwnedKeyboardEvent({ isComposing: true, keyCode: 0 })).toBe(true)
+    expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 229 })).toBe(true)
+    expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 27 })).toBe(false)
   })
 })

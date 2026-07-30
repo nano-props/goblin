@@ -83,7 +83,12 @@ describe('useTerminalSessionReadContext', () => {
       subscribeTerminalFilesystemTarget: () => () => {},
       workspaceBellCount: () => 3,
       subscribeWorkspaceBellCount: () => () => {},
-      snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+      snapshot: () => ({
+        phase: 'opening',
+        message: null,
+        processName: 'terminal',
+        composer: { expanded: false, mode: 'keys', historyEntries: [] },
+      }),
       subscribeSnapshot: () => () => {},
     }
     const { getByTestId } = renderInJsdom(

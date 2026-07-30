@@ -581,6 +581,44 @@ describe('TerminalSessionProjection events', () => {
     ).toMatchObject({ selected: true, hasBell: false })
   })
 
+  test('retains isolated Composer shells while selecting between terminal tabs', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    const firstSessionId = 'term-111111111111111111111'
+    const secondSessionId = 'term-222222222222222222222'
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [
+        makeServerSession('pty_session_a_aaaaaaaaa', firstSessionId),
+        makeServerSession('pty_session_b_aaaaaaaaa', secondSessionId),
+      ],
+      'client_local',
+    )
+
+    projection.selectTerminal(WORKTREE_KEY, firstSessionId)
+    expect(projection.setComposerExpanded(firstSessionId, true)).toBe(true)
+    expect(projection.setComposerMode(firstSessionId, 'input')).toBe(true)
+
+    projection.selectTerminal(WORKTREE_KEY, secondSessionId)
+    expect(projection.snapshot(secondSessionId).composer).toEqual({
+      expanded: false,
+      mode: 'keys',
+      historyEntries: [],
+    })
+    expect(projection.setComposerExpanded(secondSessionId, true)).toBe(true)
+
+    projection.selectTerminal(WORKTREE_KEY, firstSessionId)
+    expect(projection.snapshot(firstSessionId).composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: [],
+    })
+    expect(projection.snapshot(secondSessionId).composer).toEqual({
+      expanded: true,
+      mode: 'keys',
+      historyEntries: [],
+    })
+  })
+
   test('notifySession invalidates filesystem target cache', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
@@ -602,5 +640,57 @@ describe('TerminalSessionProjection events', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
+  })
+
+  test('publishes Composer-only snapshots without activating bindings or invalidating filesystem targets', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+    const access = terminalSessionProjectionAccess(projection)
+    const activateRuntimeBinding = vi.spyOn(access, 'activateRuntimeBinding')
+    const snapshotListener = vi.fn()
+    const filesystemTargetListener = vi.fn()
+    const unsubscribeSnapshot = projection.subscribeSnapshot(terminalSessionId, snapshotListener)
+    const unsubscribeFilesystemTarget = projection.subscribeTerminalFilesystemTarget(
+      WORKTREE_KEY,
+      filesystemTargetListener,
+    )
+
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+    expect(projection.snapshot(terminalSessionId).composer.expanded).toBe(true)
+    expect(snapshotListener).toHaveBeenCalledOnce()
+    expect(filesystemTargetListener).not.toHaveBeenCalled()
+    expect(activateRuntimeBinding).not.toHaveBeenCalled()
+
+    snapshotListener.mockClear()
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+    expect(snapshotListener).not.toHaveBeenCalled()
+    expect(projection.setComposerExpanded('missing-session', true)).toBe(false)
+
+    unsubscribeSnapshot()
+    unsubscribeFilesystemTarget()
+  })
+
+  test('destroys Composer state with logical session removal and creates no fallback state', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+
+    expect(terminalSessionProjectionAccess(projection).removeSession(terminalSessionId, { dispose: true })).toBe(true)
+    expect(projection.setComposerExpanded(terminalSessionId, false)).toBe(false)
+    expect(projection.snapshot(terminalSessionId).composer).toEqual({
+      expanded: false,
+      mode: 'keys',
+      historyEntries: [],
+    })
   })
 })

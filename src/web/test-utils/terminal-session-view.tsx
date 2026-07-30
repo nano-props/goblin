@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
   TerminalSessionContext,
@@ -165,12 +166,18 @@ export async function renderTerminalSession(
     createPending: false,
   }
   let snapshot: TerminalSnapshot = options.snapshot ?? {
-    phase: 'open' as const,
+    phase: 'open',
     message: null,
     processName: 'zsh',
+    composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
     attachment: {
-      role: 'controller' as const,
+      role: 'controller',
     },
+  }
+  const snapshotListeners = new Set<() => void>()
+  const updateComposer = (composer: TerminalSnapshot['composer']) => {
+    snapshot = { ...snapshot, composer }
+    for (const listener of snapshotListeners) listener()
   }
   const context: TerminalSessionContextValue = terminalSessionContextForTest({
     createTerminal: async () => 'term-111111111111111111111',
@@ -185,6 +192,18 @@ export async function renderTerminalSession(
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
+    setComposerExpanded: (terminalSessionId, expanded) => {
+      if (terminalSessionId !== descriptor.terminalSessionId) return false
+      if (snapshot.composer.expanded !== expanded) {
+        updateComposer({ ...snapshot.composer, expanded })
+      }
+      return true
+    },
+    setComposerMode: (terminalSessionId, mode) => {
+      if (terminalSessionId !== descriptor.terminalSessionId) return false
+      if (snapshot.composer.mode !== mode) updateComposer({ ...snapshot.composer, mode })
+      return true
+    },
     captureInputWriter: (terminalSessionId) => (data) => {
       writeInput(terminalSessionId, data)
       return true
@@ -197,7 +216,6 @@ export async function renderTerminalSession(
     focusTerminal: vi.fn(),
     ...contextOverrides,
   })
-  const snapshotListeners = new Set<() => void>()
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
     subscribeTerminalFilesystemTarget: () => () => {},

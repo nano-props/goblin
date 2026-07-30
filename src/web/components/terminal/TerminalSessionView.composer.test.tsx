@@ -24,6 +24,192 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
+  test('opens with the exact terminal shortcut, closes search, focuses the control, and collapses on Escape', async () => {
+    const user = userEvent.setup()
+    const handoffOrder: string[] = []
+    const clearSearch = vi.fn(() => handoffOrder.push('clear-search'))
+    const rendered = await renderTerminalSession({ clearSearch })
+
+    try {
+      const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
+      expect(trigger.getAttribute('aria-keyshortcuts')).toBe('Control+Shift+Enter')
+      rendered.sessionRoot.focus()
+      await user.keyboard('{Meta>}f{/Meta}')
+      expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
+      const modeToggle = rendered.container.querySelector<HTMLButtonElement>(
+        '.goblin-terminal-composer__mode-row button',
+      )
+      if (!modeToggle) throw new Error('expected Composer mode toggle')
+      modeToggle.addEventListener('focus', () => handoffOrder.push('composer-focus'))
+
+      const shortcut = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+
+      expect(shortcut.defaultPrevented).toBe(true)
+      expect(handoffOrder).toEqual(['clear-search', 'composer-focus'])
+      expect(clearSearch).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(rendered.container.querySelector('.goblin-terminal-session__search')).toBeNull()
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+
+      await user.keyboard('{Escape}')
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+      expect(document.activeElement).toBe(trigger)
+
+      for (const init of [
+        { ctrlKey: true, metaKey: true, shiftKey: true },
+        { ctrlKey: true, shiftKey: true, altKey: true },
+        { ctrlKey: true, shiftKey: true, keyCode: 229 },
+      ]) {
+        const unsupported = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          ...init,
+          bubbles: true,
+          cancelable: true,
+        })
+        act(() => rendered.sessionRoot.dispatchEvent(unsupported))
+        expect(unsupported.defaultPrevented).toBe(false)
+      }
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('uses the macOS Composer shortcut and exposes the matching accessible shortcut', async () => {
+    const savedPlatform = navigator.platform
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'MacIntel' })
+    const rendered = await renderTerminalSession()
+
+    try {
+      const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
+      expect(trigger.getAttribute('aria-keyshortcuts')).toBe('Meta+Shift+Enter')
+
+      const shortcut = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        metaKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+
+      expect(shortcut.defaultPrevented).toBe(true)
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+
+      const nonMacShortcut = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(nonMacShortcut))
+      expect(nonMacShortcut.defaultPrevented).toBe(false)
+    } finally {
+      await rendered.cleanup()
+      Object.defineProperty(window.navigator, 'platform', { configurable: true, value: savedPlatform })
+    }
+  })
+
+  test('refocuses an already-expanded Composer instead of toggling it closed', async () => {
+    const rendered = await renderTerminalSession()
+
+    try {
+      const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
+      act(() => trigger.click())
+      rendered.sessionRoot.focus()
+      expect(document.activeElement).toBe(rendered.sessionRoot)
+
+      const shortcut = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+
+      expect(shortcut.defaultPrevented).toBe(true)
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('does not consume the Composer shortcut during presentation recovery', async () => {
+    const setComposerExpanded = vi.fn(() => true)
+    const rendered = await renderTerminalSession(
+      { setComposerExpanded },
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          composer: { expanded: false, mode: 'keys', historyEntries: [] },
+          attachment: { role: 'controller' },
+          presentationRecovery: 'pending',
+        },
+      },
+    )
+
+    try {
+      const shortcut = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+
+      expect(shortcut.defaultPrevented).toBe(false)
+      expect(setComposerExpanded).not.toHaveBeenCalled()
+      expect(buttonByLabel(rendered.container, 'terminal.composer-open').getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('does not consume unsupported Composer shortcut variants or viewer input', async () => {
+    const setComposerExpanded = vi.fn(() => true)
+    const rendered = await renderTerminalSession(
+      { setComposerExpanded },
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          composer: { expanded: false, mode: 'keys', historyEntries: [] },
+          attachment: { role: 'viewer' },
+        },
+      },
+    )
+
+    try {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      act(() => rendered.sessionRoot.dispatchEvent(event))
+      expect(event.defaultPrevented).toBe(false)
+      expect(setComposerExpanded).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
   test('submits composer text through the selected terminal paste boundary followed by Enter', async () => {
     const submitText = vi.fn(async () => true)
     const rendered = await renderTerminalSession({ submitText })

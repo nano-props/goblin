@@ -3,10 +3,12 @@
 import { act, fireEvent, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
+import { useLayoutEffect, useState } from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
 import type { TerminalComposerLabels } from '#/web/components/terminal/terminal-composer.tsx'
 import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 
 const LABELS: TerminalComposerLabels = {
   composer: 'Terminal input composer',
@@ -40,16 +42,41 @@ function render(
     onScrollLines?: (amount: number) => void
   } = {},
 ) {
-  return renderInJsdom(
-    <TerminalComposer
-      labels={LABELS}
-      onVirtualKey={props.onVirtualKey ?? vi.fn()}
-      onSendText={props.onSendText ?? vi.fn(async () => true)}
-      onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
-      onRequestFocus={props.onRequestFocus ?? vi.fn()}
-      onScrollLines={props.onScrollLines ?? vi.fn()}
-    />,
-  )
+  function ControlledComposer() {
+    const [expanded, setExpanded] = useState(false)
+    const [mode, setMode] = useState<'keys' | 'input'>('keys')
+    const [historyEntries, setHistoryEntries] = useState<readonly string[]>([])
+    const sendText = async (text: string) => {
+      const accepted = await (props.onSendText ?? (async () => true))(text)
+      if (accepted) {
+        setHistoryEntries((current) => (current.at(-1) === text ? current : [...current, text]))
+      }
+      return accepted
+    }
+    return (
+      <TerminalComposer
+        labels={LABELS}
+        expanded={expanded}
+        mode={mode}
+        historyEntries={historyEntries}
+        shortcut="Control+Shift+Enter"
+        onVirtualKey={props.onVirtualKey ?? vi.fn()}
+        onSendText={sendText}
+        onExpandedChange={(next) => {
+          setExpanded(next)
+          return true
+        }}
+        onModeChange={(next) => {
+          setMode(next)
+          return true
+        }}
+        onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
+        onRequestFocus={props.onRequestFocus ?? vi.fn()}
+        onScrollLines={props.onScrollLines ?? vi.fn()}
+      />
+    )
+  }
+  return renderInJsdom(<ControlledComposer />)
 }
 
 function buttonByAccessibleName(container: HTMLElement, name: string) {
@@ -74,7 +101,100 @@ function menuItemByText(text: string) {
   return screen.getByRole('menuitem', { name: text })
 }
 
+function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = []) {
+  return (
+    <TerminalComposer
+      key={sessionId}
+      labels={LABELS}
+      expanded
+      mode="input"
+      historyEntries={historyEntries}
+      shortcut="Control+Shift+Enter"
+      onVirtualKey={vi.fn()}
+      onSendText={vi.fn(async () => true)}
+      onExpandedChange={vi.fn(() => true)}
+      onModeChange={vi.fn(() => true)}
+      onResolveFiles={vi.fn(async () => null)}
+      onRequestFocus={vi.fn()}
+      onScrollLines={vi.fn()}
+    />
+  )
+}
+
 describe('TerminalComposer', () => {
+  test('does not claim focus when an expanded session shell is restored on mount', () => {
+    const { container, rerender } = renderInJsdom(<button type="button">terminal focus owner</button>)
+    const focusOwner = buttonByAccessibleName(container, 'terminal focus owner')
+    focusOwner.focus()
+
+    rerender(
+      <>
+        <button type="button">terminal focus owner</button>
+        {expandedComposerForTest('session-one')}
+      </>,
+    )
+
+    expect(document.activeElement).toBe(buttonByAccessibleName(container, 'terminal focus owner'))
+  })
+
+  test('resets mounted draft and history cursor when the keyed session changes', () => {
+    const { container, rerender } = renderInJsdom(expandedComposerForTest('session-one', ['old command']))
+    const firstInput = within(container).getByRole<HTMLTextAreaElement>('textbox', {
+      name: LABELS.inputPlaceholder,
+    })
+    fireEvent.keyDown(firstInput, { key: 'ArrowUp' })
+    expect(firstInput.value).toBe('old command')
+    fireEvent.change(firstInput, { target: { value: 'session-one draft' } })
+
+    rerender(expandedComposerForTest('session-two', ['other command']))
+
+    const secondInput = within(container).getByRole<HTMLTextAreaElement>('textbox', {
+      name: LABELS.inputPlaceholder,
+    })
+    expect(secondInput).not.toBe(firstInput)
+    expect(secondInput.value).toBe('')
+    fireEvent.keyDown(secondInput, { key: 'ArrowUp' })
+    expect(secondInput.value).toBe('other command')
+  })
+
+  test('applies supplied history entries during commit before later layout observers', () => {
+    const commitOrder: string[] = []
+    const originalUpdateEntries = TerminalComposerHistoryCursor.prototype.updateEntries
+    const updateEntries = vi
+      .spyOn(TerminalComposerHistoryCursor.prototype, 'updateEntries')
+      .mockImplementation(function (this: TerminalComposerHistoryCursor, entries) {
+        commitOrder.push('cursor')
+        originalUpdateEntries.call(this, entries)
+      })
+
+    function LayoutObserver({ historyEntries }: { historyEntries: readonly string[] }) {
+      useLayoutEffect(() => {
+        commitOrder.push('observer')
+      }, [historyEntries])
+      return null
+    }
+
+    function Harness({ historyEntries }: { historyEntries: readonly string[] }) {
+      return (
+        <>
+          {expandedComposerForTest('session-one', historyEntries)}
+          <LayoutObserver historyEntries={historyEntries} />
+        </>
+      )
+    }
+
+    try {
+      const { rerender } = renderInJsdom(<Harness historyEntries={['old command']} />)
+      commitOrder.length = 0
+
+      rerender(<Harness historyEntries={['new command']} />)
+
+      expect(commitOrder).toEqual(['cursor', 'observer'])
+    } finally {
+      updateEntries.mockRestore()
+    }
+  })
+
   test('starts as one floating action and expands into the composer', async () => {
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
@@ -114,6 +234,33 @@ describe('TerminalComposer', () => {
     await user.keyboard('{Enter}')
 
     expect(document.activeElement).toBe(buttonByAccessibleName(container, LABELS.showInput))
+  })
+
+  test('collapses on a physical Escape and restores the trigger focus', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    expand(container)
+
+    await user.keyboard('{Escape}')
+
+    const openButton = buttonByAccessibleName(container, LABELS.open)
+    expect(openButton.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(openButton)
+  })
+
+  test('does not collapse for an IME-owned or virtual Escape', () => {
+    const onVirtualKey = vi.fn()
+    const { container } = render({ onVirtualKey })
+    expand(container)
+    const modeToggle = buttonByAccessibleName(container, LABELS.showInput)
+    const composer = container.querySelector('.goblin-terminal-composer')
+
+    fireEvent.keyDown(modeToggle, { key: 'Escape', keyCode: 229 })
+    expect(composer?.getAttribute('data-expanded')).toBe('true')
+
+    act(() => buttonByAccessibleName(container, LABELS.escape).click())
+    expect(onVirtualKey).toHaveBeenCalledWith('escape')
+    expect(composer?.getAttribute('data-expanded')).toBe('true')
   })
 
   test('submits with Enter and clears only accepted text', async () => {
@@ -219,6 +366,23 @@ describe('TerminalComposer', () => {
 
     expect(fireEvent.keyDown(input, { key: 'ArrowUp' })).toBe(true)
     expect(input.value).toBe('previous edited')
+  })
+
+  test('leaves history browsing after an accepted duplicate submission without an entries update', async () => {
+    const { container } = render()
+    expand(container)
+    showInput(container)
+    const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    fireEvent.change(input, { target: { value: 'previous' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(input.value).toBe('previous')
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await vi.waitFor(() => expect(input.value).toBe(''))
+
+    expect(fireEvent.keyDown(input, { key: 'ArrowDown' })).toBe(true)
   })
 
   test('does not carry a stale recalled-entry caret into the next draft edit', async () => {

@@ -706,10 +706,12 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
   test('progress state appears in snapshot and clears on state 0', async () => {
     const { session, notify, progressAddon } = await startSessionWithProgress()
     expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
-    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith('snapshot')
 
+    notify.mockClear()
     progressAddon.emitProgress(0, 0)
     expect(session.snapshot().progress).toBeUndefined()
+    expect(notify).toHaveBeenCalledWith('snapshot')
   })
 
   test('progress state is cleared on restart', async () => {
@@ -731,7 +733,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     session.detach(host)
 
     expect(session.snapshot().progress).toBeUndefined()
-    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify.mock.calls).toEqual([['snapshot']])
   })
 
   describe('identity and lifecycle presentation contract', () => {

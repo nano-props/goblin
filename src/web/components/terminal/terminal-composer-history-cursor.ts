@@ -1,16 +1,11 @@
-const TERMINAL_COMPOSER_HISTORY_LIMIT = 50
-
-export class TerminalComposerHistory {
-  private entries: string[] = []
+export class TerminalComposerHistoryCursor {
+  private entries: readonly string[] = []
   private index: number | null = null
   private draftBeforeBrowsing = ''
 
-  record(text: string): void {
-    if (!text) return
-    if (this.entries.at(-1) !== text) {
-      this.entries.push(text)
-      if (this.entries.length > TERMINAL_COMPOSER_HISTORY_LIMIT) this.entries.shift()
-    }
+  updateEntries(entries: readonly string[]): void {
+    if (this.entries === entries) return
+    this.entries = entries
     this.leaveBrowsing()
   }
 
