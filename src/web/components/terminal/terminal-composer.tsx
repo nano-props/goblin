@@ -7,6 +7,8 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   type Ref,
 } from 'react'
@@ -240,6 +242,30 @@ export function TerminalComposer({
     history.leaveBrowsing()
     setDraft((current) => (current === submittedDraft ? '' : current))
   }
+  const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (resolvingFiles || isImeCompositionEvent(event)) return
+    const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
+    if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
+      if (historicalDraft !== undefined) {
+        event.preventDefault()
+        if (historicalDraft !== draft) {
+          pendingCaretRef.current = historicalDraft.length
+          setDraft(historicalDraft)
+        }
+        return
+      }
+    } else if (history.isBrowsing()) {
+      history.leaveBrowsing()
+    }
+    if (event.key !== 'Enter' || event.shiftKey) return
+    event.preventDefault()
+    void submitDraft()
+  }
+  const handleVirtualKeyClick = (event: MouseEvent<HTMLButtonElement>, key: TerminalVirtualKey) => {
+    onVirtualKey(key)
+    if (event.detail > 0) onRequestFocus()
+  }
   const closeComposer = () => {
     if (!onExpandedChange(false)) return
     requestTriggerFocus()
@@ -349,26 +375,7 @@ export function TerminalComposer({
                 setDraft(event.target.value)
               }}
               onPointerDown={() => history.leaveBrowsing()}
-              onKeyDown={(event) => {
-                if (resolvingFiles || isImeCompositionEvent(event)) return
-                const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
-                if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-                  const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
-                  if (historicalDraft !== undefined) {
-                    event.preventDefault()
-                    if (historicalDraft !== draft) {
-                      pendingCaretRef.current = historicalDraft.length
-                      setDraft(historicalDraft)
-                    }
-                    return
-                  }
-                } else if (history.isBrowsing()) {
-                  history.leaveBrowsing()
-                }
-                if (event.key !== 'Enter' || event.shiftKey) return
-                event.preventDefault()
-                void submitDraft()
-              }}
+              onKeyDown={handleDraftKeyDown}
             />
           ) : (
             <ScrollArea
@@ -383,10 +390,7 @@ export function TerminalComposer({
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
                     accessibleName={labels[key.labelKey]}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => {
-                      onVirtualKey(key.key)
-                      if (event.detail > 0) onRequestFocus()
-                    }}
+                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
                   >
                     {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
                   </ComposerButton>
@@ -401,8 +405,7 @@ export function TerminalComposer({
                         onScrollLines(key.amount)
                         return
                       }
-                      onVirtualKey(key.key)
-                      if (event.detail > 0) onRequestFocus()
+                      handleVirtualKeyClick(event, key.key)
                     }}
                   >
                     {key.icon}
@@ -446,8 +449,8 @@ interface ComposerButtonProps {
   ariaHidden?: boolean
   ariaKeyShortcuts?: string
   tabIndex?: number
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
-  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void
+  onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void
 }
 
 function ComposerButton({
