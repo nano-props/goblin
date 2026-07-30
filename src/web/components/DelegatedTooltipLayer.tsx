@@ -11,6 +11,7 @@ import {
   type Ref,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { clamp } from 'es-toolkit'
 import { cn } from '#/web/lib/cn.ts'
 import { TOOLTIP_SURFACE_CLASS } from '#/web/components/ui/tooltip.tsx'
 
@@ -58,6 +59,12 @@ export const DELEGATED_TOOLTIP_TRANSITIONS = {
   slideLeft: 'top 150ms ease-out, opacity 100ms ease-out',
   slideTopStart: 'left 150ms ease-out, opacity 100ms ease-out',
 } as const
+
+const DELEGATED_TOOLTIP_TRANSITION_BY_PLACEMENT: Record<DelegatedTooltipPlacement, string> = {
+  'bottom-start': DELEGATED_TOOLTIP_TRANSITIONS.slideBottomStart,
+  left: DELEGATED_TOOLTIP_TRANSITIONS.slideLeft,
+  'top-start': DELEGATED_TOOLTIP_TRANSITIONS.slideTopStart,
+}
 
 export function DelegatedTooltipLayer<T>({
   items,
@@ -277,9 +284,7 @@ function useDelegatedTooltipStateMachine<T>(input: {
       return
     }
     setTooltip((current) =>
-      current && liveStateRef.current.getItemId(current.item) === activeItemId
-        ? { item: activeTooltip.item, rect: activeTooltip.rect ?? current.rect }
-        : current,
+      current && liveStateRef.current.getItemId(current.item) === activeItemId ? activeTooltip : current,
     )
   }, [attributeName, hide, itemsById, selector])
 
@@ -318,13 +323,8 @@ function DelegatedTooltipPopup<T>({
     return () => window.cancelAnimationFrame(id)
   }, [])
 
-  const position = tooltipPosition(tooltip.rect, size, { placement, maxWidth, margin, offset })
-  const transition =
-    placement === 'left'
-      ? DELEGATED_TOOLTIP_TRANSITIONS.slideLeft
-      : placement === 'top-start'
-        ? DELEGATED_TOOLTIP_TRANSITIONS.slideTopStart
-        : DELEGATED_TOOLTIP_TRANSITIONS.slideBottomStart
+  const position = tooltipPosition(tooltip.rect, size, { placement, margin, offset })
+  const transition = DELEGATED_TOOLTIP_TRANSITION_BY_PLACEMENT[placement]
 
   return createPortal(
     <div
@@ -359,10 +359,6 @@ function readItemId(el: HTMLElement, attributeName: string): string | null {
 
 function findClosestItemElement(target: EventTarget | null, selector: string): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>(selector) : null
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
 }
 
 function isPointerWithin(container: HTMLElement, e: PointerEvent): boolean {
@@ -410,7 +406,7 @@ function resolveTooltipStateById<T>(
 function tooltipPosition(
   rect: AnchorRect,
   size: { width: number; height: number },
-  options: { placement: DelegatedTooltipPlacement; margin: number; offset: number; maxWidth: number },
+  options: { placement: DelegatedTooltipPlacement; margin: number; offset: number },
 ): { left: number; top: number; transform?: string } {
   const { placement, margin, offset } = options
   if (placement === 'left') {
