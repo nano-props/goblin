@@ -41,18 +41,20 @@ import {
 } from '#/server/terminal/terminal-controller.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import {
-  advanceTerminalPtyIdentityRevision,
   TerminalPtyBinding,
-  terminalPtyBoundState,
-  terminalPtyGeneration,
-  terminalPtyIdentityRevision,
-  terminalPtyProcessName,
   type TerminalPtyBindingAdmission,
-  type TerminalPtyBoundState,
   type TerminalPtyMutationAdmission,
   type TerminalPtySessionState,
   type TerminalPtySpawnResult,
 } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+import {
+  advanceTerminalPtyIdentityRevision,
+  terminalPtyBoundState,
+  terminalPtyGeneration,
+  terminalPtyIdentityRevision,
+  terminalPtyProcessName,
+  type TerminalPtyBoundState,
+} from '#/server/terminal/terminal-pty-state.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'

@@ -5,6 +5,7 @@ import type {
   TerminalExecutionTarget,
   TerminalPresentation,
   TerminalRuntimeMetadata,
+  TerminalSessionPhase,
   TerminalSessionSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
@@ -13,14 +14,15 @@ import {
   terminalPtyGeneration,
   terminalPtyIdentityRevision,
   terminalPtyProcessName,
-  type TerminalPtyRecoverySnapshot,
-  type TerminalPtySessionState,
-} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+  type TerminalPtyState,
+} from '#/server/terminal/terminal-pty-state.ts'
+import type { TerminalPtyRecoverySnapshot } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 
-interface TerminalSessionProjectionSource extends Pick<
-  TerminalPtySessionState,
-  'id' | 'phase' | 'message' | 'ptyState'
-> {
+interface TerminalSessionProjectionSource {
+  id: string
+  phase: TerminalSessionPhase
+  message: string | null
+  ptyState: TerminalPtyState
   terminalSessionId: string
   target: TerminalExecutionTarget
   presentation: TerminalPresentation | null
