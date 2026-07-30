@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  REMOTE_WORKSPACE_FAILURE_REASONS,
   isRemoteWorkspaceTarget,
   isRemoteWorkspaceFailureReason,
   normalizeRemoteWorkspaceRef,
@@ -8,6 +9,7 @@ import {
   remoteWorkspaceRefFromTarget,
   remoteWorkspaceSessionEntry,
   sameWorkspaceSessionEntry,
+  toRemoteWorkspaceFailureReason,
 } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -15,6 +17,16 @@ describe('remote workspace normalization', () => {
   test('keeps Git probe outcomes out of lifecycle failure reasons', () => {
     expect(isRemoteWorkspaceFailureReason('not-a-repo')).toBe(false)
     expect(isRemoteWorkspaceFailureReason('git-missing')).toBe(false)
+  })
+
+  test('maps diagnostic and i18n failures to lifecycle reasons', () => {
+    for (const reason of REMOTE_WORKSPACE_FAILURE_REASONS) {
+      expect(toRemoteWorkspaceFailureReason(reason)).toBe(reason)
+    }
+    expect(toRemoteWorkspaceFailureReason('error.ssh-config-changed')).toBe('config-changed')
+    expect(toRemoteWorkspaceFailureReason('shell-failed')).toBe('handshake-failed')
+    expect(toRemoteWorkspaceFailureReason('error.path-not-directory')).toBe('path-missing')
+    expect(toRemoteWorkspaceFailureReason('not-a-repo')).toBe('unknown')
   })
 
   test('compares persisted workspace identity by canonical ID', () => {
