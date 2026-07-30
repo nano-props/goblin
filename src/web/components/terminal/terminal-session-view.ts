@@ -19,18 +19,12 @@ import {
   SafariShiftKeyResolver,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
+  terminalInputForVirtualKey,
 } from '#/web/components/terminal/terminal-keyboard.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { constrainTerminalSize } from '#/shared/terminal-protocol-constraints.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
-
-const CURSOR_KEY_SUFFIX = {
-  'arrow-up': 'A',
-  'arrow-down': 'B',
-  'arrow-left': 'D',
-  'arrow-right': 'C',
-} satisfies Record<Extract<TerminalVirtualKey, `arrow-${string}`>, string>
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -224,7 +218,7 @@ export class TerminalSessionView {
   sendVirtualKey(key: TerminalVirtualKey): void {
     const term = this.term
     if (!term) return
-    const data = inputForVirtualKey(key, term.modes.applicationCursorKeysMode)
+    const data = terminalInputForVirtualKey(key, term.modes.applicationCursorKeysMode)
     term.input(data, true)
   }
 
@@ -422,28 +416,6 @@ export class TerminalSessionView {
     } finally {
       pending.onSettled?.()
     }
-  }
-}
-
-function inputForVirtualKey(key: TerminalVirtualKey, applicationCursorKeysMode: boolean): string {
-  switch (key) {
-    case 'enter':
-      return '\r'
-    case 'backspace':
-      return '\x7f'
-    case 'tab':
-      return '\t'
-    case 'escape':
-      return '\x1b'
-    case 'interrupt':
-      return '\x03'
-    case 'eof':
-      return '\x04'
-    case 'arrow-up':
-    case 'arrow-down':
-    case 'arrow-left':
-    case 'arrow-right':
-      return `${applicationCursorKeysMode ? '\x1bO' : '\x1b['}${CURSOR_KEY_SUFFIX[key]}`
   }
 }
 

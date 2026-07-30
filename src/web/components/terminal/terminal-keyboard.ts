@@ -1,3 +1,5 @@
+import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+
 interface SessionIdEventLike {
   type: string
   key: string
@@ -21,6 +23,35 @@ const MAC_OPTION_ARROW_INPUT: Record<string, string> = {
   ArrowRight: '\x1bf',
   ArrowUp: '\x1b[A',
   ArrowDown: '\x1b[B',
+}
+
+const CURSOR_KEY_SUFFIX = {
+  'arrow-up': 'A',
+  'arrow-down': 'B',
+  'arrow-left': 'D',
+  'arrow-right': 'C',
+} satisfies Record<Extract<TerminalVirtualKey, `arrow-${string}`>, string>
+
+export function terminalInputForVirtualKey(key: TerminalVirtualKey, applicationCursorKeysMode: boolean): string {
+  switch (key) {
+    case 'enter':
+      return '\r'
+    case 'backspace':
+      return '\x7f'
+    case 'tab':
+      return '\t'
+    case 'escape':
+      return '\x1b'
+    case 'interrupt':
+      return '\x03'
+    case 'eof':
+      return '\x04'
+    case 'arrow-up':
+    case 'arrow-down':
+    case 'arrow-left':
+    case 'arrow-right':
+      return `${applicationCursorKeysMode ? '\x1bO' : '\x1b['}${CURSOR_KEY_SUFFIX[key]}`
+  }
 }
 
 // Safari has a longstanding bug where KeyboardEvent.key for Shift+symbol keys may report the
