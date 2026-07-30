@@ -11,10 +11,7 @@ import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import {
-  addResolvedWorkspace,
-  insertPlaceholderWorkspace,
-} from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { addResolvedWorkspace, insertPlaceholderWorkspace } from '#/web/stores/workspaces/workspace-session-state.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import {

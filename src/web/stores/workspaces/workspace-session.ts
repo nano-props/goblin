@@ -9,10 +9,8 @@ import type {
   WorkspacesSet,
   WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
-import {
-  addResolvedWorkspace,
-  createWorkspaceLifecycleActions,
-} from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { createWorkspaceLifecycleActions } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-state.ts'
 import { restoredWorkspaceIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { updateWorkspaceRuntimeCache } from '#/web/workspace-runtime-query.ts'
 import { seedRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
