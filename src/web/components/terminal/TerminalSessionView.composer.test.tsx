@@ -13,14 +13,17 @@ function buttonByLabel(container: HTMLElement, label: string) {
   return within(container).getByRole('button', { name: label })
 }
 
-function openComposerInput(container: HTMLElement) {
-  act(() => buttonByLabel(container, 'terminal.composer-open').click())
-  act(() => buttonByLabel(container, 'terminal.composer-show-input').click())
+function composerInput(container: HTMLElement) {
   const textarea = container.querySelector<HTMLTextAreaElement>(
     'textarea[aria-label="terminal.composer-input-placeholder"]',
   )
   if (!textarea) throw new Error('expected terminal composer input')
   return textarea
+}
+
+function openComposerInput(container: HTMLElement) {
+  act(() => buttonByLabel(container, 'terminal.composer-open').click())
+  return composerInput(container)
 }
 
 describe('TerminalSessionView composer', () => {
@@ -36,11 +39,8 @@ describe('TerminalSessionView composer', () => {
       rendered.sessionRoot.focus()
       await user.keyboard('{Meta>}f{/Meta}')
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
-      const modeToggle = rendered.container.querySelector<HTMLButtonElement>(
-        '.goblin-terminal-composer__mode-row button',
-      )
-      if (!modeToggle) throw new Error('expected Composer mode toggle')
-      modeToggle.addEventListener('focus', () => handoffOrder.push('composer-focus'))
+      const input = composerInput(rendered.container)
+      input.addEventListener('focus', () => handoffOrder.push('composer-focus'))
 
       const shortcut = new KeyboardEvent('keydown', {
         key: 'Enter',
@@ -56,7 +56,7 @@ describe('TerminalSessionView composer', () => {
       expect(clearSearch).toHaveBeenCalledWith('term-111111111111111111111')
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).toBeNull()
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
-      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+      expect(document.activeElement).toBe(input)
 
       await user.keyboard('{Escape}')
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -102,7 +102,7 @@ describe('TerminalSessionView composer', () => {
 
       expect(shortcut.defaultPrevented).toBe(true)
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
-      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+      expect(document.activeElement).toBe(composerInput(rendered.container))
 
       const nonMacShortcut = new KeyboardEvent('keydown', {
         key: 'Enter',
@@ -139,7 +139,7 @@ describe('TerminalSessionView composer', () => {
 
       expect(shortcut.defaultPrevented).toBe(true)
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
-      expect(document.activeElement).toBe(buttonByLabel(rendered.container, 'terminal.composer-show-input'))
+      expect(document.activeElement).toBe(composerInput(rendered.container))
     } finally {
       await rendered.cleanup()
     }

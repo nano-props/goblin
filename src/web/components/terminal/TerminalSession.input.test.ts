@@ -32,16 +32,16 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const session = new TerminalSession(descriptor, notify)
 
     expect(session.setComposerExpanded(false)).toBe(true)
-    expect(session.setComposerMode('keys')).toBe(true)
+    expect(session.setComposerMode('input')).toBe(true)
     expect(notify).not.toHaveBeenCalled()
 
     expect(session.setComposerExpanded(true)).toBe(true)
-    expect(session.setComposerMode('input')).toBe(true)
+    expect(session.setComposerMode('keys')).toBe(true)
     expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
 
     session.dispose()
     expect(session.setComposerExpanded(false)).toBe(false)
-    expect(session.setComposerMode('keys')).toBe(false)
+    expect(session.setComposerMode('input')).toBe(false)
     expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
   })
 

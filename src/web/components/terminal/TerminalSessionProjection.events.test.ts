@@ -596,12 +596,12 @@ describe('TerminalSessionProjection events', () => {
 
     projection.selectTerminal(WORKTREE_KEY, firstSessionId)
     expect(projection.setComposerExpanded(firstSessionId, true)).toBe(true)
-    expect(projection.setComposerMode(firstSessionId, 'input')).toBe(true)
+    expect(projection.setComposerMode(firstSessionId, 'keys')).toBe(true)
 
     projection.selectTerminal(WORKTREE_KEY, secondSessionId)
     expect(projection.snapshot(secondSessionId).composer).toEqual({
       expanded: false,
-      mode: 'keys',
+      mode: 'input',
       historyEntries: [],
     })
     expect(projection.setComposerExpanded(secondSessionId, true)).toBe(true)
@@ -609,12 +609,12 @@ describe('TerminalSessionProjection events', () => {
     projection.selectTerminal(WORKTREE_KEY, firstSessionId)
     expect(projection.snapshot(firstSessionId).composer).toEqual({
       expanded: true,
-      mode: 'input',
+      mode: 'keys',
       historyEntries: [],
     })
     expect(projection.snapshot(secondSessionId).composer).toEqual({
       expanded: true,
-      mode: 'keys',
+      mode: 'input',
       historyEntries: [],
     })
   })
@@ -689,7 +689,7 @@ describe('TerminalSessionProjection events', () => {
     expect(projection.setComposerExpanded(terminalSessionId, false)).toBe(false)
     expect(projection.snapshot(terminalSessionId).composer).toEqual({
       expanded: false,
-      mode: 'keys',
+      mode: 'input',
       historyEntries: [],
     })
   })

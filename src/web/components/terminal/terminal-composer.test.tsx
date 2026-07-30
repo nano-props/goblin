@@ -7,7 +7,7 @@ import { useLayoutEffect, useState } from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { TerminalComposer } from '#/web/components/terminal/terminal-composer.tsx'
 import type { TerminalComposerLabels } from '#/web/components/terminal/terminal-composer.tsx'
-import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 
 const LABELS: TerminalComposerLabels = {
@@ -40,11 +40,12 @@ function render(
     onResolveFiles?: (files: File[]) => Promise<string | null>
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
+    initialMode?: TerminalComposerMode
   } = {},
 ) {
   function ControlledComposer() {
     const [expanded, setExpanded] = useState(false)
-    const [mode, setMode] = useState<'keys' | 'input'>('keys')
+    const [mode, setMode] = useState<TerminalComposerMode>(props.initialMode ?? 'keys')
     const [historyEntries, setHistoryEntries] = useState<readonly string[]>([])
     const sendText = async (text: string) => {
       const accepted = await (props.onSendText ?? (async () => true))(text)
@@ -225,7 +226,7 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
-  test('moves keyboard focus into the default keys mode when expanded', async () => {
+  test('moves keyboard focus into keys mode when expanded', async () => {
     const user = userEvent.setup()
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
@@ -234,6 +235,15 @@ describe('TerminalComposer', () => {
     await user.keyboard('{Enter}')
 
     expect(document.activeElement).toBe(buttonByAccessibleName(container, LABELS.showInput))
+  })
+
+  test('moves keyboard focus into input mode when expanded by clicking the trigger', async () => {
+    const user = userEvent.setup()
+    const { container } = render({ initialMode: 'input' })
+
+    await user.click(buttonByAccessibleName(container, LABELS.open))
+
+    expect(document.activeElement).toBe(container.querySelector('textarea'))
   })
 
   test('collapses on a physical Escape and restores the trigger focus', async () => {

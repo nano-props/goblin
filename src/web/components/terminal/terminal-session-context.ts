@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { createInitialTerminalComposerState } from '#/web/components/terminal/terminal-composer-state.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -23,11 +24,7 @@ export const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
   message: null,
   processName: 'terminal',
-  composer: {
-    expanded: false,
-    mode: 'keys',
-    historyEntries: [],
-  },
+  composer: createInitialTerminalComposerState(),
 }
 
 export function useTerminalSessionContext(): TerminalSessionContextValue {

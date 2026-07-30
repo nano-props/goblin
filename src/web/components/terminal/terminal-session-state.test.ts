@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
-const DEFAULT_COMPOSER = { expanded: false, mode: 'keys' as const, historyEntries: [] }
+const DEFAULT_COMPOSER = { expanded: false, mode: 'input' as const, historyEntries: [] }
 
 describe('TerminalSessionState', () => {
   test('owns Composer mode, expansion, and bounded immutable history', () => {
@@ -11,7 +11,8 @@ describe('TerminalSessionState', () => {
 
     expect(state.setComposerExpanded(false)).toBe(false)
     expect(state.setComposerExpanded(true)).toBe(true)
-    expect(state.setComposerMode('keys')).toBe(false)
+    expect(state.setComposerMode('input')).toBe(false)
+    expect(state.setComposerMode('keys')).toBe(true)
     expect(state.setComposerMode('input')).toBe(true)
     expect(state.recordComposerHistory('')).toBe(false)
 
@@ -35,12 +36,12 @@ describe('TerminalSessionState', () => {
     const second = new TerminalSessionState()
 
     first.setComposerExpanded(true)
-    first.setComposerMode('input')
+    first.setComposerMode('keys')
     first.recordComposerHistory('first session only')
 
     expect(first.snapshot(null).composer).toEqual({
       expanded: true,
-      mode: 'input',
+      mode: 'keys',
       historyEntries: ['first session only'],
     })
     expect(second.snapshot(null).composer).toEqual(DEFAULT_COMPOSER)

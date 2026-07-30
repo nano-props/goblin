@@ -2,6 +2,7 @@ import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import { createTerminalOutputActivityState } from '#/web/components/terminal/terminal-output-activity-state.ts'
+import { createInitialTerminalComposerState } from '#/web/components/terminal/terminal-composer-state.ts'
 import {
   formatTerminalFilesystemTargetKey,
   parseTerminalFilesystemTargetKey,
@@ -66,11 +67,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   message: null,
   processName: 'terminal',
   canonicalTitle: null,
-  composer: {
-    expanded: false,
-    mode: 'keys',
-    historyEntries: [],
-  },
+  composer: createInitialTerminalComposerState(),
 }
 interface TerminalCreateQueueRequest {
   createOptions: TerminalCreateOptions

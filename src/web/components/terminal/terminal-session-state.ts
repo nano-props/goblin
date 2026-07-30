@@ -1,4 +1,5 @@
 import type { TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
+import { createInitialTerminalComposerState } from '#/web/components/terminal/terminal-composer-state.ts'
 import type {
   TerminalProgressState,
   TerminalComposerMode,
@@ -62,11 +63,7 @@ export class TerminalSessionState {
   /** Client-only facts that follow the logical terminal session rather than
    *  the mounted xterm/Composer view. Never clear this from view teardown or
    *  hydrate it from server runtime payloads. */
-  private composerState: TerminalComposerSessionState = {
-    expanded: false,
-    mode: 'keys',
-    historyEntries: [],
-  }
+  private composerState: TerminalComposerSessionState = createInitialTerminalComposerState()
 
   getPhase(): TerminalSessionPhase {
     return this.runtimeState.phase
