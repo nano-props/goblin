@@ -1,7 +1,7 @@
 import { lstat, opendir } from 'node:fs/promises'
 import path from 'node:path'
 import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
-import { resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
+import { resolveRemoteWorkspaceTarget } from '#/server/modules/remote-repo-execution.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'

@@ -2,11 +2,11 @@ import PQueue from 'p-queue'
 import {
   captureRepoWriteExecution,
   repoWriteExecutionBoundaryKey,
-  resolveRepoWriteBoundaryKey,
   runWithCapturedRepoWriteExecution,
   type RepoSource,
   type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
+import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-write-boundary.ts'
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {

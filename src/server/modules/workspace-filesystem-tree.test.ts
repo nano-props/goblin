@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteWorktree: vi.fn(),
 }))
 
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/modules/remote-repo-execution.ts', () => ({
   resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))

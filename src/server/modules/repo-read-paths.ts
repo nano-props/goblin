@@ -1,8 +1,5 @@
-import {
-  runWithRepoSource,
-  type RepoSourceRuntimeContext,
-  type WorkspacePaneTargetIdentity,
-} from '#/server/modules/repo-source.ts'
+import { runWithRepoSource, type WorkspacePaneTargetIdentity } from '#/server/modules/repo-source.ts'
+import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
   getRepoBoundaryLastFetchAt,

@@ -9,9 +9,12 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
     return { boundaryKey: key }
   },
   repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
-  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
   runWithCapturedRepoWriteExecution: async (_capability: unknown, task: (source: object) => Promise<unknown>) =>
     await task({}),
+}))
+
+vi.mock('#/server/modules/repo-write-boundary.ts', () => ({
+  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 
 const REMOTE_REPO = workspaceIdForTest('goblin+ssh://example/repo')

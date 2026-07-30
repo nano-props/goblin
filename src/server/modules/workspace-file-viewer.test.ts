@@ -18,7 +18,7 @@ vi.mock('#/system/user-shell.ts', () => ({
   userShellCommandExists: mocks.userShellCommandExists,
 }))
 
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/modules/remote-repo-execution.ts', () => ({
   resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
