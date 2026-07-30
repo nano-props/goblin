@@ -91,7 +91,6 @@ export interface ServerTerminalRuntime {
   host: ServerTerminalHost
   workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
-  workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   shutdown(): void
@@ -330,13 +329,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     isValidClientId: isValidTerminalClientId,
     getDiagnostics() {
+      const pty = ptySupervisor.getDiagnostics()
       return {
         terminal: {
-          mode: ptySupervisor.getDiagnostics().mode,
+          mode: pty.mode,
           state: shuttingDown ? 'shutting-down' : 'running',
           registeredSockets: broker.socketCount(),
           shuttingDown,
-          pty: ptySupervisor.getDiagnostics(),
+          pty,
           liveSessionCount: manager.getSessionCount(),
         },
       }
@@ -408,7 +408,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     host,
     workspacePaneRuntimeHost,
     workspacePaneTabsHost,
-    workspacePaneRuntimeApplication,
     worktreeRemovalApplication,
     workspaceCapabilityTransitionHost,
     shutdown() {
