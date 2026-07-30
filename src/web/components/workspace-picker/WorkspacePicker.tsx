@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
 import { ChevronDown, Download, Folder, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { sumBy } from 'es-toolkit'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -118,100 +119,77 @@ function WorkspaceMenuContent({
       }}
     >
       {showWorkspaceList ? (
-        <>
-          <ScrollArea className="max-h-80" scrollbarMode="compact">
-            <div className="space-y-0.5 p-1" role="list">
-              {workspaces.map((workspace) => {
-                const selected = workspace.id === currentWorkspaceId
-                const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
-                  ? Server
-                  : workspace.gitCapability === 'available'
-                    ? FolderGit2
-                    : Folder
-                const remoteTarget = remoteWorkspaceConnectionTarget(workspace.lifecycle)
-                return (
-                  <div key={workspace.id} className="group relative flex items-center" role="listitem">
-                    <MenuRowButton
-                      size="roomy"
-                      selected={selected}
-                      onClick={() => onSelectWorkspace(workspace.id)}
-                      aria-current={selected ? 'true' : undefined}
-                      leading={<WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />}
-                      contentClassName="whitespace-normal"
-                      trailing={
-                        (workspace.terminalBellCount ?? 0) > 0 ? (
-                          <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
-                        ) : null
-                      }
-                    >
-                      <div className="truncate font-medium leading-5">{workspace.name}</div>
-                      <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                        {formatWorkspaceDisplayLocation(workspace.id, remoteTarget)}
-                      </div>
-                    </MenuRowButton>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onClose(workspace.id)
-                      }}
-                      title={labels.closeWithName(workspace.name)}
-                      aria-label={labels.closeWithName(workspace.name)}
-                    >
-                      <X size={13} />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
-          <div className="border-t border-separator p-1">
-            <WorkspaceSwitcherAction
-              icon={<FolderOpen size={14} />}
-              label={labels.openLocal}
-              shortcut={labels.openLocalShortcut}
-              onSelect={() => onSelectAction(onOpenLocal)}
-            />
-            <WorkspaceSwitcherAction
-              icon={<Server size={14} />}
-              label={labels.openRemote}
-              shortcut={labels.openRemoteShortcut}
-              onSelect={() => onSelectAction(onOpenRemote)}
-            />
-            <WorkspaceSwitcherAction
-              icon={<Download size={14} />}
-              label={labels.clone}
-              shortcut={labels.cloneShortcut}
-              onSelect={() => onSelectAction(onClone)}
-            />
+        <ScrollArea className="max-h-80" scrollbarMode="compact">
+          <div className="space-y-0.5 p-1" role="list">
+            {workspaces.map((workspace) => {
+              const selected = workspace.id === currentWorkspaceId
+              const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
+                ? Server
+                : workspace.gitCapability === 'available'
+                  ? FolderGit2
+                  : Folder
+              const remoteTarget = remoteWorkspaceConnectionTarget(workspace.lifecycle)
+              return (
+                <div key={workspace.id} className="group relative flex items-center" role="listitem">
+                  <MenuRowButton
+                    size="roomy"
+                    selected={selected}
+                    onClick={() => onSelectWorkspace(workspace.id)}
+                    aria-current={selected ? 'true' : undefined}
+                    leading={<WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />}
+                    contentClassName="whitespace-normal"
+                    trailing={
+                      (workspace.terminalBellCount ?? 0) > 0 ? (
+                        <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
+                      ) : null
+                    }
+                  >
+                    <div className="truncate font-medium leading-5">{workspace.name}</div>
+                    <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
+                      {formatWorkspaceDisplayLocation(workspace.id, remoteTarget)}
+                    </div>
+                  </MenuRowButton>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onClose(workspace.id)
+                    }}
+                    title={labels.closeWithName(workspace.name)}
+                    aria-label={labels.closeWithName(workspace.name)}
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
+              )
+            })}
           </div>
-        </>
-      ) : (
-        <div className="p-1">
-          <WorkspaceSwitcherAction
-            icon={<FolderOpen size={14} />}
-            label={labels.openLocal}
-            shortcut={labels.openLocalShortcut}
-            onSelect={() => onSelectAction(onOpenLocal)}
-          />
-          <WorkspaceSwitcherAction
-            icon={<Server size={14} />}
-            label={labels.openRemote}
-            shortcut={labels.openRemoteShortcut}
-            onSelect={() => onSelectAction(onOpenRemote)}
-          />
-          <WorkspaceSwitcherAction
-            icon={<Download size={14} />}
-            label={labels.clone}
-            shortcut={labels.cloneShortcut}
-            onSelect={() => onSelectAction(onClone)}
-          />
-        </div>
-      )}
+        </ScrollArea>
+      ) : null}
+      <div className={showWorkspaceList ? 'border-t border-separator p-1' : 'p-1'}>
+        <WorkspaceSwitcherAction
+          icon={<FolderOpen size={14} />}
+          label={labels.openLocal}
+          shortcut={labels.openLocalShortcut}
+          onSelect={() => onSelectAction(onOpenLocal)}
+        />
+        <WorkspaceSwitcherAction
+          icon={<Server size={14} />}
+          label={labels.openRemote}
+          shortcut={labels.openRemoteShortcut}
+          onSelect={() => onSelectAction(onOpenRemote)}
+        />
+        <WorkspaceSwitcherAction
+          icon={<Download size={14} />}
+          label={labels.clone}
+          shortcut={labels.cloneShortcut}
+          onSelect={() => onSelectAction(onClone)}
+        />
+      </div>
     </PopoverContent>
   )
 }
@@ -251,7 +229,7 @@ export function WorkspacePicker({
   }
 
   const currentWorkspace = workspaces.find((r) => r.id === currentWorkspaceId) ?? workspaces[0] ?? null
-  const totalTerminalBellCount = workspaces.reduce((count, workspace) => count + (workspace.terminalBellCount ?? 0), 0)
+  const totalTerminalBellCount = sumBy(workspaces, (workspace) => workspace.terminalBellCount ?? 0)
 
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.workspaces}>
