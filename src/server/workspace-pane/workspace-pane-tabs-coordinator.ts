@@ -16,10 +16,7 @@ import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import {
-  physicalWorktreeIdentityKey,
-  type PhysicalWorktreeIdentity,
-} from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import {
   physicalWorktreeExecutionScope,
   physicalWorktreeAdmissionLease,
@@ -28,6 +25,13 @@ import {
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import {
+  admissionRecords,
+  capabilitiesByIdentity,
+  mergeCurrentCapabilities,
+  uniqueSortedAdmissionLeases,
+  uniqueSortedCapabilities,
+} from '#/server/workspace-pane/workspace-pane-physical-admission.ts'
 
 import {
   type WorkspacePaneRuntimeTabsProviderSnapshot,
@@ -688,104 +692,6 @@ function providerSnapshotsWithPendingSession(
   })
   if (!matched) next.push({ type: session.type, revision: 0, liveSessions: [session] })
   return next
-}
-
-function uniqueSortedCapabilities(
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-): PhysicalWorktreeExecutionCapability[] {
-  return Array.from(
-    new Map(
-      [...capabilities]
-        .sort((a, b) =>
-          physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(a)).localeCompare(
-            physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(b)),
-          ),
-        )
-        .map((capability) => [
-          physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)),
-          capability,
-        ]),
-    ).values(),
-  )
-}
-
-function uniqueSortedAdmissionLeases(
-  leases: readonly PhysicalWorktreeAdmissionLease[],
-): PhysicalWorktreeAdmissionLease[] {
-  return Array.from(
-    new Map(
-      [...leases]
-        .sort((a, b) => physicalWorktreeAdmissionLeaseKey(a).localeCompare(physicalWorktreeAdmissionLeaseKey(b)))
-        .map((lease) => [physicalWorktreeAdmissionLeaseKey(lease), lease]),
-    ).values(),
-  )
-}
-
-function capabilitiesByIdentity(
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-): Map<string, PhysicalWorktreeExecutionCapability> {
-  return new Map(
-    capabilities.map((capability) => [
-      physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)),
-      capability,
-    ]),
-  )
-}
-
-function mergeCurrentCapabilities(
-  existing: ReadonlyMap<string, PhysicalWorktreeExecutionCapability>,
-  current: readonly PhysicalWorktreeExecutionCapability[],
-): Map<string, PhysicalWorktreeExecutionCapability> {
-  const currentStableKeys = new Set(current.map((capability) => physicalWorktreeIdentityKey(capability.identity)))
-  return new Map([
-    ...[...existing].filter(
-      ([, capability]) => !currentStableKeys.has(physicalWorktreeIdentityKey(capability.identity)),
-    ),
-    ...capabilitiesByIdentity(current),
-  ])
-}
-
-function admissionRecords(
-  leases: readonly PhysicalWorktreeAdmissionLease[],
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-) {
-  const byStableIdentity = new Map<
-    string,
-    {
-      identity: PhysicalWorktreeIdentity
-      currentCapability: PhysicalWorktreeExecutionCapability | null
-      indexedLeases: PhysicalWorktreeAdmissionLease[]
-    }
-  >()
-  for (const lease of leases) {
-    const key = physicalWorktreeIdentityKey(lease.identity)
-    const record = byStableIdentity.get(key) ?? {
-      identity: lease.identity,
-      currentCapability: null,
-      indexedLeases: [],
-    }
-    record.indexedLeases.push(lease)
-    byStableIdentity.set(key, record)
-  }
-  for (const capability of capabilities) {
-    const lease = physicalWorktreeAdmissionLease(capability)
-    const key = physicalWorktreeIdentityKey(capability.identity)
-    const record = byStableIdentity.get(key) ?? {
-      identity: capability.identity,
-      currentCapability: null,
-      indexedLeases: [],
-    }
-    if (
-      record.currentCapability &&
-      physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(record.currentCapability)) !==
-        physicalWorktreeAdmissionLeaseKey(lease)
-    ) {
-      throw new Error('error.ambiguous-worktree-execution-capability')
-    }
-    record.currentCapability = capability
-    byStableIdentity.set(key, record)
-  }
-  return [...byStableIdentity.values()]
 }
 
 function isWorkspacePaneWorktreeTarget(
