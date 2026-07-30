@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
@@ -25,12 +26,13 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
-import { TerminalComposerHistory } from '#/web/components/terminal/terminal-composer-history.ts'
+import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 import {
   TERMINAL_COMPOSER_COMMAND_KEYS,
   type TerminalComposerCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
-import type { TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import { isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
   composer: string
@@ -56,14 +58,25 @@ export interface TerminalComposerLabels {
 }
 
 interface TerminalComposerProps {
+  ref?: Ref<TerminalComposerHandle>
   labels: TerminalComposerLabels
+  expanded: boolean
+  mode: TerminalComposerMode
+  historyEntries: readonly string[]
+  shortcut: string
   onVirtualKey: (key: TerminalVirtualKey) => void
   onSendText: (text: string) => Promise<boolean>
+  onExpandedChange: (expanded: boolean) => boolean
+  onModeChange: (mode: TerminalComposerMode) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
   hidden?: boolean
   className?: string
+}
+
+export interface TerminalComposerHandle {
+  focus(): void
 }
 
 type AccessibleName = Exclude<
@@ -125,25 +138,27 @@ function insertComposerText(value: string, insertion: string, start: number, end
   }
 }
 
-function isImeCompositionEvent(event: KeyboardEvent<HTMLTextAreaElement>) {
-  // WebKit dispatches the Enter key that confirms an IME composition after
-  // `compositionend`, with `isComposing === false`. keyCode 229 remains its
-  // compatibility signal for an input-method-owned key event.
-  return event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229
+function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
+  return isImeOwnedKeyboardEvent(event.nativeEvent)
 }
 
 export function TerminalComposer({
+  ref,
   labels,
+  expanded,
+  mode,
+  historyEntries,
+  shortcut,
   onVirtualKey,
   onSendText,
+  onExpandedChange,
+  onModeChange,
   onResolveFiles,
   onRequestFocus,
   onScrollLines,
   hidden,
   className,
 }: TerminalComposerProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [mode, setMode] = useState<'input' | 'keys'>('keys')
   const [draft, setDraft] = useState('')
   const [resolvingFiles, setResolvingFiles] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -152,9 +167,35 @@ export function TerminalComposer({
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
-  const submittingRef = useRef(false)
-  const [history] = useState(() => new TerminalComposerHistory())
+  const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
+  const [history] = useState(() => new TerminalComposerHistoryCursor())
   const composerId = useId()
+
+  const focusComposerControl = () => {
+    if (mode === 'input') inputRef.current?.focus()
+    else modeToggleRef.current?.focus()
+  }
+  const requestComposerFocus = () => {
+    pendingFocusRef.current = 'control'
+    if (!expanded || hidden) return
+    pendingFocusRef.current = null
+    focusComposerControl()
+  }
+  const requestComposerFocusAfterUpdate = () => {
+    pendingFocusRef.current = 'control'
+  }
+  const requestTriggerFocus = () => {
+    pendingFocusRef.current = 'trigger'
+    if (expanded) return
+    pendingFocusRef.current = null
+    triggerRef.current?.focus()
+  }
+
+  useImperativeHandle(ref, () => ({ focus: requestComposerFocus }))
+
+  useLayoutEffect(() => {
+    history.updateEntries(historyEntries)
+  }, [history, historyEntries])
 
   useLayoutEffect(() => {
     const input = inputRef.current
@@ -169,10 +210,20 @@ export function TerminalComposer({
   }, [draft, expanded, mode])
 
   useLayoutEffect(() => {
-    if (!expanded) return
-    if (mode === 'input') inputRef.current?.focus()
-    else modeToggleRef.current?.focus()
-  }, [expanded, mode])
+    if (hidden) {
+      pendingFocusRef.current = null
+      return
+    }
+    if (pendingFocusRef.current === 'control' && expanded) {
+      pendingFocusRef.current = null
+      focusComposerControl()
+      return
+    }
+    if (pendingFocusRef.current === 'trigger' && !expanded) {
+      pendingFocusRef.current = null
+      triggerRef.current?.focus()
+    }
+  }, [expanded, hidden, mode])
 
   useEffect(() => {
     const input = inputRef.current
@@ -183,19 +234,15 @@ export function TerminalComposer({
   }, [expanded, mode])
 
   const submitDraft = async () => {
-    if (!draft || resolvingFiles || submittingRef.current) return
+    if (!draft || resolvingFiles) return
     const submittedDraft = draft
-    submittingRef.current = true
-    try {
-      if (!(await onSendText(submittedDraft))) return
-      history.record(submittedDraft)
-      setDraft((current) => (current === submittedDraft ? '' : current))
-    } finally {
-      submittingRef.current = false
-    }
+    if (!(await onSendText(submittedDraft))) return
+    history.leaveBrowsing()
+    setDraft((current) => (current === submittedDraft ? '' : current))
   }
   const closeComposer = () => {
-    setExpanded(false)
+    if (!onExpandedChange(false)) return
+    requestTriggerFocus()
   }
   const currentFileInsertion = () => {
     const input = inputRef.current
@@ -239,6 +286,15 @@ export function TerminalComposer({
       hidden={hidden}
       role="group"
       aria-label={labels.composer}
+      onKeyDownCapture={(event) => {
+        if (!expanded || event.key !== 'Escape' || isImeCompositionEvent(event)) return
+        if (event.target instanceof Element && event.target.closest('[data-slot="dropdown-menu-content"]')) {
+          return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        closeComposer()
+      }}
     >
       <ComposerButton
         buttonRef={triggerRef}
@@ -247,8 +303,12 @@ export function TerminalComposer({
         ariaExpanded={expanded}
         ariaControls={composerId}
         ariaHidden={expanded}
+        ariaKeyShortcuts={shortcut}
         tabIndex={expanded ? -1 : undefined}
-        onClick={() => setExpanded(true)}
+        onClick={() => {
+          if (!onExpandedChange(true)) return
+          requestComposerFocus()
+        }}
       >
         <Keyboard className="size-5" />
       </ComposerButton>
@@ -262,7 +322,11 @@ export function TerminalComposer({
           <ComposerButton
             buttonRef={modeToggleRef}
             accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
-            onClick={() => setMode((current) => (current === 'input' ? 'keys' : 'input'))}
+            onClick={() => {
+              const nextMode = mode === 'input' ? 'keys' : 'input'
+              if (!onModeChange(nextMode)) return
+              requestComposerFocusAfterUpdate()
+            }}
           >
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
           </ComposerButton>
@@ -364,7 +428,7 @@ export function TerminalComposer({
             onVirtualKey={onVirtualKey}
             onRequestTerminalFocus={onRequestFocus}
             onClose={closeComposer}
-            onRestoreComposerTriggerFocus={() => triggerRef.current?.focus()}
+            onRestoreComposerTriggerFocus={requestTriggerFocus}
           />
         </div>
       </div>
@@ -380,6 +444,7 @@ interface ComposerButtonProps {
   ariaExpanded?: boolean
   ariaControls?: string
   ariaHidden?: boolean
+  ariaKeyShortcuts?: string
   tabIndex?: number
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void
@@ -393,6 +458,7 @@ function ComposerButton({
   ariaExpanded,
   ariaControls,
   ariaHidden,
+  ariaKeyShortcuts,
   tabIndex,
   onClick,
   onPointerDown,
@@ -406,6 +472,7 @@ function ComposerButton({
       aria-expanded={ariaExpanded}
       aria-controls={ariaControls}
       aria-hidden={ariaHidden}
+      aria-keyshortcuts={ariaKeyShortcuts}
       tabIndex={tabIndex}
       className={cn('goblin-terminal-composer__btn', className)}
       onPointerDown={onPointerDown}

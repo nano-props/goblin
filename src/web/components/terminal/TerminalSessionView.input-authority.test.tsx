@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -51,6 +52,7 @@ describe('TerminalSessionView input authority', () => {
       phase: 'error' as const,
       message: 'pty crashed',
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'viewer' as const,
       },
@@ -152,6 +154,7 @@ describe('TerminalSessionView input authority', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'viewer' as const,
       },
@@ -257,6 +260,7 @@ describe('TerminalSessionView input authority', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'controller' as const,
       },
@@ -379,6 +383,7 @@ describe('TerminalSessionView input authority', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'viewer' as const,
       },
@@ -472,6 +477,7 @@ describe('TerminalSessionView input authority', () => {
       phase: 'open' as const,
       message: null,
       processName: 'zsh',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       attachment: {
         role: 'controller' as const,
       },

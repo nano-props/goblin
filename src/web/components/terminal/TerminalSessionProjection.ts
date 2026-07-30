@@ -32,6 +32,7 @@ import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/term
 import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
 import type {
   TerminalDescriptor,
+  TerminalComposerMode,
   TerminalCreateOptions,
   TerminalFocusRequest,
   TerminalIdentityRealtimeEvent,
@@ -65,6 +66,11 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   message: null,
   processName: 'terminal',
   canonicalTitle: null,
+  composer: {
+    expanded: false,
+    mode: 'keys',
+    historyEntries: [],
+  },
 }
 interface TerminalCreateQueueRequest {
   createOptions: TerminalCreateOptions
@@ -952,6 +958,14 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }
 
+  setComposerExpanded = (terminalSessionId: string, expanded: boolean): boolean => {
+    return this.sessions.get(terminalSessionId)?.setComposerExpanded(expanded) ?? false
+  }
+
+  setComposerMode = (terminalSessionId: string, mode: TerminalComposerMode): boolean => {
+    return this.sessions.get(terminalSessionId)?.setComposerMode(mode) ?? false
+  }
+
   submitText = (terminalSessionId: string, text: string): Promise<boolean> => {
     return this.sessions.get(terminalSessionId)?.submitText(text) ?? Promise.resolve(false)
   }
@@ -992,6 +1006,13 @@ export class TerminalSessionProjection {
         terminalSessionProviderLog.warn('snapshot listener threw', { terminalSessionId, err })
       }
     }
+  }
+
+  private publishSessionSnapshot(terminalSessionId: string): void {
+    const session = this.sessions.get(terminalSessionId)
+    if (!session) return
+    this.snapshotCache.set(terminalSessionId, session.snapshot())
+    this.notifySnapshot(terminalSessionId)
   }
 
   private notifyAllFilesystemTargets(): void {
@@ -1317,6 +1338,10 @@ export class TerminalSessionProjection {
         if (reason === 'projection-delta-revision') {
           if (projectionDeltaRevision === undefined) throw new Error('terminal projection delta revision missing')
           this.applyTerminalSessionsDeltaRevision(terminalSessionCoordinates(descriptor), projectionDeltaRevision)
+          return
+        }
+        if (reason === 'snapshot') {
+          this.publishSessionSnapshot(descriptor.terminalSessionId)
           return
         }
         this.notifySession(descriptor.terminalSessionId)

@@ -2,7 +2,50 @@ import { describe, expect, test } from 'vitest'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
+const DEFAULT_COMPOSER = { expanded: false, mode: 'keys' as const, historyEntries: [] }
+
 describe('TerminalSessionState', () => {
+  test('owns Composer mode, expansion, and bounded immutable history', () => {
+    const state = new TerminalSessionState()
+    const initialHistory = state.snapshot(null).composer.historyEntries
+
+    expect(state.setComposerExpanded(false)).toBe(false)
+    expect(state.setComposerExpanded(true)).toBe(true)
+    expect(state.setComposerMode('keys')).toBe(false)
+    expect(state.setComposerMode('input')).toBe(true)
+    expect(state.recordComposerHistory('')).toBe(false)
+
+    for (let index = 0; index < 51; index += 1) {
+      expect(state.recordComposerHistory(`command ${index}`)).toBe(true)
+    }
+    expect(state.recordComposerHistory('command 50')).toBe(false)
+
+    const composer = state.snapshot(null).composer
+    expect(composer.expanded).toBe(true)
+    expect(composer.mode).toBe('input')
+    expect(composer.historyEntries).not.toBe(initialHistory)
+    expect(composer.historyEntries).toHaveLength(50)
+    expect(composer.historyEntries[0]).toBe('command 1')
+    expect(composer.historyEntries.at(-1)).toBe('command 50')
+    expect(state.snapshot(null).composer.historyEntries).toBe(composer.historyEntries)
+  })
+
+  test('keeps Composer facts isolated between logical client sessions', () => {
+    const first = new TerminalSessionState()
+    const second = new TerminalSessionState()
+
+    first.setComposerExpanded(true)
+    first.setComposerMode('input')
+    first.recordComposerHistory('first session only')
+
+    expect(first.snapshot(null).composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: ['first session only'],
+    })
+    expect(second.snapshot(null).composer).toEqual(DEFAULT_COMPOSER)
+  })
+
   test('initial state has the opening phase, default process name, and no attachment', () => {
     const state = new TerminalSessionState()
     expect(state.snapshot(null)).toEqual({
@@ -10,6 +53,7 @@ describe('TerminalSessionState', () => {
       message: null,
       processName: 'terminal',
       canonicalTitle: null,
+      composer: DEFAULT_COMPOSER,
     })
     // An unbound runtime passes null. Once a runtime id is addressable, its
     // control identity remains orthogonal to lifecycle.
@@ -36,6 +80,7 @@ describe('TerminalSessionState', () => {
       message: null,
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
+      composer: DEFAULT_COMPOSER,
       attachment: {
         role: 'viewer',
       },
@@ -207,6 +252,7 @@ describe('TerminalSessionState', () => {
       message: null,
       processName: 'zsh',
       canonicalTitle: null,
+      composer: DEFAULT_COMPOSER,
       attachment: { role: 'controller' },
     })
   })
@@ -232,6 +278,9 @@ describe('TerminalSessionState', () => {
     })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
     state.setProgress(1, 10)
+    state.setComposerExpanded(true)
+    state.setComposerMode('input')
+    state.recordComposerHistory('kept command')
 
     expect(state.resetTransientState()).toBe(true)
     // Identity and lifecycle survive `resetTransientState` — only
@@ -241,6 +290,7 @@ describe('TerminalSessionState', () => {
       message: null,
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
+      composer: { expanded: true, mode: 'input', historyEntries: ['kept command'] },
       attachment: {
         role: 'viewer',
       },

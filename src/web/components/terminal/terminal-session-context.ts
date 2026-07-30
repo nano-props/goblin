@@ -23,6 +23,11 @@ export const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
   message: null,
   processName: 'terminal',
+  composer: {
+    expanded: false,
+    mode: 'keys',
+    historyEntries: [],
+  },
 }
 
 export function useTerminalSessionContext(): TerminalSessionContextValue {

@@ -20,6 +20,7 @@ interface TerminalSessionProjectionTestAccess {
     clientId: string,
   ): boolean
   notifySession(terminalSessionId: string): void
+  activateRuntimeBinding(session: TerminalSession): boolean
   ensureSession(descriptor: TerminalDescriptor): TerminalSession
   removeSession(terminalSessionId: string, options: { dispose: boolean }): boolean
 }

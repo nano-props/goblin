@@ -8,6 +8,12 @@ interface SessionIdEventLike {
   code?: string
 }
 
+export function isImeOwnedKeyboardEvent(event: { isComposing: boolean; keyCode: number }): boolean {
+  // WebKit can dispatch the key that confirms composition after
+  // compositionend. keyCode 229 remains its compatibility signal.
+  return event.isComposing || event.keyCode === 229
+}
+
 type SafariShiftKeyPair = readonly [unshifted: string, shifted: string]
 
 const MAC_OPTION_ARROW_INPUT: Record<string, string> = {

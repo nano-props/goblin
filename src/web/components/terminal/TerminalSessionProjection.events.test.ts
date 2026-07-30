@@ -603,4 +603,56 @@ describe('TerminalSessionProjection events', () => {
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
   })
+
+  test('publishes Composer-only snapshots without activating bindings or invalidating filesystem targets', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+    const access = terminalSessionProjectionAccess(projection)
+    const activateRuntimeBinding = vi.spyOn(access, 'activateRuntimeBinding')
+    const snapshotListener = vi.fn()
+    const filesystemTargetListener = vi.fn()
+    const unsubscribeSnapshot = projection.subscribeSnapshot(terminalSessionId, snapshotListener)
+    const unsubscribeFilesystemTarget = projection.subscribeTerminalFilesystemTarget(
+      WORKTREE_KEY,
+      filesystemTargetListener,
+    )
+
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+    expect(projection.snapshot(terminalSessionId).composer.expanded).toBe(true)
+    expect(snapshotListener).toHaveBeenCalledOnce()
+    expect(filesystemTargetListener).not.toHaveBeenCalled()
+    expect(activateRuntimeBinding).not.toHaveBeenCalled()
+
+    snapshotListener.mockClear()
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+    expect(snapshotListener).not.toHaveBeenCalled()
+    expect(projection.setComposerExpanded('missing-session', true)).toBe(false)
+
+    unsubscribeSnapshot()
+    unsubscribeFilesystemTarget()
+  })
+
+  test('destroys Composer state with logical session removal and creates no fallback state', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+    expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+
+    expect(terminalSessionProjectionAccess(projection).removeSession(terminalSessionId, { dispose: true })).toBe(true)
+    expect(projection.setComposerExpanded(terminalSessionId, false)).toBe(false)
+    expect(projection.snapshot(terminalSessionId).composer).toEqual({
+      expanded: false,
+      mode: 'keys',
+      historyEntries: [],
+    })
+  })
 })

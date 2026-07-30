@@ -3,12 +3,24 @@ import type { TerminalSessionContextValue } from '#/web/components/terminal/type
 
 type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,
-  'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'submitText' | 'retryPresentation'
+  | 'createTerminalWithAdmission'
+  | 'captureInputWriter'
+  | 'sendVirtualKey'
+  | 'submitText'
+  | 'retryPresentation'
+  | 'setComposerExpanded'
+  | 'setComposerMode'
 > &
   Partial<
     Pick<
       TerminalSessionContextValue,
-      'createTerminalWithAdmission' | 'captureInputWriter' | 'sendVirtualKey' | 'submitText' | 'retryPresentation'
+      | 'createTerminalWithAdmission'
+      | 'captureInputWriter'
+      | 'sendVirtualKey'
+      | 'submitText'
+      | 'retryPresentation'
+      | 'setComposerExpanded'
+      | 'setComposerMode'
     >
   >
 type CreatedAdmissionTestTerminalSessionContextValue = Omit<
@@ -38,6 +50,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
   const submitText = context.submitText ?? unexpectedContextCapability('submitText')
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
+  const setComposerExpanded = context.setComposerExpanded ?? unexpectedContextCapability('setComposerExpanded')
+  const setComposerMode = context.setComposerMode ?? unexpectedContextCapability('setComposerMode')
   return {
     ...context,
     createTerminalWithAdmission,
@@ -45,6 +59,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     sendVirtualKey,
     submitText,
     retryPresentation,
+    setComposerExpanded,
+    setComposerMode,
   }
 }
 

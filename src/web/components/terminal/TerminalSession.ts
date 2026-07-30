@@ -36,6 +36,7 @@ import { toast } from 'sonner'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 import type {
   TerminalDescriptor,
+  TerminalComposerMode,
   TerminalFocusRequest,
   TerminalInputWriter,
   TerminalIdentityViewModel,
@@ -47,7 +48,9 @@ import type {
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
-export type TerminalNotify = (...notification: ['metadata'] | ['projection-delta-revision', number]) => void
+export type TerminalNotify = (
+  ...notification: ['metadata'] | ['snapshot'] | ['projection-delta-revision', number]
+) => void
 
 interface PendingOutputWrite {
   data: string
@@ -95,6 +98,7 @@ export class TerminalSession {
   private pendingOutput: PendingOutputWrite[] = []
   private pendingInputWrite: PendingInputWrite | null = null
   private inputFlushScheduled = false
+  private submitTextPending = false
   private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
   private disposed = false
 
@@ -176,13 +180,13 @@ export class TerminalSession {
     if (this.disposed || !this.view.isConnected()) return
     this.setPresentationRecovery(undefined)
     const transientChanged = this.replaceActiveView()
-    if (transientChanged) this.notify('metadata')
+    if (transientChanged) this.notify('snapshot')
   }
 
   detach(host: HTMLElement): void {
     if (!this.view.detach(host)) return
     this.setPresentationRecovery(undefined)
-    if (this.destroyActiveView()) this.notify('metadata')
+    if (this.destroyActiveView()) this.notify('snapshot')
   }
 
   restart(): void {
@@ -191,6 +195,18 @@ export class TerminalSession {
     if (!attempt) return
     this.replaceActiveView(attempt)
     this.notify('metadata')
+  }
+
+  setComposerExpanded(expanded: boolean): boolean {
+    if (this.disposed) return false
+    if (this.runtime.setComposerExpanded(expanded)) this.notify('snapshot')
+    return true
+  }
+
+  setComposerMode(mode: TerminalComposerMode): boolean {
+    if (this.disposed) return false
+    if (this.runtime.setComposerMode(mode)) this.notify('snapshot')
+    return true
   }
 
   dispose(): void {
@@ -236,19 +252,29 @@ export class TerminalSession {
   }
 
   async submitText(text: string): Promise<boolean> {
+    if (this.submitTextPending || !text) return false
     const submittedBinding = this.currentWritableInputBinding()
-    if (!text || !submittedBinding || !this.view.pasteText(text)) return false
-    // A composed submission represents two ordered user actions. Wait until
-    // the paste has reached the PTY before sending Enter so input batching
-    // cannot collapse them back into one delivery step.
-    if (!(await this.flushInput())) return false
-    // Once the paste is accepted, the Composer draft has been delivered and
-    // must not be offered for automatic resubmission. Enter may follow only
-    // while the same runtime generation remains writable: a replacement PTY
-    // must never receive the second half of an older composed submission.
-    const currentBinding = this.currentWritableInputBinding()
-    if (currentBinding && sameRuntimeBinding(currentBinding, submittedBinding)) this.view.sendVirtualKey('enter')
-    return true
+    if (!submittedBinding) return false
+    this.submitTextPending = true
+    try {
+      if (!this.view.pasteText(text)) return false
+      // A composed submission represents two ordered user actions. Wait until
+      // the paste has reached the PTY before sending Enter so input batching
+      // cannot collapse them back into one delivery step.
+      if (!(await this.flushInput())) return false
+      // Once the paste is accepted, the Composer draft has been delivered and
+      // must not be offered for automatic resubmission. History follows that
+      // accepted boundary even if controller ownership changes before Enter.
+      if (!this.disposed && this.runtime.recordComposerHistory(text)) this.notify('snapshot')
+      // Enter may follow only while the same runtime generation remains
+      // writable: a replacement PTY must never receive the second half of an
+      // older composed submission.
+      const currentBinding = this.currentWritableInputBinding()
+      if (currentBinding && sameRuntimeBinding(currentBinding, submittedBinding)) this.view.sendVirtualKey('enter')
+      return true
+    } finally {
+      this.submitTextPending = false
+    }
   }
 
   private currentWritableInputBinding(): TerminalRuntimeBinding | null {
@@ -1198,7 +1224,7 @@ export class TerminalSession {
   }
 
   private updateProgress(state: number, value: number): void {
-    if (this.runtime.setProgress(state, value)) this.notify('metadata')
+    if (this.runtime.setProgress(state, value)) this.notify('snapshot')
   }
 
   private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {
@@ -1220,7 +1246,7 @@ export class TerminalSession {
   }
 
   private setSearchResult(result: TerminalSearchResult | null): void {
-    if (this.runtime.setSearchResult(result)) this.notify('metadata')
+    if (this.runtime.setSearchResult(result)) this.notify('snapshot')
   }
 
   private openExternalLink(uri: string): void {

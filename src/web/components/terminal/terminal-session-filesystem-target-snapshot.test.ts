@@ -4,6 +4,7 @@ import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal
 import type { TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
+import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 
 function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return terminalDescriptorForTest({
@@ -35,6 +36,7 @@ describe('terminal session filesystem target snapshot helper', () => {
       phase: 'open',
       message: null,
       processName: 'bash',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
       canonicalTitle: 'npm run dev',
     })
     const cache = new Map<string, TerminalSnapshot>()

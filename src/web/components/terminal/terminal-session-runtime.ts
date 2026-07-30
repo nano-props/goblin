@@ -12,6 +12,7 @@ import { TerminalSessionState } from '#/web/components/terminal/terminal-session
 import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
 import type {
   TerminalControllerViewModel,
+  TerminalComposerMode,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
   TerminalSearchResult,
@@ -390,6 +391,18 @@ export class TerminalSessionRuntime {
 
   resetTransientState(): boolean {
     return this.state.resetTransientState()
+  }
+
+  setComposerExpanded(expanded: boolean): boolean {
+    return this.state.setComposerExpanded(expanded)
+  }
+
+  setComposerMode(mode: TerminalComposerMode): boolean {
+    return this.state.setComposerMode(mode)
+  }
+
+  recordComposerHistory(text: string): boolean {
+    return this.state.recordComposerHistory(text)
   }
 
   handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {

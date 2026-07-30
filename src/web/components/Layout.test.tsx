@@ -80,7 +80,12 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 4,
     subscribeWorkspaceBellCount: () => () => {},
-    snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+    snapshot: () => ({
+      phase: 'opening',
+      message: null,
+      processName: 'terminal',
+      composer: { expanded: false, mode: 'keys', historyEntries: [] },
+    }),
     subscribeSnapshot: () => () => {},
   }
   const commandContext: TerminalSessionContextValue = {
@@ -95,6 +100,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     scrollLines: vi.fn(),
+    setComposerExpanded: vi.fn(() => true),
+    setComposerMode: vi.fn(() => true),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => false),
     attach: vi.fn(),
