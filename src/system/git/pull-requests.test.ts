@@ -5,10 +5,9 @@ import { PULL_REQUEST_TRANSIENT_CACHE_TTL_MS } from '#/shared/pull-request-state
 import {
   getBranchPullRequest,
   getBranchPullRequests,
-  normalizeGhPullRequest,
-  pickPullRequest,
   resetPullRequestCachesForTests,
 } from '#/system/git/pull-requests.ts'
+import { normalizeGhPullRequest, pickPullRequest } from '#/system/git/pull-request-normalization.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 const canQueryGitHubHostMock = vi.hoisted(() => vi.fn())
