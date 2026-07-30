@@ -2,11 +2,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
-import {
-  bootstrapWorktreeAfterCreate,
-  getWorktreeBootstrapPreview,
-  worktreeBootstrapConfigHash,
-} from '#/system/git/worktree-bootstrap.ts'
+import { bootstrapWorktreeAfterCreate, getWorktreeBootstrapPreview } from '#/system/git/worktree-bootstrap.ts'
+import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoRoot: vi.fn(),

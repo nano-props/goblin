@@ -1,8 +1,6 @@
 import path from 'node:path'
-import { createHash } from 'node:crypto'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import { execa, ExecaError } from 'execa'
-import { parse } from 'smol-toml'
 import { glob, isDynamicPattern } from 'tinyglobby'
 import { getRepoRoot } from '#/system/git/branches.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
@@ -15,16 +13,14 @@ import {
   type WorktreeBootstrapSummary,
   type WorktreeBootstrapPreviewResult,
 } from '#/shared/worktree-bootstrap-summary.ts'
+import {
+  WORKTREE_BOOTSTRAP_CONFIG_FILE,
+  parseBootstrapConfig,
+  worktreeBootstrapConfigHash,
+  type WorktreeBootstrapConfig,
+} from '#/system/git/worktree-bootstrap-config.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
-
-export interface WorktreeBootstrapConfig {
-  copy: string[]
-  symlink: string[]
-  hardlink: string[]
-  exclude: string[]
-  setup?: string
-}
 
 export async function getWorktreeBootstrapPreview(
   sourceCwd: string,
@@ -62,7 +58,6 @@ interface ReadyMaterialization extends PlannedMaterialization {
   stat: Awaited<ReturnType<typeof fs.lstat>>
 }
 
-const CONFIG_FILE = 'goblin.toml'
 const SETUP_TIMEOUT_MS = 10 * 60_000
 const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 
@@ -80,12 +75,13 @@ export async function bootstrapWorktreeAfterCreate(
     const targetRoot = path.resolve(targetWorktreePath)
     const loaded = await loadBootstrapConfig(sourceRoot)
     if (loaded.kind === 'none') {
-      if (options?.expectedConfigHash) return bootstrapFailure(`${CONFIG_FILE} changed after confirmation`)
+      if (options?.expectedConfigHash)
+        return bootstrapFailure(`${WORKTREE_BOOTSTRAP_CONFIG_FILE} changed after confirmation`)
       return { ok: true, message: '' }
     }
     if (loaded.kind === 'error') return bootstrapFailure(loaded.message)
     if (options?.expectedConfigHash && loaded.configHash !== options.expectedConfigHash) {
-      return bootstrapFailure(`${CONFIG_FILE} changed after confirmation`)
+      return bootstrapFailure(`${WORKTREE_BOOTSTRAP_CONFIG_FILE} changed after confirmation`)
     }
 
     const planned = await planMaterializations(sourceRoot, targetRoot, loaded.config, options?.signal)
@@ -126,56 +122,13 @@ async function loadBootstrapConfig(
 > {
   let raw = ''
   try {
-    raw = await fs.readFile(path.join(sourceRoot, CONFIG_FILE), 'utf8')
+    raw = await fs.readFile(path.join(sourceRoot, WORKTREE_BOOTSTRAP_CONFIG_FILE), 'utf8')
   } catch (err) {
     if (hasErrorCode(err, 'ENOENT')) return { kind: 'none' }
-    return { kind: 'error', message: `failed to read ${CONFIG_FILE}: ${errorMessage(err)}` }
+    return { kind: 'error', message: `failed to read ${WORKTREE_BOOTSTRAP_CONFIG_FILE}: ${errorMessage(err)}` }
   }
   const loaded = parseBootstrapConfig(raw)
   return loaded.kind === 'ready' ? { ...loaded, configHash: worktreeBootstrapConfigHash(raw) } : loaded
-}
-
-export function worktreeBootstrapConfigHash(raw: string): string {
-  return `sha256:${createHash('sha256').update(raw, 'utf8').digest('hex')}`
-}
-
-export function parseBootstrapConfig(
-  raw: string,
-): { kind: 'none' } | { kind: 'ready'; config: WorktreeBootstrapConfig } | { kind: 'error'; message: string } {
-  let parsed: unknown
-  try {
-    parsed = parse(raw)
-  } catch (err) {
-    return { kind: 'error', message: `invalid ${CONFIG_FILE}: ${errorMessage(err)}` }
-  }
-
-  const root = asRecord(parsed)
-  if (!root) return { kind: 'error', message: `${CONFIG_FILE} must contain a table` }
-  if (root.worktree === undefined) return { kind: 'none' }
-  const worktree = asRecord(root.worktree)
-  if (!worktree) return { kind: 'error', message: '[worktree] must be a table' }
-
-  const copy = readStringList(worktree, 'copy')
-  if (!copy.ok) return { kind: 'error', message: copy.message }
-  const symlink = readStringList(worktree, 'symlink')
-  if (!symlink.ok) return { kind: 'error', message: symlink.message }
-  const hardlink = readStringList(worktree, 'hardlink')
-  if (!hardlink.ok) return { kind: 'error', message: hardlink.message }
-  const exclude = readStringList(worktree, 'exclude')
-  if (!exclude.ok) return { kind: 'error', message: exclude.message }
-  const setup = readSetupCommand(worktree)
-  if (!setup.ok) return { kind: 'error', message: setup.message }
-
-  return {
-    kind: 'ready',
-    config: {
-      copy: copy.value,
-      symlink: symlink.value,
-      hardlink: hardlink.value,
-      exclude: exclude.value,
-      setup: setup.value,
-    },
-  }
 }
 
 export function validateBootstrapConfigPaths(
@@ -192,31 +145,6 @@ export function validateBootstrapConfigPaths(
     if (!valid.ok) return valid
   }
   return { ok: true }
-}
-
-function readStringList(
-  table: Record<string, unknown>,
-  key: 'copy' | 'symlink' | 'hardlink' | 'exclude',
-): { ok: true; value: string[] } | { ok: false; message: string } {
-  const value = table[key]
-  if (value === undefined) return { ok: true, value: [] }
-  if (!Array.isArray(value)) return { ok: false, message: `[worktree].${key} must be an array of strings` }
-  const strings: string[] = []
-  for (const item of value) {
-    if (typeof item !== 'string') return { ok: false, message: `[worktree].${key} must be an array of strings` }
-    strings.push(item)
-  }
-  return { ok: true, value: strings }
-}
-
-function readSetupCommand(
-  table: Record<string, unknown>,
-): { ok: true; value?: string } | { ok: false; message: string } {
-  const value = table.setup
-  if (value === undefined) return { ok: true }
-  if (typeof value !== 'string') return { ok: false, message: '[worktree].setup must be a string' }
-  if (value.includes('\0')) return { ok: false, message: '[worktree].setup must not contain NUL bytes' }
-  return value.trim().length > 0 ? { ok: true, value } : { ok: true }
 }
 
 async function planMaterializations(
@@ -651,12 +579,6 @@ function bootstrapFailure(message: string): ExecResult {
 
 function pathsForMode(operations: ReadyMaterialization[], mode: MaterializationMode): string[] {
   return operations.filter((operation) => operation.mode === mode).map((operation) => operation.rel)
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
 }
 
 function errorMessage(err: unknown): string {

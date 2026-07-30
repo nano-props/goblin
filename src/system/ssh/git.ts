@@ -3,10 +3,10 @@ import PQueue from 'p-queue'
 import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import {
   parseBootstrapConfig,
-  validateBootstrapConfigPaths,
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
-} from '#/system/git/worktree-bootstrap.ts'
+} from '#/system/git/worktree-bootstrap-config.ts'
+import { validateBootstrapConfigPaths } from '#/system/git/worktree-bootstrap.ts'
 import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
