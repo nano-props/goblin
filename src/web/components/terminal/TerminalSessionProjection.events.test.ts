@@ -581,6 +581,44 @@ describe('TerminalSessionProjection events', () => {
     ).toMatchObject({ selected: true, hasBell: false })
   })
 
+  test('retains isolated Composer shells while selecting between terminal tabs', () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    const firstSessionId = 'term-111111111111111111111'
+    const secondSessionId = 'term-222222222222222222222'
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [
+        makeServerSession('pty_session_a_aaaaaaaaa', firstSessionId),
+        makeServerSession('pty_session_b_aaaaaaaaa', secondSessionId),
+      ],
+      'client_local',
+    )
+
+    projection.selectTerminal(WORKTREE_KEY, firstSessionId)
+    expect(projection.setComposerExpanded(firstSessionId, true)).toBe(true)
+    expect(projection.setComposerMode(firstSessionId, 'input')).toBe(true)
+
+    projection.selectTerminal(WORKTREE_KEY, secondSessionId)
+    expect(projection.snapshot(secondSessionId).composer).toEqual({
+      expanded: false,
+      mode: 'keys',
+      historyEntries: [],
+    })
+    expect(projection.setComposerExpanded(secondSessionId, true)).toBe(true)
+
+    projection.selectTerminal(WORKTREE_KEY, firstSessionId)
+    expect(projection.snapshot(firstSessionId).composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: [],
+    })
+    expect(projection.snapshot(secondSessionId).composer).toEqual({
+      expanded: true,
+      mode: 'keys',
+      historyEntries: [],
+    })
+  })
+
   test('notifySession invalidates filesystem target cache', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(

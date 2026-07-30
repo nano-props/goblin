@@ -60,6 +60,8 @@ const projection = vi.hoisted(() => ({
   clearSearch: vi.fn(),
   captureInputWriter: vi.fn(),
   sendVirtualKey: vi.fn(),
+  setComposerExpanded: vi.fn(),
+  setComposerMode: vi.fn(),
   submitText: vi.fn(),
   takeover: vi.fn(),
   retryPresentation: vi.fn(),
@@ -244,7 +246,7 @@ describe('TerminalSessionProvider', () => {
   test('publishes projection commands and reads through the provider contexts', () => {
     const captured = renderProviderWithContexts()
 
-    expect(captured.command).toEqual({
+    expect(captured.command).toStrictEqual({
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
@@ -261,6 +263,8 @@ describe('TerminalSessionProvider', () => {
       clearSearch: projection.clearSearch,
       captureInputWriter: projection.captureInputWriter,
       sendVirtualKey: projection.sendVirtualKey,
+      setComposerExpanded: projection.setComposerExpanded,
+      setComposerMode: projection.setComposerMode,
       submitText: projection.submitText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,

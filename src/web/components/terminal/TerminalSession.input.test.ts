@@ -50,14 +50,23 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const { host } = await startOpenControllerSession(session)
     session.setComposerExpanded(true)
     session.setComposerMode('input')
+    await expect(session.submitText('retained command')).resolves.toBe(true)
 
     session.detach(host)
-    expect(session.snapshot().composer).toMatchObject({ expanded: true, mode: 'input' })
+    expect(session.snapshot().composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: ['retained command'],
+    })
 
     session.attach(host)
     await flushTerminalStart()
     session.restart()
-    expect(session.snapshot().composer).toMatchObject({ expanded: true, mode: 'input' })
+    expect(session.snapshot().composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      historyEntries: ['retained command'],
+    })
   })
 
   test('batches rapid user input into a single ordered write', async () => {
