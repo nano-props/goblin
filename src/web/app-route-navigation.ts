@@ -1,5 +1,4 @@
 import { useRouter } from '@tanstack/react-router'
-import type { HistoryState } from '@tanstack/history'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useMemo } from 'react'
 import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
@@ -8,22 +7,13 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { appNavigationState, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
+import { returnToFromHref, routeReturnSearch, workspacePaneRouteFromBranchHref } from '#/web/app-route-href.ts'
 import {
-  appNavigationState,
-  appNavigationIsCurrent,
-  type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
-import {
-  appRoutePreconditionMatches,
-  runOwnedAppNavigation,
-  settleOwnedAppRouteCommit,
-} from '#/web/app-route-commit.ts'
-import {
-  parsedWorkspacePaneRouteFromTargetHref,
-  returnToFromHref,
-  routeReturnSearch,
-  workspacePaneRouteFromBranchHref,
-} from '#/web/app-route-href.ts'
+  commitBranchWorkspacePaneRoute,
+  commitFilesystemWorkspacePaneRoute,
+} from '#/web/workspace-pane-route-commit.ts'
 
 export interface AppRouteNavigationOptions {
   replace?: boolean
@@ -297,123 +287,12 @@ export function useAppRouteNavigation(): AppRouteNavigation {
         const workspaceId = paneTarget.workspaceId
         const workspaceSlug = workspaceSlugForId(workspaceId)
         if (!workspaceSlug || !router) return abandonAppRoute(options)
-        if (options?.navigationGeneration && !appNavigationIsCurrent(options.navigationGeneration)) {
-          return abandonAppRoute(options)
-        }
-        const worktreeParams =
-          paneTarget.kind === 'git-worktree'
-            ? { workspaceSlug, worktreeSlug: worktreeSlugFromPath(paneTarget.worktreePath) }
-            : null
-        const rootHref = worktreeParams
-          ? router.buildLocation({
-              to: '/workspace/$workspaceSlug/worktree/$worktreeSlug',
-              params: worktreeParams,
-            }).href
-          : router.buildLocation({
-              to: '/workspace/$workspaceSlug/root',
-              params: { workspaceSlug },
-            }).href
-        const routeHref = (candidate: ParsedWorkspacePaneRouteTarget): string => {
-          if (candidate === null) return rootHref
-          if (candidate.kind === 'static' || candidate.kind === 'invalid-static') {
-            const tabKey = candidate.kind === 'static' ? candidate.tab : candidate.tabKey
-            return worktreeParams
-              ? router.buildLocation({
-                  to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/tab/$tabKey',
-                  params: { ...worktreeParams, tabKey },
-                }).href
-              : router.buildLocation({
-                  to: '/workspace/$workspaceSlug/root/tab/$tabKey',
-                  params: { workspaceSlug, tabKey },
-                }).href
-          }
-          return worktreeParams
-            ? router.buildLocation({
-                to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/terminal/$terminalSessionId',
-                params: { ...worktreeParams, terminalSessionId: candidate.terminalSessionId },
-              }).href
-            : router.buildLocation({
-                to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
-                params: { workspaceSlug, terminalSessionId: candidate.terminalSessionId },
-              }).href
-        }
-        const currentHref = router.state.location.href
-        const routePrecondition = options?.routePrecondition
-        const expectedCurrentHref =
-          routePrecondition?.kind === 'current-workspace-target'
-            ? parsedWorkspacePaneRouteFromTargetHref(currentHref, rootHref) !== undefined
-              ? currentHref
-              : null
-            : routePrecondition?.kind === 'exact-route'
-              ? routeHref(routePrecondition.route)
-              : undefined
-        if (expectedCurrentHref === null) return abandonAppRoute(options)
-        const targetHref = routeHref(route)
-        return await settleOwnedAppRouteCommit({
-          generation: options?.navigationGeneration,
-          targetHref,
-          expectedCurrentHref,
-          commitEffect: options?.onCommit,
-          abandonEffect: options?.onAbandon,
-          currentHref: () => router.state.location.href,
-          navigate: async (navigationGeneration) => {
-            const navigationState = (state: HistoryState) => appNavigationState(state, navigationGeneration)
-            if (route === null) {
-              if (worktreeParams) {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/worktree/$worktreeSlug',
-                  params: worktreeParams,
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              } else {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/root',
-                  params: { workspaceSlug },
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              }
-            } else if (route.kind === 'static') {
-              if (worktreeParams) {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/tab/$tabKey',
-                  params: { ...worktreeParams, tabKey: route.tab },
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              } else {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/root/tab/$tabKey',
-                  params: { workspaceSlug, tabKey: route.tab },
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              }
-            } else {
-              if (worktreeParams) {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/worktree/$worktreeSlug/terminal/$terminalSessionId',
-                  params: { ...worktreeParams, terminalSessionId: route.terminalSessionId },
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              } else {
-                await router.navigate({
-                  to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
-                  params: { workspaceSlug, terminalSessionId: route.terminalSessionId },
-                  replace: options?.replace,
-                  ignoreBlocker: true,
-                  state: navigationState,
-                })
-              }
-            }
-          },
+        return await commitFilesystemWorkspacePaneRoute({
+          router,
+          workspaceSlug,
+          paneTarget,
+          route,
+          options,
         })
       },
       openRepoBranch(workspaceId, branchName, options) {
@@ -554,146 +433,12 @@ export function useAppRouteNavigation(): AppRouteNavigation {
       async commitWorkspacePaneRoute(workspaceId, branchName, route, options) {
         const workspaceSlug = workspaceSlugForId(workspaceId)
         if (!workspaceSlug) return abandonAppRoute(options)
-        if (options?.navigationGeneration && !appNavigationIsCurrent(options.navigationGeneration)) {
-          return abandonAppRoute(options)
-        }
-        const branchSlug = branchSlugFromName(branchName)
-        const routePrecondition = options?.routePrecondition
-        const currentHref = router.state.location.href
-        const branchRootHref = router.buildLocation({
-          to: '/workspace/$workspaceSlug/branch/$branchSlug',
-          params: { workspaceSlug, branchSlug },
-        }).href
-        const expectedCurrentHref =
-          routePrecondition?.kind === 'current-workspace-target'
-            ? parsedWorkspacePaneRouteFromTargetHref(currentHref, branchRootHref) !== undefined
-              ? currentHref
-              : null
-            : routePrecondition === undefined
-              ? undefined
-              : (routePrecondition.route === null
-                  ? router.buildLocation({
-                      to: '/workspace/$workspaceSlug/branch/$branchSlug',
-                      params: { workspaceSlug, branchSlug },
-                    })
-                  : routePrecondition.route.kind === 'static' || routePrecondition.route.kind === 'invalid-static'
-                    ? router.buildLocation({
-                        to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
-                        params: {
-                          workspaceSlug,
-                          branchSlug,
-                          tabKey:
-                            routePrecondition.route.kind === 'static'
-                              ? routePrecondition.route.tab
-                              : routePrecondition.route.tabKey,
-                        },
-                      })
-                    : router.buildLocation({
-                        to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
-                        params: {
-                          workspaceSlug,
-                          branchSlug,
-                          terminalSessionId: routePrecondition.route.terminalSessionId,
-                        },
-                      })
-                ).href
-        if (expectedCurrentHref === null) return abandonAppRoute(options)
-        const replace = options?.replace
-        if (route === null) {
-          const target = router.buildLocation({
-            to: '/workspace/$workspaceSlug/branch/$branchSlug',
-            params: { workspaceSlug, branchSlug },
-          })
-          if (
-            router.state.location.href === target.href &&
-            appRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
-          ) {
-            options?.onCommit?.()
-            return true
-          }
-          return await settleOwnedAppRouteCommit({
-            generation: options?.navigationGeneration,
-            commitEffect: options?.onCommit,
-            abandonEffect: options?.onAbandon,
-            targetHref: target.href,
-            expectedCurrentHref,
-            navigate: async (navigationGeneration) => {
-              await router.navigate({
-                to: '/workspace/$workspaceSlug/branch/$branchSlug',
-                params: { workspaceSlug, branchSlug },
-                replace,
-                ignoreBlocker: true,
-                state: (state) => appNavigationState(state, navigationGeneration),
-              })
-            },
-            currentHref: () => router.state.location.href,
-          })
-        }
-        if (route.kind === 'static') {
-          const target = router.buildLocation({
-            to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
-            params: { workspaceSlug, branchSlug, tabKey: route.tab },
-          })
-          if (
-            router.state.location.href === target.href &&
-            appRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
-          ) {
-            options?.onCommit?.()
-            return true
-          }
-          return await settleOwnedAppRouteCommit({
-            generation: options?.navigationGeneration,
-            commitEffect: options?.onCommit,
-            abandonEffect: options?.onAbandon,
-            targetHref: target.href,
-            expectedCurrentHref,
-            navigate: async (navigationGeneration) => {
-              await router.navigate({
-                to: '/workspace/$workspaceSlug/branch/$branchSlug/tab/$tabKey',
-                params: { workspaceSlug, branchSlug, tabKey: route.tab },
-                replace,
-                ignoreBlocker: true,
-                state: (state) => appNavigationState(state, navigationGeneration),
-              })
-            },
-            currentHref: () => router.state.location.href,
-          })
-        }
-        const target = router.buildLocation({
-          to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
-          params: {
-            workspaceSlug,
-            branchSlug,
-            terminalSessionId: route.terminalSessionId,
-          },
-        })
-        if (
-          router.state.location.href === target.href &&
-          appRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
-        ) {
-          options?.onCommit?.()
-          return true
-        }
-        return await settleOwnedAppRouteCommit({
-          generation: options?.navigationGeneration,
-          commitEffect: options?.onCommit,
-          abandonEffect: options?.onAbandon,
-          targetHref: target.href,
-          expectedCurrentHref,
-          navigate: async (navigationGeneration) => {
-            await router.navigate({
-              to: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
-              params: {
-                workspaceSlug,
-                branchSlug,
-                terminalSessionId: route.terminalSessionId,
-              },
-              replace,
-              ignoreBlocker: true,
-              state: (state) => appNavigationState(state, navigationGeneration),
-            })
-          },
-          currentHref: () => router.state.location.href,
+        return await commitBranchWorkspacePaneRoute({
+          router,
+          workspaceSlug,
+          branchName,
+          route,
+          options,
         })
       },
       openRepoNewWorktree(workspaceId, options) {
@@ -701,12 +446,9 @@ export function useAppRouteNavigation(): AppRouteNavigation {
         const href = router?.state.location.href ?? null
         if (workspaceSlug && router) {
           const targetPath = `/workspace/${workspaceSlug}/worktree/new`
-          const search =
-            options?.returnTo === undefined
-              ? routeReturnSearch(href, targetPath)
-              : options.returnTo
-                ? { returnTo: options.returnTo }
-                : {}
+          let search: { returnTo?: string } = {}
+          if (options?.returnTo === undefined) search = routeReturnSearch(href, targetPath)
+          else if (options.returnTo) search = { returnTo: options.returnTo }
           const target = router.buildLocation({
             to: '/workspace/$workspaceSlug/worktree/new',
             params: { workspaceSlug },
