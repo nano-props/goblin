@@ -21,11 +21,8 @@ import {
   type TerminalTitleEvent,
   type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
-import {
-  isValidTerminalRuntimeSessionId,
-  isValidTerminalWriteData,
-  normalizeTerminalSize,
-} from '#/shared/terminal-validators.ts'
+import { isValidTerminalRuntimeSessionId } from '#/shared/terminal-validators.ts'
+import { isValidTerminalWriteData, normalizeTerminalSize } from '#/shared/terminal-protocol-constraints.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import {
   claimTerminalClientControl,

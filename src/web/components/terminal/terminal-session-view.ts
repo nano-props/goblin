@@ -21,7 +21,7 @@ import {
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { constrainTerminalSize } from '#/shared/terminal-validators.ts'
+import { constrainTerminalSize } from '#/shared/terminal-protocol-constraints.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
