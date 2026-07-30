@@ -1,7 +1,7 @@
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { returnToFromHref } from '#/web/app-route-navigation.ts'
+import { returnToFromHref } from '#/web/app-route-href.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'

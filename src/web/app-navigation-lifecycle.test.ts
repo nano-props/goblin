@@ -10,7 +10,7 @@ import {
   resetAppNavigationForTest,
 } from '#/web/app-navigation-lifecycle.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import { runOwnedAppNavigation } from '#/web/app-route-navigation.ts'
+import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
 
 beforeEach(() => resetAppNavigationForTest())
 

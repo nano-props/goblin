@@ -5,19 +5,25 @@ import { useMemo } from 'react'
 import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  beginAppNavigation,
-  executeAppNavigation,
   appNavigationState,
   appNavigationIsCurrent,
-  registerAppNavigation,
-  type AppNavigationOutcome,
   type AppNavigationGeneration,
 } from '#/web/app-navigation-lifecycle.ts'
-import { navigationLog } from '#/web/logger.ts'
+import {
+  appRoutePreconditionMatches,
+  runOwnedAppNavigation,
+  settleOwnedAppRouteCommit,
+} from '#/web/app-route-commit.ts'
+import {
+  parsedWorkspacePaneRouteFromTargetHref,
+  returnToFromHref,
+  routeReturnSearch,
+  workspacePaneRouteFromBranchHref,
+} from '#/web/app-route-href.ts'
 
 export interface AppRouteNavigationOptions {
   replace?: boolean
@@ -752,202 +758,12 @@ export function useAppRouteActions(): AppRouteNavigation {
   return useAppRouteNavigation()
 }
 
-export function runOwnedAppNavigation(input: {
-  generation?: AppNavigationGeneration
-  targetHref: string
-  currentHref: string
-  commitEffect?: () => void
-  abandonEffect?: () => void
-  navigate(navigationGeneration: AppNavigationGeneration): Promise<unknown>
-}): boolean {
-  const generation = input.generation ?? beginAppNavigation()
-  if (input.currentHref === input.targetHref) {
-    if (!appNavigationIsCurrent(generation)) {
-      input.abandonEffect?.()
-      return false
-    }
-    input.commitEffect?.()
-    return true
-  }
-  const registration = registerAppNavigation(generation, input.targetHref, input.commitEffect, input.abandonEffect)
-  if (!registration) {
-    input.abandonEffect?.()
-    return false
-  }
-  void registration.settled.then((outcome) => {
-    if (outcome.status === 'failed') {
-      navigationLog.error('app navigation effect failed', {
-        intendedStatus: outcome.intendedStatus,
-        error: outcome.error,
-      })
-    }
-  })
-  void Promise.resolve()
-    .then(async () => await executeAppNavigation(generation, async () => await input.navigate(generation)))
-    .finally(() => registration.release())
-    .catch((error: unknown) => navigationLog.error('app navigation failed', { error }))
-  return true
-}
-
-type AppNavigationExecutionOutcome =
-  { kind: 'completed'; executed: boolean; routeCommitted: boolean } | { kind: 'failed'; error: unknown }
-
-export async function settleOwnedAppRouteCommit(input: {
-  generation?: AppNavigationGeneration
-  targetHref: string
-  expectedCurrentHref?: string
-  commitEffect?: () => void
-  abandonEffect?: () => void
-  navigate(navigationGeneration: AppNavigationGeneration): Promise<void>
-  currentHref(): string
-}): Promise<boolean> {
-  const generation = input.generation ?? beginAppNavigation()
-  const currentHref = input.currentHref()
-  if (!appRoutePreconditionMatches(currentHref, input.expectedCurrentHref)) {
-    input.abandonEffect?.()
-    return false
-  }
-  if (currentHref === input.targetHref) {
-    if (!appNavigationIsCurrent(generation)) {
-      input.abandonEffect?.()
-      return false
-    }
-    input.commitEffect?.()
-    return true
-  }
-  const registration = registerAppNavigation(generation, input.targetHref, input.commitEffect, input.abandonEffect)
-  if (!registration) {
-    input.abandonEffect?.()
-    return false
-  }
-  let routeCommitted = false
-  const execution: Promise<AppNavigationExecutionOutcome> = executeAppNavigation(generation, async () => {
-    routeCommitted = await settleAppRouteCommit({
-      targetHref: input.targetHref,
-      expectedCurrentHref: input.expectedCurrentHref,
-      navigate: async () => await input.navigate(generation),
-      currentHref: input.currentHref,
-    })
-  }).then(
-    (executed) => ({ kind: 'completed', executed, routeCommitted }),
-    (error: unknown) => ({ kind: 'failed', error }),
-  )
-  const first = await Promise.race([
-    execution,
-    registration.settled.then((settlement) => ({ kind: 'settled' as const, settlement })),
-  ])
-  if (first.kind === 'settled') {
-    void execution.then((outcome) => {
-      registration.release()
-      if (outcome.kind === 'failed') {
-        navigationLog.error('settled app navigation later failed', { error: outcome.error })
-      }
-    })
-    return committedAppNavigationOutcome(first.settlement)
-  }
-  registration.release()
-  if (first.kind === 'failed') throw first.error
-  return first.executed && first.routeCommitted && committedAppNavigationOutcome(await registration.settled)
-}
-
-function committedAppNavigationOutcome(outcome: AppNavigationOutcome): boolean {
-  if (outcome.status === 'failed') throw outcome.error
-  return outcome.status === 'committed'
-}
-
 function abandonAppRoute(options: AppRouteNavigationOptions | undefined): false {
   options?.onAbandon?.()
   return false
 }
 
-export async function settleAppRouteCommit(input: {
-  targetHref: string
-  expectedCurrentHref?: string
-  navigate: () => Promise<void>
-  currentHref: () => string
-}): Promise<boolean> {
-  if (!appRoutePreconditionMatches(input.currentHref(), input.expectedCurrentHref)) return false
-  await input.navigate()
-  return input.currentHref() === input.targetHref
-}
-
-export function appRoutePreconditionMatches(currentHref: string, expectedCurrentHref: string | undefined): boolean {
-  return expectedCurrentHref === undefined || currentHref === expectedCurrentHref
-}
-
-export function workspacePaneRouteFromBranchHref(
-  currentHref: string,
-  branchRootHref: string,
-): WorkspacePaneRouteTarget | undefined {
-  const route = parsedWorkspacePaneRouteFromTargetHref(currentHref, branchRootHref)
-  return route?.kind === 'invalid-static' ? undefined : route
-}
-
-export function parsedWorkspacePaneRouteFromTargetHref(
-  currentHref: string,
-  targetRootHref: string,
-): ParsedWorkspacePaneRouteTarget | undefined {
-  const currentPath = pathFromHref(currentHref)
-  const targetRootPath = pathFromHref(targetRootHref)
-  if (!currentPath || !targetRootPath) return undefined
-  if (currentPath === targetRootPath) return null
-  const prefix = `${targetRootPath}/`
-  if (!currentPath.startsWith(prefix)) return undefined
-  const [kind, encodedValue, ...rest] = currentPath.slice(prefix.length).split('/')
-  if (!encodedValue || rest.length > 0) return undefined
-  let value: string
-  try {
-    value = decodeURIComponent(encodedValue)
-  } catch {
-    return undefined
-  }
-  if (kind === 'tab') {
-    return isWorkspacePaneStaticTabType(value)
-      ? { kind: 'static', tab: value }
-      : { kind: 'invalid-static', tabKey: value }
-  }
-  if (kind === 'terminal') return { kind: 'terminal', terminalSessionId: value }
-  return undefined
-}
-
 function workspaceSlugForId(workspaceId: WorkspaceId): string | null {
   const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
   return workspace ? workspaceSlugFromId(workspace.id) : null
-}
-
-export function routeReturnSearch(
-  href: string | null,
-  targetPath: string,
-  currentRouteFamily = targetPath,
-): { returnTo?: string } {
-  if (!href) return {}
-  const path = pathFromHref(href)
-  if (!path) return {}
-  if (path === targetPath || path.startsWith(currentRouteFamily)) {
-    const existingReturnTo = returnToFromHref(href)
-    return existingReturnTo ? { returnTo: existingReturnTo } : {}
-  }
-  return { returnTo: href }
-}
-
-export function returnToFromHref(href: string | null): string | null {
-  if (!href) return null
-  const queryStart = href.indexOf('?')
-  if (queryStart < 0) return null
-  const hashStart = href.indexOf('#', queryStart)
-  const search = href.slice(queryStart + 1, hashStart < 0 ? undefined : hashStart)
-  const returnTo = new URLSearchParams(search).get('returnTo')
-  return isAppRelativeHref(returnTo) ? returnTo : null
-}
-
-function isAppRelativeHref(href: string | null): href is string {
-  return !!href && href.startsWith('/') && !href.startsWith('//')
-}
-
-function pathFromHref(href: string): string | null {
-  const queryStart = href.indexOf('?')
-  const hashStart = href.indexOf('#')
-  const end = queryStart >= 0 ? queryStart : hashStart >= 0 ? hashStart : href.length
-  const path = href.slice(0, end)
-  return path.startsWith('/') ? path : null
 }
