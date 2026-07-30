@@ -235,6 +235,13 @@ export class TerminalSessionView {
     return true
   }
 
+  sendTextAsInput(text: string): boolean {
+    const term = this.term
+    if (!term || !text) return false
+    term.input(text, true)
+    return true
+  }
+
   find(term: string, direction: 'next' | 'previous', incremental: boolean): boolean {
     if (!term || !this.searchAddon) {
       this.clearSearch()
