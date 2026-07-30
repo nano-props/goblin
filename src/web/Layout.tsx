@@ -1,85 +1,46 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { useMemo } from 'react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
-import { EmptyState } from '#/web/components/Layout.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
-import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
-import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
-import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
-import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
-import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogHost.tsx'
-import { WorkspaceDropOverlay } from '#/web/components/WorkspaceDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
-import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
-import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
-import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
-import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
-import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
-import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
-import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useT } from '#/web/stores/i18n.ts'
 import { appNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
-import { returnToFromHref, useAppRouteActions } from '#/web/app-route-navigation.ts'
-import { useAppHistoryPresentationObserver, useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
-import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
-import type {
-  AuthenticatedAppBootstrapResult,
-  AuthenticatedAppBootstrapState,
-} from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import { workspaceIdFromSlug } from '#/web/workspace-route-slugs.ts'
+import { useAppRouteActions } from '#/web/app-route-navigation.ts'
+import { useAppHistoryPresentationObserver } from '#/web/workspace-navigation-history.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
-import { useTerminalRetirementWorkspacePanePresentation } from '#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts'
-
-const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
-  state: { status: 'restoring-workspace' },
-  retry: () => {},
-})
-
-export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-failed' | 'workspace-ready'
-
-export function appLayoutRouteCallbacks(routeActions: Pick<AppRouteNavigation, 'openSettings' | 'openHome'>) {
-  return {
-    navigateToSettingsShortcuts: () => routeActions.openSettings('shortcuts'),
-    navigateToIndex: () => routeActions.openHome(),
-  }
-}
-
-export function authenticatedAppShellMode(
-  pathname: string,
-  bootstrapState: AuthenticatedAppBootstrapState,
-): AuthenticatedAppShellMode {
-  if (pathname.startsWith('/settings')) return 'settings'
-  if (bootstrapState.status === 'restoring-workspace') return 'workspace-restore'
-  return bootstrapState.status === 'failed' ? 'workspace-failed' : 'workspace-ready'
-}
+import {
+  appLayoutRouteCallbacks,
+  authenticatedAppShellMode,
+  currentWorkspacePaneRouteFromContext,
+  workspaceNavigationRouteContext,
+  workspaceRouteContextFromMatches,
+} from '#/web/app-layout-model.ts'
+import {
+  AuthenticatedWorkspaceRestoreContext,
+  WorkspaceSessionRestoreError,
+  WorkspaceSessionRestorePlaceholder,
+} from '#/web/components/WorkspaceSessionRestore.tsx'
+import { AppOverlays } from '#/web/components/AppOverlays.tsx'
+import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
 
 export function Layout() {
   useSettingsWriteErrorToast()
@@ -281,7 +242,6 @@ function AuthenticatedWorkspaceShell() {
         openCloneRepo={overlays.openCloneRepo}
         openRemoteWorkspace={overlays.openRemoteWorkspace}
         modalOpen={modalOpen}
-        isSettingsOpen={false}
         navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
         navigateToIndex={layoutRouteCallbacks.navigateToIndex}
       />
@@ -318,261 +278,4 @@ function AuthenticatedWorkspaceShell() {
       </AppNavigationProvider>
     </>
   )
-}
-
-export function WorkspaceSessionRestoreGate({ children }: { children: ReactNode }) {
-  const bootstrap = useContext(AuthenticatedWorkspaceRestoreContext)
-  const bootstrapState = bootstrap.state
-  if (bootstrapState.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
-  if (bootstrapState.status === 'failed') {
-    return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
-  }
-  return <>{children}</>
-}
-
-function WorkspaceSessionRestorePlaceholder() {
-  return <CenteredLoadingStatus label="Restoring workspace" />
-}
-
-function WorkspaceSessionRestoreError({
-  state,
-  retry,
-}: {
-  state: Extract<AuthenticatedAppBootstrapState, { status: 'failed' }>
-  retry: () => void
-}) {
-  const t = useT()
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <EmptyState
-        icon={<AlertTriangle size={18} />}
-        title={t('workspace-restore.failed')}
-        body={
-          <div className="space-y-3">
-            <div className="break-words">{state.message}</div>
-            <Button type="button" variant="outline" onClick={retry}>
-              <RefreshCw />
-              {t('error.try-again')}
-            </Button>
-          </div>
-        }
-      />
-    </div>
-  )
-}
-
-type WorkspaceRouteContext =
-  | { kind: 'empty' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
-  | { kind: 'workspace-root'; workspaceSlug: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
-  | { kind: 'branch'; workspaceSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
-  | {
-      kind: 'worktree'
-      workspaceSlug: string
-      worktreePath: string
-      workspacePaneRoute: ParsedWorkspacePaneRoute | null
-    }
-
-export function currentWorkspacePaneRouteFromContext(
-  routeContext: WorkspaceRouteContext | null,
-): ParsedWorkspacePaneRoute | null {
-  return routeContext && 'workspacePaneRoute' in routeContext ? routeContext.workspacePaneRoute : null
-}
-
-export function workspaceRouteContextFromMatches(
-  matches: Array<{ routeId: string; params: Record<string, string> }>,
-): WorkspaceRouteContext | null {
-  const workspaceMatch = [...matches].reverse().find((match) => typeof match.params.workspaceSlug === 'string')
-  if (!workspaceMatch) return null
-
-  const workspaceSlug = workspaceMatch.params.workspaceSlug
-  if (!workspaceSlug) return null
-
-  const branchSlug = workspaceMatch.params.branchSlug
-  if (branchSlug) {
-    const branchName = branchNameFromSlug(branchSlug)
-    return branchName
-      ? {
-          kind: 'branch',
-          workspaceSlug,
-          branchName,
-          workspacePaneRoute: workspacePaneRouteFromMatches(matches),
-        }
-      : { kind: 'empty', workspaceSlug }
-  }
-
-  const worktreeSlug = workspaceMatch.params.worktreeSlug
-  if (worktreeSlug) {
-    const worktreePath = worktreePathFromSlug(worktreeSlug)
-    return worktreePath
-      ? { kind: 'worktree', workspaceSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
-      : { kind: 'empty', workspaceSlug }
-  }
-
-  if (workspaceMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
-  if (workspaceMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
-  if (workspaceMatch.routeId.includes('/root')) {
-    return { kind: 'workspace-root', workspaceSlug, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
-  }
-  return { kind: 'empty', workspaceSlug }
-}
-
-function workspacePaneRouteFromMatches(
-  matches: Array<{ routeId: string; params: Record<string, string> }>,
-): ParsedWorkspacePaneRoute | null {
-  const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
-  const terminalSessionId = terminalMatch?.params.terminalSessionId
-  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
-
-  const tabMatch = [...matches].reverse().find((match) => typeof match.params.tabKey === 'string')
-  const tabKey = tabMatch?.params.tabKey
-  if (!tabKey) return null
-  return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
-}
-
-interface AppOverlaysProps {
-  overlays: ReturnType<typeof useAppOverlays>
-  workspaceDrop: ReturnType<typeof useWorkspaceDrop>
-  navigation: AppNavigationActions
-  hydratedRouteWorkspaceId: WorkspaceId | null
-  currentWorkspaceRuntimeId: string | null
-  currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
-}
-
-function AppOverlays({
-  overlays,
-  workspaceDrop,
-  navigation,
-  hydratedRouteWorkspaceId,
-  currentWorkspaceRuntimeId,
-  currentBranchName,
-  currentWorkspacePaneRoute,
-}: AppOverlaysProps) {
-  return (
-    <>
-      <WorkspaceOpenDialog open={overlays.state.openWorkspace.open} onOpenChange={overlays.setOpenWorkspaceOpen} />
-      <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
-      <OpenRemoteWorkspaceDialog
-        open={overlays.state.openRemoteWorkspace.open}
-        onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
-      />
-      <BranchActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} currentBranchName={currentBranchName} />
-      <FiletreeActionDialogHost
-        currentWorkspaceId={hydratedRouteWorkspaceId}
-        currentWorkspaceRuntimeId={currentWorkspaceRuntimeId}
-      />
-      <TerminalActionDialogHost
-        currentWorkspaceId={hydratedRouteWorkspaceId}
-        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
-        navigation={navigation}
-      />
-      <WorkspaceDropOverlay active={workspaceDrop.active} />
-      <Toaster position="bottom-right" closeButton />
-    </>
-  )
-}
-
-/**
- * Auth-gated side effects. Mounts only when `<TokenGate>` lets
- * its children through (i.e. the user is authenticated), so the
- * hooks below — and the WebSocket connections they open — do
- * not exist while the login form is showing.
- *
- * This is the architectural fix for the "/ws/invalidation
- * 401-flood on first load" bug. The pre-fix Layout declared the
- * invalidation hooks at its top level, so they ran before
- * `TokenGate` had a chance to decide whether the user was
- * authenticated. The result was an unauthenticated WebSocket
- * upgrade every 300 ms (the client's reconnect delay) until the
- * user logged in.
- *
- * Rules of hooks: this component exists solely to host hooks.
- * It renders `null` and is colocated with `Layout` because no
- * other subtree needs the same set of subscriptions.
- */
-function AuthenticatedWorkspaceSideEffects({
-  routedWorkspaceId,
-  hydratedRouteWorkspaceId,
-  currentBranchName,
-  currentWorkspacePaneCommandTarget,
-  routeContext,
-  navigation,
-  closeAllOverlays,
-  openWorkspacePathDialog,
-  openCloneRepo,
-  openRemoteWorkspace,
-  modalOpen,
-  isSettingsOpen,
-  navigateToSettingsShortcuts,
-  navigateToIndex,
-}: {
-  routedWorkspaceId: WorkspaceId | null
-  hydratedRouteWorkspaceId: WorkspaceId | null
-  currentBranchName: string | null
-  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
-  routeContext: WorkspaceNavigationRouteContext | null
-  navigation: AppNavigationActions
-  closeAllOverlays: () => void
-  openWorkspacePathDialog: () => void
-  openCloneRepo: () => void
-  openRemoteWorkspace: () => void
-  modalOpen: boolean
-  isSettingsOpen: boolean
-  navigateToSettingsShortcuts: () => void
-  navigateToIndex: () => void
-}): null {
-  const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
-  useTerminalRetirementWorkspacePanePresentation({
-    currentTarget: currentWorkspacePaneCommandTarget,
-    navigation,
-  })
-  useClientEffectIntentRouter({
-    navigation,
-    currentWorkspaceId: hydratedRouteWorkspaceId,
-    currentWorkspacePaneCommandTarget,
-    closeAllOverlays,
-    openWorkspacePathDialog,
-    openCloneRepo,
-    openRemoteWorkspace,
-    openCreateWorktree: navigation.openCreateWorktree,
-    isOverlayOpen: () => modalOpen,
-    isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
-  })
-
-  useKeyboard({
-    navigation,
-    currentWorkspaceId: hydratedRouteWorkspaceId,
-    currentBranchName,
-    currentWorkspacePaneCommandTarget,
-    onShowHelp: navigateToSettingsShortcuts,
-    isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
-    isSettingsOpen: () => isSettingsOpen,
-    onExitSettings: navigateToIndex,
-    openCreateWorktree: navigation.openCreateWorktree,
-  })
-
-  useClientWorkspacePersistence({ routedWorkspaceId })
-  useWorkspaceNavigationHistory({ routeContext })
-  useBackgroundFetch({ currentWorkspaceId: hydratedRouteWorkspaceId })
-  useNetworkReconnect()
-  useRepoStoreInvalidationRefresh()
-  useWorkspaceRuntimeInvalidationRefresh()
-  useSettingsQueryInvalidationSync()
-  return null
-}
-
-function workspaceNavigationRouteContext(
-  routeContext: WorkspaceRouteContext | null,
-  routeHref: string | null,
-): WorkspaceNavigationRouteContext | null {
-  if (!routeContext) return null
-  const workspaceId = workspaceIdFromSlug(routeContext.workspaceSlug)
-  if (!workspaceId) return null
-  if (routeContext.kind === 'branch' || routeContext.kind === 'workspace-root' || routeContext.kind === 'worktree') {
-    return null
-  }
-  if (routeContext.kind === 'newWorktree') {
-    return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
-  }
-  return { kind: routeContext.kind, workspaceId }
 }

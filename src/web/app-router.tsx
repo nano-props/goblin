@@ -10,7 +10,8 @@ import {
 } from '@tanstack/react-router'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { App, type WorkspaceRouteView } from '#/web/App.tsx'
-import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
+import { Layout } from '#/web/Layout.tsx'
+import { WorkspaceSessionRestoreGate } from '#/web/components/WorkspaceSessionRestore.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import {
