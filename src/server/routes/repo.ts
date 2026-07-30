@@ -40,7 +40,8 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
+import type { RepoLogResponse } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import {
   requireCurrentWorkspaceRuntime,
   runGitWorkspaceRuntimeRequest,

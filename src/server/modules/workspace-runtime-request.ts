@@ -1,5 +1,5 @@
 import { serverLogger } from '#/server/logger.ts'
-import { IpcError } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'

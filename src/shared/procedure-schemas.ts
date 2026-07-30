@@ -1,21 +1,12 @@
 // Procedure input schemas shared between the HTTP route layer and the
 // native bridge IPC layer. Each transport validates payloads with
 // `parseHttpInput` (see `#/server/common/http-validate.ts`) or
-// `parseIpcInput` (see `#/shared/api-types.ts`) using the schemas
+// `parseIpcInput` using the schemas
 // declared here, so the request contract is defined once.
-//
-// Primitive reusable schemas (CwdInput and Remote*Schema)
-// live in `#/shared/api-types.ts` next to the IPC types they describe.
 
 import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isValidBranchInput } from '#/shared/refnames.ts'
-import {
-  CwdInput,
-  RemoteConnectionInputSchema,
-  RemoteDirectoryPathSuggestionsInputSchema,
-  RemoteWorkspaceTargetSchema,
-} from '#/shared/api-types.ts'
 import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import {
@@ -25,7 +16,7 @@ import {
 } from '#/shared/workspace-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
-import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
+import { RemoteAbsolutePathSchema, WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
@@ -65,6 +56,24 @@ const WorktreeBootstrapDecisionSchema = v.variant('kind', [
 ])
 
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const RemotePortSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(1), v.maxValue(65535))
+const RemoteWorkspaceTargetSchema = v.object({
+  id: WorkspaceIdSchema,
+  alias: v.string(),
+  host: v.string(),
+  user: v.string(),
+  port: RemotePortSchema,
+  remotePath: RemoteAbsolutePathSchema,
+  displayName: v.string(),
+})
+const RemoteConnectionInputSchema = v.object({
+  alias: v.string(),
+  remotePath: v.string(),
+})
+const RemoteDirectoryPathSuggestionsInputSchema = v.object({
+  alias: v.string(),
+  prefix: DirectoryPathPrefixSchema,
+})
 const WorkspaceRuntimeOpenSchema = v.union([
   v.object({ workspaceId: WorkspaceIdSchema, clientId: ClientIdSchema }),
   v.object({ workspaceInput: v.string(), clientId: ClientIdSchema }),

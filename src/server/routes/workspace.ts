@@ -32,7 +32,7 @@ import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { IpcError } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { homedir } from 'node:os'

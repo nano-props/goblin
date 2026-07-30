@@ -1,4 +1,5 @@
-import { IpcError, type RestoredWorkspaceRuntime, type WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
+import type { RestoredWorkspaceRuntime, WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import {
