@@ -98,6 +98,10 @@ export class TerminalSessionRuntime {
     return this.state.getPhase()
   }
 
+  currentProcessName(): string {
+    return this.state.getProcessName()
+  }
+
   currentTerminalRuntimeSessionId(): string | null {
     return this.activeBinding()?.terminalRuntimeSessionId ?? null
   }

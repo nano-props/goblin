@@ -27,6 +27,7 @@ import {
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { TerminalRenderQueue, type RenderedOutputCheckpoint } from '#/web/components/terminal/terminal-render-queue.ts'
+import { planTerminalComposerSubmit } from '#/web/components/terminal/terminal-composer-submit-plan.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
   createTerminalWriteFailureReporter,
@@ -255,14 +256,25 @@ export class TerminalSession {
     if (this.submitTextPending || !text) return false
     const submittedBinding = this.currentWritableInputBinding()
     if (!submittedBinding) return false
+    // Foreground processName is an output-driven presentation projection, not
+    // an atomic input-admission token. It can briefly lag a same-generation
+    // foreground process transition until the next PTY output (normally the
+    // returning shell prompt). Accept that locally recoverable UI window; do
+    // not introduce a second foreground authority or coordination protocol.
+    // Runtime-generation replacement remains an enforced boundary below.
+    const submitPlan = planTerminalComposerSubmit({ text, processName: this.runtime.currentProcessName() })
     this.submitTextPending = true
     try {
-      if (!this.view.pasteText(text)) return false
+      const bodyAcceptedByView =
+        submitPlan.strategy === 'typed-then-enter'
+          ? this.view.sendTextAsInput(submitPlan.payload)
+          : this.view.pasteText(submitPlan.payload)
+      if (!bodyAcceptedByView) return false
       // A composed submission represents two ordered user actions. Wait until
-      // the paste has reached the PTY before sending Enter so input batching
+      // the body input has reached the PTY before sending Enter so input batching
       // cannot collapse them back into one delivery step.
       if (!(await this.flushInput())) return false
-      // Once the paste is accepted, the Composer draft has been delivered and
+      // Once the body input is accepted, the Composer draft has been delivered and
       // must not be offered for automatic resubmission. History follows that
       // accepted boundary even if controller ownership changes before Enter.
       if (!this.disposed && this.runtime.recordComposerHistory(text)) this.notify('snapshot')
