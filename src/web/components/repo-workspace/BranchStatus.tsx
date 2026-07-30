@@ -170,64 +170,30 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
       ? remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null)
       : null
   })
-  const openFilesTab = useMemo(
-    () =>
+  const { openFilesTab, openChangesTab, openHistoryTab } = useMemo(() => {
+    const createOpener = (type: 'files' | 'changes' | 'history') =>
       throttle(
         () => {
-          if (!branchName || !worktreePathRaw) return
+          // History is branch-scoped; files and changes require a concrete worktree.
+          if (!branchName || (type !== 'history' && !worktreePathRaw)) return
           void dispatchOpenWorkspacePaneStaticTabAction({
             workspaceId: detail.workspaceId,
             branchName,
             worktreePath: worktreePathRaw,
-            type: 'files',
+            type,
             workspacePaneRoute: { kind: 'static', tab: 'status' },
             navigation,
           })
         },
         500,
         { edges: ['leading'] },
-      ),
-    [branchName, worktreePathRaw, detail.workspaceId, navigation],
-  )
-  const openChangesTab = useMemo(
-    () =>
-      throttle(
-        () => {
-          if (!branchName || !worktreePathRaw) return
-          void dispatchOpenWorkspacePaneStaticTabAction({
-            workspaceId: detail.workspaceId,
-            branchName,
-            worktreePath: worktreePathRaw,
-            type: 'changes',
-            workspacePaneRoute: { kind: 'static', tab: 'status' },
-            navigation,
-          })
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [branchName, worktreePathRaw, detail.workspaceId, navigation],
-  )
-  // History doesn't require a worktree, unlike files/changes above.
-  const openHistoryTab = useMemo(
-    () =>
-      throttle(
-        () => {
-          if (!branchName) return
-          void dispatchOpenWorkspacePaneStaticTabAction({
-            workspaceId: detail.workspaceId,
-            branchName,
-            worktreePath: worktreePathRaw,
-            type: 'history',
-            workspacePaneRoute: { kind: 'static', tab: 'status' },
-            navigation,
-          })
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [branchName, worktreePathRaw, detail.workspaceId, navigation],
-  )
+      )
+    return {
+      openFilesTab: createOpener('files'),
+      openChangesTab: createOpener('changes'),
+      openHistoryTab: createOpener('history'),
+    }
+  }, [branchName, worktreePathRaw, detail.workspaceId, navigation])
   if (!branch) return <EmptyState title={t('branches.empty')} />
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
   const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
