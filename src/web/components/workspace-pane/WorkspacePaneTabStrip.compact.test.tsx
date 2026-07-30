@@ -302,10 +302,10 @@ describe('WorkspacePaneTabStrip compact', () => {
     // right-edge separator between this tab and the popover button.
     expect(compactTab?.className).not.toContain('bg-selected')
     expect(compactTab?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
-    // Close button stays in the DOM but is hidden until hover/focus,
-    // matching the expanded strip's unselected-tab behaviour.
+    // Compact UI has no reliable hover affordance, so close stays visible.
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
-    expect(compactCloseButton?.className).toContain('opacity-0')
+    expect(compactCloseButton?.className).toContain('opacity-100')
+    expect(compactCloseButton?.className).not.toContain('group-hover:opacity-100')
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
 
     rerender(
@@ -348,12 +348,12 @@ describe('WorkspacePaneTabStrip compact', () => {
     )
 
     const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
-    // The active panel makes isActive=true, but the compact tab still mutes
-    // the active chrome — so the close button stays hidden-until-hover, just
-    // like an unselected tab on the expanded strip.
+    // The active panel makes isActive=true, while compact chrome remains muted
+    // and its non-hover close affordance stays visible.
     expect(compactTab?.className).not.toContain('bg-selected')
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
-    expect(compactCloseButton?.className).toContain('opacity-0')
+    expect(compactCloseButton?.className).toContain('opacity-100')
+    expect(compactCloseButton?.className).not.toContain('group-hover:opacity-100')
   })
 
   test('focuses the next compact tab after closing the active tab', async () => {

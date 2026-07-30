@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Plus, X } from 'lucide-react'
-import { useRef, useState, type ComponentPropsWithoutRef, type Ref } from 'react'
+import { useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type MouseEvent, type Ref } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -36,7 +36,7 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   createAction: WorkspacePaneTabCreateAction | null
   tabInteractionBlocked: boolean
   onSelect: (identity: string) => void
-  onClose: (event: React.MouseEvent, identity: string) => void
+  onClose: (event: MouseEvent, identity: string) => void
   t: WorkspacePaneT
 }
 
@@ -169,12 +169,10 @@ export function WorkspacePaneTabSwitcherPopover({
 export function WorkspacePaneNewButton({
   id,
   action,
-  compact = false,
   ref,
 }: {
   id?: string
   action: WorkspacePaneTabCreateAction
-  compact?: boolean
   ref?: Ref<HTMLButtonElement>
 }) {
   return (
@@ -183,7 +181,7 @@ export function WorkspacePaneNewButton({
       type="button"
       variant="ghost"
       size="icon"
-      className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
+      className="h-7 w-7 shrink-0"
       id={id}
       onClick={action.onCreate}
       disabled={action.busy}
@@ -207,8 +205,8 @@ export interface WorkspacePaneTabProps {
   tabId: string
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
   onSelect: (identity: string) => void
-  onClose: (event: React.MouseEvent, identity: string) => void
-  onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
+  onClose: (event: MouseEvent, identity: string) => void
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: WorkspacePaneT
   interactionDisabled: boolean
   compact?: boolean
@@ -252,9 +250,9 @@ function WorkspacePaneTabChrome({
       ? ({ closeButton: 'placeholder' } as const)
       : ({
           closeLabel: item.closeLabel,
-          closeVisible: isActive && !compact,
+          closeVisible: compact || isActive,
           closeDisabled: interactionDisabled,
-          onClose: (event: React.MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
+          onClose: (event: MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
         } as const)
   const collectionAria =
     index !== undefined && total !== undefined ? { 'aria-posinset': index + 1, 'aria-setsize': total } : {}
