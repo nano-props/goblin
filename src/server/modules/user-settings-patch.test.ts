@@ -1,0 +1,48 @@
+import { describe, expect, test } from 'vitest'
+import type { UserSettings } from '#/shared/api-types.ts'
+import { defaultServerWorkspaceState, defaultUserSettings } from '#/shared/settings-defaults.ts'
+import type { UserSettingsData } from '#/server/modules/user-settings-codec.ts'
+import {
+  planUserSettingsPatch,
+  userSettingsFromData,
+  validateUserSettingsPatch,
+} from '#/server/modules/user-settings-patch.ts'
+
+const data: UserSettingsData = {
+  ...defaultUserSettings(),
+  workspace: defaultServerWorkspaceState(),
+  recentWorkspaces: [],
+  workspaceSettings: [],
+}
+
+describe('user settings patch policy', () => {
+  test('validates and plans changed preference values without changing workspace state', () => {
+    const plan = planUserSettingsPatch(
+      data,
+      validateUserSettingsPatch({ theme: 'dark', fetchIntervalSec: 42, terminalNotificationsEnabled: true }),
+    )
+
+    expect(plan).toMatchObject({ changed: true, fetchIntervalChanged: true })
+    expect(plan.next).toMatchObject({ theme: 'dark', fetchIntervalSec: 42, terminalNotificationsEnabled: true })
+    expect(plan.next.workspace).toBe(data.workspace)
+    expect(plan.next.recentWorkspaces).toBe(data.recentWorkspaces)
+  })
+
+  test('preserves the authoritative data object for a no-op patch', () => {
+    const plan = planUserSettingsPatch(data, validateUserSettingsPatch({ theme: data.theme }))
+
+    expect(plan).toEqual({ next: data, changed: false, fetchIntervalChanged: false })
+  })
+
+  test.each([
+    [{ lang: 'unknown' }, 'invalid language'],
+    [{ fetchIntervalSec: 1.5 }, 'invalid fetch interval'],
+    [{ globalShortcut: 'Control+O' }, 'invalid global shortcut'],
+  ] as const)('rejects invalid patch %j at the command boundary', (patch, message) => {
+    expect(() => validateUserSettingsPatch(patch as Partial<UserSettings>)).toThrow(message)
+  })
+
+  test('projects only public user preference fields', () => {
+    expect(userSettingsFromData(data)).toEqual(defaultUserSettings())
+  })
+})

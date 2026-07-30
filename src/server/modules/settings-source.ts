@@ -40,25 +40,24 @@ import type {
   WorkspacePaneLayoutRestoreTransaction,
   WorkspacePaneLayoutRestoreTransactionOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
-import { isColorTheme } from '#/shared/color-theme.ts'
 import { closeWorkspaceRuntimesForDurableRemoval } from '#/server/modules/workspace-runtimes.ts'
 import { MAX_RECENT_WORKSPACES, defaultUserSettings, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   currentSettingsData,
-  isBoolean,
   isFetchInterval,
-  isLangPref,
-  isThemePref,
   normalizeWorkspace,
   type UserSettingsData,
 } from '#/server/modules/user-settings-codec.ts'
+import {
+  planUserSettingsPatch,
+  userSettingsFromData,
+  validateUserSettingsPatch,
+  type UserSettingsPatch,
+} from '#/server/modules/user-settings-patch.ts'
 
 type FetchIntervalListener = (sec: number) => void
 type UserSettingsReadOutcome =
   { kind: 'missing' } | { kind: 'current'; data: UserSettingsData; needsRewrite: boolean } | { kind: 'invalid' }
-
-export type UserSettingsPatch = Partial<UserSettings>
 
 let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
@@ -72,20 +71,6 @@ function notifyFetchIntervalListeners(sec: number): void {
 function requireCommandValue<T>(value: unknown, valid: (candidate: unknown) => candidate is T, name: string): T {
   if (!valid(value)) throw new TypeError(`invalid ${name}`)
   return value
-}
-
-function userSettingsFromData(data: UserSettingsData): UserSettings {
-  return {
-    lang: data.lang,
-    theme: data.theme,
-    colorTheme: data.colorTheme,
-    fetchIntervalSec: data.fetchIntervalSec,
-    terminalNotificationsEnabled: data.terminalNotificationsEnabled,
-    shortcutsDisabled: data.shortcutsDisabled,
-    globalShortcutDisabled: data.globalShortcutDisabled,
-    globalShortcut: data.globalShortcut,
-    lanEnabled: data.lanEnabled,
-  }
 }
 
 function defaultWorkspace(): ServerWorkspaceState {
@@ -257,71 +242,16 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
 }
 
 export async function updateUserSettings(patch: UserSettingsPatch): Promise<UserSettings> {
-  const nextLang = patch.lang === undefined ? undefined : requireCommandValue(patch.lang, isLangPref, 'language')
-  const nextTheme = patch.theme === undefined ? undefined : requireCommandValue(patch.theme, isThemePref, 'theme')
-  const nextColorTheme =
-    patch.colorTheme === undefined ? undefined : requireCommandValue(patch.colorTheme, isColorTheme, 'color theme')
-  const nextFetchIntervalSec =
-    patch.fetchIntervalSec === undefined
-      ? undefined
-      : requireCommandValue(patch.fetchIntervalSec, isFetchInterval, 'fetch interval')
-  const nextTerminalNotificationsEnabled =
-    patch.terminalNotificationsEnabled === undefined
-      ? undefined
-      : requireCommandValue(patch.terminalNotificationsEnabled, isBoolean, 'terminal notifications setting')
-  const nextShortcutsDisabled =
-    patch.shortcutsDisabled === undefined
-      ? undefined
-      : requireCommandValue(patch.shortcutsDisabled, isBoolean, 'shortcuts setting')
-  const nextGlobalShortcutDisabled =
-    patch.globalShortcutDisabled === undefined
-      ? undefined
-      : requireCommandValue(patch.globalShortcutDisabled, isBoolean, 'global shortcut disabled setting')
-  const nextGlobalShortcut =
-    patch.globalShortcut === undefined ? undefined : parseAllowedGlobalShortcut(patch.globalShortcut)
-  if (patch.globalShortcut !== undefined && nextGlobalShortcut === null) throw new TypeError('invalid global shortcut')
-  const nextLanEnabled =
-    patch.lanEnabled === undefined ? undefined : requireCommandValue(patch.lanEnabled, isBoolean, 'LAN setting')
+  const validatedPatch = validateUserSettingsPatch(patch)
   return await mutateUserSettings(async (data) => {
-    const resolvedLang = nextLang ?? data.lang
-    const resolvedTheme = nextTheme ?? data.theme
-    const resolvedColorTheme = nextColorTheme ?? data.colorTheme
-    const resolvedFetchIntervalSec = nextFetchIntervalSec ?? data.fetchIntervalSec
-    const resolvedTerminalNotificationsEnabled = nextTerminalNotificationsEnabled ?? data.terminalNotificationsEnabled
-    const resolvedShortcutsDisabled = nextShortcutsDisabled ?? data.shortcutsDisabled
-    const resolvedGlobalShortcutDisabled = nextGlobalShortcutDisabled ?? data.globalShortcutDisabled
-    const resolvedGlobalShortcut = nextGlobalShortcut ?? data.globalShortcut
-    const resolvedLanEnabled = nextLanEnabled ?? data.lanEnabled
-    const fetchIntervalChanged = data.fetchIntervalSec !== resolvedFetchIntervalSec
-    const changed =
-      data.lang !== resolvedLang ||
-      data.theme !== resolvedTheme ||
-      data.colorTheme !== resolvedColorTheme ||
-      data.fetchIntervalSec !== resolvedFetchIntervalSec ||
-      data.terminalNotificationsEnabled !== resolvedTerminalNotificationsEnabled ||
-      data.shortcutsDisabled !== resolvedShortcutsDisabled ||
-      data.globalShortcutDisabled !== resolvedGlobalShortcutDisabled ||
-      data.globalShortcut !== resolvedGlobalShortcut ||
-      data.lanEnabled !== resolvedLanEnabled
-    const nextData: UserSettingsData = changed
-      ? {
-          ...data,
-          lang: resolvedLang,
-          theme: resolvedTheme,
-          colorTheme: resolvedColorTheme,
-          fetchIntervalSec: resolvedFetchIntervalSec,
-          terminalNotificationsEnabled: resolvedTerminalNotificationsEnabled,
-          shortcutsDisabled: resolvedShortcutsDisabled,
-          globalShortcutDisabled: resolvedGlobalShortcutDisabled,
-          globalShortcut: resolvedGlobalShortcut,
-          lanEnabled: resolvedLanEnabled,
-        }
-      : data
+    const plan = planUserSettingsPatch(data, validatedPatch)
     return {
-      next: nextData,
-      result: userSettingsFromData(nextData),
-      changed,
-      afterCommit: fetchIntervalChanged ? () => notifyFetchIntervalListeners(resolvedFetchIntervalSec) : undefined,
+      next: plan.next,
+      result: userSettingsFromData(plan.next),
+      changed: plan.changed,
+      afterCommit: plan.fetchIntervalChanged
+        ? () => notifyFetchIntervalListeners(plan.next.fetchIntervalSec)
+        : undefined,
     }
   })
 }
