@@ -30,6 +30,7 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
+  initialCreateWorktreeBase,
   remoteTrackingBranchKey,
   type CreateWorktreeMode,
   type CreateWorktreeRequest,
@@ -86,7 +87,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const compact = useIsCompactUi()
 
   const [mode, setMode] = useState<CreateWorktreeMode>('newBranch')
-  const initialBase = repo.snapshot.current || repo.snapshot.branches[0]?.name || ''
+  const initialBase = initialCreateWorktreeBase(repo.snapshot)
   const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
   const [existingBranch, setExistingBranch] = useState(initialBase)
@@ -272,17 +273,16 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                       <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {remoteBranches.map((remote) => (
-                        <SelectItem
-                          key={remoteTrackingBranchKey(remote)}
-                          value={remoteTrackingBranchKey(remote)}
-                          textValue={`${remote.remote}/${remote.branch}`}
-                        >
-                          <span className="truncate">
-                            {remote.remote}/{remote.branch}
-                          </span>
-                        </SelectItem>
-                      ))}
+                      {remoteBranches.map((remote) => {
+                        const remoteKey = remoteTrackingBranchKey(remote)
+                        return (
+                          <SelectItem key={remoteKey} value={remoteKey} textValue={`${remote.remote}/${remote.branch}`}>
+                            <span className="truncate">
+                              {remote.remote}/{remote.branch}
+                            </span>
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   <FieldDescription reserveHeight aria-live="polite" aria-atomic="true">
