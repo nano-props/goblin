@@ -1,11 +1,4 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  GitBranch,
-  GitCompareArrows,
-  GitPullRequest,
-  Workflow,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, GitBranch, GitCompareArrows, GitPullRequest, Workflow } from 'lucide-react'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import {

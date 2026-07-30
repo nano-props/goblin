@@ -3,7 +3,8 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import { WorkspacePane, type WorkspacePaneRouteContext } from '#/web/components/workspace-pane/WorkspacePane.tsx'
+import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
+import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import {
   BranchNavigatorSkeleton,
   EmptyWorkspacePaneSkeleton,
