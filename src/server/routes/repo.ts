@@ -15,7 +15,6 @@ import {
   getRepoWorktreeBootstrapPreview,
 } from '#/server/modules/repo-read-paths.ts'
 import {
-  cloneRepo,
   createRepoWorktree,
   deleteRepoBranch,
   fetchRepo,
@@ -26,6 +25,7 @@ import {
   removeCapturedRepoWorktree,
   type RepoFilesystemMutationOutcome,
 } from '#/server/modules/repo-write-paths.ts'
+import { cloneRepo } from '#/server/modules/repo-clone-write.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import {
   publishRepoReadInvalidation,
