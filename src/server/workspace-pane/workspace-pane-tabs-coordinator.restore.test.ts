@@ -1,10 +1,8 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import {
-  WorkspacePaneLayoutAggregate,
-  type WorkspacePaneTargetProjection,
-} from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'

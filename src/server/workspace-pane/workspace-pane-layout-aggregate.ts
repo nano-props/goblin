@@ -1,9 +1,6 @@
 import PQueue from 'p-queue'
 import {
-  defaultWorkspacePaneTabEntries,
   isWorkspacePaneRuntimeTabEntry,
-  workspacePaneRuntimeTabEntry,
-  workspacePaneStaticTabEntry,
   workspacePaneTabsWithRuntimeTab,
   type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabEntry,
@@ -16,14 +13,11 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import {
   restorableWorkspacePaneTargetKey,
-  workspacePaneTabsTargetFromRestorable,
-  runtimeWorkspacePaneTargetKey,
   restorableWorkspacePaneTargetFromRuntime,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
-  projectRuntimePlacements,
   providerRevisionMap,
   WorkspacePaneEpochOverlay,
   type WorkspacePaneEpochScope,
@@ -37,7 +31,15 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  canonicalTabsForTarget,
+  projectCanonicalEntries,
+  runtimeTargetKey,
+  targetMap,
+  targetProjectionKey,
+  type WorkspacePaneTargetProjection,
+} from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
@@ -69,12 +71,6 @@ type WorkspacePaneLayoutMutationTarget =
       nativeWorktreePath: string
       physicalWorktreeLease: PhysicalWorktreeAdmissionLease
     }
-
-export interface WorkspacePaneTargetProjection {
-  target: RuntimeWorkspacePaneTarget
-  nativeWorktreePath: string | null
-  canonicalBranch: string | null
-}
 
 export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope &
   WorkspacePaneLayoutMutationTarget & {
@@ -476,127 +472,12 @@ function revisionForState(
   return next.revision
 }
 
-function projectCanonicalEntries(
-  scope: WorkspacePaneEpochScope,
-  layout: WorkspacePaneDurableLayout,
-  overlay: WorkspacePaneEpochOverlay,
-  validatedTargets: ReadonlyMap<string, WorkspacePaneTargetProjection>,
-  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
-): WorkspacePaneTabsSnapshot['entries'] {
-  const liveTargets = providerTargets(scope, validatedTargets, providers)
-  layout = {
-    entries: layout.entries.filter((entry) => validatedTargets.has(durableTargetKey(scope, entry.target))),
-  }
-  const targets = new Map<string, WorkspacePaneTargetProjection>()
-  for (const entry of layout.entries) {
-    const key = durableTargetKey(scope, entry.target)
-    const projection = validatedTargets.get(key)
-    if (!projection) throw new Error('error.workspace-tabs-target-invalid')
-    targets.set(key, projection)
-  }
-  for (const [key, target] of liveTargets) targets.set(key, target)
-  return Array.from(targets.values()).map((projection) => {
-    const tabs = canonicalTabsForTarget({ ...scope, ...projection }, layout, overlay, providers)
-    return { target: projection.target, tabs }
-  })
-}
-
-function providerTargets(
-  scope: WorkspacePaneEpochScope,
-  validatedTargets: ReadonlyMap<string, WorkspacePaneTargetProjection>,
-  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
-): Map<string, WorkspacePaneTargetProjection> {
-  const targets = new Map<string, WorkspacePaneTargetProjection>()
-  for (const provider of providers) {
-    for (const session of provider.liveSessions) {
-      if (
-        session.target.workspaceId !== scope.workspaceId ||
-        session.target.workspaceRuntimeId !== scope.workspaceRuntimeId
-      ) {
-        throw new Error('error.workspace-tabs-target-invalid')
-      }
-      const key = runtimeTargetKey(session.target)
-      const validated = validatedTargets.get(key)
-      if (validated && validated.nativeWorktreePath !== session.worktreePath) {
-        throw new Error('error.workspace-tabs-target-invalid')
-      }
-      targets.set(
-        key,
-        validated ?? {
-          target: session.target,
-          nativeWorktreePath: session.worktreePath,
-          canonicalBranch: session.branch,
-        },
-      )
-    }
-  }
-  return targets
-}
-
-function targetMap(targets: readonly WorkspacePaneTargetProjection[]): Map<string, WorkspacePaneTargetProjection> {
-  return new Map(
-    targets
-      .map(
-        (projection) => [targetProjectionKey(projection), { ...projection, target: { ...projection.target } }] as const,
-      )
-      .sort(([a], [b]) => a.localeCompare(b)),
-  )
-}
-
 function resolveMutationTarget(
   scope: WorkspacePaneEpochScope & WorkspacePaneLayoutMutationTarget,
   validTargets: readonly WorkspacePaneTargetProjection[],
 ): WorkspacePaneTargetProjection | null {
   const projection = targetMap(validTargets).get(runtimeTargetKey(scope.target)) ?? null
   return projection && projection.nativeWorktreePath === scope.nativeWorktreePath ? projection : null
-}
-
-function canonicalTabsForTarget(
-  input: WorkspacePaneEpochScope & WorkspacePaneTargetProjection,
-  layout: WorkspacePaneDurableLayout,
-  overlay: WorkspacePaneEpochOverlay,
-  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
-): WorkspacePaneTabEntry[] {
-  const durable = layout.entries.find((entry) => durableTargetKey(input, entry.target) === targetProjectionKey(input))
-  const staticTabs =
-    durable?.tabs ?? defaultWorkspacePaneTabEntries(input.target.kind === 'workspace-root' ? 'workspace-root' : 'git')
-  const liveRuntimeTabs = providers.flatMap((provider) =>
-    provider.liveSessions
-      .filter((session) => input.nativeWorktreePath !== null && session.worktreePath === input.nativeWorktreePath)
-      .map((session) => workspacePaneRuntimeTabEntry(provider.type, session.sessionId)),
-  )
-  return projectRuntimePlacements({
-    staticTabs,
-    hints: overlay.placementHints(input),
-    liveRuntimeTabs,
-  })
-}
-
-function durableTargetKey(
-  scope: Pick<WorkspacePaneEpochScope, 'workspaceId' | 'workspaceRuntimeId'>,
-  target: RestorableWorkspacePaneTarget,
-): string {
-  const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
-  if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
-  const runtime = workspacePaneTabsTargetFromRestorable(workspaceId, target)
-  if (!runtime) throw new Error('error.workspace-tabs-target-invalid')
-  const bound =
-    target.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
-      : target.kind === 'git-branch'
-        ? { ...target, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
-        : { ...target, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
-  return runtimeTargetKey(bound)
-}
-
-function runtimeTargetKey(target: RuntimeWorkspacePaneTarget): string {
-  const key = runtimeWorkspacePaneTargetKey(target)
-  if (!key) throw new Error('error.workspace-tabs-target-invalid')
-  return key
-}
-
-function targetProjectionKey(projection: WorkspacePaneTargetProjection): string {
-  return runtimeTargetKey(projection.target)
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {

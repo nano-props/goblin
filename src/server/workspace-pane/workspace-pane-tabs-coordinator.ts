@@ -49,8 +49,8 @@ import type {
   WorkspacePaneLayoutCommitResult,
   WorkspacePaneLayoutOperation,
   WorkspacePaneLayoutValidationResult,
-  WorkspacePaneTargetProjection,
 } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 
 export interface WorkspacePaneRuntimeTabsLiveSession {
   sessionId: string

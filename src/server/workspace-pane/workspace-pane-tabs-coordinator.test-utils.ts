@@ -1,7 +1,5 @@
-import {
-  WorkspacePaneLayoutAggregate,
-  type WorkspacePaneTargetProjection,
-} from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
