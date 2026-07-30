@@ -242,17 +242,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       ownership.exitCompletion.complete()
     }
     this.sessions.clear()
-    if (worker) {
-      try {
-        worker.send({ type: 'shutdown' })
-      } catch {}
-      try {
-        worker.disconnect?.()
-      } catch {}
-      try {
-        worker.kill()
-      } catch {}
-    }
+    if (worker) terminateWorkerProcess(worker)
   }
 
   private ensureWorker(): TerminalWorkerChildProcess {
@@ -475,15 +465,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     const worker = this.worker
     this.worker = null
     if (!worker) return
-    try {
-      worker.send({ type: 'shutdown' })
-    } catch {}
-    try {
-      worker.disconnect?.()
-    } catch {}
-    try {
-      worker.kill()
-    } catch {}
+    terminateWorkerProcess(worker)
   }
 
   private invalidateWorkerAfterSendFailure(worker: TerminalWorkerChildProcess, detail: string): void {
@@ -598,6 +580,18 @@ function defaultSpawnWorker(entry: string): TerminalWorkerChildProcess {
     env: process.env,
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
   }) as TerminalWorkerChildProcess
+}
+
+function terminateWorkerProcess(worker: TerminalWorkerChildProcess): void {
+  try {
+    worker.send({ type: 'shutdown' })
+  } catch {}
+  try {
+    worker.disconnect?.()
+  } catch {}
+  try {
+    worker.kill()
+  } catch {}
 }
 
 function createRequestId(): string {
