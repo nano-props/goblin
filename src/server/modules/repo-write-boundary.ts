@@ -10,8 +10,7 @@ import { parseWorkspaceLocator, type WorkspaceId, type WorkspaceLocatorPlatform 
 import { resolveRepoCommonDir } from '#/system/git/branches.ts'
 import { resolveRemoteRepoCommonDir, type RemoteGitRunner } from '#/system/ssh/git.ts'
 
-type RepoWriteBoundary =
-  { kind: 'local-git'; commonDir: string } | { kind: 'remote-git'; executionIdentity: string }
+type RepoWriteBoundary = { kind: 'local-git'; commonDir: string } | { kind: 'remote-git'; executionIdentity: string }
 
 interface LocalRepoExecutionSnapshot {
   boundary: Extract<RepoWriteBoundary, { kind: 'local-git' }>
@@ -40,10 +39,7 @@ export function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
  * identity when resolution fails. Fail before observing state or admitting an
  * operation instead.
  */
-async function resolveLocalRepoWriteBoundary(
-  repoId: WorkspaceId,
-  signal?: AbortSignal,
-): Promise<RepoWriteBoundary> {
+async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
   return (await resolveLocalRepoExecution(locator.path, signal)).boundary
@@ -78,10 +74,7 @@ export async function resolveLocalRepoExecution(
   }
 }
 
-async function resolveRemoteRepoWriteBoundary(
-  repoId: WorkspaceId,
-  signal?: AbortSignal,
-): Promise<RepoWriteBoundary> {
+async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   return await resolveRepoWriteBoundaryForLocator(repoId, undefined, signal)
 }
 
