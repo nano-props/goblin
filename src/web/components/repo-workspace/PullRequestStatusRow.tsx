@@ -229,7 +229,7 @@ export function PullRequestStatusRow({
         label={t('branch-status.signal.pr')}
         value={
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{t(labelKey)}</span>
+            <span className="text-xs text-muted-foreground">{t(labelKey)}</span>
             {(read.state === 'error' || read.stale) && (
               <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
                 <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
