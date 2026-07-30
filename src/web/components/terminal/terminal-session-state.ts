@@ -266,7 +266,7 @@ export class TerminalSessionState {
   // filters the shared buffer and the outer render queue still fences by
   // runtime binding.
   beginReplay(replayBoundary: TerminalOutputCheckpoint): number {
-    this.outputSequencingState.replayBoundary = normalizeOutputCheckpoint(replayBoundary)
+    this.outputSequencingState.replayBoundary = normalizeTerminalOutputCheckpoint(replayBoundary)
     this.outputSequencingState.replayGeneration += 1
     return this.outputSequencingState.replayGeneration
   }
@@ -375,7 +375,7 @@ export interface TerminalOutputCheckpoint {
   seq: number
 }
 
-function normalizeOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
+export function normalizeTerminalOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
   return {
     seq: normalizeOutputSeq(checkpoint.seq),
   }

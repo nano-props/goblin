@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  sameTerminalRuntimeBinding,
   TerminalSessionRuntime,
   type TerminalRuntimeAttachResult,
 } from '#/web/components/terminal/terminal-session-runtime.ts'
@@ -13,6 +14,16 @@ type CommittedProjectedTerminalRuntimeAttachResult = TerminalRuntimeAttachResult
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
 type ProjectedTerminalRuntimeAttachResult = OptionalIdentityRevision<CommittedProjectedTerminalRuntimeAttachResult>
+
+describe('terminal runtime binding identity', () => {
+  test('compares the runtime session and generation together', () => {
+    const binding = { terminalRuntimeSessionId: 'pty-runtime-test', terminalRuntimeGeneration: 2 }
+    expect(sameTerminalRuntimeBinding(binding, { ...binding })).toBe(true)
+    expect(sameTerminalRuntimeBinding(binding, { ...binding, terminalRuntimeGeneration: 3 })).toBe(false)
+    expect(sameTerminalRuntimeBinding(binding, null)).toBe(false)
+    expect(sameTerminalRuntimeBinding(null, null)).toBe(true)
+  })
+})
 
 function applyAttachResult(runtime: TerminalSessionRuntime, result: ProjectedTerminalRuntimeAttachResult): boolean {
   const identityRevision = result.identityRevision ?? 0

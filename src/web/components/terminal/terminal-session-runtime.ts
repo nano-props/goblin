@@ -141,9 +141,9 @@ export class TerminalSessionRuntime {
 
   classifyRuntimeBinding(binding: TerminalRuntimeBinding): TerminalRuntimeBindingClassification {
     const active = this.activeBinding()
-    if (active && sameBinding(active, binding)) return 'active'
+    if (active && sameTerminalRuntimeBinding(active, binding)) return 'active'
     const retiring = this.retiringRuntimeBinding()
-    if (retiring && sameBinding(retiring, binding)) return 'retiring'
+    if (retiring && sameTerminalRuntimeBinding(retiring, binding)) return 'retiring'
     if (this.bindingState.kind === 'transitioning') {
       const known = active ?? retiring
       if (!known) return 'future'
@@ -256,7 +256,7 @@ export class TerminalSessionRuntime {
     }
     this.stagedAuthoritativeHydration = null
     const previous = this.activeBinding()
-    const metadata = this.applyRuntimeMetadata(result, !previous || !sameBinding(previous, binding))
+    const metadata = this.applyRuntimeMetadata(result, !previous || !sameTerminalRuntimeBinding(previous, binding))
     if (!metadata.accepted) {
       if (!previous) throw new Error('stale terminal identity cannot supersede an unbound attach')
       this.bindingState = { kind: 'active', binding: previous }
@@ -265,7 +265,7 @@ export class TerminalSessionRuntime {
     this.bindingState = { kind: 'active', binding }
     return {
       accepted: true,
-      changed: !previous || !sameBinding(previous, binding) || metadata.changed,
+      changed: !previous || !sameTerminalRuntimeBinding(previous, binding) || metadata.changed,
       resolution: 'response',
     }
   }
@@ -295,7 +295,7 @@ export class TerminalSessionRuntime {
     this.stagedAuthoritativeHydration = null
     const active = this.activeBinding()
     if (source === 'partial-effect') {
-      if (this.bindingState.kind !== 'unbound' && (!active || !sameBinding(active, input))) {
+      if (this.bindingState.kind !== 'unbound' && (!active || !sameTerminalRuntimeBinding(active, input))) {
         return { disposition: 'ignored', changed: false }
       }
     } else if (
@@ -312,8 +312,8 @@ export class TerminalSessionRuntime {
     const binding = bindingFrom(input)
     const previous = this.activeBinding()
     this.bindingState = { kind: 'active', binding }
-    const metadata = this.applyRuntimeMetadata(input, !previous || !sameBinding(previous, binding))
-    return !previous || !sameBinding(previous, binding) || metadata.changed
+    const metadata = this.applyRuntimeMetadata(input, !previous || !sameTerminalRuntimeBinding(previous, binding))
+    return !previous || !sameTerminalRuntimeBinding(previous, binding) || metadata.changed
   }
 
   private stageAuthoritativeHydration(input: TerminalRepoSessionHydration): boolean {
@@ -325,7 +325,7 @@ export class TerminalSessionRuntime {
     ) {
       return false
     }
-    if (current && sameBinding(current, input)) {
+    if (current && sameTerminalRuntimeBinding(current, input)) {
       if (current.identityRevision > input.identityRevision) return false
       if (current.identityRevision === input.identityRevision && !sameHydrationIdentity(current, input)) {
         throw new Error('staged terminal identity conflicts at the same revision')
@@ -346,7 +346,7 @@ export class TerminalSessionRuntime {
     if (
       !hydration ||
       this.bindingState.kind !== 'transitioning' ||
-      !sameBinding(hydration, binding) ||
+      !sameTerminalRuntimeBinding(hydration, binding) ||
       this.classifyRuntimeBinding(hydration) !== 'future'
     ) {
       return { accepted: false, changed: false }
@@ -537,7 +537,11 @@ function bindingFrom(input: TerminalRuntimeBinding): TerminalRuntimeBinding {
   }
 }
 
-function sameBinding(a: TerminalRuntimeBinding, b: TerminalRuntimeBinding): boolean {
+export function sameTerminalRuntimeBinding(
+  a: TerminalRuntimeBinding | null,
+  b: TerminalRuntimeBinding | null,
+): boolean {
+  if (!a || !b) return a === b
   return (
     a.terminalRuntimeSessionId === b.terminalRuntimeSessionId &&
     a.terminalRuntimeGeneration === b.terminalRuntimeGeneration

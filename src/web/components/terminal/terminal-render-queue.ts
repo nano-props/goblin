@@ -1,9 +1,41 @@
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
-import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
+import {
+  normalizeTerminalOutputCheckpoint,
+  type TerminalOutputCheckpoint,
+} from '#/web/components/terminal/terminal-session-state.ts'
 
 export interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
+}
+
+export function latestRenderedOutputCheckpoint(
+  checkpoints: readonly RenderedOutputCheckpoint[],
+  binding: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
+): RenderedOutputCheckpoint | null {
+  return checkpoints.reduce<RenderedOutputCheckpoint | null>((latest, checkpoint) => {
+    if (!sameRenderedOutputBinding(checkpoint, binding)) return latest
+    if (!latest) return checkpoint
+    return checkpoint.seq > latest.seq ? checkpoint : latest
+  }, null)
+}
+
+export function sameRenderedOutputBinding(
+  a: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
+  b: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
+): boolean {
+  return (
+    a.terminalRuntimeSessionId === b.terminalRuntimeSessionId &&
+    a.terminalRuntimeGeneration === b.terminalRuntimeGeneration
+  )
+}
+
+export function normalizeRenderedOutputCheckpoint(checkpoint: RenderedOutputCheckpoint): RenderedOutputCheckpoint {
+  return {
+    terminalRuntimeSessionId: checkpoint.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: checkpoint.terminalRuntimeGeneration,
+    seq: normalizeTerminalOutputCheckpoint(checkpoint).seq,
+  }
 }
 
 type TerminalRenderSource = 'snapshot' | 'live-output'
