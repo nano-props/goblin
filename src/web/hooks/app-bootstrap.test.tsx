@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { StrictMode } from 'react'
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { useFakeTimers } from '#/test-utils/timers.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {
   defaultClientWorkspaceState,
   defaultServerWorkspaceState,
@@ -315,7 +316,9 @@ describe('app bootstrap hooks', () => {
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
 
-    result.container.querySelector('button')?.click()
+    await act(async () => {
+      result.container.querySelector('button')?.click()
+    })
     await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
 
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
@@ -377,7 +380,9 @@ describe('app bootstrap hooks', () => {
     const result = renderInJsdom(<Harness />)
     await vi.waitFor(() => expect(result.container.textContent).toBe('settings unavailable'))
 
-    result.container.querySelector('button')?.click()
+    await act(async () => {
+      result.container.querySelector('button')?.click()
+    })
 
     await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
@@ -396,8 +401,7 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
 
-    await vi.advanceTimersByTimeAsync(30_000)
-    await flushMicrotasks(3)
+    await advanceTimersAndFlush(30_000)
 
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
@@ -422,7 +426,9 @@ describe('app bootstrap hooks', () => {
     await vi.waitFor(() =>
       expect(result.container.textContent).toBe('authenticated workspace restore timed out after 30000ms'),
     )
-    result.container.querySelector('button')?.click()
+    await act(async () => {
+      result.container.querySelector('button')?.click()
+    })
 
     await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
@@ -439,8 +445,7 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
-    await vi.advanceTimersByTimeAsync(30_000)
-    await flushMicrotasks(3)
+    await advanceTimersAndFlush(30_000)
 
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
@@ -475,8 +480,7 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
-    await vi.advanceTimersByTimeAsync(30_000)
-    await flushMicrotasks(3)
+    await advanceTimersAndFlush(30_000)
 
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)

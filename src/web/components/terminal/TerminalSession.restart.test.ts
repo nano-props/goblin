@@ -169,6 +169,82 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
+  test('fast-fails an indeterminate restart without replaying it', async () => {
+    terminalCalls.restart.mockRejectedValueOnce(
+      new ClientRealtimeRequestError('restart response was lost', {
+        kind: 'disconnected',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+    )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+
+    session.restart()
+    await flushTerminalStart()
+
+    expect(terminalCalls.restart).toHaveBeenCalledOnce()
+    expect(session.addressableRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+    })
+    expect(session.snapshot().presentationRecovery).toBe('failed')
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+  })
+
+  test('resumes presentation from a new authoritative generation without restoring focus', async () => {
+    terminalCalls.restart.mockRejectedValueOnce(
+      new ClientRealtimeRequestError('restart response was lost', {
+        kind: 'disconnected',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+    )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', { terminalRuntimeGeneration: 2, snapshot: 'new screen' }),
+    )
+
+    const settled = vi.fn()
+    session.focus({ isCurrent: () => true, onSettled: settled })
+    session.restart()
+    await flushTerminalStart()
+    expect(session.snapshot().presentationRecovery).toBe('failed')
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      identityRevision: 0,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await flushUntil(() => terminalCalls.attach.mock.calls.length === 2)
+    await flushTerminalStart()
+
+    expect(terminalCalls.restart).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      cols: 100,
+      rows: 30,
+    })
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
+    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
+    expect(settled).toHaveBeenCalledOnce()
+  })
+
   test('retries a failed restart from the retained generation and publishes exactly old plus one', async () => {
     terminalCalls.restart
       .mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
@@ -276,7 +352,7 @@ describe('TerminalSession restart and resynchronization', () => {
     warnSpy.mockRestore()
   })
 
-  test('recovers indeterminate prepared attach from authoritative generation without retrying generation zero', async () => {
+  test('fast-fails an indeterminate attach until authoritative hydration arrives', async () => {
     terminalCalls.attach
       .mockRejectedValueOnce(
         new ClientRealtimeRequestError('socket disconnected', {
@@ -302,6 +378,7 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
     expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
     expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+    expect(session.snapshot().presentationRecovery).toBe('failed')
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -315,13 +392,7 @@ describe('TerminalSession restart and resynchronization', () => {
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
     })
-    const pending = session.pendingAuthoritativeRuntimeBinding()
-    expect(pending).toEqual({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-    })
-    expect(session.commitPendingAuthoritativeHydration(pending!)).toBe(true)
-    session.resynchronizeConnectedView()
+    expect(session.pendingAuthoritativeRuntimeBinding()).toBeNull()
     await flushTerminalStart()
 
     expect(terminalCalls.attach.mock.calls).toEqual([
@@ -344,9 +415,9 @@ describe('TerminalSession restart and resynchronization', () => {
     ])
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('authoritative recovery', expect.any(Function))
-    expect(xtermMocks.terminals.at(-1)!.focus).toHaveBeenCalledOnce()
+    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
     expect(settled).toHaveBeenCalledOnce()
-    expect(host.contains(document.activeElement)).toBe(true)
+    expect(host.contains(document.activeElement)).toBe(false)
   })
 
   test('does not retain an unscoped focus request while presentation is pending', async () => {

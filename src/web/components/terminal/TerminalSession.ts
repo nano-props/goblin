@@ -914,26 +914,24 @@ export class TerminalSession {
         ? await terminalClient.restart(this.terminalRestartInput(terminalRuntimeSessionId, term))
         : await terminalClient.attach(this.terminalAttachInput(terminalRuntimeSessionId, term))
     } catch (error) {
-      if (error instanceof ClientRealtimeRequestError && error.delivery === 'indeterminate') {
-        this.runtime.markStartAttemptIndeterminate(attempt)
-        terminalLog.warn('terminal start delivery is indeterminate; awaiting authoritative recovery', {
-          terminalRuntimeSessionId,
-          operation: attempt.operation,
-          error,
-        })
-        return null
-      }
+      const indeterminate = error instanceof ClientRealtimeRequestError && error.delivery === 'indeterminate'
+      if (indeterminate) this.runtime.markStartAttemptIndeterminate(attempt)
       const resolution = this.runtime.cancelStartAttempt(attempt)
       if (resolution === 'staged') this.applySettledStagedHydration()
       else if (resolution === 'restored') {
-        if (this.presentationRecovery === 'pending') this.setPresentationRecovery('failed')
+        if (indeterminate || this.presentationRecovery === 'pending') this.setPresentationRecovery('failed')
         else this.notify('metadata')
       }
-      terminalLog.warn('terminal start request failed before an authoritative response', {
-        terminalRuntimeSessionId,
-        operation: attempt.operation,
-        error,
-      })
+      terminalLog.warn(
+        indeterminate
+          ? 'terminal start delivery is indeterminate; failing the local presentation attempt'
+          : 'terminal start request failed before an authoritative response',
+        {
+          terminalRuntimeSessionId,
+          operation: attempt.operation,
+          error,
+        },
+      )
       return null
     }
 

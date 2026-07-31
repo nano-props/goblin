@@ -375,7 +375,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('generation 2 recovery', expect.any(Function))
   })
 
-  test.each(['negative response', 'not-sent transport rejection'] as const)(
+  test.each(['negative response', 'not-sent transport rejection', 'indeterminate transport rejection'] as const)(
     'does not let a superseded recovery %s overwrite the newer authoritative recovery',
     async (settlement) => {
       const oldAttach = Promise.withResolvers<TerminalAttachResult>()
@@ -412,12 +412,20 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
 
       if (settlement === 'negative response') {
         oldAttach.resolve({ ok: false, message: 'error.unavailable' })
-      } else {
+      } else if (settlement === 'not-sent transport rejection') {
         oldAttach.reject(
           new ClientRealtimeRequestError('attach was not sent', {
             kind: 'unavailable',
             delivery: 'not-sent',
             outageId: null,
+          }),
+        )
+      } else {
+        oldAttach.reject(
+          new ClientRealtimeRequestError('attach response was lost', {
+            kind: 'disconnected',
+            delivery: 'indeterminate',
+            outageId: 1,
           }),
         )
       }

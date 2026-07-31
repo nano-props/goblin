@@ -122,7 +122,7 @@ describe('TerminalSession takeover and identity', () => {
     expect(session.snapshot().attachment).toEqual({ role: 'viewer' })
   })
 
-  test('keeps post-takeover presentation pending when attach delivery is indeterminate', async () => {
+  test('fast-fails post-takeover presentation when attach delivery is indeterminate', async () => {
     terminalCalls.takeover.mockResolvedValueOnce(takeoverResult('pty_session_1_aaaaaaaaa'))
     terminalCalls.attach.mockRejectedValueOnce(
       new ClientRealtimeRequestError('attach response was lost', {
@@ -147,7 +147,7 @@ describe('TerminalSession takeover and identity', () => {
 
     expect(session.snapshot()).toMatchObject({
       attachment: { role: 'controller' },
-      presentationRecovery: 'pending',
+      presentationRecovery: 'failed',
     })
     expect(xtermMocks.terminals[0]!.dispose).toHaveBeenCalledOnce()
     expect(terminalCalls.attach).toHaveBeenCalledOnce()
