@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { UserSettings } from '#/shared/api-types.ts'
 import { defaultServerWorkspaceState, defaultUserSettings } from '#/shared/settings-defaults.ts'
-import type { UserSettingsData } from '#/server/modules/user-settings-codec.ts'
+import { currentSettingsData, type UserSettingsData } from '#/server/modules/user-settings-codec.ts'
 import {
   planUserSettingsPatch,
   userSettingsFromData,
@@ -60,5 +60,13 @@ describe('user settings patch policy', () => {
 
     expect(validated.fetchIntervalSec).toBe(0)
     expect(Object.is(validated.fetchIntervalSec, -0)).toBe(false)
+  })
+
+  test('normalizes a negative-zero fetch interval at the persistence boundary', () => {
+    const decoded = currentSettingsData({ ...data, fetchIntervalSec: -0 })
+
+    expect(decoded).not.toBeNull()
+    expect(Object.is(decoded?.fetchIntervalSec, -0)).toBe(false)
+    expect(decoded?.fetchIntervalSec).toBe(0)
   })
 })
