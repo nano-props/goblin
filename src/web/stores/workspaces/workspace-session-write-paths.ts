@@ -263,27 +263,31 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
 
+  const currentWorkspaces = get().workspaces
+  const targets: SettledWorkspaceRuntimeMembershipRecovery['targets'] = []
+  const remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }> = []
+  for (const { workspaceId } of captured) {
+    const currentWorkspaceRuntimeId = currentWorkspaces[workspaceId]?.workspaceRuntimeId
+    if (!currentWorkspaceRuntimeId) continue
+    targets.push({ workspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId })
+
+    const runtime = runtimeByWorkspaceId.get(workspaceId)
+    if (
+      runtime &&
+      isRemoteWorkspaceId(workspaceId) &&
+      currentWorkspaceRuntimeId === runtime.workspaceRuntimeId &&
+      ['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
+    ) {
+      remoteEnsureTargets.push({ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId })
+    }
+  }
+
   return {
     kind: 'settled',
-    targets: captured.flatMap(({ workspaceId }) => {
-      const workspaceRuntimeId = get().workspaces[workspaceId]?.workspaceRuntimeId
-      return workspaceRuntimeId ? [{ workspaceId, workspaceRuntimeId }] : []
-    }),
+    targets,
     changedTargets,
     declaredWorkspaceIds: captured.map((entry) => entry.workspaceId),
-    remoteEnsureTargets: captured.flatMap(({ workspaceId }) => {
-      const runtime = runtimeByWorkspaceId.get(workspaceId)
-      const currentWorkspaceRuntimeId = get().workspaces[workspaceId]?.workspaceRuntimeId
-      if (
-        !runtime ||
-        !isRemoteWorkspaceId(workspaceId) ||
-        currentWorkspaceRuntimeId !== runtime.workspaceRuntimeId ||
-        !['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
-      ) {
-        return []
-      }
-      return [{ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId }]
-    }),
+    remoteEnsureTargets,
   }
 }
 
