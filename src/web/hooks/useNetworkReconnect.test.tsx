@@ -3,7 +3,6 @@
 import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import {
   isRemoteWorkspaceId,
   normalizeRemoteTarget,
@@ -82,45 +81,39 @@ function seedRepo(id: ReturnType<typeof workspaceIdForTest>, lifecycle: RemoteWo
 }
 
 describe('useNetworkReconnect', () => {
-  test('re-probes a `failed` remote repo on `online`', async () => {
+  test('re-probes a `failed` remote repo on `online`', () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
     mountHook()
 
     fireOnline()
-    await flushMicrotasks(10)
     expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
-  test('skips a `ready` remote repo (no re-probe on online)', async () => {
+  test('skips a `ready` remote repo (no re-probe on online)', () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'ready', target })
     mountHook()
 
     fireOnline()
-    await flushMicrotasks(10)
     expect(runRemoteWorkspaceConnection).not.toHaveBeenCalled()
   })
 
-  test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', async () => {
+  test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'connecting' })
     mountHook()
 
     fireOnline()
-    await flushMicrotasks(10)
-
     expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
-  test('skips local repos entirely', async () => {
+  test('skips local repos entirely', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/local-workspace')
     seedRepo(workspaceId, null)
     mountHook()
 
     fireOnline()
-    await flushMicrotasks(10)
-
     // Local repos don't have a lifecycle at all. The hook
     // must not call `runRemoteWorkspaceConnection` for them — which
     // means the repo remains untouched.
@@ -128,7 +121,7 @@ describe('useNetworkReconnect', () => {
     expect(repo?.admission).toEqual({ kind: 'local' })
   })
 
-  test('cleans up the window listener on unmount', async () => {
+  test('cleans up the window listener on unmount', () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
     mountHook()
@@ -140,12 +133,10 @@ describe('useNetworkReconnect', () => {
     })
 
     fireOnline()
-    await flushMicrotasks(10)
-
     expect(runRemoteWorkspaceConnection).not.toHaveBeenCalled()
   })
 
-  test('reads the latest repo set on each event (not a captured snapshot)', async () => {
+  test('reads the latest repo set on each event (not a captured snapshot)', () => {
     // The hook captures setRef / getRef to the live store, so a
     // `failed` repo added AFTER the hook mounted is still
     // re-probed on the next `online` event. This pins the
@@ -155,8 +146,6 @@ describe('useNetworkReconnect', () => {
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
 
     fireOnline()
-    await flushMicrotasks(10)
-
     expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
@@ -172,11 +161,11 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    await flushMicrotasks(10)
-
-    expect(warn).toHaveBeenCalledWith('remote workspace reconnect command failed', {
-      workspaceId: target.id,
-      reason: 'unknown',
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith('remote workspace reconnect command failed', {
+        workspaceId: target.id,
+        reason: 'unknown',
+      })
     })
   })
 })

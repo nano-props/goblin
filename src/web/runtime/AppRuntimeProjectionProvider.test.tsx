@@ -550,7 +550,7 @@ describe('AppRuntimeProjectionProvider', () => {
       revision: 1,
       sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
     })
-    await flushMicrotasks(2)
+    await waitForNextMacrotask()
 
     expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
     expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
@@ -583,7 +583,7 @@ describe('AppRuntimeProjectionProvider', () => {
       targets: [{ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId }],
       changedTargets: [],
     })
-    await flushMicrotasks(2)
+    await waitForNextMacrotask()
 
     expect(recoverSessionsMock).not.toHaveBeenCalled()
     expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
