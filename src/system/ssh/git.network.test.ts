@@ -182,7 +182,6 @@ describe('remote git network', () => {
       signal: undefined,
       timeoutMs: 180_000,
     })
-    expect(run).not.toHaveBeenCalledWith({ type: 'gitFetchAll', path: '/srv/repo' }, TARGET, expect.anything())
   })
 
   test.each(['gitSnapshot', 'gitRemoteVerbose', 'gitUpstream'] as const)(

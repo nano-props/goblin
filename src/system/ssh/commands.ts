@@ -40,7 +40,6 @@ export type RemoteCommandKind =
   | { type: 'gitWorktreeList'; path: string }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
-  | { type: 'gitFetchAll'; path: string }
   | { type: 'gitFetchRemote'; path: string; remote: string }
   | { type: 'gitStatusAll'; path: string }
   | { type: 'gitDiffNoIndex'; path: string; filePath: string }
@@ -58,7 +57,6 @@ export type RemoteCommandKind =
   | { type: 'gitUpstream'; path: string; branch: string }
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
   | { type: 'gitRemoteVerbose'; path: string }
-  | { type: 'gitRemoteGetUrl'; path: string }
   | { type: 'readRemoteFile'; path: string }
   | {
       type: 'bootstrapRemoteWorktree'
@@ -351,8 +349,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '--',
       ].join(' ')
     }
-    case 'gitFetchAll':
-      return `git -C ${shellQuote(command.path)} fetch --all --prune`
     case 'gitFetchRemote':
       return `git -C ${shellQuote(command.path)} fetch --prune -- ${shellQuote(command.remote)}`
     case 'gitPullCurrent':
@@ -401,8 +397,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         'goblin_status=$?',
         `if [ "$goblin_status" -eq 0 ]; then printf 'true\\n'; elif [ "$goblin_status" -eq 1 ]; then printf 'false\\n'; else exit "$goblin_status"; fi`,
       ].join('\n')
-    case 'gitRemoteGetUrl':
-      return `git -C ${shellQuote(command.path)} remote get-url origin`
     case 'gitRemoteVerbose':
       return `git -C ${shellQuote(command.path)} remote -v`
     case 'readRemoteFile':
