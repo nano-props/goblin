@@ -221,6 +221,33 @@ interface WorkspacePaneTabChromeProps extends Omit<WorkspacePaneTabProps, 'focus
   buttonProps?: ComponentPropsWithoutRef<'button'>
 }
 
+type WorkspacePaneTabCloseProps =
+  | { closeButton: false }
+  | { closeButton: 'placeholder' }
+  | {
+      closeLabel: string
+      closeVisible: boolean
+      closeDisabled: boolean
+      onClose: (event: MouseEvent<HTMLButtonElement>) => void
+    }
+
+function workspacePaneTabCloseProps(
+  item: WorkspacePaneTabItem,
+  compact: boolean,
+  isActive: boolean,
+  interactionDisabled: boolean,
+  onClose: (event: MouseEvent, identity: string) => void,
+): WorkspacePaneTabCloseProps {
+  if (compact) return { closeButton: false }
+  if (isPendingWorkspacePaneTabItem(item) || item.closable === false) return { closeButton: 'placeholder' }
+  return {
+    closeLabel: item.closeLabel,
+    closeVisible: isActive,
+    closeDisabled: interactionDisabled,
+    onClose: (event) => onClose(event, item.identity),
+  }
+}
+
 function WorkspacePaneTabChrome({
   item,
   isActive,
@@ -245,17 +272,7 @@ function WorkspacePaneTabChrome({
   const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps =
-    compact
-      ? ({ closeButton: false } as const)
-      : isPendingWorkspacePaneTabItem(item) || item.closable === false
-      ? ({ closeButton: 'placeholder' } as const)
-      : ({
-          closeLabel: item.closeLabel,
-          closeVisible: isActive,
-          closeDisabled: interactionDisabled,
-          onClose: (event: MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
-        } as const)
+  const closeProps = workspacePaneTabCloseProps(item, compact, isActive, interactionDisabled, onClose)
   const collectionAria =
     index !== undefined && total !== undefined ? { 'aria-posinset': index + 1, 'aria-setsize': total } : {}
   return (
