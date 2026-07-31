@@ -18,6 +18,7 @@ import {
   localWorktreeRepoIds,
   remoteWorktreeRepoIds,
   withAffectedRepoIds,
+  withAffectedRepoIdsIfChanged,
   workspaceIdForLocalWorktreePath,
   type RepoMutationResult,
 } from '#/server/modules/repo-mutation-impact.ts'
@@ -418,13 +419,13 @@ function createLocalRepoSource(
       if (!available.ok) return available
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const fetched = await fetchAll(repoId, signal)
-      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return withAffectedRepoIdsIfChanged(fetched, affectedRepoIds)
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
       const pulled = await pullBranch(repoId, branch, worktreePath, signal)
-      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return withAffectedRepoIdsIfChanged(pulled, affectedRepoIds)
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -450,7 +451,7 @@ function createLocalRepoSource(
         ...(createdWorkspaceId ? [createdWorkspaceId] : []),
       ]
       const created = await createWorktree(repoId, input, signal)
-      if (!created.ok) return created.repositoryStateChanged ? withAffectedRepoIds(created, affectedRepoIds) : created
+      if (!created.ok) return withAffectedRepoIdsIfChanged(created, affectedRepoIds)
       if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
       const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, input.worktreePath, {
         signal,
@@ -481,7 +482,7 @@ function createLocalRepoSource(
       if (validation) return validation
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
       const deleted = await deleteBranchAfterValidation(branch, upstream, options, signal)
-      return deleted.ok || deleted.repositoryStateChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
+      return withAffectedRepoIdsIfChanged(deleted, affectedRepoIds)
     },
     async removeWorktree(input, signal, lifecycle) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -603,12 +604,12 @@ async function createRemoteRepoSource(
     async fetch(signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const fetched = await fetchRemoteRepo(target, { signal, run })
-      return fetched.ok || fetched.repositoryStateChanged ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
+      return withAffectedRepoIdsIfChanged(fetched, affectedRepoIds)
     },
     async pull(branch, worktreePath, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
-      return pulled.ok || pulled.repositoryStateChanged ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
+      return withAffectedRepoIdsIfChanged(pulled, affectedRepoIds)
     },
     async push(branch, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
@@ -628,7 +629,7 @@ async function createRemoteRepoSource(
       const existingRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const created = await createRemoteWorktree(target, { ...input, signal, run })
       const affectedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, created.affectedWorktreePaths)]
-      if (!created.ok) return created.repositoryStateChanged ? withAffectedRepoIds(created, affectedRepoIds) : created
+      if (!created.ok) return withAffectedRepoIdsIfChanged(created, affectedRepoIds)
       if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
       const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
         signal,
@@ -655,7 +656,7 @@ async function createRemoteRepoSource(
         signal,
         run,
       })
-      return deleted.ok || deleted.repositoryStateChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
+      return withAffectedRepoIdsIfChanged(deleted, affectedRepoIds)
     },
     async removeWorktree(input, signal, lifecycle) {
       const exactExecution = physicalWorktreeCapability

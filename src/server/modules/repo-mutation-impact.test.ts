@@ -5,6 +5,7 @@ import {
   localWorktreeRepoIds,
   remoteWorktreeRepoIds,
   withAffectedRepoIds,
+  withAffectedRepoIdsIfChanged,
   workspaceIdForLocalWorktreePath,
 } from '#/server/modules/repo-mutation-impact.ts'
 
@@ -18,6 +19,28 @@ describe('repo mutation impact', () => {
       affectedRepoIds: [workspaceId],
     })
     expect(withAffectedRepoIds(result, [])).toBe(result)
+  })
+
+  test('only attaches affected repos when the mutation changed repository state', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/main')
+    const unchangedFailure = { ok: false, message: 'rejected' }
+
+    expect(withAffectedRepoIdsIfChanged({ ok: true, message: 'updated' }, [workspaceId])).toEqual({
+      ok: true,
+      message: 'updated',
+      affectedRepoIds: [workspaceId],
+    })
+    expect(
+      withAffectedRepoIdsIfChanged({ ok: false, message: 'partial failure', repositoryStateChanged: true }, [
+        workspaceId,
+      ]),
+    ).toEqual({
+      ok: false,
+      message: 'partial failure',
+      repositoryStateChanged: true,
+      affectedRepoIds: [workspaceId],
+    })
+    expect(withAffectedRepoIdsIfChanged(unchangedFailure, [workspaceId])).toBe(unchangedFailure)
   })
 
   test('projects non-bare local worktrees to canonical workspace ids', () => {

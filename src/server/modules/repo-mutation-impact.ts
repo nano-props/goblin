@@ -15,6 +15,13 @@ export function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonl
   return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
 }
 
+export function withAffectedRepoIdsIfChanged(
+  result: ExecResult,
+  affectedRepoIds: readonly WorkspaceId[],
+): RepoMutationResult {
+  return result.ok || result.repositoryStateChanged ? withAffectedRepoIds(result, affectedRepoIds) : result
+}
+
 export function localWorktreeRepoIds(worktrees: readonly WorktreeInfo[]): WorkspaceId[] {
   return compact(worktrees.map((worktree) => (worktree.isBare ? null : workspaceIdForLocalWorktreePath(worktree.path))))
 }
