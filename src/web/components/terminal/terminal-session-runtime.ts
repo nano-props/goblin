@@ -177,17 +177,7 @@ export class TerminalSessionRuntime {
   }
 
   startAttaching(): TerminalRuntimeAttemptToken {
-    const active = this.activeBinding()
-    const attempt = { attemptId: ++this.nextAttemptId, operation: 'attach' as const }
-    this.bindingState = {
-      kind: 'transitioning',
-      operation: 'attach',
-      active,
-      retiring: null,
-      attemptId: attempt.attemptId,
-      delivery: 'pending',
-    }
-    return attempt
+    return this.startAttempt('attach', this.activeBinding(), null)
   }
 
   prepareRestart(): TerminalRuntimeAttemptToken | null {
@@ -195,23 +185,22 @@ export class TerminalSessionRuntime {
     const addressable = this.addressableRuntimeBinding()
     if (!addressable) return null
     if (addressable.terminalRuntimeGeneration === 0) {
-      const attempt = { attemptId: ++this.nextAttemptId, operation: 'attach' as const }
-      this.bindingState = {
-        kind: 'transitioning',
-        operation: 'attach',
-        active: addressable,
-        retiring: null,
-        attemptId: attempt.attemptId,
-        delivery: 'pending',
-      }
-      return attempt
+      return this.startAttempt('attach', addressable, null)
     }
-    const attempt = { attemptId: ++this.nextAttemptId, operation: 'restart' as const }
+    return this.startAttempt('restart', null, addressable)
+  }
+
+  private startAttempt(
+    operation: TerminalRuntimeAttemptToken['operation'],
+    active: TerminalRuntimeBinding | null,
+    retiring: TerminalRuntimeBinding | null,
+  ): TerminalRuntimeAttemptToken {
+    const attempt = { attemptId: ++this.nextAttemptId, operation }
     this.bindingState = {
       kind: 'transitioning',
-      operation: 'restart',
-      active: null,
-      retiring: addressable,
+      operation,
+      active,
+      retiring,
       attemptId: attempt.attemptId,
       delivery: 'pending',
     }
