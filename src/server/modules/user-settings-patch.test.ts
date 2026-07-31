@@ -45,4 +45,13 @@ describe('user settings patch policy', () => {
   test('projects only public user preference fields', () => {
     expect(userSettingsFromData(data)).toEqual(defaultUserSettings())
   })
+
+  test('preserves the original primitive comparison for negative zero fetch intervals', () => {
+    const negativeZeroData = { ...data, fetchIntervalSec: -0 }
+    const plan = planUserSettingsPatch(negativeZeroData, validateUserSettingsPatch({ fetchIntervalSec: 0 }))
+
+    expect(plan.changed).toBe(false)
+    expect(plan.fetchIntervalChanged).toBe(false)
+    expect(plan.next).toBe(negativeZeroData)
+  })
 })

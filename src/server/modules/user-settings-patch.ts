@@ -1,4 +1,3 @@
-import { isEqual } from 'es-toolkit'
 import type { UserSettings } from '#/shared/api-types.ts'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme } from '#/shared/color-theme.ts'
@@ -81,7 +80,7 @@ export function planUserSettingsPatch(
     globalShortcut: patch.globalShortcut ?? data.globalShortcut,
     lanEnabled: patch.lanEnabled ?? data.lanEnabled,
   }
-  const changed = !isEqual(userSettingsFromData(data), userSettingsFromData(next))
+  const changed = !sameUserSettings(userSettingsFromData(data), userSettingsFromData(next))
   return {
     next: changed ? next : data,
     changed,
@@ -101,6 +100,20 @@ export function userSettingsFromData(data: UserSettingsData): UserSettings {
     globalShortcut: data.globalShortcut,
     lanEnabled: data.lanEnabled,
   }
+}
+
+function sameUserSettings(left: UserSettings, right: UserSettings): boolean {
+  return (
+    left.lang === right.lang &&
+    left.theme === right.theme &&
+    left.colorTheme === right.colorTheme &&
+    left.fetchIntervalSec === right.fetchIntervalSec &&
+    left.terminalNotificationsEnabled === right.terminalNotificationsEnabled &&
+    left.shortcutsDisabled === right.shortcutsDisabled &&
+    left.globalShortcutDisabled === right.globalShortcutDisabled &&
+    left.globalShortcut === right.globalShortcut &&
+    left.lanEnabled === right.lanEnabled
+  )
 }
 
 function optionalCommandValue<T>(
