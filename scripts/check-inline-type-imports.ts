@@ -2,10 +2,10 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { glob } from 'tinyglobby'
-import { findInlineTypeImportViolations } from '#scripts/inline-type-import-policy.ts'
+import { findInlineTypeImportViolations, INLINE_TYPE_IMPORT_SOURCE_GLOBS } from '#scripts/inline-type-import-policy.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const sourceFiles = await glob('src/**/*.{ts,tsx}', { cwd: repoRoot })
+const sourceFiles = await glob(INLINE_TYPE_IMPORT_SOURCE_GLOBS, { cwd: repoRoot })
 const violations: string[] = []
 
 for (const file of sourceFiles) {

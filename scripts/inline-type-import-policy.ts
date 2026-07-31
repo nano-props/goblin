@@ -1,5 +1,13 @@
 import { parse } from '@babel/parser'
 
+export const INLINE_TYPE_IMPORT_SOURCE_GLOBS = [
+  '**/*.{ts,tsx}',
+  '!node_modules/**',
+  '!dist/**',
+  '!release/**',
+  '!coverage/**',
+] as const
+
 export function findInlineTypeImportViolations(source: string, file: string): string[] {
   const violations: string[] = []
   const ast = parse(source, {

@@ -1,9 +1,19 @@
 import { describe, expect, test } from 'vitest'
-import { findInlineTypeImportViolations } from '#scripts/inline-type-import-policy.ts'
+import { findInlineTypeImportViolations, INLINE_TYPE_IMPORT_SOURCE_GLOBS } from '#scripts/inline-type-import-policy.ts'
 
 const file = 'src/example.ts'
 
 describe('inline type import policy', () => {
+  test('covers repository TypeScript while excluding dependencies and generated output', () => {
+    expect(INLINE_TYPE_IMPORT_SOURCE_GLOBS).toEqual([
+      '**/*.{ts,tsx}',
+      '!node_modules/**',
+      '!dist/**',
+      '!release/**',
+      '!coverage/**',
+    ])
+  })
+
   test.each(['type Example = import("example").Example', 'type ExampleModule = typeof import("example")'])(
     'rejects inline type imports: %s',
     (source) => {
