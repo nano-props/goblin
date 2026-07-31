@@ -17,8 +17,8 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-mode.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
-// data queries; the store contributes only identity, UI, and operation
-// shell fields for the list.
+// data queries; the store contributes only identity, client preference, and
+// operation shell fields for the list.
 export type BranchListRepo = BranchActionRepo
 
 type BranchListDataRepo = BranchListRepo & { branchViewMode: BranchViewMode }
