@@ -269,6 +269,30 @@ describe('useKeyboard', () => {
     expect(goForward).toHaveBeenCalledWith(REPO_ID)
   })
 
+  test('command-bracket navigates workspace history on macOS', async () => {
+    const originalPlatform = window.navigator.platform
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'MacIntel' })
+    const goBack = vi.fn()
+    const goForward = vi.fn()
+    try {
+      await renderHookHost({
+        currentWorkspaceId: REPO_ID,
+        navigation: navigationWith({ goBack, goForward }),
+      })
+
+      await act(async () => {
+        window.dispatchEvent(keyboardEventForTest('keydown', { key: '[', code: 'BracketLeft', metaKey: true }))
+        window.dispatchEvent(keyboardEventForTest('keydown', { key: ']', code: 'BracketRight', metaKey: true }))
+        await Promise.resolve()
+      })
+
+      expect(goBack).toHaveBeenCalledWith(REPO_ID)
+      expect(goForward).toHaveBeenCalledWith(REPO_ID)
+    } finally {
+      Object.defineProperty(window.navigator, 'platform', { configurable: true, value: originalPlatform })
+    }
+  })
+
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
     installNativeBridgeStub()
     seedTabbedWorktreeRepoForTest('status')
