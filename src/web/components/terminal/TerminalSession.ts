@@ -226,6 +226,19 @@ export class TerminalSession {
     return true
   }
 
+  setComposerDraft(draft: string): boolean {
+    if (this.disposed) return false
+    if (this.runtime.setComposerDraft(draft)) this.notify('snapshot')
+    return true
+  }
+
+  replaceComposerDraft(expectedDraft: string, draft: string): boolean {
+    if (this.disposed) return false
+    const changed = this.runtime.replaceComposerDraft(expectedDraft, draft)
+    if (changed) this.notify('snapshot')
+    return changed
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true

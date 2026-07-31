@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/components/terminal/types.ts'
 
-const DEFAULT_COMPOSER = { expanded: false, mode: 'input' as const, historyEntries: [] }
+const DEFAULT_COMPOSER = { expanded: false, mode: 'input' as const, draft: '', historyEntries: [] }
 
 type IdentityAndRuntimeMetadataForTest = Parameters<TerminalSessionState['establishIdentity']>[0] &
   Parameters<TerminalSessionState['applyRuntimeMetadata']>[0]
@@ -16,7 +16,7 @@ function applyIdentityAndRuntimeMetadataForTest(
 }
 
 describe('TerminalSessionState', () => {
-  test('owns Composer mode, expansion, and bounded immutable history', () => {
+  test('owns Composer mode, expansion, verbatim draft, and bounded immutable history', () => {
     const state = new TerminalSessionState()
     const initialHistory = state.snapshot(null).composer.historyEntries
 
@@ -25,6 +25,11 @@ describe('TerminalSessionState', () => {
     expect(state.setComposerMode('input')).toBe(false)
     expect(state.setComposerMode('keys')).toBe(true)
     expect(state.setComposerMode('input')).toBe(true)
+    expect(state.setComposerDraft('line one\r\nline two')).toBe(true)
+    expect(state.setComposerDraft('line one\r\nline two')).toBe(false)
+    expect(state.replaceComposerDraft('different draft', '')).toBe(false)
+    expect(state.snapshot(null).composer.draft).toBe('line one\r\nline two')
+    expect(state.replaceComposerDraft('line one\r\nline two', 'replacement')).toBe(true)
     expect(state.recordComposerHistory('')).toBe(false)
 
     for (let index = 0; index < 51; index += 1) {
@@ -35,6 +40,7 @@ describe('TerminalSessionState', () => {
     const composer = state.snapshot(null).composer
     expect(composer.expanded).toBe(true)
     expect(composer.mode).toBe('input')
+    expect(composer.draft).toBe('replacement')
     expect(composer.historyEntries).not.toBe(initialHistory)
     expect(composer.historyEntries).toHaveLength(50)
     expect(composer.historyEntries[0]).toBe('command 1')
@@ -48,11 +54,13 @@ describe('TerminalSessionState', () => {
 
     first.setComposerExpanded(true)
     first.setComposerMode('keys')
+    first.setComposerDraft('first session draft')
     first.recordComposerHistory('first session only')
 
     expect(first.snapshot(null).composer).toEqual({
       expanded: true,
       mode: 'keys',
+      draft: 'first session draft',
       historyEntries: ['first session only'],
     })
     expect(second.snapshot(null).composer).toEqual(DEFAULT_COMPOSER)
@@ -302,7 +310,7 @@ describe('TerminalSessionState', () => {
       message: null,
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
-      composer: { expanded: true, mode: 'input', historyEntries: ['kept command'] },
+      composer: { expanded: true, mode: 'input', draft: '', historyEntries: ['kept command'] },
       attachment: {
         role: 'viewer',
       },

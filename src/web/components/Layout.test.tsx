@@ -85,7 +85,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
       phase: 'opening',
       message: null,
       processName: 'terminal',
-      composer: { expanded: false, mode: 'keys', historyEntries: [] },
+      composer: { expanded: false, mode: 'keys', draft: '', historyEntries: [] },
     }),
     subscribeSnapshot: () => () => {},
   }
@@ -103,6 +103,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     scrollLines: vi.fn(),
     setComposerExpanded: vi.fn(() => true),
     setComposerMode: vi.fn(() => true),
+    setComposerDraft: vi.fn(() => true),
+    replaceComposerDraft: vi.fn(() => true),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => false),
     attach: vi.fn(),

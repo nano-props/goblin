@@ -10,6 +10,8 @@ type TestTerminalSessionContextValue = Omit<
   | 'retryPresentation'
   | 'setComposerExpanded'
   | 'setComposerMode'
+  | 'setComposerDraft'
+  | 'replaceComposerDraft'
 > &
   Partial<
     Pick<
@@ -21,6 +23,8 @@ type TestTerminalSessionContextValue = Omit<
       | 'retryPresentation'
       | 'setComposerExpanded'
       | 'setComposerMode'
+      | 'setComposerDraft'
+      | 'replaceComposerDraft'
     >
   >
 type CreatedAdmissionTestTerminalSessionContextValue = Omit<
@@ -52,6 +56,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
   const setComposerExpanded = context.setComposerExpanded ?? unexpectedContextCapability('setComposerExpanded')
   const setComposerMode = context.setComposerMode ?? unexpectedContextCapability('setComposerMode')
+  const setComposerDraft = context.setComposerDraft ?? unexpectedContextCapability('setComposerDraft')
+  const replaceComposerDraft = context.replaceComposerDraft ?? unexpectedContextCapability('replaceComposerDraft')
   return {
     ...context,
     createTerminalWithAdmission,
@@ -61,6 +67,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     retryPresentation,
     setComposerExpanded,
     setComposerMode,
+    setComposerDraft,
+    replaceComposerDraft,
   }
 }
 

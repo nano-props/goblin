@@ -395,6 +395,14 @@ export class TerminalSessionRuntime {
     return this.state.setComposerMode(mode)
   }
 
+  setComposerDraft(draft: string): boolean {
+    return this.state.setComposerDraft(draft)
+  }
+
+  replaceComposerDraft(expectedDraft: string, draft: string): boolean {
+    return this.state.replaceComposerDraft(expectedDraft, draft)
+  }
+
   recordComposerHistory(text: string): boolean {
     return this.state.recordComposerHistory(text)
   }

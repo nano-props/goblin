@@ -204,6 +204,17 @@ export async function renderTerminalSession(
       if (snapshot.composer.mode !== mode) updateComposer({ ...snapshot.composer, mode })
       return true
     },
+    setComposerDraft: (terminalSessionId, draft) => {
+      if (terminalSessionId !== descriptor.terminalSessionId) return false
+      if (snapshot.composer.draft !== draft) updateComposer({ ...snapshot.composer, draft })
+      return true
+    },
+    replaceComposerDraft: (terminalSessionId, expectedDraft, draft) => {
+      if (terminalSessionId !== descriptor.terminalSessionId) return false
+      if (snapshot.composer.draft !== expectedDraft || expectedDraft === draft) return false
+      updateComposer({ ...snapshot.composer, draft })
+      return true
+    },
     captureInputWriter: (terminalSessionId) => (data) => {
       writeInput(terminalSessionId, data)
       return true

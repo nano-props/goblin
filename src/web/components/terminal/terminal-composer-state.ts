@@ -4,6 +4,7 @@ export function createInitialTerminalComposerState(): TerminalComposerSessionSta
   return {
     expanded: false,
     mode: 'input',
+    draft: '',
     historyEntries: [],
   }
 }
