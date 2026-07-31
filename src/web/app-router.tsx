@@ -9,7 +9,7 @@ import {
   useMatch,
 } from '@tanstack/react-router'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { App, type WorkspaceRouteView } from '#/web/App.tsx'
+import { App, type ParsedWorkspacePaneRoute, type WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout } from '#/web/Layout.tsx'
 import { WorkspaceSessionRestoreGate } from '#/web/components/WorkspaceSessionRestore.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
@@ -235,37 +235,18 @@ export function workspaceRouteViewFromChildRoute(
       kind: 'worktree',
       workspaceId,
       worktreePath,
-      workspacePaneRoute: childRoute.worktreeTerminalSessionId
-        ? { kind: 'terminal', terminalSessionId: childRoute.worktreeTerminalSessionId }
-        : childRoute.worktreeTabKey
-          ? isWorkspacePaneStaticTabType(childRoute.worktreeTabKey)
-            ? { kind: 'static', tab: childRoute.worktreeTabKey }
-            : { kind: 'invalid-static', tabKey: childRoute.worktreeTabKey }
-          : null,
+      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.worktreeTerminalSessionId, childRoute.worktreeTabKey),
     }
   }
   if (childRoute.branchSlug) {
     const branchName = branchNameFromSlug(childRoute.branchSlug)
     if (!branchName) return { kind: 'empty', workspaceId }
-    if (childRoute.terminalSessionId) {
-      return {
-        kind: 'branch',
-        workspaceId,
-        branchName,
-        workspacePaneRoute: { kind: 'terminal', terminalSessionId: childRoute.terminalSessionId },
-      }
+    return {
+      kind: 'branch',
+      workspaceId,
+      branchName,
+      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.terminalSessionId, childRoute.tabKey),
     }
-    if (childRoute.tabKey) {
-      return {
-        kind: 'branch',
-        workspaceId,
-        branchName,
-        workspacePaneRoute: isWorkspacePaneStaticTabType(childRoute.tabKey)
-          ? { kind: 'static', tab: childRoute.tabKey }
-          : { kind: 'invalid-static', tabKey: childRoute.tabKey },
-      }
-    }
-    return { kind: 'branch', workspaceId, branchName, workspacePaneRoute: null }
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
   if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
@@ -273,16 +254,23 @@ export function workspaceRouteViewFromChildRoute(
     return {
       kind: 'workspace-root',
       workspaceId,
-      workspacePaneRoute: childRoute.workspaceTerminalSessionId
-        ? { kind: 'terminal', terminalSessionId: childRoute.workspaceTerminalSessionId }
-        : childRoute.workspaceTabKey
-          ? isWorkspacePaneStaticTabType(childRoute.workspaceTabKey)
-            ? { kind: 'static', tab: childRoute.workspaceTabKey }
-            : { kind: 'invalid-static', tabKey: childRoute.workspaceTabKey }
-          : null,
+      workspacePaneRoute: workspacePaneRouteFromParams(
+        childRoute.workspaceTerminalSessionId,
+        childRoute.workspaceTabKey,
+      ),
     }
   }
   return { kind: 'empty', workspaceId }
+}
+
+function workspacePaneRouteFromParams(
+  terminalSessionId: string | null | undefined,
+  tabKey: string | null | undefined,
+): ParsedWorkspacePaneRoute | null {
+  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
+  if (!tabKey) return null
+  if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
+  return { kind: 'invalid-static', tabKey }
 }
 
 function useWorkspaceRouteNavigation() {

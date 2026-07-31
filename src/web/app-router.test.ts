@@ -267,6 +267,23 @@ describe('workspace route view derivation', () => {
     })
   })
 
+  test('prefers a terminal child route when terminal and static params are both present', () => {
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
+        dashboard: false,
+        workspace: true,
+        workspaceTabKey: 'files',
+        workspaceTerminalSessionId: 'term-111111111111111111111',
+        branchSlug: null,
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'workspace-root',
+      workspaceId: ROUTE_WORKSPACE_ID,
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+    })
+  })
+
   test('maps a detached worktree terminal URL to a filesystem surface', () => {
     expect(
       workspaceRouteViewFromChildRoute(GIT_WORKSPACE_ID, {
