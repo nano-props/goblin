@@ -385,13 +385,16 @@ export type IpcEvent =
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
 
-export interface NativeHostIpcHandlers {
+export interface NativeHostSettingsIpcHandlers {
+  settings: {
+    setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
+  }
+}
+
+export interface NativeHostIpcHandlers extends NativeHostSettingsIpcHandlers {
   clientWorkspace: {
     read: (_input: undefined) => Promise<NativeClientWorkspaceReadResult>
     write: (input: ClientWorkspaceState) => Promise<void>
-  }
-  settings: {
-    setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
   }
 }
 
