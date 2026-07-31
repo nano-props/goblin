@@ -669,24 +669,12 @@ async function readRemoteTrackingAuthority(
   return { refs: result.stdout, remotes: authorities }
 }
 
-async function readRemoteWorktreeList(
-  target: RemoteWorkspaceTarget,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
-): Promise<WorktreeInfo[]> {
-  const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
-    signal: options.signal,
-  })
-  options.signal?.throwIfAborted()
-  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  return decodeRemoteWorktrees(result.stdout)
-}
-
 export async function getRemoteRepoWorktreePaths(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
+  const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 }
 
