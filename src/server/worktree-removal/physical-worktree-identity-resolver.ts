@@ -30,6 +30,10 @@ export interface ResolvePhysicalWorktreeIdentityInput {
   signal?: AbortSignal
 }
 
+export interface PhysicalWorktreeCapture {
+  capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability>
+}
+
 interface PhysicalWorktreeRuntimeEpoch {
   key: string
   userId: string
@@ -62,7 +66,7 @@ const defaultDependencies: PhysicalWorktreeIdentityResolverDependencies = {
 }
 
 /** Provider-owned canonical identity resolver, scoped to live workspace-runtime epochs. */
-export class PhysicalWorktreeIdentityResolver {
+export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture {
   private readonly deps: PhysicalWorktreeIdentityResolverDependencies
   private readonly epochs = new Map<string, PhysicalWorktreeRuntimeEpoch>()
   private readonly unsubscribeWorkspaceRuntimeClosed: () => void
@@ -108,16 +112,12 @@ export class PhysicalWorktreeIdentityResolver {
     const remote = workspace.transport === 'ssh'
     const targetPath = remote ? normalizedRemoteWorktreePath(input) : path.resolve(input.worktreePath)
     const targetKey = `${remote ? 'remote' : 'local'}\0${targetPath}`
-    let operation = epoch.inFlightByTarget.get(targetKey)
-    if (!operation) {
-      operation = this.resolveAndBind(epoch, input, targetPath, remote)
-      epoch.inFlightByTarget.set(targetKey, operation)
-      const cleanup = () => {
-        if (epoch.inFlightByTarget.get(targetKey) === operation) epoch.inFlightByTarget.delete(targetKey)
-      }
-      operation.then(cleanup, cleanup)
-    }
-    return await awaitWithAbort(operation, input.signal)
+    return await this.captureInFlight(
+      epoch,
+      targetKey,
+      () => this.resolveAndBind(epoch, input, targetPath, remote),
+      input.signal,
+    )
   }
 
   async captureWorkspace(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
@@ -128,16 +128,30 @@ export class PhysicalWorktreeIdentityResolver {
     if (!locator) throw new Error('error.workspace-locator-malformed')
     const epoch = this.activeEpoch(input)
     const targetKey = `workspace\0${locator.path}`
+    return await this.captureInFlight(
+      epoch,
+      targetKey,
+      () => this.resolveWorkspaceAndBind(epoch, input, locator),
+      input.signal,
+    )
+  }
+
+  private captureInFlight(
+    epoch: PhysicalWorktreeRuntimeEpoch,
+    targetKey: string,
+    capture: () => Promise<PhysicalWorktreeExecutionCapability>,
+    signal?: AbortSignal,
+  ): Promise<PhysicalWorktreeExecutionCapability> {
     let operation = epoch.inFlightByTarget.get(targetKey)
     if (!operation) {
-      operation = this.resolveWorkspaceAndBind(epoch, input, locator)
+      operation = capture()
       epoch.inFlightByTarget.set(targetKey, operation)
       const cleanup = () => {
         if (epoch.inFlightByTarget.get(targetKey) === operation) epoch.inFlightByTarget.delete(targetKey)
       }
       operation.then(cleanup, cleanup)
     }
-    return await awaitWithAbort(operation, input.signal)
+    return awaitWithAbort(operation, signal)
   }
 
   private async resolveWorkspaceAndBind(

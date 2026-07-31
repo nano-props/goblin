@@ -22,7 +22,7 @@ import {
 } from '#/server/terminal/terminal-session-scope.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
@@ -38,7 +38,7 @@ const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'work
 interface WorkspacePaneRuntimeApplicationDependencies {
   workspaceTabsCoordinator: WorkspacePaneRuntimeTabsCoordinator
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  physicalWorktrees: PhysicalWorktreeCapture
   terminal: ServerTerminalCreateProvider & {
     close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalCloseOutcome>
   }

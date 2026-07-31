@@ -43,8 +43,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const hostInputRef = useRef<HTMLInputElement | null>(null)
   const pathInputRef = useRef<HTMLInputElement | null>(null)
   const pending = loading
-  const pathError = remotePathError(remotePath)
-  const pathFieldError = remotePath.trim() ? pathError.errorKey : null
+  const pathFieldErrorKey = remotePath.trim() ? remotePathError(remotePath).errorKey : null
   const canSubmit = canSubmitRemoteWorkspace({ alias, remotePath, pending })
   const error = actionError ?? loadError
   const remotePathSuggestions = useDirectoryPathSuggestions({
@@ -95,14 +94,14 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
     }
   }, [hasInclude, hosts.length, open, pending])
 
-  async function resolveCurrentTarget(pathOverride?: string): Promise<RemoteWorkspaceTarget | null> {
-    const input = buildRemoteConnectionInput(alias, pathOverride ?? remotePath)
+  async function resolveCurrentTarget(): Promise<RemoteWorkspaceTarget | null> {
+    const input = buildRemoteConnectionInput(alias, remotePath)
     if (!input) return null
     return resolveRemoteWorkspaceTarget(input)
   }
 
-  async function runConnectionTest(options: { requireCanSubmit?: boolean } = {}) {
-    if (options.requireCanSubmit !== false && !canSubmit) return
+  async function handleTest() {
+    if (!canSubmit) return
     setLoading(true)
     setActionError(null)
     try {
@@ -117,26 +116,18 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
     }
   }
 
-  async function handleTest() {
-    await runConnectionTest()
-  }
-
   async function handleSubmit() {
     if (!canSubmit) return
     setLoading(true)
     setActionError(null)
     try {
       const nextTarget = await resolveCurrentTarget()
-      if (!nextTarget) {
-        setLoading(false)
-        return
-      }
+      if (!nextTarget) return
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
         const result = await testRemoteWorkspaceConnection(nextTarget)
         if (!remoteDiagnosticsAllowWorkspaceOpen(result)) {
           setDiagnostics(result)
-          setLoading(false)
           return
         }
       }
@@ -145,7 +136,6 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
         .ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
       if (!openResult.ok) {
         setActionError(formatRemoteDialogError(t, openResult.message))
-        setLoading(false)
         return
       }
       navigation.activateWorkspace(openResult.workspaceId)
@@ -244,7 +234,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
           )}
         </Field>
 
-        <Field className="gap-2" data-invalid={pathFieldError ? true : undefined}>
+        <Field className="gap-2" data-invalid={pathFieldErrorKey ? true : undefined}>
           <FieldLabel htmlFor="remote-path">{t('workspace-picker.open-remote-path-label')}</FieldLabel>
           <DirectoryPathSuggestions
             id="remote-path"
@@ -260,11 +250,11 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
             hasFetched={remotePathSuggestions.hasFetched}
             emptyLabel={t('workspace-picker.open-remote-path-no-matches')}
             placeholder={t('workspace-picker.open-remote-path-placeholder')}
-            aria-invalid={!!pathFieldError}
+            aria-invalid={!!pathFieldErrorKey}
             onPopupOpenChange={setPathSuggestionsOpen}
           />
-          {pathFieldError ? (
-            <FieldError reserveHeight>{t(pathFieldError)}</FieldError>
+          {pathFieldErrorKey ? (
+            <FieldError reserveHeight>{t(pathFieldErrorKey)}</FieldError>
           ) : (
             <FieldDescription reserveHeight aria-hidden />
           )}
@@ -320,7 +310,7 @@ export function remoteDiagnosticsAllowWorkspaceOpen(result: Pick<RemoteDiagnosti
 export function remotePathError(value: string): { errorKey: string | null } {
   const trimmed = value.trim()
   if (!trimmed) return { errorKey: 'workspace-picker.open-remote-path-required' }
-  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'workspace-picker.open-remote-path-absolute' }
+  if (!isResolvableRemotePathInput(trimmed)) return { errorKey: 'workspace-picker.open-remote-path-absolute' }
   return { errorKey: null }
 }
 
@@ -340,10 +330,9 @@ export function formatRemoteDialogError(
   err: unknown,
 ): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (message.startsWith('error.') || message.startsWith('workspace-picker.')) return t(message)
+  if (message.startsWith('error.') || message.startsWith('workspace-picker.')) {
+    const errorKey = message
+    return t(errorKey)
+  }
   return message
-}
-
-function isValidRemotePathInput(value: string): boolean {
-  return isResolvableRemotePathInput(value)
 }

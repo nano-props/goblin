@@ -10,7 +10,7 @@ import {
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type { RestorableWorkspaceState, WorkspaceSessionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -27,13 +27,22 @@ import {
 
 interface ClientWorkspaceRestorationProjection {
   id: WorkspaceId
-  ui: Pick<WorkspacesStore['workspaces'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
+  ui: WorkspacePanePreferenceProjection
   gitTargets?: ClientWorkspaceGitTargets
+}
+
+interface WorkspacePanePreferenceProjection {
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
+}
+
+interface WorkspacePaneTabsQueryWorkspaceState {
+  workspaceRuntimeId: string
+  session: WorkspaceSessionState
 }
 
 interface ClientWorkspaceBranchProjection {
   name: string
-  worktree?: { path?: string } | undefined
+  worktree?: { path?: string }
 }
 
 interface ClientWorkspaceGitTargets {
@@ -42,15 +51,17 @@ interface ClientWorkspaceGitTargets {
 
 interface ClientWorkspaceTargetProjection {
   gitTargets?: ClientWorkspaceGitTargets
-  ui?: {
-    preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
-  }
+  ui?: WorkspacePanePreferenceProjection
+}
+
+interface ClientWorkspaceTargetWithUiProjection extends ClientWorkspaceTargetProjection {
+  ui: WorkspacePanePreferenceProjection
 }
 
 type ClientWorkspaceRestorationProjectionMap = Record<string, ClientWorkspaceRestorationProjection | undefined>
 
 export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
-  workspaces: WorkspacesStore['workspaces']
+  workspaces: Record<string, WorkspaceState>
   restorableWorkspaceState: RestorableWorkspaceState
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
   restoredClientWorkspaceBaseline?: ClientWorkspaceState | null
@@ -96,7 +107,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
 }
 
 function clientWorkspaceRestorationProjections(
-  workspaces: WorkspacesStore['workspaces'],
+  workspaces: Record<string, WorkspaceState>,
   workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceRestorationProjectionMap {
   const projections: ClientWorkspaceRestorationProjectionMap = {}
@@ -120,7 +131,7 @@ function clientWorkspaceRestorationProjections(
 }
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
-  workspaces: Record<string, Pick<WorkspacesStore['workspaces'][string], 'workspaceRuntimeId' | 'session'> | undefined>,
+  workspaces: Record<string, WorkspacePaneTabsQueryWorkspaceState | undefined>,
   workspaceOrder: readonly WorkspaceId[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
@@ -141,7 +152,7 @@ function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
 function clientWorkspaceWithStubBaseline(
   clientWorkspace: ClientWorkspaceState,
   baseline: ClientWorkspaceState | null | undefined,
-  workspaces: WorkspacesStore['workspaces'],
+  workspaces: Record<string, WorkspaceState>,
   workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceState {
   if (!baseline) return clientWorkspace
@@ -198,10 +209,7 @@ function mergeBaselineSelectedTerminals(
 }
 
 function preferredWorkspacePaneTabsForClientWorkspace(
-  workspaces: Record<
-    string,
-    (ClientWorkspaceTargetProjection & Required<Pick<ClientWorkspaceTargetProjection, 'ui'>>) | undefined
-  >,
+  workspaces: Record<string, ClientWorkspaceTargetWithUiProjection | undefined>,
   workspaceOrder: readonly WorkspaceId[],
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
@@ -259,9 +267,14 @@ function workspacePaneTabsTargetKeyBelongsToWorkspace(
     return workspace.gitTargets?.branches.some((branch) => branch.name === target.branchName) ? target : null
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
-  return worktreePath && workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)
-    ? target
-    : null
+  return worktreePath && clientWorkspaceContainsWorktreePath(workspace, worktreePath) ? target : null
+}
+
+function clientWorkspaceContainsWorktreePath(
+  workspace: ClientWorkspaceTargetProjection,
+  worktreePath: string,
+): boolean {
+  return workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath) === true
 }
 
 function selectedTerminalSessionsForClientWorkspace(
@@ -282,7 +295,7 @@ function selectedTerminalSessionsForClientWorkspace(
     }
     const worktreePath = parseCanonicalWorkspaceLocator(parsed.executionRootId)?.path
     if (!worktreePath) continue
-    if (!workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
+    if (!clientWorkspaceContainsWorktreePath(workspace, worktreePath)) continue
     persisted[terminalFilesystemTargetKey] = terminalSessionId
   }
   return persisted
@@ -291,10 +304,11 @@ function selectedTerminalSessionsForClientWorkspace(
 /** Restores only the restorable workspace UI projection from ClientWorkspaceState.
  *  It intentionally does not establish a live binding back to ClientWorkspaceState;
  *  subsequent local updates flow through useClientWorkspacePersistence. */
-interface RestoredWorkspaceStateFromClientWorkspace extends Pick<
-  RestorableWorkspaceState,
-  'restoredWorkspaceId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalFilesystemTarget'
-> {
+interface RestoredWorkspaceStateFromClientWorkspace {
+  restoredWorkspaceId: RestorableWorkspaceState['restoredWorkspaceId']
+  zenMode: RestorableWorkspaceState['zenMode']
+  workspacePaneSize: RestorableWorkspaceState['workspacePaneSize']
+  selectedTerminalSessionIdByTerminalFilesystemTarget: RestorableWorkspaceState['selectedTerminalSessionIdByTerminalFilesystemTarget']
   preferredWorkspacePaneTabByTargetByWorkspace: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace']
 }
 

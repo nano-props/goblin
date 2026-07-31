@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 const mocks = vi.hoisted(() => ({ warning: vi.fn() }))
 

@@ -129,7 +129,6 @@ describe('setBranchViewMode', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test('keeps the selected branch when it remains visible', () => {

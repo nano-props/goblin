@@ -14,7 +14,6 @@ import {
   type TerminalPresentation,
   type TerminalRestartResult,
   type TerminalResizeResult,
-  type TerminalRuntimeMetadata,
   type TerminalSessionSummary,
   type TerminalSessionsChangedEvent,
   type TerminalSessionsSnapshot,
@@ -22,11 +21,8 @@ import {
   type TerminalTitleEvent,
   type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
-import {
-  isValidTerminalRuntimeSessionId,
-  isValidTerminalWriteData,
-  normalizeTerminalSize,
-} from '#/shared/terminal-validators.ts'
+import { isValidTerminalRuntimeSessionId } from '#/shared/terminal-validators.ts'
+import { isValidTerminalWriteData, normalizeTerminalSize } from '#/shared/terminal-protocol-constraints.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import {
   claimTerminalClientControl,
@@ -42,19 +38,20 @@ import {
 } from '#/server/terminal/terminal-controller.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import {
-  advanceTerminalPtyIdentityRevision,
   TerminalPtyBinding,
+  type TerminalPtyBindingAdmission,
+  type TerminalPtyMutationAdmission,
+  type TerminalPtySessionState,
+  type TerminalPtySpawnResult,
+} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+import {
+  advanceTerminalPtyIdentityRevision,
   terminalPtyBoundState,
   terminalPtyGeneration,
   terminalPtyIdentityRevision,
   terminalPtyProcessName,
-  type TerminalPtyBindingAdmission,
   type TerminalPtyBoundState,
-  type TerminalPtyMutationAdmission,
-  type TerminalPtyRecoverySnapshot,
-  type TerminalPtySessionState,
-  type TerminalPtySpawnResult,
-} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+} from '#/server/terminal/terminal-pty-state.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
@@ -65,6 +62,14 @@ import { serverLogger } from '#/server/logger.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  projectBoundTerminalRuntimeMetadata,
+  projectTerminalRuntimeMetadata,
+  projectTerminalSessionSummary,
+  projectTerminalSnapshotAttachResult,
+  projectTerminalStreamAttachResult,
+  projectTerminalTakeoverResult,
+} from '#/server/terminal/terminal-session-projection.ts'
 
 interface TerminalSessionRetirementResult {
   outcome: 'detached' | 'already-detached' | 'failed'
@@ -168,6 +173,16 @@ export interface TerminalSessionInvalidationCommit {
   publishEffects(): void
 }
 
+/**
+ * Authoritative owner of terminal directory membership and PTY resources.
+ *
+ * Admission, attachment, restart, retirement, invalidation, and retention
+ * remain together because they mutate the same directory entry and PTY
+ * binding under one lifecycle order. Splitting those workflows would move
+ * resource authority into callbacks or duplicate admission checks. Pure wire
+ * DTO construction lives in `terminal-session-projection.ts`; this class keeps
+ * the state transitions and effect publication boundary.
+ */
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<
@@ -248,7 +263,7 @@ export class TerminalSessionManager<TUser extends string | number> {
               terminalProjectionEffect: presentationChanged
                 ? { kind: 'delta', revision: this.projectionRevision(userId, scope) }
                 : { kind: 'none' },
-              ...this.runtimeMetadata(existing, controller, processName),
+              ...projectTerminalRuntimeMetadata(existing, controller, processName),
             }
           },
           publishCommittedEffects: () => {
@@ -328,7 +343,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           action: 'created',
           presentation,
           terminalProjectionEffect: { kind: 'delta', revision: this.projectionRevision(userId, scope) },
-          ...this.runtimeMetadata(session, null, processName),
+          ...projectTerminalRuntimeMetadata(session, null, processName),
         }
       },
       publishCommittedEffects: () => {
@@ -427,7 +442,10 @@ export class TerminalSessionManager<TUser extends string | number> {
           commitTerminalClientAttachment(session, clientId, attachmentDecision)
           controllerChanged = terminalIdentityChanged(session, previousController, this.sessionPresence(session))
           if (controllerChanged) advanceTerminalPtyIdentityRevision(session, current.generation)
-          committedMetadata = this.boundRuntimeMetadata(session, { cols: current.cols, rows: current.rows })
+          committedMetadata = projectBoundTerminalRuntimeMetadata(session, this.effectiveController(session), {
+            cols: current.cols,
+            rows: current.rows,
+          })
           return committedMetadata !== null
         },
       })
@@ -435,7 +453,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (!recovery.accepted || !recovery.snapshot || !committedMetadata) {
         return { ok: false, message: 'error.unavailable' }
       }
-      return this.snapshotAttachResult(recovery.snapshot, committedMetadata)
+      return projectTerminalSnapshotAttachResult(recovery.snapshot, committedMetadata)
     }
 
     if (terminalRuntimeGeneration !== 0 || session.ptyState.kind !== 'prepared') {
@@ -561,7 +579,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         if (!claimTerminalClientControl(session, clientId, presence)) return false
         controllerChanged = terminalIdentityChanged(session, previousController, presence)
         if (controllerChanged) advanceTerminalPtyIdentityRevision(session, terminalRuntimeGeneration)
-        const result = this.takeoverResult(session)
+        const result = projectTerminalTakeoverResult(session, this.effectiveController(session))
         if (!result.ok) throw new Error('committed terminal takeover lost its runtime binding')
         committedResult = result
         return true
@@ -1112,27 +1130,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private sessionSummary(session: TerminalSessionView<TUser>): TerminalSessionSummary {
-    const bound = terminalPtyBoundState(session)
-    const common = {
-      terminalRuntimeSessionId: session.id,
-      terminalRuntimeGeneration: terminalPtyGeneration(session),
-      identityRevision: terminalPtyIdentityRevision(session),
-      terminalSessionId: session.terminalSessionId,
-      controller: this.effectiveController(session),
-      processName: terminalPtyProcessName(session),
-      canonicalTitle: bound?.render.title ?? null,
-      phase: session.phase,
-      message: session.message,
-      canonicalSize: bound ? { cols: bound.cols, rows: bound.rows } : null,
-    }
-    const presentation = requiredTerminalPresentation(session)
-    if (session.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
-      return { ...common, target: session.target, presentation }
-    }
-    if (session.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
-      return { ...common, target: session.target, presentation }
-    }
-    throw new Error('terminal session target and presentation disagree')
+    return projectTerminalSessionSummary(session, this.effectiveController(session))
   }
 
   // Sends SIGWINCH to the child PTY and queues the same geometry change
@@ -1150,81 +1148,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     admission: TerminalPtyMutationAdmission,
   ): Promise<{ accepted: boolean; changed: boolean }> {
     return await session.ptyBinding.resize(session, terminalRuntimeGeneration, cols, rows, admission)
-  }
-
-  private takeoverResult(session: TerminalSessionView<TUser>): TerminalTakeoverResult {
-    const bound = terminalPtyBoundState(session)
-    if (!bound) return { ok: false, message: 'error.unavailable' }
-    return {
-      ok: true,
-      terminalRuntimeSessionId: session.id,
-      terminalRuntimeGeneration: bound.generation,
-      identityRevision: terminalPtyIdentityRevision(session),
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: this.effectiveController(session),
-      canonicalSize: { cols: bound.cols, rows: bound.rows },
-      phase: session.phase,
-    }
-  }
-
-  private runtimeMetadata(
-    session: TerminalSessionView<TUser>,
-    controller: TerminalController | null = this.effectiveController(session),
-    processName: string = terminalPtyProcessName(session),
-  ): TerminalRuntimeMetadata {
-    const bound = terminalPtyBoundState(session)
-    return {
-      terminalRuntimeSessionId: session.id,
-      terminalRuntimeGeneration: terminalPtyGeneration(session),
-      identityRevision: terminalPtyIdentityRevision(session),
-      processName,
-      canonicalTitle: bound?.render.title ?? null,
-      phase: session.phase,
-      message: session.message,
-      controller,
-      canonicalSize: bound ? { cols: bound.cols, rows: bound.rows } : null,
-    }
-  }
-
-  private streamAttachResult(
-    session: TerminalSessionView<TUser>,
-  ): Extract<TerminalAttachResult, { ok: true; frame: 'stream' }> | { ok: false; message: string } {
-    const metadata = this.boundRuntimeMetadata(session)
-    if (!metadata || session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
-    return {
-      ok: true,
-      frame: 'stream',
-      terminalProjectionEffect: {
-        kind: 'delta',
-        revision: this.projectionRevision(session.userId, session.scope),
-      },
-      ...metadata,
-      phase: 'open',
-    }
-  }
-
-  private snapshotAttachResult(
-    snap: TerminalPtyRecoverySnapshot,
-    metadata: TerminalBoundRuntimeMetadata,
-  ): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
-    return {
-      ok: true,
-      frame: 'snapshot',
-      terminalProjectionEffect: { kind: 'none' },
-      snapshot: snap.snapshot,
-      snapshotSeq: snap.snapshotSeq,
-      ...metadata,
-    }
-  }
-
-  private boundRuntimeMetadata(
-    session: TerminalSessionView<TUser>,
-    canonicalSize?: { cols: number; rows: number },
-  ): (TerminalRuntimeMetadata & { canonicalSize: { cols: number; rows: number } }) | null {
-    const metadata = this.runtimeMetadata(session)
-    const size = canonicalSize ?? metadata.canonicalSize
-    return size ? { ...metadata, canonicalSize: size } : null
   }
 
   private sessionPresence(session: TerminalSessionView<TUser>): (clientId: string) => boolean {
@@ -1328,7 +1251,14 @@ export class TerminalSessionManager<TUser extends string | number> {
     this.directory.touch(session)
     this.sink.onSessionsProjectionChanged?.(session.userId, this.sessionsChangedEvent(session))
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
-    return { generation: spawn.generation, result: this.streamAttachResult(session) }
+    return {
+      generation: spawn.generation,
+      result: projectTerminalStreamAttachResult(
+        session,
+        this.effectiveController(session),
+        this.projectionRevision(session.userId, session.scope),
+      ),
+    }
   }
 
   private async finishRestartAndAttachSession(
@@ -1344,7 +1274,15 @@ export class TerminalSessionManager<TUser extends string | number> {
       }
     }
     this.emitIdentity(session)
-    return { attempt: spawn.attempt, generation: spawn.generation, result: this.streamAttachResult(session) }
+    return {
+      attempt: spawn.attempt,
+      generation: spawn.generation,
+      result: projectTerminalStreamAttachResult(
+        session,
+        this.effectiveController(session),
+        this.projectionRevision(session.userId, session.scope),
+      ),
+    }
   }
 
   private createPtyBinding(): TerminalPtyBinding<TerminalSessionView<TUser>> {
@@ -1472,13 +1410,6 @@ function assertTerminalPresentationMatchesTarget(
   presentation: TerminalPresentation,
 ): void {
   if (target.kind !== presentation.kind) throw new Error('error.invalid-arguments')
-}
-
-function requiredTerminalPresentation<TUser extends string | number>(
-  session: TerminalSessionView<TUser>,
-): TerminalPresentation {
-  if (!session.presentation) throw new Error('terminal session presentation unavailable')
-  return session.presentation
 }
 
 function sameTerminalScope<TUser extends string | number>(

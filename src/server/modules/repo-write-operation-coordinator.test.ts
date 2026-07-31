@@ -33,9 +33,12 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
     return { boundaryKey: await mocks.resolveRepoWriteBoundaryKey(repoId, signal) }
   },
   repoWriteExecutionBoundaryKey: (capability: { boundaryKey: string }) => capability.boundaryKey,
-  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
   runWithCapturedRepoWriteExecution: async (_capability: unknown, task: (source: object) => Promise<unknown>) =>
     await task({}),
+}))
+
+vi.mock('#/server/modules/repo-write-boundary.ts', () => ({
+  resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({

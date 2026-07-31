@@ -5,10 +5,9 @@ import { PULL_REQUEST_TRANSIENT_CACHE_TTL_MS } from '#/shared/pull-request-state
 import {
   getBranchPullRequest,
   getBranchPullRequests,
-  normalizeGhPullRequest,
-  pickPullRequest,
   resetPullRequestCachesForTests,
 } from '#/system/git/pull-requests.ts'
+import { normalizeGhPullRequest, pickPullRequest } from '#/system/git/pull-request-normalization.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 const canQueryGitHubHostMock = vi.hoisted(() => vi.fn())
@@ -329,7 +328,7 @@ describe('getBranchPullRequests request coordination', () => {
 
     // Spy on the pino child logger so the test exercises the real
     // production warn path (and the defensive `try { ... } catch {}`
-    // around it at pull-requests.ts:412-414). After the migration a
+    // around it). After the migration a
     // `console.warn` spy would never observe calls.
     vi.spyOn(pullRequestsNodeLog, 'warn').mockImplementation(() => {
       throw new Error('logger unavailable')

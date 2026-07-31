@@ -13,10 +13,10 @@ import type {
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
+import { isWorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import {
-  isValidWorkspacePaneTabsOperation,
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
@@ -224,7 +224,7 @@ class TerminalSessionService {
     ) {
       return emptyWorkspacePaneTabsSnapshot()
     }
-    if (!isValidWorkspacePaneTabsOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
+    if (!isWorkspacePaneTabsUpdateOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.target.workspaceId, input.workspaceRuntimeId)
     const executionPath =
       nativeExecutionPath === null ? null : terminalSessionExecutionPath(input.workspaceId, nativeExecutionPath)
@@ -331,8 +331,12 @@ export function createTerminalSessionService(options: TerminalSessionServiceOpti
   return new TerminalSessionService(options)
 }
 
+interface TerminalSessionSnapshotReader {
+  terminalSessionsSnapshotForUser: TerminalSessionServiceManager['terminalSessionsSnapshotForUser']
+}
+
 export function terminalWorkspacePaneRuntimeTabsProvider(
-  manager: Pick<TerminalSessionServiceManager, 'terminalSessionsSnapshotForUser'>,
+  manager: TerminalSessionSnapshotReader,
   captureSnapshot: (userId: string, scope: string) => Promise<TerminalSessionsSnapshot> = async (userId, scope) =>
     manager.terminalSessionsSnapshotForUser(userId, scope),
 ): WorkspacePaneRuntimeTabsProvider {

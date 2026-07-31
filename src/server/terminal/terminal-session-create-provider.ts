@@ -36,9 +36,13 @@ interface TerminalSessionAdmittedCreateService {
   ): Promise<ServerTerminalCreateResult>
 }
 
+interface TerminalCreateWorktreeAdmission {
+  assertPermit: PhysicalWorktreeOperationCoordinator['assertPermit']
+}
+
 export function createTerminalSessionCreateProvider(deps: {
   sessionService: TerminalSessionAdmittedCreateService
-  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'assertPermit'>
+  worktreeOperations: TerminalCreateWorktreeAdmission
 }): ServerTerminalCreateProvider {
   return {
     async createAdmitted(clientId, userId, input, admission) {

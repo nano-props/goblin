@@ -6,17 +6,26 @@ import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/works
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
+interface WorktreeRemovalTerminalSessions {
+  closeSessionsForPhysicalWorktree: TerminalSessionManager<string>['closeSessionsForPhysicalWorktree']
+}
+
+interface WorktreeRemovalWorkspaceTabs {
+  physicalWorktreeTargets: WorkspacePaneTabsCoordinator['physicalWorktreeTargets']
+  clearPhysicalWorktreeIndex: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
+}
+
 interface WorktreeRemovalApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
-  terminalSessions: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
-  workspaceTabs: Pick<WorkspacePaneTabsCoordinator, 'physicalWorktreeTargets' | 'clearPhysicalWorktreeIndex'>
+  physicalWorktrees: PhysicalWorktreeCapture
+  terminalSessions: WorktreeRemovalTerminalSessions
+  workspaceTabs: WorktreeRemovalWorkspaceTabs
   isCurrentWorkspaceRuntime(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: WorkspaceId): void

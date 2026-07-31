@@ -59,6 +59,13 @@ interface CreateWorktreeFormRepo {
   snapshot: Pick<RepoSnapshot, 'branches' | 'current'>
 }
 
+export function initialCreateWorktreeBase(snapshot: {
+  current: string
+  branches: ReadonlyArray<{ name: string }>
+}): string {
+  return snapshot.current || snapshot.branches[0]?.name || ''
+}
+
 export function deriveCreateWorktreeForm(
   state: CreateWorktreeFormState,
   repo: CreateWorktreeFormRepo,

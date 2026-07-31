@@ -154,23 +154,12 @@ export function toRemoteWorkspaceFailureReason(reason: string): RemoteWorkspaceF
   if (isRemoteWorkspaceFailureReason(reason)) return reason
   switch (reason) {
     case 'error.ssh-config-changed':
-    case 'config-changed':
       return 'config-changed'
-    case 'auth-failed':
-      return 'auth-failed'
-    case 'host-key':
-      return 'host-key'
-    case 'unreachable':
-      return 'unreachable'
-    case 'handshake-failed':
     case 'shell-failed':
       return 'handshake-failed'
-    case 'path-missing':
     case 'error.path-not-found':
     case 'error.path-not-directory':
       return 'path-missing'
-    case 'timeout':
-      return 'timeout'
     default:
       return 'unknown'
   }
@@ -274,14 +263,9 @@ export interface RemoteWorkspaceRefInput {
 }
 
 export function normalizeRemoteWorkspaceId(input: RemoteWorkspaceRefInput): WorkspaceId {
-  const normalized = remoteRefFields(input)
-  if (!normalized) throw new TypeError('Invalid remote workspace reference')
-  const locator = formatWorkspaceLocator(
-    { transport: 'ssh', profile: normalized.alias, path: normalized.remotePath },
-    'posix',
-  )
-  if (!locator) throw new TypeError('Invalid remote workspace reference')
-  return locator
+  const fields = remoteRefFields(input)
+  if (!fields) throw new TypeError('Invalid remote workspace reference')
+  return fields.id
 }
 
 export function isRemoteWorkspaceId(value: string): value is WorkspaceId {
@@ -291,9 +275,8 @@ export function isRemoteWorkspaceId(value: string): value is WorkspaceId {
 export function normalizeRemoteWorkspaceRef(input: unknown): RemoteWorkspaceRef | null {
   const fields = remoteRefFields(input)
   if (!fields) return null
-  const id = normalizeRemoteWorkspaceId(fields)
   return {
-    id,
+    id: fields.id,
     alias: fields.alias,
     remotePath: fields.remotePath,
     displayName: remoteDisplayName(fields),
@@ -352,7 +335,7 @@ export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSession
   return id ? { id } : null
 }
 
-export function parseRemoteWorkspaceId(workspaceId: string): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {
+export function parseRemoteWorkspaceId(workspaceId: string): RemoteConnectionInput | null {
   const parsed = parseWorkspaceLocator(workspaceId, 'posix')
   return parsed?.transport === 'ssh' ? { alias: parsed.profile, remotePath: parsed.path } : null
 }
@@ -363,7 +346,13 @@ export function remoteWorkspaceRefFromTarget(target: RemoteWorkspaceTarget): Rem
   return ref
 }
 
-function remoteTargetFields(input: unknown): Pick<RemoteWorkspaceTarget, 'host' | 'user' | 'port'> | null {
+interface RemoteWorkspaceConnectionFields {
+  host: string
+  user: string
+  port: number
+}
+
+function remoteTargetFields(input: unknown): RemoteWorkspaceConnectionFields | null {
   if (!input || typeof input !== 'object') return null
   const rawHost = Reflect.get(input, 'host')
   const rawUser = Reflect.get(input, 'user')
@@ -374,15 +363,20 @@ function remoteTargetFields(input: unknown): Pick<RemoteWorkspaceTarget, 'host' 
   return { host, user, port }
 }
 
-function remoteRefFields(input: unknown): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {
+interface RemoteWorkspaceRefFields {
+  id: WorkspaceId
+  alias: string
+  remotePath: string
+}
+
+function remoteRefFields(input: unknown): RemoteWorkspaceRefFields | null {
   if (!input || typeof input !== 'object') return null
   const rawAlias = Reflect.get(input, 'alias')
   const rawRemotePath = Reflect.get(input, 'remotePath')
   const alias = typeof rawAlias === 'string' ? rawAlias : ''
   const remotePath = typeof rawRemotePath === 'string' ? rawRemotePath : ''
-  const locator = formatWorkspaceLocator({ transport: 'ssh', profile: alias, path: remotePath }, 'posix')
-  if (!locator) return null
-  return { alias, remotePath }
+  const id = formatWorkspaceLocator({ transport: 'ssh', profile: alias, path: remotePath }, 'posix')
+  return id ? { id, alias, remotePath } : null
 }
 
 function normalizePort(value: unknown): number | null {

@@ -5,6 +5,7 @@ import { createElement, Fragment, type ReactNode } from 'react'
 import { Outlet } from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type * as LayoutModule from '#/web/Layout.tsx'
+import type * as WorkspaceSessionRestoreModule from '#/web/components/WorkspaceSessionRestore.tsx'
 
 const appMocks = vi.hoisted(() => ({ render: vi.fn() }))
 
@@ -37,6 +38,12 @@ vi.mock('#/web/Layout.tsx', async (importOriginal) => {
   return {
     ...actual,
     Layout: () => createElement(Outlet),
+  }
+})
+vi.mock('#/web/components/WorkspaceSessionRestore.tsx', async (importOriginal) => {
+  const actual = await importOriginal<typeof WorkspaceSessionRestoreModule>()
+  return {
+    ...actual,
     WorkspaceSessionRestoreGate: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
   }
 })
@@ -56,7 +63,7 @@ import {
   currentWorkspacePaneRouteFromContext,
   appLayoutRouteCallbacks,
   workspaceRouteContextFromMatches,
-} from '#/web/Layout.tsx'
+} from '#/web/app-layout-model.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import {
   beginAppNavigation,
@@ -256,6 +263,23 @@ describe('workspace route view derivation', () => {
       kind: 'branch',
       workspaceId: ROUTE_WORKSPACE_ID,
       branchName: 'feature/a',
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+    })
+  })
+
+  test('prefers a terminal child route when terminal and static params are both present', () => {
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
+        dashboard: false,
+        workspace: true,
+        workspaceTabKey: 'files',
+        workspaceTerminalSessionId: 'term-111111111111111111111',
+        branchSlug: null,
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'workspace-root',
+      workspaceId: ROUTE_WORKSPACE_ID,
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
   })

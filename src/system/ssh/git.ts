@@ -3,12 +3,11 @@ import PQueue from 'p-queue'
 import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import {
   parseBootstrapConfig,
-  validateBootstrapConfigPaths,
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
-} from '#/system/git/worktree-bootstrap.ts'
-import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
-import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
+} from '#/system/git/worktree-bootstrap-config.ts'
+import { validateBootstrapConfigPaths } from '#/system/git/worktree-bootstrap.ts'
+import { parseLog } from '#/system/git/parsers.ts'
 import {
   getRepoUrlForRemotes,
   parseRemoteVerbose,
@@ -17,17 +16,20 @@ import {
   resolvePushTargetForRemotes,
   type UpstreamParts,
 } from '#/system/git/remote.ts'
+import { runRemoteCommand, type RemoteCommandKind, type RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
-  REMOTE_SNAPSHOT_BRANCHES_MARKER,
-  REMOTE_SNAPSHOT_CURRENT_MARKER,
-  REMOTE_SNAPSHOT_DEFAULT_MARKER,
-  runRemoteCommand,
-  type RemoteCommandKind,
-  type RemoteCommandResult,
-} from '#/system/ssh/commands.ts'
+  decodeRemoteStatus,
+  decodeRemoteWorktrees,
+  isValidRemotePath,
+  parseRemoteCurrentBranch,
+  parseRemoteRepoCommonDir,
+  parseRemoteSnapshot,
+  remoteBootstrapSummaryFromOutput,
+  remoteExecResult,
+  type RemoteRepoSnapshot,
+} from '#/system/ssh/git-codec.ts'
 import {
   GIT_HASH_RE,
-  type BranchSnapshotInfo,
   type ExecResult,
   type GitRemoteInfo,
   type LogEntry,
@@ -50,12 +52,10 @@ import {
   type RemoteTrackingBranchIdentity,
 } from '#/shared/worktree-create.ts'
 import {
-  compactWorktreeBootstrapPaths,
   formatWorktreeBootstrapSummary,
   hasWorktreeBootstrapSummaryDetails,
   worktreeBootstrapPreviewFromConfig,
   type WorktreeBootstrapPreviewResult,
-  type WorktreeBootstrapSummary,
 } from '#/shared/worktree-bootstrap-summary.ts'
 
 export type RemoteGitRunner = (
@@ -82,24 +82,12 @@ class RemotePatchFileReadError extends Error {
   }
 }
 
-export interface RemoteRepoSnapshot {
-  branches: BranchSnapshotInfo[]
-  current: string
-  remote: RepoRemoteInfo
-}
-
 export interface RemoteWorktreeMutationResult extends ExecResult {
   affectedWorktreePaths?: readonly string[]
 }
 
 export type RemoteWorkspacePaneTargetIdentity =
   { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
-
-interface SnapshotSections {
-  current: string[]
-  defaultBranch: string[]
-  branches: string[]
-}
 
 /** Authoritative remote repository projection. Transport, cancellation, and malformed output are failures. */
 export async function getRemoteSnapshot(
@@ -639,42 +627,6 @@ export async function bootstrapRemoteWorktreeAfterCreate(
   }
 }
 
-function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootstrapSummary {
-  const copy: string[] = []
-  const symlink: string[] = []
-  const hardlink: string[] = []
-  const missing: string[] = []
-  let setup: string | undefined
-  for (const line of stdout.split('\n')) {
-    const [marker, ...rest] = line.split(' ')
-    const value = rest.join(' ')
-    switch (marker) {
-      case 'GOBLIN_BOOTSTRAP_COPY':
-        copy.push(value)
-        break
-      case 'GOBLIN_BOOTSTRAP_SYMLINK':
-        symlink.push(value)
-        break
-      case 'GOBLIN_BOOTSTRAP_HARDLINK':
-        hardlink.push(value)
-        break
-      case 'GOBLIN_BOOTSTRAP_MISSING':
-        missing.push(value)
-        break
-      case 'GOBLIN_BOOTSTRAP_SETUP':
-        setup = value
-        break
-    }
-  }
-  return {
-    copy: compactWorktreeBootstrapPaths(copy),
-    symlink: compactWorktreeBootstrapPaths(symlink),
-    hardlink: compactWorktreeBootstrapPaths(hardlink),
-    skippedMissing: compactWorktreeBootstrapPaths(missing),
-    ...(setup ? { setup: { command: setup } } : {}),
-  }
-}
-
 export async function getRemoteTrackingBranches(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
@@ -717,24 +669,12 @@ async function readRemoteTrackingAuthority(
   return { refs: result.stdout, remotes: authorities }
 }
 
-async function readRemoteWorktreeList(
-  target: RemoteWorkspaceTarget,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
-): Promise<WorktreeInfo[]> {
-  const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
-    signal: options.signal,
-  })
-  options.signal?.throwIfAborted()
-  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  return decodeRemoteWorktrees(result.stdout)
-}
-
 export async function getRemoteRepoWorktreePaths(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
+  const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 }
 
@@ -748,12 +688,6 @@ export async function resolveRemoteRepoCommonDir(
   })
   if (options.signal?.aborted || !result.ok) return null
   return parseRemoteRepoCommonDir(result.stdout)
-}
-
-export function parseRemoteRepoCommonDir(output: string): string | null {
-  const fields = output.split('\0')
-  if (fields.length !== 2 || fields[1] !== '' || !fields[0]?.startsWith('/')) return null
-  return path.posix.normalize(fields[0])
 }
 
 export async function removeRemoteWorktree(
@@ -942,33 +876,6 @@ export async function getRemoteBrowserUrl(
   return getRepoUrlForRemotes(remoteInfo.remotes, urlTarget, upstream)
 }
 
-export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoSnapshot | null {
-  const sections = splitSnapshotSections(output)
-  if (!sections) return null
-  const current = singleOptionalBranchName(sections.current)
-  const defaultBranch = singleOptionalBranchName(sections.defaultBranch)
-  if (current === null || defaultBranch === null) return null
-  const branchOutput = sections.branches.join('\n')
-  let branches: BranchSnapshotInfo[]
-  try {
-    branches = parseBranches(branchOutput, current, worktrees)
-  } catch {
-    return null
-  }
-  const markedBranches = markDefaultBranch(branches, defaultBranch)
-  return {
-    branches: prioritizeDefaultBranch(markedBranches, defaultBranch),
-    current,
-    remote: repoRemoteInfoForRemotes([]),
-  }
-}
-
-function singleOptionalBranchName(lines: readonly string[]): string | null {
-  if (lines.length !== 1 || !lines[0]!.startsWith('value ')) return null
-  const value = lines[0]!.slice('value '.length)
-  return value === '' || isSafeBranchName(value) ? value : null
-}
-
 async function readRemoteWorktreeMembership(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteGitRunner },
@@ -979,32 +886,6 @@ async function readRemoteWorktreeMembership(
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   return decodeRemoteWorktrees(result.stdout)
-}
-
-function splitSnapshotSections(output: string): SnapshotSections | null {
-  const sections: SnapshotSections = { current: [], defaultBranch: [], branches: [] }
-  const markers = [
-    [REMOTE_SNAPSHOT_CURRENT_MARKER, 'current'],
-    [REMOTE_SNAPSHOT_DEFAULT_MARKER, 'defaultBranch'],
-    [REMOTE_SNAPSHOT_BRANCHES_MARKER, 'branches'],
-  ] as const
-  let nextMarker = 0
-  let active: keyof SnapshotSections | null = null
-  for (const line of output.split('\n')) {
-    const markerIndex = markers.findIndex(([marker]) => marker === line)
-    if (markerIndex >= 0) {
-      if (markerIndex !== nextMarker) return null
-      active = markers[markerIndex]![1]
-      nextMarker += 1
-      continue
-    }
-    if (!active) {
-      if (line.trim().length > 0) return null
-      continue
-    }
-    sections[active].push(line)
-  }
-  return nextMarker === markers.length ? sections : null
 }
 
 async function resolveKnownRemoteWorktree(
@@ -1097,9 +978,7 @@ async function getRemoteCurrentBranch(
   })
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  const sections = splitSnapshotSections(result.stdout)
-  if (!sections) throw new Error('error.failed-read-repo')
-  const current = singleOptionalBranchName(sections.current)
+  const current = parseRemoteCurrentBranch(result.stdout)
   if (current === null) throw new Error('error.failed-read-repo')
   return current
 }
@@ -1201,31 +1080,4 @@ async function resolveRemotePushTarget(
   ])
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
   return resolvePushTargetForRemotes(remotes, upstream, branch)
-}
-
-export function remoteExecResult(result: RemoteCommandResult): ExecResult {
-  if (result.ok) return { ok: true, message: result.stdout || result.stderr || 'ok' }
-  return { ok: false, message: result.message || result.stderr || 'error.unknown' }
-}
-
-function isValidRemotePath(value: string): boolean {
-  return value.length > 0 && !value.includes('\0') && path.posix.isAbsolute(value)
-}
-
-function decodeRemoteWorktrees(output: string): WorktreeInfo[] {
-  try {
-    const worktrees = parseWorktrees(output)
-    if (worktrees.some((worktree) => !isValidRemotePath(worktree.path))) throw new Error('Invalid remote worktree path')
-    return worktrees
-  } catch {
-    throw new Error('error.failed-read-repo')
-  }
-}
-
-function decodeRemoteStatus(output: string) {
-  try {
-    return parseStatus(output)
-  } catch {
-    throw new Error('error.failed-read-repo')
-  }
 }

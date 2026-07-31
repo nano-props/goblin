@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { IpcErrorCode } from '#/shared/api-types.ts'
+import type { IpcErrorCode } from '#/shared/ipc-error.ts'
 
 export interface ErrorEnvelope {
   ok: false

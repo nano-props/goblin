@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import type { HistoryState } from '@tanstack/history'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { isEqual } from 'es-toolkit'
 import type { AppRouteNavigation, AppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
@@ -176,16 +177,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       return {
         workspaceId,
         kind: 'workspace-root',
-        workspacePaneTab:
-          routeContext.workspacePaneRoute?.kind === 'terminal'
-            ? 'terminal'
-            : routeContext.workspacePaneRoute?.kind === 'static'
-              ? routeContext.workspacePaneRoute.tab
-              : null,
-        terminalSessionId:
-          routeContext.workspacePaneRoute?.kind === 'terminal'
-            ? routeContext.workspacePaneRoute.terminalSessionId
-            : null,
+        ...workspaceNavigationPaneSelection(routeContext.workspacePaneRoute),
       }
     case 'dashboard':
       return { workspaceId, kind: 'dashboard' }
@@ -197,8 +189,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
         workspaceId,
         kind: 'worktree',
         worktreePath: routeContext.worktreePath,
-        workspacePaneTab: route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
-        terminalSessionId: route?.kind === 'terminal' ? route.terminalSessionId : null,
+        ...workspaceNavigationPaneSelection(route),
       }
     }
     case 'branch': {
@@ -211,18 +202,26 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
         ? formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
         : null
       const route = routeContext.workspacePaneRoute
-      const workspacePaneTab: WorkspacePaneTabType | null =
-        route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
       return {
         workspaceId,
         kind: 'branch',
         branchName: routeContext.branchName,
-        workspacePaneTab,
+        ...workspaceNavigationPaneSelection(route),
         terminalFilesystemTargetKey,
-        terminalSessionId: route?.kind === 'terminal' ? route.terminalSessionId : null,
       }
     }
   }
+}
+
+function workspaceNavigationPaneSelection(route: WorkspacePaneRoute | null): {
+  workspacePaneTab: WorkspacePaneTabType | null
+  terminalSessionId: string | null
+} {
+  if (route?.kind === 'terminal') {
+    return { workspacePaneTab: 'terminal', terminalSessionId: route.terminalSessionId }
+  }
+  if (route?.kind === 'static') return { workspacePaneTab: route.tab, terminalSessionId: null }
+  return { workspacePaneTab: null, terminalSessionId: null }
 }
 
 function workspaceNavigationHistoryEntryFromSnapshot(
@@ -272,27 +271,7 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
   a: WorkspaceNavigationHistoryRouteSnapshot | null,
   b: WorkspaceNavigationHistoryRouteSnapshot | null,
 ): boolean {
-  if (a === b) return true
-  if (!a || !b) return false
-  if (a.workspaceId !== b.workspaceId || a.kind !== b.kind) return false
-  if (a.kind === 'newWorktree' && b.kind === 'newWorktree') return a.returnTo === b.returnTo
-  if (a.kind === 'worktree' && b.kind === 'worktree') {
-    return (
-      a.worktreePath === b.worktreePath &&
-      a.workspacePaneTab === b.workspacePaneTab &&
-      a.terminalSessionId === b.terminalSessionId
-    )
-  }
-  if (a.kind === 'workspace-root' && b.kind === 'workspace-root') {
-    return a.workspacePaneTab === b.workspacePaneTab && a.terminalSessionId === b.terminalSessionId
-  }
-  if (a.kind !== 'branch' || b.kind !== 'branch') return true
-  return (
-    a.branchName === b.branchName &&
-    a.workspacePaneTab === b.workspacePaneTab &&
-    a.terminalFilesystemTargetKey === b.terminalFilesystemTargetKey &&
-    a.terminalSessionId === b.terminalSessionId
-  )
+  return isEqual(a, b)
 }
 
 export function restoreWorkspaceNavigationEntry(

@@ -15,7 +15,6 @@ import {
   replaySnapshot,
   resizeRender,
   type RenderSnapshot,
-  type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import {
   markTerminalSessionError,
@@ -30,6 +29,12 @@ import type {
   PtySpawnResult,
   PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
+import {
+  advanceTerminalPtyIdentityRevision,
+  terminalPtyBoundState,
+  type TerminalPtyBoundState,
+  type TerminalPtyState,
+} from '#/server/terminal/terminal-pty-state.ts'
 
 const ptyLifecycleLogger = serverLogger.child({ module: 'terminal-session-pty-lifecycle' })
 
@@ -113,54 +118,6 @@ export interface TerminalPtySessionState<TUser extends string | number = string 
   ptyState: TerminalPtyState
 }
 
-export type TerminalPtyState =
-  | { kind: 'prepared' }
-  | {
-      kind: 'bound'
-      activity: 'active' | 'retained'
-      generation: number
-      identityRevision: number
-      cols: number
-      rows: number
-      processName: string
-      render: TerminalRenderState
-    }
-
-export type TerminalPtyBoundState = Extract<TerminalPtyState, { kind: 'bound' }>
-
-export function terminalPtyGeneration(session: Pick<TerminalPtySessionState, 'ptyState'>): number {
-  return session.ptyState.kind === 'bound' ? session.ptyState.generation : 0
-}
-
-export function terminalPtyBoundState(
-  session: Pick<TerminalPtySessionState, 'ptyState'>,
-): TerminalPtyBoundState | null {
-  return session.ptyState.kind === 'bound' ? session.ptyState : null
-}
-
-export function terminalPtyProcessName(session: Pick<TerminalPtySessionState, 'ptyState'>): string {
-  return session.ptyState.kind === 'bound' ? session.ptyState.processName : 'terminal'
-}
-
-export function terminalPtyIdentityRevision(session: Pick<TerminalPtySessionState, 'ptyState'>): number {
-  return session.ptyState.kind === 'bound' ? session.ptyState.identityRevision : 0
-}
-
-export function advanceTerminalPtyIdentityRevision(
-  session: Pick<TerminalPtySessionState, 'ptyState'>,
-  expectedGeneration: number,
-): number {
-  const state = terminalPtyBoundState(session)
-  if (!state || state.generation !== expectedGeneration) {
-    throw new Error('cannot advance identity revision for a stale terminal generation')
-  }
-  if (state.identityRevision === Number.MAX_SAFE_INTEGER) {
-    throw new Error('terminal identity revision exhausted')
-  }
-  state.identityRevision += 1
-  return state.identityRevision
-}
-
 export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionState> {
   isSessionLive(session: TSession): boolean
   emitLifecycle(session: TSession): void
@@ -173,6 +130,15 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   ): void | Promise<void>
 }
 
+/**
+ * Owns the native PTY handle, event lease, render state, and retirement debt
+ * for one terminal session.
+ *
+ * Spawn/restart adoption, geometry changes, input acknowledgements, and
+ * retirement remain together because they share the same handle and pending
+ * ownership barriers. Pure PTY state access and identity revision rules live
+ * in `terminal-pty-state.ts`; resource transitions stay here.
+ */
 export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private readonly supervisor: PtySupervisor
   private readonly events: TerminalPtyBindingEvents<TSession>

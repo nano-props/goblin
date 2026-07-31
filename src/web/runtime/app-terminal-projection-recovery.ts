@@ -11,11 +11,22 @@ interface TerminalProjectionHydrationEntry {
   phase: 'pending' | 'ready' | 'failed'
 }
 
+interface TerminalProjectionRecoveryProjection {
+  reconcileServerSessionsSnapshot: TerminalSessionProjection['reconcileServerSessionsSnapshot']
+  resynchronizeConnectedViews: TerminalSessionProjection['resynchronizeConnectedViews']
+  terminalSessionsCatalogCoverageRevision: TerminalSessionProjection['terminalSessionsCatalogCoverageRevision']
+}
+
+export type TerminalProjectionRecoveryRequirement =
+  { kind: 'minimum-revision'; revision: number } | { kind: 'reconnect' }
+
+export interface TerminalProjectionRecoveryActions {
+  begin(scope: RuntimeProjectionScope): void
+  request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void
+}
+
 export interface AppTerminalProjectionRecoveryDependencies {
-  projection: Pick<
-    TerminalSessionProjection,
-    'reconcileServerSessionsSnapshot' | 'resynchronizeConnectedViews' | 'terminalSessionsCatalogCoverageRevision'
-  >
+  projection: TerminalProjectionRecoveryProjection
   readClientId: () => string
   recoverSessions: (target: RuntimeProjectionTarget) => Promise<TerminalSessionsSnapshot>
   hydrationEntry: (workspaceId: WorkspaceId) => TerminalProjectionHydrationEntry | undefined
@@ -26,10 +37,7 @@ export interface AppTerminalProjectionRecoveryDependencies {
   logFailure: (error: unknown) => void
 }
 
-export type TerminalProjectionRecoveryRequirement =
-  { kind: 'minimum-revision'; revision: number } | { kind: 'reconnect' }
-
-export class AppTerminalProjectionRecovery {
+export class AppTerminalProjectionRecovery implements TerminalProjectionRecoveryActions {
   private readonly dependencies: AppTerminalProjectionRecoveryDependencies
   private readonly reconnectResynchronizationByScope = new WeakMap<RuntimeProjectionScope, number>()
   private nextReconnectResynchronization = 1

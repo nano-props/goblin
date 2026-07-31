@@ -9,10 +9,11 @@ import {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import {
   commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneCurrentTargetRoute,
@@ -72,7 +73,7 @@ interface WorkspacePaneTerminalRuntimeCommandOptionsBase {
   workspaceId: WorkspaceId | null
   routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation & CreatedTerminalNavigation
+  navigation: FilesystemWorkspacePaneRouteCommitActions & CreatedTerminalNavigation
   t?: TerminalCreateTranslator
 }
 
@@ -100,55 +101,10 @@ const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
 export async function dispatchTerminalRuntimePrimaryAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId) return false
-  return await terminalRuntimePrimaryAction(options)
-}
-
-async function terminalRuntimePrimaryAction({
-  workspaceId,
-  routeTarget,
-  branchName,
-  filesystemTarget,
-  workspacePaneRoute,
-  navigation,
-  t,
-}: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
+  const { workspaceId } = options
   if (!workspaceId) return false
-  return await runWorkspacePaneRuntimePrimaryAction(
-    'terminal',
-    workspacePaneRuntimeTabCommandContext({
-      workspaceId,
-      routeTarget,
-      branchName,
-      filesystemTarget,
-      workspacePaneRoute,
-      showRuntimeTab: (type, sessionId, navigationGeneration) =>
-        showTerminalRuntimeTab(
-          type,
-          sessionId,
-          workspaceId,
-          routeTarget,
-          filesystemTarget,
-          workspacePaneRoute,
-          navigation,
-          navigationGeneration,
-        ),
-      showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath, routeRequest) =>
-        showCreatedTerminalRuntimeTab(
-          type,
-          sessionId,
-          workspaceId,
-          routeTarget,
-          filesystemTarget?.workspaceRuntimeId ?? null,
-          presentation,
-          worktreePath,
-          workspacePaneRoute,
-          navigation,
-          routeRequest,
-        ),
-      terminalCreateTranslator: t,
-    }),
-  )
+  const context = terminalRuntimeTabActionContext({ ...options, workspaceId })
+  return await runWorkspacePaneRuntimePrimaryAction('terminal', context)
 }
 
 export async function dispatchNewTerminalRuntimeTabAction(
@@ -156,11 +112,11 @@ export async function dispatchNewTerminalRuntimeTabAction(
 ): Promise<boolean> {
   const { workspaceId } = options
   if (!workspaceId) return false
-  const context = newTerminalRuntimeTabActionContext({ ...options, workspaceId })
+  const context = terminalRuntimeTabActionContext({ ...options, workspaceId })
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }
 
-function newTerminalRuntimeTabActionContext({
+function terminalRuntimeTabActionContext({
   workspaceId,
   routeTarget,
   branchName,
@@ -224,23 +180,25 @@ async function showTerminalRuntimeTab(
   routeTarget: WorkspacePaneTabsTarget,
   filesystemTarget: WorkspacePaneFilesystemTarget | null | undefined,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   routeRequest: ExistingTerminalPresentationRouteRequest,
 ): Promise<boolean> {
   if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)
-  const target =
-    routeTarget.kind === 'git-branch'
-      ? workspacePaneTabTargetForBranch(workspaceId, routeTarget.branchName, { workspacePaneRoute })
-      : routeTarget.kind === 'workspace-root'
-        ? workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
-        : filesystemTarget?.kind === 'git-worktree'
-          ? workspacePaneTabTargetForPaneTarget({
-              paneTarget: routeTarget,
-              routeTarget,
-              workspacePaneRoute,
-              worktreeHead: filesystemTarget.head,
-            })
-          : null
+  let target: WorkspacePaneTabModel | null
+  if (routeTarget.kind === 'git-branch') {
+    target = workspacePaneTabTargetForBranch(workspaceId, routeTarget.branchName, { workspacePaneRoute })
+  } else if (routeTarget.kind === 'workspace-root') {
+    target = workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
+  } else if (filesystemTarget?.kind === 'git-worktree') {
+    target = workspacePaneTabTargetForPaneTarget({
+      paneTarget: routeTarget,
+      routeTarget,
+      workspacePaneRoute,
+      worktreeHead: filesystemTarget.head,
+    })
+  } else {
+    target = null
+  }
   if (!target) return abandonExistingTerminalPresentation(routeRequest)
   if (routeTarget.kind !== 'git-branch') {
     const tab = target.tabs.find(

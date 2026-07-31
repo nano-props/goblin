@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { terminalCreateErrorKey } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 describe('terminalCreateErrorKey', () => {
   test.each([

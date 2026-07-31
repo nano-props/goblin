@@ -1,6 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
-import { TerminalRenderQueue, type RenderedOutputCheckpoint } from '#/web/components/terminal/terminal-render-queue.ts'
+import {
+  latestRenderedOutputCheckpoint,
+  normalizeRenderedOutputCheckpoint,
+  sameRenderedOutputBinding,
+  TerminalRenderQueue,
+  type RenderedOutputCheckpoint,
+} from '#/web/components/terminal/terminal-render-queue.ts'
 
 const BINDING = {
   terminalRuntimeSessionId: 'pty_render_queue_123456',
@@ -48,6 +54,39 @@ describe('TerminalRenderQueue', () => {
     })
 
     await expect(queue.append('live output', checkpoint(1))).rejects.toBe(error)
+  })
+})
+
+describe('rendered output checkpoints', () => {
+  test('selects the latest checkpoint for one runtime binding', () => {
+    expect(latestRenderedOutputCheckpoint([], BINDING)).toBeNull()
+    expect(
+      latestRenderedOutputCheckpoint(
+        [
+          checkpoint(2),
+          { ...checkpoint(99), terminalRuntimeGeneration: BINDING.terminalRuntimeGeneration + 1 },
+          checkpoint(5),
+          checkpoint(3),
+        ],
+        BINDING,
+      ),
+    ).toEqual(checkpoint(5))
+  })
+
+  test('compares bindings independently from output sequence', () => {
+    expect(sameRenderedOutputBinding(checkpoint(1), checkpoint(9))).toBe(true)
+    expect(
+      sameRenderedOutputBinding(checkpoint(1), {
+        ...checkpoint(1),
+        terminalRuntimeGeneration: BINDING.terminalRuntimeGeneration + 1,
+      }),
+    ).toBe(false)
+  })
+
+  test('normalizes an output sequence without changing its binding', () => {
+    expect(normalizeRenderedOutputCheckpoint(checkpoint(4.9))).toEqual(checkpoint(4))
+    expect(normalizeRenderedOutputCheckpoint(checkpoint(Number.NaN))).toEqual(checkpoint(0))
+    expect(normalizeRenderedOutputCheckpoint(checkpoint(-1))).toEqual(checkpoint(0))
   })
 })
 

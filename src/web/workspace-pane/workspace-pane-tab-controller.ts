@@ -5,7 +5,10 @@ import {
   workspacePaneTabEntryIdentity,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type {
+  FilesystemWorkspacePaneRouteCommitActions,
+  WorkspacePaneRouteCommitActions,
+} from '#/web/app-navigation-actions.ts'
 import {
   isWorkspacePaneRuntimeTab,
   type WorkspacePaneModelTarget,
@@ -39,11 +42,8 @@ export interface WorkspacePaneControllerTarget {
   paneTarget: WorkspacePaneModelTarget
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
-export type WorkspacePaneTabControllerCommitNavigation = Pick<
-  AppNavigationActions,
-  'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute'
->
-export type WorkspacePaneRouteCommitNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
+type WorkspacePaneControllerRoutePrecondition =
+  { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 
 export function workspacePaneControllerRouteForTab(tab: WorkspacePaneTab): WorkspacePaneTabControllerRoute | undefined {
   if (isWorkspacePaneRuntimeTab(tab)) {
@@ -114,7 +114,7 @@ export interface SelectWorkspacePaneControllerTabOptions {
 export async function selectWorkspacePaneControllerTab(
   target: WorkspacePaneTabModel,
   tab: WorkspacePaneTab,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   options: SelectWorkspacePaneControllerTabOptions = {},
 ): Promise<boolean> {
   const navigationGeneration = options.navigationGeneration ?? beginAppNavigation()
@@ -149,7 +149,7 @@ export async function selectWorkspacePaneControllerTab(
 export async function selectWorkspacePaneControllerTabEntry(
   target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
   if (!appNavigationIsCurrent(navigationGeneration)) return false
@@ -174,7 +174,7 @@ export async function selectWorkspacePaneControllerTabEntry(
 
 export function commitWorkspacePaneControllerCloseBackTarget(
   lease: WorkspacePaneControllerPresentationLease,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
 ): Promise<boolean> {
   return commitWorkspacePaneControllerTargetRoute(
     lease.target,
@@ -188,7 +188,7 @@ export function commitWorkspacePaneControllerCloseBackTarget(
 
 export function commitWorkspacePaneControllerRetirementCloseBackTarget(
   lease: WorkspacePaneControllerPresentationLease,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
 ): Promise<boolean> {
   return commitWorkspacePaneControllerTargetRoute(
     lease.target,
@@ -203,7 +203,7 @@ export function commitWorkspacePaneControllerRetirementCloseBackTarget(
 async function commitWorkspacePaneControllerTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
   navigationGeneration: AppNavigationGeneration,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
@@ -239,7 +239,7 @@ export async function commitWorkspacePaneControllerRoute(
   workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: {
     replace?: boolean
     navigationGeneration?: AppNavigationGeneration
@@ -257,7 +257,7 @@ export async function commitWorkspacePaneControllerRoute(
 export async function commitWorkspacePaneCurrentTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
@@ -267,7 +267,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
     navigation,
     workspacePaneTabControllerTargetIsCurrent,
     commitWorkspacePaneRouteSupplement,
-    true,
+    { routePrecondition: { kind: 'current-workspace-target' } },
     options,
     navigationGeneration,
   )
@@ -276,7 +276,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
 export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
@@ -293,7 +293,7 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
         worktreePath: candidate.worktreePath,
       }),
     commitWorkspacePaneCommittedRuntimeRouteSupplement,
-    false,
+    {},
     options,
     navigationGeneration,
   )
@@ -302,10 +302,10 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
 async function commitWorkspacePaneValidatedTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   targetIsCurrent: (target: WorkspacePaneControllerTarget) => boolean,
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
-  useCurrentTargetPrecondition: boolean,
+  routeOptions: { routePrecondition?: WorkspacePaneControllerRoutePrecondition | undefined },
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
   navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
@@ -323,7 +323,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
     const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
       replace: options?.replace,
       navigationGeneration,
-      ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
+      ...routeOptions,
     })
     const supplementCommitted =
       committed &&
@@ -354,52 +354,20 @@ export async function commitWorkspacePaneExactTargetRoute(
   target: WorkspacePaneControllerTarget,
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
-  if (!appNavigationIsCurrent(navigationGeneration)) {
-    options?.onAbandon?.()
-    return false
-  }
-  const branchName = target.branchName
-  if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
-    options?.onAbandon?.()
-    return false
-  }
-  let completed = false
-  try {
-    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-      replace: options?.replace,
-      navigationGeneration,
-      routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
-    })
-    const supplementCommitted =
-      committed &&
-      commitWorkspacePaneRouteSupplement(
-        {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          branchName,
-          worktreePath: target.worktreePath,
-        },
-        route,
-      )
-    completed =
-      committed &&
-      supplementCommitted &&
-      appNavigationIsCurrent(navigationGeneration) &&
-      workspacePaneTabControllerTargetIsCurrent(target)
-  } catch (error) {
-    options?.onAbandon?.()
-    throw error
-  }
-  if (!completed) {
-    options?.onAbandon?.()
-    return false
-  }
-  options?.onCommit?.()
-  return true
+  return await commitWorkspacePaneValidatedTargetRoute(
+    target,
+    route,
+    navigation,
+    workspacePaneTabControllerTargetIsCurrent,
+    commitWorkspacePaneRouteSupplement,
+    { routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute } },
+    options,
+    navigationGeneration,
+  )
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {

@@ -1,5 +1,5 @@
 import { isTerminalPastePathSafe } from '#/shared/clipboard-paste.ts'
-import { TERMINAL_WS_MESSAGE_LIMIT_BYTES, terminalUtf8ByteLength } from '#/shared/terminal-validators.ts'
+import { TERMINAL_WS_MESSAGE_LIMIT_BYTES, terminalUtf8ByteLength } from '#/shared/terminal-protocol-constraints.ts'
 
 const PASTE_PATH_WRITE_MARGIN_BYTES = 4096
 const PASTE_PATH_MAX_WRITE_BYTES = TERMINAL_WS_MESSAGE_LIMIT_BYTES - PASTE_PATH_WRITE_MARGIN_BYTES

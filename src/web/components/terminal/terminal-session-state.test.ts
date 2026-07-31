@@ -4,6 +4,17 @@ import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/we
 
 const DEFAULT_COMPOSER = { expanded: false, mode: 'input' as const, historyEntries: [] }
 
+type IdentityAndRuntimeMetadataForTest = Parameters<TerminalSessionState['establishIdentity']>[0] &
+  Parameters<TerminalSessionState['applyRuntimeMetadata']>[0]
+
+function applyIdentityAndRuntimeMetadataForTest(
+  state: TerminalSessionState,
+  input: IdentityAndRuntimeMetadataForTest,
+): boolean {
+  const identityChanged = state.establishIdentity(input)
+  return state.applyRuntimeMetadata(input) || identityChanged
+}
+
 describe('TerminalSessionState', () => {
   test('owns Composer mode, expansion, and bounded immutable history', () => {
     const state = new TerminalSessionState()
@@ -61,10 +72,10 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toEqual({ role: 'controller' })
   })
 
-  test('applyOpenResult sets identity and lifecycle in one shot', () => {
+  test('identity and runtime metadata produce an open snapshot', () => {
     const state = new TerminalSessionState()
     expect(
-      state.applyOpenResult({
+      applyIdentityAndRuntimeMetadataForTest(state, {
         processName: 'zsh',
         canonicalTitle: '~/Developer/goblin — npm run dev',
         identityRevision: 0,
@@ -96,7 +107,7 @@ describe('TerminalSessionState', () => {
     // those fields. A future caller cannot accidentally re-introduce
     // the conflation because the types do not overlap.
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: null,
       identityRevision: 0,
@@ -137,7 +148,7 @@ describe('TerminalSessionState', () => {
     // separate so the conflation in the pre-split `canResize()` is
     // not possible.
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: null,
       identityRevision: 0,
@@ -161,7 +172,7 @@ describe('TerminalSessionState', () => {
 
   test('canSendInput requires both role=controller AND phase=open', () => {
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: null,
       identityRevision: 0,
@@ -230,7 +241,7 @@ describe('TerminalSessionState', () => {
 
   test('restarting state is non-interactive until open resumes', () => {
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: null,
       identityRevision: 0,
@@ -260,7 +271,7 @@ describe('TerminalSessionState', () => {
 
   test('resetTransientState clears transient state without overwriting identity or lifecycle', () => {
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
       identityRevision: 0,
@@ -318,7 +329,7 @@ describe('TerminalSessionState', () => {
 
   test('rejects stale identity, accepts an idempotent replay, and fast-fails an equal-revision conflict', () => {
     const state = new TerminalSessionState()
-    state.applyOpenResult({
+    applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
       canonicalTitle: null,
       identityRevision: 0,

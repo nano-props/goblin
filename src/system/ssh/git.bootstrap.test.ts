@@ -8,7 +8,7 @@ import {
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
-import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
+import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { TARGET, failRemoteResult, okRemoteResult } from '#/system/ssh/git-test-utils.ts'
 

@@ -6,9 +6,12 @@ import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export interface RepoRefreshStoreAccess {
-  set: WorkspacesSet
+export interface RepoRefreshStoreReader {
   get: WorkspacesGet
+}
+
+export interface RepoRefreshStoreAccess extends RepoRefreshStoreReader {
+  set: WorkspacesSet
 }
 
 export async function requestRepoSnapshotRefresh(

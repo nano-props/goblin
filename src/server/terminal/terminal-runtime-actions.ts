@@ -18,11 +18,8 @@ import type {
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
-import {
-  isValidTerminalRuntimeSessionId,
-  isValidTerminalSize,
-  isValidTerminalWriteData,
-} from '#/shared/terminal-validators.ts'
+import { isValidTerminalRuntimeSessionId } from '#/shared/terminal-validators.ts'
+import { isValidTerminalSize, isValidTerminalWriteData } from '#/shared/terminal-protocol-constraints.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalSessionCloseReason, TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
@@ -39,19 +36,28 @@ interface TerminalSessionServiceLike {
   ): Promise<TerminalSessionSummary[]>
 }
 
+interface TerminalRuntimeActionManager {
+  attachSession: TerminalSessionManager<string>['attachSession']
+  restartSessionWithProjectionOutcome: TerminalSessionManager<string>['restartSessionWithProjectionOutcome']
+  writeSession: TerminalSessionManager<string>['writeSession']
+  resizeSession: TerminalSessionManager<string>['resizeSession']
+  takeoverSession: TerminalSessionManager<string>['takeoverSession']
+  closeSessionForUserOutcome: TerminalSessionManager<string>['closeSessionForUserOutcome']
+  getPhysicalWorktreeExecutionCapabilityForUser: TerminalSessionManager<string>['getPhysicalWorktreeExecutionCapabilityForUser']
+  terminalSessionsSnapshotForUser: TerminalSessionManager<string>['terminalSessionsSnapshotForUser']
+}
+
+interface TerminalRuntimeActionBroker {
+  broadcastToUser: RealtimeBroker<AppRealtimeMessage>['broadcastToUser']
+}
+
+interface TerminalRuntimeWorktreeOperations {
+  runOperation: PhysicalWorktreeOperationCoordinator['runOperation']
+}
+
 interface TerminalRuntimeActionDependencies {
-  manager: Pick<
-    TerminalSessionManager<string>,
-    | 'attachSession'
-    | 'restartSessionWithProjectionOutcome'
-    | 'writeSession'
-    | 'resizeSession'
-    | 'takeoverSession'
-    | 'closeSessionForUserOutcome'
-    | 'getPhysicalWorktreeExecutionCapabilityForUser'
-    | 'terminalSessionsSnapshotForUser'
-  >
-  broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
+  manager: TerminalRuntimeActionManager
+  broker: TerminalRuntimeActionBroker
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
   isCurrentWorkspaceRuntimeMembership(
@@ -60,7 +66,7 @@ interface TerminalRuntimeActionDependencies {
     workspaceRuntimeId: string,
     clientId: string,
   ): boolean
-  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'runOperation'>
+  worktreeOperations: TerminalRuntimeWorktreeOperations
 }
 
 // Manager, broker, and session service all use `userId` as the terminal

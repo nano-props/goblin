@@ -10,27 +10,30 @@ import {
   type ReactNode,
 } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
   clampWorkspaceSidebarSizePercent,
   workspaceSidebarWidthExpression,
   workspaceSidebarWidthPx,
 } from '#/web/components/workspace-layout/sidebar-sizing.ts'
-import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
-import { NativeDragPlate, TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import {
+  ZenModeSidebarResizeRail,
+  type ResizeRailState,
+} from '#/web/components/workspace-layout/ZenModeSidebarResizeRail.tsx'
+import { ZenModeSidebarRevealTriggerLayer } from '#/web/components/workspace-layout/ZenModeSidebarRevealTriggerLayer.tsx'
+import { NativeDragPlate } from '#/web/components/title-bar-chrome-region.tsx'
+import {
+  isPointerInsideElement,
+  isPointerInsideRevealBounds,
+  isZenRevealSurfaceTarget,
+  zenRevealHostRect,
+} from '#/web/components/workspace-layout/zen-mode-sidebar-pointer.ts'
 
-const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
 const ZEN_REVEAL_CLOSE_MS = 260
-const ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE = {
-  top: TITLE_BAR_HEIGHT_PX,
-  height: `calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`,
-} satisfies CSSProperties
-type ResizeRailState = 'idle' | 'hover' | 'active'
 type RevealPanelState = 'closed' | 'opening' | 'open' | 'closing'
 
 interface ZenModeSidebarRevealState {
@@ -53,12 +56,6 @@ interface ZenModeSidebarRevealProps {
   onSurfaceLeave: () => void
 }
 
-interface ZenModeSidebarRevealTriggerProps {
-  workspaceId?: WorkspaceId
-  zenRevealTriggerEnabled?: boolean
-  onZenRevealTriggerEnter?: () => void
-}
-
 interface ZenModeSidebarChromeProps {
   workspaceId?: WorkspaceId
   sidebarPane: ReactNode
@@ -66,14 +63,6 @@ interface ZenModeSidebarChromeProps {
   revealEnabled: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
-}
-
-interface ZenModeSidebarResizeRailProps {
-  interactive: boolean
-  resizeRailState: ResizeRailState
-  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
-  onMouseEnter: () => void
-  onMouseLeave: () => void
 }
 
 function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
@@ -172,42 +161,6 @@ export function ZenModeSidebarChrome({
         />
       ) : null}
     </>
-  )
-}
-
-function ZenModeSidebarRevealTriggerLayer({
-  workspaceId,
-  zenRevealTriggerEnabled = false,
-  onZenRevealTriggerEnter,
-}: ZenModeSidebarRevealTriggerProps) {
-  return (
-    <div
-      data-testid="zen-mode-toggle-overlay"
-      className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
-      style={{ height: TITLE_BAR_HEIGHT_PX }}
-    >
-      <ZenModeSidebarRevealTrigger
-        workspaceId={workspaceId}
-        zenRevealTriggerEnabled={zenRevealTriggerEnabled}
-        onZenRevealTriggerEnter={onZenRevealTriggerEnter}
-      />
-    </div>
-  )
-}
-
-function ZenModeSidebarRevealTrigger({
-  workspaceId,
-  zenRevealTriggerEnabled = false,
-  onZenRevealTriggerEnter,
-}: ZenModeSidebarRevealTriggerProps) {
-  return (
-    <TitleBarInteractiveRegion>
-      <WorkspaceNavigationControls
-        workspaceId={workspaceId}
-        zenRevealTriggerEnabled={zenRevealTriggerEnabled}
-        onZenRevealTriggerEnter={onZenRevealTriggerEnter}
-      />
-    </TitleBarInteractiveRegion>
   )
 }
 
@@ -514,103 +467,6 @@ function ZenModeSidebarDragPlate({
       onMouseEnter={onSurfaceEnter}
     />
   )
-}
-
-function ZenModeSidebarResizeRail({
-  interactive,
-  resizeRailState,
-  onPointerDown,
-  onMouseEnter,
-  onMouseLeave,
-}: ZenModeSidebarResizeRailProps) {
-  const separatorState = resizeRailState === 'idle' ? undefined : resizeRailState
-  const handleProps = {
-    'data-testid': 'zen-mode-sidebar-resize-handle',
-    'data-separator': separatorState,
-    role: 'separator' as const,
-    'aria-orientation': 'vertical' as const,
-    style: ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE,
-    className: cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, 'absolute right-0 z-20'),
-    onPointerDown,
-    onMouseEnter,
-    onMouseLeave,
-  }
-
-  return (
-    <>
-      <div
-        data-testid="zen-mode-sidebar-resize-visual"
-        data-separator={separatorState}
-        aria-hidden
-        className="group pointer-events-none absolute inset-y-0 right-0 z-20 w-px"
-      >
-        <ResizeHandleLine />
-      </div>
-      {interactive ? <TitleBarInteractiveRegion {...handleProps} /> : <div {...handleProps} />}
-    </>
-  )
-}
-
-function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
-  const rect = host?.getBoundingClientRect()
-  if (rect && rect.width > 0) return rect
-  const parentRect = host?.parentElement?.getBoundingClientRect()
-  return parentRect && parentRect.width > 0 ? parentRect : null
-}
-
-function isPointerInsideElement(
-  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
-  element: HTMLElement | null,
-): boolean {
-  if (!element) return false
-  const rect = element.getBoundingClientRect()
-  if (rect.width <= 0 || rect.height <= 0) return false
-  return (
-    event.clientX >= rect.left &&
-    event.clientX <= rect.right &&
-    event.clientY >= rect.top &&
-    event.clientY <= rect.bottom
-  )
-}
-
-function isPointerInsideRevealBounds(
-  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
-  host: HTMLElement | null,
-  panel: HTMLElement | null,
-): boolean {
-  if (!host || !panel) return false
-  const hostRect = host.getBoundingClientRect()
-  const panelRect = panel.getBoundingClientRect()
-  const width = panel.offsetWidth || panelRect.width
-  if (hostRect.height <= 0 || width <= 0) return false
-
-  return (
-    event.clientX >= hostRect.left &&
-    event.clientX <= hostRect.left + width &&
-    event.clientY >= hostRect.top &&
-    event.clientY <= hostRect.bottom
-  )
-}
-
-function isZenRevealSurfaceTarget(
-  target: EventTarget | null,
-  panel: HTMLElement | null,
-  hitArea: HTMLElement | null,
-  options: { includeClosedFloatingSurfaces?: boolean } = {},
-): boolean {
-  if (!(target instanceof Node)) return false
-  if (panel?.contains(target) || hitArea?.contains(target)) return true
-
-  const targetElement = target instanceof Element ? target : target.parentElement
-  const surfaceElement = targetElement?.closest(ZEN_REVEAL_SURFACE_SELECTOR)
-  if (!surfaceElement) return false
-  if (
-    options.includeClosedFloatingSurfaces === false &&
-    surfaceElement.matches('[data-floating-surface][data-state="closed"]')
-  ) {
-    return false
-  }
-  return true
 }
 
 function useRootFontSizePx(): number {

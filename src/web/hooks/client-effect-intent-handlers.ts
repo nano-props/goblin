@@ -31,8 +31,7 @@ import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
-import { getRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { dispatchShowWorkspacePaneTerminalRouteAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import {
@@ -49,7 +48,6 @@ interface SharedClientIntentDeps {
   navigation: AppNavigationActions
   currentWorkspaceId: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
-  closeAllOverlays: () => void
   openWorkspacePathDialog: () => void
   openCloneRepo: () => void
   openRemoteWorkspace: () => void
@@ -163,7 +161,7 @@ export async function handleWorkspaceClientIntent(
       return true
     case 'open-workspace':
       await openWorkspaceFromDialog({
-        ensureWorkspaceOpen: async (path) => await deps.ensureWorkspaceOpen(path),
+        ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
         activateWorkspace: deps.navigation.activateWorkspace,
         openWorkspacePathDialog: deps.openWorkspacePathDialog,
         t: deps.t,
@@ -208,10 +206,14 @@ export async function handleWorkspaceClientIntent(
         navigation: deps.navigation,
       })
       return true
-    case 'close-workspace':
+    case 'close-workspace': {
       const closeResult = await deps.navigation.closeWorkspace(plan.workspaceId)
-      if (!closeResult.ok) toast.error(deps.t(closeResult.message))
+      if (!closeResult.ok) {
+        const closeErrorKey = closeResult.message
+        toast.error(deps.t(closeErrorKey))
+      }
       return closeResult.ok
+    }
     case 'cycle-workspace':
       deps.navigation.cycleWorkspace(plan.direction)
       return true
@@ -281,15 +283,15 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
           await openWorkspacePaths(paths, {
             ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
             activateWorkspace: deps.activateWorkspace,
-            onOpenFailed: (path, message) => {
-              const openErrorMessage = deps.t(message)
+            onOpenFailed: (path, messageKey) => {
+              const openErrorMessage = deps.t(messageKey)
               toast.error(deps.t('drop.open-failed'), {
                 description: `${path}\n${openErrorMessage}`,
               })
             },
-            onPostOpenError: (path, message) => {
+            onPostOpenError: (path, messageKey) => {
               toast.error(deps.t('workspace-picker.recent-save-failed'), {
-                description: `${path}\n${deps.t(message)}`,
+                description: `${path}\n${deps.t(messageKey)}`,
               })
             },
           })

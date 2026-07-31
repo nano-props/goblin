@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   adjacentWorkspacePaneTab,
   nextWorkspacePaneTabEntryAfterClose,
-} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   createModel,
   requiredEntryIdentity,

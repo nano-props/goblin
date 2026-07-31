@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { MAX_TERMINAL_WRITE_CHARS, TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-validators.ts'
+import { MAX_TERMINAL_WRITE_CHARS, TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-protocol-constraints.ts'
 import { planTerminalPathWrite, shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
 
 describe('shellEscapePath', () => {

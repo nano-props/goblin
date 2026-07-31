@@ -6,6 +6,7 @@ import {
   isImeOwnedKeyboardEvent,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
+  terminalInputForVirtualKey,
 } from '#/web/components/terminal/terminal-keyboard.ts'
 
 const SAFARI_UA =
@@ -198,6 +199,29 @@ describe('terminalInputForMacOptionArrow', () => {
         { isMac: true, applicationCursorKeysMode: true },
       ),
     ).toBeNull()
+  })
+})
+
+describe('terminalInputForVirtualKey', () => {
+  test.each([
+    ['enter', '\r'],
+    ['backspace', '\x7f'],
+    ['tab', '\t'],
+    ['escape', '\x1b'],
+    ['interrupt', '\x03'],
+    ['eof', '\x04'],
+  ] as const)('encodes %s', (key, expected) => {
+    expect(terminalInputForVirtualKey(key, false)).toBe(expected)
+  })
+
+  test.each([
+    ['arrow-up', 'A'],
+    ['arrow-down', 'B'],
+    ['arrow-left', 'D'],
+    ['arrow-right', 'C'],
+  ] as const)('encodes %s for normal and application cursor modes', (key, suffix) => {
+    expect(terminalInputForVirtualKey(key, false)).toBe(`\x1b[${suffix}`)
+    expect(terminalInputForVirtualKey(key, true)).toBe(`\x1bO${suffix}`)
   })
 })
 

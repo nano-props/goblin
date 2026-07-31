@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 export type TerminalCreateTranslator = (key: string) => string
 

@@ -2,16 +2,15 @@ import PQueue from 'p-queue'
 import {
   captureRepoWriteExecution,
   repoWriteExecutionBoundaryKey,
-  resolveRepoWriteBoundaryKey,
   runWithCapturedRepoWriteExecution,
   type RepoSource,
   type RepoWriteExecutionCapability,
 } from '#/server/modules/repo-source.ts'
+import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-write-boundary.ts'
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
-  RepoOperationFailureReason,
   RepoServerOperationKind,
   RepoServerOperationSource,
   RepoServerOperationState,
@@ -20,6 +19,13 @@ import type {
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
+import {
+  isSettledRepoWriteOperation,
+  projectRepoWriteOperations,
+  repoWriteOperationFailureReason,
+  repoWriteOperationTimestamp,
+  type RepoWriteOperationListOptions,
+} from '#/server/modules/repo-write-operation-state.ts'
 
 export interface RepoWriteOperationLifecycle {
   id: string
@@ -148,43 +154,13 @@ function workspaceRuntimeRegistrationClosedError(
   return registration && !registration.active ? new WorkspaceRuntimeAdmissionClosedError() : null
 }
 
-function cloneOperation(state: RepoServerOperationState): RepoServerOperationState {
-  return {
-    ...state,
-    target: state.target ? { ...state.target } : null,
-    error: state.error ? { ...state.error } : null,
-    cancellation: { ...state.cancellation },
-  }
-}
-
-function operationFailureReasonForMessage(
-  message: string | null | undefined,
-  cancellationReason: RepoOperationCancellationReason | null,
-): RepoOperationFailureReason | null {
-  if (cancellationReason) return cancellationReason
-  if (message === 'cancelled') return 'caller-abort'
-  return null
-}
-
-function sortedOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
-  return [...states].sort((a, b) => {
-    const aTime = a.settledAt ?? a.startedAt ?? a.queuedAt
-    const bTime = b.settledAt ?? b.startedAt ?? b.queuedAt
-    return bTime - aTime
-  })
-}
-
 function pruneSettledOperations(): void {
   const settled = [...boundaryGroups]
     .flatMap((runtime) =>
-      [...runtime.operations.values()]
-        .filter((operation) => operation.phase === 'done' || operation.phase === 'failed')
-        .map((operation) => ({ runtime, operation })),
+      [...runtime.operations.values()].filter(isSettledRepoWriteOperation).map((operation) => ({ runtime, operation })),
     )
     .sort((a, b) => {
-      const aTime = a.operation.settledAt ?? a.operation.startedAt ?? a.operation.queuedAt
-      const bTime = b.operation.settledAt ?? b.operation.startedAt ?? b.operation.queuedAt
-      return bTime - aTime
+      return repoWriteOperationTimestamp(b.operation) - repoWriteOperationTimestamp(a.operation)
     })
 
   for (const { runtime, operation } of settled.slice(MAX_SETTLED_OPERATIONS)) {
@@ -257,7 +233,7 @@ function beginRepoWriteOperation(
         ? null
         : {
             message: result.message ?? 'error.failed-read-repo',
-            reason: operationFailureReasonForMessage(result.message, cancellationReason),
+            reason: repoWriteOperationFailureReason(result.message, cancellationReason),
           }
       publishRepoRuntimeInvalidation(runtime, operation)
       pruneSettledOperations()
@@ -279,13 +255,12 @@ function publishRepoRuntimeInvalidation(
 function registerRepoWriteOperationBoundaryRepoId(
   group: RepoWriteBoundaryGroup,
   repoId: WorkspaceId | null | undefined,
-) {
+): void {
   ensureRepoRuntimeCloseSubscription()
   if (repoId) {
     boundaryGroupByRepoId.set(repoId, group)
     group.repoIds.add(repoId)
   }
-  return group.repoIds
 }
 
 function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId, workspaceRuntimeId: string): void {
@@ -500,24 +475,12 @@ export async function listRepoWriteOperationsForRepo(
 
 function listRuntimeOperations(
   runtimes: RepoWriteBoundaryGroup[],
-  options: { includeSettled?: boolean; workspaceRuntimeId?: string },
+  options: RepoWriteOperationListOptions,
 ): RepoServerOperationState[] {
-  const includeSettled = options.includeSettled === true
-  return sortedOperations(
-    runtimes.flatMap((runtime) =>
-      [...runtime.operations.values()].filter((operation) => {
-        if (
-          options.workspaceRuntimeId &&
-          operation.workspaceRuntimeId &&
-          operation.workspaceRuntimeId !== options.workspaceRuntimeId
-        ) {
-          return false
-        }
-        if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false
-        return true
-      }),
-    ),
-  ).map(cloneOperation)
+  return projectRepoWriteOperations(
+    runtimes.flatMap((runtime) => [...runtime.operations.values()]),
+    options,
+  )
 }
 
 export function listRepoWriteOperationsForBoundary(

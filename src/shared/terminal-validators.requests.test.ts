@@ -1,20 +1,22 @@
 import { describe, expect, test } from 'vitest'
 import {
   constrainTerminalSize,
+  isTerminalWsMessageWithinLimit,
+  isValidTerminalSize,
+  isValidTerminalWriteData,
+  MAX_TERMINAL_WRITE_CHARS,
+  normalizeTerminalSize,
+  terminalUtf8ByteLength,
+  TERMINAL_WS_MESSAGE_LIMIT_BYTES,
+} from '#/shared/terminal-protocol-constraints.ts'
+import {
   isValidTerminalClientId,
   isValidTerminalNotifyBellInput,
   isValidTerminalTestNotificationInput,
-  isTerminalWsMessageWithinLimit,
-  isValidTerminalSize,
   isValidTerminalRuntimeSessionId,
-  isValidTerminalWriteData,
-  MAX_TERMINAL_WRITE_CHARS,
   normalizeTerminalClientMessage,
   normalizeTerminalRealtimeMessage,
-  normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
-  terminalUtf8ByteLength,
-  TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-validators.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import { normalizeAppRealtimeClientMessage } from '#/shared/app-realtime-validators.ts'

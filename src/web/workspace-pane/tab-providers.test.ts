@@ -3,11 +3,9 @@ import {
   changesWorkspacePaneTabProvider,
   filesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
-  isWorkspacePaneRuntimeTabProvider,
   statusWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
   workspacePaneRuntimeTabProvider,
-  workspacePaneRuntimeTabProviders,
   workspacePaneStaticTabProvider,
   workspacePaneTabProviders,
   workspacePaneTabProvider,
@@ -77,10 +75,9 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
 
-  test('registers runtime tab providers separately from static providers', () => {
-    expect(workspacePaneRuntimeTabProviders().map((provider) => provider.type)).toEqual(['terminal'])
+  test('resolves runtime tab providers by type', () => {
     expect(workspacePaneRuntimeTabProvider('terminal')).toBe(terminalWorkspacePaneTabProvider)
-    expect(isWorkspacePaneRuntimeTabProvider(workspacePaneTabProvider('terminal'))).toBe(true)
+    expect(workspacePaneTabProvider('terminal').kind).toBe('runtime')
   })
 
   test('derives shared static scope lists from the static scope map', () => {

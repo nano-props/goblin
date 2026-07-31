@@ -6,10 +6,16 @@ import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/serve
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
-
-interface RegisteredGitBackgroundSyncTarget extends GitBackgroundSyncTarget {
-  userId: string
-}
+import {
+  backgroundSyncBackoffDelayMs,
+  backgroundSyncNextEligibleAt,
+  backgroundSyncTargetKey,
+  sameBackgroundSyncTargets,
+  shouldBackoffBackgroundSyncFailure,
+  uniqueBackgroundSyncTargets,
+  uniqueRegisteredBackgroundSyncTargets,
+  type RegisteredGitBackgroundSyncTarget,
+} from '#/server/modules/background-sync-policy.ts'
 
 interface BackgroundSyncActiveFetch {
   target: RegisteredGitBackgroundSyncTarget
@@ -86,9 +92,6 @@ let settingsInitializationGeneration = 0
 let runtimeCloseSubscription: (() => void) | null = null
 let membershipReleaseSubscription: (() => void) | null = null
 const backgroundSyncLogger = serverLogger.child({ module: 'background-sync' })
-const MIN_BACKOFF_MS = 5_000
-const MAX_BACKOFF_BASE_MS = 30_000
-const MAX_BACKOFF_MS = 5 * 60_000
 const syncQueue = new PQueue({ concurrency: 1 })
 
 function stopBackgroundSyncJob(): void {
@@ -149,13 +152,7 @@ function findNextDueTarget(now: number): RegisteredGitBackgroundSyncTarget | nul
     const index = (state.nextTargetIndex + offset) % state.targets.length
     const target = state.targets[index]
     if (!target) continue
-    const key = backgroundSyncTargetKey(target)
-    const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
-    const nextIntervalAt =
-      lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
-    const backoffUntil = state.backoffUntilByTarget[key] ?? null
-    const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
-    if (now >= nextEligibleAt) {
+    if (isTargetDue(target, now)) {
       state.nextTargetIndex = (index + 1) % state.targets.length
       return target
     }
@@ -165,16 +162,7 @@ function findNextDueTarget(now: number): RegisteredGitBackgroundSyncTarget | nul
 
 function hasDueRepo(now: number): boolean {
   if (state.targets.length === 0 || state.intervalMs <= 0) return false
-  for (const target of state.targets) {
-    const key = backgroundSyncTargetKey(target)
-    const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
-    const nextIntervalAt =
-      lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
-    const backoffUntil = state.backoffUntilByTarget[key] ?? null
-    const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
-    if (now >= nextEligibleAt) return true
-  }
-  return false
+  return state.targets.some((target) => isTargetDue(target, now))
 }
 
 function clearTargetBackoff(target: RegisteredGitBackgroundSyncTarget): void {
@@ -187,30 +175,26 @@ function recordTargetFetchStartedAt(target: RegisteredGitBackgroundSyncTarget, a
   state.lastFetchStartedAtByTarget[backgroundSyncTargetKey(target)] = at
 }
 
-function computeBackoffDelayMs(failureCount: number): number {
-  const base = Math.max(MIN_BACKOFF_MS, Math.min(MAX_BACKOFF_BASE_MS, state.intervalMs))
-  return Math.min(base * 2 ** failureCount, MAX_BACKOFF_MS)
-}
-
-function shouldBackoffMessage(message: string): boolean {
-  return message !== 'cancelled' && message !== 'error.network-op-in-progress'
-}
-
 function recordTargetFailure(target: RegisteredGitBackgroundSyncTarget, now: number): void {
   const key = backgroundSyncTargetKey(target)
   const failureCount = (state.failureCountByTarget[key] ?? 0) + 1
   state.failureCountByTarget[key] = failureCount
-  state.backoffUntilByTarget[key] = now + computeBackoffDelayMs(failureCount)
+  state.backoffUntilByTarget[key] = now + backgroundSyncBackoffDelayMs(state.intervalMs, failureCount)
 }
 
 function nextEligibleAt(target: RegisteredGitBackgroundSyncTarget, now: number = Date.now()): number | null {
-  if (state.intervalMs <= 0) return null
   const key = backgroundSyncTargetKey(target)
-  const lastFetchStartedAt = state.lastFetchStartedAtByTarget[key]
-  const nextIntervalAt =
-    lastFetchStartedAt === null || lastFetchStartedAt === undefined ? now : lastFetchStartedAt + state.intervalMs
-  const backoffUntil = state.backoffUntilByTarget[key] ?? null
-  return Math.max(nextIntervalAt, backoffUntil ?? 0)
+  return backgroundSyncNextEligibleAt({
+    intervalMs: state.intervalMs,
+    lastFetchStartedAt: state.lastFetchStartedAtByTarget[key],
+    backoffUntil: state.backoffUntilByTarget[key],
+    now,
+  })
+}
+
+function isTargetDue(target: RegisteredGitBackgroundSyncTarget, now: number): boolean {
+  const eligibleAt = nextEligibleAt(target, now)
+  return eligibleAt !== null && now >= eligibleAt
 }
 
 function abortActiveFetchForTarget(target: RegisteredGitBackgroundSyncTarget): boolean {
@@ -278,7 +262,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
       clearTargetBackoff(target)
       return
     }
-    if (shouldBackoffMessage(result.message)) {
+    if (shouldBackoffBackgroundSyncFailure(result.message)) {
       recordTargetFailure(target, now)
       const key = backgroundSyncTargetKey(target)
       backgroundSyncLogger.warn(
@@ -395,7 +379,6 @@ export function stopBackgroundSync(): void {
   state.nextTargetIndex = 0
   state.pendingScheduleGeneration = null
   state.idleDrainScheduled = false
-  state.activeFetch = null
   syncQueue.clear()
   stopBackgroundSyncJob()
   settingsInitializationGeneration += 1
@@ -457,39 +440,6 @@ export function resetBackgroundSyncForTests(): void {
   stopBackgroundSync()
 }
 
-function backgroundSyncTargetKey(target: RegisteredGitBackgroundSyncTarget): string {
-  return `${target.userId}\0${target.workspaceId}\0${target.workspaceRuntimeId}`
-}
-
-function uniqueBackgroundSyncTargets(
-  userId: string,
-  targets: readonly GitBackgroundSyncTarget[],
-): RegisteredGitBackgroundSyncTarget[] {
-  const unique = new Map<string, RegisteredGitBackgroundSyncTarget>()
-  for (const target of targets) {
-    const registered = { userId, ...target }
-    unique.set(backgroundSyncTargetKey(registered), registered)
-  }
-  return [...unique.values()]
-}
-
-function uniqueRegisteredBackgroundSyncTargets(
-  targets: readonly RegisteredGitBackgroundSyncTarget[],
-): RegisteredGitBackgroundSyncTarget[] {
-  const unique = new Map<string, RegisteredGitBackgroundSyncTarget>()
-  for (const target of targets) unique.set(backgroundSyncTargetKey(target), target)
-  return [...unique.values()]
-}
-
-function sameBackgroundSyncTargets(
-  current: readonly RegisteredGitBackgroundSyncTarget[],
-  next: readonly RegisteredGitBackgroundSyncTarget[],
-): boolean {
-  if (current.length !== next.length) return false
-  const currentKeys = new Set(current.map(backgroundSyncTargetKey))
-  return next.every((target) => currentKeys.has(backgroundSyncTargetKey(target)))
-}
-
 function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   const closedTarget = { userId, workspaceId, workspaceRuntimeId }
   const key = backgroundSyncTargetKey(closedTarget)
@@ -508,10 +458,8 @@ function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, w
 }
 
 function clearTargetState(target: RegisteredGitBackgroundSyncTarget): void {
-  const key = backgroundSyncTargetKey(target)
-  delete state.lastFetchStartedAtByTarget[key]
-  delete state.failureCountByTarget[key]
-  delete state.backoffUntilByTarget[key]
+  delete state.lastFetchStartedAtByTarget[backgroundSyncTargetKey(target)]
+  clearTargetBackoff(target)
 }
 
 function releaseBackgroundSyncMembership(

@@ -73,10 +73,6 @@ export class TerminalSessionState {
     return this.runtimeState.processName
   }
 
-  getCanonicalTitle(): string | null {
-    return this.runtimeState.canonicalTitle
-  }
-
   getSearchResult(): TerminalSearchResult | null {
     return this.transientViewState.searchResult
   }
@@ -174,21 +170,6 @@ export class TerminalSessionState {
     return true
   }
 
-  applyOpenResult(input: {
-    phase?: TerminalSessionPhase
-    message?: string | null
-    processName: string
-    canonicalTitle?: string | null
-    identityRevision: number
-    role: TerminalControllerViewModel['role']
-    controllerStatus: TerminalControllerViewModel['controllerStatus']
-    canonicalSize: { cols: number; rows: number } | null
-  }): boolean {
-    let changed = this.establishIdentity(input)
-    changed = this.applyRuntimeMetadata(input) || changed
-    return changed
-  }
-
   establishIdentity(input: TerminalIdentityStateInput): boolean {
     assertValidIdentityRevision(input.identityRevision)
     this.runtimeState.identityRevision = input.identityRevision
@@ -225,9 +206,7 @@ export class TerminalSessionState {
   }
 
   setCanonicalSize(next: { cols: number; rows: number } | null): boolean {
-    const current = this.runtimeState.canonicalSize
-    if (current === null && next === null) return false
-    if (current !== null && next !== null && current.cols === next.cols && current.rows === next.rows) return false
+    if (sameTerminalCanonicalSize(this.runtimeState.canonicalSize, next)) return false
     this.runtimeState.canonicalSize = next
     return true
   }
@@ -257,7 +236,7 @@ export class TerminalSessionState {
     return (
       currentController.role === input.role &&
       currentController.controllerStatus === input.controllerStatus &&
-      sameCanonicalSize(this.runtimeState.canonicalSize, input.canonicalSize)
+      sameTerminalCanonicalSize(this.runtimeState.canonicalSize, input.canonicalSize)
     )
   }
 
@@ -266,7 +245,7 @@ export class TerminalSessionState {
   // filters the shared buffer and the outer render queue still fences by
   // runtime binding.
   beginReplay(replayBoundary: TerminalOutputCheckpoint): number {
-    this.outputSequencingState.replayBoundary = normalizeOutputCheckpoint(replayBoundary)
+    this.outputSequencingState.replayBoundary = normalizeTerminalOutputCheckpoint(replayBoundary)
     this.outputSequencingState.replayGeneration += 1
     return this.outputSequencingState.replayGeneration
   }
@@ -347,7 +326,7 @@ function assertValidIdentityRevision(revision: number): void {
   if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('invalid terminal identity revision')
 }
 
-function sameCanonicalSize(
+export function sameTerminalCanonicalSize(
   a: { cols: number; rows: number } | null,
   b: { cols: number; rows: number } | null,
 ): boolean {
@@ -375,7 +354,7 @@ export interface TerminalOutputCheckpoint {
   seq: number
 }
 
-function normalizeOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
+export function normalizeTerminalOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
   return {
     seq: normalizeOutputSeq(checkpoint.seq),
   }

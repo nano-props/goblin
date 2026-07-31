@@ -21,7 +21,7 @@
 // commits one and continues typing from the committed path.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode, Ref } from 'react'
+import type { KeyboardEvent, MouseEventHandler, ReactNode, Ref } from 'react'
 import { CheckIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react'
 import { Input } from '#/web/components/ui/input.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -125,21 +125,16 @@ export function DirectoryPathSuggestions({
 
   useEffect(() => {
     if (!isOpen) return
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node | null
-      if (target && containerRef.current?.contains(target)) return
+    function closeOnOutsideInteraction(event: Event) {
+      const target = event.target
+      if (target instanceof Node && containerRef.current?.contains(target)) return
       setOpen(false)
     }
-    function onFocusIn(event: FocusEvent) {
-      const target = event.target as Node | null
-      if (target && containerRef.current?.contains(target)) return
-      setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('pointerdown', closeOnOutsideInteraction, true)
+    document.addEventListener('focusin', closeOnOutsideInteraction)
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('pointerdown', closeOnOutsideInteraction, true)
+      document.removeEventListener('focusin', closeOnOutsideInteraction)
     }
   }, [isOpen])
 
@@ -147,7 +142,7 @@ export function DirectoryPathSuggestions({
   // hoisted into a const so the input's `aria-controls` /
   // `aria-activedescendant` and the listbox element stay in sync.
   const listboxId = `${id ?? 'directory-path'}-suggestions`
-  const activeOptionId = hasMatches ? `${listboxId}-option-${activeIndex}` : undefined
+  const activeOptionId = suggestions[activeIndex] !== undefined ? `${listboxId}-option-${activeIndex}` : undefined
 
   const commit = useCallback(
     (next: string) => {
@@ -160,7 +155,7 @@ export function DirectoryPathSuggestions({
   )
 
   const onKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
+    (event: KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Escape') {
         if (!isOpen) return
         event.preventDefault()
@@ -322,10 +317,10 @@ function SuggestionRow({
   children,
 }: {
   active: boolean
-  id?: string
-  rowRef?: (node: HTMLDivElement | null) => void
-  onMouseDown?: React.MouseEventHandler<HTMLDivElement>
-  onMouseMove?: React.MouseEventHandler<HTMLDivElement>
+  id: string
+  rowRef: (node: HTMLDivElement | null) => void
+  onMouseDown: MouseEventHandler<HTMLDivElement>
+  onMouseMove: MouseEventHandler<HTMLDivElement>
   children: ReactNode
 }) {
   return (

@@ -1,35 +1,39 @@
-import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  RestorableWorkspaceActions,
+  WorkspaceMembershipActions,
+  WorkspaceNavigationHistoryActions,
+} from '#/web/stores/workspaces/types.ts'
 
-interface RestorableWorkspaceLayoutStoreActions extends Pick<WorkspacesStore, 'resetLayout' | 'toggleZenMode'> {}
+interface RestorableWorkspaceLayoutStoreActions {
+  resetLayout: RestorableWorkspaceActions['resetLayout']
+  toggleZenMode: RestorableWorkspaceActions['toggleZenMode']
+}
 
-interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
-  WorkspacesStore,
-  'resetLayout' | 'toggleZenMode'
-> {}
+interface RestorableWorkspaceLayoutPreferenceStoreActions extends RestorableWorkspaceLayoutStoreActions {}
 
-interface RuntimeCoherentWorkspaceOpenStoreActions extends Pick<WorkspacesStore, 'ensureWorkspaceOpen'> {}
+interface RuntimeCoherentWorkspaceOpenStoreActions {
+  ensureWorkspaceOpen: WorkspaceMembershipActions['ensureWorkspaceOpen']
+}
 
-interface RuntimeCoherentWorkspaceNavigationStoreActions extends Pick<WorkspacesStore, 'closeWorkspace'> {}
+interface RuntimeCoherentWorkspaceNavigationStoreActions {
+  closeWorkspace: WorkspaceMembershipActions['closeWorkspace']
+}
 
-interface RuntimeCoherentWorkspaceProjectionStoreActions extends Pick<
-  WorkspacesStore,
-  'ensureWorkspaceOpen' | 'closeWorkspace'
-> {}
+interface RuntimeCoherentWorkspaceProjectionStoreActions
+  extends RuntimeCoherentWorkspaceOpenStoreActions, RuntimeCoherentWorkspaceNavigationStoreActions {}
 
-interface AppNavigationStoreActions extends Pick<
-  WorkspacesStore,
-  'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
-> {}
+interface AppNavigationStoreActions extends RuntimeCoherentWorkspaceNavigationStoreActions {
+  peekWorkspaceNavigation: WorkspaceNavigationHistoryActions['peekWorkspaceNavigation']
+  commitWorkspaceNavigation: WorkspaceNavigationHistoryActions['commitWorkspaceNavigation']
+}
 
-interface WorkspacePickerStoreActions extends Pick<WorkspacesStore, 'ensureWorkspaceOpen'> {}
+interface WorkspacePickerStoreActions extends RuntimeCoherentWorkspaceOpenStoreActions {}
 
-interface ClientEffectIntentStoreActions extends Pick<
-  WorkspacesStore,
-  'ensureWorkspaceOpen' | 'resetLayout' | 'toggleZenMode'
-> {}
+interface ClientEffectIntentStoreActions
+  extends RuntimeCoherentWorkspaceOpenStoreActions, RestorableWorkspaceLayoutStoreActions {}
 
 export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'ensureWorkspaceOpen'>,
+  state: RuntimeCoherentWorkspaceOpenStoreActions,
 ): RuntimeCoherentWorkspaceOpenStoreActions {
   return {
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
@@ -37,7 +41,7 @@ export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
 }
 
 export function runtimeCoherentWorkspaceNavigationStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'closeWorkspace'>,
+  state: RuntimeCoherentWorkspaceNavigationStoreActions,
 ): RuntimeCoherentWorkspaceNavigationStoreActions {
   return {
     closeWorkspace: state.closeWorkspace,
@@ -45,7 +49,7 @@ export function runtimeCoherentWorkspaceNavigationStoreActionsFromStore(
 }
 
 export function restorableWorkspaceLayoutStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'resetLayout' | 'toggleZenMode'>,
+  state: RestorableWorkspaceLayoutStoreActions,
 ): RestorableWorkspaceLayoutStoreActions {
   return {
     resetLayout: state.resetLayout,
@@ -54,7 +58,7 @@ export function restorableWorkspaceLayoutStoreActionsFromStore(
 }
 
 export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'resetLayout' | 'toggleZenMode'>,
+  state: RestorableWorkspaceLayoutPreferenceStoreActions,
 ): RestorableWorkspaceLayoutPreferenceStoreActions {
   return {
     resetLayout: state.resetLayout,
@@ -63,7 +67,7 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
 }
 
 export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'ensureWorkspaceOpen' | 'closeWorkspace'>,
+  state: RuntimeCoherentWorkspaceProjectionStoreActions,
 ): RuntimeCoherentWorkspaceProjectionStoreActions {
   const open = runtimeCoherentWorkspaceOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
   const navigation = runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
@@ -75,9 +79,7 @@ export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
   }
 }
 
-export function appNavigationStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>,
-): AppNavigationStoreActions {
+export function appNavigationStoreActionsFromStore(state: AppNavigationStoreActions): AppNavigationStoreActions {
   return {
     closeWorkspace: state.closeWorkspace,
     peekWorkspaceNavigation: state.peekWorkspaceNavigation,
@@ -85,9 +87,7 @@ export function appNavigationStoreActionsFromStore(
   }
 }
 
-export function workspacePickerStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'ensureWorkspaceOpen'>,
-): WorkspacePickerStoreActions {
+export function workspacePickerStoreActionsFromStore(state: WorkspacePickerStoreActions): WorkspacePickerStoreActions {
   const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
@@ -97,7 +97,7 @@ export function workspacePickerStoreActionsFromStore(
 }
 
 export function clientEffectIntentStoreActionsFromStore(
-  state: Pick<WorkspacesStore, 'ensureWorkspaceOpen' | 'resetLayout' | 'toggleZenMode'>,
+  state: ClientEffectIntentStoreActions,
 ): ClientEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,

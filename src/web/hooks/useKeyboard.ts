@@ -33,12 +33,11 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { getRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -82,6 +81,19 @@ function primaryModifierPressed(event: KeyboardEvent): boolean {
 
 function macPrimaryModifierPressed(event: KeyboardEvent): boolean {
   return /\bMac|iPhone|iPad|iPod/.test(globalThis.navigator?.platform ?? '') && event.metaKey && !event.ctrlKey
+}
+
+function workspaceHistoryNavigationDirection(event: KeyboardEvent): MoveDirection | 0 {
+  if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+    if (event.code === 'ArrowLeft') return -1
+    if (event.code === 'ArrowRight') return 1
+    return 0
+  }
+  if (macPrimaryModifierPressed(event) && !event.altKey && !event.shiftKey) {
+    if (event.code === 'BracketLeft') return -1
+    if (event.code === 'BracketRight') return 1
+  }
+  return 0
 }
 
 function digitShortcutIndex(event: KeyboardEvent): number | null {
@@ -136,9 +148,9 @@ export function useKeyboard({
   onExitSettings,
   openCreateWorktree,
 }: Options) {
-  // Stash the latest closures in refs so the effect deps can be `[]` —
-  // otherwise React adds + removes the window listener on every App
-  // render (both options are recreated each render).
+  // Stash changing callbacks and route inputs in refs so the listener
+  // only follows the navigation facade instead of being replaced on
+  // every App render.
   const onShowHelpRef = useRef(onShowHelp)
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const isSettingsOpenRef = useRef(isSettingsOpen)
@@ -174,16 +186,7 @@ export function useKeyboard({
 
       if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
         const workspaceId = currentWorkspaceIdRef.current
-        const navigationDirection =
-          e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowLeft'
-            ? -1
-            : e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowRight'
-              ? 1
-              : macPrimaryModifierPressed(e) && !e.altKey && !e.shiftKey && e.code === 'BracketLeft'
-                ? -1
-                : macPrimaryModifierPressed(e) && !e.altKey && !e.shiftKey && e.code === 'BracketRight'
-                  ? 1
-                  : 0
+        const navigationDirection = workspaceHistoryNavigationDirection(e)
         if (workspaceId && navigationDirection !== 0) {
           e.preventDefault()
           if (navigationDirection === -1) navigation.goBack(workspaceId)

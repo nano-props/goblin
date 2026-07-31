@@ -4,16 +4,14 @@
 // this file aggregates what crosses process/transport boundaries.
 
 import * as v from 'valibot'
-import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import type {
   BranchSnapshotInfo,
   ExecResult,
   LogEntry,
   PullRequestInfo,
   RepoRemoteInfo,
-  RepoUrlTarget,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { WorkspacePaneSessionTabType, WorkspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -21,36 +19,20 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type {
   EditorAppAvailability,
-  EditorApp,
   Lang,
   LangPref,
   ResolvedTheme,
   UserSettings,
   TerminalAppAvailability,
-  TerminalApp,
   ThemePref,
 } from '#/shared/settings.ts'
-import type {
-  RemoteConnectionInput,
-  RemoteDiagnosticsResult,
-  WorkspaceSessionEntry,
-  RemoteWorkspaceTarget,
-  RemoteWorkspaceRuntimeLifecycle,
-  ResolvedRemoteWorkspaceTarget,
-  SshConfigHostsResult,
-} from '#/shared/remote-workspace.ts'
-import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
-import type { CreateWorktreeIpcInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
-import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceSessionEntry, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type {
   WorkspaceCapabilities,
   WorkspaceGitReadyProbeState,
-  WorkspacePaneFilesystemExecutionTarget,
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
-import { DirectoryPathPrefixSchema } from '#/shared/directory-path-suggestions.ts'
-import type { RemoteDirectoryPathSuggestionsInput } from '#/shared/directory-path-suggestions.ts'
 
 export type {
   EditorApp,
@@ -403,171 +385,22 @@ export type IpcEvent =
   | { type: 'settings-write-error'; message: string }
   | I18nChangedEvent
 
-export interface AppIpcHandlers {
-  workspace: {
-    runtimeOpen: (
-      input: ({ workspaceId: WorkspaceId } | { workspaceInput: string }) & { clientId: string },
-    ) => Promise<WorkspaceRuntimeOpenResponse>
-    runtimeReconcile: (input: {
-      clientId: string
-      workspaceIds: WorkspaceId[]
-    }) => Promise<WorkspaceRuntimeMembershipReconcileResult>
-    runtimeList: () => Promise<WorkspaceRuntimesSnapshot>
-    runtimeClose: (input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; clientId: string }) => Promise<{
-      ok: boolean
-      released: boolean
-      runtimeClosed: boolean
-    }>
-    tree: (input: {
-      target: WorkspacePaneFilesystemExecutionTarget
-      prefix?: string
-    }) => Promise<WorkspaceFilesystemTreeResult>
-    trashFile: (input: { target: WorkspacePaneFilesystemExecutionTarget; path: string }) => Promise<ExecResult>
-    fileViewer: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<WorkspaceFileViewerResult>
-    openTerminal: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: TerminalApp }) => Promise<ExecResult>
-    openEditor: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: EditorApp }) => Promise<ExecResult>
-    openInFinder: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<ExecResult>
-  }
-  repo: {
-    clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
-    snapshot: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RepoSnapshotResponse>
-    pullRequests: (input: {
-      cwd: WorkspaceId
-      workspaceRuntimeId: string
-      scope: RepoPullRequestScope
-    }) => Promise<RepoPullRequestsResponse>
-    operations: (
-      input: { includeSettled?: boolean } | { cwd: WorkspaceId; workspaceRuntimeId: string; includeSettled?: boolean },
-    ) => Promise<RepoOperationsSnapshot>
-    patch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
-    deleteBranch: (input: {
-      cwd: WorkspaceId
-      workspaceRuntimeId: string
-      branch: string
-      force?: boolean
-      deleteUpstream?: boolean
-    }) => Promise<ExecResult>
-    removeWorktree: (input: {
-      cwd: WorkspaceId
-      workspaceRuntimeId: string
-      branch: string
-      worktreePath: string
-      deleteBranch: boolean
-      forceDeleteBranch?: boolean
-      deleteUpstream?: boolean
-    }) => Promise<ExecResult>
-    createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
-    worktreeBootstrapPreview: (input: {
-      cwd: WorkspaceId
-      workspaceRuntimeId: string
-    }) => Promise<WorktreeBootstrapPreviewResult>
-    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<RemoteTrackingBranchIdentity[]>
-    pull: (input: {
-      cwd: WorkspaceId
-      workspaceRuntimeId: string
-      branch: string
-      worktreePath?: string
-    }) => Promise<ExecResult>
-    push: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<ExecResult>
-    openUrl: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    backgroundSyncRepos: (input: {
-      clientId: string
-      revision: number
-      targets: GitBackgroundSyncTarget[]
-    }) => Promise<{
-      ok: true
-      repoIds: WorkspaceId[]
-      intervalSec: number
-    }>
-  }
-  remote: {
-    listSshHosts: () => Promise<SshConfigHostsResult>
-    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteWorkspaceTarget>
-    listPathSuggestions: (input: RemoteDirectoryPathSuggestionsInput) => Promise<string[]>
-    testWorkspace: (input: { target: RemoteWorkspaceTarget }) => Promise<RemoteDiagnosticsResult>
-  }
-  theme: {
-    get: () => ThemeState
-    setPref: (input: { pref: ThemePref }) => Promise<ThemeState>
-    setColorTheme: (input: { colorTheme: ColorTheme }) => Promise<ThemeState>
-  }
+export interface NativeHostSettingsIpcHandlers {
   settings: {
-    get: () => Promise<SettingsSnapshot>
-    setFetchInterval: (input: { sec: number }) => Promise<void>
-    setTerminalNotificationsEnabled: (input: { enabled: boolean }) => Promise<void>
-    setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
-    setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    addRecentWorkspace: (input: { workspace: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
-    clearRecentWorkspaces: () => Promise<void>
-  }
-  externalApps: {
-    get: () => Promise<ExternalAppsSnapshot>
-    refresh: () => Promise<ExternalAppsSnapshot>
-  }
-  githubCli: {
-    get: (input: { hosts?: string[] } | undefined) => Promise<GitHubCliState>
-    refresh: (input: { hosts?: string[] } | undefined) => Promise<GitHubCliState>
-  }
-  i18n: {
-    get: () => Promise<I18nSnapshot>
-    setPref: (input: { pref: LangPref }) => Promise<I18nSnapshot | null>
   }
 }
 
-export interface NativeHostIpcHandlers {
+export interface NativeHostIpcHandlers extends NativeHostSettingsIpcHandlers {
   clientWorkspace: {
     read: (_input: undefined) => Promise<NativeClientWorkspaceReadResult>
     write: (input: ClientWorkspaceState) => Promise<void>
-  }
-  settings: {
-    setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
   }
 }
 
 export type NativeHostIpcPath = {
   [NS in keyof NativeHostIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeHostIpcHandlers[NS], string>}`
 }[keyof NativeHostIpcHandlers]
-
-const FiniteNumber = v.pipe(v.number(), v.finite())
-const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
-
-/** Canonical WorkspaceId envelope shared by Git procedures. */
-export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
-
-export const RemoteWorkspaceTargetSchema = v.object({
-  id: WorkspaceIdSchema,
-  alias: v.string(),
-  host: v.string(),
-  user: v.string(),
-  port: PortNumber,
-  remotePath: RemoteAbsolutePathSchema,
-  displayName: v.string(),
-})
-
-export const RemoteConnectionInputSchema = v.object({
-  alias: v.string(),
-  remotePath: v.string(),
-})
-
-export const RemoteDirectoryPathSuggestionsInputSchema = v.object({
-  alias: v.string(),
-  prefix: DirectoryPathPrefixSchema,
-})
-
-export type IpcErrorCode = 'FORBIDDEN' | 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL_SERVER_ERROR'
-
-/** Error type for the native Electron bridge IPC layer. */
-export class IpcError extends Error {
-  readonly code: string
-
-  constructor(options: { code: IpcErrorCode | string; message: string }) {
-    super(options.message)
-    this.name = 'IpcError'
-    this.code = options.code
-  }
-}
 
 type IpcInputSchema<TInput> = v.BaseSchema<unknown, TInput, v.BaseIssue<unknown>>
 

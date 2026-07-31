@@ -64,7 +64,6 @@ vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeWorkspace: mocks.probeWorkspace,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
-  cloneRepo: mocks.cloneRepo,
   pullRepoBranch: mocks.pullRepoBranch,
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
@@ -72,6 +71,9 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   removeCapturedRepoWorktree: mocks.removeCapturedRepoWorktree,
   fetchRepo: mocks.fetchRepo,
   openRepoUrl: mocks.openRepoUrl,
+}))
+vi.mock('#/server/modules/repo-clone-write.ts', () => ({
+  cloneRepo: mocks.cloneRepo,
 }))
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,

@@ -4,10 +4,9 @@ import {
   getRemoteSnapshot,
   getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities,
-  parseRemoteRepoCommonDir,
-  remoteExecResult,
   type RemoteGitRunner,
 } from '#/system/ssh/git.ts'
+import { parseRemoteRepoCommonDir, remoteExecResult } from '#/system/ssh/git-codec.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {

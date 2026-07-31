@@ -2,7 +2,7 @@ import { t } from 'i18next'
 import { toast } from 'sonner'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 export interface TerminalWriteFailureInput {
   terminalRuntimeSessionId: string

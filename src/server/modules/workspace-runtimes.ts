@@ -13,7 +13,26 @@ import type {
   WorkspaceSettledProbeState,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  planRemoteWorkspaceProbeTransition,
+  projectSettledRemoteWorkspaceLifecycle,
+  remoteWorkspaceLifecycleTarget,
+  settledRemoteWorkspaceLifecycleResult,
+  supersededRemoteWorkspaceLifecycleResult,
+  type RemoteWorkspaceLifecycleRunResult,
+  type RemoteWorkspaceTerminalCommitPlan,
+} from '#/server/modules/workspace-runtime-remote-policy.ts'
 
+/**
+ * Process-local authority for workspace runtime epochs.
+ *
+ * Membership generations, resource retainers, probe transitions, remote
+ * attempts, and close publication remain together because they decide when
+ * one runtime epoch is still owned and when it may be invalidated. Splitting
+ * those writes would create a second liveness authority or distribute commit
+ * ordering across callbacks. Pure remote result and probe-transition policy
+ * lives in `workspace-runtime-remote-policy.ts`.
+ */
 interface WorkspaceRuntimeState {
   workspaceId: WorkspaceId
   currentWorkspaceRuntimeId: string | null
@@ -67,23 +86,10 @@ export interface WorkspaceRuntimeMembershipLease {
   entries: WorkspaceRuntimeMembershipLeaseEntry[]
 }
 
-type TerminalRemoteLifecycle = Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
-
-export type RemoteWorkspaceLifecycleRunResult =
-  { kind: 'settled'; lifecycle: TerminalRemoteLifecycle } | { kind: 'superseded' } | { kind: 'stale-runtime' }
-
 export type RemoteWorkspaceLifecycleFailResult =
   | { kind: 'settled'; lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'failed' }> }
   | { kind: 'not-remote' }
   | { kind: 'stale-runtime' }
-
-export interface RemoteWorkspaceTerminalCommitPlan {
-  workspaceProbe?: {
-    mode: 'initial-only' | 'refresh'
-    probe: WorkspaceSettledProbeState
-    beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
-  }
-}
 
 const workspaceRuntimesByUser = new Map<string, Map<WorkspaceId, WorkspaceRuntimeState>>()
 const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEvent) => void>()
@@ -290,7 +296,7 @@ export function captureWorkspaceRuntimeMembershipLease(
   clientId: string,
 ): WorkspaceRuntimeMembershipLease {
   const entries: WorkspaceRuntimeMembershipLeaseEntry[] = []
-  for (const [workspaceId, state] of workspaceRuntimesByUser.get(userId) ?? []) {
+  for (const state of workspaceRuntimesByUser.get(userId)?.values() ?? []) {
     const generation = state.members.get(clientId)
     if (generation === undefined || !state.currentWorkspaceRuntimeId) continue
     entries.push({
@@ -641,11 +647,9 @@ export async function failRemoteWorkspaceLifecycle(input: {
 }): Promise<RemoteWorkspaceLifecycleFailResult> {
   if (!isRemoteWorkspaceId(input.workspaceId)) return { kind: 'not-remote' }
   const result = await runSerializedWorkspaceLifecycleOperation(input, async (state) => {
-    state.remoteAttemptController?.abort()
-    state.remoteAttemptController = null
-    state.remoteAttemptPromise = null
+    abortRemoteWorkspaceAttempt(state)
     const attemptId = state.remoteLifecycle.attemptId + 1
-    const target = input.target ?? remoteLifecycleTarget(state.remoteLifecycle) ?? undefined
+    const target = input.target ?? remoteWorkspaceLifecycleTarget(state.remoteLifecycle) ?? undefined
     state.remoteLifecycle = {
       kind: 'failed',
       attemptId,
@@ -682,7 +686,7 @@ export async function runRemoteWorkspaceLifecycle(
         if (current.remoteLifecycle.kind === 'ready') {
           return {
             kind: 'result',
-            result: settledRemoteWorkspaceLifecycleResult(current),
+            result: settledRemoteWorkspaceLifecycleResult(current.remoteLifecycle),
           } as const
         }
       }
@@ -747,7 +751,7 @@ async function settleRemoteWorkspaceLifecycleAttempt(
       state.remoteAttemptController !== controller ||
       state.remoteLifecycle.attemptId !== attemptId
     ) {
-      return supersededRemoteWorkspaceLifecycleResult(state, workspaceRuntimeId)
+      return supersededRemoteWorkspaceLifecycleResult(state.currentWorkspaceRuntimeId, workspaceRuntimeId)
     }
     result = {
       kind: 'failed',
@@ -768,12 +772,13 @@ async function settleRemoteWorkspaceLifecycleAttempt(
       previousLifecycle,
       onTransition,
     })
-    if (!committed) return supersededRemoteWorkspaceLifecycleResult(state, workspaceRuntimeId)
+    if (!committed) {
+      return supersededRemoteWorkspaceLifecycleResult(state.currentWorkspaceRuntimeId, workspaceRuntimeId)
+    }
     return committed
   } finally {
     if (state.remoteAttemptController === controller) {
-      state.remoteAttemptController = null
-      state.remoteAttemptPromise = null
+      clearRemoteWorkspaceAttempt(state)
     }
   }
 }
@@ -792,7 +797,7 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
 }): Promise<Extract<RemoteWorkspaceLifecycleRunResult, { kind: 'settled' }> | null> {
   return await runSerializedWorkspaceLifecycleOperation(input, async (state) => {
     if (!remoteAttemptMayCommit(input)) return null
-    const transition = workspaceProbeTransitionForRemoteCommit(state.workspaceProbe, input.plan)
+    const transition = planRemoteWorkspaceProbeTransition(state.workspaceProbe, input.plan)
     if (transition) {
       state.workspaceProbe = transition.after
       state.pendingWorkspaceProbeTransition = transition
@@ -806,8 +811,7 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
       }
       if (remoteAttemptMayCommit(input)) {
         state.remoteLifecycle = input.previousLifecycle
-        state.remoteAttemptController = null
-        state.remoteAttemptPromise = null
+        clearRemoteWorkspaceAttempt(state)
         notifyRemoteLifecycleTransition(input.onTransition, state.remoteLifecycle, input.workspaceId)
       }
       throw error
@@ -819,24 +823,13 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
       }
       return null
     }
-    state.remoteLifecycle = terminalRemoteLifecycle(input.result, input.attemptId)
-    state.remoteAttemptController = null
-    state.remoteAttemptPromise = null
+    state.remoteLifecycle = projectSettledRemoteWorkspaceLifecycle(input.result, input.attemptId)
+    clearRemoteWorkspaceAttempt(state)
     state.pendingWorkspaceProbeTransition = null
-    const settled = settledRemoteWorkspaceLifecycleResult(state)
+    const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle)
     notifyRemoteLifecycleTransition(input.onTransition, settled.lifecycle, input.workspaceId)
     return settled
   })
-}
-
-function workspaceProbeTransitionForRemoteCommit(
-  current: WorkspaceProbeState,
-  plan: RemoteWorkspaceTerminalCommitPlan,
-): { before: WorkspaceProbeState; after: WorkspaceSettledProbeState } | null {
-  const workspaceProbe = plan.workspaceProbe
-  if (!workspaceProbe) return null
-  if (workspaceProbe.mode === 'initial-only' && current.status !== 'probing') return null
-  return { before: current, after: workspaceProbe.probe }
 }
 
 function remoteAttemptMayCommit(input: {
@@ -853,35 +846,14 @@ function remoteAttemptMayCommit(input: {
   )
 }
 
-function terminalRemoteLifecycle(result: RemoteWorkspaceConnectionResult, attemptId: number): TerminalRemoteLifecycle {
-  return result.kind === 'ready'
-    ? { kind: 'ready', attemptId, target: result.lifecycle.target }
-    : {
-        kind: 'failed',
-        attemptId,
-        reason: result.lifecycle.reason,
-        ...(result.lifecycle.target ? { target: result.lifecycle.target } : {}),
-      }
+function clearRemoteWorkspaceAttempt(state: WorkspaceRuntimeState): void {
+  state.remoteAttemptController = null
+  state.remoteAttemptPromise = null
 }
 
-function settledRemoteWorkspaceLifecycleResult(
-  state: WorkspaceRuntimeState,
-): Extract<RemoteWorkspaceLifecycleRunResult, { kind: 'settled' }> {
-  if (state.remoteLifecycle.kind !== 'ready' && state.remoteLifecycle.kind !== 'failed') {
-    throw new Error('remote workspace lifecycle must be terminal before it settles')
-  }
-  return { kind: 'settled', lifecycle: state.remoteLifecycle }
-}
-
-function remoteLifecycleTarget(lifecycle: RemoteWorkspaceRuntimeLifecycle): RemoteWorkspaceTarget | null {
-  return lifecycle.kind === 'ready' || lifecycle.kind === 'failed' ? (lifecycle.target ?? null) : null
-}
-
-function supersededRemoteWorkspaceLifecycleResult(
-  state: WorkspaceRuntimeState,
-  workspaceRuntimeId: string,
-): RemoteWorkspaceLifecycleRunResult {
-  return state.currentWorkspaceRuntimeId === workspaceRuntimeId ? { kind: 'superseded' } : { kind: 'stale-runtime' }
+function abortRemoteWorkspaceAttempt(state: WorkspaceRuntimeState): void {
+  state.remoteAttemptController?.abort()
+  clearRemoteWorkspaceAttempt(state)
 }
 
 function notifyRemoteLifecycleTransition(
@@ -941,9 +913,7 @@ function startWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string {
 
 function stopWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string | null {
   const workspaceRuntimeId = state.currentWorkspaceRuntimeId
-  state.remoteAttemptController?.abort()
-  state.remoteAttemptController = null
-  state.remoteAttemptPromise = null
+  abortRemoteWorkspaceAttempt(state)
   state.workspaceProbe = { status: 'probing' }
   state.pendingWorkspaceProbeTransition = null
   state.currentWorkspaceRuntimeId = null

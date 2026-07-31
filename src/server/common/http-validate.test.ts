@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
-import { IpcError } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import { createRouteApp, parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 

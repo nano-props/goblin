@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,
@@ -92,19 +92,25 @@ export const WorkspacePaneTabsReplaceInputSchema = v.object({
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
+export const WorkspacePaneTabsUpdateOperationSchema = v.variant('type', [
+  v.object({
+    type: v.literal('open-static'),
+    tabType: WorkspacePaneStaticTabTypeSchema,
+    insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
+  }),
+  v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+  v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
+])
+
+export function isWorkspacePaneTabsUpdateOperation(value: unknown): value is WorkspacePaneTabsUpdateOperation {
+  return v.safeParse(WorkspacePaneTabsUpdateOperationSchema, value).success
+}
+
 export const WorkspacePaneTabsUpdateInputSchema = v.object({
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   target: RuntimeWorkspacePaneTargetSchema,
-  operation: v.variant('type', [
-    v.object({
-      type: v.literal('open-static'),
-      tabType: WorkspacePaneStaticTabTypeSchema,
-      insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
-    }),
-    v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
-    v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
-  ]),
+  operation: WorkspacePaneTabsUpdateOperationSchema,
 })
 
 export const WorkspacePaneTabsEntrySchema = v.strictObject({

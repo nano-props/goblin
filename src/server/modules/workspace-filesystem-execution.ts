@@ -4,7 +4,7 @@ import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
-import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/remote-repo-execution.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteWorktree, type RemoteGitRunner } from '#/system/ssh/git.ts'
 

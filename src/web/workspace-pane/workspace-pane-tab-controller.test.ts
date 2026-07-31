@@ -14,9 +14,11 @@ import {
   selectWorkspacePaneControllerTab,
   selectWorkspacePaneControllerTabEntry,
   workspacePaneTabControllerTargetIsCurrent,
-  type WorkspacePaneTabControllerCommitNavigation,
-  type WorkspacePaneRouteCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type {
+  FilesystemWorkspacePaneRouteCommitActions,
+  WorkspacePaneRouteCommitActions,
+} from '#/web/app-navigation-actions.ts'
 import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
@@ -289,7 +291,7 @@ describe('workspace pane tab controller transactions', () => {
 
   test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
-    const navigation: WorkspacePaneRouteCommitNavigation = {
+    const navigation: WorkspacePaneRouteCommitActions = {
       commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
@@ -377,7 +379,7 @@ describe('workspace pane tab controller transactions', () => {
 
   test('rejects completion when the target worktree changes while navigation settles', async () => {
     const commit = Promise.withResolvers<boolean>()
-    const navigation: WorkspacePaneRouteCommitNavigation = {
+    const navigation: WorkspacePaneRouteCommitActions = {
       commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
@@ -448,7 +450,7 @@ function workspacePaneTarget(): WorkspacePaneTabModel {
   } as WorkspacePaneTabModel
 }
 
-function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
+function committingNavigation(): FilesystemWorkspacePaneRouteCommitActions {
   return controllerNavigation({
     commitWorkspacePaneRoute: vi.fn(async (_repoId, _branchName, _route, options) => {
       options?.onCommit?.()
@@ -458,8 +460,8 @@ function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
 }
 
 function controllerNavigation(
-  overrides: Partial<WorkspacePaneTabControllerCommitNavigation>,
-): WorkspacePaneTabControllerCommitNavigation {
+  overrides: Partial<FilesystemWorkspacePaneRouteCommitActions>,
+): FilesystemWorkspacePaneRouteCommitActions {
   return {
     commitWorkspacePaneRoute: vi.fn(unexpectedNavigationAction('commitWorkspacePaneRoute')),
     commitFilesystemWorkspacePaneRoute: vi.fn(unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute')),

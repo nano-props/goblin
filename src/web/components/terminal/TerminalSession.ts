@@ -23,10 +23,17 @@ import {
   type TerminalRuntimeAttemptToken,
   type TerminalRuntimeBinding,
   type TerminalRuntimeBindingClassification,
+  sameTerminalRuntimeBinding,
 } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
-import { TerminalRenderQueue, type RenderedOutputCheckpoint } from '#/web/components/terminal/terminal-render-queue.ts'
+import {
+  latestRenderedOutputCheckpoint,
+  normalizeRenderedOutputCheckpoint,
+  sameRenderedOutputBinding,
+  TerminalRenderQueue,
+  type RenderedOutputCheckpoint,
+} from '#/web/components/terminal/terminal-render-queue.ts'
 import { planTerminalComposerSubmit } from '#/web/components/terminal/terminal-composer-submit-plan.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
@@ -34,7 +41,7 @@ import {
   type TerminalWriteFailureReporter,
 } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { toast } from 'sonner'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import type {
   TerminalDescriptor,
   TerminalComposerMode,
@@ -82,6 +89,15 @@ interface InFlightTerminalStartOperation {
   promise: Promise<TerminalStartResultWithController | null>
 }
 
+/**
+ * Owns one client terminal's xterm view and runtime-binding lifecycle.
+ *
+ * Attach, recovery, replay, input, resize, and view replacement remain here
+ * because they coordinate the same xterm instance and start epoch. Splitting
+ * those workflows would distribute cancellation and generation checks across
+ * callbacks. Pure binding identity and render-checkpoint policy live in their
+ * existing runtime and render-queue modules.
+ */
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: TerminalNotify
@@ -282,7 +298,9 @@ export class TerminalSession {
       // writable: a replacement PTY must never receive the second half of an
       // older composed submission.
       const currentBinding = this.currentWritableInputBinding()
-      if (currentBinding && sameRuntimeBinding(currentBinding, submittedBinding)) this.view.sendVirtualKey('enter')
+      if (currentBinding && sameTerminalRuntimeBinding(currentBinding, submittedBinding)) {
+        this.view.sendVirtualKey('enter')
+      }
       return true
     } finally {
       this.submitTextPending = false
@@ -297,7 +315,7 @@ export class TerminalSession {
   private enqueueInput(binding: TerminalRuntimeBinding, data: string): boolean {
     if (!data || !this.isCurrentInputBinding(binding)) return false
     const pending = this.pendingInputWrite
-    if (pending && !sameRuntimeBinding(pending.binding, binding)) {
+    if (pending && !sameTerminalRuntimeBinding(pending.binding, binding)) {
       throw new Error('terminal input queue contains conflicting runtime bindings')
     }
     this.pendingInputWrite = pending ? { binding: pending.binding, data: pending.data + data } : { binding, data }
@@ -343,7 +361,7 @@ export class TerminalSession {
   private isCurrentInputBinding(binding: TerminalRuntimeBinding): boolean {
     if (this.disposed || !this.runtime.canSendInput()) return false
     const current = this.runtime.currentRuntimeBinding()
-    return current !== null && sameRuntimeBinding(current, binding)
+    return current !== null && sameTerminalRuntimeBinding(current, binding)
   }
 
   private flushResize(): void {
@@ -566,7 +584,7 @@ export class TerminalSession {
 
   private reconcileViewOwnership(previousBinding: TerminalRuntimeBinding | null): void {
     const binding = this.runtime.currentRuntimeBinding()
-    const bindingChanged = previousBinding !== null && !sameRuntimeBinding(previousBinding, binding)
+    const bindingChanged = previousBinding !== null && !sameTerminalRuntimeBinding(previousBinding, binding)
     if (this.presentationRecovery === 'failed' || bindingChanged || !this.runtime.isController()) {
       this.setPresentationRecovery(undefined)
     }
@@ -1105,10 +1123,13 @@ export class TerminalSession {
     const pendingOutput = this.pendingOutput
     this.pendingOutput = []
     if (!binding) return
-    const currentOutput = pendingOutput.filter((entry) => sameRenderedBinding(entry.checkpoint, binding))
+    const currentOutput = pendingOutput.filter((entry) => sameRenderedOutputBinding(entry.checkpoint, binding))
     if (!currentOutput.length) return
     const output = currentOutput.map((entry) => entry.data).join('')
-    const checkpoint = latestCheckpoint(currentOutput.map((entry) => entry.checkpoint))
+    const checkpoint = latestRenderedOutputCheckpoint(
+      currentOutput.map((entry) => entry.checkpoint),
+      binding,
+    )
     const term = this.view.currentTerminal()
     if (!term || !checkpoint) return
     void this.enqueueRenderAppend(term, output, checkpoint).catch((error) => {
@@ -1161,21 +1182,21 @@ export class TerminalSession {
 
   private isOutputAlreadyRendered(event: TerminalOutputEvent): boolean {
     const checkpoint = this.renderedOutputCheckpoint
-    if (!checkpoint || !sameRenderedBinding(checkpoint, event)) return false
+    if (!checkpoint || !sameRenderedOutputBinding(checkpoint, event)) return false
     return event.seq <= checkpoint.seq
   }
 
   private isCheckpointRendered(checkpoint: RenderedOutputCheckpoint): boolean {
     const current = this.renderedOutputCheckpoint
-    if (!current || !sameRenderedBinding(current, checkpoint)) return false
+    if (!current || !sameRenderedOutputBinding(current, checkpoint)) return false
     return checkpoint.seq <= current.seq
   }
 
   private markOutputRendered(checkpoint: RenderedOutputCheckpoint): void {
     const binding = this.runtime.currentRuntimeBinding()
-    if (!binding || !sameRenderedBinding(binding, checkpoint)) return
+    if (!binding || !sameRenderedOutputBinding(binding, checkpoint)) return
     const current = this.renderedOutputCheckpoint
-    if (!current || !sameRenderedBinding(current, checkpoint)) {
+    if (!current || !sameRenderedOutputBinding(current, checkpoint)) {
       this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
     } else if (checkpoint.seq > current.seq) {
       this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
@@ -1274,48 +1295,12 @@ function cancelScheduledAnimationFrame(frame: number): void {
   else clearTimeout(frame)
 }
 
-function latestCheckpoint(checkpoints: RenderedOutputCheckpoint[]): RenderedOutputCheckpoint | null {
-  return checkpoints.reduce<RenderedOutputCheckpoint | null>((latest, checkpoint) => {
-    if (!latest) return checkpoint
-    if (!sameRenderedBinding(checkpoint, latest)) return latest
-    return checkpoint.seq > latest.seq ? checkpoint : latest
-  }, null)
-}
-
-function sameRenderedBinding(
-  a: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number },
-  b: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number },
-): boolean {
-  return (
-    a.terminalRuntimeSessionId === b.terminalRuntimeSessionId &&
-    a.terminalRuntimeGeneration === b.terminalRuntimeGeneration
-  )
-}
-
-function sameRuntimeBinding(a: TerminalRuntimeBinding | null, b: TerminalRuntimeBinding | null): boolean {
-  if (!a || !b) return a === b
-  return sameRenderedBinding(a, b)
-}
-
 function sameResizeProposal(a: PendingResize, b: PendingResize): boolean {
-  return a.cols === b.cols && a.rows === b.rows && a.startEpoch === b.startEpoch && sameRenderedBinding(a, b)
+  return a.cols === b.cols && a.rows === b.rows && a.startEpoch === b.startEpoch && sameRenderedOutputBinding(a, b)
 }
 
 function sameAttempt(a: TerminalRuntimeAttemptToken, b: TerminalRuntimeAttemptToken): boolean {
   return a.attemptId === b.attemptId && a.operation === b.operation
-}
-
-function normalizeRenderedOutputCheckpoint(checkpoint: RenderedOutputCheckpoint): RenderedOutputCheckpoint {
-  return {
-    terminalRuntimeSessionId: checkpoint.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: checkpoint.terminalRuntimeGeneration,
-    seq: normalizeOutputNumber(checkpoint.seq),
-  }
-}
-
-function normalizeOutputNumber(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(0, Math.floor(value))
 }
 
 function isHttpExternalUrl(value: string): boolean {

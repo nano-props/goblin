@@ -1,4 +1,5 @@
 import PQueue from 'p-queue'
+import { compact } from 'es-toolkit'
 import {
   type SnapshotRestoredWorkspaceRuntime,
   type RepoSnapshot,
@@ -149,10 +150,9 @@ async function restoreServerWorkspaceSnapshot(
   }
 
   input.signal?.throwIfAborted()
-  const opened = source.openWorkspaceEntries.flatMap((entry) => {
-    const workspace = openedByWorkspaceId.get(workspaceSessionEntryId(entry))
-    return workspace ? [workspace] : []
-  })
+  const opened = compact(
+    source.openWorkspaceEntries.map((entry) => openedByWorkspaceId.get(workspaceSessionEntryId(entry))),
+  )
   const membership = await compareAndReplaceServerWorkspaceEntries(
     source.openWorkspaceEntries,
     opened.map((workspace) => workspace.entry),

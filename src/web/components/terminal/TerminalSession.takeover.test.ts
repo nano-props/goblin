@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 const xtermMocks = terminalXtermMocks()
 const geometryMocks = terminalGeometryMocks()

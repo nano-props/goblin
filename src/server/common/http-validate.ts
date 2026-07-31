@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 import { Hono } from 'hono'
-import { IpcError } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { errorJson } from '#/server/common/responses.ts'

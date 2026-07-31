@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendor/ssh-config/index.ts'
-import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
+import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/invocation.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 import {
   normalizeRemoteWorkspaceRef,

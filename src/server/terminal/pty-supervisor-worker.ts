@@ -232,9 +232,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     this.shuttingDown = true
     const worker = this.worker
     this.worker = null
-    this.failPendingSpawns('PTY worker stopped')
-    this.settlePendingWrites({ status: 'indeterminate' })
-    this.settlePendingResizes(false)
+    this.failPendingRequests('PTY worker stopped')
     // Drop all event ownership — the runtime that owns us has already
     // called ptySupervisor.shutdown and is closing its own sessions.
     for (const ownership of this.sessions.values()) {
@@ -242,17 +240,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       ownership.exitCompletion.complete()
     }
     this.sessions.clear()
-    if (worker) {
-      try {
-        worker.send({ type: 'shutdown' })
-      } catch {}
-      try {
-        worker.disconnect?.()
-      } catch {}
-      try {
-        worker.kill()
-      } catch {}
-    }
+    if (worker) terminateWorkerProcess(worker)
   }
 
   private ensureWorker(): TerminalWorkerChildProcess {
@@ -475,15 +463,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     const worker = this.worker
     this.worker = null
     if (!worker) return
-    try {
-      worker.send({ type: 'shutdown' })
-    } catch {}
-    try {
-      worker.disconnect?.()
-    } catch {}
-    try {
-      worker.kill()
-    } catch {}
+    terminateWorkerProcess(worker)
   }
 
   private invalidateWorkerAfterSendFailure(worker: TerminalWorkerChildProcess, detail: string): void {
@@ -525,15 +505,19 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       },
       'PTY worker transport lost',
     )
-    this.failPendingSpawns(pendingSpawnMessage)
-    this.settlePendingWrites({ status: 'indeterminate' })
-    this.settlePendingResizes(false)
+    this.failPendingRequests(pendingSpawnMessage)
     this.failSessionListenersOnWorkerExit()
     if (kind !== 'exit') {
       try {
         worker.kill()
       } catch {}
     }
+  }
+
+  private failPendingRequests(pendingSpawnMessage: string): void {
+    this.failPendingSpawns(pendingSpawnMessage)
+    this.settlePendingWrites({ status: 'indeterminate' })
+    this.settlePendingResizes(false)
   }
 
   private failSessionListenersOnWorkerExit(): void {
@@ -598,6 +582,18 @@ function defaultSpawnWorker(entry: string): TerminalWorkerChildProcess {
     env: process.env,
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
   }) as TerminalWorkerChildProcess
+}
+
+function terminateWorkerProcess(worker: TerminalWorkerChildProcess): void {
+  try {
+    worker.send({ type: 'shutdown' })
+  } catch {}
+  try {
+    worker.disconnect?.()
+  } catch {}
+  try {
+    worker.kill()
+  } catch {}
 }
 
 function createRequestId(): string {

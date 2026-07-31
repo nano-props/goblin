@@ -14,6 +14,7 @@ import {
 import type { GitHubRepoRef, GraphqlRequestError } from '#/system/github/graphql.ts'
 import type { PullRequestFetchMode, PullRequestInfo } from '#/shared/git-types.ts'
 import { canQueryGitHubHost } from '#/system/github-cli.ts'
+import { normalizeGhPullRequest, pickPullRequest, type GhPullRequest } from '#/system/git/pull-request-normalization.ts'
 
 interface PrCacheEntry {
   expiresAt: number
@@ -36,36 +37,6 @@ const pendingRepoFetches: PendingPullRequestFetches = new Map()
 const pendingBranchFetches: PendingPullRequestFetches = new Map()
 const loggedGraphqlErrors = new Map<string, number>()
 
-interface GhPullRequest {
-  number?: number
-  title?: string
-  url?: string
-  state?: string
-  isDraft?: boolean
-  createdAt?: string
-  mergedAt?: string | null
-  author?: { login?: string } | null
-  baseRefName?: string
-  headRefName?: string
-  headRepositoryOwner?: { login?: string } | null
-  isCrossRepository?: boolean
-  reviewDecision?: string | null
-  mergeable?: string
-  mergeStateStatus?: string | null
-  statusCheckRollup?: {
-    nodes?: Array<{
-      commit?: {
-        statusCheckRollup?: {
-          contexts?: {
-            checkRunCountsByState?: Array<{ state?: string; count?: number }>
-            statusContextCountsByState?: Array<{ state?: string; count?: number }>
-          }
-        } | null
-      }
-    }>
-  }
-}
-
 interface PullRequestsData {
   repository?: {
     pullRequests?: {
@@ -80,80 +51,6 @@ interface PullRequestsData {
 
 type PullRequestsConnection = NonNullable<NonNullable<PullRequestsData['repository']>['pullRequests']>
 type GhPullRequestState = 'OPEN' | 'CLOSED' | 'MERGED'
-
-export function normalizeGhPullRequest(pr: GhPullRequest): PullRequestInfo | null {
-  if (typeof pr.number !== 'number' || !pr.url || !pr.title) return null
-  const rawState = pr.state?.toUpperCase()
-  const state: PullRequestInfo['state'] =
-    pr.mergedAt != null || rawState === 'MERGED' ? 'merged' : rawState === 'OPEN' ? 'open' : 'closed'
-  return {
-    number: pr.number,
-    title: pr.title,
-    url: pr.url,
-    state,
-    isDraft: pr.isDraft === true,
-    createdAt: pr.createdAt || undefined,
-    author: pr.author?.login || undefined,
-    baseRefName: pr.baseRefName || undefined,
-    headRefName: pr.headRefName || undefined,
-    headRepositoryOwner: pr.headRepositoryOwner?.login || undefined,
-    isCrossRepository: pr.isCrossRepository === true,
-    checks: summarizeChecks(pr.statusCheckRollup),
-    reviewDecision: normalizeReviewDecision(pr.reviewDecision),
-    mergeable: normalizeMergeable(pr),
-  }
-}
-
-function normalizeReviewDecision(value: string | null | undefined): PullRequestInfo['reviewDecision'] {
-  if (value === 'APPROVED' || value === 'CHANGES_REQUESTED' || value === 'REVIEW_REQUIRED') return value
-  return null
-}
-
-function normalizeMergeable(pr: GhPullRequest): PullRequestInfo['mergeable'] | undefined {
-  if (pr.mergeStateStatus === 'DIRTY') return 'CONFLICTING'
-  if (pr.mergeable === 'MERGEABLE' || pr.mergeable === 'CONFLICTING') return pr.mergeable
-  if (pr.mergeable === 'UNKNOWN') return 'UNKNOWN'
-  return undefined
-}
-
-function summarizeChecks(statusCheckRollup: GhPullRequest['statusCheckRollup']): PullRequestInfo['checks'] | undefined {
-  const contexts = statusCheckRollup?.nodes?.[0]?.commit?.statusCheckRollup?.contexts
-  if (!contexts) return undefined
-  let passing = 0
-  let failing = 0
-  let pending = 0
-  for (const item of contexts.checkRunCountsByState ?? []) {
-    const count = typeof item.count === 'number' ? item.count : 0
-    if (item.state === 'NEUTRAL' || item.state === 'SKIPPED' || item.state === 'SUCCESS') passing += count
-    else if (
-      item.state === 'ACTION_REQUIRED' ||
-      item.state === 'CANCELLED' ||
-      item.state === 'FAILURE' ||
-      item.state === 'TIMED_OUT'
-    )
-      failing += count
-    else pending += count
-  }
-  for (const item of contexts.statusContextCountsByState ?? []) {
-    const count = typeof item.count === 'number' ? item.count : 0
-    if (item.state === 'SUCCESS') passing += count
-    else if (item.state === 'ERROR' || item.state === 'FAILURE') failing += count
-    else pending += count
-  }
-  const total = passing + failing + pending
-  return total > 0 ? { total, passing, failing, pending } : undefined
-}
-
-function stateRank(pr: PullRequestInfo): number {
-  if (pr.state === 'open') return 0
-  if (pr.state === 'merged') return 1
-  return 2
-}
-
-export function pickPullRequest(existing: PullRequestInfo | undefined, next: PullRequestInfo): PullRequestInfo {
-  if (!existing) return next
-  return stateRank(next) < stateRank(existing) ? next : existing
-}
 
 function filterPullRequests(
   prs: Map<string, PullRequestInfo> | null,
@@ -190,10 +87,6 @@ function branchCacheKey(cwd: string, repo: GitHubRepoRef, branch: string, mode: 
 
 function repoRequestKey(cwd: string, repo: GitHubRepoRef, mode: PullRequestFetchMode): string {
   return `${repoCacheKey(cwd, repo)}\0${mode}`
-}
-
-async function hasPullRequestQueryCapability(repo: GitHubRepoRef, signal?: AbortSignal): Promise<boolean> {
-  return canQueryGitHubHost(repo.host, signal)
 }
 
 const abortScopeIds = new WeakMap<AbortSignal, number>()
@@ -529,7 +422,7 @@ export async function getBranchPullRequestsForRepoRef(
       if (cached.hit) {
         return cached.pr ? new Map([[singleBranch, cached.pr]]) : new Map()
       }
-      if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+      if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
 
       return await runPendingPullRequestFetch(
         pendingBranchFetches,
@@ -539,7 +432,7 @@ export async function getBranchPullRequestsForRepoRef(
       )
     }
 
-    if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+    if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
     const byBranch = await runPendingPullRequestFetch(
       pendingRepoFetches,
       repoRequestKey(scopeId, repo, mode),
@@ -593,7 +486,7 @@ export async function getBranchPullRequest(
     const cached = getCachedBranchPullRequest(cwd, repo, branch, 'full')
     if (cached.hit) return cached.pr
     if (isGitHubHostCoolingDown(repo.host)) return null
-    if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+    if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
     const byBranch = await runPendingPullRequestFetch(
       pendingBranchFetches,
       branchCacheKey(cwd, repo, branch, 'full'),

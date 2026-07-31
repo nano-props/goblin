@@ -269,12 +269,10 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabPro
   }
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
-    const pendingLabelKey =
-      input.projectionPhase === 'failed'
-        ? 'terminal.load-failed'
-        : input.createPending || input.projectionPhase === 'ready'
-          ? 'terminal.opening'
-          : 'terminal.loading'
+    let pendingLabelKey: string
+    if (input.projectionPhase === 'failed') pendingLabelKey = 'terminal.load-failed'
+    else if (input.createPending || input.projectionPhase === 'ready') pendingLabelKey = 'terminal.opening'
+    else pendingLabelKey = 'terminal.loading'
     return input.t(pendingLabelKey)
   }
 
@@ -309,11 +307,12 @@ function isPlaceholderTerminalTitle(view: WorkspacePaneTabSummary): boolean {
   return view.type === 'terminal' && !view.originalTitle && view.title.trim().toLowerCase() === 'terminal'
 }
 
-const STATIC_WORKSPACE_PANE_TAB_PROVIDERS = [
+export const workspacePaneTabProviders = [
   statusWorkspacePaneTabProvider,
   changesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
   filesWorkspacePaneTabProvider,
+  terminalWorkspacePaneTabProvider,
 ] as const
 
 const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticTabProvider> = {
@@ -323,8 +322,6 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabT
   files: filesWorkspacePaneTabProvider,
 }
 
-const RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS = [terminalWorkspacePaneTabProvider] as const
-
 const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<
   WorkspacePaneRuntimeTabType,
   WorkspacePaneRuntimeTabProvider
@@ -332,21 +329,8 @@ const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<
   terminal: terminalWorkspacePaneTabProvider,
 }
 
-export const workspacePaneTabProviders = [
-  ...STATIC_WORKSPACE_PANE_TAB_PROVIDERS,
-  ...RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS,
-] as const
-
-export function workspacePaneStaticTabProviders(): readonly WorkspacePaneStaticTabProvider[] {
-  return STATIC_WORKSPACE_PANE_TAB_PROVIDERS
-}
-
 export function workspacePaneStaticTabProvider(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabProvider {
   return STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE[type]
-}
-
-export function workspacePaneRuntimeTabProviders(): readonly WorkspacePaneRuntimeTabProvider[] {
-  return RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS
 }
 
 export function workspacePaneRuntimeTabProvider(type: WorkspacePaneRuntimeTabType): WorkspacePaneRuntimeTabProvider {
@@ -362,12 +346,6 @@ export function isWorkspacePaneStaticTabProvider(
   provider: WorkspacePaneTabProvider,
 ): provider is WorkspacePaneStaticTabProvider {
   return provider.kind === 'static'
-}
-
-export function isWorkspacePaneRuntimeTabProvider(
-  provider: WorkspacePaneTabProvider,
-): provider is WorkspacePaneRuntimeTabProvider {
-  return provider.kind === 'runtime'
 }
 
 function runtimeTabAvailability(

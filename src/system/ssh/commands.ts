@@ -1,56 +1,23 @@
-import { createHash } from 'node:crypto'
-import { accessSync, constants as fsConstants, statSync } from 'node:fs'
-import { chmod, mkdir } from 'node:fs/promises'
-import os from 'node:os'
-import path from 'node:path'
 import { execa, ExecaError } from 'execa'
+import { clamp } from 'es-toolkit'
 import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP } from '#/system/git/parsers.ts'
 import { GIT_UPSTREAM_FORMAT } from '#/system/git/upstream.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import {
+  buildCanonicalSshInvocation,
+  ensureSshControlDirectory,
+  type RemoteCommandInvocation,
+} from '#/system/ssh/invocation.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
-const SSH_CONNECT_TIMEOUT_SEC = 10
 /** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
  *  SSH_COMMAND_TIMEOUT_MS so slow networks get a fast "connecting"→"unreachable"
  *  transition, but long enough to ride out a VPN reconnect or a sleeping
  *  laptop's first SSH handshake on the ControlMaster. */
 export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
-// One multiplexed socket per (alias, host, port, user) tuple, kept well
-// under the macOS Unix-domain-socket 104-byte path limit. Using
-// `os.tmpdir() + '%C'` (40 hex chars + ssh's random suffix) blows past
-// that limit on typical macOS temp dirs, which manifests as every ssh
-// call failing with "unix_listener: path ... too long for Unix domain
-// socket" before the SSH handshake even starts. A short first-16-hex
-// of a SHA-256 over the target tuple gives us plenty of room to spare
-// while still being effectively unique per Goblin host.
-const SSH_CONTROL_DIR = path.join(os.homedir(), '.goblin', 'ssh')
-const SSH_CONTROL_PERSIST_SEC = 600
-
-function controlPathFor(target: RemoteWorkspaceTarget): string {
-  const key = target.sshConnection
-    ? JSON.stringify([target.sshConnection.destination, ...target.sshConnection.options])
-    : JSON.stringify([target.alias, target.host, target.port, target.user])
-  const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
-  return path.join(SSH_CONTROL_DIR, hash)
-}
-
-let controlDirReady: Promise<void> | null = null
-function ensureControlDir(): Promise<void> {
-  if (!controlDirReady) {
-    controlDirReady = mkdir(SSH_CONTROL_DIR, { recursive: true, mode: 0o700 })
-      .then(async () => {
-        await chmod(SSH_CONTROL_DIR, 0o700)
-      })
-      .catch((err) => {
-        controlDirReady = null
-        throw err
-      })
-  }
-  return controlDirReady
-}
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
@@ -73,7 +40,6 @@ export type RemoteCommandKind =
   | { type: 'gitWorktreeList'; path: string }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
-  | { type: 'gitFetchAll'; path: string }
   | { type: 'gitFetchRemote'; path: string; remote: string }
   | { type: 'gitStatusAll'; path: string }
   | { type: 'gitDiffNoIndex'; path: string; filePath: string }
@@ -91,7 +57,6 @@ export type RemoteCommandKind =
   | { type: 'gitUpstream'; path: string; branch: string }
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
   | { type: 'gitRemoteVerbose'; path: string }
-  | { type: 'gitRemoteGetUrl'; path: string }
   | { type: 'readRemoteFile'; path: string }
   | {
       type: 'bootstrapRemoteWorktree'
@@ -114,57 +79,9 @@ export interface RemoteCommandResult {
   transportStderr?: string
 }
 
-export interface RemoteCommandInvocation {
-  command: string
-  args: string[]
-  script: string
-}
-
-const SNAPSHOT_MANAGED_SSH_OPTIONS = new Set([
-  'connecttimeout',
-  'controlmaster',
-  'controlpath',
-  'controlpersist',
-  'host',
-  'hostname',
-  'port',
-  'requesttty',
-  'stricthostkeychecking',
-  'user',
-])
 const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
 const REMOTE_COMMAND_STDERR_BEGIN_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_BEGIN__'
 const REMOTE_COMMAND_STDERR_END_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_END__'
-
-/** Converts one `ssh -G` result into argv-safe options that never consult config again. */
-export function buildCanonicalSshConnectionSnapshot(
-  target: Pick<RemoteWorkspaceTarget, 'alias' | 'host' | 'user' | 'port'>,
-  effectiveConfig: string,
-): NonNullable<RemoteWorkspaceTarget['sshConnection']> {
-  const options = effectiveConfig
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      const firstSpace = line.search(/\s/u)
-      const key = (firstSpace === -1 ? line : line.slice(0, firstSpace)).toLowerCase()
-      if (SNAPSHOT_MANAGED_SSH_OPTIONS.has(key)) return []
-      const value = firstSpace === -1 ? '' : line.slice(firstSpace + 1).trim()
-      return value ? [`${key}=${value}`] : []
-    })
-  return Object.freeze({
-    // Keep the original argv host so OpenSSH's %n token retains alias semantics.
-    // HostName below still fixes %h and the actual network destination.
-    destination: target.alias,
-    options: Object.freeze([`hostname=${target.host}`, `user=${target.user}`, `port=${target.port}`, ...options]),
-  })
-}
-
-function capturedConnectionArgs(target: RemoteWorkspaceTarget): string[] {
-  if (!target.sshConnection) return []
-  const nullConfig = process.platform === 'win32' ? 'NUL' : '/dev/null'
-  return ['-F', nullConfig, ...target.sshConnection.options.flatMap((option) => ['-o', option])]
-}
 
 export type RemoteCommandRunner = (
   command: RemoteCommandKind,
@@ -178,49 +95,6 @@ export function buildRemoteCommandInvocation(
 ): RemoteCommandInvocation {
   const script = scriptForCommand(command)
   return buildCanonicalSshInvocation(target, script, ['-T', '-o', 'RequestTTY=no'])
-}
-
-export function buildRemoteTerminalInvocation(
-  target: RemoteWorkspaceTarget,
-  remotePath: string,
-  options: { startupShellCommand?: string } = {},
-): RemoteCommandInvocation {
-  const startupShellCommand = normalizeTerminalStartupShellCommand(options.startupShellCommand)
-  // This invocation is prepared with the logical session, but it is not executed until
-  // attach starts the remote PTY with the mounted xterm's fitted geometry.
-  const script = startupShellCommand
-    ? `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -ilc ${shellQuote(`${startupShellCommand}\nexec "\${SHELL:-/bin/sh}" -l`)}`
-    : `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
-  return buildCanonicalSshInvocation(target, script, ['-tt'])
-}
-
-function buildCanonicalSshInvocation(
-  target: RemoteWorkspaceTarget,
-  script: string,
-  ttyArgs: readonly string[],
-): RemoteCommandInvocation {
-  const args = [
-    ...capturedConnectionArgs(target),
-    ...ttyArgs,
-    '-o',
-    'StrictHostKeyChecking=yes',
-    '-o',
-    `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`,
-    '-o',
-    `ControlPath=${controlPathFor(target)}`,
-    '-o',
-    `ControlMaster=auto`,
-    '-o',
-    `ControlPersist=${SSH_CONTROL_PERSIST_SEC}`,
-  ]
-  const destination = target.sshConnection?.destination ?? target.alias
-  args.push('--', destination, `sh -lc ${shellQuote(script)}`)
-  return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
-}
-
-function normalizeTerminalStartupShellCommand(command: string | undefined): string {
-  const withoutTrailingNewline = (command ?? '').replace(/[\r\n]+$/u, '')
-  return withoutTrailingNewline.trim().length === 0 ? '' : withoutTrailingNewline
 }
 
 export async function runRemoteCommand(
@@ -237,7 +111,7 @@ export async function runRemoteCommand(
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
-  await ensureControlDir()
+  await ensureSshControlDirectory()
   try {
     const { stdout, stderr } = await execa(invocation.command, invocation.args, {
       timeout: options?.timeoutMs ?? SSH_COMMAND_TIMEOUT_MS,
@@ -375,7 +249,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'testDirectory':
       return `cd ${shellQuote(command.path)} && test -r . && pwd -P`
     case 'listDirectories': {
-      const limit = Math.max(1, Math.min(50, Math.floor(command.limit ?? 20)))
+      const limit = clamp(Math.floor(command.limit ?? 20), 1, 50)
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
@@ -462,7 +336,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {
-      const count = Math.max(1, Math.min(1000, Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT)))
+      const count = clamp(Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT), 1, 1000)
       const skip = Math.max(0, Math.floor(command.skip ?? 0))
       const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(PRETTY_FIELD_SEP)
       return [
@@ -475,8 +349,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '--',
       ].join(' ')
     }
-    case 'gitFetchAll':
-      return `git -C ${shellQuote(command.path)} fetch --all --prune`
     case 'gitFetchRemote':
       return `git -C ${shellQuote(command.path)} fetch --prune -- ${shellQuote(command.remote)}`
     case 'gitPullCurrent':
@@ -525,8 +397,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         'goblin_status=$?',
         `if [ "$goblin_status" -eq 0 ]; then printf 'true\\n'; elif [ "$goblin_status" -eq 1 ]; then printf 'false\\n'; else exit "$goblin_status"; fi`,
       ].join('\n')
-    case 'gitRemoteGetUrl':
-      return `git -C ${shellQuote(command.path)} remote get-url origin`
     case 'gitRemoteVerbose':
       return `git -C ${shellQuote(command.path)} remote -v`
     case 'readRemoteFile':
@@ -1081,35 +951,4 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     'fi',
   ]
   return lines.join('\n')
-}
-
-function findExecutableOnPath(name: string): string | null {
-  const pathEnv = process.env.PATH || process.env.Path || process.env.path || ''
-  for (const dir of pathEnv.split(path.delimiter)) {
-    if (!dir) continue
-    for (const candidateName of executableNames(name)) {
-      const candidate = path.join(dir, candidateName)
-      if (isExecutableFile(candidate)) return candidate
-    }
-  }
-  return null
-}
-
-function isExecutableFile(candidate: string): boolean {
-  try {
-    if (!statSync(candidate).isFile()) return false
-    accessSync(candidate, fsConstants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function executableNames(name: string): string[] {
-  if (process.platform !== 'win32' || path.extname(name)) return [name]
-  const extensions = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
-    .split(';')
-    .map((ext) => ext.trim().toLowerCase())
-    .filter(Boolean)
-  return [name, ...extensions.map((ext) => `${name}${ext}`)]
 }

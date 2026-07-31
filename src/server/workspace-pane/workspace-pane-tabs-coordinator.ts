@@ -1,8 +1,4 @@
-import {
-  isWorkspacePaneStaticTabType,
-  type WorkspacePaneRuntimeTabType,
-  type WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
@@ -16,10 +12,7 @@ import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import {
-  physicalWorktreeIdentityKey,
-  type PhysicalWorktreeIdentity,
-} from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import {
   physicalWorktreeExecutionScope,
   physicalWorktreeAdmissionLease,
@@ -27,7 +20,14 @@ import {
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import {
+  admissionRecords,
+  capabilitiesByIdentity,
+  mergeCurrentCapabilities,
+  uniqueSortedAdmissionLeases,
+  uniqueSortedCapabilities,
+} from '#/server/workspace-pane/workspace-pane-physical-admission.ts'
 
 import {
   type WorkspacePaneRuntimeTabsProviderSnapshot,
@@ -45,8 +45,8 @@ import type {
   WorkspacePaneLayoutCommitResult,
   WorkspacePaneLayoutOperation,
   WorkspacePaneLayoutValidationResult,
-  WorkspacePaneTargetProjection,
 } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 
 export interface WorkspacePaneRuntimeTabsLiveSession {
   sessionId: string
@@ -110,7 +110,7 @@ export interface WorkspacePaneRuntimeTabsCoordinator {
 export interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  physicalWorktrees: PhysicalWorktreeCapture
   layoutAggregate: WorkspacePaneLayoutAggregate
   targetProjection: WorkspacePaneTargetProjectionProvider
 }
@@ -118,7 +118,7 @@ export interface WorkspacePaneTabsCoordinatorOptions {
 export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
-  private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  private readonly physicalWorktrees: PhysicalWorktreeCapture
   private readonly layoutAggregate: WorkspacePaneLayoutAggregate
   private readonly targetProjection: WorkspacePaneTargetProjectionProvider
 
@@ -690,104 +690,6 @@ function providerSnapshotsWithPendingSession(
   return next
 }
 
-function uniqueSortedCapabilities(
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-): PhysicalWorktreeExecutionCapability[] {
-  return Array.from(
-    new Map(
-      [...capabilities]
-        .sort((a, b) =>
-          physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(a)).localeCompare(
-            physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(b)),
-          ),
-        )
-        .map((capability) => [
-          physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)),
-          capability,
-        ]),
-    ).values(),
-  )
-}
-
-function uniqueSortedAdmissionLeases(
-  leases: readonly PhysicalWorktreeAdmissionLease[],
-): PhysicalWorktreeAdmissionLease[] {
-  return Array.from(
-    new Map(
-      [...leases]
-        .sort((a, b) => physicalWorktreeAdmissionLeaseKey(a).localeCompare(physicalWorktreeAdmissionLeaseKey(b)))
-        .map((lease) => [physicalWorktreeAdmissionLeaseKey(lease), lease]),
-    ).values(),
-  )
-}
-
-function capabilitiesByIdentity(
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-): Map<string, PhysicalWorktreeExecutionCapability> {
-  return new Map(
-    capabilities.map((capability) => [
-      physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)),
-      capability,
-    ]),
-  )
-}
-
-function mergeCurrentCapabilities(
-  existing: ReadonlyMap<string, PhysicalWorktreeExecutionCapability>,
-  current: readonly PhysicalWorktreeExecutionCapability[],
-): Map<string, PhysicalWorktreeExecutionCapability> {
-  const currentStableKeys = new Set(current.map((capability) => physicalWorktreeIdentityKey(capability.identity)))
-  return new Map([
-    ...[...existing].filter(
-      ([, capability]) => !currentStableKeys.has(physicalWorktreeIdentityKey(capability.identity)),
-    ),
-    ...capabilitiesByIdentity(current),
-  ])
-}
-
-function admissionRecords(
-  leases: readonly PhysicalWorktreeAdmissionLease[],
-  capabilities: readonly PhysicalWorktreeExecutionCapability[],
-) {
-  const byStableIdentity = new Map<
-    string,
-    {
-      identity: PhysicalWorktreeIdentity
-      currentCapability: PhysicalWorktreeExecutionCapability | null
-      indexedLeases: PhysicalWorktreeAdmissionLease[]
-    }
-  >()
-  for (const lease of leases) {
-    const key = physicalWorktreeIdentityKey(lease.identity)
-    const record = byStableIdentity.get(key) ?? {
-      identity: lease.identity,
-      currentCapability: null,
-      indexedLeases: [],
-    }
-    record.indexedLeases.push(lease)
-    byStableIdentity.set(key, record)
-  }
-  for (const capability of capabilities) {
-    const lease = physicalWorktreeAdmissionLease(capability)
-    const key = physicalWorktreeIdentityKey(capability.identity)
-    const record = byStableIdentity.get(key) ?? {
-      identity: capability.identity,
-      currentCapability: null,
-      indexedLeases: [],
-    }
-    if (
-      record.currentCapability &&
-      physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(record.currentCapability)) !==
-        physicalWorktreeAdmissionLeaseKey(lease)
-    ) {
-      throw new Error('error.ambiguous-worktree-execution-capability')
-    }
-    record.currentCapability = capability
-    byStableIdentity.set(key, record)
-  }
-  return [...byStableIdentity.values()]
-}
-
 function isWorkspacePaneWorktreeTarget(
   target: WorkspacePaneTargetProjection,
 ): target is WorkspacePaneTargetProjection & { nativeWorktreePath: string } {
@@ -857,37 +759,4 @@ export function createWorkspacePaneTabsCoordinator(
   options: WorkspacePaneTabsCoordinatorOptions,
 ): WorkspacePaneTabsCoordinator {
   return new WorkspacePaneTabsCoordinator(options)
-}
-
-export function isValidWorkspacePaneTabsOperation(value: unknown): value is WorkspacePaneTabsUpdateOperation {
-  if (!value || typeof value !== 'object') return false
-  const operation = value as {
-    type?: unknown
-    tabType?: unknown
-    tabIdentities?: unknown
-    insertAfterIdentity?: unknown
-  }
-  if (operation.type === 'open-static') {
-    return (
-      typeof operation.tabType === 'string' &&
-      isWorkspacePaneStaticTabType(operation.tabType) &&
-      (operation.insertAfterIdentity === undefined ||
-        operation.insertAfterIdentity === null ||
-        (typeof operation.insertAfterIdentity === 'string' &&
-          operation.insertAfterIdentity.length > 0 &&
-          !operation.insertAfterIdentity.includes('\0')))
-    )
-  }
-  if (operation.type === 'close-static') {
-    return typeof operation.tabType === 'string' && isWorkspacePaneStaticTabType(operation.tabType)
-  }
-  if (operation.type === 'reorder') {
-    return (
-      Array.isArray(operation.tabIdentities) &&
-      operation.tabIdentities.every(
-        (identity) => typeof identity === 'string' && identity.length > 0 && !identity.includes('\0'),
-      )
-    )
-  }
-  return false
 }

@@ -9,7 +9,6 @@ import type {
   RepoEvent,
   RepoResultEventOptions,
   WorkspaceState,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
 
 let nextEventId = 1
@@ -17,7 +16,9 @@ let nextEventId = 1
 const MAX_REPO_EVENTS = 50
 
 type WorkspaceMutator = (workspace: Draft<WorkspaceState>) => void
-type WorkspacesPatch = Pick<WorkspacesStore, 'workspaces'>
+interface WorkspacesPatch {
+  workspaces: Record<string, WorkspaceState>
+}
 
 export function emptyWorkspace(id: string, workspaceRuntimeId: string): WorkspaceState {
   const workspaceId: WorkspaceId | null = canonicalWorkspaceLocator(id)

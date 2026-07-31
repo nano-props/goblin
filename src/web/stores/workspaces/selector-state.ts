@@ -1,6 +1,5 @@
 import type {
   WorkspaceState,
-  WorkspacesStore,
   RestorableWorkspaceState,
   RuntimeCoherentWorkspaceState,
 } from '#/web/stores/workspaces/types.ts'
@@ -12,24 +11,21 @@ interface KeyboardRuntimeState {
   workspace: WorkspaceState | null
 }
 
+interface WorkspaceRestoreProgressState {
+  workspaceMembershipReady: boolean
+  sessionPersistenceReady: boolean
+  sessionRestoreError: string | null
+}
+
 export function runtimeCoherentWorkspaceStateFromStore(
-  state: Pick<WorkspacesStore, 'workspaces'>,
+  state: RuntimeCoherentWorkspaceState,
 ): RuntimeCoherentWorkspaceState {
   return {
     workspaces: state.workspaces,
   }
 }
 
-export function restorableWorkspaceStateFromStore(
-  state: Pick<
-    WorkspacesStore,
-    | 'workspaceOrder'
-    | 'restoredWorkspaceId'
-    | 'zenMode'
-    | 'workspacePaneSize'
-    | 'selectedTerminalSessionIdByTerminalFilesystemTarget'
-  >,
-): RestorableWorkspaceState {
+export function restorableWorkspaceStateFromStore(state: RestorableWorkspaceState): RestorableWorkspaceState {
   return {
     workspaceOrder: state.workspaceOrder,
     restoredWorkspaceId: state.restoredWorkspaceId,
@@ -40,7 +36,7 @@ export function restorableWorkspaceStateFromStore(
 }
 
 export function keyboardRuntimeStateFromStore(
-  state: Pick<WorkspacesStore, 'workspaces'>,
+  state: RuntimeCoherentWorkspaceState,
   currentWorkspaceId: WorkspaceId | null,
 ): KeyboardRuntimeState {
   const workspace = currentWorkspaceId ? (state.workspaces[currentWorkspaceId] ?? null) : null
@@ -49,17 +45,13 @@ export function keyboardRuntimeStateFromStore(
   }
 }
 
-export function workspaceRestoreStatusFromStore(
-  state: Pick<WorkspacesStore, 'workspaceMembershipReady' | 'sessionPersistenceReady' | 'sessionRestoreError'>,
-): WorkspaceRestoreStatus {
+export function workspaceRestoreStatusFromStore(state: WorkspaceRestoreProgressState): WorkspaceRestoreStatus {
   if (!state.workspaceMembershipReady) return 'restoring-membership'
   if (state.sessionRestoreError) return 'blocked'
   if (!state.sessionPersistenceReady) return 'restoring-runtime-state'
   return 'ready'
 }
 
-export function workspaceSessionPersistenceOpenFromStore(
-  state: Pick<WorkspacesStore, 'workspaceMembershipReady' | 'sessionPersistenceReady' | 'sessionRestoreError'>,
-): boolean {
+export function workspaceSessionPersistenceOpenFromStore(state: WorkspaceRestoreProgressState): boolean {
   return workspaceRestoreStatusFromStore(state) === 'ready'
 }

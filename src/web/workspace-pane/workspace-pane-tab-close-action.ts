@@ -9,10 +9,10 @@ import {
 } from '#/shared/terminal-types.ts'
 import {
   isWorkspacePaneRuntimeTab,
-  nextWorkspacePaneTabEntryAfterClose,
   workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
@@ -97,9 +97,7 @@ type CloseWorkspacePaneTabActionStart =
       kind: 'started'
       target: WorkspacePaneTabModel
       closingIdentity: string
-      wasActive: boolean
-      nextEntry: WorkspacePaneTabEntry | null
-      presentationLease: WorkspacePaneControllerPresentationLease | null
+      transition: WorkspacePaneCloseTransition
       completion: Promise<boolean>
     }
 
@@ -148,10 +146,10 @@ async function closeWorkspacePaneTabAction(
 ): Promise<boolean> {
   const start = beginCloseWorkspacePaneTabAction(options, selection)
   if (start.kind === 'done') return start.result
-  return await runWorkspacePaneCloseTransition(start.presentationLease, async () => {
+  return await runWorkspacePaneCloseTransition(start.transition.presentationLease, async () => {
     if (!(await completeWorkspacePaneTabLifecycle(start.completion))) return false
     completeWorkspacePaneTabClose(start.target, start.closingIdentity)
-    await completeCommittedWorkspacePaneClosePresentation(start.target, start, options.navigation)
+    await completeCommittedWorkspacePaneClosePresentation(start.target, start.transition, options.navigation)
     return true
   })
 }
@@ -280,7 +278,7 @@ function beginCloseWorkspacePaneTabAction(
   const tab = target.tabs.find((candidate) => candidate.identity === closingIdentity) ?? null
   const runtimeView = tab && isWorkspacePaneRuntimeTab(tab) ? tab.view : options.runtimeView
   if (!skipRuntimeCloseConfirm && runtimeView?.type === 'terminal') {
-    const terminalBase = terminalBaseForPaneModel(target)
+    const terminalBase = workspacePaneTerminalBaseForTabModel(target)
     if (!terminalBase) return { kind: 'done', result: false }
     const closeConfirm = workspacePaneRuntimeTabCloseConfirmRequest({
       type: runtimeView.type,
@@ -319,9 +317,7 @@ function beginCloseWorkspacePaneTabAction(
     kind: 'started',
     target,
     closingIdentity,
-    wasActive: transition.wasActive,
-    nextEntry: transition.nextEntry,
-    presentationLease: transition.presentationLease,
+    transition,
     completion: close.completion,
   }
 }
@@ -359,10 +355,6 @@ function workspacePaneCloseTransition(
       })
     : null
   return { wasActive, nextEntry, presentationLease }
-}
-
-function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {
-  return workspacePaneTerminalBaseForTabModel(target)
 }
 
 function openWorkspacePaneRuntimeCloseConfirm(

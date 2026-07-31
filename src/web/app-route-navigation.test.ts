@@ -1,13 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
+import { settleOwnedAppRouteCommit, settleAppRouteCommit } from '#/web/app-route-commit.ts'
 import {
   returnToFromHref,
   parsedWorkspacePaneRouteFromTargetHref,
   routeReturnSearch,
-  settleOwnedAppRouteCommit,
-  settleAppRouteCommit,
   workspacePaneRouteFromBranchHref,
-} from '#/web/app-route-navigation.ts'
+} from '#/web/app-route-href.ts'
 import { beginAppNavigation, observeAppHistoryNavigation, appNavigationState } from '#/web/app-navigation-lifecycle.ts'
 
 describe('app route navigation helpers', () => {

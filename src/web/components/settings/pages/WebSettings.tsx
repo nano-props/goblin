@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Copy, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
@@ -15,10 +15,10 @@ import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schem
 
 /**
  * Settings page for everything related to the embedded / standalone
- * server that the client talks to. Visible in both repoOperationSchedulers:
+ * server that the client talks to. Visible in both runtimes:
  *
- * - Both: the current address, the access token (with copy + auto-rotate
- *   QR), and any LAN URLs the server is currently bound to.
+ * - Both: the current address, the access token with copy support,
+ *   token-bearing QR codes, and any active LAN URLs.
  * - Electron only: the `lanEnabled` toggle (the bind address is
  *   owned by the host process) and the `Rotate token` action
  *   (the rotation requires restarting the embedded server, which
@@ -71,28 +71,30 @@ export function WebSettings() {
   }, [bootstrapToken])
   const accessToken = fetchedToken
 
-  const handleCopyToken = async () => {
-    if (!accessToken) return
+  const copyToClipboard = async (
+    value: string,
+    copiedKey: 'settings.web.token-copied' | 'settings.web.url-copied',
+    copyFailedKey: 'settings.web.token-copy-failed' | 'settings.web.url-copy-failed',
+  ) => {
     try {
-      await navigator.clipboard.writeText(accessToken)
-      toast.success(t('settings.web.token-copied'))
+      await navigator.clipboard.writeText(value)
+      toast.success(t(copiedKey))
     } catch {
-      toast.error(t('settings.web.token-copy-failed'))
+      toast.error(t(copyFailedKey))
     }
   }
 
-  const handleCopyUrl = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success(t('settings.web.url-copied'))
-    } catch {
-      toast.error(t('settings.web.url-copy-failed'))
-    }
+  const handleCopyToken = async () => {
+    if (!accessToken) return
+    await copyToClipboard(accessToken, 'settings.web.token-copied', 'settings.web.token-copy-failed')
+  }
+
+  const handleCopyUrl = (url: string) => {
+    return copyToClipboard(url, 'settings.web.url-copied', 'settings.web.url-copy-failed')
   }
 
   const handleRotate = async () => {
-    if (!isElectron) return
-    if (!bridge.rotateAccessToken) return
+    if (!isElectron || !bridge.rotateAccessToken) return
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
@@ -104,10 +106,6 @@ export function WebSettings() {
       // client (`server-fetch`) prefers the bootstrap header when
       // present. After the reload the preload runs again, captures
       // the new token via IPC, and the gate stays clear.
-      //
-      // The URL-token path is no longer required — kept commented
-      // as a historical breadcrumb in case the cookie replant
-      // regresses and the user re-reports the bug.
       window.location.reload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('settings.web.token-rotate-failed'))
@@ -119,10 +117,9 @@ export function WebSettings() {
   // token. Scanning the QR opens the page with `?accessToken=...`;
   // the page consumes it on first load (POST `/api/login` →
   // Set-Cookie → strip from URL) and the user is logged in.
-  const qrTargets = useMemo(() => {
-    if (!accessToken) return []
-    return lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken)}`)
-  }, [lanUrls, accessToken])
+  const qrTargets = accessToken
+    ? lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken)}`)
+    : []
   const showNetworkGroup = isElectron || lanUrls.length > 0
   let lanStatusKey: 'settings.lan.restart-hint' | 'settings.lan.local-only' | null = null
   if (isElectron && lanInfo) {

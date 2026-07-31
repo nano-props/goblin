@@ -1,7 +1,7 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppTerminalProjectionRecovery } from '#/web/runtime/app-terminal-projection-recovery.ts'
+import type { TerminalProjectionRecoveryActions } from '#/web/runtime/app-terminal-projection-recovery.ts'
 import type { RuntimeProjectionScopeRegistry, RuntimeProjectionTarget } from '#/web/runtime/runtime-projection-scope.ts'
-import type { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
+import type { WorkspacePaneTabsRecoveryActions } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
 
 type WorkspaceRuntimeMembershipRecovery =
   { kind: 'superseded' } | { kind: 'settled'; targets: RuntimeProjectionTarget[] }
@@ -10,8 +10,8 @@ export interface WorkspaceRuntimeReconnectRecoveryDependencies {
   scopeRegistry: RuntimeProjectionScopeRegistry
   reconcileMemberships: () => Promise<WorkspaceRuntimeMembershipRecovery>
   currentWorkspaceRuntimeId: (workspaceId: WorkspaceId) => string | null
-  terminalRecovery: Pick<AppTerminalProjectionRecovery, 'begin' | 'request'>
-  workspaceTabsRecovery: Pick<WorkspacePaneTabsRecovery, 'request'>
+  terminalRecovery: TerminalProjectionRecoveryActions
+  workspaceTabsRecovery: WorkspacePaneTabsRecoveryActions
   logFailure: (error: unknown) => void
 }
 

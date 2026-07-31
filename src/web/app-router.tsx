@@ -9,8 +9,9 @@ import {
   useMatch,
 } from '@tanstack/react-router'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { App, type WorkspaceRouteView } from '#/web/App.tsx'
-import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
+import { App, type ParsedWorkspacePaneRoute, type WorkspaceRouteView } from '#/web/App.tsx'
+import { Layout } from '#/web/Layout.tsx'
+import { WorkspaceSessionRestoreGate } from '#/web/components/WorkspaceSessionRestore.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import {
@@ -20,7 +21,7 @@ import {
   worktreePathFromSlug,
 } from '#/web/workspace-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useAppRouteActions, type AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
@@ -138,15 +139,19 @@ function IndexRoute() {
   )
 }
 
-export function initialWorkspaceRouteSlugFromStore(
-  state: Pick<WorkspacesStore, 'restoredWorkspaceId' | 'workspaceOrder' | 'workspaces' | 'workspaceMembershipReady'>,
-): string | null {
+export function initialWorkspaceRouteSlugFromStore(state: InitialWorkspaceRouteState): string | null {
   const restoredWorkspace = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
   if (restoredWorkspace) return workspaceSlugFromId(restoredWorkspace.id)
   if (!state.workspaceMembershipReady) return null
   const firstWorkspaceId = state.workspaceOrder[0]
   const firstWorkspace = firstWorkspaceId ? state.workspaces[firstWorkspaceId] : null
   return firstWorkspace ? workspaceSlugFromId(firstWorkspace.id) : null
+}
+
+interface InitialWorkspaceRouteState extends RuntimeCoherentWorkspaceState {
+  restoredWorkspaceId: WorkspaceId | null
+  workspaceOrder: WorkspaceId[]
+  workspaceMembershipReady: boolean
 }
 
 function WorkspaceRoute() {
@@ -234,37 +239,18 @@ export function workspaceRouteViewFromChildRoute(
       kind: 'worktree',
       workspaceId,
       worktreePath,
-      workspacePaneRoute: childRoute.worktreeTerminalSessionId
-        ? { kind: 'terminal', terminalSessionId: childRoute.worktreeTerminalSessionId }
-        : childRoute.worktreeTabKey
-          ? isWorkspacePaneStaticTabType(childRoute.worktreeTabKey)
-            ? { kind: 'static', tab: childRoute.worktreeTabKey }
-            : { kind: 'invalid-static', tabKey: childRoute.worktreeTabKey }
-          : null,
+      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.worktreeTerminalSessionId, childRoute.worktreeTabKey),
     }
   }
   if (childRoute.branchSlug) {
     const branchName = branchNameFromSlug(childRoute.branchSlug)
     if (!branchName) return { kind: 'empty', workspaceId }
-    if (childRoute.terminalSessionId) {
-      return {
-        kind: 'branch',
-        workspaceId,
-        branchName,
-        workspacePaneRoute: { kind: 'terminal', terminalSessionId: childRoute.terminalSessionId },
-      }
+    return {
+      kind: 'branch',
+      workspaceId,
+      branchName,
+      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.terminalSessionId, childRoute.tabKey),
     }
-    if (childRoute.tabKey) {
-      return {
-        kind: 'branch',
-        workspaceId,
-        branchName,
-        workspacePaneRoute: isWorkspacePaneStaticTabType(childRoute.tabKey)
-          ? { kind: 'static', tab: childRoute.tabKey }
-          : { kind: 'invalid-static', tabKey: childRoute.tabKey },
-      }
-    }
-    return { kind: 'branch', workspaceId, branchName, workspacePaneRoute: null }
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
   if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
@@ -272,16 +258,23 @@ export function workspaceRouteViewFromChildRoute(
     return {
       kind: 'workspace-root',
       workspaceId,
-      workspacePaneRoute: childRoute.workspaceTerminalSessionId
-        ? { kind: 'terminal', terminalSessionId: childRoute.workspaceTerminalSessionId }
-        : childRoute.workspaceTabKey
-          ? isWorkspacePaneStaticTabType(childRoute.workspaceTabKey)
-            ? { kind: 'static', tab: childRoute.workspaceTabKey }
-            : { kind: 'invalid-static', tabKey: childRoute.workspaceTabKey }
-          : null,
+      workspacePaneRoute: workspacePaneRouteFromParams(
+        childRoute.workspaceTerminalSessionId,
+        childRoute.workspaceTabKey,
+      ),
     }
   }
   return { kind: 'empty', workspaceId }
+}
+
+function workspacePaneRouteFromParams(
+  terminalSessionId: string | null | undefined,
+  tabKey: string | null | undefined,
+): ParsedWorkspacePaneRoute | null {
+  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
+  if (!tabKey) return null
+  if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
+  return { kind: 'invalid-static', tabKey }
 }
 
 function useWorkspaceRouteNavigation() {
@@ -312,11 +305,16 @@ export function appRouterCallbacks(routeActions: AppRouteNavigation) {
 }
 
 export function applyAppSettingsRouteChange(
-  routeActions: Pick<AppRouteNavigation, 'openSettings' | 'closeSettings'>,
+  routeActions: AppSettingsRouteActions,
   nextPage: SettingsPage | null,
 ): void {
   if (nextPage) routeActions.openSettings(nextPage)
   else routeActions.closeSettings()
+}
+
+interface AppSettingsRouteActions {
+  openSettings: AppRouteNavigation['openSettings']
+  closeSettings: AppRouteNavigation['closeSettings']
 }
 
 function SettingsRoute() {

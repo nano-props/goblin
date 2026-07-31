@@ -1,6 +1,6 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { RepoBranchWorkspacePaneRouteNavigation } from '#/web/app-route-navigation.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
@@ -79,7 +79,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
 }
 
 export function openWorkspacePaneRoute(
-  routeNavigation: Pick<AppRouteNavigation, 'openRepoBranch' | 'openRepoBranchTab' | 'openRepoBranchTerminal'>,
+  routeNavigation: RepoBranchWorkspacePaneRouteNavigation,
   repoId: WorkspaceId,
   branchName: string,
   options?: { replace?: boolean; navigationGeneration?: AppNavigationGeneration; onCommit?: () => void },

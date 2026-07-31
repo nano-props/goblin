@@ -1,3 +1,4 @@
+import { isEqual } from 'es-toolkit'
 import {
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneTabEntryIdentity,
@@ -53,13 +54,7 @@ export class WorkspacePaneEpochOverlay {
     this.targetsByPhysicalKey.clear()
     this.epochsByWorkspaceId.clear()
     for (const [key, state] of source.epochs) {
-      this.epochs.set(key, {
-        overlayRevision: state.overlayRevision,
-        placementsByTarget: new Map(
-          [...state.placementsByTarget].map(([targetKey, hints]) => [targetKey, hints.map(cloneHint)]),
-        ),
-        physicalLeasesByTarget: new Map(state.physicalLeasesByTarget),
-      })
+      this.epochs.set(key, cloneEpochState(state))
     }
     for (const [physicalKey, refs] of source.targetsByPhysicalKey) {
       this.targetsByPhysicalKey.set(
@@ -77,13 +72,7 @@ export class WorkspacePaneEpochOverlay {
     const key = epochKey(scope)
     const sourceState = source.epochs.get(key)
     if (!sourceState) return
-    const state: EpochState = {
-      overlayRevision: sourceState.overlayRevision,
-      placementsByTarget: new Map(
-        [...sourceState.placementsByTarget].map(([targetKey, hints]) => [targetKey, hints.map(cloneHint)]),
-      ),
-      physicalLeasesByTarget: new Map(sourceState.physicalLeasesByTarget),
-    }
+    const state = cloneEpochState(sourceState)
     this.epochs.set(key, state)
     const active = this.epochsByWorkspaceId.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
     active.set(key, { ...scope })
@@ -104,7 +93,7 @@ export class WorkspacePaneEpochOverlay {
     const targetKey = canonicalTargetKey(input.target)
     const next = runtimePlacementHints(input.tabs)
     const current = state.placementsByTarget.get(targetKey) ?? []
-    if (JSON.stringify(current) === JSON.stringify(next)) return false
+    if (isEqual(current, next)) return false
     if (next.length === 0) state.placementsByTarget.delete(targetKey)
     else state.placementsByTarget.set(targetKey, next)
     state.overlayRevision += 1
@@ -331,6 +320,16 @@ function canonicalTargetKey(target: RuntimeWorkspacePaneTarget): string {
   const key = runtimeWorkspacePaneTargetKey(target)
   if (!key) throw new Error('error.workspace-tabs-target-invalid')
   return key
+}
+
+function cloneEpochState(state: EpochState): EpochState {
+  return {
+    overlayRevision: state.overlayRevision,
+    placementsByTarget: new Map(
+      [...state.placementsByTarget].map(([targetKey, hints]) => [targetKey, hints.map(cloneHint)]),
+    ),
+    physicalLeasesByTarget: new Map(state.physicalLeasesByTarget),
+  }
 }
 
 function cloneHint(hint: WorkspacePaneRuntimePlacementHint): WorkspacePaneRuntimePlacementHint {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
-import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type { RuntimeCoherentWorkspaceState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { hasClientServerConfig } from '#/web/lib/server-config.ts'
@@ -16,7 +16,7 @@ function isExecutableGitWorkspace(repo: WorkspaceState | null | undefined): repo
 }
 
 export function backgroundSyncTargetsFromStore(
-  state: Pick<WorkspacesStore, 'workspaces'>,
+  state: RuntimeCoherentWorkspaceState,
   currentWorkspaceId: WorkspaceId | null,
 ): GitBackgroundSyncTarget[] {
   const currentWorkspace = currentWorkspaceId ? state.workspaces[currentWorkspaceId] : null

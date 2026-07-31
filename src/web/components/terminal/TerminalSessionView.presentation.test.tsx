@@ -19,7 +19,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
-import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import {
   TerminalSessionView,
   completeFilesystemTargetSnapshot,

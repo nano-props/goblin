@@ -1,4 +1,4 @@
-import type { NativeHostIpcHandlers } from '#/shared/api-types.ts'
+import type { NativeHostSettingsIpcHandlers } from '#/shared/api-types.ts'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { getUserSettings, setGlobalShortcutState, updateUserSettings } from '#/main/settings-server-client.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
@@ -13,7 +13,7 @@ async function getRuntimeUserSettings() {
   return await getUserSettings()
 }
 
-export function createNativeHostSettingsIpcHandlers(): Pick<NativeHostIpcHandlers, 'settings'> {
+export function createNativeHostSettingsIpcHandlers(): NativeHostSettingsIpcHandlers {
   return {
     settings: {
       setGlobalShortcut: async ({ accelerator }) => {

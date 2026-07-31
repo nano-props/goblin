@@ -111,6 +111,14 @@ type AcceptedTerminalRetirementListener = (retirement: AcceptedTerminalRetiremen
  * natural React tree boundary. The previous Provider-owned lifetime
  * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
+ *
+ * **Why this remains one large owner**: catalog reconciliation, selection,
+ * create admission, close single-flight, and subscriber publication all
+ * mutate or publish the same client projection. Splitting those workflows by
+ * event or feature would distribute their ordering invariants across modules
+ * or replace direct state access with a broad callback protocol. Pure policy
+ * and snapshot construction live in focused modules; authoritative mutation
+ * stays here.
  */
 interface TerminalRuntimeBindingIdentity {
   workspaceId: WorkspaceId
@@ -565,7 +573,7 @@ export class TerminalSessionProjection {
 
   // Phase 2: the accepted catalog is the complete membership authority for
   // this workspace runtime. Pending creates live in lifecycle queues, not sessions.
-  private evictOrphanedLocalSessions(scope: WorkspaceRuntimeScope, serverTerminalSessionIds: Set<string>): number {
+  private evictOrphanedLocalSessions(scope: WorkspaceRuntimeScope, serverTerminalSessionIds: Set<string>): void {
     const orphanedTerminalSessionIds = Array.from(this.sessions.values())
       .filter(
         (session) =>
@@ -579,7 +587,6 @@ export class TerminalSessionProjection {
       if (!session) continue
       this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
     }
-    return orphanedTerminalSessionIds.length
   }
 
   // Phase 3: for every filesystem target that saw a server-side change, decide
@@ -648,15 +655,6 @@ export class TerminalSessionProjection {
   }
 
   private async performCreateTerminal(
-    base: TerminalSessionBase,
-    terminalFilesystemTargetKey: string,
-    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
-    createOptions: ResolvedTerminalCreateOptions,
-  ): Promise<TerminalCreateQueueResult> {
-    return await this.performCreateTerminalNow(base, terminalFilesystemTargetKey, pending, createOptions)
-  }
-
-  private async performCreateTerminalNow(
     base: TerminalSessionBase,
     terminalFilesystemTargetKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,

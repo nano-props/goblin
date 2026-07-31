@@ -28,6 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
+  Reflect.deleteProperty(navigator, 'clipboard')
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
@@ -229,6 +230,22 @@ describe('WebSettings runtime parity', () => {
     // mounts. (The toast mock would catch any accidental error
     // reporting from a missing bridge call.)
     expect(toastMocks.error).not.toHaveBeenCalled()
+  })
+
+  test('copies the current browser origin with URL-specific feedback', async () => {
+    seedWebBootstrap()
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const { container } = await renderPage()
+
+    const copyUrlButton = container.querySelector<HTMLButtonElement>(
+      `[aria-label="settings.web.url-copy: ${window.location.origin}"]`,
+    )
+    expect(copyUrlButton).not.toBeNull()
+    await act(async () => copyUrlButton?.click())
+
+    expect(writeText).toHaveBeenCalledWith(window.location.origin)
+    expect(toastMocks.success).toHaveBeenCalledWith('settings.web.url-copied')
   })
 
   test('shows server-reported LAN addresses in the web runtime without a native LAN toggle', async () => {

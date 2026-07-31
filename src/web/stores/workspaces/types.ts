@@ -121,6 +121,11 @@ export interface RestorableWorkspaceState {
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
 }
 
+export interface WorkspaceSessionLayoutState {
+  zenMode: boolean
+  workspacePaneSize: number
+}
+
 export type WorkspaceNavigationHistoryRoute =
   | { kind: 'empty' }
   | { kind: 'workspace-root'; workspacePaneTab: WorkspacePaneTabType | null; terminalSessionId: string | null }
@@ -163,7 +168,14 @@ export interface WorkspaceHydrationOptions {
   restoredClientWorkspace?: ClientWorkspaceState
 }
 
-interface LocalWorkspaceState {
+export interface WorkspaceNavigationHistoryCollectionState {
+  /** Session-only app navigation history, scoped by workspace. The route owns
+   *  the visible workspace/branch, while this store keeps enough local context
+   *  to restore branch-level workspace tab and terminal selection. */
+  navigationHistoryByWorkspace: Record<string, WorkspaceNavigationHistoryState>
+}
+
+export interface LocalWorkspaceState extends WorkspaceNavigationHistoryCollectionState {
   /** Client-only workspace UI state that should never be serialized into
    *  ClientWorkspaceState or treated as restorable workspace state. */
   /** Workspace membership restore flag. True once boot workspace entries have
@@ -191,18 +203,17 @@ interface LocalWorkspaceState {
    *  unlike terminal identities. Session-local only — openers don't need to
    *  survive reload/restart. */
   tabOpenerIdentityByScope: Record<string, Record<string, string>>
-  /** Session-only app navigation history, scoped by workspace. The route owns
-   *  the visible workspace/branch, while this store keeps enough local context
-   *  to restore branch-level workspace tab and terminal selection. */
-  navigationHistoryByWorkspace: Record<string, WorkspaceNavigationHistoryState>
 }
 
-interface LocalWorkspaceActions {
+export interface WorkspaceTabOpenerActions {
   /** Records that `childIdentity` was opened from `openerIdentity` within a
    *  workspace-pane target scope. */
   setTabOpener: (scopeKey: string, childIdentity: string, openerIdentity: string) => void
   /** Clears a tab's recorded opener within a scope, e.g. once the tab has closed. */
   clearTabOpener: (scopeKey: string, childIdentity: string) => void
+}
+
+export interface WorkspaceNavigationHistoryActions {
   recordWorkspaceNavigation: (
     entry: WorkspaceNavigationHistoryEntry,
     options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
@@ -214,8 +225,10 @@ interface LocalWorkspaceActions {
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
 }
 
-interface RestorableWorkspaceActions {
-  applySessionLayoutState: (layout: Pick<ClientWorkspaceState, 'zenMode' | 'workspacePaneSize'>) => void
+interface LocalWorkspaceActions extends WorkspaceTabOpenerActions, WorkspaceNavigationHistoryActions {}
+
+export interface RestorableWorkspaceActions {
+  applySessionLayoutState: (layout: WorkspaceSessionLayoutState) => void
   applySessionSelectedTerminalState: (
     selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>,
   ) => void
@@ -226,7 +239,7 @@ interface RestorableWorkspaceActions {
   setSelectedTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string | null) => void
 }
 
-interface WorkspaceLifecycleActions {
+export interface WorkspaceMembershipActions {
   /** Ensure a workspace belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
@@ -240,6 +253,9 @@ interface WorkspaceLifecycleActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>
+}
+
+export interface WorkspaceRuntimeRestoreActions {
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: WorkspaceHydrationOptions,
@@ -247,7 +263,9 @@ interface WorkspaceLifecycleActions {
   promoteRestoredWorkspace: (result: WorkspaceTabsRestoreResult) => boolean
 }
 
-interface WorkspacePanePreferenceActions {
+export interface WorkspaceLifecycleActions extends WorkspaceMembershipActions, WorkspaceRuntimeRestoreActions {}
+
+export interface WorkspacePanePreferenceActions {
   /** Updates the selected target's workspace pane tab type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
@@ -255,9 +273,12 @@ interface WorkspacePanePreferenceActions {
   setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
 }
 
-interface GitWorkspaceClientActions {
+export interface GitWorkspacePreferenceActions {
   setWorkspacePaneTab: (id: WorkspaceId, branch: string, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: WorkspaceId, viewMode: BranchViewMode) => void
+}
+
+export interface GitWorkspaceClientActions extends GitWorkspacePreferenceActions {
   setLastResult: (
     id: WorkspaceId,
     result: ExecResult,

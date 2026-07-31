@@ -187,7 +187,7 @@ describe('cloneRepo cancellation', () => {
     const caller = new AbortController()
     caller.abort('client disconnected')
 
-    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
@@ -207,7 +207,7 @@ describe('cloneRepo cancellation', () => {
       },
     )
 
-    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
@@ -220,7 +220,7 @@ describe('cloneRepo cancellation', () => {
           signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
         }),
     )
-    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
     const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
     const caller = new AbortController()
 

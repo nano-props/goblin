@@ -12,7 +12,7 @@ describe('resolveRemoteWorkspaceTarget', () => {
   test('threads cancellation into SSH config resolution', async () => {
     const signal = new AbortController().signal
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    const { resolveRemoteWorkspaceTarget } = await import('#/server/modules/repo-source.ts')
+    const { resolveRemoteWorkspaceTarget } = await import('#/server/modules/remote-repo-execution.ts')
 
     await resolveRemoteWorkspaceTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
 

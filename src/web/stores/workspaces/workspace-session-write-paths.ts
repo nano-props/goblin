@@ -1,7 +1,4 @@
-import { recordWithoutKey } from '#/shared/record.ts'
 import PQueue from 'p-queue'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
@@ -21,46 +18,35 @@ import {
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
 import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
-import { markRemoteLifecycleReady } from '#/web/stores/workspaces/remote-workspace-admission.ts'
 import type {
   CloseWorkspaceResult,
   OpenWorkspacePostOpenError,
   OpenWorkspaceResult,
-  WorkspaceSessionProjectionState,
+  WorkspaceMembershipActions,
   WorkspacesGet,
   WorkspacesSet,
-  WorkspaceState,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
-import { nextRestoredWorkspaceIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
   isRemoteWorkspaceId,
   localWorkspaceSessionEntry,
   normalizeRemoteWorkspaceRef,
   parseRemoteWorkspaceId,
-  remoteWorkspaceConnectionTarget,
   remoteWorkspaceSessionEntry,
-  sameWorkspaceSessionEntry,
-  type RemoteWorkspaceTarget,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
-import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
-
-interface ResolvedWorkspace {
-  id: WorkspaceId
-  target?: RemoteWorkspaceTarget
-  workspaceProbe?: WorkspaceProbeState
-  session?: {
-    entry: WorkspaceSessionEntry
-    projectionState: WorkspaceSessionProjectionState
-  }
-}
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import {
+  addResolvedWorkspace,
+  insertPlaceholderWorkspace,
+  removeWorkspaceFromSessionState,
+  workspaceShellForNewRuntimeEpoch,
+  type ResolvedWorkspace,
+} from '#/web/stores/workspaces/workspace-session-state.ts'
 
 export interface RuntimeOpenResolvedWorkspace {
   input: string
@@ -277,27 +263,31 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
 
+  const currentWorkspaces = get().workspaces
+  const targets: SettledWorkspaceRuntimeMembershipRecovery['targets'] = []
+  const remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }> = []
+  for (const { workspaceId } of captured) {
+    const currentWorkspaceRuntimeId = currentWorkspaces[workspaceId]?.workspaceRuntimeId
+    if (!currentWorkspaceRuntimeId) continue
+    targets.push({ workspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId })
+
+    const runtime = runtimeByWorkspaceId.get(workspaceId)
+    if (
+      runtime &&
+      isRemoteWorkspaceId(workspaceId) &&
+      currentWorkspaceRuntimeId === runtime.workspaceRuntimeId &&
+      ['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
+    ) {
+      remoteEnsureTargets.push({ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId })
+    }
+  }
+
   return {
     kind: 'settled',
-    targets: captured.flatMap(({ workspaceId }) => {
-      const workspaceRuntimeId = get().workspaces[workspaceId]?.workspaceRuntimeId
-      return workspaceRuntimeId ? [{ workspaceId, workspaceRuntimeId }] : []
-    }),
+    targets,
     changedTargets,
     declaredWorkspaceIds: captured.map((entry) => entry.workspaceId),
-    remoteEnsureTargets: captured.flatMap(({ workspaceId }) => {
-      const runtime = runtimeByWorkspaceId.get(workspaceId)
-      const currentWorkspaceRuntimeId = get().workspaces[workspaceId]?.workspaceRuntimeId
-      if (
-        !runtime ||
-        !isRemoteWorkspaceId(workspaceId) ||
-        currentWorkspaceRuntimeId !== runtime.workspaceRuntimeId ||
-        !['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
-      ) {
-        return []
-      }
-      return [{ workspaceId, workspaceRuntimeId: runtime.workspaceRuntimeId }]
-    }),
+    remoteEnsureTargets,
   }
 }
 
@@ -305,22 +295,6 @@ function sameWorkspaceIdSet(left: readonly string[], right: readonly string[]): 
   if (left.length !== right.length) return false
   const rightSet = new Set(right)
   return left.every((workspaceId) => rightSet.has(workspaceId))
-}
-
-function workspaceShellForNewRuntimeEpoch(workspace: WorkspaceState, workspaceRuntimeId: string): WorkspaceState {
-  const next: WorkspaceState = {
-    ...workspace,
-    workspaceRuntimeId,
-    capability: { kind: 'probing', probe: { status: 'probing' } },
-  }
-  if (workspace.admission.kind === 'remote') {
-    next.admission = {
-      kind: 'remote',
-      lifecycle: null,
-      lifecycleAttemptId: null,
-    }
-  }
-  return next
 }
 
 async function runWorkspaceRuntimeMembershipCommand<T>(workspaceKey: string, command: () => Promise<T>): Promise<T> {
@@ -377,80 +351,6 @@ async function runExclusiveWorkspaceRuntimeMembershipCommand<T>(command: () => P
     () => undefined,
   )
   return await work
-}
-
-function orderedInsert(
-  workspaceOrder: WorkspaceId[],
-  id: WorkspaceId,
-  rankById?: ReadonlyMap<string, number>,
-): WorkspaceId[] {
-  if (!rankById) return [...workspaceOrder, id]
-  const rank = rankById.get(id)
-  if (rank === undefined) return [...workspaceOrder, id]
-  const next = [...workspaceOrder]
-  const index = next.findIndex((existing) => {
-    const existingRank = rankById.get(existing)
-    return existingRank !== undefined && existingRank > rank
-  })
-  next.splice(index === -1 ? next.length : index, 0, id)
-  return next
-}
-
-function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partial<WorkspacesStore> {
-  const workspace = s.workspaces[id]
-  if (!workspace) return s
-  const workspaces = { ...s.workspaces }
-  const selectedTerminalSessionIdByTerminalFilesystemTarget = {
-    ...s.selectedTerminalSessionIdByTerminalFilesystemTarget,
-  }
-  const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
-  const navigationHistoryByWorkspace = { ...s.navigationHistoryByWorkspace }
-  delete workspaces[id]
-  delete navigationHistoryByWorkspace[id]
-  for (const terminalFilesystemTargetKey of Object.keys(selectedTerminalSessionIdByTerminalFilesystemTarget)) {
-    const target = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)
-    if (target?.workspaceId === id)
-      delete selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey]
-  }
-  for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
-    if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
-  }
-  const workspaceOrder = s.workspaceOrder.filter((x) => x !== id)
-  const restoredWorkspaceId = nextRestoredWorkspaceIdAfterWorkspaceClose(
-    s.workspaceOrder,
-    s.restoredWorkspaceId,
-    workspace.id,
-  )
-  const restoredClientWorkspaceBaseline = s.restoredClientWorkspaceBaseline
-    ? {
-        ...s.restoredClientWorkspaceBaseline,
-        preferredWorkspacePaneTabByTargetByWorkspace: recordWithoutKey(
-          s.restoredClientWorkspaceBaseline.preferredWorkspacePaneTabByTargetByWorkspace,
-          id,
-        ),
-        filetreeViewStateByFilesystemTargetByWorkspace: recordWithoutKey(
-          s.restoredClientWorkspaceBaseline.filetreeViewStateByFilesystemTargetByWorkspace,
-          id,
-        ),
-        selectedTerminalSessionIdByTerminalFilesystemTarget: Object.fromEntries(
-          Object.entries(s.restoredClientWorkspaceBaseline.selectedTerminalSessionIdByTerminalFilesystemTarget).filter(
-            ([key]) => {
-              const target = parseTerminalFilesystemTargetKey(key)
-              return target?.workspaceId !== id
-            },
-          ),
-        ),
-      }
-    : null
-  return {
-    workspaces,
-    selectedTerminalSessionIdByTerminalFilesystemTarget,
-    tabOpenerIdentityByScope,
-    navigationHistoryByWorkspace,
-    workspaceOrder,
-    restoredWorkspaceId,
-    restoredClientWorkspaceBaseline,
-  }
 }
 
 async function rollbackNewWorkspace(
@@ -527,211 +427,6 @@ async function recordRecentWorkspacePostOpen(workspace: WorkspaceSessionEntry): 
   }
 }
 
-/** Build a fresh workspace from its canonical identity. */
-function buildNewWorkspace(id: WorkspaceId, workspaceRuntimeId: string): WorkspaceState {
-  return emptyWorkspace(id, workspaceRuntimeId)
-}
-
-function remoteTargetsEqual(
-  a: RemoteWorkspaceTarget | undefined | null,
-  b: RemoteWorkspaceTarget | undefined,
-): boolean {
-  if (!a || !b) return false
-  return (
-    a.alias === b.alias &&
-    a.host === b.host &&
-    a.user === b.user &&
-    a.port === b.port &&
-    a.remotePath === b.remotePath &&
-    a.displayName === b.displayName
-  )
-}
-
-function sessionEntryForResolvedWorkspace(resolvedWorkspace: ResolvedWorkspace): WorkspaceSessionEntry {
-  return (
-    resolvedWorkspace.session?.entry ??
-    (resolvedWorkspace.target
-      ? remoteWorkspaceSessionEntry(resolvedWorkspace.target)
-      : localWorkspaceSessionEntry(resolvedWorkspace.id))
-  )
-}
-
-function sessionProjectionStateForResolvedWorkspace(
-  resolvedWorkspace: ResolvedWorkspace,
-): WorkspaceSessionProjectionState {
-  return resolvedWorkspace.session?.projectionState ?? 'projected'
-}
-
-function capabilityAcrossRuntimeTransition(
-  workspace: WorkspaceState,
-  workspaceRuntimeId: string,
-): WorkspaceState['capability'] {
-  return workspace.workspaceRuntimeId === workspaceRuntimeId
-    ? workspace.capability
-    : { kind: 'probing', probe: { status: 'probing' } }
-}
-
-/** Upsert a workspace by id, centralising the "if it exists, mutate; if
- *  not, create + insert" pattern shared by addResolvedWorkspace,
- *  addResolvedWorkspace and insertPlaceholderWorkspace.
- *  - `create` runs when the id is new and returns the new workspace.
- *  - `update`, when provided, runs against the existing workspace and
- *    returns the updated state, or `null` to signal "no change". The
- *    returned `changed` is true exactly when the produced state
- *    differs from the input state — true for new workspaces, true for
- *    any in-place update that returns a non-null value, false when
- *    the existing workspace was preserved (no-op or update returned null). */
-function upsertWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
-  id: WorkspaceId,
-  options: {
-    rankById?: ReadonlyMap<string, number>
-    create: () => WorkspaceState
-    update?: (existing: WorkspaceState) => WorkspaceState | null
-  },
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
-  const existing = s.workspaces[id]
-  if (existing) {
-    if (!options.update) return { workspaces: s.workspaces, workspaceOrder: s.workspaceOrder, changed: false, id }
-    const updated = options.update(existing)
-    if (!updated) return { workspaces: s.workspaces, workspaceOrder: s.workspaceOrder, changed: false, id }
-    return {
-      workspaces: { ...s.workspaces, [id]: updated },
-      workspaceOrder: s.workspaceOrder,
-      changed: true,
-      id,
-    }
-  }
-  return {
-    workspaces: { ...s.workspaces, [id]: options.create() },
-    workspaceOrder: orderedInsert(s.workspaceOrder, id, options.rankById),
-    changed: true,
-    id,
-  }
-}
-
-export function addResolvedWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
-  resolvedWorkspace: ResolvedWorkspace,
-  workspaceRuntimeId: string,
-  rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
-  return upsertWorkspace(s, resolvedWorkspace.id, {
-    rankById,
-    create: () => {
-      const workspace = buildNewWorkspace(resolvedWorkspace.id, workspaceRuntimeId)
-      workspace.session = {
-        entry: sessionEntryForResolvedWorkspace(resolvedWorkspace),
-        projectionState: sessionProjectionStateForResolvedWorkspace(resolvedWorkspace),
-      }
-      // Local resolves carry no target, so `lifecycle` stays null
-      // (emptyWorkspace's default). Remote resolves with a target settle
-      // to 'ready'. The `addResolvedWorkspace` write path is only ever
-      // reached for a remote entry with a target — the failure
-      // branch in workspace runtime resolution retains the unavailable probe instead.
-      if (resolvedWorkspace.workspaceProbe) {
-        acceptWorkspaceProbeState(workspace, resolvedWorkspace.workspaceProbe)
-      }
-      if (resolvedWorkspace.target) markRemoteLifecycleReady(workspace, resolvedWorkspace.target)
-      return workspace
-    },
-    update: (existing) => {
-      const runtimeChanged = existing.workspaceRuntimeId !== workspaceRuntimeId
-      const sessionEntry = sessionEntryForResolvedWorkspace(resolvedWorkspace)
-      const sessionProjectionState = sessionProjectionStateForResolvedWorkspace(resolvedWorkspace)
-      const sessionChanged =
-        existing.session.projectionState !== sessionProjectionState ||
-        !sameWorkspaceSessionEntry(existing.session.entry, sessionEntry)
-      const workspaceProbeChanged =
-        !!resolvedWorkspace.workspaceProbe &&
-        !sameWorkspaceProbeState(existing.capability.probe, resolvedWorkspace.workspaceProbe)
-      if (!resolvedWorkspace.target) {
-        if (!runtimeChanged && !sessionChanged && !workspaceProbeChanged) return null
-        const next: WorkspaceState = {
-          ...existing,
-          workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
-          session: {
-            entry: sessionEntry,
-            projectionState: sessionProjectionState,
-          },
-          capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
-        }
-        if (resolvedWorkspace.workspaceProbe) acceptWorkspaceProbeState(next, resolvedWorkspace.workspaceProbe)
-        return next
-      }
-      const lifecycleReady = existing.admission.kind === 'remote' && existing.admission.lifecycle?.kind === 'ready'
-      const targetChanged = !remoteTargetsEqual(
-        existing.admission.kind === 'remote' ? remoteWorkspaceConnectionTarget(existing.admission.lifecycle) : null,
-        resolvedWorkspace.target,
-      )
-      if (!runtimeChanged && !sessionChanged && !workspaceProbeChanged && lifecycleReady && !targetChanged) {
-        return null
-      }
-      // Promote the existing remote workspace from 'connecting' or
-      // 'failed' to 'ready' even when the retained target is the
-      // same. The converged lifecycle result is authoritative; target
-      // equality alone does not prove the workspace is already ready.
-      const next: WorkspaceState = {
-        ...existing,
-        workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
-        session: {
-          entry: sessionEntry,
-          projectionState: sessionProjectionState,
-        },
-        capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
-        admission:
-          existing.admission.kind === 'remote'
-            ? {
-                kind: 'remote',
-                lifecycle: existing.admission.lifecycle,
-                lifecycleAttemptId: existing.admission.lifecycleAttemptId,
-              }
-            : existing.admission,
-      }
-      if (resolvedWorkspace.workspaceProbe) acceptWorkspaceProbeState(next, resolvedWorkspace.workspaceProbe)
-      markRemoteLifecycleReady(next, resolvedWorkspace.target)
-      return next
-    },
-  })
-}
-
-/**
- * Insert a placeholder workspace for a session entry whose probe is still in
- * flight. The placeholder carries only the workspace shell; repository reads
- * remain unavailable until capability promotion. Connectivity reads as
- * 'connecting' because no remote target has been resolved yet. Probe resolution
- * then promotes it to 'connected' or 'unreachable' via addResolvedWorkspace /
- * the authoritative runtime projection. No-op if the workspace is already in the store (so
- * calling this twice for the same entry is safe).
- *
- * The canonical locator carries the SSH profile and remote path; host/user/port
- * require `resolveRemoteWorkspaceTarget`, which hasn't run yet. Until the probe
- * succeeds and addResolvedWorkspace fills in the target, the placeholder lives
- * in a "known profile, unknown concrete host" state —
- * `deriveWorkspaceConnectivity(workspace) === 'connecting'` is the signal callers should
- * branch on rather than reading target fields.
- */
-export function insertPlaceholderWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
-  entry: WorkspaceSessionEntry,
-  workspaceRuntimeId: string,
-  rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
-  return upsertWorkspace(s, entry.id, {
-    rankById,
-    create: () => {
-      const workspace = buildNewWorkspace(entry.id, workspaceRuntimeId)
-      workspace.session = {
-        entry,
-        projectionState: 'projected',
-      }
-      // A remote shell with no accepted server lifecycle derives as connecting;
-      // only the authoritative runtime projection may settle that lifecycle.
-      return workspace
-    },
-  })
-}
-
 export function refreshInitialWorkspaceState(set: WorkspacesSet, get: WorkspacesGet, refresh: InitialWorkspaceRefresh) {
   const workspace = get().workspaces[refresh.id]
   if (!workspace || workspace.workspaceRuntimeId !== refresh.workspaceRuntimeId) return
@@ -741,10 +436,7 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   })
 }
 
-export function createWorkspaceLifecycleActions(
-  set: WorkspacesSet,
-  get: WorkspacesGet,
-): Pick<WorkspacesStore, 'ensureWorkspaceOpen' | 'closeWorkspace' | 'retryRemoteWorkspaceConnection'> {
+export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceMembershipActions {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)

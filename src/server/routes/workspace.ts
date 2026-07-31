@@ -32,7 +32,7 @@ import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { IpcError } from '#/shared/api-types.ts'
+import { IpcError } from '#/shared/ipc-error.ts'
 import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { homedir } from 'node:os'
@@ -60,7 +60,7 @@ export function createWorkspaceRoutes(options: {
         userId,
         workspaceId,
         workspaceRuntimeId,
-        probe: async () => await probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
+        probe: () => probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
           await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
@@ -151,8 +151,8 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () =>
-          await readWorkspaceDirectoryOverview(workspaceId, {
+        run: () =>
+          readWorkspaceDirectoryOverview(workspaceId, {
             workspaceRuntimeId,
             signal: c.req.raw.signal,
           }),
@@ -173,8 +173,8 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () =>
-          await readWorkspaceFilesystemTree(executionTarget, {
+        run: () =>
+          readWorkspaceFilesystemTree(executionTarget, {
             prefix,
             signal: c.req.raw.signal,
           }),
@@ -195,7 +195,7 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () => await readWorkspaceFileViewer(executionTarget, c.req.raw.signal),
+        run: () => readWorkspaceFileViewer(executionTarget, c.req.raw.signal),
         label: 'file-viewer',
         signal: c.req.raw.signal,
       }),
@@ -212,14 +212,15 @@ export function createWorkspaceRoutes(options: {
     )
     const result = await runWorkspaceRuntimeRequest({
       userId,
-      run: async () => await trashWorkspaceFile(executionTarget, path, c.req.raw.signal),
+      run: () => trashWorkspaceFile(executionTarget, path, c.req.raw.signal),
       label: 'trash-file',
       signal: c.req.raw.signal,
     })
-    if (result.ok || result.repositoryStateChanged === true) {
+    const invalidationRequired = result.ok || result.repositoryStateChanged === true
+    if (invalidationRequired) {
       publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
     }
-    if (executionTarget.kind === 'git-worktree' && (result.ok || result.repositoryStateChanged === true)) {
+    if (executionTarget.kind === 'git-worktree' && invalidationRequired) {
       publishUserRepoReadInvalidation(userId, {
         repoId: executionTarget.workspaceId,
         domain: 'worktree-status',
@@ -239,7 +240,7 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () => await openWorkspaceTerminal(executionTarget, terminalApp, c.req.raw.signal),
+        run: () => openWorkspaceTerminal(executionTarget, terminalApp, c.req.raw.signal),
         label: 'open-terminal',
         signal: c.req.raw.signal,
       }),
@@ -257,7 +258,7 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () => await openWorkspaceEditor(executionTarget, editorApp, c.req.raw.signal),
+        run: () => openWorkspaceEditor(executionTarget, editorApp, c.req.raw.signal),
         label: 'open-editor',
         signal: c.req.raw.signal,
       }),
@@ -275,7 +276,7 @@ export function createWorkspaceRoutes(options: {
     return c.json(
       await runWorkspaceRuntimeRequest({
         userId,
-        run: async () => await openWorkspaceInFinder(executionTarget, c.req.raw.signal),
+        run: () => openWorkspaceInFinder(executionTarget, c.req.raw.signal),
         label: 'open-in-finder',
         signal: c.req.raw.signal,
       }),

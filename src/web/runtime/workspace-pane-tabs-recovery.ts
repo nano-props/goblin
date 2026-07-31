@@ -13,7 +13,11 @@ export interface WorkspacePaneTabsRecoveryDependencies {
   logFailure: (target: RuntimeProjectionScope['target'], error: unknown) => void
 }
 
-export class WorkspacePaneTabsRecovery {
+export interface WorkspacePaneTabsRecoveryActions {
+  request(scope: RuntimeProjectionScope): void
+}
+
+export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActions {
   private readonly dependencies: WorkspacePaneTabsRecoveryDependencies
 
   constructor(dependencies: WorkspacePaneTabsRecoveryDependencies) {

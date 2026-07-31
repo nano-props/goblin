@@ -3,11 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import {
-  buildCanonicalSshConnectionSnapshot,
-  buildRemoteCommandInvocation,
-  buildRemoteTerminalInvocation,
-} from '#/system/ssh/commands.ts'
+import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
+import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -223,6 +220,30 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).not.toContain('check-ignore')
     expect(invocation.script).not.toContain('ls-files -- "$rel"')
     expect(invocation.script).toContain('error.workspace-path-not-found')
+  })
+
+  test('bounds remote directory and Git log result counts after flooring', () => {
+    const directoryScript = (limit?: number) =>
+      buildRemoteCommandInvocation(target(), {
+        type: 'listDirectories',
+        path: '/srv',
+        limit,
+      }).script
+    const logScript = (count?: number) =>
+      buildRemoteCommandInvocation(target(), {
+        type: 'gitLog',
+        path: '/srv/repo',
+        branch: 'main',
+        count,
+      }).script
+
+    expect(directoryScript()).toContain('head -n 20')
+    expect(directoryScript(0)).toContain('head -n 1')
+    expect(directoryScript(2.9)).toContain('head -n 2')
+    expect(directoryScript(51)).toContain('head -n 50')
+    expect(logScript(0)).toContain('--max-count=1')
+    expect(logScript(2.9)).toContain('--max-count=2')
+    expect(logScript(1001)).toContain('--max-count=1000')
   })
 
   test('remote Git worktree walk decorates direct children with ignore state', () => {

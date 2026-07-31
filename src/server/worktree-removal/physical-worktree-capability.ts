@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
+import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/invocation.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   physicalWorktreeIdentityKey,
