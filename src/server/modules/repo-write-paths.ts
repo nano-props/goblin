@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { omit } from 'es-toolkit'
+import { omit, uniq } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoReadInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
@@ -48,7 +48,7 @@ function publishMutationInvalidations(
 ): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
   if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
-    const uniqueRepoIds = Array.from(new Set([workspaceId, ...affectedRepoIds]))
+    const uniqueRepoIds = uniq([workspaceId, ...affectedRepoIds])
     for (const repoId of uniqueRepoIds) {
       for (const domain of domains) publishRepoReadInvalidation({ repoId, domain })
     }

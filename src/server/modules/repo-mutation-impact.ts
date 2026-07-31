@@ -1,3 +1,4 @@
+import { compact, uniq } from 'es-toolkit'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -10,16 +11,12 @@ export interface RepoMutationResult extends ExecResult {
 }
 
 export function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
-  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
+  const unique = uniq(affectedRepoIds.filter((repoId) => repoId.length > 0))
   return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
 }
 
 export function localWorktreeRepoIds(worktrees: readonly WorktreeInfo[]): WorkspaceId[] {
-  return worktrees.flatMap((worktree) => {
-    if (worktree.isBare) return []
-    const id = workspaceIdForLocalWorktreePath(worktree.path)
-    return id ? [id] : []
-  })
+  return compact(worktrees.map((worktree) => (worktree.isBare ? null : workspaceIdForLocalWorktreePath(worktree.path))))
 }
 
 export function workspaceIdForLocalWorktreePath(worktreePath: string): WorkspaceId | null {
@@ -32,8 +29,7 @@ export function remoteWorktreeRepoIds(
   worktreePaths: readonly string[] | undefined,
 ): WorkspaceId[] {
   if (!worktreePaths) return []
-  return worktreePaths.flatMap((remotePath) => {
-    const ref = normalizeRemoteWorkspaceRef({ alias: target.alias, remotePath })
-    return ref ? [ref.id] : []
-  })
+  return compact(
+    worktreePaths.map((remotePath) => normalizeRemoteWorkspaceRef({ alias: target.alias, remotePath })?.id ?? null),
+  )
 }
