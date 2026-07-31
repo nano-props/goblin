@@ -169,6 +169,32 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
+  test('fast-fails an indeterminate restart without replaying it', async () => {
+    terminalCalls.restart.mockRejectedValueOnce(
+      new ClientRealtimeRequestError('restart response was lost', {
+        kind: 'disconnected',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+    )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+
+    session.restart()
+    await flushTerminalStart()
+
+    expect(terminalCalls.restart).toHaveBeenCalledOnce()
+    expect(session.addressableRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+    })
+    expect(session.snapshot().presentationRecovery).toBe('failed')
+    expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+  })
+
   test('retries a failed restart from the retained generation and publishes exactly old plus one', async () => {
     terminalCalls.restart
       .mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })

@@ -809,12 +809,13 @@ export class TerminalSession {
 
   private failPresentationStart(epoch: number, attempt: TerminalRuntimeAttemptToken, error: unknown): void {
     if (!this.isCurrentStartEpoch(epoch)) return
+    const indeterminate = this.runtime.currentAttemptIsIndeterminate()
     const resolution = this.runtime.cancelStartAttempt(attempt)
     if (resolution === 'staged') {
       this.applySettledStagedHydration()
     }
     this.destroyActiveView({ preserveTransientState: true })
-    if (resolution === 'restored' && this.presentationRecovery === 'pending') {
+    if (resolution === 'restored' && this.presentationRecovery === 'pending' && !indeterminate) {
       this.setPresentationRecovery(error instanceof StartCancelledError ? undefined : 'failed')
     } else if (resolution === 'restored') {
       this.notify('metadata')
