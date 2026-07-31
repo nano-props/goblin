@@ -89,13 +89,20 @@ export function admissionRecords(
     byStableIdentity.set(key, record)
   }
   for (const capability of capabilities) {
+    const lease = physicalWorktreeAdmissionLease(capability)
     const key = physicalWorktreeIdentityKey(capability.identity)
     const record = byStableIdentity.get(key) ?? {
       identity: capability.identity,
       currentCapability: null,
       indexedLeases: [],
     }
-    // Multiple captures of one stable identity converge on the latest capability.
+    if (
+      record.currentCapability &&
+      physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(record.currentCapability)) !==
+        physicalWorktreeAdmissionLeaseKey(lease)
+    ) {
+      throw new Error('error.ambiguous-worktree-execution-capability')
+    }
     record.currentCapability = capability
     byStableIdentity.set(key, record)
   }
