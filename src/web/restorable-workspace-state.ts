@@ -10,7 +10,12 @@ import {
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  RestorableWorkspaceState,
+  WorkspaceSessionState,
+  WorkspaceState,
+  WorkspaceUiState,
+} from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -27,8 +32,13 @@ import {
 
 interface ClientWorkspaceRestorationProjection {
   id: WorkspaceId
-  ui: Pick<WorkspacesStore['workspaces'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
+  ui: WorkspaceUiState
   gitTargets?: ClientWorkspaceGitTargets
+}
+
+interface WorkspacePaneTabsQueryWorkspaceState {
+  workspaceRuntimeId: string
+  session: WorkspaceSessionState
 }
 
 interface ClientWorkspaceBranchProjection {
@@ -47,10 +57,14 @@ interface ClientWorkspaceTargetProjection {
   }
 }
 
+interface ClientWorkspaceTargetWithUiProjection extends ClientWorkspaceTargetProjection {
+  ui: WorkspaceUiState
+}
+
 type ClientWorkspaceRestorationProjectionMap = Record<string, ClientWorkspaceRestorationProjection | undefined>
 
 export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
-  workspaces: WorkspacesStore['workspaces']
+  workspaces: Record<string, WorkspaceState>
   restorableWorkspaceState: RestorableWorkspaceState
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
   restoredClientWorkspaceBaseline?: ClientWorkspaceState | null
@@ -96,7 +110,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
 }
 
 function clientWorkspaceRestorationProjections(
-  workspaces: WorkspacesStore['workspaces'],
+  workspaces: Record<string, WorkspaceState>,
   workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceRestorationProjectionMap {
   const projections: ClientWorkspaceRestorationProjectionMap = {}
@@ -120,7 +134,7 @@ function clientWorkspaceRestorationProjections(
 }
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
-  workspaces: Record<string, Pick<WorkspacesStore['workspaces'][string], 'workspaceRuntimeId' | 'session'> | undefined>,
+  workspaces: Record<string, WorkspacePaneTabsQueryWorkspaceState | undefined>,
   workspaceOrder: readonly WorkspaceId[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
@@ -141,7 +155,7 @@ function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
 function clientWorkspaceWithStubBaseline(
   clientWorkspace: ClientWorkspaceState,
   baseline: ClientWorkspaceState | null | undefined,
-  workspaces: WorkspacesStore['workspaces'],
+  workspaces: Record<string, WorkspaceState>,
   workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceState {
   if (!baseline) return clientWorkspace
@@ -198,10 +212,7 @@ function mergeBaselineSelectedTerminals(
 }
 
 function preferredWorkspacePaneTabsForClientWorkspace(
-  workspaces: Record<
-    string,
-    (ClientWorkspaceTargetProjection & Required<Pick<ClientWorkspaceTargetProjection, 'ui'>>) | undefined
-  >,
+  workspaces: Record<string, ClientWorkspaceTargetWithUiProjection | undefined>,
   workspaceOrder: readonly WorkspaceId[],
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
@@ -296,10 +307,11 @@ function selectedTerminalSessionsForClientWorkspace(
 /** Restores only the restorable workspace UI projection from ClientWorkspaceState.
  *  It intentionally does not establish a live binding back to ClientWorkspaceState;
  *  subsequent local updates flow through useClientWorkspacePersistence. */
-interface RestoredWorkspaceStateFromClientWorkspace extends Pick<
-  RestorableWorkspaceState,
-  'restoredWorkspaceId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalFilesystemTarget'
-> {
+interface RestoredWorkspaceStateFromClientWorkspace {
+  restoredWorkspaceId: RestorableWorkspaceState['restoredWorkspaceId']
+  zenMode: RestorableWorkspaceState['zenMode']
+  workspacePaneSize: RestorableWorkspaceState['workspacePaneSize']
+  selectedTerminalSessionIdByTerminalFilesystemTarget: RestorableWorkspaceState['selectedTerminalSessionIdByTerminalFilesystemTarget']
   preferredWorkspacePaneTabByTargetByWorkspace: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace']
 }
 

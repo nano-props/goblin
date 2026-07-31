@@ -28,6 +28,16 @@ export interface ResolvedWorkspace {
   }
 }
 
+interface OrderedWorkspaceState {
+  workspaces: Record<string, WorkspaceState>
+  workspaceOrder: WorkspaceId[]
+}
+
+interface WorkspaceUpsertResult extends OrderedWorkspaceState {
+  changed: boolean
+  id: WorkspaceId
+}
+
 export function workspaceShellForNewRuntimeEpoch(
   workspace: WorkspaceState,
   workspaceRuntimeId: string,
@@ -159,14 +169,14 @@ function remoteTargetsEqual(
 }
 
 function upsertWorkspace(
-  state: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
+  state: OrderedWorkspaceState,
   id: WorkspaceId,
   options: {
     rankById?: ReadonlyMap<string, number>
     create: () => WorkspaceState
     update?: (existing: WorkspaceState) => WorkspaceState | null
   },
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
+): WorkspaceUpsertResult {
   const existing = state.workspaces[id]
   if (existing) {
     if (!options.update) {
@@ -192,11 +202,11 @@ function upsertWorkspace(
 }
 
 export function addResolvedWorkspace(
-  state: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
+  state: OrderedWorkspaceState,
   resolvedWorkspace: ResolvedWorkspace,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
+): WorkspaceUpsertResult {
   return upsertWorkspace(state, resolvedWorkspace.id, {
     rankById,
     create: () => {
@@ -272,11 +282,11 @@ export function addResolvedWorkspace(
 }
 
 export function insertPlaceholderWorkspace(
-  state: Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'>,
+  state: OrderedWorkspaceState,
   entry: WorkspaceSessionEntry,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
+): WorkspaceUpsertResult {
   return upsertWorkspace(state, entry.id, {
     rankById,
     create: () => {

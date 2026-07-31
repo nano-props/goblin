@@ -24,12 +24,17 @@ import type {
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
+interface DashboardWorkspaceIdentity {
+  id: WorkspaceState['id']
+  admission: WorkspaceState['admission']
+}
+
 export function DashboardHeader({
   workspace,
   remote,
   currentBranch,
 }: {
-  workspace: Pick<WorkspaceState, 'id' | 'admission'>
+  workspace: DashboardWorkspaceIdentity
   remote: RepoRemoteInfo
   currentBranch: string
 }) {

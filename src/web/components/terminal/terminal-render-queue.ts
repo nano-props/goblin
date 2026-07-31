@@ -9,9 +9,14 @@ export interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
   terminalRuntimeGeneration: number
 }
 
+export interface RenderedOutputBinding {
+  terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
+}
+
 export function latestRenderedOutputCheckpoint(
   checkpoints: readonly RenderedOutputCheckpoint[],
-  binding: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
+  binding: RenderedOutputBinding,
 ): RenderedOutputCheckpoint | null {
   return checkpoints.reduce<RenderedOutputCheckpoint | null>((latest, checkpoint) => {
     if (!sameRenderedOutputBinding(checkpoint, binding)) return latest
@@ -20,10 +25,7 @@ export function latestRenderedOutputCheckpoint(
   }, null)
 }
 
-export function sameRenderedOutputBinding(
-  a: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
-  b: Pick<RenderedOutputCheckpoint, 'terminalRuntimeSessionId' | 'terminalRuntimeGeneration'>,
-): boolean {
+export function sameRenderedOutputBinding(a: RenderedOutputBinding, b: RenderedOutputBinding): boolean {
   return (
     a.terminalRuntimeSessionId === b.terminalRuntimeSessionId &&
     a.terminalRuntimeGeneration === b.terminalRuntimeGeneration

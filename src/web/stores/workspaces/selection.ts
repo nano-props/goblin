@@ -4,7 +4,14 @@ import {
   normalizeWorkspacePaneSize,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
-import type { BranchViewMode, WorkspacesGet, WorkspacesSet, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  BranchViewMode,
+  GitWorkspacePreferenceActions,
+  RestorableWorkspaceActions,
+  WorkspacePanePreferenceActions,
+  WorkspacesGet,
+  WorkspacesSet,
+} from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -16,22 +23,9 @@ import {
 import { requireRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { createWorkspaceNavigationHistoryActions } from '#/web/stores/workspaces/navigation-history-actions.ts'
 
-type RestorableWorkspaceActions = Pick<
-  WorkspacesStore,
-  | 'applySessionLayoutState'
-  | 'applySessionSelectedTerminalState'
-  | 'setZenMode'
-  | 'toggleZenMode'
-  | 'setWorkspacePaneSize'
-  | 'resetLayout'
-  | 'setSelectedTerminal'
->
-
-type WorkspacePanePreferenceActions = Pick<WorkspacesStore, 'setWorkspacePaneTabForTarget'>
-type GitWorkspacePreferenceActions = Pick<WorkspacesStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
 function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspaceActions {
   return {
-    applySessionLayoutState(layoutState: Parameters<WorkspacesStore['applySessionLayoutState']>[0]) {
+    applySessionLayoutState(layoutState) {
       // One-shot boot/session restore of restorable layout fields. Runtime
       // edits are persisted later through useClientWorkspacePersistence.
       set((s) => {

@@ -123,10 +123,7 @@ function providerTargets(
   return targets
 }
 
-function durableTargetKey(
-  scope: Pick<WorkspacePaneEpochScope, 'workspaceId' | 'workspaceRuntimeId'>,
-  target: RestorableWorkspacePaneTarget,
-): string {
+function durableTargetKey(scope: WorkspacePaneEpochScope, target: RestorableWorkspacePaneTarget): string {
   const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
   const runtime = workspacePaneTabsTargetFromRestorable(workspaceId, target)

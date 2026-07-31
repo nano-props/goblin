@@ -62,7 +62,7 @@ export function ensureSshControlDirectory(): Promise<void> {
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
-  target: Pick<RemoteWorkspaceTarget, 'alias' | 'host' | 'user' | 'port'>,
+  target: RemoteWorkspaceTarget,
   effectiveConfig: string,
 ): NonNullable<RemoteWorkspaceTarget['sshConnection']> {
   const options = effectiveConfig

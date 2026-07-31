@@ -1,5 +1,10 @@
 const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
 
+interface PointerCoordinates {
+  clientX: number
+  clientY: number
+}
+
 export function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   const rect = host?.getBoundingClientRect()
   if (rect && rect.width > 0) return rect
@@ -7,10 +12,7 @@ export function zenRevealHostRect(host: HTMLElement | null): DOMRect | null {
   return parentRect && parentRect.width > 0 ? parentRect : null
 }
 
-export function isPointerInsideElement(
-  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
-  element: HTMLElement | null,
-): boolean {
+export function isPointerInsideElement(event: PointerCoordinates, element: HTMLElement | null): boolean {
   if (!element) return false
   const rect = element.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return false
@@ -23,7 +25,7 @@ export function isPointerInsideElement(
 }
 
 export function isPointerInsideRevealBounds(
-  event: Pick<MouseEvent | PointerEvent, 'clientX' | 'clientY'>,
+  event: PointerCoordinates,
   host: HTMLElement | null,
   panel: HTMLElement | null,
 ): boolean {

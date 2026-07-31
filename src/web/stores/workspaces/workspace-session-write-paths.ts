@@ -27,9 +27,9 @@ import type {
   CloseWorkspaceResult,
   OpenWorkspacePostOpenError,
   OpenWorkspaceResult,
+  WorkspaceMembershipActions,
   WorkspacesGet,
   WorkspacesSet,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
 import {
   isRemoteWorkspaceId,
@@ -436,10 +436,7 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   })
 }
 
-export function createWorkspaceLifecycleActions(
-  set: WorkspacesSet,
-  get: WorkspacesGet,
-): Pick<WorkspacesStore, 'ensureWorkspaceOpen' | 'closeWorkspace' | 'retryRemoteWorkspaceConnection'> {
+export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceMembershipActions {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)

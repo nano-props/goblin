@@ -1,10 +1,8 @@
-import type { WorkspacesSet, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceTabOpenerActions, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import {
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
-
-type TabOpenerActions = Pick<WorkspacesStore, 'setTabOpener' | 'clearTabOpener'>
 
 // Opener identities (e.g. `workspace-pane:changes`) are shared string
 // constants across *every* workspace pane target, unlike terminal identities
@@ -16,7 +14,7 @@ export function tabOpenerScopeKey(target: WorkspacePaneTabsTarget): string {
   return workspacePaneTabsTargetIdentityKey(target)
 }
 
-export function createTabOpenerActions(set: WorkspacesSet): TabOpenerActions {
+export function createTabOpenerActions(set: WorkspacesSet): WorkspaceTabOpenerActions {
   return {
     setTabOpener(scopeKey: string, childIdentity: string, openerIdentity: string) {
       set((s) => {

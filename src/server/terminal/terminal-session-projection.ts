@@ -28,6 +28,17 @@ interface TerminalSessionProjectionSource {
   presentation: TerminalPresentation | null
 }
 
+interface TerminalRuntimeProjectionSource {
+  id: string
+  phase: TerminalSessionPhase
+  message: string | null
+  ptyState: TerminalPtyState
+}
+
+interface TerminalPresentationSource {
+  presentation: TerminalPresentation | null
+}
+
 export function projectTerminalSessionSummary(
   session: TerminalSessionProjectionSource,
   controller: TerminalController | null,
@@ -44,7 +55,7 @@ export function projectTerminalSessionSummary(
 }
 
 export function projectTerminalRuntimeMetadata(
-  session: Pick<TerminalSessionProjectionSource, 'id' | 'phase' | 'message' | 'ptyState'>,
+  session: TerminalRuntimeProjectionSource,
   controller: TerminalController | null,
   processName: string = terminalPtyProcessName(session),
 ): TerminalRuntimeMetadata {
@@ -63,7 +74,7 @@ export function projectTerminalRuntimeMetadata(
 }
 
 export function projectBoundTerminalRuntimeMetadata(
-  session: Pick<TerminalSessionProjectionSource, 'id' | 'phase' | 'message' | 'ptyState'>,
+  session: TerminalRuntimeProjectionSource,
   controller: TerminalController | null,
   canonicalSize?: { cols: number; rows: number },
 ): TerminalBoundRuntimeMetadata | null {
@@ -73,7 +84,7 @@ export function projectBoundTerminalRuntimeMetadata(
 }
 
 export function projectTerminalTakeoverResult(
-  session: Pick<TerminalSessionProjectionSource, 'id' | 'phase' | 'ptyState'>,
+  session: TerminalRuntimeProjectionSource,
   controller: TerminalController | null,
 ): TerminalTakeoverResult {
   const bound = terminalPtyBoundState(session)
@@ -92,7 +103,7 @@ export function projectTerminalTakeoverResult(
 }
 
 export function projectTerminalStreamAttachResult(
-  session: Pick<TerminalSessionProjectionSource, 'id' | 'phase' | 'message' | 'ptyState'>,
+  session: TerminalRuntimeProjectionSource,
   controller: TerminalController | null,
   projectionRevision: number,
 ): Extract<TerminalAttachResult, { ok: true; frame: 'stream' }> | { ok: false; message: string } {
@@ -121,9 +132,7 @@ export function projectTerminalSnapshotAttachResult(
   }
 }
 
-function requiredTerminalPresentation(
-  session: Pick<TerminalSessionProjectionSource, 'presentation'>,
-): TerminalPresentation {
+function requiredTerminalPresentation(session: TerminalPresentationSource): TerminalPresentation {
   if (!session.presentation) throw new Error('terminal session presentation unavailable')
   return session.presentation
 }

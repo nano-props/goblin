@@ -357,7 +357,13 @@ function remoteTargetFields(input: unknown): Pick<RemoteWorkspaceTarget, 'host' 
   return { host, user, port }
 }
 
-function remoteRefFields(input: unknown): Pick<RemoteWorkspaceRef, 'id' | 'alias' | 'remotePath'> | null {
+interface RemoteWorkspaceRefFields {
+  id: WorkspaceId
+  alias: string
+  remotePath: string
+}
+
+function remoteRefFields(input: unknown): RemoteWorkspaceRefFields | null {
   if (!input || typeof input !== 'object') return null
   const rawAlias = Reflect.get(input, 'alias')
   const rawRemotePath = Reflect.get(input, 'remotePath')

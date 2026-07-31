@@ -19,7 +19,12 @@ export type WorkspaceRouteContext =
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
 
-export function appLayoutRouteCallbacks(routeActions: Pick<AppRouteNavigation, 'openSettings' | 'openHome'>) {
+interface AppLayoutRouteActions {
+  openSettings: AppRouteNavigation['openSettings']
+  openHome: AppRouteNavigation['openHome']
+}
+
+export function appLayoutRouteCallbacks(routeActions: AppLayoutRouteActions) {
   return {
     navigateToSettingsShortcuts: () => routeActions.openSettings('shortcuts'),
     navigateToIndex: () => routeActions.openHome(),

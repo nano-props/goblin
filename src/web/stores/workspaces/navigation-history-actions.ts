@@ -4,17 +4,13 @@ import {
 } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type {
   WorkspaceNavigationHistoryEntry,
+  WorkspaceNavigationHistoryActions,
+  WorkspaceNavigationHistoryCollectionState,
   WorkspaceNavigationHistoryState,
   WorkspaceNavigationHistoryTraversal,
   WorkspacesGet,
   WorkspacesSet,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
-
-type WorkspaceNavigationHistoryActions = Pick<
-  WorkspacesStore,
-  'recordWorkspaceNavigation' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
->
 
 const MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES = 50
 
@@ -97,10 +93,10 @@ export function createWorkspaceNavigationHistoryActions(
 }
 
 function workspaceStateWithNavigationHistory(
-  state: Pick<WorkspacesStore, 'navigationHistoryByWorkspace'>,
+  state: WorkspaceNavigationHistoryCollectionState,
   workspaceId: string,
   history: WorkspaceNavigationHistoryState,
-): Pick<WorkspacesStore, 'navigationHistoryByWorkspace'> {
+): WorkspaceNavigationHistoryCollectionState {
   return {
     navigationHistoryByWorkspace: {
       ...state.navigationHistoryByWorkspace,

@@ -10,14 +10,23 @@ export type WorkspacePaneRouteContext =
   | { kind: 'routed'; route: ParsedWorkspacePaneRoute | null }
   | { kind: 'inactive' }
 
+interface GitWorkspacePaneOperations {
+  branchAction: GitWorkspaceClientState['operations']['branchAction']
+}
+
+interface FilesystemWorkspacePaneUi {
+  preferredWorkspacePaneTabByTarget: WorkspaceState['ui']['preferredWorkspacePaneTabByTarget']
+  currentBranchName: string | null
+}
+
 export type GitWorkspacePaneShell = Omit<GitWorkspacePaneProjection, 'snapshot' | 'status' | 'branchAction'> & {
-  operations: Pick<GitWorkspaceClientState['operations'], 'branchAction'>
+  operations: GitWorkspacePaneOperations
   probe: WorkspaceReadyProbeState
 }
 
 export interface FilesystemWorkspacePaneProjection {
   id: WorkspaceId
   workspaceRuntimeId: string
-  ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
+  ui: FilesystemWorkspacePaneUi
   probe: WorkspaceReadyProbeState
 }

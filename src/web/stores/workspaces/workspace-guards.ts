@@ -10,8 +10,8 @@ import type {
   GitWorkspaceClientState,
   WorkspaceCapabilityState,
   WorkspaceState,
+  RuntimeCoherentWorkspaceState,
   WorkspacesSet,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -141,10 +141,7 @@ function requiredRemoteWorkspaceAdmission(
 
 type WorkspaceMutator = (workspace: Draft<WorkspaceState>) => void
 
-export function currentWorkspaceRuntimeId(
-  state: Pick<WorkspacesStore, 'workspaces'>,
-  workspaceId: string,
-): string | null {
+export function currentWorkspaceRuntimeId(state: RuntimeCoherentWorkspaceState, workspaceId: string): string | null {
   return state.workspaces[workspaceId]?.workspaceRuntimeId ?? null
 }
 

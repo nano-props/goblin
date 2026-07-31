@@ -21,7 +21,7 @@ import {
   worktreePathFromSlug,
 } from '#/web/workspace-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useAppRouteActions, type AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
@@ -139,15 +139,19 @@ function IndexRoute() {
   )
 }
 
-export function initialWorkspaceRouteSlugFromStore(
-  state: Pick<WorkspacesStore, 'restoredWorkspaceId' | 'workspaceOrder' | 'workspaces' | 'workspaceMembershipReady'>,
-): string | null {
+export function initialWorkspaceRouteSlugFromStore(state: InitialWorkspaceRouteState): string | null {
   const restoredWorkspace = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
   if (restoredWorkspace) return workspaceSlugFromId(restoredWorkspace.id)
   if (!state.workspaceMembershipReady) return null
   const firstWorkspaceId = state.workspaceOrder[0]
   const firstWorkspace = firstWorkspaceId ? state.workspaces[firstWorkspaceId] : null
   return firstWorkspace ? workspaceSlugFromId(firstWorkspace.id) : null
+}
+
+interface InitialWorkspaceRouteState extends RuntimeCoherentWorkspaceState {
+  restoredWorkspaceId: WorkspaceId | null
+  workspaceOrder: WorkspaceId[]
+  workspaceMembershipReady: boolean
 }
 
 function WorkspaceRoute() {
@@ -301,11 +305,16 @@ export function appRouterCallbacks(routeActions: AppRouteNavigation) {
 }
 
 export function applyAppSettingsRouteChange(
-  routeActions: Pick<AppRouteNavigation, 'openSettings' | 'closeSettings'>,
+  routeActions: AppSettingsRouteActions,
   nextPage: SettingsPage | null,
 ): void {
   if (nextPage) routeActions.openSettings(nextPage)
   else routeActions.closeSettings()
+}
+
+interface AppSettingsRouteActions {
+  openSettings: AppRouteNavigation['openSettings']
+  closeSettings: AppRouteNavigation['closeSettings']
 }
 
 function SettingsRoute() {
