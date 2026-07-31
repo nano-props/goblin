@@ -181,7 +181,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   get: WorkspacesGet,
 ): Promise<WorkspaceRuntimeMembershipRecoveryResult> {
   const recovery = await runExclusiveWorkspaceRuntimeMembershipCommand(
-    async () => await reconcileOpenWorkspaceRuntimeMembershipsInCommand(set, get),
+    async () => await reconcileOpenWorkspaceRuntimeMembershipsNow(set, get),
   )
   if (recovery.kind === 'superseded') return recovery
   void Promise.all(
@@ -197,7 +197,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   return { kind: 'settled', targets: recovery.targets, changedTargets: recovery.changedTargets }
 }
 
-async function reconcileOpenWorkspaceRuntimeMembershipsInCommand(
+async function reconcileOpenWorkspaceRuntimeMembershipsNow(
   set: WorkspacesSet,
   get: WorkspacesGet,
 ): Promise<ReconciledWorkspaceRuntimeMembershipRecovery> {

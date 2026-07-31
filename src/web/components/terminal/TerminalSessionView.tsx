@@ -327,7 +327,7 @@ export function TerminalSessionView({
   const showProjectionRecoveryFailure =
     !showErrorChip &&
     projectionFailed &&
-    ((sessionPhase === 'opening' && !hasSessions) || !isAttaching)
+    ((sessionPhase === 'opening' && !hasSessions) || (!isAttaching && presentationRecovery === 'pending'))
   const showEmptyCta = sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending
   const showStatusOverlay =
     (isAttaching && !showEmptyCta && !(sessionPhase === 'opening' && !hasSessions && projectionFailed)) ||

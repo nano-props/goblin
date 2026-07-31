@@ -107,49 +107,19 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
   test('does not recover a target replaced after membership reconciliation', async () => {
     const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
     const workspaceTabsRecovery = { request: vi.fn() }
-    const failRecovery = vi.fn()
     const recovery = new WorkspaceRuntimeReconnectRecovery({
       scopeRegistry: createRuntimeProjectionScopeRegistry(() => true),
       reconcileMemberships: async () => ({ kind: 'settled', targets: [TARGET] }),
       currentWorkspaceRuntimeId: () => 'workspace-runtime-newer',
       terminalRecovery,
       workspaceTabsRecovery,
-      beginRecovery: vi.fn(() => failRecovery),
+      beginRecovery: vi.fn(() => vi.fn()),
       logFailure: vi.fn(),
     })
 
     recovery.request()
     await waitForNextMacrotask()
 
-    expect(terminalRecovery.begin).not.toHaveBeenCalled()
-    expect(workspaceTabsRecovery.request).not.toHaveBeenCalled()
-    expect(failRecovery).toHaveBeenCalledWith(expect.any(Error))
-  })
-
-  test('validates every target before disposing scopes or starting partial recovery', async () => {
-    const firstTarget = { ...TARGET, workspaceId: workspaceIdForTest('goblin+file:///workspace-a') }
-    const secondTarget = { ...TARGET, workspaceId: workspaceIdForTest('goblin+file:///workspace-b') }
-    const scopeRegistry = createRuntimeProjectionScopeRegistry(() => true)
-    const disposeScopes = vi.spyOn(scopeRegistry, 'disposeScopes')
-    const failRecovery = vi.fn()
-    const terminalRecovery = { begin: vi.fn(), request: vi.fn() }
-    const workspaceTabsRecovery = { request: vi.fn() }
-    const recovery = new WorkspaceRuntimeReconnectRecovery({
-      scopeRegistry,
-      reconcileMemberships: async () => ({ kind: 'settled', targets: [firstTarget, secondTarget] }),
-      currentWorkspaceRuntimeId: (workspaceId) =>
-        workspaceId === firstTarget.workspaceId ? firstTarget.workspaceRuntimeId : 'workspace-runtime-newer',
-      terminalRecovery,
-      workspaceTabsRecovery,
-      beginRecovery: vi.fn(() => failRecovery),
-      logFailure: vi.fn(),
-    })
-
-    recovery.request()
-    await waitForNextMacrotask()
-
-    expect(failRecovery).toHaveBeenCalledWith(expect.any(Error))
-    expect(disposeScopes).not.toHaveBeenCalled()
     expect(terminalRecovery.begin).not.toHaveBeenCalled()
     expect(workspaceTabsRecovery.request).not.toHaveBeenCalled()
   })

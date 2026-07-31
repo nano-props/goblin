@@ -856,36 +856,6 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('renders a non-blocking full recovery retry for an already-open terminal', async () => {
-    const retryRecovery = vi.fn(() => true)
-    const view = await renderTerminalSession(
-      { retryRecovery },
-      {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'controller' },
-        },
-        projectionPhase: 'failed',
-      },
-    )
-
-    try {
-      const alert = view.container.querySelector('[role="alert"]')
-      expect(alert?.textContent).toContain('terminal.load-failed')
-      expect(view.container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
-      const retry = alert?.querySelector('button')
-      expect(retry?.textContent).toBe('error.try-again')
-
-      await act(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
-      expect(retryRecovery).toHaveBeenCalledOnce()
-    } finally {
-      await view.cleanup()
-    }
-  })
-
   test('keeps unowned attachment passive and reserves takeover for true viewers', async () => {
     const unowned = await renderTerminalSession(
       {},

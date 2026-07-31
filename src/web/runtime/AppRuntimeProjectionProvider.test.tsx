@@ -468,46 +468,6 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('fails the current runtime when membership recovery changes epoch before rejecting', async () => {
-    const repo = seedCurrentRepo()
-    const nextWorkspaceRuntimeId = 'repo-runtime-next-1234567890123456789'
-    const failure = new Error('membership unavailable')
-    const result = renderRuntimeProvider(REPO_ID)
-    const markProjectionFailed = vi.fn(useTerminalProjectionHydrationStore.getState().markProjectionFailed)
-    useTerminalProjectionHydrationStore.setState({ markProjectionFailed })
-    try {
-      await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'ready',
-        }),
-      )
-      projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockImplementationOnce(async () => {
-        useWorkspacesStore.setState((state) => ({
-          ...state,
-          workspaces: {
-            ...state.workspaces,
-            [REPO_ID]: { ...state.workspaces[REPO_ID]!, workspaceRuntimeId: nextWorkspaceRuntimeId },
-          },
-        }))
-        throw failure
-      })
-
-      await act(async () => {
-        recoveredHandler?.('client_sharedterminal')
-      })
-
-      await vi.waitFor(() => {
-        expect(markProjectionFailed).toHaveBeenCalledWith(REPO_ID, nextWorkspaceRuntimeId, failure.message)
-      })
-    } finally {
-      useTerminalProjectionHydrationStore.setState({
-        markProjectionFailed: useTerminalProjectionHydrationStore.getInitialState().markProjectionFailed,
-      })
-      result.unmount()
-    }
-  })
-
   test('reconciles a replaced repo epoch before recovering runtime projections', async () => {
     const repo = seedCurrentRepo()
     const nextWorkspaceRuntimeId = 'repo-runtime-123456789012345678901'

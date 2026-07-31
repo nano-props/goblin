@@ -84,28 +84,22 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
         terminalRecovery,
         workspaceTabsRecovery,
         beginRecovery: () => {
-          // Membership recovery is window-global: a failure applies to every currently open workspace.
-          // This is intentional so no projection remains pending behind a failed authoritative refresh.
-          const workspaceIds = workspaceRuntimeTargets().map((target) => target.workspaceId)
-          for (const workspaceId of workspaceIds) {
-            const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
-            if (!workspaceRuntimeId) continue
+          const targets = workspaceRuntimeTargets()
+          for (const target of targets) {
             useTerminalProjectionHydrationStore
               .getState()
-              .beginProjectionHydration(workspaceId, workspaceRuntimeId)
+              .beginProjectionHydration(target.workspaceId, target.workspaceRuntimeId)
           }
           return (error) => {
             const errorMessage = recoveryFailureMessage(error)
-            // Re-read the complete current membership so workspaces added while the
-            // global reconciliation was in flight cannot be left with an implicit pending state.
-            for (const { workspaceId, workspaceRuntimeId } of workspaceRuntimeTargets()) {
+            for (const target of targets) {
               const hydration = useTerminalProjectionHydrationStore
                 .getState()
-                .hydrationByWorkspace.get(workspaceId)
-              if (hydration?.workspaceRuntimeId === workspaceRuntimeId && hydration.phase !== 'pending') continue
+                .hydrationByWorkspace.get(target.workspaceId)
+              if (hydration?.workspaceRuntimeId !== target.workspaceRuntimeId || hydration.phase !== 'pending') continue
               useTerminalProjectionHydrationStore
                 .getState()
-                .markProjectionFailed(workspaceId, workspaceRuntimeId, errorMessage)
+                .markProjectionFailed(target.workspaceId, target.workspaceRuntimeId, errorMessage)
             }
           }
         },
@@ -229,6 +223,5 @@ function workspaceRuntimeTargets(): Array<{ workspaceId: WorkspaceId; workspaceR
 function recoveryFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
   if (typeof error === 'string' && error) return error
-  // Leave the optional detail empty so the UI can render its translated generic failure label.
-  return ''
+  return 'error.unknown'
 }

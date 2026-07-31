@@ -111,5 +111,5 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
 function projectionHydrationFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
   if (typeof error === 'string') return error
-  return ''
+  return 'error.unknown'
 }
