@@ -331,8 +331,12 @@ export function createTerminalSessionService(options: TerminalSessionServiceOpti
   return new TerminalSessionService(options)
 }
 
+interface TerminalSessionSnapshotReader {
+  terminalSessionsSnapshotForUser: TerminalSessionServiceManager['terminalSessionsSnapshotForUser']
+}
+
 export function terminalWorkspacePaneRuntimeTabsProvider(
-  manager: Pick<TerminalSessionServiceManager, 'terminalSessionsSnapshotForUser'>,
+  manager: TerminalSessionSnapshotReader,
   captureSnapshot: (userId: string, scope: string) => Promise<TerminalSessionsSnapshot> = async (userId, scope) =>
     manager.terminalSessionsSnapshotForUser(userId, scope),
 ): WorkspacePaneRuntimeTabsProvider {

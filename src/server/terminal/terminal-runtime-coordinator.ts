@@ -12,9 +12,13 @@ import { serverLogger } from '#/server/logger.ts'
 
 const terminalRuntimeCoordinatorLogger = serverLogger.child({ module: 'terminal-runtime-coordinator' })
 
+interface WorkspaceTabsUserCleanup {
+  closeUser: WorkspacePaneTabsCoordinator['closeUser']
+}
+
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
-  workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'closeUser'>
+  workspaceTabsCoordinator: WorkspaceTabsUserCleanup
   detachedTtlMs: number
   clientStateTtlMs: number
 }
