@@ -24,7 +24,7 @@ import {
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
   admissionRecords,
   capabilitiesByIdentity,
@@ -114,7 +114,7 @@ export interface WorkspacePaneRuntimeTabsCoordinator {
 export interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  physicalWorktrees: PhysicalWorktreeCapture
   layoutAggregate: WorkspacePaneLayoutAggregate
   targetProjection: WorkspacePaneTargetProjectionProvider
 }
@@ -122,7 +122,7 @@ export interface WorkspacePaneTabsCoordinatorOptions {
 export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
-  private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  private readonly physicalWorktrees: PhysicalWorktreeCapture
   private readonly layoutAggregate: WorkspacePaneLayoutAggregate
   private readonly targetProjection: WorkspacePaneTargetProjectionProvider
 

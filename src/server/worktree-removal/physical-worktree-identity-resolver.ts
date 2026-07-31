@@ -30,6 +30,10 @@ export interface ResolvePhysicalWorktreeIdentityInput {
   signal?: AbortSignal
 }
 
+export interface PhysicalWorktreeCapture {
+  capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability>
+}
+
 interface PhysicalWorktreeRuntimeEpoch {
   key: string
   userId: string
@@ -62,7 +66,7 @@ const defaultDependencies: PhysicalWorktreeIdentityResolverDependencies = {
 }
 
 /** Provider-owned canonical identity resolver, scoped to live workspace-runtime epochs. */
-export class PhysicalWorktreeIdentityResolver {
+export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture {
   private readonly deps: PhysicalWorktreeIdentityResolverDependencies
   private readonly epochs = new Map<string, PhysicalWorktreeRuntimeEpoch>()
   private readonly unsubscribeWorkspaceRuntimeClosed: () => void
