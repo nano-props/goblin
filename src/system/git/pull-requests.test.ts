@@ -328,7 +328,7 @@ describe('getBranchPullRequests request coordination', () => {
 
     // Spy on the pino child logger so the test exercises the real
     // production warn path (and the defensive `try { ... } catch {}`
-    // around it at pull-requests.ts:412-414). After the migration a
+    // around it). After the migration a
     // `console.warn` spy would never observe calls.
     vi.spyOn(pullRequestsNodeLog, 'warn').mockImplementation(() => {
       throw new Error('logger unavailable')

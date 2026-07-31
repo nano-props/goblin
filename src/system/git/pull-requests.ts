@@ -89,10 +89,6 @@ function repoRequestKey(cwd: string, repo: GitHubRepoRef, mode: PullRequestFetch
   return `${repoCacheKey(cwd, repo)}\0${mode}`
 }
 
-async function hasPullRequestQueryCapability(repo: GitHubRepoRef, signal?: AbortSignal): Promise<boolean> {
-  return canQueryGitHubHost(repo.host, signal)
-}
-
 const abortScopeIds = new WeakMap<AbortSignal, number>()
 let nextAbortScopeId = 1
 
@@ -426,7 +422,7 @@ export async function getBranchPullRequestsForRepoRef(
       if (cached.hit) {
         return cached.pr ? new Map([[singleBranch, cached.pr]]) : new Map()
       }
-      if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+      if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
 
       return await runPendingPullRequestFetch(
         pendingBranchFetches,
@@ -436,7 +432,7 @@ export async function getBranchPullRequestsForRepoRef(
       )
     }
 
-    if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+    if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
     const byBranch = await runPendingPullRequestFetch(
       pendingRepoFetches,
       repoRequestKey(scopeId, repo, mode),
@@ -490,7 +486,7 @@ export async function getBranchPullRequest(
     const cached = getCachedBranchPullRequest(cwd, repo, branch, 'full')
     if (cached.hit) return cached.pr
     if (isGitHubHostCoolingDown(repo.host)) return null
-    if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
+    if (!(await canQueryGitHubHost(repo.host, options?.signal))) return null
     const byBranch = await runPendingPullRequestFetch(
       pendingBranchFetches,
       branchCacheKey(cwd, repo, branch, 'full'),
