@@ -152,14 +152,7 @@ function findNextDueTarget(now: number): RegisteredGitBackgroundSyncTarget | nul
     const index = (state.nextTargetIndex + offset) % state.targets.length
     const target = state.targets[index]
     if (!target) continue
-    const key = backgroundSyncTargetKey(target)
-    const eligibleAt = backgroundSyncNextEligibleAt({
-      intervalMs: state.intervalMs,
-      lastFetchStartedAt: state.lastFetchStartedAtByTarget[key],
-      backoffUntil: state.backoffUntilByTarget[key],
-      now,
-    })
-    if (eligibleAt !== null && now >= eligibleAt) {
+    if (isTargetDue(target, now)) {
       state.nextTargetIndex = (index + 1) % state.targets.length
       return target
     }
@@ -169,17 +162,7 @@ function findNextDueTarget(now: number): RegisteredGitBackgroundSyncTarget | nul
 
 function hasDueRepo(now: number): boolean {
   if (state.targets.length === 0 || state.intervalMs <= 0) return false
-  for (const target of state.targets) {
-    const key = backgroundSyncTargetKey(target)
-    const eligibleAt = backgroundSyncNextEligibleAt({
-      intervalMs: state.intervalMs,
-      lastFetchStartedAt: state.lastFetchStartedAtByTarget[key],
-      backoffUntil: state.backoffUntilByTarget[key],
-      now,
-    })
-    if (eligibleAt !== null && now >= eligibleAt) return true
-  }
-  return false
+  return state.targets.some((target) => isTargetDue(target, now))
 }
 
 function clearTargetBackoff(target: RegisteredGitBackgroundSyncTarget): void {
@@ -207,6 +190,11 @@ function nextEligibleAt(target: RegisteredGitBackgroundSyncTarget, now: number =
     backoffUntil: state.backoffUntilByTarget[key],
     now,
   })
+}
+
+function isTargetDue(target: RegisteredGitBackgroundSyncTarget, now: number): boolean {
+  const eligibleAt = nextEligibleAt(target, now)
+  return eligibleAt !== null && now >= eligibleAt
 }
 
 function abortActiveFetchForTarget(target: RegisteredGitBackgroundSyncTarget): boolean {
