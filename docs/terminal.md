@@ -517,7 +517,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
   one explicit attach-only retry. The retry does not resend takeover, restart
   or recreate the PTY, mutate controller intent, or install a retry loop.
 - Terminal presentation is a best-effort projection. If attach delivery is
-  indeterminate, the client records that transport classification without
+  indeterminate, the client classifies the transport outcome without
   inferring whether the server operation succeeded, then ends the local
   presentation attempt as failed instead of waiting indefinitely for an
   optional reconnect event. The same rule applies to an indeterminate restart:
