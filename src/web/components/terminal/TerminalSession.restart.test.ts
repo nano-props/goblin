@@ -230,6 +230,7 @@ describe('TerminalSession restart and resynchronization', () => {
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
     })
+    await flushUntil(() => terminalCalls.attach.mock.calls.length === 2)
     await flushTerminalStart()
 
     expect(terminalCalls.restart).toHaveBeenCalledOnce()
