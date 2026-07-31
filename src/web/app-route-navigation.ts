@@ -29,7 +29,23 @@ export type FilesystemWorkspacePaneRouteTarget = Extract<
   { kind: 'workspace-root' | 'git-worktree' }
 >
 
-export interface AppRouteNavigation {
+export interface RepoBranchWorkspacePaneRouteNavigation {
+  openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: AppRouteNavigationOptions) => boolean
+  openRepoBranchTab: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    tab: WorkspacePaneStaticTabType,
+    options?: AppRouteNavigationOptions,
+  ) => boolean
+  openRepoBranchTerminal: (
+    workspaceId: WorkspaceId,
+    branchName: string,
+    terminalSessionId: string,
+    options?: AppRouteNavigationOptions,
+  ) => boolean
+}
+
+export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigation {
   workspaceSlugForId: (workspaceId: WorkspaceId) => string | null
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: AppRouteNavigationOptions) => void
@@ -54,19 +70,6 @@ export interface AppRouteNavigation {
     options?: AppRouteNavigationOptions,
   ) => Promise<boolean>
   openWorkspaceDashboard: (workspaceId: WorkspaceId, options?: AppRouteNavigationOptions) => void
-  openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: AppRouteNavigationOptions) => boolean
-  openRepoBranchTab: (
-    workspaceId: WorkspaceId,
-    branchName: string,
-    tab: WorkspacePaneStaticTabType,
-    options?: AppRouteNavigationOptions,
-  ) => boolean
-  openRepoBranchTerminal: (
-    workspaceId: WorkspaceId,
-    branchName: string,
-    terminalSessionId: string,
-    options?: AppRouteNavigationOptions,
-  ) => boolean
   openRepoWorktree: (workspaceId: WorkspaceId, worktreePath: string, options?: AppRouteNavigationOptions) => boolean
   openRepoWorktreeTerminal: (
     workspaceId: WorkspaceId,

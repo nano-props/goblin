@@ -5,7 +5,10 @@ import {
   workspacePaneTabEntryIdentity,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type {
+  FilesystemWorkspacePaneRouteCommitActions,
+  WorkspacePaneRouteCommitActions,
+} from '#/web/app-navigation-actions.ts'
 import {
   isWorkspacePaneRuntimeTab,
   type WorkspacePaneModelTarget,
@@ -39,11 +42,6 @@ export interface WorkspacePaneControllerTarget {
   paneTarget: WorkspacePaneModelTarget
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
-export type WorkspacePaneTabControllerCommitNavigation = Pick<
-  AppNavigationActions,
-  'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute'
->
-export type WorkspacePaneRouteCommitNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
 type WorkspacePaneControllerRoutePrecondition =
   { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 
@@ -116,7 +114,7 @@ export interface SelectWorkspacePaneControllerTabOptions {
 export async function selectWorkspacePaneControllerTab(
   target: WorkspacePaneTabModel,
   tab: WorkspacePaneTab,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   options: SelectWorkspacePaneControllerTabOptions = {},
 ): Promise<boolean> {
   const navigationGeneration = options.navigationGeneration ?? beginAppNavigation()
@@ -151,7 +149,7 @@ export async function selectWorkspacePaneControllerTab(
 export async function selectWorkspacePaneControllerTabEntry(
   target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
   if (!appNavigationIsCurrent(navigationGeneration)) return false
@@ -176,7 +174,7 @@ export async function selectWorkspacePaneControllerTabEntry(
 
 export function commitWorkspacePaneControllerCloseBackTarget(
   lease: WorkspacePaneControllerPresentationLease,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
 ): Promise<boolean> {
   return commitWorkspacePaneControllerTargetRoute(
     lease.target,
@@ -190,7 +188,7 @@ export function commitWorkspacePaneControllerCloseBackTarget(
 
 export function commitWorkspacePaneControllerRetirementCloseBackTarget(
   lease: WorkspacePaneControllerPresentationLease,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
 ): Promise<boolean> {
   return commitWorkspacePaneControllerTargetRoute(
     lease.target,
@@ -205,7 +203,7 @@ export function commitWorkspacePaneControllerRetirementCloseBackTarget(
 async function commitWorkspacePaneControllerTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
   navigationGeneration: AppNavigationGeneration,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
@@ -241,7 +239,7 @@ export async function commitWorkspacePaneControllerRoute(
   workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: {
     replace?: boolean
     navigationGeneration?: AppNavigationGeneration
@@ -259,7 +257,7 @@ export async function commitWorkspacePaneControllerRoute(
 export async function commitWorkspacePaneCurrentTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
@@ -278,7 +276,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
 export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
@@ -304,7 +302,7 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
 async function commitWorkspacePaneValidatedTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   targetIsCurrent: (target: WorkspacePaneControllerTarget) => boolean,
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
   routeOptions: { routePrecondition?: WorkspacePaneControllerRoutePrecondition | undefined },
@@ -356,7 +354,7 @@ export async function commitWorkspacePaneExactTargetRoute(
   target: WorkspacePaneControllerTarget,
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {

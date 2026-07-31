@@ -5,9 +5,9 @@ import {
 } from '#/shared/api-types.ts'
 import type {
   WorkspaceHydrationOptions,
+  WorkspaceRuntimeRestoreActions,
   WorkspacesGet,
   WorkspacesSet,
-  WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
 import { createWorkspaceLifecycleActions } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-state.ts'
@@ -23,15 +23,10 @@ import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 
-type RestorableWorkspaceLifecycleActions = Pick<
-  WorkspacesStore,
-  'hydrateRestoredWorkspaceRuntime' | 'promoteRestoredWorkspace'
->
-
 function createRestorableWorkspaceLifecycleActions(
   set: WorkspacesSet,
   get: WorkspacesGet,
-): RestorableWorkspaceLifecycleActions {
+): WorkspaceRuntimeRestoreActions {
   return {
     async hydrateRestoredWorkspaceRuntime(
       runtime: WorkspaceRuntimeRestoreSnapshot,

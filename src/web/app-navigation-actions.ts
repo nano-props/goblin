@@ -41,7 +41,24 @@ export type WorkspaceRootPanePresentation =
 
 export type FilesystemWorkspacePaneCommitTarget = FilesystemWorkspacePaneTargetLease
 
-export interface AppNavigationActions {
+export interface WorkspacePaneRouteCommitActions {
+  commitWorkspacePaneRoute: (
+    workspaceId: WorkspaceId,
+    branch: string,
+    route: WorkspacePaneRouteTarget,
+    options?: AppNavigationOptions,
+  ) => Promise<boolean>
+}
+
+export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePaneRouteCommitActions {
+  commitFilesystemWorkspacePaneRoute: (
+    target: FilesystemWorkspacePaneCommitTarget,
+    route: WorkspacePaneRouteTarget,
+    options?: AppNavigationOptions,
+  ) => Promise<boolean>
+}
+
+export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommitActions {
   activateWorkspace: (workspaceId: WorkspaceId) => void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
@@ -57,21 +74,10 @@ export interface AppNavigationActions {
     presentation: WorkspaceRootPanePresentation,
     options?: AppNavigationOptions,
   ) => boolean
-  commitFilesystemWorkspacePaneRoute: (
-    target: FilesystemWorkspacePaneCommitTarget,
-    route: WorkspacePaneRouteTarget,
-    options?: AppNavigationOptions,
-  ) => Promise<boolean>
   commitWorkspaceRootTerminalSession: (
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     terminalSessionId: string,
-    options?: AppNavigationOptions,
-  ) => Promise<boolean>
-  commitWorkspacePaneRoute: (
-    workspaceId: WorkspaceId,
-    branch: string,
-    route: WorkspacePaneRouteTarget,
     options?: AppNavigationOptions,
   ) => Promise<boolean>
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined

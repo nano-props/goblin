@@ -13,7 +13,7 @@ import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import {
   commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneCurrentTargetRoute,
@@ -73,7 +73,7 @@ interface WorkspacePaneTerminalRuntimeCommandOptionsBase {
   workspaceId: WorkspaceId | null
   routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation & CreatedTerminalNavigation
+  navigation: FilesystemWorkspacePaneRouteCommitActions & CreatedTerminalNavigation
   t?: TerminalCreateTranslator
 }
 
@@ -180,7 +180,7 @@ async function showTerminalRuntimeTab(
   routeTarget: WorkspacePaneTabsTarget,
   filesystemTarget: WorkspacePaneFilesystemTarget | null | undefined,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  navigation: WorkspacePaneTabControllerCommitNavigation,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   routeRequest: ExistingTerminalPresentationRouteRequest,
 ): Promise<boolean> {
   if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)

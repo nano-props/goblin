@@ -1,6 +1,6 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { WorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
@@ -19,8 +19,6 @@ import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-
-export type WorkspacePaneDestinationNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
 
 export interface WorkspacePaneDestinationPresentation {
   generation: AppNavigationGeneration
@@ -47,7 +45,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   workspaceId: WorkspaceId
   branchName: string
   route: WorkspacePaneRouteTarget
-  navigation: WorkspacePaneDestinationNavigation
+  navigation: WorkspacePaneRouteCommitActions
   options?: { replace?: boolean }
 }): Promise<WorkspacePaneActionOutcome> {
   const lease = resolveWorkspacePaneDestinationTargetLease(input.workspaceId, input.branchName)
@@ -77,7 +75,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
 export async function commitWorkspacePaneDestinationRoute(
   presentation: WorkspacePaneDestinationPresentation,
   route: WorkspacePaneRouteTarget,
-  navigation: WorkspacePaneDestinationNavigation,
+  navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean },
 ): Promise<WorkspacePaneActionOutcome> {
   if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }

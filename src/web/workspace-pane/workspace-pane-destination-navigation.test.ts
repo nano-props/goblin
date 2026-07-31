@@ -11,8 +11,8 @@ import {
   commitWorkspacePaneDestinationRoute,
   dispatchWorkspacePaneDestinationRoute,
   resetWorkspacePaneDestinationPresentationForTest,
-  type WorkspacePaneDestinationNavigation,
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
+import type { WorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -284,7 +284,7 @@ function beginPresentation(branchName: string) {
 }
 
 function acceptedRouteCommit() {
-  return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
+  return vi.fn<WorkspacePaneRouteCommitActions['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       if (!options?.navigationGeneration || appNavigationIsCurrent(options.navigationGeneration)) {
         options?.onCommit?.()
@@ -296,7 +296,7 @@ function acceptedRouteCommit() {
 
 function deferredRouteCommit(completion: Promise<boolean>) {
   const started = Promise.withResolvers<void>()
-  const commit = vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
+  const commit = vi.fn<WorkspacePaneRouteCommitActions['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       started.resolve()
       const accepted = await completion

@@ -38,7 +38,7 @@ import {
   type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
-import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -817,7 +817,7 @@ function navigationWithStoreActions(
     state.setWorkspacePaneTab(workspaceId, branch, tab)
     return true
   },
-): WorkspacePaneTabControllerCommitNavigation {
+): FilesystemWorkspacePaneRouteCommitActions {
   seedInitialObservedWorkspacePaneRouteForTest()
   return {
     commitWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({

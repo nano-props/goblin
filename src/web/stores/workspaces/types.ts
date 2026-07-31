@@ -255,13 +255,15 @@ export interface WorkspaceMembershipActions {
   retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>
 }
 
-export interface WorkspaceLifecycleActions extends WorkspaceMembershipActions {
+export interface WorkspaceRuntimeRestoreActions {
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: WorkspaceHydrationOptions,
   ) => Promise<void>
   promoteRestoredWorkspace: (result: WorkspaceTabsRestoreResult) => boolean
 }
+
+export interface WorkspaceLifecycleActions extends WorkspaceMembershipActions, WorkspaceRuntimeRestoreActions {}
 
 export interface WorkspacePanePreferenceActions {
   /** Updates the selected target's workspace pane tab type. The store does not project

@@ -7,8 +7,8 @@ import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-provide
 import {
   commitWorkspacePaneCurrentTargetRoute,
   selectWorkspacePaneControllerTab,
-  type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import {
   beginWorkspacePaneDestinationPresentation,
   commitWorkspacePaneDestinationRoute,
@@ -54,7 +54,7 @@ export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   worktreeHead?: GitHead
   type: WorkspacePaneStaticTabType
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation
+  navigation: FilesystemWorkspacePaneRouteCommitActions
 }
 
 /** Opens and presents a static tab as one target-scoped transaction. */
@@ -130,7 +130,7 @@ export interface OpenWorkspacePaneStaticTabActionOptions {
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation
+  navigation: FilesystemWorkspacePaneRouteCommitActions
 }
 
 export interface ShowWorkspacePaneStaticTabActionOptions {
@@ -138,7 +138,7 @@ export interface ShowWorkspacePaneStaticTabActionOptions {
   branchName: string | null
   type: WorkspacePaneStaticTabType
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerCommitNavigation
+  navigation: FilesystemWorkspacePaneRouteCommitActions
 }
 
 type WorkspacePaneStaticTabPlacement =
@@ -322,7 +322,7 @@ async function commitWorkspacePaneStaticTab(
     branchName: string
     worktreePath: string | null
     type: WorkspacePaneStaticTabType
-    navigation: WorkspacePaneTabControllerCommitNavigation
+    navigation: FilesystemWorkspacePaneRouteCommitActions
   },
   sourceRoute: ParsedWorkspacePaneRoute | null | undefined,
   transaction: WorkspacePaneStaticTabRouteTransaction,
