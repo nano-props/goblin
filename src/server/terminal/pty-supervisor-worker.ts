@@ -232,9 +232,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     this.shuttingDown = true
     const worker = this.worker
     this.worker = null
-    this.failPendingSpawns('PTY worker stopped')
-    this.settlePendingWrites({ status: 'indeterminate' })
-    this.settlePendingResizes(false)
+    this.failPendingRequests('PTY worker stopped')
     // Drop all event ownership — the runtime that owns us has already
     // called ptySupervisor.shutdown and is closing its own sessions.
     for (const ownership of this.sessions.values()) {
@@ -507,15 +505,19 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       },
       'PTY worker transport lost',
     )
-    this.failPendingSpawns(pendingSpawnMessage)
-    this.settlePendingWrites({ status: 'indeterminate' })
-    this.settlePendingResizes(false)
+    this.failPendingRequests(pendingSpawnMessage)
     this.failSessionListenersOnWorkerExit()
     if (kind !== 'exit') {
       try {
         worker.kill()
       } catch {}
     }
+  }
+
+  private failPendingRequests(pendingSpawnMessage: string): void {
+    this.failPendingSpawns(pendingSpawnMessage)
+    this.settlePendingWrites({ status: 'indeterminate' })
+    this.settlePendingResizes(false)
   }
 
   private failSessionListenersOnWorkerExit(): void {
