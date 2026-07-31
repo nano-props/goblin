@@ -112,8 +112,8 @@ function menuItemByText(text: string) {
   return screen.getByRole('menuitem', { name: text })
 }
 
-function ExpandedComposerForTest({ historyEntries }: { historyEntries: readonly string[] }) {
-  const [draft, setDraft] = useState('')
+function ExpandedComposerForTest({ historyEntries, initialDraft }: { historyEntries: readonly string[]; initialDraft: string }) {
+  const [draft, setDraft] = useState(initialDraft)
   return (
     <TerminalComposer
       labels={LABELS}
@@ -141,8 +141,8 @@ function ExpandedComposerForTest({ historyEntries }: { historyEntries: readonly 
   )
 }
 
-function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = []) {
-  return <ExpandedComposerForTest key={sessionId} historyEntries={historyEntries} />
+function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = [], draft = '') {
+  return <ExpandedComposerForTest key={sessionId} historyEntries={historyEntries} initialDraft={draft} />
 }
 
 describe('TerminalComposer', () => {
@@ -161,7 +161,7 @@ describe('TerminalComposer', () => {
     expect(document.activeElement).toBe(buttonByAccessibleName(container, 'terminal focus owner'))
   })
 
-  test('resets mounted draft and history cursor when the keyed session changes', () => {
+  test('uses the session-provided draft when the keyed session changes', () => {
     const { container, rerender } = renderInJsdom(expandedComposerForTest('session-one', ['old command']))
     const firstInput = within(container).getByRole<HTMLTextAreaElement>('textbox', {
       name: LABELS.inputPlaceholder,
@@ -170,15 +170,13 @@ describe('TerminalComposer', () => {
     expect(firstInput.value).toBe('old command')
     fireEvent.change(firstInput, { target: { value: 'session-one draft' } })
 
-    rerender(expandedComposerForTest('session-two', ['other command']))
+    rerender(expandedComposerForTest('session-two', ['other command'], 'session-two draft'))
 
     const secondInput = within(container).getByRole<HTMLTextAreaElement>('textbox', {
       name: LABELS.inputPlaceholder,
     })
     expect(secondInput).not.toBe(firstInput)
-    expect(secondInput.value).toBe('')
-    fireEvent.keyDown(secondInput, { key: 'ArrowUp' })
-    expect(secondInput.value).toBe('other command')
+    expect(secondInput.value).toBe('session-two draft')
   })
 
   test('applies supplied history entries during commit before later layout observers', () => {
