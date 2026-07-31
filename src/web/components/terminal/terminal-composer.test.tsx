@@ -112,7 +112,13 @@ function menuItemByText(text: string) {
   return screen.getByRole('menuitem', { name: text })
 }
 
-function ExpandedComposerForTest({ historyEntries, initialDraft }: { historyEntries: readonly string[]; initialDraft: string }) {
+function ExpandedComposerForTest({
+  historyEntries,
+  initialDraft,
+}: {
+  historyEntries: readonly string[]
+  initialDraft: string
+}) {
   const [draft, setDraft] = useState(initialDraft)
   return (
     <TerminalComposer

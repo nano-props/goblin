@@ -316,6 +316,7 @@ describe('main repo ipc cancellation', () => {
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      branchViewModeByWorkspace: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByFilesystemTargetByWorkspace: {},
     }
@@ -335,6 +336,7 @@ describe('main repo ipc cancellation', () => {
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+      branchViewModeByWorkspace: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByFilesystemTargetByWorkspace: {},
     })

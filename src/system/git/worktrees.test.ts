@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createWorktree, readWorktreeMembership, removeWorktree } from '#/system/git/worktrees.ts'
+import type * as GitExecModule from '#/system/git/git-exec.ts'
 
 const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
 const gitMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
+  const actual = await vi.importActual<typeof GitExecModule>('#/system/git/git-exec.ts')
   return {
     ...actual,
     git: gitMock,

@@ -26,6 +26,7 @@
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "check:no-html-injection": "bun scripts/check-no-html-injection.ts",
     "check:type-assertions": "bun scripts/check-type-assertions.ts",
+    "check:inline-type-imports": "bun scripts/check-inline-type-imports.ts",
     "check": "bun run typecheck && bun run format:check",
     "typecheck": "bun scripts/typecheck.ts",
     "test": "vitest run",

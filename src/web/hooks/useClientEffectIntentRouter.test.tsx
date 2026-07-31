@@ -52,6 +52,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import type * as SettingsActionsModule from '#/web/settings-actions.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -61,7 +62,7 @@ const appDataClientMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/settings-actions.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/settings-actions.ts')>('#/web/settings-actions.ts')
+  const actual = await vi.importActual<typeof SettingsActionsModule>('#/web/settings-actions.ts')
   return {
     ...actual,
     clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,

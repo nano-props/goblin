@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type * as ExecaModule from 'execa'
+import type * as GitRemoteModule from '#/system/git/remote.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', async () => {
-  const actual = await vi.importActual<typeof import('execa')>('execa')
+  const actual = await vi.importActual<typeof ExecaModule>('execa')
   return { ...actual, execa: execaMock }
 })
 
@@ -70,7 +72,7 @@ describe('GitHub repo reference parsing', () => {
   test('prefers the branch upstream GitHub remote over origin', async () => {
     vi.resetModules()
     vi.doMock('#/system/git/remote.ts', async () => {
-      const actual = await vi.importActual<typeof import('#/system/git/remote.ts')>('#/system/git/remote.ts')
+      const actual = await vi.importActual<typeof GitRemoteModule>('#/system/git/remote.ts')
       return {
         ...actual,
         getRemotes: vi.fn().mockResolvedValue([
@@ -92,7 +94,7 @@ describe('GitHub repo reference parsing', () => {
   test('falls back to origin when the selected upstream is not a GitHub remote', async () => {
     vi.resetModules()
     vi.doMock('#/system/git/remote.ts', async () => {
-      const actual = await vi.importActual<typeof import('#/system/git/remote.ts')>('#/system/git/remote.ts')
+      const actual = await vi.importActual<typeof GitRemoteModule>('#/system/git/remote.ts')
       return {
         ...actual,
         getRemotes: vi.fn().mockResolvedValue([

@@ -11,12 +11,13 @@ import {
   pullBranch,
 } from '#/system/git/remote.ts'
 import type { BrowserRemoteProvider, GitRemoteInfo } from '#/shared/git-types.ts'
+import type * as GitExecModule from '#/system/git/git-exec.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
 const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
+  const actual = await vi.importActual<typeof GitExecModule>('#/system/git/git-exec.ts')
   return {
     ...actual,
     git: vi.fn((cwd: string, args: string[], options?: unknown) => gitMock(cwd, args, options)),

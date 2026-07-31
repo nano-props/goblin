@@ -27,6 +27,7 @@ import {
 } from '#/shared/workspace-pane-runtime.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type * as PhysicalWorktreeIdentityResolverModule from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 // No library test double spans node-pty, realtime sockets, runtime membership, and durable pane layout.
 // Keep that integration fixture shared while each suite owns one observable runtime behavior.
@@ -114,8 +115,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
 export const resolveRemoteTargetMock = vi.mocked(resolveRemoteTarget)
 
 vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
+  const original = await importOriginal<typeof PhysicalWorktreeIdentityResolverModule>()
   class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
     issue(input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) {
       const remote = input.workspaceId.startsWith('goblin+ssh://')

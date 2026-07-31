@@ -212,6 +212,10 @@ capabilities needed by the behavior suites.
   mocks between the `vi.mock(...)` factory and the test body. Module
   scope variables do not work because the factory runs before module
   evaluation.
+- When `vi.importActual` or `importOriginal` needs a module namespace type,
+  declare it with a top-level type-only namespace import and pass
+  `typeof ModuleName` to the helper. Do not use `typeof import('…')`; the
+  repository-wide inline-type-import check covers tests and test utilities.
 
 ## 7. Timers
 

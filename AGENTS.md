@@ -13,7 +13,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 
 - Pin new package versions exactly in `package.json`; no range prefixes.
 - Use repo-alias imports with explicit `.ts`/`.tsx` extensions. Import canonical modules directly; do not add re-export shims.
-- Do not use inline imports unless they are genuinely required. Type dependencies must use a top-level `import type`, never `import('…').Type`. Runtime `import('…')` is allowed only for a concrete lazy-loading, optional-dependency, or proven circular-dependency boundary; keep it local to that boundary and document the reason when it is not self-evident.
+- Do not use inline imports unless they are genuinely required. Type dependencies must use a top-level `import type`, never `import('…').Type` or `typeof import('…')`. Runtime `import('…')` is allowed only for a concrete lazy-loading or optional-dependency boundary; keep it local and document the reason when it is not self-evident. Treat circular dependencies as architectural defects by default: refactor to break the cycle, and use a runtime import only as a last resort with an explicit explanation of why immediate refactoring is not viable.
 - Verify with `bun run typecheck` and `bun run test` (`bun run test:watch` for watch mode). Never use `bun test` directly — it bypasses the project's test config and guards.
 - For detailed testing conventions (helpers, library policy, anti-patterns), follow `docs/testing.md`.
 - Keep examples, tests, docs, and snapshots privacy-safe: use generic placeholders, not real users, paths, emails, tokens, or internal identifiers.

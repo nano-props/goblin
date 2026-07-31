@@ -2,13 +2,14 @@ import { mkdtempDisposableSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import type * as NodeFsModule from 'node:fs'
 
 const execaMock = vi.hoisted(() => vi.fn())
 vi.mock('execa', () => ({ execa: execaMock }))
 
 const existsSyncMock = vi.hoisted(() => vi.fn())
 vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  const actual = await vi.importActual<typeof NodeFsModule>('node:fs')
   return { ...actual, existsSync: existsSyncMock }
 })
 

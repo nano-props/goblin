@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import type * as ExecaModule from 'execa'
 
 const execaMock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', async () => {
-  const actual = await vi.importActual<typeof import('execa')>('execa')
+  const actual = await vi.importActual<typeof ExecaModule>('execa')
   return { ...actual, execa: execaMock }
 })
 
