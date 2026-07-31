@@ -73,10 +73,6 @@ export class TerminalSessionState {
     return this.runtimeState.processName
   }
 
-  getCanonicalTitle(): string | null {
-    return this.runtimeState.canonicalTitle
-  }
-
   getSearchResult(): TerminalSearchResult | null {
     return this.transientViewState.searchResult
   }
@@ -174,21 +170,6 @@ export class TerminalSessionState {
     return true
   }
 
-  applyOpenResult(input: {
-    phase?: TerminalSessionPhase
-    message?: string | null
-    processName: string
-    canonicalTitle?: string | null
-    identityRevision: number
-    role: TerminalControllerViewModel['role']
-    controllerStatus: TerminalControllerViewModel['controllerStatus']
-    canonicalSize: { cols: number; rows: number } | null
-  }): boolean {
-    let changed = this.establishIdentity(input)
-    changed = this.applyRuntimeMetadata(input) || changed
-    return changed
-  }
-
   establishIdentity(input: TerminalIdentityStateInput): boolean {
     assertValidIdentityRevision(input.identityRevision)
     this.runtimeState.identityRevision = input.identityRevision
@@ -225,9 +206,7 @@ export class TerminalSessionState {
   }
 
   setCanonicalSize(next: { cols: number; rows: number } | null): boolean {
-    const current = this.runtimeState.canonicalSize
-    if (current === null && next === null) return false
-    if (current !== null && next !== null && current.cols === next.cols && current.rows === next.rows) return false
+    if (sameTerminalCanonicalSize(this.runtimeState.canonicalSize, next)) return false
     this.runtimeState.canonicalSize = next
     return true
   }
