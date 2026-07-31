@@ -70,7 +70,6 @@ export function CurrentWorkspaceToolbarButton({
         onClick: () => onActivate(workspace.id),
         onKeyDown: (event) => handleWorkspaceKeyboardNavigation(event, workspace.id, onKeyboardNavigate),
       }}
-      closeButton={false}
       // justify-between pushes the chevron to the trailing edge so
       // the tab reads as a dropdown button rather than a label
       // followed by an ornament; the inner span groups the leading

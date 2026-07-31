@@ -7,7 +7,7 @@ import { Separator } from '#/web/components/ui/separator.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
-import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
+import { ToolbarClosableTab, type ToolbarTabClose } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
@@ -221,6 +221,24 @@ interface WorkspacePaneTabChromeProps extends Omit<WorkspacePaneTabProps, 'focus
   buttonProps?: ComponentPropsWithoutRef<'button'>
 }
 
+function workspacePaneTabCloseProps(
+  item: WorkspacePaneTabItem,
+  compact: boolean,
+  isActive: boolean,
+  interactionDisabled: boolean,
+  onClose: (event: MouseEvent, identity: string) => void,
+): ToolbarTabClose | undefined {
+  if (compact) return undefined
+  if (isPendingWorkspacePaneTabItem(item) || item.closable === false) return { kind: 'placeholder' }
+  return {
+    kind: 'action',
+    label: item.closeLabel,
+    visible: isActive,
+    disabled: interactionDisabled,
+    onClose: (event) => onClose(event, item.identity),
+  }
+}
+
 function WorkspacePaneTabChrome({
   item,
   isActive,
@@ -245,15 +263,7 @@ function WorkspacePaneTabChrome({
   const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps =
-    isPendingWorkspacePaneTabItem(item) || item.closable === false
-      ? ({ closeButton: 'placeholder' } as const)
-      : ({
-          closeLabel: item.closeLabel,
-          closeVisible: compact || isActive,
-          closeDisabled: interactionDisabled,
-          onClose: (event: MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
-        } as const)
+  const closeProps = workspacePaneTabCloseProps(item, compact, isActive, interactionDisabled, onClose)
   const collectionAria =
     index !== undefined && total !== undefined ? { 'aria-posinset': index + 1, 'aria-setsize': total } : {}
   return (
@@ -298,7 +308,7 @@ function WorkspacePaneTabChrome({
         onClick: () => onSelect(item.identity),
         onKeyDown: (event) => onKeyDown(event, item.identity),
       }}
-      {...closeProps}
+      close={closeProps}
     >
       <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
       <WorkspacePaneTabTitle item={item} />

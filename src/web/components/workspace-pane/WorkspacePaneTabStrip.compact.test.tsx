@@ -302,10 +302,11 @@ describe('WorkspacePaneTabStrip compact', () => {
     // right-edge separator between this tab and the popover button.
     expect(compactTab?.className).not.toContain('bg-selected')
     expect(compactTab?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
-    // Compact UI has no reliable hover affordance, so close stays visible.
+    // Compact UI delegates closing to the adjacent tab switcher, leaving the
+    // selected tab's full trailing width available to its title.
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
-    expect(compactCloseButton?.className).toContain('opacity-100')
-    expect(compactCloseButton?.className).not.toContain('group-hover:opacity-100')
+    expect(compactCloseButton).toBeNull()
+    expect(compactTab?.querySelector('[data-toolbar-tab-close-placeholder]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
 
     rerender(
@@ -328,7 +329,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).toBeNull()
   })
 
-  test('keeps the compact tab visually unselected even when its panel is active', () => {
+  test('keeps the compact tab visually unselected and free of close chrome when its panel is active', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -349,15 +350,15 @@ describe('WorkspacePaneTabStrip compact', () => {
 
     const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
     // The active panel makes isActive=true, while compact chrome remains muted
-    // and its non-hover close affordance stays visible.
+    // and leaves closing to the adjacent tab switcher.
     expect(compactTab?.className).not.toContain('bg-selected')
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
-    expect(compactCloseButton?.className).toContain('opacity-100')
-    expect(compactCloseButton?.className).not.toContain('group-hover:opacity-100')
+    expect(compactCloseButton).toBeNull()
+    expect(compactTab?.querySelector('[data-toolbar-tab-close-placeholder]')).toBeNull()
   })
 
-  test('focuses the next compact tab after closing the active tab', async () => {
-    function CompactCloseFocusHarness() {
+  test('closes the active compact tab through the tab switcher', async () => {
+    function CompactCloseHarness() {
       const [sessions, setSessions] = useState([
         session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
         session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
@@ -388,8 +389,16 @@ describe('WorkspacePaneTabStrip compact', () => {
       )
     }
 
-    render(<CompactCloseFocusHarness />)
-    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-1"]')
+    render(<CompactCloseHarness />)
+    const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
+    expect(compactTab?.querySelector('button[aria-label="close term-1"]')).toBeNull()
+
+    const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
+    openCompactSwitcher(trigger)
+
+    const list = document.body.querySelector('[role="list"]')
+    const closeButton = list?.querySelector<HTMLButtonElement>('button[aria-label="close term-1"]')
     expect(closeButton).not.toBeNull()
 
     act(() => {
@@ -397,6 +406,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     })
     await flushTimers()
 
+    expect(compactTab?.textContent).toContain('term-2')
     expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab')
     expect(document.activeElement?.textContent).toContain('term-2')
   })
