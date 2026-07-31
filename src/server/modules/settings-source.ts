@@ -73,10 +73,6 @@ function requireCommandValue<T>(value: unknown, valid: (candidate: unknown) => c
   return value
 }
 
-function defaultWorkspace(): ServerWorkspaceState {
-  return defaultServerWorkspaceState()
-}
-
 function cloneWorkspaceSettings(workspaceSettings: readonly WorkspaceSettingsEntry[]): WorkspaceSettingsEntry[] {
   return workspaceSettings.map((entry) => ({
     workspaceId: entry.workspaceId,
@@ -114,14 +110,10 @@ async function readUserSettingsFile(): Promise<UserSettingsReadOutcome> {
   return { kind: 'current', data: current, needsRewrite: !isDeepStrictEqual(current, raw) }
 }
 
-async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
-  await writeUserSettingsJson(data)
-}
-
 function defaultUserSettingsData(): UserSettingsData {
   return {
     ...defaultUserSettings(),
-    workspace: defaultWorkspace(),
+    workspace: defaultServerWorkspaceState(),
     recentWorkspaces: [],
     workspaceSettings: [],
   }
@@ -134,10 +126,10 @@ async function loadUserSettings(): Promise<UserSettingsData> {
     let data: UserSettingsData
     if (persisted.kind === 'current') {
       data = persisted.data
-      if (persisted.needsRewrite) await writeUserSettingsFile(data)
+      if (persisted.needsRewrite) await writeUserSettingsJson(data)
     } else {
       data = defaultUserSettingsData()
-      await writeUserSettingsFile(data)
+      await writeUserSettingsJson(data)
     }
     settingsData = data
     return data
@@ -169,7 +161,7 @@ async function mutateUserSettings<T>(
       const current = await loadUserSettings()
       const commit = await mutation(current)
       if (commit.changed !== false) {
-        await writeUserSettingsFile(commit.next)
+        await writeUserSettingsJson(commit.next)
         settingsData = commit.next
         settingsLoadPromise = Promise.resolve(commit.next)
         invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
