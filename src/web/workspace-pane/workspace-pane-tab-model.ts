@@ -41,6 +41,7 @@ import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace
 import {
   gitWorktreeFilesystemExecutionTarget,
   workspaceRootFilesystemExecutionTarget,
+  type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import {
   workspacePaneRuntimeTabTargetKeyByType,
@@ -201,16 +202,16 @@ export interface WorkspacePaneTabModelInput {
 
 export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
   const worktreePath = paneTargetFilesystemPath(input.paneTarget)
-  const filesystemTarget =
-    input.paneTarget.kind === 'workspace-root'
-      ? workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
-      : input.paneTarget.kind === 'git-worktree'
-        ? gitWorktreeFilesystemExecutionTarget(
-            input.workspaceId,
-            input.workspaceRuntimeId,
-            input.paneTarget.worktreePath,
-          )
-        : null
+  let filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null = null
+  if (input.paneTarget.kind === 'workspace-root') {
+    filesystemTarget = workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
+  } else if (input.paneTarget.kind === 'git-worktree') {
+    filesystemTarget = gitWorktreeFilesystemExecutionTarget(
+      input.workspaceId,
+      input.workspaceRuntimeId,
+      input.paneTarget.worktreePath,
+    )
+  }
   const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
   const normalizedTabEntries =
     input.paneTarget.kind === 'inactive'
@@ -396,12 +397,12 @@ function materializedWorkspacePaneTabs(input: {
   const tabs: WorkspacePaneMaterializedTab[] = []
 
   for (const entry of input.tabEntries) {
-    if (!isWorkspacePaneRuntimeTabEntry(entry)) {
-      if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
+    const runtimeEntry = isWorkspacePaneRuntimeTabEntry(entry)
+    if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
+    if (!runtimeEntry) {
       tabs.push(staticWorkspacePaneTab(entry.type))
       continue
     }
-    if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
     const identity = runtimeTabEntryIdentity(entry)
     const runtimeView = runtimeViewByIdentity.get(identity)
     if (!runtimeView || seenRuntimeTabs.has(identity)) continue
