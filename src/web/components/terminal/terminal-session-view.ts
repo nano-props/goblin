@@ -79,15 +79,15 @@ export class TerminalSessionView {
 
   detach(host: HTMLElement): boolean {
     if (this.host !== host) return false
-    this.host = null
-    this.markPresentationPending()
-    this.blurIfFocused()
-    this.disconnectResizeObserver()
-    this.frame.remove()
+    this.removeFrameFromHost()
     return true
   }
 
   disposeFrame(): void {
+    this.removeFrameFromHost()
+  }
+
+  private removeFrameFromHost(): void {
     this.host = null
     this.markPresentationPending()
     this.blurIfFocused()
@@ -267,8 +267,7 @@ export class TerminalSessionView {
     for (const disposable of this.disposables.splice(0)) disposable.dispose()
     this.disposeThemeObserver?.()
     this.disposeThemeObserver = null
-    this.disposeFontObserver?.()
-    this.disposeFontObserver = null
+    this.stopObservingFonts()
     this.safariShiftKeyResolver.reset()
     this.fitAddon = null
     this.searchAddon = null
@@ -382,8 +381,7 @@ export class TerminalSessionView {
   }
 
   private installFontObserver(term: XTermTerminal): void {
-    this.disposeFontObserver?.()
-    this.disposeFontObserver = null
+    this.stopObservingFonts()
     const fonts = document.fonts
     if (!fonts) return
     const refit = () => {
@@ -394,6 +392,11 @@ export class TerminalSessionView {
     this.disposeFontObserver = () => {
       fonts.removeEventListener?.('loadingdone', refit)
     }
+  }
+
+  private stopObservingFonts(): void {
+    this.disposeFontObserver?.()
+    this.disposeFontObserver = null
   }
 
   private disconnectResizeObserver(): void {
