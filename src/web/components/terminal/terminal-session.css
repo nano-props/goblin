@@ -17,6 +17,7 @@
   --goblin-terminal-composer-key-size: 40px;
   --goblin-terminal-composer-key-gap: 4px;
   --goblin-terminal-composer-max-width: 800px;
+  --goblin-terminal-composer-keyboard-offset: 0px;
 }
 
 .goblin-terminal-session__host {
@@ -331,7 +332,7 @@
 .goblin-terminal-composer--floating {
   position: absolute;
   right: var(--goblin-terminal-float-offset);
-  bottom: var(--goblin-terminal-float-offset);
+  bottom: calc(var(--goblin-terminal-float-offset) + var(--goblin-terminal-composer-keyboard-offset));
   z-index: 2;
 }
 

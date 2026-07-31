@@ -27,6 +27,64 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
+  test('keeps the floating composer above the mobile visual viewport', async () => {
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+    const visualViewport = new EventTarget()
+    Object.defineProperties(visualViewport, {
+      height: { configurable: true, value: 500 },
+      offsetTop: { configurable: true, value: 0 },
+    })
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
+    const rendered = await renderTerminalSession()
+
+    try {
+      const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
+      const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
+      if (!session || !composer) throw new Error('expected terminal session with a floating composer')
+      vi.spyOn(session, 'getBoundingClientRect').mockReturnValue({
+        bottom: 800,
+        height: 800,
+        left: 0,
+        right: 400,
+        top: 0,
+        width: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
+
+      act(() => visualViewport.dispatchEvent(new Event('resize')))
+      await vi.waitFor(() =>
+        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px'),
+      )
+
+      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 800 })
+      act(() => visualViewport.dispatchEvent(new Event('resize')))
+      await vi.waitFor(() =>
+        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px'),
+      )
+    } finally {
+      await rendered.cleanup()
+      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
+      else Reflect.deleteProperty(window, 'visualViewport')
+    }
+  })
+
+  test('keeps the original bottom positioning when visual viewport APIs are unavailable', async () => {
+    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
+    Reflect.deleteProperty(window, 'visualViewport')
+    const rendered = await renderTerminalSession()
+
+    try {
+      const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
+      if (!composer) throw new Error('expected a floating composer')
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('')
+    } finally {
+      await rendered.cleanup()
+      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
+    }
+  })
+
   test('opens with the exact terminal shortcut, closes search, focuses the control, and collapses on Escape', async () => {
     const user = userEvent.setup()
     const handoffOrder: string[] = []
