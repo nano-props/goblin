@@ -95,7 +95,9 @@ export function admissionRecords(
       currentCapability: null,
       indexedLeases: [],
     }
-    // Capabilities for one stable identity converge on the latest capture.
+    // Admission lease keys are derived from the stable physical identity.
+    // Repeated captures therefore represent the same admission target; retain
+    // the latest execution capability for that identity.
     record.currentCapability = capability
     byStableIdentity.set(key, record)
   }

@@ -62,7 +62,7 @@ describe('workspace pane physical admission policy', () => {
     ])
   })
 
-  test('uses the latest current capability for one stable physical identity', () => {
+  test('collapses repeated captures of one admission identity to the latest capability', () => {
     const identity = testPhysicalWorktreeIdentity('/workspace/a')
     const first = issueTestPhysicalWorktreeExecutionCapability({ identity })
     const second = issueTestPhysicalWorktreeExecutionCapability({ identity })
