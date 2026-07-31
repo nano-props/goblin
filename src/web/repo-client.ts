@@ -15,8 +15,7 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
-import { ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
-import { decodeWith } from '#/shared/http-response-schema.ts'
+import { decodeWith, ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
 import {
   BackgroundSyncReposResponseSchema,
   CloneRepoResponseSchema,
@@ -112,8 +111,8 @@ export async function getRepoSnapshot(
   signal?: AbortSignal,
 ): Promise<RepoSnapshotResponse> {
   return await runRepoReadWithStableErrorKey(
-    async () =>
-      await postServerJson('/api/repo/snapshot', { cwd, workspaceRuntimeId }, decodeWith(RepoSnapshotResponseSchema), {
+    () =>
+      postServerJson('/api/repo/snapshot', { cwd, workspaceRuntimeId }, decodeWith(RepoSnapshotResponseSchema), {
         signal,
       }),
     signal,
@@ -127,8 +126,8 @@ export async function getRepoPullRequests(
   signal?: AbortSignal,
 ): Promise<RepoPullRequestsResponse> {
   return await runRepoReadWithStableErrorKey(
-    async () =>
-      await postServerJson(
+    () =>
+      postServerJson(
         '/api/repo/pull-requests',
         { cwd, workspaceRuntimeId, scope },
         decodeWith(RepoPullRequestsResponseSchema),
@@ -144,8 +143,8 @@ export async function getRepoWorktreeStatus(
   signal?: AbortSignal,
 ): Promise<RepoWorktreeStatusSnapshot> {
   return await runRepoReadWithStableErrorKey(
-    async () =>
-      await postServerJson(
+    () =>
+      postServerJson(
         '/api/repo/worktree-status',
         { cwd, workspaceRuntimeId },
         decodeWith(RepoWorktreeStatusResponseSchema),
