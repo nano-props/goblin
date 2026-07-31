@@ -33,7 +33,7 @@ interface ClientWorkspaceRestorationProjection {
 
 interface ClientWorkspaceBranchProjection {
   name: string
-  worktree?: { path?: string } | undefined
+  worktree?: { path?: string }
 }
 
 interface ClientWorkspaceGitTargets {
@@ -259,9 +259,14 @@ function workspacePaneTabsTargetKeyBelongsToWorkspace(
     return workspace.gitTargets?.branches.some((branch) => branch.name === target.branchName) ? target : null
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
-  return worktreePath && workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)
-    ? target
-    : null
+  return worktreePath && clientWorkspaceContainsWorktreePath(workspace, worktreePath) ? target : null
+}
+
+function clientWorkspaceContainsWorktreePath(
+  workspace: ClientWorkspaceTargetProjection,
+  worktreePath: string,
+): boolean {
+  return workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath) === true
 }
 
 function selectedTerminalSessionsForClientWorkspace(
@@ -282,7 +287,7 @@ function selectedTerminalSessionsForClientWorkspace(
     }
     const worktreePath = parseCanonicalWorkspaceLocator(parsed.executionRootId)?.path
     if (!worktreePath) continue
-    if (!workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
+    if (!clientWorkspaceContainsWorktreePath(workspace, worktreePath)) continue
     persisted[terminalFilesystemTargetKey] = terminalSessionId
   }
   return persisted
