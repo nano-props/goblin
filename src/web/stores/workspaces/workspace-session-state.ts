@@ -66,7 +66,9 @@ export function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string):
   }
   const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
   const navigationHistoryByWorkspace = { ...s.navigationHistoryByWorkspace }
+  const branchViewModeByWorkspace = { ...s.branchViewModeByWorkspace }
   delete workspaces[id]
+  delete branchViewModeByWorkspace[id]
   delete navigationHistoryByWorkspace[id]
   for (const terminalFilesystemTargetKey of Object.keys(selectedTerminalSessionIdByTerminalFilesystemTarget)) {
     const target = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)
@@ -90,6 +92,7 @@ export function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string):
           s.restoredClientWorkspaceBaseline.preferredWorkspacePaneTabByTargetByWorkspace,
           id,
         ),
+        branchViewModeByWorkspace: recordWithoutKey(s.restoredClientWorkspaceBaseline.branchViewModeByWorkspace, id),
         filetreeViewStateByFilesystemTargetByWorkspace: recordWithoutKey(
           s.restoredClientWorkspaceBaseline.filetreeViewStateByFilesystemTargetByWorkspace,
           id,
@@ -106,6 +109,7 @@ export function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string):
     selectedTerminalSessionIdByTerminalFilesystemTarget,
     tabOpenerIdentityByScope,
     navigationHistoryByWorkspace,
+    branchViewModeByWorkspace,
     workspaceOrder,
     restoredWorkspaceId,
     restoredClientWorkspaceBaseline,

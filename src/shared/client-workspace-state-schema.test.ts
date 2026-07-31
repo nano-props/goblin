@@ -18,4 +18,13 @@ describe('client workspace state JSON codec', () => {
 
     expect(() => parseClientWorkspaceStateJson(enveloped)).toThrow()
   })
+
+  test('rejects a branch view preference with a non-canonical workspace identity', () => {
+    const state = {
+      ...defaultClientWorkspaceState(),
+      branchViewModeByWorkspace: { '/tmp/repo': 'worktrees' as const },
+    }
+
+    expect(() => stringifyClientWorkspaceState(state)).toThrow()
+  })
 })

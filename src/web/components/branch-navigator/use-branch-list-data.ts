@@ -7,28 +7,30 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import {
   useRepoOperationsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repo-queries.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-mode.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
-// data queries; the store contributes only identity, UI, and operation
-// shell fields for the list.
-export type BranchListRepo = BranchActionRepo & {
-  ui: GitWorkspaceClientState['ui']
-}
+// data queries; the store contributes only identity, client preference, and
+// operation shell fields for the list.
+export type BranchListRepo = BranchActionRepo
 
-type BranchListRepoShell = Omit<BranchListRepo, 'snapshot' | 'status' | 'branchAction'> & {
+type BranchListDataRepo = BranchListRepo & { branchViewMode: BranchViewMode }
+
+type BranchListRepoShell = Omit<BranchListDataRepo, 'snapshot' | 'status' | 'branchAction'> & {
   operations: Pick<GitWorkspaceClientState['operations'], 'branchAction'>
 }
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
   'workspaceRuntimeId',
-  'ui',
+  'branchViewMode',
   'operations',
   'remoteLifecycle',
 ]
@@ -37,9 +39,7 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   if (a === b) return true
   if (!a || !b) return false
   for (const field of branchListRepoShellEqualFields) {
-    if (field === 'ui') {
-      if (a.ui.branchViewMode !== b.ui.branchViewMode) return false
-    } else if (field === 'operations') {
+    if (field === 'operations') {
       // The selector rebuilds `{ branchAction }` on every call, so the
       // wrapper reference always changes; compare the inner field
       // directly so unrelated store updates can short-circuit.
@@ -51,7 +51,7 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   return true
 }
 
-export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefined {
+export function useBranchListRepo(repoId: WorkspaceId): BranchListDataRepo | undefined {
   const repoShell = useStoreWithEqualityFn(
     useWorkspacesStore,
     (s) => {
@@ -60,9 +60,7 @@ export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefin
         ? {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
-            ui: {
-              branchViewMode: repo.capability.git.ui.branchViewMode,
-            },
+            branchViewMode: branchViewModeForWorkspace(s.branchViewModeByWorkspace, repo.id),
             operations: {
               branchAction: repo.capability.git.operations.branchAction,
             },
@@ -92,5 +90,6 @@ export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefin
       { ...repoShell, snapshot, status: statusReadModel.data?.status },
       operationsReadModel.data?.operations,
     ),
+    branchViewMode: repoShell.branchViewMode,
   }
 }

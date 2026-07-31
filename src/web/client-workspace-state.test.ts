@@ -57,6 +57,7 @@ describe('client workspace persistence', () => {
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
         'goblin+file:///repo-a\0goblin+file:///worktree': 'term-111',
       },
+      branchViewModeByWorkspace: { 'goblin+file:///repo-a': 'worktrees' },
       preferredWorkspacePaneTabByTargetByWorkspace: {
         'goblin+file:///repo-a': { 'goblin+file:///repo-a\0workspace-root': 'history' },
       },
@@ -113,6 +114,7 @@ describe('client workspace persistence', () => {
       filetreeViewStateByFilesystemTargetByWorkspace: state.filetreeViewStateByFilesystemTargetByWorkspace,
       preferredWorkspacePaneTabByTargetByWorkspace: state.preferredWorkspacePaneTabByTargetByWorkspace,
       selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
+      branchViewModeByWorkspace: state.branchViewModeByWorkspace,
       workspacePaneSize: state.workspacePaneSize,
       zenMode: state.zenMode,
       restoredWorkspaceId: state.restoredWorkspaceId,

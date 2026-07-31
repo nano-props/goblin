@@ -32,6 +32,7 @@ export function restorableWorkspaceStateFromStore(state: RestorableWorkspaceStat
     zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
     selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
+    branchViewModeByWorkspace: state.branchViewModeByWorkspace,
   }
 }
 

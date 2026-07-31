@@ -14,6 +14,7 @@ import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-gua
 import { addResolvedWorkspace, insertPlaceholderWorkspace } from '#/web/stores/workspaces/workspace-session-state.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
+import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -676,6 +677,29 @@ describe('repo lifecycle', () => {
     expect(history[REPO_B]?.current).toEqual({
       workspaceId: REPO_B,
       route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/dashboard' },
+    })
+  })
+
+  test('closeWorkspace clears only the branch view preference owned by that workspace', async () => {
+    installGoblin()
+    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [] })
+    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [] })
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_A]: repoA, [REPO_B]: repoB },
+      workspaceOrder: [REPO_A, REPO_B],
+      restoredWorkspaceId: REPO_A,
+      branchViewModeByWorkspace: { [REPO_A]: 'worktrees', [REPO_B]: 'worktrees' },
+      restoredClientWorkspaceBaseline: {
+        ...defaultClientWorkspaceState(),
+        branchViewModeByWorkspace: { [REPO_A]: 'worktrees', [REPO_B]: 'worktrees' },
+      },
+    })
+
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({ ok: true })
+
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace).toEqual({ [REPO_B]: 'worktrees' })
+    expect(useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.branchViewModeByWorkspace).toEqual({
+      [REPO_B]: 'worktrees',
     })
   })
 })

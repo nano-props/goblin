@@ -29,6 +29,7 @@ interface ClientWorkspacePersistenceInput {
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
+  branchViewModeByWorkspace: ReturnType<typeof useWorkspacesStore.getState>['branchViewModeByWorkspace']
   filetreeInteractionByScope: Parameters<
     typeof clientWorkspaceStateFromRestorableWorkspaceState
   >[0]['filetreeInteractionByScope']
@@ -42,6 +43,7 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
   const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
     (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
+  const branchViewModeByWorkspace = useWorkspacesStore((s) => s.branchViewModeByWorkspace)
   const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useWorkspacesStore((s) => s.sessionPersistenceReady)
   const sessionRestoreError = useWorkspacesStore((s) => s.sessionRestoreError)
@@ -66,6 +68,7 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
         zenMode,
         workspacePaneSize,
         selectedTerminalSessionIdByTerminalFilesystemTarget,
+        branchViewModeByWorkspace,
         filetreeInteractionByScope,
       },
       routedWorkspaceId ?? lastRoutedWorkspaceIdRef.current,
@@ -131,6 +134,7 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
     workspacePaneSize,
     zenMode,
     selectedTerminalSessionIdByTerminalFilesystemTarget,
+    branchViewModeByWorkspace,
     workspaces,
     workspacePaneTabsVersion,
     filetreeInteractionByScope,
@@ -164,6 +168,7 @@ function clientWorkspaceFromPersistenceInput(
       zenMode: input.zenMode,
       workspacePaneSize: input.workspacePaneSize,
       selectedTerminalSessionIdByTerminalFilesystemTarget: input.selectedTerminalSessionIdByTerminalFilesystemTarget,
+      branchViewModeByWorkspace: input.branchViewModeByWorkspace,
     }),
     filetreeInteractionByScope: input.filetreeInteractionByScope,
     restoredClientWorkspaceBaseline: input.restoredClientWorkspaceBaseline,

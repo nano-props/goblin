@@ -11,14 +11,14 @@
 //   unpressed → branchViewMode === 'all'       (no filter)
 // The underlying store action `setBranchViewMode` is unchanged;
 // BranchNavigator / persistence / refresh continue to read
-// `repo.ui.branchViewMode` as before.
+// The value is a restorable per-workspace client preference.
 
 import { FolderTree, ListTree, type LucideIcon } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
-import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 
 interface Props {
   value: BranchViewMode

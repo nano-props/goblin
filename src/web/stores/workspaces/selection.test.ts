@@ -122,13 +122,21 @@ beforeEach(() => {
 })
 
 describe('setBranchViewMode', () => {
-  test('persists branch view mode without retargeting branch selection', () => {
+  test('resetWorkspacesStore clears the persisted view mode map', () => {
+    seedRepo({ currentBranchName: 'feature/plain' })
+    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+
+    resetWorkspacesStore()
+
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace).toEqual({})
+  })
+
+  test('sets branch view mode for the workspace', () => {
     seedRepo({ currentBranchName: 'feature/plain' })
 
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 
   test('keeps the selected branch when it remains visible', () => {
@@ -137,7 +145,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('feature/worktree')
   })
 
@@ -147,7 +155,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('main')
   })
 
@@ -168,7 +176,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const updatedRepo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(updatedRepo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(updatedRepo!).snapshot.current).toBe('main')
     expect(
       repoPresentationFromQueryForTest(updatedRepo!).snapshot.branches.map((repoBranch) => repoBranch.name),

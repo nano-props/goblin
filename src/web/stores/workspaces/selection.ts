@@ -5,15 +5,15 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type {
-  BranchViewMode,
   GitWorkspacePreferenceActions,
   RestorableWorkspaceActions,
   WorkspacePanePreferenceActions,
   WorkspacesGet,
   WorkspacesSet,
 } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
+import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -62,6 +62,10 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
           },
         }
       })
+    },
+
+    applySessionBranchViewModes(branchViewModeByWorkspace) {
+      set({ branchViewModeByWorkspace: { ...branchViewModeByWorkspace } })
     },
 
     setZenMode(enabled: boolean) {
@@ -143,11 +147,8 @@ function createGitWorkspacePreferenceActions(set: WorkspacesSet, get: Workspaces
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       set((s) => {
         const repo = s.workspaces[id]
-        if (!repo || !isGitWorkspace(repo) || gitWorkspaceClientState(repo).ui.branchViewMode === viewMode) return s
-        return replaceWorkspaceState(s, repo, (r) => {
-          if (!isGitWorkspace(r)) return
-          gitWorkspaceClientState(r).ui.branchViewMode = viewMode
-        })
+        if (!repo || !isGitWorkspace(repo) || s.branchViewModeByWorkspace[id] === viewMode) return s
+        return { branchViewModeByWorkspace: branchViewModeByWorkspaceWith(s.branchViewModeByWorkspace, id, viewMode) }
       })
     },
 
@@ -162,6 +163,14 @@ function createGitWorkspacePreferenceActions(set: WorkspacesSet, get: Workspaces
       if (target) setWorkspacePaneTabForTarget(set, target, tab)
     },
   }
+}
+
+function branchViewModeByWorkspaceWith(
+  current: Record<string, BranchViewMode>,
+  workspaceId: string,
+  viewMode: BranchViewMode,
+): Record<string, BranchViewMode> {
+  return { ...current, [workspaceId]: viewMode }
 }
 
 export function createSelectionActions(set: WorkspacesSet, get: WorkspacesGet) {

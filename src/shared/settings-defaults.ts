@@ -29,6 +29,7 @@ export function defaultClientWorkspaceState(): ClientWorkspaceState {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+    branchViewModeByWorkspace: {},
     preferredWorkspacePaneTabByTargetByWorkspace: {},
     filetreeViewStateByFilesystemTargetByWorkspace: {},
   }

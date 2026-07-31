@@ -46,7 +46,7 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
       repo
         ? visibleBranches({
             branches: repo.snapshot.branches,
-            viewMode: repo.ui.branchViewMode,
+            viewMode: repo.branchViewMode,
           })
         : [],
     [repo],

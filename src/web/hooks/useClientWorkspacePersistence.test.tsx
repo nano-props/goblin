@@ -204,6 +204,38 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
+  test('debounces a branch view mode change even when it is the only presentation change', () => {
+    useFakeTimers()
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [
+        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
+      ],
+      currentBranchName: 'feature/a',
+    })
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+    renderInJsdom(<Harness />)
+    writePresentationMock.mockClear()
+
+    act(() => {
+      useWorkspacesStore.getState().setBranchViewMode(repo.id, 'worktrees')
+    })
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+
+    expect(writePresentationMock).toHaveBeenCalledOnce()
+    expect(writePresentationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ branchViewModeByWorkspace: { [repo.id]: 'worktrees' } }),
+    )
+  })
+
   test('flushes a pending local presentation synchronously on pagehide', () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({

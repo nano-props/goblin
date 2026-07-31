@@ -178,10 +178,12 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
   // persisted client workspace with a partially hydrated one.
   const normalizedLayout = normalizeWorkspaceSessionLayoutState(clientWorkspace)
   const restoredWorkspaceState = restoreRestorableWorkspaceStateFromClientWorkspace(clientWorkspace)
-  const { applySessionLayoutState, applySessionSelectedTerminalState } = useWorkspacesStore.getState()
+  const { applySessionLayoutState, applySessionSelectedTerminalState, applySessionBranchViewModes } =
+    useWorkspacesStore.getState()
   restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
+  applySessionBranchViewModes(restoredWorkspaceState.branchViewModeByWorkspace)
 }
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {
