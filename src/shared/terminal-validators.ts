@@ -52,27 +52,22 @@ const TERMINAL_SESSION_PHASE_VALUES = [
   'closed',
 ] satisfies TerminalSessionPhase[]
 const TerminalRuntimeSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_RUNTIME_SESSION_ID_RE))
-const TerminalClientIdSchema = v.pipe(v.string(), v.regex(TERMINAL_CLIENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
-const TerminalIdentityRevisionSchema = v.pipe(
+const TerminalNonnegativeSafeIntegerSchema = v.pipe(
   v.number(),
   v.integer(),
   v.minValue(0),
   v.maxValue(Number.MAX_SAFE_INTEGER),
 )
-const TerminalRuntimeGenerationSchema = v.pipe(
-  v.number(),
-  v.integer(),
-  v.minValue(0),
-  v.maxValue(Number.MAX_SAFE_INTEGER),
-)
+const TerminalIdentityRevisionSchema = TerminalNonnegativeSafeIntegerSchema
+const TerminalRuntimeGenerationSchema = TerminalNonnegativeSafeIntegerSchema
+const TerminalOutputSequenceSchema = TerminalNonnegativeSafeIntegerSchema
 const TerminalBoundRuntimeGenerationSchema = v.pipe(
   v.number(),
   v.integer(),
   v.minValue(1),
   v.maxValue(Number.MAX_SAFE_INTEGER),
 )
-const TerminalOutputSequenceSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER))
 const TerminalControllerSchema = v.object({
   clientId: v.string(),
   status: v.picklist(TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES),
