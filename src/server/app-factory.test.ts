@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type * as NodeFsModule from 'node:fs'
+import type * as NodeFsPromisesModule from 'node:fs/promises'
+import type * as NodeOsModule from 'node:os'
+import type * as NodePathModule from 'node:path'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -83,7 +87,7 @@ const worktreeRemovalApplicationStub = {
 // through to the real module so disk operations work in this
 // file's integration-style tests.
 vi.mock('node:fs/promises', async () => {
-  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  const actual = await vi.importActual<typeof NodeFsPromisesModule>('node:fs/promises')
   return {
     access: mocks.access,
     readFile: mocks.readFile,
@@ -100,7 +104,7 @@ vi.mock('node:fs/promises', async () => {
 // fake HTML above. Tests that don't care can rely on the catch-all
 // skipping when `existsSync` returns false.
 vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  const actual = await vi.importActual<typeof NodeFsModule>('node:fs')
   return {
     ...actual,
     existsSync: mocks.existsSync,
@@ -402,9 +406,9 @@ describe('per-sub-path body limits and auth ordering', () => {
     // point everything at a per-test scratch dir.
     const scratch = process.env['GOBLIN_SERVER_DATA_DIR']
     if (!scratch) {
-      const os = require('node:os') as typeof import('node:os')
-      const path = require('node:path') as typeof import('node:path')
-      const fs = require('node:fs') as typeof import('node:fs')
+      const os = require('node:os') as typeof NodeOsModule
+      const path = require('node:path') as typeof NodePathModule
+      const fs = require('node:fs') as typeof NodeFsModule
       const dir = path.join(os.tmpdir(), `app-factory-test-${process.pid}-${Math.random().toString(36).slice(2)}`)
       fs.mkdirSync(dir, { recursive: true })
       vi.stubEnv('GOBLIN_SERVER_DATA_DIR', dir)

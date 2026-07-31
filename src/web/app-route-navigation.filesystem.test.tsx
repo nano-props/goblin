@@ -4,11 +4,12 @@ import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-u
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { HistoryState } from '@tanstack/history'
+import type * as ReactRouterModule from '@tanstack/react-router'
 
 const routerMock = vi.hoisted(() => ({ current: null as unknown }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  const actual = await importOriginal<typeof ReactRouterModule>()
   return { ...actual, useRouter: () => routerMock.current }
 })
 

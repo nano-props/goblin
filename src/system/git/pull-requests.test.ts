@@ -8,6 +8,8 @@ import {
   resetPullRequestCachesForTests,
 } from '#/system/git/pull-requests.ts'
 import { normalizeGhPullRequest, pickPullRequest } from '#/system/git/pull-request-normalization.ts'
+import type * as GitHubGraphqlModule from '#/system/github/graphql.ts'
+import type * as GitHubQueueModule from '#/system/github/queue.ts'
 
 const execaMock = vi.hoisted(() => vi.fn())
 const canQueryGitHubHostMock = vi.hoisted(() => vi.fn())
@@ -21,7 +23,7 @@ vi.mock('#/system/github-cli.ts', () => ({
 }))
 
 vi.mock('#/system/github/graphql.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/github/graphql.ts')>('#/system/github/graphql.ts')
+  const actual = await vi.importActual<typeof GitHubGraphqlModule>('#/system/github/graphql.ts')
   return {
     ...actual,
     getGitHubRepoRef: vi.fn((cwd: string, options?: unknown) => getGitHubRepoRefMock(cwd, options)),
@@ -29,7 +31,7 @@ vi.mock('#/system/github/graphql.ts', async () => {
 })
 
 vi.mock('#/system/github/queue.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/github/queue.ts')>('#/system/github/queue.ts')
+  const actual = await vi.importActual<typeof GitHubQueueModule>('#/system/github/queue.ts')
   return {
     ...actual,
     enqueueGitHubApiRequest: (task: () => Promise<unknown>) => task(),

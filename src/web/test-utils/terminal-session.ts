@@ -24,6 +24,7 @@ import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { installTerminalThemeStyles } from '#/web/test-utils/terminal-theme.ts'
+import type * as TerminalGeometryModule from '#/web/components/terminal/terminal-geometry.ts'
 
 vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_local' }))
 
@@ -359,9 +360,7 @@ const geometryMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/components/terminal/terminal-geometry.ts')>(
-    '#/web/components/terminal/terminal-geometry.ts',
-  )
+  const actual = await vi.importActual<typeof TerminalGeometryModule>('#/web/components/terminal/terminal-geometry.ts')
   return {
     ...actual,
     preloadTerminalFont: geometryMocks.preloadTerminalFont,

@@ -1,11 +1,13 @@
 import { describe, expect, test, vi } from 'vitest'
 import { getWorktreePatch } from '#/system/git/patch.ts'
+import type * as ExecaModule from 'execa'
+import type * as GitExecModule from '#/system/git/git-exec.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
 const execaMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/system/git/git-exec.ts')>('#/system/git/git-exec.ts')
+  const actual = await vi.importActual<typeof GitExecModule>('#/system/git/git-exec.ts')
   return {
     ...actual,
     git: vi.fn((cwd: string, args: string[], options?: unknown) => gitMock(cwd, args, options)),
@@ -13,7 +15,7 @@ vi.mock('#/system/git/git-exec.ts', async () => {
 })
 
 vi.mock('execa', async () => {
-  const actual = await vi.importActual<typeof import('execa')>('execa')
+  const actual = await vi.importActual<typeof ExecaModule>('execa')
   return {
     ...actual,
     execa: vi.fn((file: string, args: string[], options?: unknown) => execaMock(file, args, options)),

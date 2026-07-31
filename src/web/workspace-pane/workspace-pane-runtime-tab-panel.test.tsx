@@ -18,6 +18,7 @@ import {
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type * as WorkspacePaneTabsQueryModule from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 stubI18n()
 
@@ -45,7 +46,7 @@ const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#/web/workspace-pane/workspace-pane-tabs-query.ts')>()),
+  ...(await importOriginal<typeof WorkspacePaneTabsQueryModule>()),
   refreshWorkspacePaneTabsQueryData: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData,
 }))
 

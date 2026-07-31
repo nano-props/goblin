@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as ServerInvalidationModule from '#/shared/server-invalidation.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
@@ -23,9 +24,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/shared/server-invalidation.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/shared/server-invalidation.ts')>(
-    '#/shared/server-invalidation.ts',
-  )
+  const actual = await vi.importActual<typeof ServerInvalidationModule>('#/shared/server-invalidation.ts')
   return {
     ...actual,
     settingsInvalidationScopesForPrefsPatch: mocks.settingsInvalidationScopesForPrefsPatch,

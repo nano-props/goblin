@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as NodeOsModule from 'node:os'
 
 const execaMock = vi.hoisted(() => vi.fn())
 let tmpHome: string
@@ -12,7 +13,7 @@ vi.mock('execa', () => ({
 }))
 
 vi.mock('node:os', async () => {
-  const actual = await vi.importActual<typeof import('node:os')>('node:os')
+  const actual = await vi.importActual<typeof NodeOsModule>('node:os')
   return {
     ...actual,
     homedir: () => tmpHome,

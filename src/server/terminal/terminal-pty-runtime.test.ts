@@ -5,6 +5,7 @@ import {
   spawnTerminalPtyRuntime as spawnTerminalPtyRuntimeWithEvents,
   type SpawnTerminalPtyRuntimeInput,
 } from '#/server/terminal/terminal-pty-runtime.ts'
+import type * as NodeOsModule from 'node:os'
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock('node-pty', () => ({
 }))
 
 vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:os')>()
+  const actual = await importOriginal<typeof NodeOsModule>()
   return {
     ...actual,
     userInfo: vi.fn(),

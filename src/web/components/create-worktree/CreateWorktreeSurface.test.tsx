@@ -13,12 +13,13 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as RepoClientModule from '#/web/repo-client.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo')
 const WORKTREE_PATH = '/tmp/goblin-repo'
 
 vi.mock('#/web/repo-client.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
+  const actual = await vi.importActual<typeof RepoClientModule>('#/web/repo-client.ts')
   return { ...actual, getRepoRemoteBranches: vi.fn() }
 })
 
