@@ -174,6 +174,15 @@ export function isMacNavigatorPlatform(platform: string): boolean {
   return /\bMac|iPhone|iPad|iPod/.test(platform)
 }
 
+/**
+ * A deliberately strict desktop gate; the broader helper above includes iOS by design.
+ * iPadOS desktop compatibility mode can report MacIntel, which navigator.platform alone
+ * cannot distinguish from macOS, so that unavoidable limitation remains local to this gate.
+ */
+export function isDesktopMacNavigatorPlatform(platform: string): boolean {
+  return /^Mac(?:Intel|PPC|68K)$/.test(platform)
+}
+
 function isSafariNavigator(): boolean {
   try {
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''

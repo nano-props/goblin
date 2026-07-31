@@ -34,7 +34,13 @@ import {
   TERMINAL_COMPOSER_COMMAND_KEYS,
   type TerminalComposerCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
-import { isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import {
+  draftOffsetToTextareaOffset,
+  planTerminalComposerEdit,
+  textareaOffsetToDraftOffset,
+  terminalComposerEditCommandForEvent,
+} from '#/web/components/terminal/terminal-composer-editing.ts'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -287,7 +293,30 @@ export function TerminalComposer({
     onDraftReplace(submittedDraft, '')
   }
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (resolvingFiles || isImeCompositionEvent(event)) return
+    if (isImeCompositionEvent(event)) return
+    const editingCommand = terminalComposerEditCommandForEvent(
+      event,
+      isDesktopMacNavigatorPlatform(globalThis.navigator?.platform ?? ''),
+    )
+    if (editingCommand) {
+      event.preventDefault()
+      if (resolvingFiles) return
+      const selectionStart = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionStart)
+      const selectionEnd = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionEnd)
+      const plan = planTerminalComposerEdit(
+        draft,
+        selectionStart,
+        selectionEnd,
+        editingCommand,
+      )
+      if (plan.start === plan.end) return
+      if (onDraftReplace(draft, plan.value)) {
+        history.leaveBrowsing()
+        pendingCaretRef.current = draftOffsetToTextareaOffset(plan.value, plan.caret)
+      }
+      return
+    }
+    if (resolvingFiles) return
     const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
     if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
