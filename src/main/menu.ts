@@ -16,6 +16,7 @@
 // rebuilds this menu on lang change).
 
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
+import { partition } from 'es-toolkit'
 import { activatePrimaryWindow, getPrimaryWindow, resetPrimaryWindow } from '#/main/window.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
@@ -33,11 +34,9 @@ import {
   resolveClientMenuCommandAccelerator,
   resolveClientMenuCommandEnabled,
   resolveClientMenuCommandIntent,
+  type ClientMenuCommandContext,
 } from '#/shared/shortcut-definitions.ts'
-import {
-  openDataFolder as runOpenDataFolder,
-  openWebVersionFromMenu as runOpenWebVersionFromMenu,
-} from '#/main/native-menu-actions.ts'
+import { openDataFolder, openWebVersionFromMenu } from '#/main/native-menu-actions.ts'
 import { platform } from '#/main/platform.ts'
 
 interface AppMenuState {
@@ -49,7 +48,6 @@ interface AppMenuState {
   langPref: LangPref
 }
 
-type AppMenuCommandContext = Record<string, never>
 type MissingWindowPolicy = 'activate' | 'ignore'
 
 const APPEARANCE_MENU_OPTIONS = [
@@ -180,12 +178,9 @@ function createRecentWorkspacesMenu(recentWorkspaces: WorkspaceSessionEntry[]): 
   if (recentWorkspaces.length === 0) return [{ label: t('menu.file.no-recent'), enabled: false }]
 
   const home = app.getPath('home')
-  const localWorkspaceItems = recentWorkspaces
-    .filter((entry) => !isRemoteWorkspaceId(entry.id))
-    .map((entry) => createRecentWorkspaceMenuItem(entry, home))
-  const remoteWorkspaceItems = recentWorkspaces
-    .filter((entry) => isRemoteWorkspaceId(entry.id))
-    .map((entry) => createRecentWorkspaceMenuItem(entry, home))
+  const [remoteWorkspaces, localWorkspaces] = partition(recentWorkspaces, (entry) => isRemoteWorkspaceId(entry.id))
+  const localWorkspaceItems = localWorkspaces.map((entry) => createRecentWorkspaceMenuItem(entry, home))
+  const remoteWorkspaceItems = remoteWorkspaces.map((entry) => createRecentWorkspaceMenuItem(entry, home))
 
   return [
     ...localWorkspaceItems,
@@ -328,7 +323,7 @@ function createClientCommandMenuItem(
   options?: { beforeIntent?: () => void; missingWindow?: MissingWindowPolicy },
 ): MenuItemConstructorOptions {
   const command = clientMenuCommandById(id)
-  const context = menuCommandContext(state)
+  const context: ClientMenuCommandContext = {}
   const resolvedAccelerator = resolveClientMenuCommandAccelerator(command, context)
   const resolvedEnabled = resolveClientMenuCommandEnabled(command, context)
   return {
@@ -340,17 +335,4 @@ function createClientCommandMenuItem(
       send(resolveClientMenuCommandIntent(command, context), options?.missingWindow)
     },
   }
-}
-
-function menuCommandContext(state: AppMenuState): AppMenuCommandContext {
-  void state
-  return {}
-}
-
-async function openWebVersionFromMenu(): Promise<void> {
-  await runOpenWebVersionFromMenu()
-}
-
-async function openDataFolder(): Promise<void> {
-  await runOpenDataFolder()
 }
