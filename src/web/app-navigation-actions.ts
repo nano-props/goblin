@@ -101,6 +101,21 @@ export function createAppNavigationActions({
   commitWorkspaceNavigation,
   routeNavigation,
 }: CreateAppNavigationActionsOptions): AppNavigationActions {
+  const traverseWorkspaceNavigation = (workspaceId: WorkspaceId, direction: 'back' | 'forward') => {
+    if (workspaceNavigationHistoryRestoreBlocked(workspaceId, direction)) return
+    const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
+    if (!canonicalWorkspaceId) return
+    const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, direction)
+    if (!traversal) return
+    restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
+      onCommit() {
+        if (!commitWorkspaceNavigation(traversal)) {
+          throw new Error('workspace navigation history changed before its route committed')
+        }
+      },
+    })
+  }
+
   return {
     currentWorkspacePaneRoute(workspaceId, branchName) {
       return routeNavigation.currentWorkspacePaneRoute(workspaceId, branchName)
@@ -151,11 +166,11 @@ export function createAppNavigationActions({
         ? routeNavigation.openWorkspaceRootTerminal(workspaceId, presentation.terminalSessionId, navigationOptions)
         : routeNavigation.openWorkspaceRootTab(workspaceId, presentation.tab, navigationOptions)
     },
-    async commitFilesystemWorkspacePaneRoute(target, route, options) {
-      return await commitFilesystemWorkspacePaneRoute(routeNavigation, target, route, options)
+    commitFilesystemWorkspacePaneRoute(target, route, options) {
+      return commitFilesystemWorkspacePaneRoute(routeNavigation, target, route, options)
     },
-    async commitWorkspaceRootTerminalSession(workspaceId, workspaceRuntimeId, terminalSessionId, options) {
-      return await commitFilesystemWorkspacePaneRoute(
+    commitWorkspaceRootTerminalSession(workspaceId, workspaceRuntimeId, terminalSessionId, options) {
+      return commitFilesystemWorkspacePaneRoute(
         routeNavigation,
         workspaceRootPaneTargetLease(workspaceId, workspaceRuntimeId),
         { kind: 'terminal', terminalSessionId },
@@ -166,32 +181,10 @@ export function createAppNavigationActions({
       return commitWorkspacePaneRoute(routeNavigation, workspaceId, branch, route, options)
     },
     goBack(workspaceId) {
-      if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'back')) return
-      const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
-      if (!canonicalWorkspaceId) return
-      const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'back')
-      if (!traversal) return
-      restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
-        onCommit() {
-          if (!commitWorkspaceNavigation(traversal)) {
-            throw new Error('workspace navigation history changed before its route committed')
-          }
-        },
-      })
+      traverseWorkspaceNavigation(workspaceId, 'back')
     },
     goForward(workspaceId) {
-      if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'forward')) return
-      const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
-      if (!canonicalWorkspaceId) return
-      const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'forward')
-      if (!traversal) return
-      restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, {
-        onCommit() {
-          if (!commitWorkspaceNavigation(traversal)) {
-            throw new Error('workspace navigation history changed before its route committed')
-          }
-        },
-      })
+      traverseWorkspaceNavigation(workspaceId, 'forward')
     },
     openSettings(page) {
       const navigationGeneration = beginAppNavigation()
