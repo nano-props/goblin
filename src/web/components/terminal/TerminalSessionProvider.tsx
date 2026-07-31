@@ -117,6 +117,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       replaceComposerDraft: projection.replaceComposerDraft,
       submitText: projection.submitText,
       takeover: projection.takeover,
+      retryRecovery: projection.retryPresentationRecovery,
       retryPresentation: projection.retryPresentation,
     }),
     [projection],

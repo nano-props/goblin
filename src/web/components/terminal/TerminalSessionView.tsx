@@ -82,6 +82,7 @@ export function TerminalSessionView({
     replaceComposerDraft,
     submitText,
     takeover,
+    retryRecovery,
     retryPresentation,
     restart,
     focusTerminal,
@@ -638,7 +639,13 @@ export function TerminalSessionView({
       {showUnownedOverlay && <AttachmentOverlay badge={t('terminal.unowned')} snapshot={snapshot} />}
       {/* Stable mount — see the constants block above for the aria-live rationale. */}
       {showStatusOverlay && <StatusOverlay label={statusOverlayLabel} />}
-      {showProjectionRecoveryFailure && <PresentationFailureOverlay label={projectionFailureLabel} />}
+      {showProjectionRecoveryFailure && (
+        <PresentationFailureOverlay
+          label={projectionFailureLabel}
+          retryLabel={t('error.try-again')}
+          onRetry={() => retryRecovery()}
+        />
+      )}
       {showPresentationFailure && (
         <PresentationFailureOverlay
           label={t('terminal.restore-failed')}

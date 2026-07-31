@@ -66,6 +66,7 @@ const projection = vi.hoisted(() => ({
   replaceComposerDraft: vi.fn(),
   submitText: vi.fn(),
   takeover: vi.fn(),
+  retryPresentationRecovery: vi.fn(),
   retryPresentation: vi.fn(),
 }))
 
@@ -271,6 +272,7 @@ describe('TerminalSessionProvider', () => {
       replaceComposerDraft: projection.replaceComposerDraft,
       submitText: projection.submitText,
       takeover: projection.takeover,
+      retryRecovery: projection.retryPresentationRecovery,
       retryPresentation: projection.retryPresentation,
     })
     expect(captured.read).toEqual({

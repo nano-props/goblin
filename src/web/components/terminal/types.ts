@@ -237,6 +237,8 @@ export interface TerminalSessionContextValue {
    */
   submitText: (terminalSessionId: string, text: string) => Promise<boolean>
   takeover: (terminalSessionId: string) => Promise<boolean>
+  /** Retries the complete authoritative membership, catalog, and presentation recovery chain. */
+  retryRecovery: () => boolean
   /** Retries only the local attach/presentation path after a stable recovery failure. */
   retryPresentation: (terminalSessionId: string) => boolean
 }

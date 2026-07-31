@@ -205,6 +205,7 @@ export class TerminalSessionProjection {
   private readonly outputActivityState = createTerminalOutputActivityState((terminalFilesystemTargetKey) =>
     this.notifyFilesystemTarget(terminalFilesystemTargetKey),
   )
+  private presentationRecoveryRetry: (() => void) | null = null
 
   constructor(
     onSelectedFilesystemTargetChange: (
@@ -218,6 +219,16 @@ export class TerminalSessionProjection {
   setRuntimeMembershipIndex(runtimeMembershipIndex: TerminalRuntimeMembershipIndex): void {
     this.runtimeMembershipIndex = runtimeMembershipIndex
     this.pruneSessionsMissingFromRuntimeMembership()
+  }
+
+  setPresentationRecoveryRetry(retry: (() => void) | null): void {
+    this.presentationRecoveryRetry = retry
+  }
+
+  retryPresentationRecovery = (): boolean => {
+    if (!this.presentationRecoveryRetry) return false
+    this.presentationRecoveryRetry()
+    return true
   }
 
   /**

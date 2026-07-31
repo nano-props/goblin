@@ -7,6 +7,7 @@ type TestTerminalSessionContextValue = Omit<
   | 'captureInputWriter'
   | 'sendVirtualKey'
   | 'submitText'
+  | 'retryRecovery'
   | 'retryPresentation'
   | 'setComposerExpanded'
   | 'setComposerMode'
@@ -20,6 +21,7 @@ type TestTerminalSessionContextValue = Omit<
       | 'captureInputWriter'
       | 'sendVirtualKey'
       | 'submitText'
+      | 'retryRecovery'
       | 'retryPresentation'
       | 'setComposerExpanded'
       | 'setComposerMode'
@@ -53,6 +55,7 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
   const submitText = context.submitText ?? unexpectedContextCapability('submitText')
+  const retryRecovery = context.retryRecovery ?? vi.fn(() => false)
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
   const setComposerExpanded = context.setComposerExpanded ?? unexpectedContextCapability('setComposerExpanded')
   const setComposerMode = context.setComposerMode ?? unexpectedContextCapability('setComposerMode')
@@ -64,6 +67,7 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     captureInputWriter,
     sendVirtualKey,
     submitText,
+    retryRecovery,
     retryPresentation,
     setComposerExpanded,
     setComposerMode,

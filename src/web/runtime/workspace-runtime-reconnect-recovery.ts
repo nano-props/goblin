@@ -12,6 +12,7 @@ export interface WorkspaceRuntimeReconnectRecoveryDependencies {
   currentWorkspaceRuntimeId: (workspaceId: WorkspaceId) => string | null
   terminalRecovery: TerminalProjectionRecoveryActions
   workspaceTabsRecovery: WorkspacePaneTabsRecoveryActions
+  beginRecovery: () => (error: unknown) => void
   logFailure: (error: unknown) => void
 }
 
@@ -25,17 +26,22 @@ export class WorkspaceRuntimeReconnectRecovery {
 
   request(): void {
     const generation = ++this.generation
-    void this.run(generation)
+    const failRecovery = this.dependencies.beginRecovery()
+    void this.run(generation, failRecovery)
   }
 
   invalidate(): void {
     this.generation += 1
   }
 
-  private async run(generation: number): Promise<void> {
+  private async run(generation: number, failRecovery: (error: unknown) => void): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
-      if (generation !== this.generation || recovery.kind === 'superseded') return
+      if (generation !== this.generation) return
+      if (recovery.kind === 'superseded') {
+        failRecovery(new Error('workspace runtime membership recovery was superseded'))
+        return
+      }
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
@@ -45,7 +51,10 @@ export class WorkspaceRuntimeReconnectRecovery {
         this.dependencies.workspaceTabsRecovery.request(scope)
       }
     } catch (error) {
-      if (generation === this.generation) this.dependencies.logFailure(error)
+      if (generation === this.generation) {
+        failRecovery(error)
+        this.dependencies.logFailure(error)
+      }
     }
   }
 }

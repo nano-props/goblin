@@ -83,6 +83,26 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
         currentWorkspaceRuntimeId: workspaceRuntimeIdForRoot,
         terminalRecovery,
         workspaceTabsRecovery,
+        beginRecovery: () => {
+          const targets = workspaceRuntimeTargets()
+          for (const target of targets) {
+            useTerminalProjectionHydrationStore
+              .getState()
+              .beginProjectionHydration(target.workspaceId, target.workspaceRuntimeId)
+          }
+          return (error) => {
+            const errorMessage = recoveryFailureMessage(error)
+            for (const target of targets) {
+              const hydration = useTerminalProjectionHydrationStore
+                .getState()
+                .hydrationByWorkspace.get(target.workspaceId)
+              if (hydration?.workspaceRuntimeId !== target.workspaceRuntimeId || hydration.phase !== 'pending') continue
+              useTerminalProjectionHydrationStore
+                .getState()
+                .markProjectionFailed(target.workspaceId, target.workspaceRuntimeId, errorMessage)
+            }
+          }
+        },
         logFailure: (error) => {
           appRuntimeProjectionLog.warn('failed to reconcile workspace runtime memberships after realtime recovery', {
             error,
@@ -91,6 +111,11 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
       }),
   )
   useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])
+
+  useEffect(() => {
+    terminalProjection.setPresentationRecoveryRetry(() => reconnectRecovery.request())
+    return () => terminalProjection.setPresentationRecoveryRetry(null)
+  }, [reconnectRecovery, terminalProjection])
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -186,4 +211,17 @@ function currentScopeForWorkspace(
 
 function workspaceRuntimeIdForRoot(workspaceId: WorkspaceId): string | null {
   return useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId ?? null
+}
+
+function workspaceRuntimeTargets(): Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }> {
+  return Object.values(useWorkspacesStore.getState().workspaces).map((workspace) => ({
+    workspaceId: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
+  }))
+}
+
+function recoveryFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return 'error.unknown'
 }
