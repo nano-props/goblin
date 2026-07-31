@@ -44,6 +44,8 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
   'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute'
 >
 export type WorkspacePaneRouteCommitNavigation = Pick<AppNavigationActions, 'commitWorkspacePaneRoute'>
+type WorkspacePaneControllerRoutePrecondition =
+  { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 
 export function workspacePaneControllerRouteForTab(tab: WorkspacePaneTab): WorkspacePaneTabControllerRoute | undefined {
   if (isWorkspacePaneRuntimeTab(tab)) {
@@ -267,7 +269,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
     navigation,
     workspacePaneTabControllerTargetIsCurrent,
     commitWorkspacePaneRouteSupplement,
-    true,
+    { routePrecondition: { kind: 'current-workspace-target' } },
     options,
     navigationGeneration,
   )
@@ -293,7 +295,7 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
         worktreePath: candidate.worktreePath,
       }),
     commitWorkspacePaneCommittedRuntimeRouteSupplement,
-    false,
+    {},
     options,
     navigationGeneration,
   )
@@ -305,7 +307,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
   navigation: WorkspacePaneRouteCommitNavigation,
   targetIsCurrent: (target: WorkspacePaneControllerTarget) => boolean,
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
-  useCurrentTargetPrecondition: boolean,
+  routeOptions: { routePrecondition?: WorkspacePaneControllerRoutePrecondition | undefined },
   options: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void } | undefined,
   navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
@@ -323,7 +325,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
     const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
       replace: options?.replace,
       navigationGeneration,
-      ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
+      ...routeOptions,
     })
     const supplementCommitted =
       committed &&
@@ -358,48 +360,16 @@ export async function commitWorkspacePaneExactTargetRoute(
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
 ): Promise<boolean> {
-  if (!appNavigationIsCurrent(navigationGeneration)) {
-    options?.onAbandon?.()
-    return false
-  }
-  const branchName = target.branchName
-  if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
-    options?.onAbandon?.()
-    return false
-  }
-  let completed = false
-  try {
-    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-      replace: options?.replace,
-      navigationGeneration,
-      routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute },
-    })
-    const supplementCommitted =
-      committed &&
-      commitWorkspacePaneRouteSupplement(
-        {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          branchName,
-          worktreePath: target.worktreePath,
-        },
-        route,
-      )
-    completed =
-      committed &&
-      supplementCommitted &&
-      appNavigationIsCurrent(navigationGeneration) &&
-      workspacePaneTabControllerTargetIsCurrent(target)
-  } catch (error) {
-    options?.onAbandon?.()
-    throw error
-  }
-  if (!completed) {
-    options?.onAbandon?.()
-    return false
-  }
-  options?.onCommit?.()
-  return true
+  return await commitWorkspacePaneValidatedTargetRoute(
+    target,
+    route,
+    navigation,
+    workspacePaneTabControllerTargetIsCurrent,
+    commitWorkspacePaneRouteSupplement,
+    { routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute } },
+    options,
+    navigationGeneration,
+  )
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
