@@ -195,6 +195,55 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
   })
 
+  test('resumes presentation from a new authoritative generation without restoring focus', async () => {
+    terminalCalls.restart.mockRejectedValueOnce(
+      new ClientRealtimeRequestError('restart response was lost', {
+        kind: 'disconnected',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+    )
+    const host = createTerminalHost()
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', { terminalRuntimeGeneration: 2, snapshot: 'new screen' }),
+    )
+
+    const settled = vi.fn()
+    session.focus({ isCurrent: () => true, onSettled: settled })
+    session.restart()
+    await flushTerminalStart()
+    expect(session.snapshot().presentationRecovery).toBe('failed')
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      identityRevision: 0,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalSize: { cols: 100, rows: 30 },
+    })
+    await flushTerminalStart()
+
+    expect(terminalCalls.restart).toHaveBeenCalledOnce()
+    expect(terminalCalls.attach).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      cols: 100,
+      rows: 30,
+    })
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
+    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
+    expect(settled).toHaveBeenCalledOnce()
+  })
+
   test('retries a failed restart from the retained generation and publishes exactly old plus one', async () => {
     terminalCalls.restart
       .mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
