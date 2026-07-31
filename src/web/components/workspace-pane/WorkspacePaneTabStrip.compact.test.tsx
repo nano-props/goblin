@@ -407,6 +407,8 @@ describe('WorkspacePaneTabStrip compact', () => {
     await flushTimers()
 
     expect(compactTab?.textContent).toContain('term-2')
+    expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab')
+    expect(document.activeElement?.textContent).toContain('term-2')
   })
 
   test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', () => {
