@@ -1,4 +1,5 @@
 import { execa, ExecaError } from 'execa'
+import { clamp } from 'es-toolkit'
 import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP } from '#/system/git/parsers.ts'
 import { GIT_UPSTREAM_FORMAT } from '#/system/git/upstream.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
@@ -250,7 +251,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'testDirectory':
       return `cd ${shellQuote(command.path)} && test -r . && pwd -P`
     case 'listDirectories': {
-      const limit = Math.max(1, Math.min(50, Math.floor(command.limit ?? 20)))
+      const limit = clamp(Math.floor(command.limit ?? 20), 1, 50)
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
@@ -337,7 +338,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {
-      const count = Math.max(1, Math.min(1000, Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT)))
+      const count = clamp(Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT), 1, 1000)
       const skip = Math.max(0, Math.floor(command.skip ?? 0))
       const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(PRETTY_FIELD_SEP)
       return [
