@@ -391,7 +391,6 @@ export function stopBackgroundSync(): void {
   state.nextTargetIndex = 0
   state.pendingScheduleGeneration = null
   state.idleDrainScheduled = false
-  state.activeFetch = null
   syncQueue.clear()
   stopBackgroundSyncJob()
   settingsInitializationGeneration += 1
@@ -471,10 +470,8 @@ function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, w
 }
 
 function clearTargetState(target: RegisteredGitBackgroundSyncTarget): void {
-  const key = backgroundSyncTargetKey(target)
-  delete state.lastFetchStartedAtByTarget[key]
-  delete state.failureCountByTarget[key]
-  delete state.backoffUntilByTarget[key]
+  delete state.lastFetchStartedAtByTarget[backgroundSyncTargetKey(target)]
+  clearTargetBackoff(target)
 }
 
 function releaseBackgroundSyncMembership(
