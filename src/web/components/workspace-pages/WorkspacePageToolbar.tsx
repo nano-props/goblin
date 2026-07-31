@@ -31,7 +31,6 @@ export function WorkspacePageToolbar({
   const backLabel = t('workspace.back-to-workspace-navigator')
   const tab = (
     <ToolbarClosableTab
-      closeButton={false}
       containerClassName={toolbarTabChromeClassName({ variant: 'workspace-pane', active: true })}
       buttonProps={{ role: 'tab', 'aria-selected': true, title: label }}
     >

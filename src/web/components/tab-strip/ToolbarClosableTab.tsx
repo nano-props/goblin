@@ -15,7 +15,17 @@ type DataAttributes = {
 type ToolbarClosableTabContainerProps = Omit<ComponentPropsWithoutRef<'div'>, 'children' | 'className'> & DataAttributes
 type ToolbarClosableTabButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'className' | 'ref'> &
   DataAttributes
-type ToolbarTabCloseEvent = ReactMouseEvent<HTMLButtonElement>
+export type ToolbarTabCloseEvent = ReactMouseEvent<HTMLButtonElement>
+
+export type ToolbarTabClose =
+  | {
+      kind: 'action'
+      label: string
+      visible: boolean
+      disabled?: boolean
+      onClose: (event: ToolbarTabCloseEvent) => void
+    }
+  | { kind: 'placeholder' }
 
 interface ToolbarClosableTabBaseProps {
   containerRef?: Ref<HTMLDivElement>
@@ -25,33 +35,11 @@ interface ToolbarClosableTabBaseProps {
   buttonRef?: Ref<HTMLButtonElement>
   buttonProps?: ToolbarClosableTabButtonProps
   buttonClassName?: string
+  close?: ToolbarTabClose
   children: ReactNode
 }
 
-type ToolbarClosableTabProps = ToolbarClosableTabBaseProps &
-  (
-    | {
-        closeLabel: string
-        closeVisible: boolean
-        closeDisabled?: boolean
-        closeButton?: true
-        onClose: (event: ToolbarTabCloseEvent) => void
-      }
-    | {
-        closeButton: 'placeholder'
-        closeLabel?: never
-        closeVisible?: never
-        closeDisabled?: never
-        onClose?: never
-      }
-    | {
-        closeButton: false
-        closeLabel?: never
-        closeVisible?: never
-        closeDisabled?: never
-        onClose?: never
-      }
-  )
+type ToolbarClosableTabProps = ToolbarClosableTabBaseProps
 
 export function ToolbarClosableTab({
   containerRef,
@@ -61,8 +49,8 @@ export function ToolbarClosableTab({
   buttonRef,
   buttonProps,
   buttonClassName,
+  close,
   children,
-  ...closeProps
 }: ToolbarClosableTabProps) {
   return (
     <div
@@ -83,14 +71,14 @@ export function ToolbarClosableTab({
       >
         {children}
       </button>
-      {closeProps.closeButton === 'placeholder' ? (
+      {close?.kind === 'placeholder' ? (
         <ToolbarTabClosePlaceholder />
-      ) : closeProps.closeButton !== false ? (
+      ) : close ? (
         <ToolbarTabCloseAction
-          label={closeProps.closeLabel}
-          visible={closeProps.closeVisible}
-          disabled={closeProps.closeDisabled ?? false}
-          onClose={closeProps.onClose}
+          label={close.label}
+          visible={close.visible}
+          disabled={close.disabled ?? false}
+          onClose={close.onClose}
         />
       ) : null}
     </div>
