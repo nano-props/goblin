@@ -1,5 +1,4 @@
 import PQueue from 'p-queue'
-import { sumBy } from 'es-toolkit'
 import {
   captureRepoWriteExecution,
   repoWriteExecutionBoundaryKey,
@@ -538,12 +537,12 @@ export function repoWriteOperationCoordinatorStatsForTests(): {
   runningOperations: number
 } {
   const runtimes = [...boundaryGroups]
-  const queues = [...new Set(runtimes.map((runtime) => runtime.queue))]
+  const queues = new Set(runtimes.map((runtime) => runtime.queue))
   return {
     boundaryRuntimes: runtimes.length,
     registeredBoundaries: boundaryGroupByDescriptor.size,
     registeredRepoIds: boundaryGroupByRepoId.size,
-    queuedOperations: sumBy(queues, (queue) => queue.size),
-    runningOperations: sumBy(queues, (queue) => queue.pending),
+    queuedOperations: [...queues].reduce((total, queue) => total + queue.size, 0),
+    runningOperations: [...queues].reduce((total, queue) => total + queue.pending, 0),
   }
 }

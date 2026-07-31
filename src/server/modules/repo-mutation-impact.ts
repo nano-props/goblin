@@ -1,4 +1,4 @@
-import { compact, uniq } from 'es-toolkit'
+import { compact } from 'es-toolkit'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -11,7 +11,7 @@ export interface RepoMutationResult extends ExecResult {
 }
 
 export function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
-  const unique = uniq(affectedRepoIds.filter((repoId) => repoId.length > 0))
+  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
   return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
 }
 

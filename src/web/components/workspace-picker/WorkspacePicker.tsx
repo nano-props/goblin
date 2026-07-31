@@ -1,6 +1,5 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
 import { ChevronDown, Download, Folder, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
-import { sumBy } from 'es-toolkit'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -229,7 +228,7 @@ export function WorkspacePicker({
   }
 
   const currentWorkspace = workspaces.find((r) => r.id === currentWorkspaceId) ?? workspaces[0] ?? null
-  const totalTerminalBellCount = sumBy(workspaces, (workspace) => workspace.terminalBellCount ?? 0)
+  const totalTerminalBellCount = workspaces.reduce((count, workspace) => count + (workspace.terminalBellCount ?? 0), 0)
 
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.workspaces}>

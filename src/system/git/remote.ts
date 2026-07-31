@@ -1,4 +1,3 @@
-import { compact } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import {
   GIT_HASH_RE,
@@ -141,12 +140,12 @@ export function browserRemote(remote: GitRemoteInfo): BrowserRemote | null {
 
 export function pickBrowserRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): BrowserRemote | null {
   return pickPreferredRemote(
-    compact(
-      remotes.map((remote) => {
+    remotes
+      .map((remote) => {
         const browser = browserRemote(remote)
         return browser ? { name: remote.name, ...browser } : null
-      }),
-    ),
+      })
+      .filter((remote): remote is { name: string } & BrowserRemote => remote !== null),
     upstream,
   )
 }
@@ -173,12 +172,10 @@ export async function getRemoteInfo(cwd: string, signal?: AbortSignal): Promise<
 
 export function repoRemoteInfoForRemotes(remotes: GitRemoteInfo[]): RepoRemoteInfo {
   const remoteProviders = Object.fromEntries(
-    compact(
-      remotes.map((remote) => {
-        const browser = browserRemote(remote)
-        return browser ? ([remote.name, browser.provider] as const) : null
-      }),
-    ),
+    remotes.flatMap((remote) => {
+      const browser = browserRemote(remote)
+      return browser ? [[remote.name, browser.provider] as const] : []
+    }),
   )
   const browser = pickBrowserRemote(remotes)
   return {

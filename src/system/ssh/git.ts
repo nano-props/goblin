@@ -1,6 +1,5 @@
 import path from 'node:path'
 import PQueue from 'p-queue'
-import { compact, uniq } from 'es-toolkit'
 import { mapWithConcurrency, runWithQueuedAdmission } from '#/system/git/concurrency.ts'
 import {
   parseBootstrapConfig,
@@ -126,7 +125,7 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   if (branches.some((branch) => !isSafeBranchName(branch)) || new Set(branches).size !== branches.length) {
     throw new Error('error.failed-read-repo')
   }
-  const checkedOutBranches = new Set(compact(worktrees.map((worktree) => worktree.branch || null)))
+  const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
   return [
     ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
@@ -160,7 +159,7 @@ async function sampleRemoteWorktreeStatus(
     async (worktree) => await sampleRemoteWorktreeStatusForTarget(target, worktree, options),
     { signal: options.signal, abort: 'throw' },
   )
-  return compact(sampled)
+  return sampled.filter((status): status is WorktreeStatus => status !== null)
 }
 
 async function sampleRemoteWorktreeStatusForTarget(
@@ -819,7 +818,7 @@ function withAffectedWorktreePaths(
   result: ExecResult,
   affectedWorktreePaths: readonly string[],
 ): RemoteWorktreeMutationResult {
-  const unique = uniq(affectedWorktreePaths.filter((worktreePath) => worktreePath.length > 0))
+  const unique = Array.from(new Set(affectedWorktreePaths.filter((worktreePath) => worktreePath.length > 0)))
   return unique.length > 0 ? { ...result, affectedWorktreePaths: unique } : result
 }
 
