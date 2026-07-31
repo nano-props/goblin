@@ -42,9 +42,15 @@ export class WorkspaceRuntimeReconnectRecovery {
         failRecovery(new Error('workspace runtime membership recovery was superseded'))
         return
       }
+      const staleTarget = recovery.targets.find(
+        (target) => this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId,
+      )
+      if (staleTarget) {
+        failRecovery(new Error(`workspace runtime membership changed during recovery for ${staleTarget.workspaceId}`))
+        return
+      }
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
-        if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
         const scope = this.dependencies.scopeRegistry.scopeFor(target)
         this.dependencies.terminalRecovery.begin(scope)
         this.dependencies.terminalRecovery.request(scope, { kind: 'reconnect' })

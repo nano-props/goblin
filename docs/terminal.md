@@ -522,10 +522,15 @@ The system supports replay and snapshot hydration so users can reattach to runni
   membership recovery, terminal catalog recovery, and only then presentation.
   It never skips directly to attach while the authoritative runtime generation
   remains unknown.
+- If membership reconciliation is superseded or a target runtime changes before
+  recovery can start, the current attempt fast-fails for the affected open
+  workspaces. This is intentional: the client must not leave a projection
+  pending without an owner; the explicit retry starts a fresh server-first
+  membership and catalog recovery chain.
 - Cancellation or an unmeasurable host is not a stable recovery failure; the
   next ordinary layout signal may admit presentation again. Detach, disposal,
-  viewer ownership, stale work, and superseding bindings clear local recovery
-  feedback.
+  and viewer ownership clear local recovery feedback; an unresolved membership
+  supersession is handled by the explicit projection retry above.
 
 ### Input during presentation
 
