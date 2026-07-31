@@ -1,3 +1,4 @@
+import { compact } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import {
   GIT_HASH_RE,
@@ -80,39 +81,25 @@ async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Pro
 
 export function parseRemoteVerbose(output: string): GitRemoteInfo[] {
   const lines = output.split('\n').filter((line) => line.trim().length > 0)
-  const rolesByRemote = new Map<string, Set<'fetch' | 'push'>>()
-  for (const line of lines) {
-    const match = line.match(REMOTE_VERBOSE_LINE_RE)
-    if (!match) throw new Error('Invalid remote output')
-    const roles = rolesByRemote.get(match[1]!) ?? new Set<'fetch' | 'push'>()
-    roles.add(match[3] as 'fetch' | 'push')
-    rolesByRemote.set(match[1]!, roles)
-  }
-  if (Array.from(rolesByRemote.values()).some((roles) => !roles.has('fetch') || !roles.has('push'))) {
-    throw new Error('Incomplete remote output')
-  }
-  return parseRemoteVerboseLines(lines)
-}
-
-const REMOTE_VERBOSE_LINE_RE = /^(\S+)\s+(.+?)\s+\((fetch|push)\)$/
-
-function parseRemoteVerboseLines(lines: readonly string[]): GitRemoteInfo[] {
   const remotes = new Map<string, { name: string; fetchUrl?: string; pushUrl?: string }>()
   for (const line of lines) {
     const match = line.match(REMOTE_VERBOSE_LINE_RE)
-    if (!match) continue
+    if (!match) throw new Error('Invalid remote output')
     const name = match[1]!
     const remote = remotes.get(name) ?? { name }
     if (match[3] === 'fetch') remote.fetchUrl = match[2]!
     else remote.pushUrl = match[2]!
     remotes.set(name, remote)
   }
-  return Array.from(remotes.values()).flatMap((remote) => {
-    const fetchUrl = remote.fetchUrl ?? remote.pushUrl
-    const pushUrl = remote.pushUrl ?? remote.fetchUrl
-    return fetchUrl && pushUrl ? [{ name: remote.name, fetchUrl, pushUrl }] : []
-  })
+  const result: GitRemoteInfo[] = []
+  for (const remote of remotes.values()) {
+    if (!remote.fetchUrl || !remote.pushUrl) throw new Error('Incomplete remote output')
+    result.push({ name: remote.name, fetchUrl: remote.fetchUrl, pushUrl: remote.pushUrl })
+  }
+  return result
 }
+
+const REMOTE_VERBOSE_LINE_RE = /^(\S+)\s+(.+?)\s+\((fetch|push)\)$/
 
 export async function getRemotes(cwd: string, signal?: AbortSignal): Promise<GitRemoteInfo[]> {
   return parseRemoteVerbose(await git(cwd, ['remote', '-v'], { signal }))
@@ -154,12 +141,12 @@ export function browserRemote(remote: GitRemoteInfo): BrowserRemote | null {
 
 export function pickBrowserRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): BrowserRemote | null {
   return pickPreferredRemote(
-    remotes
-      .map((remote) => {
+    compact(
+      remotes.map((remote) => {
         const browser = browserRemote(remote)
         return browser ? { name: remote.name, ...browser } : null
-      })
-      .filter((remote): remote is { name: string } & BrowserRemote => remote !== null),
+      }),
+    ),
     upstream,
   )
 }
@@ -186,10 +173,12 @@ export async function getRemoteInfo(cwd: string, signal?: AbortSignal): Promise<
 
 export function repoRemoteInfoForRemotes(remotes: GitRemoteInfo[]): RepoRemoteInfo {
   const remoteProviders = Object.fromEntries(
-    remotes.flatMap((remote) => {
-      const browser = browserRemote(remote)
-      return browser ? [[remote.name, browser.provider] as const] : []
-    }),
+    compact(
+      remotes.map((remote) => {
+        const browser = browserRemote(remote)
+        return browser ? ([remote.name, browser.provider] as const) : null
+      }),
+    ),
   )
   const browser = pickBrowserRemote(remotes)
   return {

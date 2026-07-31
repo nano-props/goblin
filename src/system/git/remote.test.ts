@@ -5,6 +5,7 @@ import {
   fetchAll,
   getBrowserRepoUrl,
   getRepoUrlForRemotes,
+  parseRemoteVerbose,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
   pullBranch,
@@ -32,6 +33,58 @@ function remote(name: string, fetchUrl = `git@github.com:acme/${name}.git`): Git
 function browserRemote(url: string, provider: BrowserRemoteProvider) {
   return { url, provider }
 }
+
+describe('parseRemoteVerbose', () => {
+  test('parses complete remotes in first-seen order and retains distinct fetch and push URLs', () => {
+    expect(
+      parseRemoteVerbose(
+        [
+          'upstream\tgit@example.test:sample/upstream.git (push)',
+          'origin\thttps://example.test/sample/origin.git (fetch)',
+          'upstream\thttps://example.test/sample/upstream.git (fetch)',
+          'origin\tgit@example.test:sample/origin.git (push)',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      {
+        name: 'upstream',
+        fetchUrl: 'https://example.test/sample/upstream.git',
+        pushUrl: 'git@example.test:sample/upstream.git',
+      },
+      {
+        name: 'origin',
+        fetchUrl: 'https://example.test/sample/origin.git',
+        pushUrl: 'git@example.test:sample/origin.git',
+      },
+    ])
+  })
+
+  test('uses the last URL for a repeated remote role', () => {
+    expect(
+      parseRemoteVerbose(
+        [
+          'origin\thttps://example.test/sample/old.git (fetch)',
+          'origin\thttps://example.test/sample/current.git (fetch)',
+          'origin\tgit@example.test:sample/current.git (push)',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      {
+        name: 'origin',
+        fetchUrl: 'https://example.test/sample/current.git',
+        pushUrl: 'git@example.test:sample/current.git',
+      },
+    ])
+  })
+
+  test('rejects malformed and incomplete remote output', () => {
+    expect(() => parseRemoteVerbose('origin https://example.test/sample/repo.git')).toThrow('Invalid remote output')
+    expect(() => parseRemoteVerbose('origin\thttps://example.test/sample/repo.git (fetch)')).toThrow(
+      'Incomplete remote output',
+    )
+  })
+})
 
 describe('getBrowserRepoUrl', () => {
   test('returns the branch URL on the remote when a branch is provided', async () => {
