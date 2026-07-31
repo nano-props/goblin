@@ -516,12 +516,6 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - A stable local recovery failure stops layout/font auto-admission and offers
   one explicit attach-only retry. The retry does not resend takeover, restart
   or recreate the PTY, mutate controller intent, or install a retry loop.
-- A reconnect failure before the authoritative terminal catalog is accepted is
-  a projection failure, not a stable local presentation failure. It replaces
-  passive restoring feedback with an explicit retry that reruns workspace
-  membership recovery, terminal catalog recovery, and only then presentation.
-  It never skips directly to attach while the authoritative runtime generation
-  remains unknown.
 - Cancellation or an unmeasurable host is not a stable recovery failure; the
   next ordinary layout signal may admit presentation again. Detach, disposal,
   viewer ownership, stale work, and superseding bindings clear local recovery

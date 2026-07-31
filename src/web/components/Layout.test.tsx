@@ -118,7 +118,6 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     sendVirtualKey: vi.fn(),
     submitText: vi.fn(async () => false),
     takeover: vi.fn(async () => false),
-    retryRecovery: vi.fn(() => false),
     retryPresentation: vi.fn(() => false),
   }
   return {

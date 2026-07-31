@@ -824,10 +824,9 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('renders workspace projection failure with a full recovery retry during presentation recovery', async () => {
-    const retryRecovery = vi.fn(() => true)
+  test('renders workspace projection failure as static feedback during presentation recovery', async () => {
     const view = await renderTerminalSession(
-      { retryRecovery },
+      {},
       {
         snapshot: {
           phase: 'open',
@@ -846,11 +845,7 @@ describe('TerminalSessionView presentation and focus', () => {
       expect(alert?.textContent).toContain('terminal.load-failed')
       expect(alert?.hasAttribute('aria-busy')).toBe(false)
       expect(view.container.querySelector('.goblin-terminal-session__status-dot')).toBeNull()
-      const retry = alert?.querySelector('button')
-      expect(retry?.textContent).toBe('error.try-again')
-
-      await act(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
-      expect(retryRecovery).toHaveBeenCalledOnce()
+      expect(alert?.querySelector('button')).toBeNull()
     } finally {
       await view.cleanup()
     }

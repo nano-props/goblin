@@ -40,7 +40,6 @@ const projectionMocks = vi.hoisted(() => ({
   terminalSessionsCatalogCoverageRevision: vi.fn(() => 0),
   resynchronizeConnectedViews: vi.fn(),
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(),
-  setPresentationRecoveryRetry: vi.fn(),
 }))
 
 vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
@@ -63,7 +62,6 @@ type TestTerminalSessionSummary = TerminalSessionSummary
 let sessionsChangedHandler: ((event: TerminalSessionsChangedEvent) => void) | null = null
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
 let recoveredHandler: ((clientId: string) => void) | null = null
-let presentationRecoveryRetry: (() => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
   vi.fn<
@@ -76,7 +74,6 @@ describe('AppRuntimeProjectionProvider', () => {
     sessionsChangedHandler = null
     workspaceTabsChangedHandler = null
     recoveredHandler = null
-    presentationRecoveryRetry = null
     kickReconnectMock.mockClear()
     projectionMocks.reconcileServerSessionsSnapshot.mockClear()
     projectionMocks.reconcileServerSessionsSnapshot.mockReturnValue(true)
@@ -92,10 +89,6 @@ describe('AppRuntimeProjectionProvider', () => {
       })),
       changedTargets: [],
     }))
-    projectionMocks.setPresentationRecoveryRetry.mockReset()
-    projectionMocks.setPresentationRecoveryRetry.mockImplementation((retry: (() => void) | null) => {
-      presentationRecoveryRetry = retry
-    })
     recoverSessionsMock.mockReset()
     recoverSessionsMock.mockResolvedValue({ revision: 0, sessions: [] })
     listWorkspaceTabsMock.mockReset()
@@ -414,53 +407,6 @@ describe('AppRuntimeProjectionProvider', () => {
         expect(recoverSessionsMock).toHaveBeenCalledWith({
           workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
-        })
-      })
-    } finally {
-      result.unmount()
-    }
-  })
-
-  test('fails reconnect hydration when membership recovery rejects and retries the full recovery chain', async () => {
-    const repo = seedCurrentRepo()
-    const failure = new Error('membership unavailable')
-    const result = renderRuntimeProvider(REPO_ID)
-    try {
-      await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'ready',
-        }),
-      )
-      recoverSessionsMock.mockClear()
-      projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockRejectedValueOnce(failure)
-
-      await act(async () => {
-        recoveredHandler?.('client_sharedterminal')
-      })
-
-      await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toEqual({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'failed',
-          errorMessage: failure.message,
-        }),
-      )
-      expect(recoverSessionsMock).not.toHaveBeenCalled()
-
-      await act(async () => {
-        presentationRecoveryRetry?.()
-      })
-
-      await vi.waitFor(() => {
-        expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledTimes(2)
-        expect(recoverSessionsMock).toHaveBeenCalledWith({
-          workspaceId: REPO_ID,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        })
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          phase: 'ready',
         })
       })
     } finally {
