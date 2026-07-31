@@ -33,7 +33,9 @@ export function validateUserSettingsPatch(patch: UserSettingsPatch): ValidatedUs
   const lang = optionalCommandValue(patch.lang, isLangPref, 'language')
   const theme = optionalCommandValue(patch.theme, isThemePref, 'theme')
   const colorTheme = optionalCommandValue(patch.colorTheme, isColorTheme, 'color theme')
-  const fetchIntervalSec = optionalCommandValue(patch.fetchIntervalSec, isFetchInterval, 'fetch interval')
+  const fetchIntervalSec = normalizeFetchInterval(
+    optionalCommandValue(patch.fetchIntervalSec, isFetchInterval, 'fetch interval'),
+  )
   const terminalNotificationsEnabled = optionalCommandValue(
     patch.terminalNotificationsEnabled,
     isBoolean,
@@ -114,6 +116,10 @@ function sameUserSettings(left: UserSettings, right: UserSettings): boolean {
     left.globalShortcut === right.globalShortcut &&
     left.lanEnabled === right.lanEnabled
   )
+}
+
+function normalizeFetchInterval(value: number | undefined): number | undefined {
+  return value === 0 ? 0 : value
 }
 
 function optionalCommandValue<T>(

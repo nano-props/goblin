@@ -54,4 +54,11 @@ describe('user settings patch policy', () => {
     expect(plan.fetchIntervalChanged).toBe(false)
     expect(plan.next).toBe(negativeZeroData)
   })
+
+  test('normalizes a negative-zero fetch interval at the patch boundary', () => {
+    const validated = validateUserSettingsPatch({ fetchIntervalSec: -0 })
+
+    expect(validated.fetchIntervalSec).toBe(0)
+    expect(Object.is(validated.fetchIntervalSec, -0)).toBe(false)
+  })
 })
