@@ -158,7 +158,9 @@ export function CreateWorktreePagePane({
       })
     : false
   const worktreeBootstrap = {
-    loading: !bootstrapDecisionReady,
+    // `holdLoadingPage` keeps the form unmounted until the bootstrap
+    // decision is ready, so this rendered prompt is never loading.
+    loading: false,
     preview: bootstrapPreview,
     error: bootstrapPreviewError,
     configTrusted,
@@ -197,7 +199,7 @@ export function CreateWorktreePagePane({
       currentRepo.capability.git.operations.branchAction,
       operationsReadModel.data?.operations,
     )
-    if (branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
+    if (branchAction.phase !== 'idle') return false
     const navigationGeneration = beginAppNavigation()
     const result = await runBranchAction(
       repoId,
@@ -223,18 +225,16 @@ export function CreateWorktreePagePane({
       )}
       <ScrollPane>
         <CreateWorktreePageBody
-          repo={{
-            ...projectBranchActionRepo(
-              {
-                id: liveRepo.id,
-                workspaceRuntimeId: liveRepo.workspaceRuntimeId,
-                operations: { branchAction: git.operations.branchAction },
-                snapshot,
-                remoteLifecycle: liveRepo.admission.kind === 'remote' ? liveRepo.admission.lifecycle : null,
-              },
-              operationsReadModel.data?.operations,
-            ),
-          }}
+          repo={projectBranchActionRepo(
+            {
+              id: liveRepo.id,
+              workspaceRuntimeId: liveRepo.workspaceRuntimeId,
+              operations: { branchAction: git.operations.branchAction },
+              snapshot,
+              remoteLifecycle: liveRepo.admission.kind === 'remote' ? liveRepo.admission.lifecycle : null,
+            },
+            operationsReadModel.data?.operations,
+          )}
           worktreeBootstrap={worktreeBootstrap}
           onCancel={onCancel}
           onCreate={handleCreateWorktree}
