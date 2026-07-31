@@ -1,8 +1,4 @@
-import {
-  isWorkspacePaneStaticTabType,
-  type WorkspacePaneRuntimeTabType,
-  type WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
@@ -763,37 +759,4 @@ export function createWorkspacePaneTabsCoordinator(
   options: WorkspacePaneTabsCoordinatorOptions,
 ): WorkspacePaneTabsCoordinator {
   return new WorkspacePaneTabsCoordinator(options)
-}
-
-export function isValidWorkspacePaneTabsOperation(value: unknown): value is WorkspacePaneTabsUpdateOperation {
-  if (!value || typeof value !== 'object') return false
-  const operation = value as {
-    type?: unknown
-    tabType?: unknown
-    tabIdentities?: unknown
-    insertAfterIdentity?: unknown
-  }
-  if (operation.type === 'open-static') {
-    return (
-      typeof operation.tabType === 'string' &&
-      isWorkspacePaneStaticTabType(operation.tabType) &&
-      (operation.insertAfterIdentity === undefined ||
-        operation.insertAfterIdentity === null ||
-        (typeof operation.insertAfterIdentity === 'string' &&
-          operation.insertAfterIdentity.length > 0 &&
-          !operation.insertAfterIdentity.includes('\0')))
-    )
-  }
-  if (operation.type === 'close-static') {
-    return typeof operation.tabType === 'string' && isWorkspacePaneStaticTabType(operation.tabType)
-  }
-  if (operation.type === 'reorder') {
-    return (
-      Array.isArray(operation.tabIdentities) &&
-      operation.tabIdentities.every(
-        (identity) => typeof identity === 'string' && identity.length > 0 && !identity.includes('\0'),
-      )
-    )
-  }
-  return false
 }
