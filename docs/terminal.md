@@ -516,6 +516,12 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - A stable local recovery failure stops layout/font auto-admission and offers
   one explicit attach-only retry. The retry does not resend takeover, restart
   or recreate the PTY, mutate controller intent, or install a retry loop.
+- Terminal presentation is a best-effort projection. If attach delivery is
+  indeterminate, the client preserves the transport classification but ends
+  the local presentation attempt as failed instead of waiting indefinitely for
+  an optional reconnect event. A later authoritative hydration may start the
+  normal presentation path again; otherwise the user can retry or reopen the
+  terminal explicitly.
 - Cancellation or an unmeasurable host is not a stable recovery failure; the
   next ordinary layout signal may admit presentation again. Detach, disposal,
   viewer ownership, stale work, and superseding bindings clear local recovery

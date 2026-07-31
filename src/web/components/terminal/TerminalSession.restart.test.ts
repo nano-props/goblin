@@ -276,7 +276,7 @@ describe('TerminalSession restart and resynchronization', () => {
     warnSpy.mockRestore()
   })
 
-  test('recovers indeterminate prepared attach from authoritative generation without retrying generation zero', async () => {
+  test('fast-fails an indeterminate attach until authoritative hydration arrives', async () => {
     terminalCalls.attach
       .mockRejectedValueOnce(
         new ClientRealtimeRequestError('socket disconnected', {
@@ -302,6 +302,7 @@ describe('TerminalSession restart and resynchronization', () => {
     expect(terminalCalls.attach).toHaveBeenCalledTimes(1)
     expect(xtermMocks.terminals[0]!.focus).not.toHaveBeenCalled()
     expect(host.querySelector('.goblin-managed-terminal-host .xterm')).toBeNull()
+    expect(session.snapshot().presentationRecovery).toBe('failed')
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -315,13 +316,7 @@ describe('TerminalSession restart and resynchronization', () => {
       controllerStatus: 'connected',
       canonicalSize: { cols: 100, rows: 30 },
     })
-    const pending = session.pendingAuthoritativeRuntimeBinding()
-    expect(pending).toEqual({
-      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalRuntimeGeneration: 1,
-    })
-    expect(session.commitPendingAuthoritativeHydration(pending!)).toBe(true)
-    session.resynchronizeConnectedView()
+    expect(session.pendingAuthoritativeRuntimeBinding()).toBeNull()
     await flushTerminalStart()
 
     expect(terminalCalls.attach.mock.calls).toEqual([
@@ -344,9 +339,9 @@ describe('TerminalSession restart and resynchronization', () => {
     ])
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(xtermMocks.terminals.at(-1)!.write).toHaveBeenCalledWith('authoritative recovery', expect.any(Function))
-    expect(xtermMocks.terminals.at(-1)!.focus).toHaveBeenCalledOnce()
+    expect(xtermMocks.terminals.at(-1)!.focus).not.toHaveBeenCalled()
     expect(settled).toHaveBeenCalledOnce()
-    expect(host.contains(document.activeElement)).toBe(true)
+    expect(host.contains(document.activeElement)).toBe(false)
   })
 
   test('does not retain an unscoped focus request while presentation is pending', async () => {
