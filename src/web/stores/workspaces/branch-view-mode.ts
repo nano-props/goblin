@@ -1,5 +1,15 @@
-import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+
+export const DEFAULT_BRANCH_VIEW_MODE: BranchViewMode = 'all'
+
+export function branchViewModeForWorkspace(
+  branchViewModeByWorkspace: Readonly<Record<string, BranchViewMode>>,
+  workspaceId: string,
+): BranchViewMode {
+  return branchViewModeByWorkspace[workspaceId] ?? DEFAULT_BRANCH_VIEW_MODE
+}
+
 interface BranchSelectionInput {
   branches: BranchSnapshotInfo[]
   currentBranch: string

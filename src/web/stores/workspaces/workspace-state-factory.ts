@@ -41,7 +41,6 @@ export function emptyWorkspace(id: string, workspaceRuntimeId: string): Workspac
 export function emptyGitWorkspaceClientState(): GitWorkspaceClientState {
   return {
     operations: emptyWorkspaceOperations(),
-    ui: { branchViewMode: 'all' },
     events: [],
   }
 }

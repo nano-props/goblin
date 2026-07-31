@@ -51,6 +51,7 @@ describe('restorable-workspace-state', () => {
           selectedTerminalSessionIdByTerminalFilesystemTarget: {
             'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
           },
+          branchViewModeByWorkspace: { [repo.id]: 'worktrees' },
         },
       }),
     ).toEqual({
@@ -60,6 +61,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
       },
+      branchViewModeByWorkspace: { 'goblin+file:///tmp/repo': 'worktrees' },
       preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'terminal' } },
       filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
@@ -94,6 +96,7 @@ describe('restorable-workspace-state', () => {
           selectedTerminalSessionIdByTerminalFilesystemTarget: {
             [terminalFilesystemTargetKey]: 'term-workspaceroot0000001',
           },
+          branchViewModeByWorkspace: {},
         },
       }),
     ).toEqual({
@@ -103,6 +106,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
         [terminalFilesystemTargetKey]: 'term-workspaceroot0000001',
       },
+      branchViewModeByWorkspace: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {
         [workspace.id]: { [workspaceRootTargetKey]: 'files' },
       },
@@ -132,6 +136,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {
             [staleTerminalTargetKey]: 'term-stale00000000000000',
           },
@@ -173,6 +178,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: { [activeRepo.id]: 'worktrees' },
           selectedTerminalSessionIdByTerminalFilesystemTarget: {
             'goblin+file:///tmp/repo-a\0goblin+file:///tmp/active-worktree': 'term-active0000000000000',
             'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
@@ -182,6 +188,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: { [stubRepo.id]: 'worktrees' },
           selectedTerminalSessionIdByTerminalFilesystemTarget: {
             'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
           },
@@ -207,6 +214,7 @@ describe('restorable-workspace-state', () => {
         'goblin+file:///tmp/repo-a\0goblin+file:///tmp/active-worktree': 'term-active0000000000000',
         'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
       },
+      branchViewModeByWorkspace: { [activeRepo.id]: 'worktrees', [stubRepo.id]: 'worktrees' },
       preferredWorkspacePaneTabByTargetByWorkspace: {
         [activeRepo.id]: { [activeTargetKey]: 'status' },
         [stubRepo.id]: { [stubTargetKey]: 'files' },
@@ -247,6 +255,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         },
       }),
@@ -279,6 +288,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         },
       }),
@@ -311,6 +321,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         },
       }),
@@ -328,6 +339,7 @@ describe('restorable-workspace-state', () => {
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
         },
+        branchViewModeByWorkspace: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
         filetreeViewStateByFilesystemTargetByWorkspace: {},
       }),
@@ -338,6 +350,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalSessionIdByTerminalFilesystemTarget: {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
       },
+      branchViewModeByWorkspace: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
     })
   })
@@ -366,6 +379,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         },
       }),
@@ -397,6 +411,7 @@ describe('restorable-workspace-state', () => {
         restoredWorkspaceId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
+        branchViewModeByWorkspace: {},
         selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       },
     })
@@ -425,6 +440,7 @@ describe('restorable-workspace-state', () => {
           restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
           selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         },
         filetreeInteractionByScope: {

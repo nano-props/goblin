@@ -2,6 +2,7 @@ import type { StoreApi } from 'zustand'
 import type { ExecResult } from '#/web/types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
+  BranchViewMode,
   ClientWorkspaceState,
   WorkspaceTabsRestoreResult,
   WorkspaceRuntimeRestoreSnapshot,
@@ -16,7 +17,6 @@ import type {
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-export type BranchViewMode = 'all' | 'worktrees'
 
 export type RepoEventAction =
   | { kind: 'pull'; branch: string }
@@ -62,7 +62,6 @@ export type WorkspaceAdmissionState =
 /** Git-only client state, owned exclusively by the Git capability. */
 export interface GitWorkspaceClientState {
   operations: RepoOperationsState
-  ui: { branchViewMode: BranchViewMode }
   events: RepoEvent[]
 }
 
@@ -119,6 +118,8 @@ export interface RestorableWorkspaceState {
   workspacePaneSize: number
   /** Per-filesystem-target terminal selection restored from ClientWorkspaceState. */
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
+  /** Per-workspace branch navigator preference restored from ClientWorkspaceState. */
+  branchViewModeByWorkspace: Record<string, BranchViewMode>
 }
 
 export interface WorkspaceSessionLayoutState {
@@ -232,6 +233,7 @@ export interface RestorableWorkspaceActions {
   applySessionSelectedTerminalState: (
     selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>,
   ) => void
+  applySessionBranchViewModes: (branchViewModeByWorkspace: Record<string, BranchViewMode>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void

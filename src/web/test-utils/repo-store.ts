@@ -30,7 +30,6 @@ import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/
 export type RepoPresentationForTest = WorkspaceState & {
   operations: GitWorkspaceClientState['operations']
   remoteLifecycle: Extract<WorkspaceState['admission'], { kind: 'remote' }>['lifecycle']
-  ui: WorkspaceState['ui'] & GitWorkspaceClientState['ui']
   branchAction: GitWorkspaceClientState['operations']['branchAction']
   snapshot: RepoSnapshot
   status: WorktreeStatus[] | undefined
@@ -53,7 +52,6 @@ export function repoPresentationForTest(
     ...repo,
     operations: git.operations,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
-    ui: { ...repo.ui, ...git.ui },
     branchAction: git.operations.branchAction,
     snapshot: testRepoSnapshot(facts.branches, facts.currentBranch, facts.remote),
     status: facts.status,
@@ -77,7 +75,6 @@ export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPres
     ...repo,
     operations: git.operations,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
-    ui: { ...repo.ui, ...git.ui },
     branchAction: git.operations.branchAction,
     snapshot,
     status: getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId)?.status,
@@ -184,6 +181,7 @@ export function resetWorkspacesStore(): void {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+    branchViewModeByWorkspace: {},
     tabOpenerIdentityByScope: {},
     navigationHistoryByWorkspace: {},
   })

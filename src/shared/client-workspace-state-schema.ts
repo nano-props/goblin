@@ -34,6 +34,7 @@ export const ClientWorkspaceStateSchema = v.pipe(
       v.check((value) => Math.round(value * 10) / 10 === value, 'workspace pane size must use one decimal place'),
     ),
     selectedTerminalSessionIdByTerminalFilesystemTarget: v.record(v.string(), v.string()),
+    branchViewModeByWorkspace: v.record(v.string(), v.picklist(['all', 'worktrees'])),
     preferredWorkspacePaneTabByTargetByWorkspace: v.record(
       v.string(),
       v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
@@ -70,6 +71,9 @@ export function stringifyClientWorkspaceState(state: ClientWorkspaceState): stri
 }
 
 function hasCanonicalClientWorkspaceIdentities(state: ClientWorkspaceState): boolean {
+  for (const workspaceId of Object.keys(state.branchViewModeByWorkspace)) {
+    if (canonicalWorkspaceLocator(workspaceId) !== workspaceId) return false
+  }
   for (const [key, sessionId] of Object.entries(state.selectedTerminalSessionIdByTerminalFilesystemTarget)) {
     if (!parseTerminalFilesystemTargetKey(key) || !sessionId) return false
   }

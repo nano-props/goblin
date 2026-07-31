@@ -52,7 +52,6 @@ describe('deriveWorkspaceConnectivity', () => {
     expect(workspace.capability.kind).toBe('git')
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     expect(workspace.capability.git.operations.branchAction.phase).toBe('idle')
-    expect(workspace.capability.git.ui).toEqual({ branchViewMode: 'all' })
     expect(workspace.capability.git.events).toEqual([])
 
     acceptWorkspaceProbeState(workspace, {
@@ -81,7 +80,6 @@ describe('deriveWorkspaceConnectivity', () => {
     acceptWorkspaceProbeState(workspace, gitProbe)
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     const acceptedProjection = workspace.capability.git
-    acceptedProjection.ui.branchViewMode = 'worktrees'
     const refreshedProbe = {
       ...gitProbe,
       diagnostics: [{ scope: 'transport' as const, message: 'Connection recovered' }],
@@ -92,7 +90,6 @@ describe('deriveWorkspaceConnectivity', () => {
     if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
     expect(workspace.capability.probe).toEqual(refreshedProbe)
     expect(workspace.capability.git).toBe(acceptedProjection)
-    expect(workspace.capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test.each([

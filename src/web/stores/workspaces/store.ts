@@ -34,6 +34,7 @@ export const useWorkspacesStore = create<WorkspacesStore>()((set, get) => ({
   zenMode: DEFAULT_ZEN_MODE,
   workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+  branchViewModeByWorkspace: {},
 
   // Local client-only state.
   workspaceMembershipReady: false,

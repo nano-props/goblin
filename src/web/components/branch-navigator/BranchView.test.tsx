@@ -20,6 +20,7 @@ import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const mocks = vi.hoisted(() => ({
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
@@ -89,6 +90,27 @@ describe('BranchView', () => {
     renderBranchView()
 
     expect(screen.getByText('feature/query')).toBeTruthy()
+  })
+
+  test('filters the query branch rows with the workspace branch view preference', () => {
+    const worktreeBranch = createRepoBranch('feature/worktree', {
+      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/plain'), worktreeBranch],
+      currentBranchName: 'feature/worktree',
+    })
+    seedRepoQueryDataForTest(repo, {
+      branches: [createRepoBranch('feature/plain'), worktreeBranch],
+      currentBranch: 'feature/worktree',
+    })
+    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+
+    renderBranchView()
+
+    expect(screen.getByText('feature/worktree')).toBeTruthy()
+    expect(screen.queryByText('feature/plain')).toBeNull()
   })
 
   test('opens a non-current branch status through destination navigation', () => {

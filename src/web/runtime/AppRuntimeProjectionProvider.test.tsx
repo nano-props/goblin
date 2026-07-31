@@ -475,20 +475,15 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('does not recover terminal sessions when unrelated workspace metadata changes', async () => {
-    const repo = seedCurrentRepo()
+  test('does not recover terminal sessions when the branch view mode changes', async () => {
+    seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       recoverSessionsMock.mockClear()
-      const changedRepo = structuredClone(repo)
-      if (changedRepo.capability.kind !== 'git') throw new Error('expected Git workspace')
-      changedRepo.capability.git.ui.branchViewMode = 'worktrees'
 
       await act(async () => {
-        useWorkspacesStore.setState((state) => ({
-          workspaces: { ...state.workspaces, [REPO_ID]: changedRepo },
-        }))
+        useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
       })
 
       expect(recoverSessionsMock).not.toHaveBeenCalled()

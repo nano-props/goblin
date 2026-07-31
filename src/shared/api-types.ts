@@ -78,12 +78,16 @@ export interface ServerWorkspaceState {
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
 }
 
+export type BranchViewMode = 'all' | 'worktrees'
+
 export interface ClientWorkspaceState {
   /** Workspace restored when opening `/`; null when none were open. */
   restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
+  /** Per-workspace branch navigator view mode. This is client UI preference, not Git runtime state. */
+  branchViewModeByWorkspace: Record<string, BranchViewMode>
   /** Per-workspace, per-target pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
   /** Per-workspace, per-filesystem-target file tree view state. */

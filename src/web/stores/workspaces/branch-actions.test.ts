@@ -20,7 +20,7 @@ import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/workspaces/branch-action-types.ts'
-import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { GitRemoteInfo } from '#/shared/git-types.ts'
@@ -90,9 +90,7 @@ function updateRepoForTest(
 }
 
 function setBranchViewModeForTest(branchViewMode: BranchViewMode) {
-  updateRepoForTest((repo) => {
-    requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode = branchViewMode
-  })
+  useWorkspacesStore.getState().setBranchViewMode(REPO_ID, branchViewMode)
 }
 
 function repoBranchNames(): string[] {
@@ -823,8 +821,7 @@ describe('runBranchAction', () => {
       .getState()
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('all')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('all')
   })
 
   test('keeps worktrees filtering after creating a worktree', async () => {
@@ -835,8 +832,7 @@ describe('runBranchAction', () => {
       .getState()
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 
   test.each([
@@ -852,8 +848,7 @@ describe('runBranchAction', () => {
       workspaceRuntimeId: 'repo-runtime-test',
     })
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 
   test('does not let stale create worktree refresh results change selection', async () => {
@@ -876,7 +871,7 @@ describe('runBranchAction', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 
   test('keeps selection after non-create branch actions refresh', async () => {
@@ -903,7 +898,6 @@ describe('runBranchAction', () => {
         { workspaceRuntimeId: 'repo-runtime-test' },
       )
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
+    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 })

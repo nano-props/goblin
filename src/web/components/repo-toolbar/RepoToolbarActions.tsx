@@ -6,7 +6,7 @@ import { GitBranchPlus } from 'lucide-react'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
-import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
@@ -15,6 +15,7 @@ import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { branchViewModeForWorkspace, DEFAULT_BRANCH_VIEW_MODE } from '#/web/stores/workspaces/branch-view-mode.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -41,7 +42,10 @@ function WorktreeFilterToggle({ repoId }: Props) {
       return {
         id: repo?.id ?? '',
         workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
-        branchViewMode: repo?.capability.kind === 'git' ? repo.capability.git.ui.branchViewMode : 'all',
+        branchViewMode:
+          repo?.capability.kind === 'git'
+            ? branchViewModeForWorkspace(s.branchViewModeByWorkspace, repo.id)
+            : DEFAULT_BRANCH_VIEW_MODE,
         exists: repo?.capability.kind === 'git',
       }
     }),

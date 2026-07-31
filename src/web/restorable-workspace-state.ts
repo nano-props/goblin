@@ -1,4 +1,4 @@
-import type { ClientWorkspaceState } from '#/shared/api-types.ts'
+import type { BranchViewMode, ClientWorkspaceState } from '#/shared/api-types.ts'
 import {
   isWorkspacePaneSessionTabType,
   isWorkspacePaneStaticTabType,
@@ -87,6 +87,10 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget,
       restorationProjections,
     ),
+    branchViewModeByWorkspace: branchViewModesForClientWorkspace(
+      restorableWorkspaceState.branchViewModeByWorkspace,
+      restorableWorkspaceState.workspaceOrder,
+    ),
     preferredWorkspacePaneTabByTargetByWorkspace: preferredWorkspacePaneTabsForClientWorkspace(
       restorationProjections,
       restorableWorkspaceState.workspaceOrder,
@@ -128,6 +132,18 @@ function clientWorkspaceRestorationProjections(
     }
   }
   return projections
+}
+
+function branchViewModesForClientWorkspace(
+  branchViewModeByWorkspace: Record<string, BranchViewMode>,
+  workspaceOrder: readonly WorkspaceId[],
+): ClientWorkspaceState['branchViewModeByWorkspace'] {
+  const persisted: ClientWorkspaceState['branchViewModeByWorkspace'] = {}
+  for (const workspaceId of workspaceOrder) {
+    const viewMode = branchViewModeByWorkspace[workspaceId]
+    if (viewMode) persisted[workspaceId] = viewMode
+  }
+  return persisted
 }
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
@@ -173,6 +189,11 @@ function clientWorkspaceWithStubBaseline(
     filetreeViewStateByFilesystemTargetByWorkspace: mergeBaselineWorkspaceMap(
       clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace,
       baseline.filetreeViewStateByFilesystemTargetByWorkspace,
+      stubWorkspaceIds,
+    ),
+    branchViewModeByWorkspace: mergeBaselineWorkspaceMap(
+      clientWorkspace.branchViewModeByWorkspace,
+      baseline.branchViewModeByWorkspace,
       stubWorkspaceIds,
     ),
   }
@@ -309,6 +330,7 @@ interface RestoredWorkspaceStateFromClientWorkspace {
   zenMode: RestorableWorkspaceState['zenMode']
   workspacePaneSize: RestorableWorkspaceState['workspacePaneSize']
   selectedTerminalSessionIdByTerminalFilesystemTarget: RestorableWorkspaceState['selectedTerminalSessionIdByTerminalFilesystemTarget']
+  branchViewModeByWorkspace: RestorableWorkspaceState['branchViewModeByWorkspace']
   preferredWorkspacePaneTabByTargetByWorkspace: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace']
 }
 
@@ -322,6 +344,7 @@ export function restoreRestorableWorkspaceStateFromClientWorkspace(
     workspacePaneSize: clientWorkspace.workspacePaneSize,
     selectedTerminalSessionIdByTerminalFilesystemTarget:
       clientWorkspace.selectedTerminalSessionIdByTerminalFilesystemTarget,
+    branchViewModeByWorkspace: clientWorkspace.branchViewModeByWorkspace,
     preferredWorkspacePaneTabByTargetByWorkspace: clientWorkspace.preferredWorkspacePaneTabByTargetByWorkspace,
   }
 }

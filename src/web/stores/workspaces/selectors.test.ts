@@ -46,6 +46,7 @@ describe('workspace selectors', () => {
         restoredWorkspaceId: WORKSPACE_ID,
         zenMode: false,
         workspacePaneSize: 50,
+        branchViewModeByWorkspace: {},
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/repo': 'term-111111111111111111111',
         },

@@ -15,13 +15,14 @@
 import { useEffect, useRef } from 'react'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
-import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
+import { branchViewModeForWorkspace, visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import type { AppNavigationActions } from '#/web/app-navigation.tsx'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
@@ -117,7 +118,7 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
 function moveBranchSelection(
   input: {
     repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>
-    git: Extract<WorkspaceState['capability'], { kind: 'git' }>['git']
+    viewMode: BranchViewMode
     currentBranchName: string | null
   },
   direction: MoveDirection,
@@ -127,7 +128,7 @@ function moveBranchSelection(
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,
-    viewMode: input.git.ui.branchViewMode,
+    viewMode: input.viewMode,
   })
   if (branches.length === 0) return false
   const index = branches.findIndex((branch) => branch.name === input.currentBranchName)
@@ -302,7 +303,11 @@ export function useKeyboard({
           if (overlayOpen || !repo || repo.capability.kind !== 'git') break
           if (
             moveBranchSelection(
-              { repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current },
+              {
+                repo,
+                viewMode: branchViewModeForWorkspace(useWorkspacesStore.getState().branchViewModeByWorkspace, repo.id),
+                currentBranchName: currentBranchNameRef.current,
+              },
               1,
               navigation,
             )
@@ -314,7 +319,11 @@ export function useKeyboard({
           if (overlayOpen || !repo || repo.capability.kind !== 'git') break
           if (
             moveBranchSelection(
-              { repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current },
+              {
+                repo,
+                viewMode: branchViewModeForWorkspace(useWorkspacesStore.getState().branchViewModeByWorkspace, repo.id),
+                currentBranchName: currentBranchNameRef.current,
+              },
               -1,
               navigation,
             )
