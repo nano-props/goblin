@@ -118,9 +118,7 @@ export function createClientRealtimeSocketConnection<
       if (message) handleSocketMessage(message, entry.connection.clientId)
     },
     onDisconnect(_entry, context) {
-      clearRealtimeOpenTimeout()
-      stopLivenessProbes()
-      clearPendingHealthProbes()
+      clearSocketGenerationState()
       const outageId = context.idleClose ? null : beginOutage()
       rejectPendingSocketRequests(
         new ClientRealtimeRequestError(context.reason, {
@@ -136,9 +134,7 @@ export function createClientRealtimeSocketConnection<
       reconcileSocketDemand('reconnect')
     },
     onUnavailableSocketDropped() {
-      clearRealtimeOpenTimeout()
-      stopLivenessProbes()
-      clearPendingHealthProbes()
+      clearSocketGenerationState()
     },
   })
 
@@ -202,6 +198,12 @@ export function createClientRealtimeSocketConnection<
   function clearPendingHealthProbes() {
     for (const pending of pendingHealthProbes.values()) clearTimeout(pending.timeout)
     pendingHealthProbes.clear()
+  }
+
+  function clearSocketGenerationState(): void {
+    clearRealtimeOpenTimeout()
+    stopLivenessProbes()
+    clearPendingHealthProbes()
   }
 
   function hasPendingHealthProbe(currentSocket: WebSocket, generation: number): boolean {
