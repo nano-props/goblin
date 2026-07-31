@@ -246,11 +246,13 @@ function WorkspacePaneTabChrome({
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
   const closeProps =
-    isPendingWorkspacePaneTabItem(item) || item.closable === false
+    compact
+      ? ({ closeButton: false } as const)
+      : isPendingWorkspacePaneTabItem(item) || item.closable === false
       ? ({ closeButton: 'placeholder' } as const)
       : ({
           closeLabel: item.closeLabel,
-          closeVisible: compact || isActive,
+          closeVisible: isActive,
           closeDisabled: interactionDisabled,
           onClose: (event: MouseEvent<HTMLButtonElement>) => onClose(event, item.identity),
         } as const)
