@@ -597,24 +597,29 @@ describe('TerminalSessionProjection events', () => {
     projection.selectTerminal(WORKTREE_KEY, firstSessionId)
     expect(projection.setComposerExpanded(firstSessionId, true)).toBe(true)
     expect(projection.setComposerMode(firstSessionId, 'keys')).toBe(true)
+    expect(projection.setComposerDraft(firstSessionId, 'first draft')).toBe(true)
 
     projection.selectTerminal(WORKTREE_KEY, secondSessionId)
     expect(projection.snapshot(secondSessionId).composer).toEqual({
       expanded: false,
       mode: 'input',
+      draft: '',
       historyEntries: [],
     })
     expect(projection.setComposerExpanded(secondSessionId, true)).toBe(true)
+    expect(projection.setComposerDraft(secondSessionId, 'second draft')).toBe(true)
 
     projection.selectTerminal(WORKTREE_KEY, firstSessionId)
     expect(projection.snapshot(firstSessionId).composer).toEqual({
       expanded: true,
       mode: 'keys',
+      draft: 'first draft',
       historyEntries: [],
     })
     expect(projection.snapshot(secondSessionId).composer).toEqual({
       expanded: true,
       mode: 'input',
+      draft: 'second draft',
       historyEntries: [],
     })
   })
@@ -669,6 +674,14 @@ describe('TerminalSessionProjection events', () => {
     snapshotListener.mockClear()
     expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
     expect(snapshotListener).not.toHaveBeenCalled()
+    expect(projection.setComposerDraft(terminalSessionId, 'verbatim\r\ndraft')).toBe(true)
+    expect(projection.snapshot(terminalSessionId).composer.draft).toBe('verbatim\r\ndraft')
+    expect(snapshotListener).toHaveBeenCalledOnce()
+
+    snapshotListener.mockClear()
+    expect(projection.setComposerDraft(terminalSessionId, 'verbatim\r\ndraft')).toBe(true)
+    expect(projection.replaceComposerDraft(terminalSessionId, 'stale', '')).toBe(false)
+    expect(snapshotListener).not.toHaveBeenCalled()
     expect(projection.setComposerExpanded('missing-session', true)).toBe(false)
 
     unsubscribeSnapshot()
@@ -684,12 +697,14 @@ describe('TerminalSessionProjection events', () => {
     )
     const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
     expect(projection.setComposerExpanded(terminalSessionId, true)).toBe(true)
+    expect(projection.setComposerDraft(terminalSessionId, 'destroyed with session')).toBe(true)
 
     expect(terminalSessionProjectionAccess(projection).removeSession(terminalSessionId, { dispose: true })).toBe(true)
     expect(projection.setComposerExpanded(terminalSessionId, false)).toBe(false)
     expect(projection.snapshot(terminalSessionId).composer).toEqual({
       expanded: false,
       mode: 'input',
+      draft: '',
       historyEntries: [],
     })
   })

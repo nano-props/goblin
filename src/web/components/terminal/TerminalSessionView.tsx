@@ -77,6 +77,8 @@ export function TerminalSessionView({
     sendVirtualKey,
     setComposerExpanded,
     setComposerMode,
+    setComposerDraft,
+    replaceComposerDraft,
     submitText,
     takeover,
     retryPresentation,
@@ -594,12 +596,15 @@ export function TerminalSessionView({
           labels={terminalComposerLabels}
           expanded={snapshot.composer.expanded}
           mode={snapshot.composer.mode}
+          draft={snapshot.composer.draft}
           historyEntries={snapshot.composer.historyEntries}
           shortcut={terminalComposerShortcut}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
           onSendText={handleComposerSend}
           onExpandedChange={(expanded) => setComposerExpanded(terminalSessionId, expanded)}
           onModeChange={(mode) => setComposerMode(terminalSessionId, mode)}
+          onDraftChange={(draft) => setComposerDraft(terminalSessionId, draft)}
+          onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
           onResolveFiles={resolveComposerFiles}
           onRequestFocus={() => focusTerminal(terminalSessionId)}
           onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}

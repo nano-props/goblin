@@ -87,7 +87,7 @@ describe('useTerminalSessionReadContext', () => {
         phase: 'opening',
         message: null,
         processName: 'terminal',
-        composer: { expanded: false, mode: 'keys', historyEntries: [] },
+        composer: { expanded: false, mode: 'keys', draft: '', historyEntries: [] },
       }),
       subscribeSnapshot: () => () => {},
     }

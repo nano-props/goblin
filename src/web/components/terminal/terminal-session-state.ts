@@ -117,6 +117,7 @@ export class TerminalSessionState {
       composer: {
         expanded: this.composerState.expanded,
         mode: this.composerState.mode,
+        draft: this.composerState.draft,
         historyEntries: this.composerState.historyEntries,
       },
     }
@@ -146,6 +147,17 @@ export class TerminalSessionState {
     if (this.composerState.mode === mode) return false
     this.composerState.mode = mode
     return true
+  }
+
+  setComposerDraft(draft: string): boolean {
+    if (this.composerState.draft === draft) return false
+    this.composerState.draft = draft
+    return true
+  }
+
+  replaceComposerDraft(expectedDraft: string, draft: string): boolean {
+    if (this.composerState.draft !== expectedDraft) return false
+    return this.setComposerDraft(draft)
   }
 
   recordComposerHistory(text: string): boolean {

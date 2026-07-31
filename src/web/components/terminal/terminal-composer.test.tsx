@@ -46,6 +46,7 @@ function render(
   function ControlledComposer() {
     const [expanded, setExpanded] = useState(false)
     const [mode, setMode] = useState<TerminalComposerMode>(props.initialMode ?? 'keys')
+    const [draft, setDraft] = useState('')
     const [historyEntries, setHistoryEntries] = useState<readonly string[]>([])
     const sendText = async (text: string) => {
       const accepted = await (props.onSendText ?? (async () => true))(text)
@@ -59,6 +60,7 @@ function render(
         labels={LABELS}
         expanded={expanded}
         mode={mode}
+        draft={draft}
         historyEntries={historyEntries}
         shortcut="Control+Shift+Enter"
         onVirtualKey={props.onVirtualKey ?? vi.fn()}
@@ -69,6 +71,14 @@ function render(
         }}
         onModeChange={(next) => {
           setMode(next)
+          return true
+        }}
+        onDraftChange={(next) => {
+          setDraft(next)
+          return true
+        }}
+        onDraftReplace={(expectedDraft, next) => {
+          setDraft((current) => (current === expectedDraft ? next : current))
           return true
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
@@ -102,24 +112,37 @@ function menuItemByText(text: string) {
   return screen.getByRole('menuitem', { name: text })
 }
 
-function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = []) {
+function ExpandedComposerForTest({ historyEntries }: { historyEntries: readonly string[] }) {
+  const [draft, setDraft] = useState('')
   return (
     <TerminalComposer
-      key={sessionId}
       labels={LABELS}
       expanded
       mode="input"
+      draft={draft}
       historyEntries={historyEntries}
       shortcut="Control+Shift+Enter"
       onVirtualKey={vi.fn()}
       onSendText={vi.fn(async () => true)}
       onExpandedChange={vi.fn(() => true)}
       onModeChange={vi.fn(() => true)}
+      onDraftChange={(next) => {
+        setDraft(next)
+        return true
+      }}
+      onDraftReplace={(expectedDraft, next) => {
+        setDraft((current) => (current === expectedDraft ? next : current))
+        return true
+      }}
       onResolveFiles={vi.fn(async () => null)}
       onRequestFocus={vi.fn()}
       onScrollLines={vi.fn()}
     />
   )
+}
+
+function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = []) {
+  return <ExpandedComposerForTest key={sessionId} historyEntries={historyEntries} />
 }
 
 describe('TerminalComposer', () => {
@@ -289,6 +312,21 @@ describe('TerminalComposer', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onSendText).toHaveBeenNthCalledWith(2, 'git status')
     await vi.waitFor(() => expect(input.value).toBe(''))
+  })
+
+  test('does not clear text entered while an earlier draft is being submitted', async () => {
+    const submission = Promise.withResolvers<boolean>()
+    const { container } = render({ onSendText: vi.fn(() => submission.promise) })
+    expand(container)
+    showInput(container)
+    const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    fireEvent.change(input, { target: { value: 'submitted draft' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.change(input, { target: { value: 'new draft' } })
+
+    await act(async () => submission.resolve(true))
+
+    expect(input.value).toBe('new draft')
   })
 
   test('Enter submits while Shift+Enter remains available for text entry', async () => {

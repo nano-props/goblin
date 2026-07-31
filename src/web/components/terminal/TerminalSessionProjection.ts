@@ -961,6 +961,14 @@ export class TerminalSessionProjection {
     return this.sessions.get(terminalSessionId)?.setComposerMode(mode) ?? false
   }
 
+  setComposerDraft = (terminalSessionId: string, draft: string): boolean => {
+    return this.sessions.get(terminalSessionId)?.setComposerDraft(draft) ?? false
+  }
+
+  replaceComposerDraft = (terminalSessionId: string, expectedDraft: string, draft: string): boolean => {
+    return this.sessions.get(terminalSessionId)?.replaceComposerDraft(expectedDraft, draft) ?? false
+  }
+
   submitText = (terminalSessionId: string, text: string): Promise<boolean> => {
     return this.sessions.get(terminalSessionId)?.submitText(text) ?? Promise.resolve(false)
   }

@@ -125,6 +125,7 @@ export type TerminalComposerMode = 'keys' | 'input'
 export interface TerminalComposerSessionState {
   expanded: boolean
   mode: TerminalComposerMode
+  draft: string
   historyEntries: readonly string[]
 }
 
@@ -226,6 +227,9 @@ export interface TerminalSessionContextValue {
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
   setComposerExpanded: (terminalSessionId: string, expanded: boolean) => boolean
   setComposerMode: (terminalSessionId: string, mode: TerminalComposerMode) => boolean
+  setComposerDraft: (terminalSessionId: string, draft: string) => boolean
+  /** Replaces the draft only when it still matches expectedDraft. Returns whether the replacement was applied. */
+  replaceComposerDraft: (terminalSessionId: string, expectedDraft: string, draft: string) => boolean
   /**
    * Returns true once the composed text write is accepted and the caller must
    * clear its draft. The following Enter write is reported independently and

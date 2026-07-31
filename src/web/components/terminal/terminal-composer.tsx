@@ -64,12 +64,15 @@ interface TerminalComposerProps {
   labels: TerminalComposerLabels
   expanded: boolean
   mode: TerminalComposerMode
+  draft: string
   historyEntries: readonly string[]
   shortcut: string
   onVirtualKey: (key: TerminalVirtualKey) => void
   onSendText: (text: string) => Promise<boolean>
   onExpandedChange: (expanded: boolean) => boolean
   onModeChange: (mode: TerminalComposerMode) => boolean
+  onDraftChange: (draft: string) => boolean
+  onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
   onScrollLines: (amount: number) => void
@@ -149,19 +152,21 @@ export function TerminalComposer({
   labels,
   expanded,
   mode,
+  draft,
   historyEntries,
   shortcut,
   onVirtualKey,
   onSendText,
   onExpandedChange,
   onModeChange,
+  onDraftChange,
+  onDraftReplace,
   onResolveFiles,
   onRequestFocus,
   onScrollLines,
   hidden,
   className,
 }: TerminalComposerProps) {
-  const [draft, setDraft] = useState('')
   const [resolvingFiles, setResolvingFiles] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
@@ -240,7 +245,7 @@ export function TerminalComposer({
     const submittedDraft = draft
     if (!(await onSendText(submittedDraft))) return
     history.leaveBrowsing()
-    setDraft((current) => (current === submittedDraft ? '' : current))
+    onDraftReplace(submittedDraft, '')
   }
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (resolvingFiles || isImeCompositionEvent(event)) return
@@ -251,7 +256,7 @@ export function TerminalComposer({
         event.preventDefault()
         if (historicalDraft !== draft) {
           pendingCaretRef.current = historicalDraft.length
-          setDraft(historicalDraft)
+          onDraftChange(historicalDraft)
         }
         return
       }
@@ -288,13 +293,10 @@ export function TerminalComposer({
       const insertion = await onResolveFiles(files)
       if (!insertion) return
       history.leaveBrowsing()
-      setDraft((current) => {
-        const start = Math.min(insertionRange.start, current.length)
-        const end = Math.min(Math.max(insertionRange.end, start), current.length)
-        const next = insertComposerText(current, insertion, start, end)
-        pendingCaretRef.current = next.caret
-        return next.value
-      })
+      const start = Math.min(insertionRange.start, draft.length)
+      const end = Math.min(Math.max(insertionRange.end, start), draft.length)
+      const next = insertComposerText(draft, insertion, start, end)
+      if (onDraftReplace(draft, next.value)) pendingCaretRef.current = next.caret
     } finally {
       setResolvingFiles(false)
     }
@@ -372,7 +374,7 @@ export function TerminalComposer({
               className="goblin-terminal-composer__input font-mono"
               onChange={(event) => {
                 history.leaveBrowsing()
-                setDraft(event.target.value)
+                onDraftChange(event.target.value)
               }}
               onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={handleDraftKeyDown}

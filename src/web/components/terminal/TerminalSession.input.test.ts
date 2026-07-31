@@ -33,16 +33,22 @@ describe('TerminalSession input, resize, and controller authority', () => {
 
     expect(session.setComposerExpanded(false)).toBe(true)
     expect(session.setComposerMode('input')).toBe(true)
+    expect(session.setComposerDraft('')).toBe(true)
     expect(notify).not.toHaveBeenCalled()
 
     expect(session.setComposerExpanded(true)).toBe(true)
     expect(session.setComposerMode('keys')).toBe(true)
-    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
+    expect(session.setComposerDraft('draft')).toBe(true)
+    expect(session.replaceComposerDraft('stale draft', 'replacement')).toBe(false)
+    expect(session.replaceComposerDraft('draft', 'replacement')).toBe(true)
+    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot'], ['snapshot'], ['snapshot']])
 
     session.dispose()
     expect(session.setComposerExpanded(false)).toBe(false)
     expect(session.setComposerMode('input')).toBe(false)
-    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot']])
+    expect(session.setComposerDraft('disposed')).toBe(false)
+    expect(session.replaceComposerDraft('replacement', '')).toBe(false)
+    expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot'], ['snapshot'], ['snapshot']])
   })
 
   test('retains Composer session facts through presentation detach and runtime restart', async () => {
@@ -50,12 +56,14 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const { host } = await startOpenControllerSession(session)
     session.setComposerExpanded(true)
     session.setComposerMode('input')
+    session.setComposerDraft('retained draft\r\nverbatim')
     await expect(session.submitText('retained command')).resolves.toBe(true)
 
     session.detach(host)
     expect(session.snapshot().composer).toEqual({
       expanded: true,
       mode: 'input',
+      draft: 'retained draft\r\nverbatim',
       historyEntries: ['retained command'],
     })
 
@@ -65,6 +73,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(session.snapshot().composer).toEqual({
       expanded: true,
       mode: 'input',
+      draft: 'retained draft\r\nverbatim',
       historyEntries: ['retained command'],
     })
   })
