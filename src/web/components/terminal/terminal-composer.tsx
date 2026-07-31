@@ -11,6 +11,7 @@ import {
   type PointerEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from 'react'
 import {
   ArrowDown,
@@ -61,6 +62,7 @@ export interface TerminalComposerLabels {
 
 interface TerminalComposerProps {
   ref?: Ref<TerminalComposerHandle>
+  containerRef?: RefObject<HTMLElement | null>
   labels: TerminalComposerLabels
   expanded: boolean
   mode: TerminalComposerMode
@@ -149,6 +151,7 @@ function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
 
 export function TerminalComposer({
   ref,
+  containerRef,
   labels,
   expanded,
   mode,
@@ -168,6 +171,7 @@ export function TerminalComposer({
   className,
 }: TerminalComposerProps) {
   const [resolvingFiles, setResolvingFiles] = useState(false)
+  const composerRootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -240,6 +244,41 @@ export function TerminalComposer({
     return () => observer.disconnect()
   }, [expanded, mode])
 
+  useEffect(() => {
+    const composer = composerRootRef.current
+    const visualViewport = window.visualViewport
+    const container = containerRef?.current ?? composer?.parentElement
+    if (!composer || !container || !visualViewport) return
+
+    let frameId: number | null = null
+    const applyKeyboardOffset = () => {
+      const visibleBottom = visualViewport.offsetTop + visualViewport.height
+      const obscuredHeight = Math.max(0, container.getBoundingClientRect().bottom - visibleBottom)
+      const nextOffset = Math.round(obscuredHeight)
+      composer.style.setProperty('--goblin-terminal-composer-keyboard-offset', `${nextOffset}px`)
+    }
+    const updateKeyboardOffset = () => {
+      if (frameId !== null) return
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null
+        applyKeyboardOffset()
+      })
+    }
+    updateKeyboardOffset()
+    visualViewport.addEventListener('resize', updateKeyboardOffset)
+    visualViewport.addEventListener('scroll', updateKeyboardOffset)
+    const containerObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => updateKeyboardOffset())
+    containerObserver?.observe(container)
+
+    return () => {
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
+      visualViewport.removeEventListener('resize', updateKeyboardOffset)
+      visualViewport.removeEventListener('scroll', updateKeyboardOffset)
+      containerObserver?.disconnect()
+    }
+  }, [containerRef])
+
   const submitDraft = async () => {
     if (!draft || resolvingFiles) return
     const submittedDraft = draft
@@ -309,6 +348,7 @@ export function TerminalComposer({
 
   return (
     <div
+      ref={composerRootRef}
       className={cn('goblin-terminal-composer', expanded && 'goblin-terminal-composer--expanded', className)}
       data-expanded={expanded}
       hidden={hidden}

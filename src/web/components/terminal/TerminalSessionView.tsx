@@ -59,6 +59,7 @@ export function TerminalSessionView({
   createTerminalForSlot,
 }: TerminalSessionViewProps) {
   const t = useT()
+  const sessionRootRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const composerRef = useRef<TerminalComposerHandle | null>(null)
@@ -533,6 +534,7 @@ export function TerminalSessionView({
 
   return (
     <div
+      ref={sessionRootRef}
       className="goblin-terminal-session focus-visible:outline-none"
       tabIndex={-1}
       onKeyDownCapture={handleKeyDownCapture}
@@ -590,6 +592,7 @@ export function TerminalSessionView({
       {isController && terminalSessionId && (
         <TerminalComposer
           ref={composerRef}
+          containerRef={sessionRootRef}
           key={terminalSessionId}
           className="goblin-terminal-composer--floating"
           hidden={searchOpen}
