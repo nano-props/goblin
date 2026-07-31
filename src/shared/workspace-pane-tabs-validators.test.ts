@@ -34,6 +34,7 @@ describe('workspace pane tabs update operation schema', () => {
       }),
     ).toBe(false)
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'reorder', tabIdentities: ['bad\0identity'] })).toBe(false)
+    expect(isWorkspacePaneTabsUpdateOperation({ type: 'reorder', tabIdentities: new Array(1) })).toBe(false)
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'unsupported' })).toBe(false)
   })
 })
