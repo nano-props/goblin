@@ -89,7 +89,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={submitting}
-            className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
+            className="rounded-md border border-input bg-background px-3 py-2 font-mono text-base"
             placeholder={t('auth.gate.token-placeholder')}
           />
         </label>
