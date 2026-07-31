@@ -36,6 +36,13 @@ export interface RemoteCommandInvocation {
   script: string
 }
 
+export interface SshConnectionSnapshotTarget {
+  alias: string
+  host: string
+  user: string
+  port: number
+}
+
 function controlPathFor(target: RemoteWorkspaceTarget): string {
   const key = target.sshConnection
     ? JSON.stringify([target.sshConnection.destination, ...target.sshConnection.options])
@@ -62,7 +69,7 @@ export function ensureSshControlDirectory(): Promise<void> {
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
-  target: RemoteWorkspaceTarget,
+  target: SshConnectionSnapshotTarget,
   effectiveConfig: string,
 ): NonNullable<RemoteWorkspaceTarget['sshConnection']> {
   const options = effectiveConfig

@@ -28,11 +28,14 @@ interface TerminalSessionProjectionSource {
   presentation: TerminalPresentation | null
 }
 
-interface TerminalRuntimeProjectionSource {
+interface TerminalTakeoverProjectionSource {
   id: string
   phase: TerminalSessionPhase
-  message: string | null
   ptyState: TerminalPtyState
+}
+
+interface TerminalRuntimeProjectionSource extends TerminalTakeoverProjectionSource {
+  message: string | null
 }
 
 interface TerminalPresentationSource {
@@ -84,7 +87,7 @@ export function projectBoundTerminalRuntimeMetadata(
 }
 
 export function projectTerminalTakeoverResult(
-  session: TerminalRuntimeProjectionSource,
+  session: TerminalTakeoverProjectionSource,
   controller: TerminalController | null,
 ): TerminalTakeoverResult {
   const bound = terminalPtyBoundState(session)

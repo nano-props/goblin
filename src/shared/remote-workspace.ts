@@ -335,7 +335,7 @@ export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSession
   return id ? { id } : null
 }
 
-export function parseRemoteWorkspaceId(workspaceId: string): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {
+export function parseRemoteWorkspaceId(workspaceId: string): RemoteConnectionInput | null {
   const parsed = parseWorkspaceLocator(workspaceId, 'posix')
   return parsed?.transport === 'ssh' ? { alias: parsed.profile, remotePath: parsed.path } : null
 }
@@ -346,7 +346,13 @@ export function remoteWorkspaceRefFromTarget(target: RemoteWorkspaceTarget): Rem
   return ref
 }
 
-function remoteTargetFields(input: unknown): Pick<RemoteWorkspaceTarget, 'host' | 'user' | 'port'> | null {
+interface RemoteWorkspaceConnectionFields {
+  host: string
+  user: string
+  port: number
+}
+
+function remoteTargetFields(input: unknown): RemoteWorkspaceConnectionFields | null {
   if (!input || typeof input !== 'object') return null
   const rawHost = Reflect.get(input, 'host')
   const rawUser = Reflect.get(input, 'user')

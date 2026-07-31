@@ -9,7 +9,7 @@ import {
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   projectRuntimePlacements,
   type WorkspacePaneEpochScope,
@@ -21,6 +21,11 @@ export interface WorkspacePaneTargetProjection {
   target: RuntimeWorkspacePaneTarget
   nativeWorktreePath: string | null
   canonicalBranch: string | null
+}
+
+interface WorkspacePaneRuntimeScope {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
 export function projectCanonicalEntries(
@@ -123,7 +128,7 @@ function providerTargets(
   return targets
 }
 
-function durableTargetKey(scope: WorkspacePaneEpochScope, target: RestorableWorkspacePaneTarget): string {
+function durableTargetKey(scope: WorkspacePaneRuntimeScope, target: RestorableWorkspacePaneTarget): string {
   const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
   const runtime = workspacePaneTabsTargetFromRestorable(workspaceId, target)
