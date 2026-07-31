@@ -27,7 +27,7 @@ export type ToolbarTabClose =
     }
   | { kind: 'placeholder' }
 
-interface ToolbarClosableTabBaseProps {
+interface ToolbarClosableTabProps {
   containerRef?: Ref<HTMLDivElement>
   containerProps?: ToolbarClosableTabContainerProps
   containerClassName: string
@@ -38,8 +38,6 @@ interface ToolbarClosableTabBaseProps {
   close?: ToolbarTabClose
   children: ReactNode
 }
-
-type ToolbarClosableTabProps = ToolbarClosableTabBaseProps
 
 export function ToolbarClosableTab({
   containerRef,
