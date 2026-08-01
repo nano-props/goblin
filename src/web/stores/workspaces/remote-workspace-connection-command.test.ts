@@ -89,6 +89,33 @@ describe('remote lifecycle command client', () => {
     })
   })
 
+  test('applies a canonical failed terminal and probe without starting Git projection work', async () => {
+    vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
+      kind: 'settled',
+      workspaceId,
+      lifecycle: { kind: 'failed', attemptId: 3, reason: 'auth-failed', target },
+      workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+    })
+
+    await expect(
+      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+    ).resolves.toEqual({
+      kind: 'failed',
+      workspaceId,
+      reason: 'auth-failed',
+      target,
+    })
+    expect(remoteAdmission()).toMatchObject({
+      lifecycle: { kind: 'failed', reason: 'auth-failed', target },
+      lifecycleAttemptId: 3,
+    })
+    expect(useWorkspacesStore.getState().workspaces[workspaceId]?.capability).toEqual({
+      kind: 'unavailable',
+      probe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+    })
+    expect(requestRepoSnapshotRefresh).not.toHaveBeenCalled()
+  })
+
   test('rejects a wire response for a different workspace before applying projection state', async () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
       kind: 'superseded',

@@ -109,6 +109,45 @@ describe('workspace runtime membership recovery', () => {
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
   })
 
+  test('omits only the changed local target whose one-shot Refresh throws', async () => {
+    resetWorkspacesStore()
+    vi.mocked(runWorkspaceRefresh).mockImplementation(async (_, workspaceId) => {
+      if (workspaceId === SECOND_REPO_ROOT) throw new Error('probe transport failed')
+      return { ok: true }
+    })
+    const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
+      workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: 'repo-runtime-first-123456789012345',
+            workspaceProbe: { status: 'probing' as const },
+          },
+          {
+            workspaceId: SECOND_REPO_ROOT,
+            workspaceRuntimeId: 'repo-runtime-second-12345678901234',
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      }),
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
+      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
+    })
+    expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2)
+  })
+
   test('attempts changed local runtimes in parallel and omits only the failed target', async () => {
     resetWorkspacesStore()
     const firstRefresh = Promise.withResolvers<{ ok: true }>()

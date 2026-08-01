@@ -32,19 +32,33 @@ const clientId = 'client-test'
 describe('workspace runtime remote lifecycle', () => {
   beforeEach(() => clearWorkspaceRuntimesForUser(userId))
 
-  test('latest attempt aborts its predecessor and owns the terminal state', async () => {
+  test('repeated restart commands admit the latest attempt as terminal owner', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     const firstAttempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     let firstSignal!: AbortSignal
-    const first = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, (signal) => {
-      firstSignal = signal
-      return firstAttempt.promise
-    })
+    const first = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      (signal) => {
+        firstSignal = signal
+        return firstAttempt.promise
+      },
+      () => {},
+      'restart',
+    )
     await vi.waitFor(() =>
       expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
     )
 
-    const second = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
+    const second = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      async () => ready,
+      () => {},
+      'restart',
+    )
     await vi.waitFor(() => expect(firstSignal.aborted).toBe(true))
     await expect(second).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 2 } })
     firstAttempt.resolve(ready)
