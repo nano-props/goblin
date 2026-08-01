@@ -58,7 +58,7 @@ export function TerminalComposerMenu({
       <PopoverContent
         side="top"
         align="end"
-        className="w-max min-w-48 max-w-72 overflow-hidden p-1"
+        className="w-max min-w-32 max-w-72 overflow-hidden p-1"
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => {
           const focusTarget = focusTargetRef.current
