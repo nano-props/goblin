@@ -22,6 +22,7 @@ vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
 }))
 
 const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/runtime-membership-recovery')
+const SECOND_REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/second-runtime-membership-recovery')
 const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://example/srv/runtime-membership-recovery')
 
 describe('workspace runtime membership recovery', () => {
@@ -100,8 +101,54 @@ describe('workspace runtime membership recovery', () => {
 
     await expect(
       reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
-    ).resolves.toMatchObject({ kind: 'settled', changedTargets: [{ workspaceId: REPO_ROOT }] })
-    await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledOnce())
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [],
+      changedTargets: [{ workspaceId: REPO_ROOT }],
+    })
+    expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
+  })
+
+  test('attempts changed local runtimes in parallel and omits only the failed target', async () => {
+    resetWorkspacesStore()
+    const firstRefresh = Promise.withResolvers<{ ok: true }>()
+    const secondRefresh = Promise.withResolvers<{ ok: false; cancelled: true }>()
+    vi.mocked(runWorkspaceRefresh).mockImplementation((_, workspaceId) =>
+      workspaceId === REPO_ROOT ? firstRefresh.promise : secondRefresh.promise,
+    )
+    const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
+      workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
+    })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: 'repo-runtime-first-123456789012345',
+            workspaceProbe: { status: 'probing' as const },
+          },
+          {
+            workspaceId: SECOND_REPO_ROOT,
+            workspaceRuntimeId: 'repo-runtime-second-12345678901234',
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      }),
+    })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2))
+
+    firstRefresh.resolve({ ok: true })
+    secondRefresh.resolve({ ok: false, cancelled: true })
+    await expect(recovery).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
+      changedTargets: [{ workspaceId: REPO_ROOT }, { workspaceId: SECOND_REPO_ROOT }],
+    })
   })
 
   test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {

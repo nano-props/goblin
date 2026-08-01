@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
@@ -35,6 +35,7 @@ describe('UnavailableWorkspaceView Retry', () => {
   afterEach(() => vi.restoreAllMocks())
 
   test('restarts the remote lifecycle through the existing store action', async () => {
+    const user = userEvent.setup()
     const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-remote')
     if (workspace.admission.kind !== 'remote') throw new Error('expected remote admission')
     workspace.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
@@ -47,13 +48,14 @@ describe('UnavailableWorkspaceView Retry', () => {
     })
 
     const { getByText } = renderInJsdom(<UnavailableWorkspaceView workspace={workspace} />)
-    fireEvent.click(getByText('workspace-unavailable.retry'))
+    await user.click(getByText('workspace-unavailable.retry'))
 
     await vi.waitFor(() => expect(retry).toHaveBeenCalledWith(remoteWorkspaceId))
     expect(runWorkspaceRefresh).not.toHaveBeenCalled()
   })
 
-  test('keeps local recovery on the manual capability refresh command', async () => {
+  test('keeps local recovery on the capability Refresh command', async () => {
+    const user = userEvent.setup()
     const workspace = emptyWorkspace(localWorkspaceId, 'workspace-runtime-local')
     acceptWorkspaceProbeState(workspace, {
       status: 'unavailable',
@@ -68,7 +70,7 @@ describe('UnavailableWorkspaceView Retry', () => {
     })
 
     const { getByText } = renderInJsdom(<UnavailableWorkspaceView workspace={workspace} />)
-    fireEvent.click(getByText('workspace-unavailable.retry'))
+    await user.click(getByText('workspace-unavailable.retry'))
 
     await vi.waitFor(() =>
       expect(runWorkspaceRefresh).toHaveBeenCalledWith(
@@ -81,6 +83,7 @@ describe('UnavailableWorkspaceView Retry', () => {
   })
 
   test('uses capability Refresh when a connected remote has a capability failure', async () => {
+    const user = userEvent.setup()
     const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-connected-remote')
     if (workspace.admission.kind !== 'remote') throw new Error('expected remote admission')
     const target = normalizeRemoteTarget({
@@ -105,7 +108,7 @@ describe('UnavailableWorkspaceView Retry', () => {
     })
 
     const { getByText } = renderInJsdom(<UnavailableWorkspaceView workspace={workspace} />)
-    fireEvent.click(getByText('workspace-unavailable.retry'))
+    await user.click(getByText('workspace-unavailable.retry'))
 
     await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledOnce())
     expect(retry).not.toHaveBeenCalled()

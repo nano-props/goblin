@@ -175,7 +175,8 @@ type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRe
 /**
  * Re-declares this window's complete workspace membership after realtime recovery,
  * then atomically advances every still-current local shell to the server's
- * canonical runtime epoch.
+ * canonical runtime epoch. Changed local targets remain eligible for downstream
+ * projection recovery only when their one-shot Refresh succeeds.
  */
 export async function reconcileOpenWorkspaceRuntimeMemberships(
   set: WorkspacesSet,
@@ -195,26 +196,37 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   ).catch((err) => {
     workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
   })
-  for (const target of recovery.changedTargets) {
-    if (isRemoteWorkspaceId(target.workspaceId)) continue
-    void runWorkspaceRefresh({ set, get }, target.workspaceId, { workspaceRuntimeId: target.workspaceRuntimeId })
-      .then((outcome) => {
-        if (outcome.ok || 'cancelled' in outcome) return
+  const ineligibleLocalWorkspaceIds = new Set<WorkspaceId>()
+  await Promise.all(
+    recovery.changedTargets.map(async (target) => {
+      if (isRemoteWorkspaceId(target.workspaceId)) return
+      try {
+        const outcome = await runWorkspaceRefresh({ set, get }, target.workspaceId, {
+          workspaceRuntimeId: target.workspaceRuntimeId,
+        })
+        if (outcome.ok) return
+        ineligibleLocalWorkspaceIds.add(target.workspaceId)
+        if ('cancelled' in outcome) return
         workspacesLog.warn('workspace refresh did not recover the changed local runtime', {
           workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           message: outcome.message,
         })
-      })
-      .catch((err) => {
+      } catch (err) {
+        ineligibleLocalWorkspaceIds.add(target.workspaceId)
         workspacesLog.warn('workspace refresh failed after local runtime epoch replacement', {
           workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           err,
         })
-      })
+      }
+    }),
+  )
+  return {
+    kind: 'settled',
+    targets: recovery.targets.filter((target) => !ineligibleLocalWorkspaceIds.has(target.workspaceId)),
+    changedTargets: recovery.changedTargets,
   }
-  return { kind: 'settled', targets: recovery.targets, changedTargets: recovery.changedTargets }
 }
 
 async function reconcileOpenWorkspaceRuntimeMembershipsNow(
