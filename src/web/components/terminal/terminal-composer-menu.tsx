@@ -2,6 +2,7 @@ import { Ellipsis, Upload, X } from 'lucide-react'
 import { Fragment, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
 import {
   TERMINAL_COMPOSER_COMMAND_KEY_GROUPS,
@@ -40,7 +41,6 @@ export function TerminalComposerMenu({
   const [open, setOpen] = useState(false)
   const sendVirtualKey = (key: TerminalComposerCommandKeyName) => {
     focusTargetRef.current = 'terminal'
-    setOpen(false)
     onVirtualKey(key)
   }
   const closeMenu = () => setOpen(false)
@@ -58,7 +58,7 @@ export function TerminalComposerMenu({
       <PopoverContent
         side="top"
         align="end"
-        className="w-max min-w-32 max-w-72 overflow-hidden p-1"
+        className="w-max min-w-32 max-w-72 overflow-hidden p-0"
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => {
           const focusTarget = focusTargetRef.current
@@ -72,37 +72,43 @@ export function TerminalComposerMenu({
           onRestoreComposerTriggerFocus()
         }}
       >
-        {mode === 'input' ? (
-          <ComposerMenuItem disabled={resolvingFiles} onClick={onUpload} closeMenu={closeMenu}>
-            <Upload className="size-4" />
-            {labels.uploadFiles}
-          </ComposerMenuItem>
-        ) : (
-          <>
-            {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
-              <Fragment key={group.id}>
-                {groupIndex > 0 && <Separator className="-mx-1 my-1 w-auto" />}
-                {group.keys.map((action) => (
-                  <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
-                    <Keycap>{action.keycap}</Keycap>
-                    {labels[action.labelKey]}
-                  </ComposerMenuItem>
-                ))}
-              </Fragment>
-            ))}
-          </>
-        )}
-        <Separator className="-mx-1 my-1 w-auto" />
-        <ComposerMenuItem
-          onClick={() => {
-            focusTargetRef.current = 'composer-trigger'
-            onClose()
-          }}
-          closeMenu={closeMenu}
+        <ScrollArea
+          className="max-h-(--radix-popover-content-available-height)"
+          viewportClassName="p-1"
+          scrollbarMode="compact"
         >
-          <X className="size-4" />
-          {labels.close}
-        </ComposerMenuItem>
+          {mode === 'input' ? (
+            <ComposerMenuItem disabled={resolvingFiles} onClick={onUpload} closeMenu={closeMenu}>
+              <Upload className="size-4" />
+              {labels.uploadFiles}
+            </ComposerMenuItem>
+          ) : (
+            <>
+              {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
+                <Fragment key={group.id}>
+                  {groupIndex > 0 && <Separator className="-mx-1 my-1 w-auto" />}
+                  {group.keys.map((action) => (
+                    <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
+                      <Keycap>{action.keycap}</Keycap>
+                      {labels[action.labelKey]}
+                    </ComposerMenuItem>
+                  ))}
+                </Fragment>
+              ))}
+            </>
+          )}
+          <Separator className="-mx-1 my-1 w-auto" />
+          <ComposerMenuItem
+            onClick={() => {
+              focusTargetRef.current = 'composer-trigger'
+              onClose()
+            }}
+            closeMenu={closeMenu}
+          >
+            <X className="size-4" />
+            {labels.close}
+          </ComposerMenuItem>
+        </ScrollArea>
       </PopoverContent>
     </Popover>
   )

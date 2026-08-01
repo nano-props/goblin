@@ -303,12 +303,7 @@ export function TerminalComposer({
       if (resolvingFiles) return
       const selectionStart = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionStart)
       const selectionEnd = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionEnd)
-      const plan = planTerminalComposerEdit(
-        draft,
-        selectionStart,
-        selectionEnd,
-        editingCommand,
-      )
+      const plan = planTerminalComposerEdit(draft, selectionStart, selectionEnd, editingCommand)
       if (plan.start === plan.end) return
       if (onDraftReplace(draft, plan.value)) {
         history.leaveBrowsing()
@@ -346,8 +341,8 @@ export function TerminalComposer({
   const currentFileInsertion = () => {
     const input = inputRef.current
     return {
-      start: input?.selectionStart ?? draft.length,
-      end: input?.selectionEnd ?? draft.length,
+      start: textareaOffsetToDraftOffset(draft, input?.selectionStart ?? draft.length),
+      end: textareaOffsetToDraftOffset(draft, input?.selectionEnd ?? draft.length),
     }
   }
   const openFilePicker = () => {
@@ -364,7 +359,9 @@ export function TerminalComposer({
       const start = Math.min(insertionRange.start, draft.length)
       const end = Math.min(Math.max(insertionRange.end, start), draft.length)
       const next = insertComposerText(draft, insertion, start, end)
-      if (onDraftReplace(draft, next.value)) pendingCaretRef.current = next.caret
+      if (onDraftReplace(draft, next.value)) {
+        pendingCaretRef.current = draftOffsetToTextareaOffset(next.value, next.caret)
+      }
     } finally {
       setResolvingFiles(false)
     }

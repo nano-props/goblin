@@ -41,13 +41,14 @@ function render(
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
     initialMode?: TerminalComposerMode
+    initialDraft?: string
     draftReplaceAccepted?: boolean
   } = {},
 ) {
   function ControlledComposer() {
     const [expanded, setExpanded] = useState(false)
     const [mode, setMode] = useState<TerminalComposerMode>(props.initialMode ?? 'keys')
-    const [draft, setDraft] = useState('')
+    const [draft, setDraft] = useState(props.initialDraft ?? '')
     const [historyEntries, setHistoryEntries] = useState<readonly string[]>([])
     const sendText = async (text: string) => {
       const accepted = await (props.onSendText ?? (async () => true))(text)
@@ -713,6 +714,28 @@ describe('TerminalComposer', () => {
     expect(textarea.selectionStart).toBe(4 + resolvedPath.length)
     expect(fileInput.value).toBe('')
     expect(document.activeElement).toBe(textarea)
+  })
+
+  test('maps file insertion through CRLF draft offsets', async () => {
+    const resolvedPath = "'/tmp/notes.txt'"
+    const onResolveFiles = vi.fn(async () => resolvedPath)
+    const { container } = render({ initialDraft: 'cat\r\ndone', onResolveFiles })
+    expand(container)
+    showInput(container)
+    const textarea = container.querySelector('textarea')
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!textarea || !fileInput) throw new Error('expected composer inputs')
+    const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+    textarea.setSelectionRange('cat\n'.length, 'cat\nd'.length)
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.uploadFiles).click())
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } })
+    })
+
+    expect(textarea.value).toBe(`cat\n${resolvedPath} one`)
+    expect(textarea.selectionStart).toBe(`cat\n${resolvedPath}`.length)
   })
 
   test('keeps one draft edit admitted while selected files resolve', async () => {

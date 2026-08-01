@@ -140,7 +140,7 @@ button,
 @layer base {
   /* Tailwind v4 preflight resets borders with `border: 0 solid` — no
    * color, which means any `border` / `border-t` utility (used heavily
-   * by shadcn components: DropdownMenuContent, Card, Input…) falls
+   * by shadcn components such as PopoverContent, Card, and Input) falls
    * back to `currentColor` and paints near-black against the text
    * color, not the intended muted `--color-border` (12% black). The
    * canonical shadcn template fixes this by setting border-color on

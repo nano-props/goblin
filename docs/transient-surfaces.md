@@ -79,8 +79,8 @@ Current rule for `Popover`:
 - callers such as repo pickers and row action menus do not add bespoke
   reporting code.
 
-`DropdownMenu` should follow the same contract if a transient parent contains a
-dropdown-backed control.
+Other floating primitives should follow the same contract when a transient
+parent contains one of those controls.
 
 ### Transient Parents
 

@@ -312,10 +312,11 @@ describe('TerminalSessionView composer', () => {
       if (!fileInput) throw new Error('expected composer file controls')
       fireEvent.change(textarea, { target: { value: 'cat ' } })
       textarea.setSelectionRange(4, 4)
-      act(() => fireEvent.pointerDown(moreButton, { button: 0, ctrlKey: false }))
-      const uploadItem = Array.from(document.querySelectorAll<HTMLElement>('[data-slot="dropdown-menu-item"]')).find(
-        (item) => item.textContent?.includes('terminal.composer-upload-files'),
-      )
+      act(() => fireEvent.click(moreButton))
+      const popoverContent = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+      const uploadItem = popoverContent
+        ? within(popoverContent).getByRole('button', { name: 'terminal.composer-upload-files' })
+        : null
       if (!uploadItem) throw new Error('expected composer upload action')
       act(() => uploadItem.click())
 
