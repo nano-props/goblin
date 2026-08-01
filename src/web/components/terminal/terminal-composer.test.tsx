@@ -105,7 +105,9 @@ function showInput(container: HTMLElement) {
 }
 
 function openMoreMenu(container: HTMLElement) {
-  act(() => buttonByAccessibleName(container, LABELS.more).click())
+  const more = buttonByAccessibleName(container, LABELS.more)
+  more.focus()
+  act(() => more.click())
 }
 
 function menuItemByText(text: string) {
@@ -881,6 +883,7 @@ describe('TerminalComposer', () => {
     expand(container)
     const more = buttonByAccessibleName(container, LABELS.more)
     openMoreMenu(container)
+    expect(document.activeElement).toBe(more)
 
     await user.keyboard('{Escape}')
 
