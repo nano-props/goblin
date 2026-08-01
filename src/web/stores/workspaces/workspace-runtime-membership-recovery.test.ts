@@ -192,6 +192,15 @@ describe('workspace runtime membership recovery', () => {
 
   test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {
     const nextWorkspaceRuntimeId = 'repo-runtime-abcdefghijklmnopqrstu'
+    const runtimeList = vi.fn(async () => ({
+      runtimes: [
+        {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: nextWorkspaceRuntimeId,
+          workspaceProbe: { status: 'probing' as const },
+        },
+      ],
+    }))
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     installGoblinTestBridge({
       'workspace.runtimeReconcile': async () => ({
@@ -203,19 +212,12 @@ describe('workspace runtime membership recovery', () => {
           },
         ],
       }),
-      'workspace.runtimeList': async () => ({
-        runtimes: [
-          {
-            workspaceId: REPO_ROOT,
-            workspaceRuntimeId: nextWorkspaceRuntimeId,
-            workspaceProbe: { status: 'probing' as const },
-          },
-        ],
-      }),
+      'workspace.runtimeList': runtimeList,
     })
 
     await reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
 
+    expect(runtimeList).toHaveBeenCalledOnce()
     const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe(nextWorkspaceRuntimeId)
     expect(repo?.capability.kind).toBe('git')

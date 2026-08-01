@@ -178,14 +178,8 @@ type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRe
  * canonical runtime epoch. Changed local targets remain eligible for downstream
  * projection recovery only when their one-shot Refresh succeeds.
  *
- * The exclusive membership boundary intentionally ends before Refresh. This
- * keeps capability probing out of membership admission and makes the Refresh a
- * bounded best-effort gate for this invocation, not an epoch-wide readiness
- * lease. A newer realtime recovery can therefore supersede this invocation
- * while Refresh is pending and may project the already-current epoch while it is
- * still probing. That reversible presentation edge is accepted by #359; reload
- * is the explicit full-recovery path. Do not add joining, retry, or pending
- * recovery state here without revisiting that product boundary.
+ * Refresh stays outside membership admission. #359 accepts that overlapping
+ * recovery may project a settling epoch instead of adding generation joining.
  */
 export async function reconcileOpenWorkspaceRuntimeMemberships(
   set: WorkspacesSet,
@@ -206,6 +200,8 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
     workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
   })
   const ineligibleLocalWorkspaceIds = new Set<WorkspaceId>()
+  // Settle one batch before projection recovery. #359 accepts cross-workspace
+  // delay instead of adding per-target generation coordination.
   await Promise.all(
     recovery.changedTargets.map(async (target) => {
       if (isRemoteWorkspaceId(target.workspaceId)) return
