@@ -810,7 +810,13 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
         state.pendingWorkspaceProbeTransition = null
       }
       if (remoteAttemptMayCommit(input)) {
-        state.remoteLifecycle = input.previousLifecycle
+        const target = input.result.lifecycle.target ?? remoteWorkspaceLifecycleTarget(input.previousLifecycle)
+        state.remoteLifecycle = {
+          kind: 'failed',
+          attemptId: input.attemptId,
+          reason: 'unknown',
+          ...(target ? { target } : {}),
+        }
         clearRemoteWorkspaceAttempt(state)
         notifyRemoteLifecycleTransition(input.onTransition, state.remoteLifecycle, input.workspaceId)
       }

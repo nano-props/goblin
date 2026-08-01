@@ -9,6 +9,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteWorkspaceConnectionResult, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const userId = 'user_test'
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
@@ -222,6 +223,82 @@ describe('workspace runtime remote lifecycle', () => {
       kind: 'failed',
       attemptId: 1,
       reason: 'unknown',
+    })
+  })
+
+  test('terminalizes cleanup failure monotonically before a queued restart', async () => {
+    const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    const availableProbe = {
+      status: 'ready' as const,
+      capabilities: {
+        files: { read: true as const, write: true as const },
+        terminal: { available: true as const },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    const unavailableProbe = {
+      ...availableProbe,
+      capabilities: { ...availableProbe.capabilities, git: { status: 'unavailable' as const } },
+    }
+    const transitions: string[] = []
+    const onTransition = (lifecycle: { kind: string; attemptId: number }) => {
+      transitions.push(`${lifecycle.kind}:${lifecycle.attemptId}`)
+    }
+    await runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      async () => ready,
+      onTransition,
+      'restart',
+      () => ({ workspaceProbe: { mode: 'refresh', probe: availableProbe } }),
+    )
+    const secondResult = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
+    const secondStarted = Promise.withResolvers<void>()
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupRelease = Promise.withResolvers<void>()
+    const cleanupError = new Error('cleanup failed')
+    const failing = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      () => {
+        secondStarted.resolve()
+        return secondResult.promise
+      },
+      onTransition,
+      'restart',
+      () => ({
+        workspaceProbe: {
+          mode: 'refresh',
+          probe: unavailableProbe,
+          beforeCommit: async () => {
+            cleanupStarted.resolve()
+            await cleanupRelease.promise
+            throw cleanupError
+          },
+        },
+      }),
+    )
+    await secondStarted.promise
+    const ensureResolver = vi.fn(async () => ready)
+    const ensured = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, ensureResolver, onTransition, 'ensure')
+    await flushMicrotasks()
+    secondResult.resolve(ready)
+    await cleanupStarted.promise
+    const restarted = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready, onTransition)
+
+    cleanupRelease.resolve()
+
+    await expect(failing).rejects.toBe(cleanupError)
+    await expect(ensured).rejects.toBe(cleanupError)
+    await expect(restarted).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 3 } })
+    expect(ensureResolver).not.toHaveBeenCalled()
+    expect(transitions).toEqual(['connecting:1', 'ready:1', 'connecting:2', 'failed:2', 'connecting:3', 'ready:3'])
+    expect(listWorkspaceRuntimes(userId)[0]).toMatchObject({
+      remoteLifecycle: { kind: 'ready', attemptId: 3 },
+      workspaceProbe: availableProbe,
     })
   })
 

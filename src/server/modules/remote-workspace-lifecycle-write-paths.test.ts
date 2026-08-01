@@ -229,7 +229,7 @@ describe('remote lifecycle write path', () => {
     expect(cleanup).toHaveBeenCalledOnce()
   })
 
-  test('rejects a later Git downgrade when no transactional cleanup dependency was injected', async () => {
+  test('fast-fails a later Git downgrade without restoring an older lifecycle attempt', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
@@ -240,7 +240,13 @@ describe('remote lifecycle write path', () => {
     expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toMatchObject({
       capabilities: { git: { status: 'available' } },
     })
-    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'ready', attemptId: 1 })
+    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
+      kind: 'failed',
+      attemptId: 2,
+      reason: 'unknown',
+      target: remoteTarget,
+    })
+    expect(mocks.publishInvalidation).toHaveBeenCalledTimes(4)
   })
 
   test('commits an initial readable workspace when Git enrichment is operationally unavailable', async () => {
