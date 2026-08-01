@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import {
-  acceptRemoteWorkspaceLifecycleProjection,
-} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -52,16 +50,15 @@ describe('remote lifecycle projection acceptance', () => {
     }))
     expect(accept({ kind: 'ready', attemptId: 1, target })).toBe(false)
   })
-
 })
-
 function accept(
-  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteWorkspaceLifecycleProjection>[2]['remoteLifecycle']>,
+  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteWorkspaceRuntimeProjection>[2]['remoteLifecycle']>,
 ) {
-  return acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+  return acceptRemoteWorkspaceRuntimeProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
     workspaceId: repoRoot,
     workspaceRuntimeId,
     remoteLifecycle,
+    workspaceProbe: { status: 'probing' },
   })
 }
 

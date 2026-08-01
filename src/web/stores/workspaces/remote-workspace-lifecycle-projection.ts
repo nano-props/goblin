@@ -10,43 +10,6 @@ import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/
 
 const LIFECYCLE_PHASE_ORDER = { idle: 0, connecting: 1, ready: 2, failed: 2 } as const
 
-export function acceptRemoteWorkspaceLifecycleProjection(
-  set: WorkspacesSet,
-  get: WorkspacesGet,
-  entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle'>,
-): boolean {
-  const lifecycle = entry.remoteLifecycle
-  if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
-  const current = get().workspaces[entry.workspaceId]
-  if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
-  if (current.admission.kind !== 'remote') return false
-  if (
-    !remoteWorkspaceLifecycleProjectionIsFresh(
-      current.admission.lifecycleAttemptId,
-      current.admission.lifecycle?.kind,
-      lifecycle,
-    )
-  ) {
-    return false
-  }
-
-  let accepted = false
-  updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
-    if (repo.admission.kind !== 'remote') return
-    if (
-      !remoteWorkspaceLifecycleProjectionIsFresh(
-        repo.admission.lifecycleAttemptId,
-        repo.admission.lifecycle?.kind,
-        lifecycle,
-      )
-    )
-      return
-    applyRemoteWorkspaceLifecycle(repo, lifecycle)
-    accepted = true
-  })
-  return accepted
-}
-
 /** Accept the transport lifecycle and capability probe as one server-runtime projection. */
 export function acceptRemoteWorkspaceRuntimeProjection(
   set: WorkspacesSet,
