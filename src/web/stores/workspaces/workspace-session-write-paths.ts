@@ -177,6 +177,15 @@ type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRe
  * then atomically advances every still-current local shell to the server's
  * canonical runtime epoch. Changed local targets remain eligible for downstream
  * projection recovery only when their one-shot Refresh succeeds.
+ *
+ * The exclusive membership boundary intentionally ends before Refresh. This
+ * keeps capability probing out of membership admission and makes the Refresh a
+ * bounded best-effort gate for this invocation, not an epoch-wide readiness
+ * lease. A newer realtime recovery can therefore supersede this invocation
+ * while Refresh is pending and may project the already-current epoch while it is
+ * still probing. That reversible presentation edge is accepted by #359; reload
+ * is the explicit full-recovery path. Do not add joining, retry, or pending
+ * recovery state here without revisiting that product boundary.
  */
 export async function reconcileOpenWorkspaceRuntimeMemberships(
   set: WorkspacesSet,

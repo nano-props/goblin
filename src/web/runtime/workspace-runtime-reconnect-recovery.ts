@@ -35,6 +35,11 @@ export class WorkspaceRuntimeReconnectRecovery {
   private async run(generation: number): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
+      // The latest recovered event owns presentation. We deliberately do not
+      // join an older generation that may still be waiting on its one-shot local
+      // Refresh. Consequently, overlapping recoveries can project an
+      // already-current epoch while its probe is still settling. #359 accepts
+      // that reload-recoverable edge instead of adding cross-generation state.
       if (generation !== this.generation || recovery.kind === 'superseded') return
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
