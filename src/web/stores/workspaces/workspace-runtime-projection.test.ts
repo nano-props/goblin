@@ -10,6 +10,7 @@ const workspaceId = workspaceIdForTest('goblin+file:///workspace/runtime-project
 const workspaceRuntimeId = 'repo-runtime-projection-test'
 const remoteWorkspaceId = workspaceIdForTest('goblin+ssh://example/runtime-projection')
 const remoteWorkspaceRuntimeId = 'remote-runtime-projection-test'
+const otherRemoteWorkspaceId = workspaceIdForTest('goblin+ssh://other/runtime-projection')
 const target = normalizeRemoteTarget({
   alias: 'example',
   host: 'example.test',
@@ -68,5 +69,38 @@ describe('workspace runtime snapshot projection', () => {
       kind: 'remote',
       lifecycle: { kind: 'ready', target },
     })
+  })
+
+  test('projects only runtime entries represented by this window', () => {
+    const workspace = emptyWorkspace(remoteWorkspaceId, remoteWorkspaceRuntimeId)
+    useWorkspacesStore.setState({
+      workspaces: { [remoteWorkspaceId]: workspace },
+      workspaceOrder: [remoteWorkspaceId],
+    })
+
+    acceptWorkspaceRuntimeSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+      runtimes: [
+        {
+          workspaceId: remoteWorkspaceId,
+          workspaceRuntimeId: remoteWorkspaceRuntimeId,
+          workspaceProbe: createGitWorkspaceProbeForTest(),
+          remoteLifecycle: { kind: 'ready', attemptId: 1, target },
+        },
+        {
+          workspaceId: otherRemoteWorkspaceId,
+          workspaceRuntimeId: 'remote-runtime-other',
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'timeout' },
+        },
+      ],
+    })
+
+    const updated = useWorkspacesStore.getState().workspaces[remoteWorkspaceId]
+    expect(updated?.capability.kind).toBe('git')
+    expect(updated?.admission).toMatchObject({
+      kind: 'remote',
+      lifecycle: { kind: 'ready', target },
+    })
+    expect(useWorkspacesStore.getState().workspaces[otherRemoteWorkspaceId]).toBeUndefined()
   })
 })
