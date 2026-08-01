@@ -5,8 +5,7 @@ import {
   type RemoteWorkspaceTarget,
 } from '#/shared/remote-workspace.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
-import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
-import { acceptWorkspaceProbeSnapshot } from '#/web/stores/workspaces/workspace-probe-projection.ts'
+import { acceptWorkspaceRuntimeSnapshot } from '#/web/stores/workspaces/workspace-runtime-projection.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
@@ -82,8 +81,7 @@ export async function runRemoteWorkspaceConnection(
     } catch {
       return { kind: 'transport-failed', workspaceId, reason: 'unknown' }
     }
-    acceptRemoteWorkspaceLifecycleSnapshot(set, get, snapshot)
-    acceptWorkspaceProbeSnapshot(set, get, snapshot)
+    acceptWorkspaceRuntimeSnapshot(set, get, snapshot)
     const runtime = snapshot.runtimes.find(
       (entry) => entry.workspaceId === workspaceId && entry.workspaceRuntimeId === workspaceRuntimeId,
     )
