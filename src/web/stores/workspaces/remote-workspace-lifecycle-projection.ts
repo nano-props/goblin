@@ -57,12 +57,12 @@ export function acceptRemoteWorkspaceRuntimeProjection(
   if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
   const current = get().workspaces[entry.workspaceId]
   if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
-  if (!remoteWorkspaceRuntimeProjectionIsFresh(current, lifecycle)) return false
 
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (workspace) => {
-    if (!remoteWorkspaceRuntimeProjectionIsFresh(workspace, lifecycle)) return
-    applyRemoteWorkspaceLifecycle(workspace, lifecycle)
+    if (remoteWorkspaceRuntimeProjectionIsFresh(workspace, lifecycle)) {
+      applyRemoteWorkspaceLifecycle(workspace, lifecycle)
+    }
     acceptWorkspaceProbeState(workspace, entry.workspaceProbe)
     accepted = true
   })
