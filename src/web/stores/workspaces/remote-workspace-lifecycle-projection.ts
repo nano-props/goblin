@@ -1,5 +1,5 @@
 import { isRemoteWorkspaceId, type RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeEntry } from '#/shared/api-types.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
@@ -67,14 +67,6 @@ export function acceptRemoteWorkspaceRuntimeProjection(
     accepted = true
   })
   return accepted
-}
-
-export function acceptRemoteWorkspaceLifecycleSnapshot(
-  set: WorkspacesSet,
-  get: WorkspacesGet,
-  snapshot: WorkspaceRuntimesSnapshot,
-): void {
-  for (const entry of snapshot.runtimes) acceptRemoteWorkspaceLifecycleProjection(set, get, entry)
 }
 
 function remoteWorkspaceLifecycleProjectionIsFresh(

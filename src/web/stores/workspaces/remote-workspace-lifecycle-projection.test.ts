@@ -3,8 +3,9 @@ import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
   acceptRemoteWorkspaceLifecycleProjection,
-  acceptRemoteWorkspaceLifecycleSnapshot,
 } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import { acceptWorkspaceRuntimeSnapshot } from '#/web/stores/workspaces/workspace-runtime-projection.ts'
+import { createGitWorkspaceProbeForTest } from '#/web/test-utils/repo-store.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -55,12 +56,12 @@ describe('remote lifecycle projection acceptance', () => {
   })
 
   test('applies only runtime entries represented by this window', () => {
-    acceptRemoteWorkspaceLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+    acceptWorkspaceRuntimeSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
       runtimes: [
         {
           workspaceId: repoRoot,
           workspaceRuntimeId,
-          workspaceProbe: { status: 'probing' },
+          workspaceProbe: createGitWorkspaceProbeForTest(),
           remoteLifecycle: { kind: 'ready', attemptId: 1, target },
         },
         {
@@ -74,6 +75,7 @@ describe('remote lifecycle projection acceptance', () => {
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'ready', target },
     })
+    expect(useWorkspacesStore.getState().workspaces[repoRoot]?.capability.kind).toBe('git')
     expect(useWorkspacesStore.getState().workspaces['goblin+ssh://other/repo']).toBeUndefined()
   })
 })
