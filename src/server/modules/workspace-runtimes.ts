@@ -686,7 +686,7 @@ export async function runRemoteWorkspaceLifecycle(
         if (current.remoteLifecycle.kind === 'ready') {
           return {
             kind: 'result',
-            result: settledRemoteWorkspaceLifecycleResult(current.remoteLifecycle),
+            result: settledRemoteWorkspaceLifecycleResult(current.remoteLifecycle, current.workspaceProbe),
           } as const
         }
       }
@@ -826,7 +826,7 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
     state.remoteLifecycle = projectSettledRemoteWorkspaceLifecycle(input.result, input.attemptId)
     clearRemoteWorkspaceAttempt(state)
     state.pendingWorkspaceProbeTransition = null
-    const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle)
+    const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle, state.workspaceProbe)
     notifyRemoteLifecycleTransition(input.onTransition, settled.lifecycle, input.workspaceId)
     return settled
   })

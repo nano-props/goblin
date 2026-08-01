@@ -6,7 +6,7 @@ import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
@@ -155,7 +155,7 @@ function RepoRefreshButton({
 
   async function handleSync(): Promise<void> {
     const workspaceRuntimeId = repo.workspaceRuntimeId
-    const outcome = await runManualWorkspaceRefresh(
+    const outcome = await runWorkspaceRefresh(
       { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
       repo.id,
       { workspaceRuntimeId },

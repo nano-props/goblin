@@ -247,11 +247,9 @@ export interface WorkspaceMembershipActions {
   ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   /**
-   * Re-probe a remote workspace's lifecycle. The single user-facing
-   * entry point for "retry" (and the only path the
-   * `useNetworkReconnect` hook calls to recover from a failed
-   * lifecycle). Safe to call regardless of the current lifecycle
-   * phase — the server starts a newer monotonic attempt.
+   * Explicitly re-probe a remote workspace lifecycle for the user-facing
+   * Retry action. Safe to call regardless of the current lifecycle phase —
+   * the server starts a newer monotonic attempt.
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>

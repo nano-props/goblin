@@ -79,6 +79,10 @@ describe('remote lifecycle write path', () => {
       kind: 'settled',
       workspaceId,
       lifecycle: { kind: 'ready', attemptId: 1 },
+      workspaceProbe: {
+        status: 'ready',
+        capabilities: { git: { status: 'available' } },
+      },
     })
     expect(mocks.resolveConnection).toHaveBeenCalledTimes(1)
     expect(mocks.publishInvalidation).toHaveBeenCalledTimes(2)
@@ -284,7 +288,12 @@ describe('remote lifecycle write path', () => {
       lifecycle: { kind: 'failed', reason },
     })
 
-    await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'ensure' })
+    await expect(
+      runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'ensure' }),
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      workspaceProbe: { status: 'unavailable', reason: expected },
+    })
 
     expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toEqual({ status: 'unavailable', reason: expected })
   })

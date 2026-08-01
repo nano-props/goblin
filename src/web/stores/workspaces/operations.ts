@@ -3,7 +3,7 @@ export type RepoOperationPhase = 'idle' | 'queued' | 'running'
 export type RepoBranchActionReason =
   'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
 export type RepoOperationReason =
-  'fetch' | 'network' | 'pull' | 'push' | 'user-fetch' | 'manual-refresh' | RepoBranchActionReason
+  'fetch' | 'network' | 'pull' | 'push' | 'user-fetch' | 'workspace-refresh' | RepoBranchActionReason
 
 export interface RepoOperationState {
   operationId: number

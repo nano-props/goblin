@@ -114,6 +114,7 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
+      workspaceProbe: gitProbe(),
       repoId: 'goblin+ssh://prod/srv/repo',
     })
   })
@@ -304,6 +305,10 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
+      workspaceProbe: {
+        status: 'unavailable',
+        reason: 'error.workspace-transport-unavailable',
+      },
     })
     mocks.workspaceProbes.set(remoteEntry.id, {
       status: 'unavailable',

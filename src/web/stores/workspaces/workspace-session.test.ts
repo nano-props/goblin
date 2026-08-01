@@ -482,6 +482,15 @@ describe('repo lifecycle', () => {
       kind: 'settled'
       workspaceId: string
       lifecycle: { kind: 'ready'; attemptId: number; target: NonNullable<typeof target> }
+      workspaceProbe: {
+        status: 'ready'
+        capabilities: {
+          files: { read: true; write: boolean }
+          terminal: { available: boolean }
+          git: { status: 'available'; worktrees: boolean; pullRequests: { provider: 'none' } }
+        }
+        diagnostics: []
+      }
     }>()
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
 
@@ -492,6 +501,15 @@ describe('repo lifecycle', () => {
       kind: 'settled',
       workspaceId: target!.id,
       lifecycle: { kind: 'ready', attemptId: 1, target: target! },
+      workspaceProbe: {
+        status: 'ready',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
     })
 
     await expect(opening).resolves.toEqual({ ok: false, message: 'error.workspace-open-failed' })

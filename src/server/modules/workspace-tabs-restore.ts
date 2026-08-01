@@ -93,8 +93,7 @@ async function projectWorkspace(
     )
     assertCurrentWorkspaceRuntimeMembership(input)
     if (lifecycle.kind !== 'settled') return null
-    const workspaceProbe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
-    if (!workspaceProbe) return null
+    const workspaceProbe = lifecycle.workspaceProbe
     if (lifecycle.lifecycle.kind === 'failed') {
       return {
         entry,

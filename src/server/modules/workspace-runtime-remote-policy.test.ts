@@ -74,8 +74,12 @@ describe('remote workspace runtime policy', () => {
 
   test('classifies settled and superseded results from authoritative runtime inputs', () => {
     const lifecycle = { kind: 'ready' as const, attemptId: 4, target }
-    expect(settledRemoteWorkspaceLifecycleResult(lifecycle)).toEqual({ kind: 'settled', lifecycle })
-    expect(() => settledRemoteWorkspaceLifecycleResult({ kind: 'connecting', attemptId: 4 })).toThrow(
+    expect(settledRemoteWorkspaceLifecycleResult(lifecycle, unavailableProbe)).toEqual({
+      kind: 'settled',
+      lifecycle,
+      workspaceProbe: unavailableProbe,
+    })
+    expect(() => settledRemoteWorkspaceLifecycleResult({ kind: 'connecting', attemptId: 4 }, unavailableProbe)).toThrow(
       'remote workspace lifecycle must be terminal before it settles',
     )
     expect(supersededRemoteWorkspaceLifecycleResult('runtime-current', 'runtime-current')).toEqual({

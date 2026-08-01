@@ -18,16 +18,15 @@ export interface WorkspaceRefreshStoreAccess {
   get: WorkspacesGet
 }
 
-export type ManualWorkspaceRefreshOutcome =
-  { ok: true } | { ok: false; message: string } | { ok: false; cancelled: true }
+export type WorkspaceRefreshOutcome = { ok: true } | { ok: false; message: string } | { ok: false; cancelled: true }
 
-const commands = new Map<string, Promise<ManualWorkspaceRefreshOutcome>>()
+const commands = new Map<string, Promise<WorkspaceRefreshOutcome>>()
 
-export async function runManualWorkspaceRefresh(
+export async function runWorkspaceRefresh(
   store: WorkspaceRefreshStoreAccess,
   workspaceId: WorkspaceId,
   options?: { workspaceRuntimeId?: string },
-): Promise<ManualWorkspaceRefreshOutcome> {
+): Promise<WorkspaceRefreshOutcome> {
   const workspace = store.get().workspaces[workspaceId]
   if (!workspace) return { ok: false, cancelled: true }
   const workspaceRuntimeId = options?.workspaceRuntimeId ?? workspace.workspaceRuntimeId
@@ -35,7 +34,7 @@ export async function runManualWorkspaceRefresh(
   const key = `${workspaceId}\0${workspaceRuntimeId}`
   const existing = commands.get(key)
   if (existing) return await existing
-  const command = runManualWorkspaceRefreshOnce(store, workspaceId, workspaceRuntimeId)
+  const command = runWorkspaceRefreshOnce(store, workspaceId, workspaceRuntimeId)
   commands.set(key, command)
   try {
     return await command
@@ -44,11 +43,11 @@ export async function runManualWorkspaceRefresh(
   }
 }
 
-async function runManualWorkspaceRefreshOnce(
+async function runWorkspaceRefreshOnce(
   store: WorkspaceRefreshStoreAccess,
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-): Promise<ManualWorkspaceRefreshOutcome> {
+): Promise<WorkspaceRefreshOutcome> {
   const outcome = await requestWorkspaceCapabilityRefresh(workspaceId, workspaceRuntimeId)
   if (outcome.kind === 'cancelled') return { ok: false, cancelled: true }
   if (outcome.kind === 'failed') return { ok: false, message: outcome.message }
@@ -63,7 +62,7 @@ async function runManualWorkspaceRefreshOnce(
   })
   const resolved = resolveActionWorkspaceRuntimeId(store.get, workspaceId, workspaceRuntimeId)
   if (!resolved || !isGitWorkspace(resolved.repo)) return { ok: true }
-  const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
+  const { runRefreshSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
     refreshReadModels: async (repoId, nextWorkspaceRuntimeId, signal) => {
       void refreshActiveRepoPullRequestQueries(repoId, nextWorkspaceRuntimeId).catch((error) => {
         goblinLog.warn('active pull-request refresh failed', {
@@ -85,8 +84,8 @@ async function runManualWorkspaceRefreshOnce(
     workspaceRuntimeId,
     lane: 'read',
     priority: 100,
-    targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-    task: async (signal) => await runManualSyncPipeline(workspaceId, workspaceRuntimeId, signal),
+    targets: [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
+    task: async (signal) => await runRefreshSyncPipeline(workspaceId, workspaceRuntimeId, signal),
     onError: (message) => {
       updateIfFresh(store.set, workspaceId, workspaceRuntimeId, (workspace) => {
         if (!isGitWorkspace(workspace)) return

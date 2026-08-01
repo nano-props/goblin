@@ -8,7 +8,9 @@ import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/w
 export type SettledRemoteWorkspaceLifecycle = Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
 
 export type RemoteWorkspaceLifecycleRunResult =
-  { kind: 'settled'; lifecycle: SettledRemoteWorkspaceLifecycle } | { kind: 'superseded' } | { kind: 'stale-runtime' }
+  | { kind: 'settled'; lifecycle: SettledRemoteWorkspaceLifecycle; workspaceProbe: WorkspaceProbeState }
+  | { kind: 'superseded' }
+  | { kind: 'stale-runtime' }
 
 export interface RemoteWorkspaceTerminalCommitPlan {
   workspaceProbe?: {
@@ -50,11 +52,12 @@ export function remoteWorkspaceLifecycleTarget(
 
 export function settledRemoteWorkspaceLifecycleResult(
   lifecycle: RemoteWorkspaceRuntimeLifecycle,
+  workspaceProbe: WorkspaceProbeState,
 ): Extract<RemoteWorkspaceLifecycleRunResult, { kind: 'settled' }> {
   if (lifecycle.kind !== 'ready' && lifecycle.kind !== 'failed') {
     throw new Error('remote workspace lifecycle must be terminal before it settles')
   }
-  return { kind: 'settled', lifecycle }
+  return { kind: 'settled', lifecycle, workspaceProbe }
 }
 
 export function supersededRemoteWorkspaceLifecycleResult(

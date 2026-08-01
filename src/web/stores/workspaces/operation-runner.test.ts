@@ -261,7 +261,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: (signal) =>
         new Promise<{ ok: true; tag: 'first' }>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -284,7 +284,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: async () => {
         secondStarted = true
         return { ok: true, tag: 'second' as const }
@@ -321,7 +321,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: (signal) =>
         new Promise<{ ok: true }>((resolve) => {
           signal.addEventListener('abort', () => resolve({ ok: true }))
@@ -338,7 +338,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: async () => {
         secondStarted = true
         return { ok: true }
@@ -423,7 +423,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: (signal) =>
         new Promise<string>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -444,7 +444,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: async () => 'NEW',
     })
 
@@ -469,7 +469,7 @@ describe('runLatestOperation active-task cancellation', () => {
       priority: 50,
       targets: [
         { key: 'branchAction', reason: 'branch:pull' },
-        { key: 'manualRefresh', reason: 'manual-refresh' },
+        { key: 'workspaceRefresh', reason: 'workspace-refresh' },
       ],
       task: () =>
         new Promise<string>((_resolve, reject) => {
@@ -486,10 +486,10 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
-      operationKey: 'manual-refresh',
+      operationKey: 'workspace-refresh',
       priority: 40,
-      targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-      task: async () => 'manual-refresh',
+      targets: [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
+      task: async () => 'workspace-refresh',
     })
     rejectReadModel(new CancelledError())
 
@@ -520,7 +520,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: (signal) =>
         new Promise<string>((_resolve, reject) => {
           signal.addEventListener('abort', () => reject(abortError()), { once: true })
@@ -538,7 +538,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'workspace-refresh' }],
       task: async () => 'fresh',
     })
 

@@ -5,6 +5,7 @@ import {
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 import { isStringIn } from '#/shared/string-literals.ts'
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 export interface RemoteWorkspaceRef {
   id: WorkspaceId
@@ -194,6 +195,7 @@ export type RemoteWorkspaceLifecycleCommandResult =
       kind: 'settled'
       workspaceId: WorkspaceId
       lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      workspaceProbe: WorkspaceProbeState
     }
   | { kind: 'superseded'; workspaceId: WorkspaceId }
   | { kind: 'stale-runtime'; workspaceId: WorkspaceId }

@@ -71,11 +71,19 @@ describe('workspace HTTP response schemas', () => {
       kind: 'settled' as const,
       workspaceId,
       lifecycle: { kind: 'ready' as const, attemptId: 1, target },
+      workspaceProbe: readyProbe,
     }
 
     expect(v.parse(WorkspaceProbeStateResponseSchema, readyProbe)).toEqual(readyProbe)
     expect(v.parse(WorkspaceRuntimeOpenResponseSchema, runtimeOpenResponse)).toEqual(runtimeOpenResponse)
     expect(v.parse(RemoteLifecycleResponseSchema, lifecycleResponse)).toEqual(lifecycleResponse)
+    expect(
+      v.safeParse(RemoteLifecycleResponseSchema, {
+        kind: lifecycleResponse.kind,
+        workspaceId: lifecycleResponse.workspaceId,
+        lifecycle: lifecycleResponse.lifecycle,
+      }).success,
+    ).toBe(false)
     expect(v.safeParse(WorkspaceProbeStateResponseSchema, { ...readyProbe, name: 'Documents' }).success).toBe(false)
     expect(
       v.safeParse(WorkspaceRuntimeOpenResponseSchema, {

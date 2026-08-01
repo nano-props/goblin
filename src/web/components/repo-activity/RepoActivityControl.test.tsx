@@ -25,7 +25,7 @@ const refreshMocks = vi.hoisted(() => ({
 const toastMocks = vi.hoisted(() => ({ error: vi.fn() }))
 
 vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
-  runManualWorkspaceRefresh: refreshMocks.run,
+  runWorkspaceRefresh: refreshMocks.run,
 }))
 vi.mock('sonner', () => ({ toast: toastMocks }))
 
@@ -134,9 +134,14 @@ describe('RepoActivityControl', () => {
     fireEvent.click(button(rendered.container))
 
     const operationId = nextRepoOperationId(REPO_ID)
-    markRepoOperationTargets(REPO_ID, operationId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], 'running')
+    markRepoOperationTargets(
+      REPO_ID,
+      operationId,
+      [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
+      'running',
+    )
     rendered.rerender(control())
-    settleRepoOperationTargets(REPO_ID, operationId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], null)
+    settleRepoOperationTargets(REPO_ID, operationId, [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }], null)
 
     await act(async () => {
       refresh.resolve({ ok: true })

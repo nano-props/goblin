@@ -135,11 +135,29 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
             kind: 'settled',
             workspaceId: canonicalWorkspaceId,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
+            workspaceProbe: {
+              status: 'ready',
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: result.gitAvailable
+                  ? { status: 'available', worktrees: true, pullRequests: { provider: 'none' } }
+                  : { status: 'unavailable' },
+              },
+              diagnostics: result.gitDiagnostic ? [{ scope: 'git', message: result.gitDiagnostic }] : [],
+            },
           }
         : {
             kind: 'settled',
             workspaceId: canonicalWorkspaceId,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
+            workspaceProbe: {
+              status: 'unavailable',
+              reason:
+                result.lifecycle.reason === 'path-missing'
+                  ? 'error.workspace-path-not-found'
+                  : 'error.workspace-transport-unavailable',
+            },
           }
     }
   }

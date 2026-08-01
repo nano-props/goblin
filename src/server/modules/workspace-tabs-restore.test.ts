@@ -279,6 +279,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready', target: remoteTarget },
+      workspaceProbe: plainWorkspaceProbe(),
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -416,6 +417,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready', attemptId: 3, target: remoteTarget },
+      workspaceProbe: gitProbe(),
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
@@ -444,6 +446,10 @@ describe('restoreWorkspaceTabs', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
+      workspaceProbe: {
+        status: 'unavailable',
+        reason: 'error.workspace-transport-unavailable',
+      },
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue({
       status: 'unavailable',

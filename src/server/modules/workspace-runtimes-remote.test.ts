@@ -216,6 +216,7 @@ describe('workspace runtime remote lifecycle', () => {
     ).resolves.toEqual({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' },
+      workspaceProbe: { status: 'probing' },
     })
     expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
       kind: 'failed',

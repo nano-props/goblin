@@ -96,6 +96,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       kind: 'settled',
       repoId: 'goblin+ssh://prod/srv/repo',
       lifecycle: { kind: 'ready', target: { id: 'goblin+ssh://prod/srv/repo' } },
+      workspaceProbe: gitProbe(),
     })
     mocks.readRepoSnapshot.mockImplementation(async (workspaceId: string) => ({
       snapshot: {

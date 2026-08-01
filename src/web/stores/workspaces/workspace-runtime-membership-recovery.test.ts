@@ -15,12 +15,19 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+
+vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
+  runWorkspaceRefresh: vi.fn(async () => ({ ok: true })),
+}))
 
 const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/runtime-membership-recovery')
 const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://example/srv/runtime-membership-recovery')
 
 describe('workspace runtime membership recovery', () => {
   beforeEach(() => {
+    vi.mocked(runWorkspaceRefresh).mockClear()
+    vi.mocked(runWorkspaceRefresh).mockResolvedValue({ ok: true })
     resetWorkspacesStore()
     installGoblinTestBridge({
       'workspace.runtimeReconcile': async () => ({
@@ -57,6 +64,44 @@ describe('workspace runtime membership recovery', () => {
     const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
     expect(repo?.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
+    expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
+    expect(runWorkspaceRefresh).toHaveBeenCalledWith(
+      { set: useWorkspacesStore.setState, get: useWorkspacesStore.getState },
+      REPO_ROOT,
+      { workspaceRuntimeId: 'repo-runtime-123456789012345678901' },
+    )
+  })
+
+  test('does not refresh capability when reconnect keeps the current local epoch', async () => {
+    resetWorkspacesStore()
+    const workspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            workspaceProbe: createGitWorkspaceProbeForTest(),
+          },
+        ],
+      }),
+    })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+    ).resolves.toMatchObject({ kind: 'settled', changedTargets: [] })
+
+    expect(runWorkspaceRefresh).not.toHaveBeenCalled()
+  })
+
+  test('keeps membership recovery settled when the one-shot local refresh fails', async () => {
+    vi.mocked(runWorkspaceRefresh).mockResolvedValue({ ok: false, message: 'error.workspace-operation-failed' })
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+
+    await expect(
+      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+    ).resolves.toMatchObject({ kind: 'settled', changedTargets: [{ workspaceId: REPO_ROOT }] })
+    await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledOnce())
   })
 
   test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {

@@ -22,6 +22,7 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
 import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import type {
   CloseWorkspaceResult,
@@ -194,6 +195,25 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   ).catch((err) => {
     workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
   })
+  for (const target of recovery.changedTargets) {
+    if (isRemoteWorkspaceId(target.workspaceId)) continue
+    void runWorkspaceRefresh({ set, get }, target.workspaceId, { workspaceRuntimeId: target.workspaceRuntimeId })
+      .then((outcome) => {
+        if (outcome.ok || 'cancelled' in outcome) return
+        workspacesLog.warn('workspace refresh did not recover the changed local runtime', {
+          workspaceId: target.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          message: outcome.message,
+        })
+      })
+      .catch((err) => {
+        workspacesLog.warn('workspace refresh failed after local runtime epoch replacement', {
+          workspaceId: target.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          err,
+        })
+      })
+  }
   return { kind: 'settled', targets: recovery.targets, changedTargets: recovery.changedTargets }
 }
 
@@ -458,7 +478,7 @@ export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: Workspa
     async retryRemoteWorkspaceConnection(id: string) {
       const workspace = get().workspaces[id]
       if (workspace?.admission.kind !== 'remote') return null
-      const outcome = await runRemoteWorkspaceConnection(set, get, workspace.id)
+      const outcome = await runRemoteWorkspaceConnection(set, get, workspace.id, { mode: 'restart' })
       if (!outcome) return null
       if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime' || outcome.kind === 'cancelled') return null
       if (outcome.kind === 'transport-failed') return { ok: false, reason: outcome.reason }
