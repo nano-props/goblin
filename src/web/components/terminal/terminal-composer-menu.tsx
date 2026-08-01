@@ -58,7 +58,7 @@ export function TerminalComposerMenu({
       <PopoverContent
         side="top"
         align="end"
-        className="w-max min-w-32 p-1"
+        className="w-max min-w-48 max-w-72 overflow-hidden p-1"
         onCloseAutoFocus={(event) => {
           const focusTarget = focusTargetRef.current
           if (!focusTarget) return
@@ -128,7 +128,7 @@ function ComposerMenuItem({
       type="button"
       disabled={disabled}
       onClick={handleClick}
-      className="group relative flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+      className="group relative flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
     >
       {children}
     </button>
