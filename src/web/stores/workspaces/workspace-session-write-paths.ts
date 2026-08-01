@@ -23,7 +23,10 @@ import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
 import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import {
+  acceptRemoteWorkspaceLifecycleSnapshot,
+  acceptRemoteWorkspaceRuntimeProjection,
+} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import type {
   CloseWorkspaceResult,
   OpenWorkspacePostOpenError,
@@ -300,6 +303,11 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
       queryKey: repoDataQueryKey(changed.workspaceId, changed.previousWorkspaceRuntimeId),
     })
     disposeRepoRuntimeReadState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
+  }
+  for (const changed of changedTargets) {
+    if (!isRemoteWorkspaceId(changed.workspaceId)) continue
+    const runtime = runtimeByWorkspaceId.get(changed.workspaceId)
+    if (runtime) acceptRemoteWorkspaceRuntimeProjection(set, get, runtime)
   }
   const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
+  closeWorkspaceRuntimesForDurableRemoval,
   failRemoteWorkspaceLifecycle,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
@@ -315,6 +316,72 @@ describe('workspace runtime remote lifecycle', () => {
       workspaceProbe: availableProbe,
     })
   })
+
+  test.each(['success', 'failure'] as const)(
+    'does not let stale cleanup %s restore a probe into a replacement epoch',
+    async (cleanupOutcome) => {
+      const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+      const availableProbe = {
+        status: 'ready' as const,
+        capabilities: {
+          files: { read: true as const, write: true as const },
+          terminal: { available: true as const },
+          git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+        },
+        diagnostics: [],
+      }
+      const unavailableProbe = {
+        ...availableProbe,
+        capabilities: { ...availableProbe.capabilities, git: { status: 'unavailable' as const } },
+      }
+      await runRemoteWorkspaceLifecycle(
+        userId,
+        workspaceId,
+        runtimeId,
+        async () => ready,
+        () => {},
+        'restart',
+        () => ({ workspaceProbe: { mode: 'refresh', probe: availableProbe } }),
+      )
+      const cleanupStarted = Promise.withResolvers<void>()
+      const cleanupRelease = Promise.withResolvers<void>()
+      const work = runRemoteWorkspaceLifecycle(
+        userId,
+        workspaceId,
+        runtimeId,
+        async () => ready,
+        () => {},
+        'restart',
+        () => ({
+          workspaceProbe: {
+            mode: 'refresh',
+            probe: unavailableProbe,
+            beforeCommit: async () => {
+              cleanupStarted.resolve()
+              await cleanupRelease.promise
+              if (cleanupOutcome === 'failure') throw new Error('cleanup failed after durable removal')
+            },
+          },
+        }),
+      )
+      await cleanupStarted.promise
+
+      expect(closeWorkspaceRuntimesForDurableRemoval(workspaceId)).toBe(1)
+      cleanupRelease.resolve()
+      await expect(work).resolves.toEqual({ kind: 'stale-runtime' })
+
+      const replacementRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+      expect(replacementRuntimeId).not.toBe(runtimeId)
+      expect(listWorkspaceRuntimes(userId)).toEqual([
+        {
+          workspaceId,
+          workspaceRuntimeId: replacementRuntimeId,
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'idle', attemptId: 0 },
+        },
+      ])
+    },
+  )
 
   test('returns stale-runtime when close replaces the running generation', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
