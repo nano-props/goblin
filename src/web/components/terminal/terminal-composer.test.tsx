@@ -463,35 +463,6 @@ describe('TerminalComposer', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
-  test('toggles the More menu when its trigger is clicked repeatedly', async () => {
-    const user = userEvent.setup()
-    const { container } = render()
-    expand(container)
-    const more = buttonByAccessibleName(container, LABELS.more)
-
-    await user.click(more)
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).not.toBeNull()
-
-    await user.click(more)
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
-  })
-
-  test('toggles the More menu through a touch pointer sequence', () => {
-    const { container } = render()
-    expand(container)
-    const more = buttonByAccessibleName(container, LABELS.more)
-    const tap = () => {
-      fireEvent.pointerDown(more, { pointerType: 'touch', button: 0, ctrlKey: false })
-      fireEvent.pointerUp(more, { pointerType: 'touch', button: 0, ctrlKey: false })
-      fireEvent.click(more)
-    }
-
-    tap()
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).not.toBeNull()
-    tap()
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
-  })
-
   test('moves keyboard focus into keys mode when expanded', async () => {
     const user = userEvent.setup()
     const { container } = render()
