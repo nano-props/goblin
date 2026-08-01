@@ -34,7 +34,13 @@ import {
   TERMINAL_COMPOSER_COMMAND_KEYS,
   type TerminalComposerCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
-import { isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import {
+  draftOffsetToTextareaOffset,
+  planTerminalComposerEdit,
+  textareaOffsetToDraftOffset,
+  terminalComposerEditCommandForEvent,
+} from '#/web/components/terminal/terminal-composer-editing.ts'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -287,7 +293,25 @@ export function TerminalComposer({
     onDraftReplace(submittedDraft, '')
   }
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (resolvingFiles || isImeCompositionEvent(event)) return
+    if (isImeCompositionEvent(event)) return
+    const editingCommand = terminalComposerEditCommandForEvent(
+      event,
+      isDesktopMacNavigatorPlatform(globalThis.navigator?.platform ?? ''),
+    )
+    if (editingCommand) {
+      event.preventDefault()
+      if (resolvingFiles) return
+      const selectionStart = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionStart)
+      const selectionEnd = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionEnd)
+      const plan = planTerminalComposerEdit(draft, selectionStart, selectionEnd, editingCommand)
+      if (plan.start === plan.end) return
+      if (onDraftReplace(draft, plan.value)) {
+        history.leaveBrowsing()
+        pendingCaretRef.current = draftOffsetToTextareaOffset(plan.value, plan.caret)
+      }
+      return
+    }
+    if (resolvingFiles) return
     const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
     if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
@@ -317,8 +341,8 @@ export function TerminalComposer({
   const currentFileInsertion = () => {
     const input = inputRef.current
     return {
-      start: input?.selectionStart ?? draft.length,
-      end: input?.selectionEnd ?? draft.length,
+      start: textareaOffsetToDraftOffset(draft, input?.selectionStart ?? draft.length),
+      end: textareaOffsetToDraftOffset(draft, input?.selectionEnd ?? draft.length),
     }
   }
   const openFilePicker = () => {
@@ -335,7 +359,9 @@ export function TerminalComposer({
       const start = Math.min(insertionRange.start, draft.length)
       const end = Math.min(Math.max(insertionRange.end, start), draft.length)
       const next = insertComposerText(draft, insertion, start, end)
-      if (onDraftReplace(draft, next.value)) pendingCaretRef.current = next.caret
+      if (onDraftReplace(draft, next.value)) {
+        pendingCaretRef.current = draftOffsetToTextareaOffset(next.value, next.caret)
+      }
     } finally {
       setResolvingFiles(false)
     }
@@ -356,7 +382,11 @@ export function TerminalComposer({
       aria-label={labels.composer}
       onKeyDownCapture={(event) => {
         if (!expanded || event.key !== 'Escape' || isImeCompositionEvent(event)) return
-        if (event.target instanceof Element && event.target.closest('[data-slot="dropdown-menu-content"]')) {
+        if (
+          event.target instanceof Element &&
+          (event.target.closest('[data-slot="popover-content"]') ||
+            event.target.closest('[data-slot="popover-trigger"][data-state="open"]'))
+        ) {
           return
         }
         event.preventDefault()

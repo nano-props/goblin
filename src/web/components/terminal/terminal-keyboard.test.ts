@@ -5,6 +5,7 @@ import {
   SafariShiftKeyResolver,
   isImeOwnedKeyboardEvent,
   isMacNavigatorPlatform,
+  isDesktopMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
   terminalInputForVirtualKey,
 } from '#/web/components/terminal/terminal-keyboard.ts'
@@ -232,6 +233,16 @@ describe('isMacNavigatorPlatform', () => {
     expect(isMacNavigatorPlatform('iPad')).toBe(true)
     expect(isMacNavigatorPlatform('Win32')).toBe(false)
     expect(isMacNavigatorPlatform('Linux x86_64')).toBe(false)
+  })
+})
+
+describe('isDesktopMacNavigatorPlatform', () => {
+  test('excludes iOS platforms from the strict desktop gate', () => {
+    expect(isDesktopMacNavigatorPlatform('MacIntel')).toBe(true)
+    expect(isDesktopMacNavigatorPlatform('MacPPC')).toBe(true)
+    expect(isDesktopMacNavigatorPlatform('iPhone')).toBe(false)
+    expect(isDesktopMacNavigatorPlatform('iPad')).toBe(false)
+    expect(isDesktopMacNavigatorPlatform('Win32')).toBe(false)
   })
 })
 

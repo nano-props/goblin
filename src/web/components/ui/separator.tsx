@@ -15,9 +15,8 @@
 //
 // Orientation:
 //   • horizontal (default): h-px w-full. Use between stacked groups
-//     inside popovers/menus. Matches the SelectSeparator and
-//     DropdownMenuSeparator rendering — they remain Radix-wrapped
-//     because they participate in those primitives' keyboard nav.
+//     inside popovers/menus. Primitive-specific separators remain
+//     Radix-wrapped when they participate in keyboard navigation.
 //   • vertical: w-px h-<size>. Use as an inline seam between toolbar
 //     siblings. Most callers wrap the rendered element in a `relative`
 //     parent and add `absolute left-0|right-0 top-1/2 -translate-y-1/2`

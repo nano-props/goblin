@@ -1,18 +1,14 @@
 import { Ellipsis, Upload, X } from 'lucide-react'
-import { Fragment, useRef } from 'react'
+import { Fragment, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { Separator } from '#/web/components/ui/separator.tsx'
 import {
   TERMINAL_COMPOSER_COMMAND_KEY_GROUPS,
   type TerminalComposerCommandKeyName,
   type TerminalComposerCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '#/web/components/ui/dropdown-menu.tsx'
 
 type TerminalComposerMenuLabels = Record<TerminalComposerCommandLabelKey, string> & {
   more: string
@@ -42,25 +38,28 @@ export function TerminalComposerMenu({
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
   const focusTargetRef = useRef<'composer-trigger' | 'terminal' | null>(null)
+  const [open, setOpen] = useState(false)
   const sendVirtualKey = (key: TerminalComposerCommandKeyName) => {
     focusTargetRef.current = 'terminal'
     onVirtualKey(key)
   }
+  const closeMenu = () => setOpen(false)
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button type="button" size="icon" variant="secondary" className="goblin-terminal-composer__btn">
           <span aria-hidden="true">
             <Ellipsis className="size-4" />
           </span>
           <span className="sr-only">{labels.more}</span>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
+      </PopoverTrigger>
+      <PopoverContent
         side="top"
         align="end"
-        className="w-max min-w-32"
+        className="w-max min-w-32 max-w-72 overflow-hidden p-0"
+        onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => {
           const focusTarget = focusTargetRef.current
           if (!focusTarget) return
@@ -73,38 +72,73 @@ export function TerminalComposerMenu({
           onRestoreComposerTriggerFocus()
         }}
       >
-        {mode === 'input' ? (
-          <DropdownMenuItem disabled={resolvingFiles} onSelect={onUpload}>
-            <Upload className="size-4" />
-            {labels.uploadFiles}
-          </DropdownMenuItem>
-        ) : (
-          <>
-            {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
-              <Fragment key={group.id}>
-                {groupIndex > 0 && <DropdownMenuSeparator />}
-                {group.keys.map((action) => (
-                  <DropdownMenuItem key={action.key} onSelect={() => sendVirtualKey(action.key)}>
-                    <Keycap>{action.keycap}</Keycap>
-                    {labels[action.labelKey]}
-                  </DropdownMenuItem>
-                ))}
-              </Fragment>
-            ))}
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            focusTargetRef.current = 'composer-trigger'
-            onClose()
-          }}
+        <ScrollArea
+          className="max-h-(--radix-popover-content-available-height)"
+          viewportClassName="p-1"
+          scrollbarMode="compact"
         >
-          <X className="size-4" />
-          {labels.close}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {mode === 'input' ? (
+            <ComposerMenuItem disabled={resolvingFiles} onClick={onUpload} closeMenu={closeMenu}>
+              <Upload className="size-4" />
+              {labels.uploadFiles}
+            </ComposerMenuItem>
+          ) : (
+            <>
+              {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
+                <Fragment key={group.id}>
+                  {groupIndex > 0 && <Separator className="-mx-1 my-1 w-auto" />}
+                  {group.keys.map((action) => (
+                    <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
+                      <Keycap>{action.keycap}</Keycap>
+                      {labels[action.labelKey]}
+                    </ComposerMenuItem>
+                  ))}
+                </Fragment>
+              ))}
+            </>
+          )}
+          <Separator className="-mx-1 my-1 w-auto" />
+          <ComposerMenuItem
+            onClick={() => {
+              focusTargetRef.current = 'composer-trigger'
+              onClose()
+            }}
+            closeMenu={closeMenu}
+          >
+            <X className="size-4" />
+            {labels.close}
+          </ComposerMenuItem>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function ComposerMenuItem({
+  children,
+  closeMenu,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode
+  closeMenu: () => void
+  onClick: () => void
+  disabled?: boolean
+}) {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    closeMenu()
+    onClick()
+  }
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={handleClick}
+      className="group relative flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
+    >
+      {children}
+    </button>
   )
 }
 

@@ -7,10 +7,8 @@ import { focusRingVisibleInset } from '#/web/components/ui/focus.ts'
 // Positioning: Select is the form-field dropdown. The trigger is a bordered
 // input-style control — used in settings rows (label on the left, this on
 // the right) and other form layouts. Radix renders a built-in checkmark on
-// the selected item, matching the HTML <select> convention. Do NOT reach
-// for this in command bars or navigation toolbars — that's `dropdown-menu.tsx`,
-// whose trigger is a ghost/icon button and which marks the active entry
-// with `bg-selected text-selected-foreground`.
+// the selected item, matching the HTML <select> convention. Use Popover-based
+// action surfaces for command bars and navigation toolbars instead.
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }

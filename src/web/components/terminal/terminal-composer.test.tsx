@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { useLayoutEffect, useState } from 'react'
@@ -41,12 +41,14 @@ function render(
     onRequestFocus?: () => void
     onScrollLines?: (amount: number) => void
     initialMode?: TerminalComposerMode
+    initialDraft?: string
+    draftReplaceAccepted?: boolean
   } = {},
 ) {
   function ControlledComposer() {
     const [expanded, setExpanded] = useState(false)
     const [mode, setMode] = useState<TerminalComposerMode>(props.initialMode ?? 'keys')
-    const [draft, setDraft] = useState('')
+    const [draft, setDraft] = useState(props.initialDraft ?? '')
     const [historyEntries, setHistoryEntries] = useState<readonly string[]>([])
     const sendText = async (text: string) => {
       const accepted = await (props.onSendText ?? (async () => true))(text)
@@ -78,6 +80,7 @@ function render(
           return true
         }}
         onDraftReplace={(expectedDraft, next) => {
+          if (props.draftReplaceAccepted === false) return false
           setDraft((current) => (current === expectedDraft ? next : current))
           return true
         }}
@@ -103,21 +106,25 @@ function showInput(container: HTMLElement) {
 }
 
 function openMoreMenu(container: HTMLElement) {
-  act(() => {
-    fireEvent.pointerDown(buttonByAccessibleName(container, LABELS.more), { button: 0, ctrlKey: false })
-  })
+  const more = buttonByAccessibleName(container, LABELS.more)
+  more.focus()
+  act(() => more.click())
 }
 
 function menuItemByText(text: string) {
-  return screen.getByRole('menuitem', { name: text })
+  const content = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+  if (!content) throw new Error('expected open composer menu')
+  return within(content).getByRole('button', { name: text })
 }
 
 function ExpandedComposerForTest({
   historyEntries,
   initialDraft,
+  onDraftReplaceObserved,
 }: {
   historyEntries: readonly string[]
   initialDraft: string
+  onDraftReplaceObserved?: (expectedDraft: string, nextDraft: string) => void
 }) {
   const [draft, setDraft] = useState(initialDraft)
   return (
@@ -137,6 +144,7 @@ function ExpandedComposerForTest({
         return true
       }}
       onDraftReplace={(expectedDraft, next) => {
+        onDraftReplaceObserved?.(expectedDraft, next)
         setDraft((current) => (current === expectedDraft ? next : current))
         return true
       }}
@@ -152,6 +160,211 @@ function expandedComposerForTest(sessionId: string, historyEntries: readonly str
 }
 
 describe('TerminalComposer', () => {
+  function withNavigatorPlatform(platform: string, callback: () => void) {
+    const original = navigator.platform
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: platform })
+    try {
+      callback()
+    } finally {
+      Object.defineProperty(navigator, 'platform', { configurable: true, value: original })
+    }
+  }
+
+  async function withNavigatorPlatformAsync(platform: string, callback: () => Promise<void>) {
+    const original = navigator.platform
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: platform })
+    try {
+      await callback()
+    } finally {
+      Object.defineProperty(navigator, 'platform', { configurable: true, value: original })
+    }
+  }
+
+  test('handles macOS Ctrl+W and restores the caret after an accepted edit', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'git commit --message' } })
+      input.setSelectionRange(input.value.length, input.value.length)
+
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', ctrlKey: true })
+
+      expect(input.value).toBe('git commit ')
+      expect(input.selectionStart).toBe('git commit '.length)
+    })
+  })
+
+  test('handles Ctrl+W in the middle of a word without deleting text to the right', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'echo foobar tail' } })
+      input.setSelectionRange('echo foo'.length, 'echo foo'.length)
+
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', ctrlKey: true })
+
+      expect(input.value).toBe('echo bar tail')
+      expect(input.selectionStart).toBe('echo '.length)
+    })
+  })
+
+  test('handles Ctrl+U without deleting the current line ending', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'first line\nsecond line' } })
+      input.setSelectionRange('first line\nsecond '.length, 'first line\nsecond '.length)
+
+      fireEvent.keyDown(input, { code: 'KeyU', key: 'u', ctrlKey: true })
+
+      expect(input.value).toBe('first line\nline')
+      expect(input.selectionStart).toBe('first line\n'.length)
+    })
+  })
+
+  test('keeps CRLF draft offsets aligned with the normalized textarea', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const onDraftReplaceObserved = vi.fn()
+      const { container } = renderInJsdom(
+        <ExpandedComposerForTest
+          historyEntries={[]}
+          initialDraft={'first line\r\nsecond line'}
+          onDraftReplaceObserved={onDraftReplaceObserved}
+        />,
+      )
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      expect(input.value).toBe('first line\nsecond line')
+      input.setSelectionRange(input.value.length, input.value.length)
+
+      fireEvent.keyDown(input, { code: 'KeyU', key: 'u', ctrlKey: true })
+
+      expect(onDraftReplaceObserved).toHaveBeenCalledWith('first line\r\nsecond line', 'first line\r\n')
+      expect(input.value).toBe('first line\n')
+      expect(input.selectionStart).toBe('first line\n'.length)
+    })
+  })
+
+  test('consumes an empty edit without publishing or moving the caret', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'line\ntwo' } })
+      input.setSelectionRange('line\n'.length, 'line\n'.length)
+      const event = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true })
+
+      fireEvent(input, event)
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(input.value).toBe('line\ntwo')
+      expect(input.selectionStart).toBe('line\n'.length)
+    })
+  })
+
+  test('deletes a selection and places the caret at its start for Ctrl+U', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'before selected after' } })
+      input.setSelectionRange(6, 15)
+
+      fireEvent.keyDown(input, { code: 'KeyU', ctrlKey: true })
+
+      expect(input.value).toBe('before after')
+      expect(input.selectionStart).toBe(6)
+    })
+  })
+
+  test('does not leave a pending caret after a rejected replacement', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render({ draftReplaceAccepted: false })
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'abc' } })
+      input.setSelectionRange(3, 3)
+      fireEvent.keyDown(input, { code: 'KeyW', ctrlKey: true })
+
+      fireEvent.change(input, { target: { value: 'abcd' } })
+
+      expect(input.value).toBe('abcd')
+      expect(input.selectionStart).toBe(4)
+    })
+  })
+
+  test('leaves IME-owned events and Cmd+W untouched', () => {
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'abc' } })
+      input.setSelectionRange(3, 3)
+
+      const composingEvent = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, isComposing: true })
+      fireEvent(input, composingEvent)
+      const webkitCompositionEvent = createEvent.keyDown(input, { code: 'KeyW', ctrlKey: true, keyCode: 229 })
+      fireEvent(input, webkitCompositionEvent)
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', metaKey: true })
+
+      expect(composingEvent.defaultPrevented).toBe(false)
+      expect(webkitCompositionEvent.defaultPrevented).toBe(false)
+      expect(input.value).toBe('abc')
+    })
+  })
+
+  test('leaves history browsing after an accepted editing command', async () => {
+    await withNavigatorPlatformAsync('MacIntel', async () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'previous' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await vi.waitFor(() => expect(input.value).toBe(''))
+      fireEvent.keyDown(input, { key: 'ArrowUp' })
+      expect(input.value).toBe('previous')
+      input.setSelectionRange(input.value.length, input.value.length)
+
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', ctrlKey: true })
+      expect(input.value).toBe('')
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      expect(input.value).toBe('')
+    })
+  })
+
+  test('leaves non-macOS and mixed-modifier chords untouched', () => {
+    withNavigatorPlatform('Win32', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'abc' } })
+      input.setSelectionRange(3, 3)
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', ctrlKey: true })
+      expect(input.value).toBe('abc')
+    })
+    withNavigatorPlatform('MacIntel', () => {
+      const { container } = render()
+      expand(container)
+      showInput(container)
+      const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+      fireEvent.change(input, { target: { value: 'abc' } })
+      input.setSelectionRange(3, 3)
+      fireEvent.keyDown(input, { code: 'KeyW', key: 'w', ctrlKey: true, shiftKey: true })
+      expect(input.value).toBe('abc')
+    })
+  })
+
   test('does not claim focus when an expanded session shell is restored on mount', () => {
     const { container, rerender } = renderInJsdom(<button type="button">terminal focus owner</button>)
     const focusOwner = buttonByAccessibleName(container, 'terminal focus owner')
@@ -503,7 +716,30 @@ describe('TerminalComposer', () => {
     expect(document.activeElement).toBe(textarea)
   })
 
+  test('maps file insertion through CRLF draft offsets', async () => {
+    const resolvedPath = "'/tmp/notes.txt'"
+    const onResolveFiles = vi.fn(async () => resolvedPath)
+    const { container } = render({ initialDraft: 'cat\r\ndone', onResolveFiles })
+    expand(container)
+    showInput(container)
+    const textarea = container.querySelector('textarea')
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!textarea || !fileInput) throw new Error('expected composer inputs')
+    const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+    textarea.setSelectionRange('cat\n'.length, 'cat\nd'.length)
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.uploadFiles).click())
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } })
+    })
+
+    expect(textarea.value).toBe(`cat\n${resolvedPath} one`)
+    expect(textarea.selectionStart).toBe(`cat\n${resolvedPath}`.length)
+  })
+
   test('keeps one draft edit admitted while selected files resolve', async () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
     const resolution = Promise.withResolvers<string | null>()
     const onResolveFiles = vi.fn(() => resolution.promise)
     const onSendText = vi.fn(async () => true)
@@ -523,6 +759,10 @@ describe('TerminalComposer', () => {
 
     expect(textarea.readOnly).toBe(true)
     expect(textarea.getAttribute('aria-busy')).toBe('true')
+    const editingEvent = createEvent.keyDown(textarea, { code: 'KeyW', ctrlKey: true })
+    fireEvent(textarea, editingEvent)
+    expect(editingEvent.defaultPrevented).toBe(true)
+    expect(textarea.value).toBe('cat ')
     fireEvent.keyDown(textarea, { key: 'Enter' })
     expect(onSendText).not.toHaveBeenCalled()
 
@@ -656,7 +896,7 @@ describe('TerminalComposer', () => {
 
     await user.click(input)
 
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(input)
   })
 
@@ -666,10 +906,11 @@ describe('TerminalComposer', () => {
     expand(container)
     const more = buttonByAccessibleName(container, LABELS.more)
     openMoreMenu(container)
+    expect(document.activeElement).toBe(more)
 
     await user.keyboard('{Escape}')
 
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(more)
   })
 
