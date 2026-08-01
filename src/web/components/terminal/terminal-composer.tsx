@@ -385,7 +385,10 @@ export function TerminalComposer({
       aria-label={labels.composer}
       onKeyDownCapture={(event) => {
         if (!expanded || event.key !== 'Escape' || isImeCompositionEvent(event)) return
-        if (event.target instanceof Element && event.target.closest('[data-slot="dropdown-menu-content"]')) {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('[data-slot="popover-content"]')
+        ) {
           return
         }
         event.preventDefault()

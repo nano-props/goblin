@@ -105,13 +105,13 @@ function showInput(container: HTMLElement) {
 }
 
 function openMoreMenu(container: HTMLElement) {
-  act(() => {
-    fireEvent.pointerDown(buttonByAccessibleName(container, LABELS.more), { button: 0, ctrlKey: false })
-  })
+  act(() => buttonByAccessibleName(container, LABELS.more).click())
 }
 
 function menuItemByText(text: string) {
-  return screen.getByRole('menuitem', { name: text })
+  const content = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+  if (!content) throw new Error('expected open composer menu')
+  return within(content).getByRole('button', { name: text })
 }
 
 function ExpandedComposerForTest({
@@ -871,7 +871,7 @@ describe('TerminalComposer', () => {
 
     await user.click(input)
 
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(input)
   })
 
@@ -884,7 +884,7 @@ describe('TerminalComposer', () => {
 
     await user.keyboard('{Escape}')
 
-    expect(document.querySelector('[data-slot="dropdown-menu-content"]')).toBeNull()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
     expect(document.activeElement).toBe(more)
   })
 
