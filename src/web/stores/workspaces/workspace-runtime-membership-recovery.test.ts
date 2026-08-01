@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  createGitWorkspaceProbeForTest,
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   closeWorkspaceRuntimeWithCache,
@@ -53,6 +57,38 @@ describe('workspace runtime membership recovery', () => {
     const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
     expect(repo?.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
+  })
+
+  test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {
+    const nextWorkspaceRuntimeId = 'repo-runtime-abcdefghijklmnopqrstu'
+    seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    installGoblinTestBridge({
+      'workspace.runtimeReconcile': async () => ({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: nextWorkspaceRuntimeId,
+            workspaceProbe: createGitWorkspaceProbeForTest(),
+          },
+        ],
+      }),
+      'workspace.runtimeList': async () => ({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: nextWorkspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      }),
+    })
+
+    await reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
+    expect(repo?.workspaceRuntimeId).toBe(nextWorkspaceRuntimeId)
+    expect(repo?.capability.kind).toBe('git')
+    expect(repo?.capability.probe.status).toBe('ready')
   })
 
   test('redeclares the latest window membership when a repo closes during recovery', async () => {

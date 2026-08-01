@@ -44,7 +44,7 @@ import {
   addResolvedWorkspace,
   insertPlaceholderWorkspace,
   removeWorkspaceFromSessionState,
-  workspaceShellForNewRuntimeEpoch,
+  workspaceShellForReconciledRuntimeEpoch,
   type ResolvedWorkspace,
 } from '#/web/stores/workspaces/workspace-session-state.ts'
 
@@ -241,7 +241,11 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
       if (!current || current.workspaceRuntimeId !== previous.workspaceRuntimeId || !runtime) continue
       if (runtime.workspaceRuntimeId === previous.workspaceRuntimeId) continue
       if (workspaces === state.workspaces) workspaces = { ...state.workspaces }
-      workspaces[previous.workspaceId] = workspaceShellForNewRuntimeEpoch(current, runtime.workspaceRuntimeId)
+      workspaces[previous.workspaceId] = workspaceShellForReconciledRuntimeEpoch(
+        current,
+        runtime.workspaceRuntimeId,
+        runtime.workspaceProbe,
+      )
       changedTargets.push({
         workspaceId: previous.workspaceId,
         previousWorkspaceRuntimeId: previous.workspaceRuntimeId,

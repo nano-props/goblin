@@ -57,6 +57,23 @@ export function workspaceShellForNewRuntimeEpoch(
   return next
 }
 
+/**
+ * Replace one client shell from the reconcile command's exact epoch result.
+ *
+ * A local probe can be accepted here because the new runtime was not visible
+ * to this client before this state transition. Remote admission continues
+ * through its lifecycle projection, where attempt ordering belongs.
+ */
+export function workspaceShellForReconciledRuntimeEpoch(
+  workspace: WorkspaceState,
+  workspaceRuntimeId: string,
+  workspaceProbe: WorkspaceProbeState,
+): WorkspaceState {
+  const shell = workspaceShellForNewRuntimeEpoch(workspace, workspaceRuntimeId)
+  if (shell.admission.kind === 'local') acceptWorkspaceProbeState(shell, workspaceProbe)
+  return shell
+}
+
 export function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partial<WorkspacesStore> {
   const workspace = s.workspaces[id]
   if (!workspace) return s
