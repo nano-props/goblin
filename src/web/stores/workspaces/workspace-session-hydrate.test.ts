@@ -21,7 +21,7 @@ import {
   REPO_B,
   resetLifecycleTest,
 } from '#/web/stores/workspaces/workspace-session-test-utils.ts'
-import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import { acceptRemoteWorkspaceLifecycleProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -455,11 +455,10 @@ describe('repo session hydration', () => {
       restoredWorkspaceId: entry.id,
     })
     expect(
-      acceptRemoteWorkspaceRuntimeProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+      acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
         workspaceId,
         workspaceRuntimeId,
         remoteLifecycle: { kind: 'ready', attemptId: 5, target },
-        workspaceProbe: GIT_WORKSPACE_PROBE,
       }),
     ).toBe(true)
 

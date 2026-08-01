@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import {
+  acceptRemoteWorkspaceLifecycleProjection,
+  acceptRemoteWorkspaceLifecycleSnapshot,
+} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -50,15 +53,38 @@ describe('remote lifecycle projection acceptance', () => {
     }))
     expect(accept({ kind: 'ready', attemptId: 1, target })).toBe(false)
   })
+
+  test('applies only runtime entries represented by this window', () => {
+    acceptRemoteWorkspaceLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+      runtimes: [
+        {
+          workspaceId: repoRoot,
+          workspaceRuntimeId,
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'ready', attemptId: 1, target },
+        },
+        {
+          workspaceId: workspaceIdForTest('goblin+ssh://other/repo'),
+          workspaceRuntimeId: 'repo-runtime-other',
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'timeout' },
+        },
+      ],
+    })
+    expect(remoteAdmission()).toMatchObject({
+      lifecycle: { kind: 'ready', target },
+    })
+    expect(useWorkspacesStore.getState().workspaces['goblin+ssh://other/repo']).toBeUndefined()
+  })
 })
+
 function accept(
-  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteWorkspaceRuntimeProjection>[2]['remoteLifecycle']>,
+  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteWorkspaceLifecycleProjection>[2]['remoteLifecycle']>,
 ) {
-  return acceptRemoteWorkspaceRuntimeProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+  return acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
     workspaceId: repoRoot,
     workspaceRuntimeId,
     remoteLifecycle,
-    workspaceProbe: { status: 'probing' },
   })
 }
 

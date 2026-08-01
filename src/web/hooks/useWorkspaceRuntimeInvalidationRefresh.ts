@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { goblinLog } from '#/web/logger.ts'
-import { acceptWorkspaceRuntimeSnapshot } from '#/web/stores/workspaces/workspace-runtime-projection.ts'
+import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
+import { acceptWorkspaceProbeSnapshot } from '#/web/stores/workspaces/workspace-probe-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { subscribeWorkspaceRuntimeInvalidation } from '#/web/workspace-runtime-invalidation-ingress.ts'
@@ -13,7 +14,8 @@ export function useWorkspaceRuntimeInvalidationRefresh(): void {
       void (async () => {
         const snapshot = await invalidateWorkspaceRuntimes()
         if (!active) return
-        acceptWorkspaceRuntimeSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, snapshot)
+        acceptRemoteWorkspaceLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, snapshot)
+        acceptWorkspaceProbeSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, snapshot)
       })().catch((error) => goblinLog.warn('workspace runtime invalidation refresh failed', { error }))
     }
 

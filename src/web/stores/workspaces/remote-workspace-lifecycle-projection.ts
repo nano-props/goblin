@@ -1,5 +1,5 @@
 import { isRemoteWorkspaceId, type RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
-import type { WorkspaceRuntimeEntry } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
@@ -9,6 +9,43 @@ import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspace
 import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 
 const LIFECYCLE_PHASE_ORDER = { idle: 0, connecting: 1, ready: 2, failed: 2 } as const
+
+export function acceptRemoteWorkspaceLifecycleProjection(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle'>,
+): boolean {
+  const lifecycle = entry.remoteLifecycle
+  if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
+  const current = get().workspaces[entry.workspaceId]
+  if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
+  if (current.admission.kind !== 'remote') return false
+  if (
+    !remoteWorkspaceLifecycleProjectionIsFresh(
+      current.admission.lifecycleAttemptId,
+      current.admission.lifecycle?.kind,
+      lifecycle,
+    )
+  ) {
+    return false
+  }
+
+  let accepted = false
+  updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
+    if (repo.admission.kind !== 'remote') return
+    if (
+      !remoteWorkspaceLifecycleProjectionIsFresh(
+        repo.admission.lifecycleAttemptId,
+        repo.admission.lifecycle?.kind,
+        lifecycle,
+      )
+    )
+      return
+    applyRemoteWorkspaceLifecycle(repo, lifecycle)
+    accepted = true
+  })
+  return accepted
+}
 
 /** Accept the transport lifecycle and capability probe as one server-runtime projection. */
 export function acceptRemoteWorkspaceRuntimeProjection(
@@ -30,6 +67,14 @@ export function acceptRemoteWorkspaceRuntimeProjection(
     accepted = true
   })
   return accepted
+}
+
+export function acceptRemoteWorkspaceLifecycleSnapshot(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  snapshot: WorkspaceRuntimesSnapshot,
+): void {
+  for (const entry of snapshot.runtimes) acceptRemoteWorkspaceLifecycleProjection(set, get, entry)
 }
 
 function remoteWorkspaceLifecycleProjectionIsFresh(

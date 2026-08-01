@@ -59,7 +59,7 @@ describe('workspace runtime membership recovery', () => {
     expect(repo?.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
   })
 
-  test('projects the authoritative probe when a repo epoch is replaced', async () => {
+  test('projects the reconciled local probe without accepting a later runtime-list probe', async () => {
     const nextWorkspaceRuntimeId = 'repo-runtime-abcdefghijklmnopqrstu'
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     installGoblinTestBridge({
@@ -68,7 +68,7 @@ describe('workspace runtime membership recovery', () => {
           {
             workspaceId: REPO_ROOT,
             workspaceRuntimeId: nextWorkspaceRuntimeId,
-            workspaceProbe: { status: 'probing' as const },
+            workspaceProbe: createGitWorkspaceProbeForTest(),
           },
         ],
       }),
@@ -77,7 +77,7 @@ describe('workspace runtime membership recovery', () => {
           {
             workspaceId: REPO_ROOT,
             workspaceRuntimeId: nextWorkspaceRuntimeId,
-            workspaceProbe: createGitWorkspaceProbeForTest(),
+            workspaceProbe: { status: 'probing' as const },
           },
         ],
       }),

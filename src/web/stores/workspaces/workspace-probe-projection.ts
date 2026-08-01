@@ -1,4 +1,4 @@
-import type { WorkspaceRuntimeEntry } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 
@@ -15,4 +15,12 @@ export function acceptWorkspaceProbeProjection(
     accepted = true
   })
   return accepted
+}
+
+export function acceptWorkspaceProbeSnapshot(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  snapshot: WorkspaceRuntimesSnapshot,
+): void {
+  for (const entry of snapshot.runtimes) acceptWorkspaceProbeProjection(set, get, entry)
 }
