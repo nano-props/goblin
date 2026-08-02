@@ -279,6 +279,96 @@ describe('useWorkspaceFilesystemTree', () => {
     ])
   })
 
+  test('does not restore hidden descendants until their ancestors are expanded', async () => {
+    const target = mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main')
+    const root = filesystemTree(directoryNode('src'))
+    const sourceChildren = filesystemTree(directoryNode('src/web', 'src'))
+    queryClient.setQueryData(workspaceFilesystemTreeChildrenQueryKey(target, ''), root)
+    queryClient.setQueryData(workspaceFilesystemTreeChildrenQueryKey(target, 'src'), sourceChildren)
+    queryClient.setQueryData(
+      workspaceFilesystemTreeChildrenQueryKey(target, 'src/web'),
+      filesystemTree(fileNode('src/web/old.ts', 'src/web')),
+    )
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') return Promise.resolve(sourceChildren)
+      if (options.prefix === 'src/web') return Promise.resolve(filesystemTree(fileNode('src/web/new.ts', 'src/web')))
+      return Promise.resolve(root)
+    })
+    const props = (expandedKeys: readonly string[]): HarnessProps => ({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys,
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+
+    await render(props(['src/web']))
+    await flush()
+
+    expect(filesystemReadCount()).toBe(1)
+    expect(filesystemReadCount('src')).toBe(0)
+    expect(filesystemReadCount('src/web')).toBe(0)
+
+    await setProps(props(['src', 'src/web']))
+    await flush()
+
+    expect(filesystemReadCount('src')).toBe(1)
+    expect(filesystemReadCount('src/web')).toBe(1)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/web', 'src/web/new.ts'])
+  })
+
+  test('does not project an in-flight child failure after its ancestor is collapsed', async () => {
+    const webChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    let webRecovered = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') return Promise.resolve(filesystemTree(directoryNode('src/web', 'src')))
+      if (options.prefix === 'src/web') {
+        return webRecovered
+          ? Promise.resolve(filesystemTree(fileNode('src/web/recovered.ts', 'src/web')))
+          : webChildren.promise
+      }
+      return Promise.resolve(filesystemTree(directoryNode('src')))
+    })
+    const props = (expandedKeys: readonly string[]): HarnessProps => ({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys,
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+
+    await render(props(['src', 'src/web']))
+    await flush()
+    expect(filesystemReadCount('src/web')).toBe(1)
+
+    await setProps(props(['src/web']))
+    await act(async () => {
+      webChildren.reject(new Error('hidden child failed'))
+      await Promise.resolve()
+    })
+    await flush()
+
+    expect(lastSnapshot?.error).toBeNull()
+    expect(lastSnapshot?.errorKeys.size).toBe(0)
+
+    await setProps(props(['src', 'src/web']))
+    await flush()
+    expect(lastSnapshot?.error).toBe('filetree.error')
+    expect(lastSnapshot?.errorKeys.has('src/web')).toBe(true)
+
+    webRecovered = true
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+
+    expect(filesystemReadCount('src/web')).toBe(2)
+    expect(lastSnapshot?.error).toBeNull()
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/web', 'src/web/recovered.ts'])
+  })
+
   test('kicks an initial fetch on mount and exposes loading=true', async () => {
     const deferred = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)

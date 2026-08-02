@@ -17,9 +17,9 @@ import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-
 import {
   emptyFiletreeInteractionSnapshot,
   filetreeInteractionScopeKey,
-  isFiletreeExpandedKeyRestoreReady,
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
+import { isFiletreeExpandedKeyRestoreReady } from '#/web/workspace-filesystem-lazy-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'

@@ -51,22 +51,6 @@ export function emptyFiletreeInteractionSnapshot(): FiletreeInteractionSnapshot 
   return EMPTY_SNAPSHOT
 }
 
-export function isFiletreeExpandedKeyRestoreReady(
-  key: string,
-  expandedKeys: ReadonlySet<string>,
-  loadedPrefixes: ReadonlySet<string>,
-  errorPrefixes: ReadonlySet<string>,
-): boolean {
-  let cursor = key
-  while (true) {
-    if (errorPrefixes.has(cursor)) return true
-    const slash = cursor.lastIndexOf('/')
-    if (slash < 0) return loadedPrefixes.has(key)
-    cursor = cursor.slice(0, slash)
-    if (!expandedKeys.has(cursor)) return true
-  }
-}
-
 export const useFiletreeInteractionStore = create<FiletreeInteractionStore>()((set) => ({
   ...INITIAL_STATE,
   setSelectedKeys: (scopeKey, keys) =>

@@ -13,6 +13,7 @@ import {
 } from '#/web/workspace-filesystem-query.ts'
 import {
   emptyLazyWorkspaceFilesystemTreeState,
+  isFiletreeExpandedKeyReachable,
   lazyWorkspaceFilesystemTreeReducer,
   type LazyWorkspaceFilesystemTreeAggregate,
   type LazyWorkspaceFilesystemTreeState,
@@ -69,6 +70,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     [target.kind, workspaceId, workspaceRuntimeId, filesystemRootPath],
   )
   const expandedKeysSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
+  const expandedKeySet = useMemo(() => new Set(expandedKeys.map(normalizePrefix)), [expandedKeysSignal])
   const [treeState, dispatchTreeState] = useReducer(
     lazyWorkspaceFilesystemTreeReducer,
     { queryClient, target, expandedKeys },
@@ -151,6 +153,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
   const restoreExpandedChildren = useEffectEvent(() => {
     for (const key of expandedKeys) {
       const prefix = normalizePrefix(key)
+      if (!isFiletreeExpandedKeyReachable(prefix, expandedKeySet)) continue
       if (treeState.nodesById.get(prefix)?.kind !== 'directory') continue
       void readChildren(prefix, 'restore').catch(() => {})
     }
@@ -159,14 +162,19 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
   useEffect(() => {
     if (!rootData) return
     restoreExpandedChildren()
-  }, [expandedKeysSignal, rootData, treeState.nodesById, treeState.reloadEpoch])
+  }, [expandedKeySet, rootData, treeState.nodesById, treeState.reloadEpoch])
+
+  const reachableErrorPrefixes = useMemo(
+    () => reachableExpandedPrefixes(treeState.errorPrefixes, expandedKeySet),
+    [expandedKeySet, treeState.errorPrefixes],
+  )
 
   const refresh = useCallback(() => {
     if (!enabled) return
     void refetch({ cancelRefetch: false })
   }, [enabled, refetch])
 
-  const error = workspaceFilesystemTreeError(rootError, treeState.errorPrefixes)
+  const error = workspaceFilesystemTreeError(rootError, reachableErrorPrefixes)
 
   return {
     tree: rootData ? treeState.result : null,
@@ -174,7 +182,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     reading: isFetching || treeState.loadingPrefixes.size > 0,
     error,
     loadingKeys: treeState.loadingPrefixes,
-    errorKeys: treeState.errorPrefixes,
+    errorKeys: reachableErrorPrefixes,
     loadedPrefixes: treeState.loadedPrefixes,
     loadChildren,
     refresh,
@@ -183,6 +191,17 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
 
 function normalizePrefix(prefix: string): string {
   return prefix.replace(/^\.\/+/, '').replace(/\/+$/u, '')
+}
+
+function reachableExpandedPrefixes(
+  prefixes: ReadonlySet<string>,
+  expandedKeys: ReadonlySet<string>,
+): ReadonlySet<string> {
+  return new Set(
+    Array.from(prefixes).filter(
+      (prefix) => expandedKeys.has(prefix) && isFiletreeExpandedKeyReachable(prefix, expandedKeys),
+    ),
+  )
 }
 
 function cachedWorkspaceFilesystemTreeState({
