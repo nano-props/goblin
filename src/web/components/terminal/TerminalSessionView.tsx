@@ -263,18 +263,17 @@ export function TerminalSessionView({
     // phase === 'open'
     return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
   })()
-  // `isController` is the *interactive* affordance flag — it gates the
-  // terminal composer, the paste/drop file handlers, and the xterm's
-  // `aria-readonly`. The PTY is dead in `error-controller`, so we
-  // deliberately exclude that state even though the controller status
-  // is still ours. The error chip is shown via `showErrorChip`
-  // instead.
+  // Controller ownership gates input affordances. The PTY is dead in
+  // `error-controller`, so it is excluded even though ownership is still ours.
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
 
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const presentationRecovery = snapshot.presentationRecovery
+  // Keep controller-owned Composer state mounted during a local presentation
+  // recovery, but do not expose controls until the xterm is available again.
+  const composerHidden = searchOpen || presentationRecovery !== undefined
   const showViewerOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'viewer' && !presentationRecovery
   const showUnownedOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'unowned' && !presentationRecovery
   const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
@@ -595,7 +594,7 @@ export function TerminalSessionView({
           containerRef={sessionRootRef}
           key={terminalSessionId}
           className="goblin-terminal-composer--floating"
-          hidden={searchOpen}
+          hidden={composerHidden}
           labels={terminalComposerLabels}
           expanded={snapshot.composer.expanded}
           mode={snapshot.composer.mode}
