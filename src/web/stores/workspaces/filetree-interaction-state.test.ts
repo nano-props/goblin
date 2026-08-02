@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   filetreeInteractionScopeKey,
+  isReachableExpandedFiletreeKey,
   parseFiletreeInteractionScopeKey,
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
@@ -12,6 +13,13 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspaces/example')
 describe('useFiletreeInteractionStore', () => {
   beforeEach(() => {
     resetFiletreeInteractionStore()
+  })
+
+  test('treats expanded descendants as reachable only while their ancestors are expanded', () => {
+    expect(isReachableExpandedFiletreeKey('src', new Set(['src']))).toBe(true)
+    expect(isReachableExpandedFiletreeKey('src/web', new Set(['src', 'src/web']))).toBe(true)
+    expect(isReachableExpandedFiletreeKey('src/web/components', new Set(['src', 'src/web/components']))).toBe(false)
+    expect(isReachableExpandedFiletreeKey('src/web', new Set(['src/web']))).toBe(false)
   })
 
   test('stores selected and expanded keys by repo worktree scope', () => {

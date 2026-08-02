@@ -105,11 +105,18 @@ describe('filetree lazy state', () => {
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: 'src',
-      result: { nodes: [node('src/index.ts', 'src')], truncated: true },
+      result: { nodes: [node('src/web', 'src', 'directory')], truncated: true },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: 'src/web',
+      result: { nodes: [node('src/web/index.ts', 'src/web')], truncated: true },
     })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'markForReload' })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src/web' })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src/web' })
 
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',

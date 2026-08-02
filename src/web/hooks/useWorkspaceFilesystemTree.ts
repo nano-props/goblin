@@ -85,6 +85,8 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: 'always',
+    // Keep TanStack's default reconnect revalidation: it converges this read-only
+    // projection with server authority and never replays a filesystem operation.
   })
   const { data: rootData, error: rootError, isFetching, isPending, refetch } = rootQuery
 
@@ -147,13 +149,17 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
   )
 
   const restoreExpandedChildren = useEffectEvent(() => {
-    for (const key of expandedKeys) void readChildren(key, 'restore').catch(() => {})
+    for (const key of expandedKeys) {
+      const prefix = normalizePrefix(key)
+      if (treeState.nodesById.get(prefix)?.kind !== 'directory') continue
+      void readChildren(prefix, 'restore').catch(() => {})
+    }
   })
 
   useEffect(() => {
     if (!rootData) return
     restoreExpandedChildren()
-  }, [expandedKeysSignal, rootData, treeState.reloadEpoch])
+  }, [expandedKeysSignal, rootData, treeState.nodesById, treeState.reloadEpoch])
 
   const refresh = useCallback(() => {
     if (!enabled) return

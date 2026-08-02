@@ -51,6 +51,16 @@ export function emptyFiletreeInteractionSnapshot(): FiletreeInteractionSnapshot 
   return EMPTY_SNAPSHOT
 }
 
+export function isReachableExpandedFiletreeKey(key: string, expandedKeys: ReadonlySet<string>): boolean {
+  let slash = key.lastIndexOf('/')
+  while (slash >= 0) {
+    const ancestor = key.slice(0, slash)
+    if (!expandedKeys.has(ancestor)) return false
+    slash = ancestor.lastIndexOf('/')
+  }
+  return true
+}
+
 export const useFiletreeInteractionStore = create<FiletreeInteractionStore>()((set) => ({
   ...INITIAL_STATE,
   setSelectedKeys: (scopeKey, keys) =>

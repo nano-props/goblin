@@ -719,6 +719,91 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 
+  test('waits for restored ancestors before loading nested expanded directories', async () => {
+    const sourceChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    const webChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') return sourceChildren.promise
+      if (options.prefix === 'src/web') return webChildren.promise
+      return Promise.resolve(filesystemTree(directoryNode('src')))
+    })
+
+    await render({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src', 'src/web'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    expect(filesystemReadCount('src')).toBe(1)
+    expect(filesystemReadCount('src/web')).toBe(0)
+
+    webChildren.resolve(filesystemTree(fileNode('src/web/index.ts', 'src/web')))
+    await act(async () => {
+      sourceChildren.resolve(filesystemTree(directoryNode('src/web', 'src')))
+      await sourceChildren.promise
+    })
+    await flush()
+
+    expect(filesystemReadCount('src/web')).toBe(1)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual([
+      'src',
+      'src/web',
+      'src/web/index.ts',
+    ])
+  })
+
+  test('does not restore late children after their directory is authoritatively removed', async () => {
+    const lateChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    let removed = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') {
+        return removed ? lateChildren.promise : Promise.resolve(filesystemTree(fileNode('src/old.ts', 'src')))
+      }
+      return Promise.resolve(removed ? filesystemTree() : filesystemTree(directoryNode('src')))
+    })
+    const props: HarnessProps = {
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    }
+
+    await render(props)
+    await flush()
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+
+    removed = true
+    await act(async () => {
+      lastSnapshot?.refresh()
+      await Promise.resolve()
+    })
+    await flush()
+    expect(lastSnapshot?.tree?.nodes).toEqual([])
+
+    await act(async () => {
+      lateChildren.resolve(filesystemTree(fileNode('src/late.ts', 'src')))
+      await lateChildren.promise
+    })
+    await flush()
+    expect(lastSnapshot?.tree?.nodes).toEqual([])
+    expect(lastSnapshot?.error).toBeNull()
+
+    rendered?.unmount()
+    rendered = null
+    await render(props)
+    await flush()
+
+    expect(lastSnapshot?.tree?.nodes).toEqual([])
+    expect(lastSnapshot?.error).toBeNull()
+    expect(filesystemReadCount('src')).toBe(2)
+  })
+
   test('preserves accepted children after revalidation fails and replaces them on explicit retry', async () => {
     const root = filesystemTree(directoryNode('src'))
     const acceptedChildren = filesystemTree(fileNode('src/old.ts', 'src'))
