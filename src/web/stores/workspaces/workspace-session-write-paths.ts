@@ -174,6 +174,9 @@ type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembers
 type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRecoveryResult & {
   remoteEnsureTargets?: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
 }
+type CapturedWorkspaceRuntimeMembershipRecovery = SettledWorkspaceRuntimeMembershipRecovery & {
+  remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
+}
 type ChangedWorkspaceRuntimeTarget = SettledWorkspaceRuntimeMembershipRecovery['changedTargets'][number]
 
 /**
@@ -284,8 +287,7 @@ async function reconcileOpenWorkspaceRuntimeMembershipsNow(
 ): Promise<ReconciledWorkspaceRuntimeMembershipRecovery> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const capturedRecovery = await reconcileCapturedWorkspaceRuntimeMemberships(set, get)
-    const currentWorkspaceIds = Object.values(get().workspaces).map((workspace) => workspace.id)
-    if (sameWorkspaceIdSet(currentWorkspaceIds, capturedRecovery.declaredWorkspaceIds)) {
+    if (capturedRecovery) {
       return {
         kind: 'settled',
         targets: capturedRecovery.targets,
@@ -300,18 +302,22 @@ async function reconcileOpenWorkspaceRuntimeMembershipsNow(
 async function reconcileCapturedWorkspaceRuntimeMemberships(
   set: WorkspacesSet,
   get: WorkspacesGet,
-): Promise<
-  SettledWorkspaceRuntimeMembershipRecovery & {
-    declaredWorkspaceIds: WorkspaceId[]
-    remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
-  }
-> {
+): Promise<CapturedWorkspaceRuntimeMembershipRecovery | null> {
   const captured = Object.values(get().workspaces).map((workspace) => ({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
   }))
   const response = await reconcileWorkspaceRuntimeMemberships(captured.map((entry) => entry.workspaceId))
   const runtimeByWorkspaceId = new Map(response.runtimes.map((entry) => [entry.workspaceId, entry]))
+  const runtimeSnapshot = await invalidateWorkspaceRuntimes()
+  const currentWorkspaceIds = Object.values(get().workspaces).map((workspace) => workspace.id)
+  if (
+    !sameWorkspaceIdSet(
+      currentWorkspaceIds,
+      captured.map((entry) => entry.workspaceId),
+    )
+  )
+    return null
   const changedTargets: SettledWorkspaceRuntimeMembershipRecovery['changedTargets'] = []
 
   set((state) => {
@@ -350,7 +356,6 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     const runtime = runtimeByWorkspaceId.get(changed.workspaceId)
     if (runtime) acceptRemoteWorkspaceRuntimeProjection(set, get, runtime)
   }
-  const runtimeSnapshot = await invalidateWorkspaceRuntimes()
   acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
 
   const currentWorkspaces = get().workspaces
@@ -376,7 +381,6 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
     kind: 'settled',
     targets,
     changedTargets,
-    declaredWorkspaceIds: captured.map((entry) => entry.workspaceId),
     remoteEnsureTargets,
   }
 }

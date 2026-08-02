@@ -265,6 +265,70 @@ describe('workspace runtime membership recovery', () => {
     expect(reconcile).toHaveBeenNthCalledWith(2, expect.objectContaining({ workspaceIds: [] }))
   })
 
+  test('preserves a surviving changed runtime when membership changes between declarations', async () => {
+    resetWorkspacesStore()
+    const firstResponse = Promise.withResolvers<{
+      runtimes: Array<{
+        workspaceId: string
+        workspaceRuntimeId: string
+        workspaceProbe: { status: 'probing' }
+      }>
+    }>()
+    const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
+    const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
+      workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
+    })
+    const nextWorkspaceRuntimeId = 'repo-runtime-123456789012345678901'
+    const reconcile = vi
+      .fn()
+      .mockReturnValueOnce(firstResponse.promise)
+      .mockResolvedValueOnce({
+        runtimes: [
+          {
+            workspaceId: REPO_ROOT,
+            workspaceRuntimeId: nextWorkspaceRuntimeId,
+            workspaceProbe: { status: 'probing' as const },
+          },
+        ],
+      })
+    installGoblinTestBridge({ 'workspace.runtimeReconcile': reconcile })
+
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce())
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_ROOT]: firstWorkspace },
+      workspaceOrder: [REPO_ROOT],
+    })
+    firstResponse.resolve({
+      runtimes: [
+        {
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: nextWorkspaceRuntimeId,
+          workspaceProbe: { status: 'probing' },
+        },
+        {
+          workspaceId: SECOND_REPO_ROOT,
+          workspaceRuntimeId: 'repo-runtime-second-12345678901234',
+          workspaceProbe: { status: 'probing' },
+        },
+      ],
+    })
+
+    await expect(recovery).resolves.toMatchObject({
+      kind: 'settled',
+      targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
+      changedTargets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }],
+    })
+    expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
+    expect(reconcile).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ workspaceIds: [REPO_ROOT, SECOND_REPO_ROOT] }),
+    )
+    expect(reconcile).toHaveBeenNthCalledWith(2, expect.objectContaining({ workspaceIds: [REPO_ROOT] }))
+  })
+
   test('serializes full-set recovery with explicit open membership commands', async () => {
     resetWorkspacesStore()
     const reconcileResponse = Promise.withResolvers<{ runtimes: [] }>()
