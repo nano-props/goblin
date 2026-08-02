@@ -203,8 +203,9 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('does not consume the Composer shortcut during presentation recovery', async () => {
+  test('hides the Composer and does not consume its shortcut during presentation recovery', async () => {
     const setComposerExpanded = vi.fn(() => true)
+    const composerState = { expanded: false, mode: 'input' as const, draft: 'preserved draft', historyEntries: [] }
     const rendered = await renderTerminalSession(
       { setComposerExpanded },
       {
@@ -212,7 +213,7 @@ describe('TerminalSessionView composer', () => {
           phase: 'open',
           message: null,
           processName: 'zsh',
-          composer: { expanded: false, mode: 'keys', draft: '', historyEntries: [] },
+          composer: composerState,
           attachment: { role: 'controller' },
           presentationRecovery: 'pending',
         },
@@ -220,6 +221,10 @@ describe('TerminalSessionView composer', () => {
     )
 
     try {
+      const composerGroup = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer')
+      expect(composerGroup?.hidden).toBe(true)
+      expect(within(rendered.container).queryByRole('button', { name: 'terminal.composer-open' })).toBeNull()
+
       const shortcut = new KeyboardEvent('keydown', {
         key: 'Enter',
         ctrlKey: true,
@@ -231,7 +236,27 @@ describe('TerminalSessionView composer', () => {
 
       expect(shortcut.defaultPrevented).toBe(false)
       expect(setComposerExpanded).not.toHaveBeenCalled()
+
+      await rendered.publishSnapshot({
+        phase: 'open',
+        message: null,
+        processName: 'zsh',
+        composer: composerState,
+        attachment: { role: 'controller' },
+        presentationRecovery: 'failed',
+      })
+      expect(composerGroup?.hidden).toBe(true)
+
+      await rendered.publishSnapshot({
+        phase: 'open',
+        message: null,
+        processName: 'zsh',
+        composer: composerState,
+        attachment: { role: 'controller' },
+      })
+      expect(composerGroup?.hidden).toBe(false)
       expect(buttonByLabel(rendered.container, 'terminal.composer-open').getAttribute('aria-expanded')).toBe('false')
+      expect(composerInput(rendered.container).value).toBe('preserved draft')
     } finally {
       await rendered.cleanup()
     }
