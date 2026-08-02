@@ -17,7 +17,6 @@ export interface LazyWorkspaceFilesystemTreeState {
 }
 
 export type LazyWorkspaceFilesystemTreeAction =
-  | { readonly type: 'replace'; readonly state: LazyWorkspaceFilesystemTreeState }
   | { readonly type: 'markForReload' }
   | { readonly type: 'childrenLoading'; readonly prefix: string }
   | { readonly type: 'childrenLoaded'; readonly prefix: string; readonly result: WorkspaceFilesystemTreeResult }
@@ -42,8 +41,6 @@ export function lazyWorkspaceFilesystemTreeReducer(
   action: LazyWorkspaceFilesystemTreeAction,
 ): LazyWorkspaceFilesystemTreeState {
   switch (action.type) {
-    case 'replace':
-      return action.state
     case 'markForReload':
       return {
         ...state,

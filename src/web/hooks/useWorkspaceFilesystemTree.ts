@@ -4,11 +4,11 @@
 // invalidation, and restored expanded-directory loading. Persisted UI
 // interaction state stays in the filetree interaction store.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useReducer } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
   readCurrentWorkspaceFilesystemTree,
-  subscribeWorkspaceFilesystemQueryInvalidationConsumer,
+  subscribeWorkspaceFilesystemRootReloadStart,
   workspaceFilesystemTreeChildrenQueryKey,
 } from '#/web/workspace-filesystem-query.ts'
 import {
@@ -24,6 +24,7 @@ import {
 } from '#/shared/workspace-runtime.ts'
 
 export interface UseWorkspaceFilesystemTreeInput {
+  /** Stable for this hook owner's lifetime; execution-target changes replace the owner. */
   readonly target: WorkspacePaneFilesystemExecutionTarget
   readonly expandedKeys?: readonly string[]
 }
@@ -31,6 +32,7 @@ export interface UseWorkspaceFilesystemTreeInput {
 export interface UseWorkspaceFilesystemTreeResult {
   readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
   readonly loading: boolean
+  readonly reading: boolean
   readonly error: string | null
   readonly loadingKeys: ReadonlySet<string>
   readonly errorKeys: ReadonlySet<string>
@@ -66,15 +68,12 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     () => workspaceFilesystemTreeChildrenQueryKey(target, ''),
     [target.kind, workspaceId, workspaceRuntimeId, filesystemRootPath],
   )
-  const expandedKeysCacheSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
-  const cachedExpandedPrefixes = useMemo(() => cachedPrefixesForExpandedKeys(expandedKeys), [expandedKeysCacheSignal])
+  const expandedKeysSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
   const [treeState, dispatchTreeState] = useReducer(
     lazyWorkspaceFilesystemTreeReducer,
     { queryClient, target, expandedKeys },
-    cachedWorkspaceFilesystemTreeState,
+    revalidatingCachedWorkspaceFilesystemTreeState,
   )
-  const expandedKeysRef = useRef(expandedKeys)
-  const readChildrenRef = useRef<(prefix: string, mode: ChildLoadMode) => Promise<void>>(async () => {})
 
   const rootQuery = useQuery({
     queryKey: rootQueryKey,
@@ -84,42 +83,16 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     // aborting when a tab briefly remounts only creates duplicate replacement reads.
     queryFn: () => readCurrentWorkspaceFilesystemTree(queryClient, target, {}),
     retry: false,
-    staleTime: Infinity,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: 'always',
   })
-  const { data: rootData, error: rootError, isPending, refetch } = rootQuery
+  const { data: rootData, error: rootError, isFetching, isPending, refetch } = rootQuery
 
   useEffect(() => {
-    return subscribeWorkspaceFilesystemQueryInvalidationConsumer(queryClient, (invalidatedTarget) => {
-      if (!sameFilesystemExecutionTarget(invalidatedTarget, target)) return
+    return subscribeWorkspaceFilesystemRootReloadStart(queryClient, target, () => {
       dispatchTreeState({ type: 'markForReload' })
     })
   }, [queryClient, target])
-
-  useEffect(() => {
-    expandedKeysRef.current = expandedKeys
-  }, [expandedKeysCacheSignal, expandedKeys])
-
-  useEffect(() => {
-    dispatchTreeState({
-      type: 'replace',
-      state: cachedWorkspaceFilesystemTreeState({
-        queryClient,
-        target,
-        expandedKeys: expandedKeysRef.current,
-      }),
-    })
-  }, [queryClient, target, workspaceId, workspaceRuntimeId, filesystemRootPath])
-
-  useEffect(() => {
-    if (!enabled) return
-    for (const prefix of cachedExpandedPrefixes) {
-      const result = queryClient.getQueryData<WorkspaceFilesystemTreeResult>(
-        workspaceFilesystemTreeChildrenQueryKey(target, prefix),
-      )
-      if (!result) continue
-      dispatchTreeState({ type: 'childrenLoaded', prefix, result })
-    }
-  }, [cachedExpandedPrefixes, enabled, queryClient, target, workspaceId, workspaceRuntimeId, filesystemRootPath])
 
   useEffect(() => {
     if (!rootData) return
@@ -173,25 +146,27 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
     [readChildren],
   )
 
-  useEffect(() => {
-    readChildrenRef.current = readChildren
-  }, [readChildren])
+  const restoreExpandedChildren = useEffectEvent(() => {
+    for (const key of expandedKeys) void readChildren(key, 'restore').catch(() => {})
+  })
 
   useEffect(() => {
     if (!rootData) return
-    for (const key of expandedKeys) void readChildrenRef.current(key, 'restore').catch(() => {})
-  }, [expandedKeysCacheSignal, rootData, treeState.reloadEpoch])
+    restoreExpandedChildren()
+  }, [expandedKeysSignal, rootData, treeState.reloadEpoch])
 
   const refresh = useCallback(() => {
     if (!enabled) return
-    dispatchTreeState({ type: 'markForReload' })
-    void refetch()
+    void refetch({ cancelRefetch: false })
   }, [enabled, refetch])
+
+  const error = workspaceFilesystemTreeError(rootError, treeState.errorPrefixes)
 
   return {
     tree: rootData ? treeState.result : null,
     loading: isPending,
-    error: rootError instanceof Error ? rootError.message : rootError ? String(rootError) : null,
+    reading: isFetching || treeState.loadingPrefixes.size > 0,
+    error,
     loadingKeys: treeState.loadingPrefixes,
     errorKeys: treeState.errorPrefixes,
     loadedPrefixes: treeState.loadedPrefixes,
@@ -220,6 +195,19 @@ function cachedWorkspaceFilesystemTreeState({
   return state
 }
 
+function revalidatingCachedWorkspaceFilesystemTreeState(
+  input: CachedWorkspaceFilesystemTreeStateInput,
+): LazyWorkspaceFilesystemTreeState {
+  return lazyWorkspaceFilesystemTreeReducer(cachedWorkspaceFilesystemTreeState(input), { type: 'markForReload' })
+}
+
+function workspaceFilesystemTreeError(rootError: unknown, errorPrefixes: ReadonlySet<string>): string | null {
+  if (rootError instanceof Error) return rootError.message
+  if (rootError) return String(rootError)
+  if (errorPrefixes.size > 0) return 'filetree.error'
+  return null
+}
+
 function cachedPrefixesForExpandedKeys(expandedKeys: readonly string[]): readonly string[] {
   const prefixes = new Set<string>([''])
   for (const key of expandedKeys) {
@@ -237,16 +225,4 @@ function ancestorAndSelfPrefixes(key: string): readonly string[] {
 
 function prefixDepth(prefix: string): number {
   return prefix === '' ? 0 : prefix.split('/').length
-}
-
-function sameFilesystemExecutionTarget(
-  left: WorkspacePaneFilesystemExecutionTarget,
-  right: WorkspacePaneFilesystemExecutionTarget,
-): boolean {
-  return (
-    left.kind === right.kind &&
-    left.workspaceId === right.workspaceId &&
-    left.workspaceRuntimeId === right.workspaceRuntimeId &&
-    (left.kind === 'workspace-root' || (right.kind === 'git-worktree' && left.root === right.root))
-  )
 }

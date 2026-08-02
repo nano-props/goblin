@@ -2,6 +2,10 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
+import {
+  workspacePaneFilesystemExecutionTargetKey,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/workspace-pane/file-read-command.ts'
@@ -40,6 +44,28 @@ export function WorkspaceFilesystemTabPanel({
     () => workspacePaneFilesystemRuntimeTarget(target),
     [rootPath, target.kind, workspaceId, workspaceRuntimeId],
   )
+
+  return (
+    <ExecutionTargetFilesystemTabPanel
+      key={workspacePaneFilesystemExecutionTargetKey(executionTarget)}
+      routeTarget={routeTarget}
+      target={target}
+      executionTarget={executionTarget}
+    />
+  )
+}
+
+function ExecutionTargetFilesystemTabPanel({
+  routeTarget,
+  target,
+  executionTarget,
+}: {
+  routeTarget: WorkspacePaneTabsTarget
+  target: WorkspacePaneFilesystemTarget
+  executionTarget: WorkspacePaneFilesystemExecutionTarget
+}) {
+  const workspaceId = target.workspaceId
+  const rootPath = workspacePaneFilesystemRootPath(target)
   const t = useT()
   const navigation = useAppNavigation()
   const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
@@ -172,6 +198,7 @@ export function WorkspaceFilesystemTabPanel({
     <FiletreeView
       tree={result.tree}
       loading={result.loading}
+      reading={result.reading}
       loadingKeys={result.loadingKeys}
       openingFileKeys={openingFileKeys}
       error={result.error}
@@ -180,6 +207,7 @@ export function WorkspaceFilesystemTabPanel({
       onSelectedKeysChange={handleSelectedKeysChange}
       onDirectoryRowToggle={handleDirectoryRowToggle}
       onPruneKeys={handlePruneKeys}
+      onRetry={result.refresh}
       initialTopVisibleRowIndex={initialTopVisibleRowIndex}
       scrollRestoreKey={interactionScopeKey}
       scrollRestoreReady={scrollRestoreReady}

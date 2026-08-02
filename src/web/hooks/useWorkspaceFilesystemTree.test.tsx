@@ -6,9 +6,16 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
-import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
+import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
-import { startWorkspaceFilesystemQueryInvalidationSync } from '#/web/workspace-filesystem-query.ts'
+import {
+  workspacePaneFilesystemExecutionTargetKey,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
+import {
+  startWorkspaceFilesystemQueryInvalidationSync,
+  workspaceFilesystemTreeChildrenQueryKey,
+} from '#/web/workspace-filesystem-query.ts'
 
 const mocks = vi.hoisted(() => ({
   getWorkspaceFilesystemTree: vi.fn(),
@@ -31,6 +38,7 @@ vi.mock('#/web/workspace-filesystem-invalidation-ingress.ts', () => ({
 type HarnessSnapshot = {
   tree: WorkspaceFilesystemTreeResult | null
   loading: boolean
+  reading: boolean
   error: string | null
   loadingKeys: ReadonlySet<string>
   errorKeys: ReadonlySet<string>
@@ -56,6 +64,25 @@ function Harness({
   onSnapshot,
 }: HarnessProps) {
   const target = mockExecutionTarget(workspaceRootPath, workspaceRuntimeId, worktreePath, targetKind)
+  return (
+    <ExecutionTargetHarness
+      key={workspacePaneFilesystemExecutionTargetKey(target)}
+      target={target}
+      expandedKeys={expandedKeys}
+      onSnapshot={onSnapshot}
+    />
+  )
+}
+
+function ExecutionTargetHarness({
+  target,
+  expandedKeys,
+  onSnapshot,
+}: {
+  readonly target: WorkspacePaneFilesystemExecutionTarget
+  readonly expandedKeys?: readonly string[]
+  readonly onSnapshot: (snapshot: HarnessSnapshot) => void
+}) {
   const result = useWorkspaceFilesystemTree({ target, expandedKeys })
   onSnapshot(result)
   return null
@@ -73,6 +100,22 @@ function mockExecutionTarget(
   return targetKind === 'workspace-root'
     ? ({ kind: 'workspace-root', workspaceId, workspaceRuntimeId } as const)
     : ({ kind: 'git-worktree', workspaceId, workspaceRuntimeId, root } as const)
+}
+
+function directoryNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
+  return { id, path: id, name: id.split('/').at(-1) ?? id, parentId, kind: 'directory', status: 'clean' }
+}
+
+function fileNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
+  return { id, path: id, name: id.split('/').at(-1) ?? id, parentId, kind: 'file', status: 'clean' }
+}
+
+function filesystemTree(...nodes: WorkspaceFilesystemNode[]): WorkspaceFilesystemTreeResult {
+  return { nodes, truncated: false }
+}
+
+function filesystemReadCount(prefix = ''): number {
+  return mocks.getWorkspaceFilesystemTree.mock.calls.filter(([, options]) => (options.prefix ?? '') === prefix).length
 }
 
 let rendered: ReturnType<typeof renderInJsdom> | null = null
@@ -300,6 +343,69 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
     expect(lastSnapshot?.tree).toEqual(result)
     expect(lastSnapshot?.loading).toBe(false)
+  })
+
+  test('revalidates cached restored children once under StrictMode', async () => {
+    const target = mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main')
+    const root = filesystemTree(directoryNode('src'))
+    queryClient.setQueryData(workspaceFilesystemTreeChildrenQueryKey(target, ''), root)
+    queryClient.setQueryData(
+      workspaceFilesystemTreeChildrenQueryKey(target, 'src'),
+      filesystemTree(fileNode('src/old.ts', 'src')),
+    )
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) =>
+      Promise.resolve(options.prefix === 'src' ? filesystemTree(fileNode('src/new.ts', 'src')) : root),
+    )
+
+    await renderElement(
+      <StrictMode>
+        <Harness
+          workspaceRootPath="/repo-a"
+          worktreePath="/repo-a/main"
+          expandedKeys={['src']}
+          onSnapshot={(snapshot) => {
+            lastSnapshot = snapshot
+          }}
+        />
+      </StrictMode>,
+    )
+    await flush()
+
+    expect(filesystemReadCount()).toBe(1)
+    expect(filesystemReadCount('src')).toBe(1)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
+  })
+
+  test('revalidates the root and restored expanded directories when the tree mounts again', async () => {
+    const root = filesystemTree(directoryNode('src'))
+    let children = filesystemTree(fileNode('src/old.ts', 'src'))
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) =>
+      Promise.resolve(options.prefix === 'src' ? children : root),
+    )
+
+    const props: HarnessProps = {
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    }
+    await render(props)
+    await flush()
+    expect(filesystemReadCount()).toBe(1)
+    expect(filesystemReadCount('src')).toBe(1)
+
+    rendered?.unmount()
+    rendered = null
+    children = filesystemTree(fileNode('src/new.ts', 'src'))
+
+    await render(props)
+    await flush()
+
+    expect(filesystemReadCount()).toBe(2)
+    expect(filesystemReadCount('src')).toBe(2)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
   test('treats an authoritative empty tree as success', async () => {
@@ -541,6 +647,7 @@ describe('useWorkspaceFilesystemTree', () => {
       await Promise.resolve()
     })
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
+    expect(lastSnapshot?.reading).toBe(true)
 
     await setProps({
       workspaceRootPath: '/repo-a',
@@ -571,6 +678,7 @@ describe('useWorkspaceFilesystemTree', () => {
     })
     await flush()
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
+    expect(lastSnapshot?.reading).toBe(false)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 
@@ -611,29 +719,71 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 
-  test('records restored expanded directory load failures without replacing the root tree error', async () => {
-    mocks.getWorkspaceFilesystemTree
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
-      .mockRejectedValueOnce(new Error('child boom'))
-
-    await render({
+  test('preserves accepted children after revalidation fails and replaces them on explicit retry', async () => {
+    const root = filesystemTree(directoryNode('src'))
+    const acceptedChildren = filesystemTree(fileNode('src/old.ts', 'src'))
+    const recoveredChildren = filesystemTree(fileNode('src/new.ts', 'src'))
+    let phase: 'accepted' | 'failing' | 'recovered' = 'accepted'
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix !== 'src') return Promise.resolve(root)
+      if (phase === 'failing') return Promise.reject(new Error('child failed'))
+      return Promise.resolve(phase === 'accepted' ? acceptedChildren : recoveredChildren)
+    })
+    const props: HarnessProps = {
       workspaceRootPath: '/repo-a',
       worktreePath: '/repo-a/main',
       expandedKeys: ['src'],
       onSnapshot: (snapshot) => {
         lastSnapshot = snapshot
       },
+    }
+    await render(props)
+    await flush()
+
+    rendered?.unmount()
+    rendered = null
+    phase = 'failing'
+    await render(props)
+    await flush()
+
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+    expect(lastSnapshot?.error).toBe('filetree.error')
+    expect(lastSnapshot?.errorKeys.has('src')).toBe(true)
+
+    phase = 'recovered'
+    await act(async () => {
+      lastSnapshot?.refresh()
     })
     await flush()
 
-    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.errorKeys.has('src')).toBe(true)
-    expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
-    expect(lastSnapshot?.tree?.nodes.map((node) => node.id)).toEqual(['src'])
+    expect(lastSnapshot?.errorKeys.size).toBe(0)
+  })
+
+  test('keeps the accepted root available when its refresh fails', async () => {
+    const accepted = filesystemTree(fileNode('README.md'))
+    let failing = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation(() =>
+      failing ? Promise.reject(new Error('refresh failed')) : Promise.resolve(accepted),
+    )
+    await render({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    failing = true
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+
+    expect(lastSnapshot?.tree).toEqual(accepted)
+    expect(lastSnapshot?.error).toBe('refresh failed')
   })
 
   test('invalidating after a successful read refreshes the cached tree', async () => {
@@ -676,27 +826,13 @@ describe('useWorkspaceFilesystemTree', () => {
   })
 
   test('invalidating keeps the current tree visible and reloads restored expanded children', async () => {
-    mocks.getWorkspaceFilesystemTree
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
-      .mockResolvedValueOnce({
-        nodes: [
-          { id: 'src/old.ts', path: 'src/old.ts', name: 'old.ts', parentId: 'src', kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
-      .mockResolvedValueOnce({
-        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-        truncated: false,
-      })
-      .mockResolvedValueOnce({
-        nodes: [
-          { id: 'src/new.ts', path: 'src/new.ts', name: 'new.ts', parentId: 'src', kind: 'file', status: 'clean' },
-        ],
-        truncated: false,
-      })
+    const root = filesystemTree(directoryNode('src'))
+    let invalidated = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) =>
+      Promise.resolve(
+        options.prefix === 'src' ? filesystemTree(fileNode(invalidated ? 'src/new.ts' : 'src/old.ts', 'src')) : root,
+      ),
+    )
 
     await render({
       workspaceRootPath: '/repo-a',
@@ -710,6 +846,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
     await act(async () => {
+      invalidated = true
       for (const listener of listeners) {
         listener({
           type: 'workspace-filesystem-invalidated',
@@ -720,12 +857,8 @@ describe('useWorkspaceFilesystemTree', () => {
     })
     await flush()
 
-    expect(mocks.getWorkspaceFilesystemTree.mock.calls.map(([, options]) => options.prefix ?? 'root')).toEqual([
-      'root',
-      'src',
-      'root',
-      'src',
-    ])
+    expect(filesystemReadCount()).toBe(2)
+    expect(filesystemReadCount('src')).toBe(2)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
@@ -814,6 +947,54 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree).toEqual(current)
   })
 
+  test('reloads settled expanded children when invalidation arrives during the root read', async () => {
+    const target = mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main')
+    const root = filesystemTree(directoryNode('src'))
+    queryClient.setQueryData(workspaceFilesystemTreeChildrenQueryKey(target, ''), root)
+    queryClient.setQueryData(
+      workspaceFilesystemTreeChildrenQueryKey(target, 'src'),
+      filesystemTree(fileNode('src/cached.ts', 'src')),
+    )
+    const firstRootRead = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    let rootReadCount = 0
+    let childReadCount = 0
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') {
+        childReadCount += 1
+        return Promise.resolve(filesystemTree(fileNode(childReadCount === 1 ? 'src/old.ts' : 'src/current.ts', 'src')))
+      }
+      rootReadCount += 1
+      return rootReadCount === 1 ? firstRootRead.promise : Promise.resolve(root)
+    })
+
+    await render({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({ type: 'workspace-filesystem-invalidated', target })
+      }
+      await Promise.resolve()
+    })
+    await act(async () => {
+      firstRootRead.resolve(root)
+      await firstRootRead.promise
+    })
+    await flush()
+
+    expect(filesystemReadCount()).toBe(2)
+    expect(filesystemReadCount('src')).toBe(2)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/current.ts'])
+  })
+
   test('shares one invalidation ingress and one refetch across observers of the same target', async () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
       nodes: [
@@ -843,6 +1024,47 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+  })
+
+  test('revalidates expanded children for an existing observer when a later observer refreshes the shared root', async () => {
+    const snapshots: Record<'first' | 'second', HarnessSnapshot | null> = { first: null, second: null }
+    let childReadCount = 0
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix !== 'src') return Promise.resolve(filesystemTree(directoryNode('src')))
+      childReadCount += 1
+      return Promise.resolve(filesystemTree(fileNode(childReadCount === 1 ? 'src/old.ts' : 'src/new.ts', 'src')))
+    })
+    const observer = (name: 'first' | 'second') => (
+      <Harness
+        key={name}
+        workspaceRootPath="/repo-a"
+        worktreePath="/repo-a/main"
+        expandedKeys={['src']}
+        onSnapshot={(snapshot) => {
+          snapshots[name] = snapshot
+        }}
+      />
+    )
+
+    await renderElement(observer('first'))
+    await flush()
+    expect(snapshots.first?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+
+    await act(async () => {
+      if (!rendered) throw new Error('expected rendered filesystem tree harness')
+      rendered.rerender(
+        <QueryClientProvider client={queryClient}>
+          {observer('first')}
+          {observer('second')}
+        </QueryClientProvider>,
+      )
+    })
+    await flush()
+
+    expect(filesystemReadCount()).toBe(2)
+    expect(filesystemReadCount('src')).toBe(2)
+    expect(snapshots.first?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
+    expect(snapshots.second?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
   test('keeps cached data invalidatable while every filesystem observer is unmounted', async () => {

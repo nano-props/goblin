@@ -42,7 +42,129 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
+
+function cleanFileNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
+  return { id, path: id, name: id.split('/').at(-1) ?? id, parentId, kind: 'file', status: 'clean' }
+}
+
+function cleanDirectoryNode(id: string): WorkspaceFilesystemNode {
+  return { id, path: id, name: id, parentId: null, kind: 'directory', status: 'clean' }
+}
+
+function filesystemTree(...nodes: WorkspaceFilesystemNode[]): WorkspaceFilesystemTreeResult {
+  return { nodes, truncated: false }
+}
+
 describe('GitWorkspacePaneContent filesystem-terminal', () => {
+  test('revalidates the file tree after switching away from and back to the files tab', async () => {
+    const worktreePath = '/tmp/filetree-tab-refresh-worktree'
+    const branchName = 'feature/filetree-tab-refresh'
+    filetreeClientMocks.getWorkspaceFilesystemTree
+      .mockResolvedValueOnce(filesystemTree(cleanFileNode('before.txt')))
+      .mockResolvedValueOnce(filesystemTree(cleanFileNode('after.txt')))
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
+      ],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    const renderSurface = () => {
+      const currentRepo = useWorkspacesStore.getState().workspaces[REPO_ID]!
+      const projection = gitWorkspacePaneProjection(currentRepo)
+      return (
+        <TerminalSessionContext value={terminalCommandContextWith()}>
+          <TerminalSessionReadContext value={emptyTerminalReadContext}>
+            <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+              <GitWorkspacePaneContentHarness
+                repo={projection}
+                detail={getTestGitWorkspacePanePresentation(projection)}
+                workspacePaneId="workspace"
+              />
+            </BranchActionSurfaceContext>
+          </TerminalSessionReadContext>
+        </TerminalSessionContext>
+      )
+    }
+    const rendered = renderInJsdom(renderSurface())
+
+    expect(await screen.findByRole('treeitem', { name: 'before.txt' })).toBeTruthy()
+    expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
+
+    act(() => {
+      useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'status')
+      rendered.rerender(renderSurface())
+    })
+    expect(rendered.container.querySelector('#workspace-status-panel')).not.toBeNull()
+
+    act(() => {
+      useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'files')
+      rendered.rerender(renderSurface())
+    })
+
+    expect(await screen.findByRole('treeitem', { name: 'after.txt' })).toBeTruthy()
+    expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+  })
+
+  test('isolates an in-flight directory read when the execution runtime changes', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/filetree-runtime-owner-workspace')
+    const oldRuntimeId = 'runtime-filetree-owner-old'
+    const currentRuntimeId = 'runtime-filetree-owner-current'
+    const oldChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    const currentChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    filetreeClientMocks.getWorkspaceFilesystemTree.mockImplementation((target, options) => {
+      if (options.prefix === 'src') {
+        return target.workspaceRuntimeId === oldRuntimeId ? oldChildren.promise : currentChildren.promise
+      }
+      return Promise.resolve(filesystemTree(cleanDirectoryNode('src')))
+    })
+    const surface = (workspaceRuntimeId: string) => (
+      <QueryClientProvider client={appQueryClient}>
+        <AppNavigationProvider value={navigationWith({})}>
+          <TerminalSessionContext value={terminalCommandContextWith()}>
+            <WorkspaceFilesystemTabPanel
+              routeTarget={{ kind: 'workspace-root', workspaceId }}
+              target={workspaceRootPaneFilesystemTarget({
+                workspaceId,
+                workspaceRuntimeId,
+                capabilities: {
+                  files: { read: true, write: false },
+                  terminal: { available: false },
+                  git: { status: 'unavailable' },
+                },
+              })}
+            />
+          </TerminalSessionContext>
+        </AppNavigationProvider>
+      </QueryClientProvider>
+    )
+    const rendered = renderInJsdom(surface(oldRuntimeId))
+    const directory = await screen.findByRole('treeitem', { name: 'src' })
+
+    act(() => directory.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await waitFor(() => expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2))
+
+    rendered.rerender(surface(currentRuntimeId))
+    await waitFor(() => expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(4))
+
+    await act(async () => {
+      oldChildren.resolve(filesystemTree(cleanFileNode('src/stale.ts', 'src')))
+      await oldChildren.promise
+    })
+    expect(screen.queryByRole('treeitem', { name: 'stale.ts' })).toBeNull()
+
+    await act(async () => {
+      currentChildren.resolve(filesystemTree(cleanFileNode('src/current.ts', 'src')))
+      await currentChildren.promise
+    })
+    expect(await screen.findByRole('treeitem', { name: 'current.ts' })).toBeTruthy()
+    expect(screen.queryByRole('treeitem', { name: 'stale.ts' })).toBeNull()
+  })
+
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)

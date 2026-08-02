@@ -183,10 +183,44 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.empty/)
   })
 
-  test('renders error state when error is set', () => {
-    const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
-    renderView({ tree, loading: false, error: 'boom' })
+  test('renders a retryable error state when the initial read fails', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    renderView({ tree: null, loading: false, error: 'boom', onRetry })
     expect(container?.textContent).toMatch(/filetree\.error/)
+    await user.click(container!.querySelector('button')!)
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  test('keeps the accepted tree visible with a retryable stale notice when refresh fails', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      error: 'boom',
+      onRetry,
+    })
+
+    expect(row('README.md')).toBeTruthy()
+    expect(container?.textContent).toMatch(/filetree\.stale-title/)
+    expect(container?.textContent).not.toMatch(/filetree\.error/)
+    await user.click(container!.querySelector('button')!)
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  test('keeps retry disabled and reports busy while filesystem reads are pending', () => {
+    const onRetry = vi.fn()
+    renderView({
+      tree: { nodes: [fileNode('README.md')], truncated: false },
+      loading: false,
+      reading: true,
+      error: 'boom',
+      onRetry,
+    })
+
+    expect(container?.querySelector('[data-filetree]')?.getAttribute('aria-busy')).toBe('true')
+    expect(container?.querySelector('button')?.hasAttribute('disabled')).toBe(true)
   })
 
   test('renders a virtualized tree labelled by i18n', () => {
