@@ -17,6 +17,7 @@ export interface StandaloneServerLayout {
 export async function launchStandaloneServer(
   layout: StandaloneServerLayout,
   args: string[] = process.argv.slice(2),
+  fileExists: typeof existsSync = existsSync,
 ): Promise<BootstrappedServer> {
   process.chdir(layout.repoRoot)
   prepareNodePtyDarwinRuntime({
@@ -51,7 +52,7 @@ export async function launchStandaloneServer(
 
   const webIndex = path.join(layout.repoRoot, 'dist/web/index.html')
   const webBoot = path.join(layout.repoRoot, 'dist/web/boot.js')
-  const webReady = existsSync(webIndex) && existsSync(webBoot)
+  const webReady = fileExists(webIndex) && fileExists(webBoot)
   const server = await bootstrapServer({
     ptyWorkerEntry: resolvePtyWorkerEntry(layout.runtimeEntryDir),
     gCommandEntry: resolveGoblinCommandEntry(layout.runtimeEntryDir),
