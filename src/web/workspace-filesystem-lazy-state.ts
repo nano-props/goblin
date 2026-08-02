@@ -137,9 +137,7 @@ function existingDirectoryPrefixes(
   prefixes: ReadonlySet<string>,
   nodesById: ReadonlyMap<string, WorkspaceFilesystemNode>,
 ): ReadonlySet<string> {
-  return new Set(
-    Array.from(prefixes).filter((prefix) => prefix === '' || nodesById.get(prefix)?.kind === 'directory'),
-  )
+  return new Set(Array.from(prefixes).filter((prefix) => prefix === '' || nodesById.get(prefix)?.kind === 'directory'))
 }
 
 function withoutPrefix(prefixes: ReadonlySet<string>, prefix: string): ReadonlySet<string> {

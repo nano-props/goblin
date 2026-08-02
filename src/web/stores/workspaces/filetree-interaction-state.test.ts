@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   filetreeInteractionScopeKey,
-  isReachableExpandedFiletreeKey,
+  isFiletreeExpandedKeyRestoreReady,
   parseFiletreeInteractionScopeKey,
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
@@ -15,11 +15,12 @@ describe('useFiletreeInteractionStore', () => {
     resetFiletreeInteractionStore()
   })
 
-  test('treats expanded descendants as reachable only while their ancestors are expanded', () => {
-    expect(isReachableExpandedFiletreeKey('src', new Set(['src']))).toBe(true)
-    expect(isReachableExpandedFiletreeKey('src/web', new Set(['src', 'src/web']))).toBe(true)
-    expect(isReachableExpandedFiletreeKey('src/web/components', new Set(['src', 'src/web/components']))).toBe(false)
-    expect(isReachableExpandedFiletreeKey('src/web', new Set(['src/web']))).toBe(false)
+  test('restores scrolling after reachable directories settle or an ancestor blocks them', () => {
+    const expanded = new Set(['src', 'src/web'])
+    expect(isFiletreeExpandedKeyRestoreReady('src', expanded, new Set(['src']), new Set())).toBe(true)
+    expect(isFiletreeExpandedKeyRestoreReady('src/web', expanded, new Set(), new Set())).toBe(false)
+    expect(isFiletreeExpandedKeyRestoreReady('src/web', expanded, new Set(), new Set(['src']))).toBe(true)
+    expect(isFiletreeExpandedKeyRestoreReady('src/web', new Set(['src/web']), new Set(), new Set())).toBe(true)
   })
 
   test('stores selected and expanded keys by repo worktree scope', () => {

@@ -749,11 +749,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(filesystemReadCount('src/web')).toBe(1)
-    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual([
-      'src',
-      'src/web',
-      'src/web/index.ts',
-    ])
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/web', 'src/web/index.ts'])
   })
 
   test('does not restore late children after their directory is authoritatively removed', async () => {

@@ -17,7 +17,7 @@ import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-
 import {
   emptyFiletreeInteractionSnapshot,
   filetreeInteractionScopeKey,
-  isReachableExpandedFiletreeKey,
+  isFiletreeExpandedKeyRestoreReady,
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
@@ -106,11 +106,8 @@ function ExecutionTargetFilesystemTabPanel({
   const expandedKeys = useMemo(() => new Set(expandedKeyList), [expandedKeyList])
   const scrollRestoreReady = useMemo(
     () =>
-      expandedKeyList.every(
-        (key) =>
-          !isReachableExpandedFiletreeKey(key, expandedKeys) ||
-          result.loadedPrefixes.has(key) ||
-          result.errorKeys.has(key),
+      expandedKeyList.every((key) =>
+        isFiletreeExpandedKeyRestoreReady(key, expandedKeys, result.loadedPrefixes, result.errorKeys),
       ),
     [expandedKeyList, expandedKeys, result.errorKeys, result.loadedPrefixes],
   )
