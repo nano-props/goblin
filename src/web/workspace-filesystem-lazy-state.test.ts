@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
   emptyLazyWorkspaceFilesystemTreeState,
-  isFiletreeExpandedKeyReachable,
-  isFiletreeExpandedKeyRestoreReady,
   lazyWorkspaceFilesystemTreeReducer,
 } from '#/web/workspace-filesystem-lazy-state.ts'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
@@ -17,17 +15,6 @@ function node(
 }
 
 describe('filetree lazy state', () => {
-  test('restores only reachable expanded directories after they settle or an ancestor fails', () => {
-    const expanded = new Set(['src', 'src/web'])
-    expect(isFiletreeExpandedKeyReachable('src/web', expanded)).toBe(true)
-    expect(isFiletreeExpandedKeyReachable('src/web', new Set(['src/web']))).toBe(false)
-    expect(isFiletreeExpandedKeyRestoreReady('src', expanded, new Set(['src']), new Set())).toBe(true)
-    expect(isFiletreeExpandedKeyRestoreReady('src/web', expanded, new Set(), new Set())).toBe(false)
-    expect(isFiletreeExpandedKeyRestoreReady('src/web', expanded, new Set(), new Set(['src']))).toBe(true)
-    expect(isFiletreeExpandedKeyRestoreReady('src/web', expanded, new Set(), new Set(['src/web']))).toBe(true)
-    expect(isFiletreeExpandedKeyRestoreReady('src/web', new Set(['src/web']), new Set(), new Set())).toBe(true)
-  })
-
   test('tracks loading and loaded prefixes around child reads', () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {

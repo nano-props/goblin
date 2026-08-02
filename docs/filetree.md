@@ -40,6 +40,8 @@ Use this document for the workspace-pane filesystem tree and its file actions.
 - Expansion, selection, and scroll position are client-owned presentation
   preferences and may be restored across sessions. Loading and action state are
   ephemeral.
+- A remembered expansion participates in restored reads and visible read status
+  only while all of its ancestor directories are expanded.
 - Each filesystem execution target owns one read lifecycle. Changing the target
   replaces that owner; results from the previous target remain isolated in its
   query cache and cannot enter the new projection.

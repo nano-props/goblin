@@ -13,7 +13,6 @@ import {
 } from '#/web/workspace-filesystem-query.ts'
 import {
   emptyLazyWorkspaceFilesystemTreeState,
-  isFiletreeExpandedKeyReachable,
   lazyWorkspaceFilesystemTreeReducer,
   type LazyWorkspaceFilesystemTreeAggregate,
   type LazyWorkspaceFilesystemTreeState,
@@ -36,15 +35,20 @@ export interface UseWorkspaceFilesystemTreeResult {
   readonly reading: boolean
   readonly error: string | null
   readonly loadingKeys: ReadonlySet<string>
-  readonly errorKeys: ReadonlySet<string>
   readonly loadedPrefixes: ReadonlySet<string>
+  readonly expandedDirectoryReadsSettled: boolean
   loadChildren(prefix: string): Promise<void>
   refresh(): void
 }
 
-type ChildLoadMode = 'manual' | 'restore'
-
 const EMPTY_EXPANDED_KEYS: readonly string[] = []
+
+interface WorkspaceFilesystemExpansionProjection {
+  readonly restorePrefixes: ReadonlySet<string>
+  readonly visibleLoadingPrefixes: ReadonlySet<string>
+  readonly visibleErrorPrefixes: ReadonlySet<string>
+  readonly readsSettled: boolean
+}
 
 interface CachedWorkspaceFilesystemTreeStateInput {
   readonly queryClient: QueryClient
@@ -65,12 +69,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
   const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
   const queryClient = useQueryClient()
   const enabled = workspaceId.length > 0 && workspaceRuntimeId.length > 0 && filesystemRootPath.length > 0
-  const rootQueryKey = useMemo(
-    () => workspaceFilesystemTreeChildrenQueryKey(target, ''),
-    [target.kind, workspaceId, workspaceRuntimeId, filesystemRootPath],
-  )
-  const expandedKeysSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
-  const expandedKeySet = useMemo(() => new Set(expandedKeys.map(normalizePrefix)), [expandedKeysSignal])
+  const rootQueryKey = useMemo(() => workspaceFilesystemTreeChildrenQueryKey(target, ''), [target])
   const [treeState, dispatchTreeState] = useReducer(
     lazyWorkspaceFilesystemTreeReducer,
     { queryClient, target, expandedKeys },
@@ -99,17 +98,16 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
   }, [queryClient, target])
 
   useEffect(() => {
-    if (!rootData) return
+    if (!rootData || isFetching || rootError) return
     dispatchTreeState({ type: 'childrenLoaded', prefix: '', result: rootData })
-  }, [rootData])
+  }, [isFetching, rootData, rootError])
 
   const readChildren = useCallback(
-    async (prefix: string, mode: ChildLoadMode) => {
+    async (prefix: string) => {
       if (!enabled) return
       const normalizedPrefix = normalizePrefix(prefix)
       if (treeState.loadedPrefixes.has(normalizedPrefix)) return
       if (treeState.loadingPrefixes.has(normalizedPrefix)) return
-      if (mode === 'restore' && treeState.errorPrefixes.has(normalizedPrefix)) return
 
       dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
       try {
@@ -130,60 +128,47 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
         dispatchTreeState({ type: 'childrenSettled', prefix: normalizedPrefix })
       }
     },
-    [
-      enabled,
-      queryClient,
-      workspaceId,
-      workspaceRuntimeId,
-      treeState.errorPrefixes,
-      treeState.loadedPrefixes,
-      treeState.loadingPrefixes,
-      filesystemRootPath,
-      target,
-    ],
+    [enabled, queryClient, treeState.loadedPrefixes, treeState.loadingPrefixes, target],
   )
 
   const loadChildren = useCallback(
     async (prefix: string) => {
-      await readChildren(prefix, 'manual')
+      await readChildren(prefix)
     },
     [readChildren],
   )
 
+  const expansionProjection = useMemo(
+    () => deriveWorkspaceFilesystemExpansionProjection(expandedKeys, treeState, !isFetching && Boolean(rootError)),
+    [expandedKeys, isFetching, rootError, treeState],
+  )
+
   const restoreExpandedChildren = useEffectEvent(() => {
-    for (const key of expandedKeys) {
-      const prefix = normalizePrefix(key)
-      if (!isFiletreeExpandedKeyReachable(prefix, expandedKeySet)) continue
-      if (treeState.nodesById.get(prefix)?.kind !== 'directory') continue
-      void readChildren(prefix, 'restore').catch(() => {})
+    for (const prefix of expansionProjection.restorePrefixes) {
+      void readChildren(prefix).catch(() => {})
     }
   })
 
   useEffect(() => {
     if (!rootData) return
     restoreExpandedChildren()
-  }, [expandedKeySet, rootData, treeState.nodesById, treeState.reloadEpoch])
-
-  const reachableErrorPrefixes = useMemo(
-    () => reachableExpandedPrefixes(treeState.errorPrefixes, expandedKeySet),
-    [expandedKeySet, treeState.errorPrefixes],
-  )
+  }, [expandedKeys, rootData, treeState.nodesById, treeState.reloadEpoch])
 
   const refresh = useCallback(() => {
     if (!enabled) return
     void refetch({ cancelRefetch: false })
   }, [enabled, refetch])
 
-  const error = workspaceFilesystemTreeError(rootError, reachableErrorPrefixes)
+  const error = workspaceFilesystemTreeError(rootError, expansionProjection.visibleErrorPrefixes)
 
   return {
     tree: rootData ? treeState.result : null,
     loading: isPending,
-    reading: isFetching || treeState.loadingPrefixes.size > 0,
+    reading: isFetching || expansionProjection.visibleLoadingPrefixes.size > 0,
     error,
-    loadingKeys: treeState.loadingPrefixes,
-    errorKeys: reachableErrorPrefixes,
+    loadingKeys: expansionProjection.visibleLoadingPrefixes,
     loadedPrefixes: treeState.loadedPrefixes,
+    expandedDirectoryReadsSettled: expansionProjection.readsSettled,
     loadChildren,
     refresh,
   }
@@ -193,15 +178,75 @@ function normalizePrefix(prefix: string): string {
   return prefix.replace(/^\.\/+/, '').replace(/\/+$/u, '')
 }
 
-function reachableExpandedPrefixes(
-  prefixes: ReadonlySet<string>,
-  expandedKeys: ReadonlySet<string>,
-): ReadonlySet<string> {
-  return new Set(
-    Array.from(prefixes).filter(
-      (prefix) => expandedKeys.has(prefix) && isFiletreeExpandedKeyReachable(prefix, expandedKeys),
-    ),
-  )
+function deriveWorkspaceFilesystemExpansionProjection(
+  expandedKeys: readonly string[],
+  state: LazyWorkspaceFilesystemTreeState,
+  rootReadFailed: boolean,
+): WorkspaceFilesystemExpansionProjection {
+  const expandedPrefixes = new Set(expandedKeys.map(normalizePrefix).filter(Boolean))
+  const reachablePrefixes = new Set<string>()
+  const restorePrefixes = new Set<string>()
+  const visibleLoadingPrefixes = new Set<string>()
+  const visibleErrorPrefixes = new Set<string>()
+  let readsSettled = true
+
+  for (const prefix of expandedPrefixes) {
+    if (!hasExpandedAncestors(prefix, expandedPrefixes)) continue
+    reachablePrefixes.add(prefix)
+  }
+
+  for (const prefix of reachablePrefixes) {
+    if (state.loadingPrefixes.has(prefix)) visibleLoadingPrefixes.add(prefix)
+    if (state.errorPrefixes.has(prefix)) visibleErrorPrefixes.add(prefix)
+
+    const blockedByAncestorError = hasAncestorInSet(prefix, state.errorPrefixes)
+    const node = state.nodesById.get(prefix)
+    if (
+      node?.kind === 'directory' &&
+      !state.loadedPrefixes.has(prefix) &&
+      !state.loadingPrefixes.has(prefix) &&
+      !state.errorPrefixes.has(prefix) &&
+      !blockedByAncestorError
+    ) {
+      restorePrefixes.add(prefix)
+    }
+
+    if (state.loadingPrefixes.has(prefix)) {
+      readsSettled = false
+      continue
+    }
+    if (state.loadedPrefixes.has(prefix) || state.errorPrefixes.has(prefix) || blockedByAncestorError) continue
+    if (rootReadFailed && node?.kind !== 'directory') continue
+    if (state.loadedPrefixes.has(parentPrefix(prefix)) && node?.kind !== 'directory') continue
+    readsSettled = false
+  }
+
+  return { restorePrefixes, visibleLoadingPrefixes, visibleErrorPrefixes, readsSettled }
+}
+
+function hasExpandedAncestors(prefix: string, expandedPrefixes: ReadonlySet<string>): boolean {
+  let slash = prefix.lastIndexOf('/')
+  while (slash >= 0) {
+    const ancestor = prefix.slice(0, slash)
+    if (!expandedPrefixes.has(ancestor)) return false
+    slash = ancestor.lastIndexOf('/')
+  }
+  return true
+}
+
+function hasAncestorInSet(prefix: string, prefixes: ReadonlySet<string>): boolean {
+  let slash = prefix.lastIndexOf('/')
+  while (slash >= 0) {
+    const ancestor = prefix.slice(0, slash)
+    if (prefixes.has(ancestor)) return true
+    slash = ancestor.lastIndexOf('/')
+  }
+  return false
+}
+
+function parentPrefix(prefix: string): string {
+  const slash = prefix.lastIndexOf('/')
+  return slash < 0 ? '' : prefix.slice(0, slash)
 }
 
 function cachedWorkspaceFilesystemTreeState({

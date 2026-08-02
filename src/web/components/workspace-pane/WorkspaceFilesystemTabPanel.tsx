@@ -19,7 +19,6 @@ import {
   filetreeInteractionScopeKey,
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { isFiletreeExpandedKeyRestoreReady } from '#/web/workspace-filesystem-lazy-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -104,13 +103,6 @@ function ExecutionTargetFilesystemTabPanel({
   }, [openingFileKeyPrefix, pendingOpeningFileKeys])
   const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
   const expandedKeys = useMemo(() => new Set(expandedKeyList), [expandedKeyList])
-  const scrollRestoreReady = useMemo(
-    () =>
-      expandedKeyList.every((key) =>
-        isFiletreeExpandedKeyRestoreReady(key, expandedKeys, result.loadedPrefixes, result.errorKeys),
-      ),
-    [expandedKeyList, expandedKeys, result.errorKeys, result.loadedPrefixes],
-  )
   const handleSelectedKeysChange = useCallback(
     (keys: Set<Key>) => {
       setSelectedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
@@ -214,7 +206,7 @@ function ExecutionTargetFilesystemTabPanel({
       onRetry={result.refresh}
       initialTopVisibleRowIndex={initialTopVisibleRowIndex}
       scrollRestoreKey={interactionScopeKey}
-      scrollRestoreReady={scrollRestoreReady}
+      scrollRestoreReady={result.expandedDirectoryReadsSettled}
       onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
       onOpenFile={
         target.capabilities.terminal.available

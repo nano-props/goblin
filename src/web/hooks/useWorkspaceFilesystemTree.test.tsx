@@ -41,7 +41,7 @@ type HarnessSnapshot = {
   reading: boolean
   error: string | null
   loadingKeys: ReadonlySet<string>
-  errorKeys: ReadonlySet<string>
+  expandedDirectoryReadsSettled: boolean
   loadChildren: (prefix: string) => Promise<void>
   refresh: () => void
 }
@@ -321,6 +321,7 @@ describe('useWorkspaceFilesystemTree', () => {
   test('does not project an in-flight child failure after its ancestor is collapsed', async () => {
     const webChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
     let webRecovered = false
+    let rootRefreshFailure = false
     mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
       if (options.prefix === 'src') return Promise.resolve(filesystemTree(directoryNode('src/web', 'src')))
       if (options.prefix === 'src/web') {
@@ -328,6 +329,7 @@ describe('useWorkspaceFilesystemTree', () => {
           ? Promise.resolve(filesystemTree(fileNode('src/web/recovered.ts', 'src/web')))
           : webChildren.promise
       }
+      if (rootRefreshFailure) return Promise.reject(new Error('root refresh failed'))
       return Promise.resolve(filesystemTree(directoryNode('src')))
     })
     const props = (expandedKeys: readonly string[]): HarnessProps => ({
@@ -344,6 +346,25 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(filesystemReadCount('src/web')).toBe(1)
 
     await setProps(props(['src/web']))
+    expect(lastSnapshot?.loadingKeys.size).toBe(0)
+    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
+
+    rootRefreshFailure = true
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+    expect(lastSnapshot?.error).toBe('root refresh failed')
+    expect(lastSnapshot?.reading).toBe(false)
+
+    rootRefreshFailure = false
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+    expect(lastSnapshot?.error).toBeNull()
+
     await act(async () => {
       webChildren.reject(new Error('hidden child failed'))
       await Promise.resolve()
@@ -351,12 +372,12 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.errorKeys.size).toBe(0)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     await setProps(props(['src', 'src/web']))
     await flush()
     expect(lastSnapshot?.error).toBe('filetree.error')
-    expect(lastSnapshot?.errorKeys.has('src/web')).toBe(true)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     webRecovered = true
     await act(async () => {
@@ -736,8 +757,8 @@ describe('useWorkspaceFilesystemTree', () => {
       childLoad = lastSnapshot?.loadChildren('src')
       await Promise.resolve()
     })
-    expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
-    expect(lastSnapshot?.reading).toBe(true)
+    expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
+    expect(lastSnapshot?.reading).toBe(false)
 
     await setProps({
       workspaceRootPath: '/repo-a',
@@ -830,6 +851,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(filesystemReadCount('src')).toBe(1)
     expect(filesystemReadCount('src/web')).toBe(0)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(false)
 
     webChildren.resolve(filesystemTree(fileNode('src/web/index.ts', 'src/web')))
     await act(async () => {
@@ -839,7 +861,64 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(filesystemReadCount('src/web')).toBe(1)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/web', 'src/web/index.ts'])
+  })
+
+  test('settles descendants when an ancestor read fails', async () => {
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (options.prefix === 'src') return Promise.reject(new Error('source read failed'))
+      return Promise.resolve(filesystemTree(directoryNode('src')))
+    })
+
+    await render({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['src', 'src/web'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+
+    expect(filesystemReadCount('src')).toBe(1)
+    expect(filesystemReadCount('src/web')).toBe(0)
+    expect(lastSnapshot?.error).toBe('filetree.error')
+    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
+  })
+
+  test('settles a missing restored directory after unchanged and failed root refreshes', async () => {
+    const root = filesystemTree()
+    let rootRefreshFailure = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation(() =>
+      rootRefreshFailure ? Promise.reject(new Error('root refresh failed')) : Promise.resolve(root),
+    )
+
+    await render({
+      workspaceRootPath: '/repo-a',
+      worktreePath: '/repo-a/main',
+      expandedKeys: ['missing'],
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await flush()
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
+
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
+
+    rootRefreshFailure = true
+    await act(async () => {
+      lastSnapshot?.refresh()
+    })
+    await flush()
+    expect(lastSnapshot?.error).toBe('root refresh failed')
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
   })
 
   test('does not restore late children after their directory is authoritatively removed', async () => {
@@ -919,7 +998,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
     expect(lastSnapshot?.error).toBe('filetree.error')
-    expect(lastSnapshot?.errorKeys.has('src')).toBe(true)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     phase = 'recovered'
     await act(async () => {
@@ -929,7 +1008,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.errorKeys.size).toBe(0)
+    expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
   })
 
   test('keeps the accepted root available when its refresh fails', async () => {
