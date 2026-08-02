@@ -132,11 +132,8 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
   // soon as the app mounts. The first boot request is public
   // i18n; the auth-gated `useAccessTokenStatus` whoami probe
   // runs after the client entrypoint has hydrated i18n and
-  // mounted the app. The window's
-  // `webContents.session` is a per-window cookie store in
-  // Electron — sharing the default session across windows would
-  // leak the cookie into popups. See `cookie-bootstrap.ts` for
-  // the full rationale.
+  // mounted the app. The default Electron session is shared; the
+  // cookie is host-scoped with `Path=/`, while popups are denied.
   const runtime = getEmbeddedServerRuntime()
   if (runtime?.accessToken) {
     try {

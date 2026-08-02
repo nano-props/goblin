@@ -68,11 +68,9 @@ export function createAuthRoutes({ accessToken }: AuthRouteOptions): Hono {
 
   app.get('/whoami', createAccessTokenMiddleware(accessToken), (c) => c.json({ ok: true }))
 
-  // Echo the access token back to an authenticated caller. Used by
-  // the Web settings page so a browser-mode operator can copy the
-  // token without reading the server log. Always auth-gated; the
-  // token is the only thing that authenticates, so the only callers
-  // are callers who already have it.
+  // Accepted tradeoff: the authenticated renderer is high-trust and already
+  // has terminal/file/Git authority. Exposing the token supports copy/QR;
+  // HttpOnly prevents incidental cookie reads, not renderer/XSS compromise.
   app.get('/access-token', createAccessTokenMiddleware(accessToken), (c) => c.json({ accessToken }))
 
   return app

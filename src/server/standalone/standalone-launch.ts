@@ -58,6 +58,8 @@ export async function launchStandaloneServer(
     gCommandEntry: resolveGoblinCommandEntry(layout.runtimeEntryDir),
   })
 
+  // Accepted tradeoff: built-in LAN access uses HTTP and a token-bearing URL.
+  // Use it only on a trusted network; terminate HTTPS externally otherwise.
   console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
   console.log(`[embedded-server] data dir: ${serverDataDir()}`)
   console.log(`[embedded-server] access token: ${accessToken}`)

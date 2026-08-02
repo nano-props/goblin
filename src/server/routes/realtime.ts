@@ -38,6 +38,9 @@ interface RealtimeRouteOptions {
 // happens in the client's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {
+  // Accepted tradeoff: WS upgrades do not validate Origin. They still require
+  // the access token, and SameSite=Lax blocks normal cross-site cookie use;
+  // the residual same-site risk is accepted for loopback/trusted-LAN use.
   // The shared middleware accepts cookie, header, or `?t=` query, so
   // browser clients (cookie), embedded Electron clients (`?t=`),
   // and LAN CLI clients (any of the three) all work. The middleware

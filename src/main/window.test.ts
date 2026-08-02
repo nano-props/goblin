@@ -244,13 +244,8 @@ describe('primary window navigation boundaries', () => {
     expect(mocks.readFileSync).toHaveBeenCalledWith('/app/dist/web/index.html')
   })
 
-  test('plants the auth cookie scoped to the Vite dev origin (port 5173)', async () => {
-    // Regression: the cookie bootstrap used to strip the port
-    // when computing the cookie URL, which silently defaulted
-    // the cookie to port 80. In dev the client loads from Vite
-    // (5173), so the cookie must be scoped to that origin —
-    // otherwise the very first whoami probe fails and the token
-    // gate reappears on every fresh dev run.
+  test('passes the concrete Vite dev URL when planting the host-scoped auth cookie', async () => {
+    // Keep the concrete URL; the cookie remains host-scoped with `Path=/`.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 
@@ -267,10 +262,8 @@ describe('primary window navigation boundaries', () => {
     })
   })
 
-  test('plants the auth cookie scoped to the embedded server origin (port 32100) in production', async () => {
-    // Mirror of the dev test above for the packaged build path:
-    // the cookie must carry the embedded server's port, not the
-    // default port 80.
+  test('passes the concrete embedded-server URL when planting the production auth cookie', async () => {
+    // Keep the concrete URL; the cookie remains host-scoped with `Path=/`.
     mocks.isPackaged = true
     const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
 

@@ -36,13 +36,7 @@ describe('replantEmbedAuthCookieForRotation', () => {
 
     expect(cookieSetMock).toHaveBeenCalledTimes(1)
     const cookieArg = cookieSetMock.mock.calls[0][0]
-    // The cookie's URL must include the port. Chromium scopes
-    // cookies to host *and* port — a port-stripped URL like
-    // `http://127.0.0.1` would default the port to 80, and the
-    // browser would refuse to send the cookie on requests to
-    // `http://127.0.0.1:32100/`. In dev the client loads from
-    // the Vite port (5173), in prod from the embedded server
-    // port (32100); both need an explicit port in the cookie URL.
+    // The API gets the concrete URL; the cookie remains host-scoped with `Path=/`.
     expect(cookieArg).toMatchObject({
       url: 'http://127.0.0.1:32100/',
       name: 'goblin_access_token',
@@ -72,13 +66,7 @@ describe('replantEmbedAuthCookieForRotation', () => {
   })
 
   test('plants the cookie with the Vite dev URL so dev-mode whoami probes authenticate', async () => {
-    // Regression: the cookie bootstrap used to strip the port
-    // (`new URL(url).hostname`), which silently defaulted the
-    // cookie's port to 80. In dev, the client loads from
-    // `http://127.0.0.1:5173/` (Vite), which proxies `/api/*` to
-    // the embedded server. The browser must see a cookie scoped
-    // to the Vite origin, otherwise the very first whoami probe
-    // fails and the token gate appears even on a fresh dev run.
+    // Keep the concrete Vite URL; the cookie remains host-scoped with `Path=/`.
     const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
     await replantEmbedAuthCookieForRotation({
       accessToken: 'dev-token-xyz',
@@ -87,9 +75,7 @@ describe('replantEmbedAuthCookieForRotation', () => {
     })
 
     const cookieArg = cookieSetMock.mock.calls[0][0]
-    // Query string stripped — Chromium's cookies.set ignores
-    // query params for scoping but they are not part of the
-    // cookie URL. We only need the origin (protocol + host + port).
+    // Strip the query while keeping the concrete URL.
     expect(cookieArg.url).toBe('http://127.0.0.1:5173/')
   })
 

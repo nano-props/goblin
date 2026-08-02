@@ -44,11 +44,8 @@ export function WebSettings() {
   // Electron and standalone-web sessions with no value.
   const currentUrl = window.location.origin
 
-  // A QR/login handoff may carry the token in the bootstrap. Normal
-  // same-origin sessions round-trip to the auth-gated `/api/access-token`
-  // endpoint. Either way the displayed value matches what the server
-  // actually authenticates against, so a copy/paste into the gate (or QR
-  // scan) works.
+  // Intentional high-trust boundary: authenticated settings may read the
+  // token for copy/QR; HttpOnly is not an XSS boundary for this renderer.
   const bootstrapToken = getInitialBootstrap().initialServer?.accessToken
   const [fetchedToken, setFetchedToken] = useState<string | null>(null)
   useEffect(() => {
