@@ -174,15 +174,16 @@ type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembers
 type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRecoveryResult & {
   remoteEnsureTargets?: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
 }
+type ChangedWorkspaceRuntimeTarget = SettledWorkspaceRuntimeMembershipRecovery['changedTargets'][number]
 
 /**
  * Re-declares this window's complete workspace membership after realtime recovery,
- * then atomically advances every still-current local shell to the server's
- * canonical runtime epoch. Changed local targets remain eligible for downstream
- * projection recovery only when their one-shot Refresh succeeds.
+ * then atomically advances every still-current shell to the server's canonical
+ * runtime epoch. Changed targets remain eligible for downstream projection
+ * recovery only after their one-shot capability command succeeds.
  *
- * Refresh stays outside membership admission. #359 accepts that overlapping
- * recovery may project a settling epoch instead of adding generation joining.
+ * Capability commands stay outside membership admission. #359 accepts that
+ * overlapping recovery may project a settling epoch instead of adding generation joining.
  */
 export async function reconcileOpenWorkspaceRuntimeMemberships(
   set: WorkspacesSet,
@@ -192,48 +193,88 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
     async () => await reconcileOpenWorkspaceRuntimeMembershipsNow(set, get),
   )
   if (recovery.kind === 'superseded') return recovery
+  const changedRemoteWorkspaceIds = new Set(
+    recovery.changedTargets
+      .filter((target) => isRemoteWorkspaceId(target.workspaceId))
+      .map((target) => target.workspaceId),
+  )
   void Promise.all(
-    (recovery.remoteEnsureTargets ?? []).map(async (target) => {
-      await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        mode: 'ensure',
-      })
-    }),
+    (recovery.remoteEnsureTargets ?? [])
+      .filter((target) => !changedRemoteWorkspaceIds.has(target.workspaceId))
+      .map(async (target) => {
+        await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          mode: 'ensure',
+        })
+      }),
   ).catch((err) => {
     workspacesLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
   })
-  const ineligibleLocalWorkspaceIds = new Set<WorkspaceId>()
+  const remoteEnsureWorkspaceIds = new Set((recovery.remoteEnsureTargets ?? []).map((target) => target.workspaceId))
   // Settle one batch before projection recovery. #359 accepts cross-workspace
   // delay instead of adding per-target generation coordination.
-  await Promise.all(
-    recovery.changedTargets.map(async (target) => {
-      if (isRemoteWorkspaceId(target.workspaceId)) return
-      try {
-        const outcome = await runWorkspaceRefresh({ set, get }, target.workspaceId, {
-          workspaceRuntimeId: target.workspaceRuntimeId,
-        })
-        if (outcome.ok) return
-        ineligibleLocalWorkspaceIds.add(target.workspaceId)
-        if ('cancelled' in outcome) return
-        workspacesLog.warn('workspace refresh did not recover the changed local runtime', {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          message: outcome.message,
-        })
-      } catch (err) {
-        ineligibleLocalWorkspaceIds.add(target.workspaceId)
-        workspacesLog.warn('workspace refresh failed after local runtime epoch replacement', {
-          workspaceId: target.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          err,
-        })
-      }
-    }),
+  const changedTargetEligibility = await Promise.all(
+    recovery.changedTargets.map(async (target) => ({
+      workspaceId: target.workspaceId,
+      eligible: await settleChangedWorkspaceRuntimeForProjection(
+        set,
+        get,
+        target,
+        remoteEnsureWorkspaceIds.has(target.workspaceId),
+      ),
+    })),
+  )
+  const ineligibleWorkspaceIds = new Set(
+    changedTargetEligibility.filter((target) => !target.eligible).map((target) => target.workspaceId),
   )
   return {
     kind: 'settled',
-    targets: recovery.targets.filter((target) => !ineligibleLocalWorkspaceIds.has(target.workspaceId)),
+    targets: recovery.targets.filter((target) => !ineligibleWorkspaceIds.has(target.workspaceId)),
     changedTargets: recovery.changedTargets,
+  }
+}
+
+async function settleChangedWorkspaceRuntimeForProjection(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  target: ChangedWorkspaceRuntimeTarget,
+  remoteEnsureRequired: boolean,
+): Promise<boolean> {
+  if (isRemoteWorkspaceId(target.workspaceId)) {
+    if (remoteEnsureRequired) {
+      const outcome = await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
+        workspaceRuntimeId: target.workspaceRuntimeId,
+        mode: 'ensure',
+      })
+      return outcome?.kind === 'ready'
+    }
+    const workspace = get().workspaces[target.workspaceId]
+    return (
+      workspace?.workspaceRuntimeId === target.workspaceRuntimeId &&
+      workspace.admission.kind === 'remote' &&
+      workspace.admission.lifecycle?.kind === 'ready'
+    )
+  }
+
+  try {
+    const outcome = await runWorkspaceRefresh({ set, get }, target.workspaceId, {
+      workspaceRuntimeId: target.workspaceRuntimeId,
+    })
+    if (outcome.ok) return true
+    if ('cancelled' in outcome) return false
+    workspacesLog.warn('workspace refresh did not recover the changed local runtime', {
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      message: outcome.message,
+    })
+    return false
+  } catch (err) {
+    workspacesLog.warn('workspace refresh failed after local runtime epoch replacement', {
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      err,
+    })
+    return false
   }
 }
 
