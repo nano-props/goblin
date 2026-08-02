@@ -98,7 +98,7 @@ describe('standalone server launch boundary', () => {
     expect(process.cwd()).toBe(repoRoot)
     expect(process.env.GOBLIN_SERVER_DATA_DIR).toBe('/tmp/goblin-test-data')
     expect(process.env.GOBLIN_SERVER_ACCESS_TOKEN).toBe('generic-explicit-token')
-    expect(process.env.npm_package_version).toBe('0.3.0')
+    expect(process.env.npm_package_version).toBe('0.3.1')
     expect(mocks.prepareNodePtyDarwinRuntime).toHaveBeenCalledWith({
       packageRoot: path.join(repoRoot, 'node_modules/node-pty'),
     })
