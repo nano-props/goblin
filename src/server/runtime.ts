@@ -3,8 +3,7 @@ import { omit } from 'es-toolkit'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
-import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
-import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
+import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -19,13 +18,6 @@ interface ServerRuntimeBaseOptions extends Omit<
   | 'serverHost'
   | 'serverPort'
 > {
-  /**
-   * On-disk path of the bundled PTY worker entry. When provided, the
-   * runtime uses a dedicated subprocess for node-pty work, so a PTY
-   * crash never tears down the native host. When omitted the runtime
-   * hosts PTY sessions in-process (cheap, useful for tests).
-   */
-  ptyWorkerEntry?: string
   gCommandEntry?: string
   gCommandBinDir?: string
   gCommandNodePath?: string
@@ -40,9 +32,16 @@ interface ServerRuntimeInjectedHosts {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }
 
-type ServerRuntimeManagedHosts = Partial<Record<keyof ServerRuntimeInjectedHosts, never>>
+interface ServerRuntimeManagedHosts extends Partial<Record<keyof ServerRuntimeInjectedHosts, never>> {
+  ptySupervisor: PtySupervisor
+}
 
-export type ServerRuntimeOptions = ServerRuntimeBaseOptions & (ServerRuntimeManagedHosts | ServerRuntimeInjectedHosts)
+interface ServerRuntimeExternallyManagedHosts extends ServerRuntimeInjectedHosts {
+  ptySupervisor?: never
+}
+
+export type ServerRuntimeOptions = ServerRuntimeBaseOptions &
+  (ServerRuntimeManagedHosts | ServerRuntimeExternallyManagedHosts)
 
 export interface ServerRuntime {
   app: Hono
@@ -52,7 +51,7 @@ export interface ServerRuntime {
 
 function isServerRuntimeInjectedHosts(
   options: ServerRuntimeOptions,
-): options is ServerRuntimeBaseOptions & ServerRuntimeInjectedHosts {
+): options is ServerRuntimeBaseOptions & ServerRuntimeExternallyManagedHosts {
   return (
     options.appRealtimeHost !== undefined &&
     options.workspacePaneTabsHost !== undefined &&
@@ -76,46 +75,42 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     'workspacePaneTabsHost',
     'worktreeRemovalApplication',
     'workspaceCapabilityTransitionHost',
+    'ptySupervisor',
   ])
-  const { ptyWorkerEntry, gCommandEntry, gCommandBinDir, gCommandNodePath, serverHost, serverPort, ...appOptions } =
-    appRuntimeOptions
-  const injectedHosts = isServerRuntimeInjectedHosts(options)
-    ? {
-        appRealtimeHost: options.appRealtimeHost,
-        workspacePaneTabsHost: options.workspacePaneTabsHost,
-        worktreeRemovalApplication: options.worktreeRemovalApplication,
-        workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
-      }
-    : null
-  if (!injectedHosts && hasAnyServerRuntimeInjectedHost(options)) {
-    throw new Error('server runtime host injection must include all hosts')
-  }
+  const { gCommandEntry, gCommandBinDir, gCommandNodePath, serverHost, serverPort, ...appOptions } = appRuntimeOptions
 
   let terminalRuntime: ReturnType<typeof createServerTerminalRuntime> | null = null
-  const hosts =
-    injectedHosts ??
-    (() => {
-      terminalRuntime = createServerTerminalRuntime({
-        ptySupervisor: ptyWorkerEntry
-          ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
-          : createInProcessPtySupervisor(),
-        gCommand: gCommandEntry
-          ? {
-              serverUrl: embeddedServerUrl(serverHost, serverPort),
-              accessToken: appOptions.accessToken,
-              entryPath: gCommandEntry,
-              binDir: gCommandBinDir,
-              nodePath: gCommandNodePath,
-            }
-          : undefined,
-      })
-      return {
-        appRealtimeHost: terminalRuntime.host,
-        workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
-        worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
-        workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
-      }
-    })()
+  let hosts: ServerRuntimeInjectedHosts
+  if (isServerRuntimeInjectedHosts(options)) {
+    hosts = {
+      appRealtimeHost: options.appRealtimeHost,
+      workspacePaneTabsHost: options.workspacePaneTabsHost,
+      worktreeRemovalApplication: options.worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+    }
+  } else {
+    if (hasAnyServerRuntimeInjectedHost(options)) {
+      throw new Error('server runtime host injection must include all hosts')
+    }
+    terminalRuntime = createServerTerminalRuntime({
+      ptySupervisor: options.ptySupervisor,
+      gCommand: gCommandEntry
+        ? {
+            serverUrl: embeddedServerUrl(serverHost, serverPort),
+            accessToken: appOptions.accessToken,
+            entryPath: gCommandEntry,
+            binDir: gCommandBinDir,
+            nodePath: gCommandNodePath,
+          }
+        : undefined,
+    })
+    hosts = {
+      appRealtimeHost: terminalRuntime.host,
+      workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
+      worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
+    }
+  }
 
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.

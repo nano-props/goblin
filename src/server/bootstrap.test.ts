@@ -84,6 +84,7 @@ describe('bootstrap server shutdown', () => {
     // here; the rest of the test is unchanged.
     const server = await bootstrapServer({
       exit,
+      ptyWorkerEntry: '/tmp/generic-pty-worker.js',
     })
     expect(mocks.websocketConstructor).toHaveBeenCalledWith({ noServer: true, maxPayload: 1024 * 1024 })
     const stopPromise = server.stop()
@@ -116,7 +117,7 @@ describe('bootstrap server shutdown', () => {
     mocks.closeHttpServer.mockImplementation((callback: () => void) => callback())
     mocks.websocketClose.mockImplementation((callback: () => void) => callback())
     const { bootstrapServer } = await import('#/server/bootstrap.ts')
-    const server = await bootstrapServer()
+    const server = await bootstrapServer({ ptyWorkerEntry: '/tmp/generic-pty-worker.js' })
 
     const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
     expect(() => socketListeners.get('error')?.(reset)).not.toThrow()

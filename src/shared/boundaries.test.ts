@@ -189,6 +189,49 @@ describe('architecture boundary rules', () => {
     ])
   })
 
+  test('keeps in-process PTY composition confined to the approved test runtime', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/server/feature/runtime.ts',
+          source: "import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/server/feature/relative-runtime.ts',
+          source: "import { createInProcessPtySupervisor } from '../terminal/pty-supervisor-inprocess.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/server/test-utils/terminal-runtime.ts',
+          source: "import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'\n",
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining(
+        '/src/server/feature/runtime.ts: disallowed import "#/server/terminal/pty-supervisor-inprocess.ts"',
+      ),
+      expect.stringContaining(
+        '/src/server/feature/relative-runtime.ts: disallowed import "../terminal/pty-supervisor-inprocess.ts"',
+      ),
+    ])
+  })
+
+  test('keeps the concrete worker-backed PTY implementation at the server bootstrap boundary', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/server/runtime.ts',
+          source: "import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/server/bootstrap.ts',
+          source: "import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'\n",
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining('/src/server/runtime.ts: disallowed import "#/server/terminal/pty-supervisor-worker.ts"'),
+    ])
+  })
+
   test('rejects legacy direct repo read surfaces in web code', () => {
     expect(
       checkArchitectureSources([

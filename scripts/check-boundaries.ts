@@ -56,6 +56,21 @@ const RULES: Rule[] = [
     reason: 'server runtime must stay Electron-agnostic; avoid coupling backend capabilities to the desktop shell',
   },
   {
+    fromPrefix: '/src/server/',
+    disallow: ['#/server/terminal/pty-supervisor-inprocess.ts'],
+    allowedImportsByFile: {
+      '/src/server/test-utils/terminal-runtime.ts': ['createInProcessPtySupervisor'],
+    },
+    reason:
+      'production server composition must inject worker-backed PTY; the in-process native implementation is test-only',
+  },
+  {
+    fromPrefix: '/src/server/runtime.ts',
+    disallow: ['#/server/terminal/pty-supervisor-worker.ts'],
+    reason:
+      'server runtime consumes the PtySupervisor capability; bootstrap owns the concrete production implementation',
+  },
+  {
     fromPrefix: '/src/shared/',
     disallow: ['electron'],
     reason: 'shared layer must be reusable across web/server/main; must not depend on Electron',
