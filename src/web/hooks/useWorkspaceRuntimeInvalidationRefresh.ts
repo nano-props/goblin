@@ -13,6 +13,8 @@ export function useWorkspaceRuntimeInvalidationRefresh(): void {
       void (async () => {
         const snapshot = await invalidateWorkspaceRuntimes()
         if (!active) return
+        // Probe snapshots are unversioned and may overwrite a newer command result.
+        // Cross-window capability convergence stays best-effort via Refresh or reload.
         acceptRemoteWorkspaceLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, snapshot)
       })().catch((error) => goblinLog.warn('workspace runtime invalidation refresh failed', { error }))
     }
