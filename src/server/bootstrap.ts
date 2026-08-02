@@ -6,6 +6,7 @@ import { serverLogger } from '#/server/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
 import { disconnectAllClientIntentSockets } from '#/server/modules/client-intent-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
+import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
@@ -25,8 +26,8 @@ export interface BootstrappedServer {
 }
 
 export interface BootstrapServerOptions {
-  /** Path to the bundled PTY worker entry. Enables subprocess PTY isolation. */
-  ptyWorkerEntry?: string
+  /** Path to the PTY worker entry owned by this server runtime. */
+  ptyWorkerEntry: string
   /** Path to the Node entrypoint used by the built-in `g` terminal command. */
   gCommandEntry?: string
   exit?: (code: number) => void
@@ -44,7 +45,7 @@ async function resolveAccessToken(): Promise<string> {
   return await readOrCreateAccessToken()
 }
 
-export async function bootstrapServer(options: BootstrapServerOptions = {}): Promise<BootstrappedServer> {
+export async function bootstrapServer(options: BootstrapServerOptions): Promise<BootstrappedServer> {
   const startedAt = Date.now()
   const hostname = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
@@ -53,7 +54,7 @@ export async function bootstrapServer(options: BootstrapServerOptions = {}): Pro
     version: process.env.npm_package_version?.trim() || '0.1.0',
     startedAt,
     accessToken,
-    ptyWorkerEntry: options.ptyWorkerEntry,
+    ptySupervisor: new WorkerBackedPtySupervisor({ workerEntry: options.ptyWorkerEntry }),
     gCommandEntry: options.gCommandEntry,
     serverHost: hostname,
     serverPort: port,

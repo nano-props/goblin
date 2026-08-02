@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   createApp: vi.fn(() => ({ fetch: vi.fn() })),
   stopBackgroundSync: vi.fn(),
-  createInProcessPtySupervisor: vi.fn(() => ({ mode: 'in-process' })),
   createServerTerminalRuntime: vi.fn(() => ({
     host: {
       isValidClientId: (_value: unknown): _value is string => true,
@@ -31,10 +31,6 @@ vi.mock('#/server/app-factory.ts', () => ({
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
   stopBackgroundSync: mocks.stopBackgroundSync,
-}))
-
-vi.mock('#/server/terminal/pty-supervisor-inprocess.ts', () => ({
-  createInProcessPtySupervisor: mocks.createInProcessPtySupervisor,
 }))
 
 vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
@@ -63,6 +59,20 @@ function makeAppRealtimeHost(overrides: Partial<ServerAppRealtimeHost> = {}): Se
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,
+  }
+}
+
+function makePtySupervisor(): PtySupervisor {
+  return {
+    mode: 'worker-backed',
+    spawn: vi.fn(),
+    write: vi.fn(),
+    resize: vi.fn(),
+    kill: vi.fn(),
+    waitForExit: vi.fn(),
+    killAndWait: vi.fn(),
+    getDiagnostics: vi.fn(),
+    shutdown: vi.fn(),
   }
 }
 
@@ -125,8 +135,9 @@ describe('server runtime', () => {
     expect(mocks.createApp).not.toHaveBeenCalled()
   })
 
-  test('wires the in-process pty supervisor into the terminal runtime by default', async () => {
+  test('wires the composition-root pty supervisor into the terminal runtime', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
+    const ptySupervisor = makePtySupervisor()
 
     const runtime = createServerRuntime({
       version: '0.1.0',
@@ -134,12 +145,12 @@ describe('server runtime', () => {
       accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
+      ptySupervisor,
     })
 
-    expect(mocks.createInProcessPtySupervisor).toHaveBeenCalledTimes(1)
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledTimes(1)
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
-      ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
+      ptySupervisor,
       gCommand: undefined,
     })
     expect(runtime.appRealtimeHost).toBe(mocks.createServerTerminalRuntime.mock.results[0]?.value.host)
@@ -191,6 +202,7 @@ describe('server runtime', () => {
 
   test('wires the g command runtime when an entrypoint is available', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
+    const ptySupervisor = makePtySupervisor()
 
     createServerRuntime({
       version: '0.1.0',
@@ -198,13 +210,14 @@ describe('server runtime', () => {
       accessToken: 'secret',
       serverHost: '0.0.0.0',
       serverPort: 32100,
+      ptySupervisor,
       gCommandEntry: '/app/dist/server/g-command.js',
       gCommandBinDir: '/app/terminal-bin',
       gCommandNodePath: '/app/electron',
     })
 
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
-      ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
+      ptySupervisor,
       gCommand: {
         serverUrl: 'http://127.0.0.1:32100',
         accessToken: 'secret',

@@ -2,8 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# No build:server here: this path serves the web bundle while the
-# standalone server runs from source via scripts/start-server.ts.
-# Keeping dist/server out of this flow avoids stale server artifacts.
+# The standalone runtime has its own freshly cleaned output. Electron keeps
+# owning dist/server, while this path never falls back to a stale artifact.
 bun run build:web
-exec ./scripts/start-server.ts "$@"
+bun run build:standalone-server
+exec node ./dist/standalone-server/main.js "$@"
