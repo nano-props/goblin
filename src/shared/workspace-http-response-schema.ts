@@ -206,6 +206,7 @@ export const RemoteLifecycleResponseSchema = v.variant('kind', [
   v.strictObject({
     kind: v.literal('settled'),
     workspaceId: WorkspaceIdSchema,
+    workspaceProbe: WorkspaceProbeStateResponseSchema,
     lifecycle: v.variant('kind', [
       v.strictObject({
         kind: v.literal('ready'),

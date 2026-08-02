@@ -4,7 +4,6 @@ import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
-import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
@@ -93,7 +92,6 @@ export function AuthenticatedWorkspaceSideEffects({
   useClientWorkspacePersistence({ routedWorkspaceId })
   useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ currentWorkspaceId: hydratedRouteWorkspaceId })
-  useNetworkReconnect()
   useRepoStoreInvalidationRefresh()
   useWorkspaceRuntimeInvalidationRefresh()
   useSettingsQueryInvalidationSync()

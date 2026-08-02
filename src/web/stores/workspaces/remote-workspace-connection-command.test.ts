@@ -5,12 +5,10 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/web/remote-workspace-client.ts', () => ({ resolveRemoteWorkspaceConnection: vi.fn() }))
 vi.mock('#/web/stores/workspaces/refresh.ts', () => ({ requestRepoSnapshotRefresh: vi.fn(async () => {}) }))
-vi.mock('#/web/workspace-runtime-query.ts', () => ({ invalidateWorkspaceRuntimes: vi.fn() }))
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
 const runtimeId = 'repo-runtime-test-1'
@@ -21,6 +19,19 @@ const target = normalizeRemoteTarget({
   port: 22,
   remotePath: '/repo',
 })!
+const readyProbe = {
+  status: 'ready' as const,
+  capabilities: {
+    files: { read: true as const, write: true },
+    terminal: { available: true },
+    git: {
+      status: 'available' as const,
+      worktrees: true,
+      pullRequests: { provider: 'none' as const },
+    },
+  },
+  diagnostics: [],
+}
 
 describe('remote lifecycle command client', () => {
   beforeEach(() => {
@@ -29,24 +40,6 @@ describe('remote lifecycle command client', () => {
     if (repo.admission.kind !== 'remote') throw new Error('expected remote workspace admission')
     repo.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
     useWorkspacesStore.setState({ workspaces: { [workspaceId]: repo }, workspaceOrder: [workspaceId] })
-    vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue({
-      runtimes: [
-        {
-          workspaceId: workspaceId,
-          workspaceRuntimeId: runtimeId,
-          remoteLifecycle: { kind: 'ready', attemptId: 3, target },
-          workspaceProbe: {
-            status: 'ready',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-            },
-            diagnostics: [],
-          },
-        },
-      ],
-    })
   })
 
   test('sends the runtime generation and does not manufacture connecting', async () => {
@@ -65,7 +58,12 @@ describe('remote lifecycle command client', () => {
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
-    release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 3, target } })
+    release({
+      kind: 'settled',
+      workspaceId,
+      lifecycle: { kind: 'ready', attemptId: 3, target },
+      workspaceProbe: readyProbe,
+    })
     await expect(pending).resolves.toMatchObject({ kind: 'ready', workspaceId: workspaceId })
   })
 
@@ -74,6 +72,7 @@ describe('remote lifecycle command client', () => {
       kind: 'settled',
       workspaceId,
       lifecycle: { kind: 'ready', attemptId: 3, target },
+      workspaceProbe: readyProbe,
     })
     await expect(
       runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
@@ -90,6 +89,33 @@ describe('remote lifecycle command client', () => {
     })
   })
 
+  test('applies a canonical failed terminal and probe without starting Git projection work', async () => {
+    vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
+      kind: 'settled',
+      workspaceId,
+      lifecycle: { kind: 'failed', attemptId: 3, reason: 'auth-failed', target },
+      workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+    })
+
+    await expect(
+      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+    ).resolves.toEqual({
+      kind: 'failed',
+      workspaceId,
+      reason: 'auth-failed',
+      target,
+    })
+    expect(remoteAdmission()).toMatchObject({
+      lifecycle: { kind: 'failed', reason: 'auth-failed', target },
+      lifecycleAttemptId: 3,
+    })
+    expect(useWorkspacesStore.getState().workspaces[workspaceId]?.capability).toEqual({
+      kind: 'unavailable',
+      probe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+    })
+    expect(requestRepoSnapshotRefresh).not.toHaveBeenCalled()
+  })
+
   test('rejects a wire response for a different workspace before applying projection state', async () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
       kind: 'superseded',
@@ -99,7 +125,6 @@ describe('remote lifecycle command client', () => {
     await expect(
       runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
     ).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
-    expect(invalidateWorkspaceRuntimes).not.toHaveBeenCalled()
   })
 
   test('does not apply a response to a replaced runtime generation', async () => {
@@ -116,7 +141,12 @@ describe('remote lifecycle command client', () => {
         [workspaceId]: { ...state.workspaces[workspaceId]!, workspaceRuntimeId: 'repo-runtime-test-2' },
       },
     }))
-    release({ kind: 'settled', workspaceId, lifecycle: { kind: 'ready', attemptId: 1, target } })
+    release({
+      kind: 'settled',
+      workspaceId,
+      lifecycle: { kind: 'ready', attemptId: 1, target },
+      workspaceProbe: readyProbe,
+    })
     await expect(pending).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
@@ -162,39 +192,22 @@ describe('remote lifecycle command client', () => {
     })
   })
 
-  test('normalizes a terminal projection refresh failure', async () => {
-    vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
-      kind: 'settled',
-      workspaceId,
-      lifecycle: { kind: 'ready', attemptId: 3, target },
-    })
-    vi.mocked(invalidateWorkspaceRuntimes).mockRejectedValue(new Error('offline'))
-
-    await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
-    ).resolves.toEqual({ kind: 'transport-failed', workspaceId, reason: 'unknown' })
-  })
-
   test('does not report or enrich a command superseded by a newer runtime attempt', async () => {
-    vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({
+    const response = Promise.withResolvers<Awaited<ReturnType<typeof resolveRemoteWorkspaceConnection>>>()
+    vi.mocked(resolveRemoteWorkspaceConnection).mockReturnValue(response.promise)
+    const pending = runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId)
+    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+    if (workspace?.admission.kind !== 'remote') throw new Error('expected remote workspace admission')
+    workspace.admission.lifecycle = { kind: 'failed', reason: 'unreachable', target }
+    workspace.admission.lifecycleAttemptId = 4
+    response.resolve({
       kind: 'settled',
       workspaceId,
       lifecycle: { kind: 'ready', attemptId: 3, target },
-    })
-    vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue({
-      runtimes: [
-        {
-          workspaceId,
-          workspaceRuntimeId: runtimeId,
-          remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable', target },
-          workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
-        },
-      ],
+      workspaceProbe: readyProbe,
     })
 
-    await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
-    ).resolves.toEqual({ kind: 'superseded', workspaceId })
+    await expect(pending).resolves.toEqual({ kind: 'superseded', workspaceId })
     expect(requestRepoSnapshotRefresh).not.toHaveBeenCalled()
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },

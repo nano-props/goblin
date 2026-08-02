@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
+  closeWorkspaceRuntimesForDurableRemoval,
   failRemoteWorkspaceLifecycle,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
@@ -9,6 +10,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteWorkspaceConnectionResult, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 const userId = 'user_test'
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
@@ -31,19 +33,33 @@ const clientId = 'client-test'
 describe('workspace runtime remote lifecycle', () => {
   beforeEach(() => clearWorkspaceRuntimesForUser(userId))
 
-  test('latest attempt aborts its predecessor and owns the terminal state', async () => {
+  test('repeated restart commands admit the latest attempt as terminal owner', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     const firstAttempt = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
     let firstSignal!: AbortSignal
-    const first = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, (signal) => {
-      firstSignal = signal
-      return firstAttempt.promise
-    })
+    const first = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      (signal) => {
+        firstSignal = signal
+        return firstAttempt.promise
+      },
+      () => {},
+      'restart',
+    )
     await vi.waitFor(() =>
       expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 }),
     )
 
-    const second = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
+    const second = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      async () => ready,
+      () => {},
+      'restart',
+    )
     await vi.waitFor(() => expect(firstSignal.aborted).toBe(true))
     await expect(second).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 2 } })
     firstAttempt.resolve(ready)
@@ -216,6 +232,7 @@ describe('workspace runtime remote lifecycle', () => {
     ).resolves.toEqual({
       kind: 'settled',
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' },
+      workspaceProbe: { status: 'probing' },
     })
     expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
       kind: 'failed',
@@ -223,6 +240,148 @@ describe('workspace runtime remote lifecycle', () => {
       reason: 'unknown',
     })
   })
+
+  test('terminalizes cleanup failure monotonically before a queued restart', async () => {
+    const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    const availableProbe = {
+      status: 'ready' as const,
+      capabilities: {
+        files: { read: true as const, write: true as const },
+        terminal: { available: true as const },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    const unavailableProbe = {
+      ...availableProbe,
+      capabilities: { ...availableProbe.capabilities, git: { status: 'unavailable' as const } },
+    }
+    const transitions: string[] = []
+    const onTransition = (lifecycle: { kind: string; attemptId: number }) => {
+      transitions.push(`${lifecycle.kind}:${lifecycle.attemptId}`)
+    }
+    await runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      async () => ready,
+      onTransition,
+      'restart',
+      () => ({ workspaceProbe: { mode: 'refresh', probe: availableProbe } }),
+    )
+    const secondResult = Promise.withResolvers<RemoteWorkspaceConnectionResult>()
+    const secondStarted = Promise.withResolvers<void>()
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupRelease = Promise.withResolvers<void>()
+    const cleanupError = new Error('cleanup failed')
+    const failing = runRemoteWorkspaceLifecycle(
+      userId,
+      workspaceId,
+      runtimeId,
+      () => {
+        secondStarted.resolve()
+        return secondResult.promise
+      },
+      onTransition,
+      'restart',
+      () => ({
+        workspaceProbe: {
+          mode: 'refresh',
+          probe: unavailableProbe,
+          beforeCommit: async () => {
+            cleanupStarted.resolve()
+            await cleanupRelease.promise
+            throw cleanupError
+          },
+        },
+      }),
+    )
+    await secondStarted.promise
+    const ensureResolver = vi.fn(async () => ready)
+    const ensured = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, ensureResolver, onTransition, 'ensure')
+    await flushMicrotasks()
+    secondResult.resolve(ready)
+    await cleanupStarted.promise
+    const restarted = runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready, onTransition)
+
+    cleanupRelease.resolve()
+
+    await expect(failing).rejects.toBe(cleanupError)
+    await expect(ensured).rejects.toBe(cleanupError)
+    await expect(restarted).resolves.toMatchObject({ kind: 'settled', lifecycle: { kind: 'ready', attemptId: 3 } })
+    expect(ensureResolver).not.toHaveBeenCalled()
+    expect(transitions).toEqual(['connecting:1', 'ready:1', 'connecting:2', 'failed:2', 'connecting:3', 'ready:3'])
+    expect(listWorkspaceRuntimes(userId)[0]).toMatchObject({
+      remoteLifecycle: { kind: 'ready', attemptId: 3 },
+      workspaceProbe: availableProbe,
+    })
+  })
+
+  test.each(['success', 'failure'] as const)(
+    'does not let stale cleanup %s restore a probe into a replacement epoch',
+    async (cleanupOutcome) => {
+      const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+      const availableProbe = {
+        status: 'ready' as const,
+        capabilities: {
+          files: { read: true as const, write: true as const },
+          terminal: { available: true as const },
+          git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+        },
+        diagnostics: [],
+      }
+      const unavailableProbe = {
+        ...availableProbe,
+        capabilities: { ...availableProbe.capabilities, git: { status: 'unavailable' as const } },
+      }
+      await runRemoteWorkspaceLifecycle(
+        userId,
+        workspaceId,
+        runtimeId,
+        async () => ready,
+        () => {},
+        'restart',
+        () => ({ workspaceProbe: { mode: 'refresh', probe: availableProbe } }),
+      )
+      const cleanupStarted = Promise.withResolvers<void>()
+      const cleanupRelease = Promise.withResolvers<void>()
+      const work = runRemoteWorkspaceLifecycle(
+        userId,
+        workspaceId,
+        runtimeId,
+        async () => ready,
+        () => {},
+        'restart',
+        () => ({
+          workspaceProbe: {
+            mode: 'refresh',
+            probe: unavailableProbe,
+            beforeCommit: async () => {
+              cleanupStarted.resolve()
+              await cleanupRelease.promise
+              if (cleanupOutcome === 'failure') throw new Error('cleanup failed after durable removal')
+            },
+          },
+        }),
+      )
+      await cleanupStarted.promise
+
+      expect(closeWorkspaceRuntimesForDurableRemoval(workspaceId)).toBe(1)
+      cleanupRelease.resolve()
+      await expect(work).resolves.toEqual({ kind: 'stale-runtime' })
+
+      const replacementRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+      expect(replacementRuntimeId).not.toBe(runtimeId)
+      expect(listWorkspaceRuntimes(userId)).toEqual([
+        {
+          workspaceId,
+          workspaceRuntimeId: replacementRuntimeId,
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'idle', attemptId: 0 },
+        },
+      ])
+    },
+  )
 
   test('returns stale-runtime when close replaces the running generation', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)

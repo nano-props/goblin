@@ -1,6 +1,6 @@
 import { publishUserWorkspaceRuntimeInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
-import { runRemoteWorkspaceLifecycle, workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
+import { isCurrentWorkspaceRuntime, runRemoteWorkspaceLifecycle } from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceId, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
@@ -73,7 +73,11 @@ export async function runRemoteWorkspaceLifecycleWrite(
     },
   )
   if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
-  if (!workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId))
-    return { kind: 'stale-runtime', workspaceId }
-  return { kind: 'settled', workspaceId, lifecycle: result.lifecycle }
+  if (!isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) return { kind: 'stale-runtime', workspaceId }
+  return {
+    kind: 'settled',
+    workspaceId,
+    lifecycle: result.lifecycle,
+    workspaceProbe: result.workspaceProbe,
+  }
 }

@@ -35,6 +35,8 @@ export class WorkspaceRuntimeReconnectRecovery {
   private async run(generation: number): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
+      // The latest recovered event owns presentation; #359 accepts that it does
+      // not join an older generation's in-flight Refresh.
       if (generation !== this.generation || recovery.kind === 'superseded') return
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {

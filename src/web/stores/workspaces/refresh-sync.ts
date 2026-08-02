@@ -68,7 +68,7 @@ export function createRefreshSyncHelpers(
     if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, workspaceRuntimeId)
   }
 
-  async function runManualSyncPipeline(
+  async function runRefreshSyncPipeline(
     id: WorkspaceId,
     workspaceRuntimeId: string,
     signal: AbortSignal,
@@ -86,6 +86,6 @@ export function createRefreshSyncHelpers(
   }
 
   return {
-    runManualSyncPipeline,
+    runRefreshSyncPipeline,
   }
 }

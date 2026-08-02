@@ -7,7 +7,7 @@ import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { remoteWorkspaceTarget, workspaceOperationalFailureReason } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -35,6 +35,22 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
   async function handleClose() {
     const result = await navigation.closeWorkspace(workspace.id)
     if (!result.ok) toast.error(t(result.message))
+  }
+
+  async function handleRetry() {
+    if (workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed') {
+      const outcome = await useWorkspacesStore.getState().retryRemoteWorkspaceConnection(workspace.id)
+      if (outcome && !outcome.ok) {
+        toast.error(formatTranslatableReason(t, outcome.reason ?? 'unknown'))
+      }
+      return
+    }
+    const outcome = await runWorkspaceRefresh(
+      { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+      workspace.id,
+      { workspaceRuntimeId: workspace.workspaceRuntimeId },
+    )
+    presentWorkspaceRefreshOutcome(outcome, t)
   }
 
   return (
@@ -68,11 +84,7 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
                 type="button"
                 variant="default"
                 onClick={() => {
-                  void runManualWorkspaceRefresh(
-                    { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
-                    workspace.id,
-                    { workspaceRuntimeId: workspace.workspaceRuntimeId },
-                  ).then((outcome) => presentWorkspaceRefreshOutcome(outcome, t))
+                  void handleRetry()
                 }}
               >
                 <RefreshCw />

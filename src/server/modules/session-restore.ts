@@ -293,7 +293,7 @@ async function openRemoteWorkspace(
           opened: stubWorkspace({
             entry,
             workspaceId: lease.workspaceId,
-            workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
+            workspaceProbe: lifecycle.workspaceProbe,
             transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
             lease,
           }),
@@ -301,7 +301,7 @@ async function openRemoteWorkspace(
       }
       throw new Error('workspace workspace runtime was superseded during restore')
     }
-    const workspaceProbe = requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId)
+    const workspaceProbe = lifecycle.workspaceProbe
     if (!workspaceGitAvailable(workspaceProbe) || !options.active) {
       return {
         kind: 'opened',

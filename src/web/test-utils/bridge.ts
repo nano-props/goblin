@@ -420,8 +420,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               kind?: string
               workspaceId?: string
               lifecycle?: RemoteWorkspaceRuntimeLifecycle
+              workspaceProbe?: WorkspaceProbeState
             }
-            if (value.kind === 'settled' && value.workspaceId && value.lifecycle) {
+            if (value.kind === 'settled' && value.workspaceId && value.lifecycle && value.workspaceProbe) {
               const requestedRuntimeId =
                 typeof body.workspaceRuntimeId === 'string' ? body.workspaceRuntimeId : createOpaqueId('repo-runtime')
               const state = workspaceRuntimeState.get(value.workspaceId) ?? {
@@ -431,17 +432,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               workspaceRuntimeState.set(value.workspaceId, state)
               if (state.currentWorkspaceRuntimeId === requestedRuntimeId) {
                 state.remoteLifecycle = value.lifecycle
-                if (value.lifecycle.kind === 'ready') {
-                  state.workspaceProbe = {
-                    status: 'ready',
-                    capabilities: {
-                      files: { read: true, write: true },
-                      terminal: { available: true },
-                      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-                    },
-                    diagnostics: [],
-                  }
-                }
+                state.workspaceProbe = value.workspaceProbe
               }
             }
             return result

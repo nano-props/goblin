@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -218,7 +218,7 @@ export async function handleWorkspaceClientIntent(
       deps.navigation.cycleWorkspace(plan.direction)
       return true
     case 'refresh-workspace':
-      const refreshOutcome = await runManualWorkspaceRefresh(
+      const refreshOutcome = await runWorkspaceRefresh(
         { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
         plan.workspaceId,
         {

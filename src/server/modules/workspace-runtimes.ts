@@ -686,7 +686,7 @@ export async function runRemoteWorkspaceLifecycle(
         if (current.remoteLifecycle.kind === 'ready') {
           return {
             kind: 'result',
-            result: settledRemoteWorkspaceLifecycleResult(current.remoteLifecycle),
+            result: settledRemoteWorkspaceLifecycleResult(current.remoteLifecycle, current.workspaceProbe),
           } as const
         }
       }
@@ -805,28 +805,27 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
     try {
       if (transition) await input.plan.workspaceProbe?.beforeCommit?.(transition)
     } catch (error) {
+      if (!remoteAttemptMayCommit(input)) return null
       if (transition) {
         state.workspaceProbe = transition.before
         state.pendingWorkspaceProbeTransition = null
       }
-      if (remoteAttemptMayCommit(input)) {
-        state.remoteLifecycle = input.previousLifecycle
-        clearRemoteWorkspaceAttempt(state)
-        notifyRemoteLifecycleTransition(input.onTransition, state.remoteLifecycle, input.workspaceId)
+      const target = input.result.lifecycle.target ?? remoteWorkspaceLifecycleTarget(input.previousLifecycle)
+      state.remoteLifecycle = {
+        kind: 'failed',
+        attemptId: input.attemptId,
+        reason: 'unknown',
+        ...(target ? { target } : {}),
       }
+      clearRemoteWorkspaceAttempt(state)
+      notifyRemoteLifecycleTransition(input.onTransition, state.remoteLifecycle, input.workspaceId)
       throw error
     }
-    if (!remoteAttemptMayCommit(input)) {
-      if (transition) {
-        state.workspaceProbe = transition.before
-        state.pendingWorkspaceProbeTransition = null
-      }
-      return null
-    }
+    if (!remoteAttemptMayCommit(input)) return null
     state.remoteLifecycle = projectSettledRemoteWorkspaceLifecycle(input.result, input.attemptId)
     clearRemoteWorkspaceAttempt(state)
     state.pendingWorkspaceProbeTransition = null
-    const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle)
+    const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle, state.workspaceProbe)
     notifyRemoteLifecycleTransition(input.onTransition, settled.lifecycle, input.workspaceId)
     return settled
   })
@@ -908,6 +907,8 @@ function startWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string {
   state.resourceRetainers.clear()
   state.nextMembershipGeneration = 0
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
+  state.workspaceProbe = { status: 'probing' }
+  state.pendingWorkspaceProbeTransition = null
   return workspaceRuntimeId
 }
 

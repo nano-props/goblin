@@ -28,6 +28,7 @@ describe('remote lifecycle route', () => {
       kind: 'settled',
       workspaceId: REMOTE_ID,
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
+      workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
     })
 
     const response = await createRemoteRoutes({
@@ -116,6 +117,15 @@ describe('remote lifecycle route', () => {
             host: 'example.test',
             user: 'developer',
             port: 22,
+          },
+        },
+        workspaceProbe: {
+          status: 'ready',
+          diagnostics: [],
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'unavailable' },
           },
         },
       }

@@ -79,6 +79,10 @@ describe('remote lifecycle write path', () => {
       kind: 'settled',
       workspaceId,
       lifecycle: { kind: 'ready', attemptId: 1 },
+      workspaceProbe: {
+        status: 'ready',
+        capabilities: { git: { status: 'available' } },
+      },
     })
     expect(mocks.resolveConnection).toHaveBeenCalledTimes(1)
     expect(mocks.publishInvalidation).toHaveBeenCalledTimes(2)
@@ -225,7 +229,7 @@ describe('remote lifecycle write path', () => {
     expect(cleanup).toHaveBeenCalledOnce()
   })
 
-  test('rejects a later Git downgrade when no transactional cleanup dependency was injected', async () => {
+  test('fast-fails a later Git downgrade without restoring an older lifecycle attempt', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection.mockResolvedValueOnce(readyConnection(true)).mockResolvedValueOnce(readyConnection(false))
     await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'restart' })
@@ -236,7 +240,13 @@ describe('remote lifecycle write path', () => {
     expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toMatchObject({
       capabilities: { git: { status: 'available' } },
     })
-    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'ready', attemptId: 1 })
+    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toEqual({
+      kind: 'failed',
+      attemptId: 2,
+      reason: 'unknown',
+      target: remoteTarget,
+    })
+    expect(mocks.publishInvalidation).toHaveBeenCalledTimes(4)
   })
 
   test('commits an initial readable workspace when Git enrichment is operationally unavailable', async () => {
@@ -284,7 +294,12 @@ describe('remote lifecycle write path', () => {
       lifecycle: { kind: 'failed', reason },
     })
 
-    await runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'ensure' })
+    await expect(
+      runRemoteWorkspaceLifecycleWrite({ userId, workspaceId, workspaceRuntimeId, mode: 'ensure' }),
+    ).resolves.toMatchObject({
+      kind: 'settled',
+      workspaceProbe: { status: 'unavailable', reason: expected },
+    })
 
     expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toEqual({ status: 'unavailable', reason: expected })
   })

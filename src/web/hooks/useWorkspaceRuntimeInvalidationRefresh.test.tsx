@@ -7,7 +7,6 @@ import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runti
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
-import { acceptWorkspaceProbeSnapshot } from '#/web/stores/workspaces/workspace-probe-projection.ts'
 import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
@@ -32,9 +31,6 @@ vi.mock('#/web/workspace-runtime-query.ts', () => ({ invalidateWorkspaceRuntimes
 vi.mock('#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts', () => ({
   acceptRemoteWorkspaceLifecycleSnapshot: vi.fn(),
 }))
-vi.mock('#/web/stores/workspaces/workspace-probe-projection.ts', () => ({
-  acceptWorkspaceProbeSnapshot: vi.fn(),
-}))
 
 function Harness() {
   useWorkspaceRuntimeInvalidationRefresh()
@@ -48,7 +44,7 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
     mocks.getState.mockReturnValue({ workspaces: { [workspaceId]: { id: workspaceId } } })
   })
 
-  test('projects lifecycle and capability state from one runtime snapshot', async () => {
+  test('projects lifecycle without writing capability from the runtime snapshot', async () => {
     const snapshot = { runtimes: [] }
     vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue(snapshot)
     renderInJsdom(<Harness />)
@@ -60,7 +56,6 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
 
     expect(invalidateWorkspaceRuntimes).toHaveBeenCalledOnce()
     expect(acceptRemoteWorkspaceLifecycleSnapshot).toHaveBeenCalledWith(mocks.setState, mocks.getState, snapshot)
-    expect(acceptWorkspaceProbeSnapshot).toHaveBeenCalledWith(mocks.setState, mocks.getState, snapshot)
   })
 
   test('serializes a terminal invalidation that arrives during the connecting refresh', async () => {
@@ -82,6 +77,5 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
     resolveFirst(firstSnapshot)
     await vi.waitFor(() => expect(acceptRemoteWorkspaceLifecycleSnapshot).toHaveBeenCalledTimes(2))
     expect(acceptRemoteWorkspaceLifecycleSnapshot).toHaveBeenCalledTimes(2)
-    expect(acceptWorkspaceProbeSnapshot).toHaveBeenCalledTimes(2)
   })
 })

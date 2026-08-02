@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -39,7 +39,7 @@ describe('manual workspace refresh', () => {
     const refetchPullRequests = vi.spyOn(appQueryClient, 'refetchQueries')
 
     await expect(
-      runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: repo.workspaceRuntimeId }),
+      runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: repo.workspaceRuntimeId }),
     ).resolves.toEqual({ ok: true })
 
     expect(fetch).not.toHaveBeenCalled()
@@ -71,7 +71,7 @@ describe('manual workspace refresh', () => {
     }))
 
     await expect(
-      runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: repo.workspaceRuntimeId }),
+      runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: repo.workspaceRuntimeId }),
     ).resolves.toEqual({ ok: true })
   })
 
@@ -91,7 +91,7 @@ describe('manual workspace refresh', () => {
       return { workspaceRuntimeId: runtimeId, status: [], loadedAt: Date.now() }
     }
 
-    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(order[0]).toBe('fetch')
     expect(new Set(order.slice(1))).toEqual(new Set(['snapshot', 'status']))
@@ -109,8 +109,8 @@ describe('manual workspace refresh', () => {
     ipcHandlers['repo.fetch'] = fetch
     ipcHandlers['repo.snapshot'] = () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' })
 
-    const first = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    const second = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const first = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const second = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
     resolveFetch({ ok: true, message: 'ok' })
 
@@ -125,7 +125,7 @@ describe('manual workspace refresh', () => {
       new Promise((resolve) => {
         resolveFetch = resolve
       })
-    const refresh = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: firstRuntimeId })
+    const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId: firstRuntimeId })
     await vi.waitFor(() => expect(resolveFetch).toEqual(expect.any(Function)))
 
     seedRepo([branch('reopened')], 'repo-runtime-second')

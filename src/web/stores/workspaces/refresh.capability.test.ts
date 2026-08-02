@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import {
   branch,
   REPO_ID,
@@ -46,7 +46,7 @@ describe('workspace refresh capability', () => {
     })
     ipcHandlers['repo.snapshot'] = projection
 
-    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
     expect(projection).toHaveBeenCalledOnce()
@@ -71,8 +71,8 @@ describe('workspace refresh capability', () => {
     ipcHandlers['workspace.refresh'] = refresh
     ipcHandlers['repo.snapshot'] = projection
 
-    const first = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-    const second = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const first = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const second = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
     response.resolve({
       kind: 'committed',
@@ -111,7 +111,7 @@ describe('workspace refresh capability', () => {
       },
     })
 
-    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe(workspaceRuntimeId)
@@ -154,7 +154,7 @@ describe('workspace refresh capability', () => {
       },
     })
 
-    await expect(runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+    await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
       ok: false,
       message: 'git timed out',
     })
@@ -181,7 +181,7 @@ describe('workspace refresh capability', () => {
       throw new Error('workspace transport unavailable')
     }
 
-    await expect(runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+    await expect(runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
       ok: false,
       message: 'workspace transport unavailable',
     })
@@ -205,7 +205,7 @@ describe('workspace refresh capability', () => {
     const refreshRequest = vi.fn(() => response.promise)
     ipcHandlers['workspace.refresh'] = refreshRequest
 
-    const refresh = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalledOnce())
     await expect(useWorkspacesStore.getState().closeWorkspace(REPO_ID)).resolves.toEqual({ ok: true })
 
@@ -250,7 +250,7 @@ describe('workspace refresh capability', () => {
 
     const closing = useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     await vi.waitFor(() => expect(removeWorkspaceEntry).toHaveBeenCalledOnce())
-    const refresh = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(projection).toHaveBeenCalledOnce())
 
     removeMembership.resolve({ openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} })
